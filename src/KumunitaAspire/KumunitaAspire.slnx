@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="KumunitaAspire.ApiService/KumunitaAspire.ApiService.csproj" />
+  <Project Path="KumunitaAspire.AppHost/KumunitaAspire.AppHost.csproj" />
+  <Project Path="KumunitaAspire.ServiceDefaults/KumunitaAspire.ServiceDefaults.csproj" />
+  <Project Path="KumunitaAspire.Tests/KumunitaAspire.Tests.csproj" />
+  <Project Path="KumunitaAspire.Web/KumunitaAspire.Web.csproj" />
+</Solution>
