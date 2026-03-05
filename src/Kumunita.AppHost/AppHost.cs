@@ -1,11 +1,11 @@
-var builder = DistributedApplication.CreateBuilder(args);
+IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres")
+IResourceBuilder<PostgresServerResource> postgres = builder.AddPostgres("postgres")
     .WithPgAdmin(); // Adds pgAdmin UI in local dev
 
-var postgresDb = postgres.AddDatabase("kumunitadb");
+IResourceBuilder<PostgresDatabaseResource> postgresDb = postgres.AddDatabase("kumunitadb");
 
-var apiService = builder.AddProject<Projects.Kumunita_Host>("api")
+IResourceBuilder<ProjectResource> apiService = builder.AddProject<Projects.Kumunita_Host>("api")
     .WithReference(postgresDb)
     .WaitFor(postgresDb)
     .WithHttpHealthCheck("/health");
