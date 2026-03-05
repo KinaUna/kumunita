@@ -1,0 +1,6 @@
+@KumunitaHost_HostAddress = http://localhost:5563
+
+GET {{KumunitaHost_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
