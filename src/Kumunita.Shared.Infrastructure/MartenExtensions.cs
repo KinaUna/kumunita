@@ -1,4 +1,5 @@
-﻿using Kumunita.Localization;
+﻿using Kumunita.Identity;
+using Kumunita.Localization;
 using Kumunita.Shared.Kernel;
 using Kumunita.Shared.Kernel.ValueObjects;
 using Marten;
@@ -17,6 +18,7 @@ public static class MartenExtensions
         // Identity schema is handled by EF Core separately
 
         opts.AddLocalizationSchema();
+        opts.AddIdentitySchema();
 
         // Register all strongly typed IDs so Marten understands them in LINQ
         opts.RegisterValueType(typeof(UserId));

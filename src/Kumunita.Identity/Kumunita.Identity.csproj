@@ -12,7 +12,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="OpenIddict.AspNetCore" />
+    <PackageReference Include="OpenIddict.EntityFrameworkCore" />
+    <PackageReference Include="OpenIddict.Quartz" />
   </ItemGroup>
 
   <ItemGroup>

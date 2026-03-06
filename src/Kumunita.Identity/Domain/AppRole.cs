@@ -9,7 +9,7 @@ public class AppRole : IdentityRole<Guid>
     public LocalizedContent DisplayName { get; private set; } = new();
 
     // System roles that cannot be deleted
-    public bool IsSystem { get; private set; }
+    public bool IsSystem { get; init; }
 
     public static class SystemRoles
     {
