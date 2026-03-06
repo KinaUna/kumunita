@@ -7,6 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Kumunita.Announcements\Kumunita.Announcements.csproj" />
+    <ProjectReference Include="..\..\Kumunita.Identity\Kumunita.Identity.csproj" />
+    <ProjectReference Include="..\..\Kumunita.Localization\Kumunita.Localization.csproj" />
+    <ProjectReference Include="..\..\Kumunita.Shared.Infrastructure\Kumunita.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
     <ProjectReference Include="..\Kumunita.ServiceDefaults\Kumunita.ServiceDefaults.csproj" />
   </ItemGroup>
 

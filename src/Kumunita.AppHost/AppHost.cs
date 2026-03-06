@@ -5,10 +5,11 @@ IResourceBuilder<PostgresServerResource> postgres = builder.AddPostgres("postgre
 
 IResourceBuilder<PostgresDatabaseResource> postgresDb = postgres.AddDatabase("kumunitadb");
 
-IResourceBuilder<ProjectResource> apiService = builder.AddProject<Projects.Kumunita_Host>("api")
+IResourceBuilder<ProjectResource> apiService = builder.AddProject<Projects.Kumunita_Host>("kumunitahost")
+    .WithHttpHealthCheck("/health")
     .WithReference(postgresDb)
-    .WaitFor(postgresDb)
-    .WithHttpHealthCheck("/health");
+    .WaitFor(postgresDb);
+    
 
 builder.AddProject<Projects.Kumunita_Web>("webfrontend")
     .WithExternalHttpEndpoints()

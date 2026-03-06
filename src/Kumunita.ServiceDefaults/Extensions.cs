@@ -40,7 +40,7 @@ public static class Extensions
         // {
         //     options.AllowedSchemes = ["https"];
         // });
-
+        
         return builder;
     }
 
