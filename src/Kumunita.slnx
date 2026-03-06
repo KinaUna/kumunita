@@ -4,13 +4,13 @@
     <Project Path="Kumunita.AppHost/Kumunita.AppHost.csproj" />
   </Folder>
   <Folder Name="/Modules/">
-    <Project Path="../Kumunita.Announcements/Kumunita.Announcements.csproj" />
-    <Project Path="../Kumunita.Identity/Kumunita.Identity.csproj" />
-    <Project Path="../Kumunita.Localization/Kumunita.Localization.csproj" />
+    <Project Path="Kumunita.Announcements/Kumunita.Announcements.csproj" />
+    <Project Path="Kumunita.Identity/Kumunita.Identity.csproj" />
+    <Project Path="Kumunita.Localization/Kumunita.Localization.csproj" />
   </Folder>
   <Folder Name="/Shared/">
-    <Project Path="../Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj" />
-    <Project Path="../Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj" />
+    <Project Path="Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj" />
+    <Project Path="Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj" />
   </Folder>
   <Project Path="Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj" />
   <Project Path="Kumunita.Tests/Kumunita.Tests.csproj" />
