@@ -1,9 +1,8 @@
-﻿namespace Kumunita.Localization.Domain
+﻿namespace Kumunita.Localization.Domain;
+
+public enum TranslationStatus
 {
-    public enum TranslationStatus
-    {
-        Draft,
-        NeedsReview,
-        Approved
-    }
+    Draft,
+    NeedsReview,
+    Approved
 }

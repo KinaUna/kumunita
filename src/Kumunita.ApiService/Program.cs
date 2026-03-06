@@ -1,6 +1,11 @@
+using Kumunita.Announcements;
+using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
+using Kumunita.Shared.Infrastructure.Messaging;
+using Kumunita.Shared.Kernel.Events;
 using Marten;
 using Wolverine;
+using Wolverine.FluentValidation;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -45,20 +50,24 @@ builder.Services.AddMarten(opts =>
 builder.Host.UseWolverine(opts =>
 {
     // Auto-wraps any handler touching IDocumentSession in a Marten transaction
-    // This is what we just walked through — zero boilerplate per handler
     opts.Policies.AutoApplyTransactions();
 
     // Handlers are discovered by convention from all referenced assemblies
-    // Each module's handlers will be picked up automatically
-    // opts.Discovery.IncludeAssembly(typeof(Kumunita.Identity.IdentityModule).Assembly);
-    opts.Discovery.IncludeAssembly(typeof(Kumunita.Localization.LocalizationModule).Assembly);
-    opts.Discovery.IncludeAssembly(typeof(Kumunita.Announcements.AnnouncementsModule).Assembly);
+    //opts.Discovery.IncludeAssembly(typeof(IdentityModule).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(LocalizationModule).Assembly);
+    opts.Discovery.IncludeAssembly(typeof(AnnouncementsModule).Assembly);
 
-    // Local queues for in-process message delivery between modules
-    // Durable means unprocessed messages survive app restarts via the outbox
-    opts.LocalQueue("identity").UseDurableInbox();
-    opts.LocalQueue("localization").UseDurableInbox();
-    opts.LocalQueue("announcements").UseDurableInbox();
+    // All local queues use a durable inbox — unprocessed messages survive app restarts
+    opts.Policies.AllLocalQueues(q => q.UseDurableInbox());
+
+    // Declare per-module queues (durability is applied by the policy above)
+    opts.LocalQueue("identity");
+    opts.LocalQueue("localization");
+    opts.LocalQueue("announcements");
+
+    // Route every IDomainEvent implementation to the correct module queue
+    // by matching its namespace prefix — see DomainEventModuleRoutingConvention
+    opts.RouteWith(new DomainEventModuleRoutingConvention());
 });
 
 // ── Wolverine HTTP (maps handler return values to HTTP responses)
@@ -74,7 +83,7 @@ builder.Services.AddAuthentication();
 
 // ── Module registrations
 // Each module registers its own services via an extension method
-// builder.Services.AddLocalizationModule();
+builder.Services.AddLocalizationModule();
 // builder.Services.AddAnnouncementsModule();
 
 WebApplication app = builder.Build();

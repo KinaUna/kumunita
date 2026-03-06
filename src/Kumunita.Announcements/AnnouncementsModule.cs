@@ -1,26 +1,25 @@
 ﻿using Marten;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Kumunita.Announcements
+namespace Kumunita.Announcements;
+
+public static class AnnouncementsModule
 {
-    public static class AnnouncementsModule
+    public static IServiceCollection AddAnnouncementsModule(
+        this IServiceCollection services)
     {
-        public static IServiceCollection AddAnnouncementsModule(
-            this IServiceCollection services)
-        {
-            // Register module-specific services
-            // services.AddScoped<IAnnouncementService, AnnouncementService>();
+        // Register module-specific services
+        // services.AddScoped<IAnnouncementService, AnnouncementService>();
 
-            return services;
-        }
+        return services;
+    }
 
-        public static StoreOptions AddLocalizationSchema(this StoreOptions opts)
-        {
-            // Register Marten documents owned by this module
-            // opts.Schema.For<Announcement>().DatabaseSchemaName("announcements");
+    public static StoreOptions AddLocalizationSchema(this StoreOptions opts)
+    {
+        // Register Marten documents owned by this module
+        // opts.Schema.For<Announcement>().DatabaseSchemaName("announcements");
             
 
-            return opts;
-        }
+        return opts;
     }
 }

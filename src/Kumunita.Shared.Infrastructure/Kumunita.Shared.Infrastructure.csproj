@@ -8,10 +8,12 @@
 
   <ItemGroup>
     <PackageReference Include="Marten" />
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Kumunita.Localization\Kumunita.Localization.csproj" />
+    <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
   </ItemGroup>
 
 </Project>

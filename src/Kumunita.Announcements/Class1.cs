@@ -1,7 +1,6 @@
-﻿namespace Kumunita.Announcements
-{
-    public class Class1
-    {
+﻿namespace Kumunita.Announcements;
 
-    }
+public class Class1
+{
+
 }
