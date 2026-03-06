@@ -12,6 +12,9 @@
     <Project Path="Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj" />
     <Project Path="Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj" />
   </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+  </Folder>
   <Project Path="Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj" />
   <Project Path="Kumunita.Tests/Kumunita.Tests.csproj" />
   <Project Path="Kumunita.Web/Kumunita.Web.csproj" />

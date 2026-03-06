@@ -19,8 +19,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddMarten(opts =>
 {
     // Aspire injects this connection string automatically from the AppHost
-    var connectionString = builder.Configuration.GetConnectionString("kumunitadb")
-        ?? throw new InvalidOperationException("Missing 'kumunitadb' connection string.");
+    string connectionString = builder.Configuration.GetConnectionString("kumunitadb")
+                              ?? throw new InvalidOperationException("Missing 'kumunitadb' connection string.");
 
     opts.Connection(connectionString);
 
