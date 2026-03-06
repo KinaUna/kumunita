@@ -6,4 +6,17 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Folder Include="Features\Authentication\" />
+    <Folder Include="Infrastructure\Migrations\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
+  </ItemGroup>
+
 </Project>
