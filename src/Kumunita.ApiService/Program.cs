@@ -1,13 +1,14 @@
+using JasperFx.Core;
 using Kumunita.Announcements;
 using Kumunita.Authorization;
 using Kumunita.Identity;
 using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
+using Kumunita.Shared.Infrastructure.ExceptionHandling;
 using Kumunita.Shared.Infrastructure.Messaging;
-using Kumunita.Shared.Kernel.Events;
 using Marten;
 using Wolverine;
-using Wolverine.FluentValidation;
+using Wolverine.ErrorHandling;
 using Wolverine.Http;
 using Wolverine.Marten;
 
@@ -15,6 +16,8 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -71,6 +74,14 @@ builder.Host.UseWolverine(opts =>
     // Route every IDomainEvent implementation to the correct module queue
     // by matching its namespace prefix — see DomainEventModuleRoutingConvention
     opts.RouteWith(new DomainEventModuleRoutingConvention());
+
+    // Retry transient failures
+    opts.Policies.OnException<TimeoutException>()
+        .RetryWithCooldown(50.Milliseconds(), 100.Milliseconds(), 250.Milliseconds());
+
+    // Move poison messages to dead letter queue after repeated failures
+    opts.Policies.OnException<Exception>()
+        .MoveToErrorQueue();
 });
 
 // ── Wolverine HTTP (maps handler return values to HTTP responses)
@@ -106,6 +117,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseAntiforgery();
+
+app.UseExceptionHandler();
 
 // Map Wolverine HTTP endpoints — discovers endpoints from all module assemblies
 app.MapWolverineEndpoints();
