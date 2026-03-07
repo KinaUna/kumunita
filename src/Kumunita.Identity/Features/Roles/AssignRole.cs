@@ -1,5 +1,6 @@
 ﻿using Kumunita.Identity.Domain;
 using Kumunita.Identity.Domain.Events;
+using Kumunita.Identity.Exceptions;
 using Kumunita.Shared.Kernel;
 using Microsoft.AspNetCore.Identity;
 

@@ -6,6 +6,9 @@
 [StronglyTypedId] public partial struct GroupId { }
 [StronglyTypedId] public partial struct PermissionId { }
 
+// Authorization module
+[StronglyTypedId] public partial struct CapabilityTokenId { }
+
 // Localization module
 [StronglyTypedId] public partial struct TranslationKeyId { }
 [StronglyTypedId] public partial struct TranslationId { }

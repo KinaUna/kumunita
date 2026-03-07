@@ -1,4 +1,5 @@
 using Kumunita.Announcements;
+using Kumunita.Authorization;
 using Kumunita.Identity;
 using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
@@ -54,6 +55,7 @@ builder.Host.UseWolverine(opts =>
     opts.Policies.AutoApplyTransactions();
 
     // Handlers are discovered by convention from all referenced assemblies
+    opts.Discovery.IncludeAssembly(typeof(AuthorizationModule).Assembly);
     opts.Discovery.IncludeAssembly(typeof(IdentityModule).Assembly);
     opts.Discovery.IncludeAssembly(typeof(LocalizationModule).Assembly);
     opts.Discovery.IncludeAssembly(typeof(AnnouncementsModule).Assembly);

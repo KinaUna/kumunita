@@ -39,7 +39,7 @@ public static class IdentityModule
         services.AddOpenIddictForIdentity(configuration);
 
         // Custom claims enrichment
-        services.AddSingleton<CustomClaimsHandler>();
+        services.AddScoped<CustomClaimsHandler>();
 
         return services;
     }

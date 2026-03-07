@@ -5,6 +5,7 @@
   </Folder>
   <Folder Name="/Modules/">
     <Project Path="Kumunita.Announcements/Kumunita.Announcements.csproj" />
+    <Project Path="Kumunita.Authorization/Kumunita.Authorization.csproj" Id="2f180386-8545-40e4-9042-7d56efbc9e4b" />
     <Project Path="Kumunita.Identity/Kumunita.Identity.csproj" />
     <Project Path="Kumunita.Localization/Kumunita.Localization.csproj" />
   </Folder>

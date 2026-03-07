@@ -25,6 +25,7 @@ public static class MartenExtensions
         opts.RegisterValueType(typeof(GroupId));
         opts.RegisterValueType(typeof(RoleId));
         opts.RegisterValueType(typeof(PermissionId));
+        opts.RegisterValueType(typeof(CapabilityTokenId));
         opts.RegisterValueType(typeof(TranslationKeyId));
         opts.RegisterValueType(typeof(TranslationId));
         opts.RegisterValueType(typeof(AnnouncementId));

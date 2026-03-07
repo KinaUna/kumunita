@@ -3,6 +3,7 @@ using Kumunita.Shared.Kernel;
 using Marten;
 using System.Text.RegularExpressions;
 using Kumunita.Identity.Domain.Events;
+using Kumunita.Identity.Exceptions;
 
 namespace Kumunita.Identity.Features.UserGroups;
 

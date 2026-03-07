@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kumunita.Identity\Kumunita.Identity.csproj" />
+    <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
+  </ItemGroup>
+
+</Project>
