@@ -99,7 +99,7 @@ builder.Services.AddAuthentication();
 // Each module registers its own services via an extension method
 builder.Services.AddLocalizationModule();
 builder.Services.AddIdentityModule(builder.Configuration);
-// builder.Services.AddAnnouncementsModule();
+builder.Services.AddAnnouncementsModule();
 
 WebApplication app = builder.Build();
 

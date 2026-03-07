@@ -13,7 +13,6 @@ public static class LocalizationModule
         this IServiceCollection services)
     {
         // Register module-specific services
-        // services.AddScoped<ITranslationService, TranslationService>();
         services.AddScoped<TranslationResolver>();
         services.AddSingleton<IInitialData, DefaultLanguagesSeed>();
 
@@ -23,9 +22,7 @@ public static class LocalizationModule
     public static StoreOptions AddLocalizationSchema(this StoreOptions opts)
     {
         // Register Marten documents owned by this module
-        // opts.Schema.For<Language>().DatabaseSchemaName("localization");
-        // opts.Schema.For<TranslationKey>().DatabaseSchemaName("localization");
-
+        
         return opts.AddLocalizationMartenSchema(); // calls LocalizationMartenConfiguration
     }
 }

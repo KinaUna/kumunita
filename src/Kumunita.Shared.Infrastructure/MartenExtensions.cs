@@ -1,4 +1,5 @@
-﻿using Kumunita.Identity;
+﻿using Kumunita.Announcements;
+using Kumunita.Identity;
 using Kumunita.Localization;
 using Kumunita.Shared.Kernel;
 using Kumunita.Shared.Kernel.ValueObjects;
@@ -19,6 +20,7 @@ public static class MartenExtensions
 
         opts.AddLocalizationSchema();
         opts.AddIdentitySchema();
+        opts.AddAnnouncementsSchema();
 
         // Register all strongly typed IDs so Marten understands them in LINQ
         opts.RegisterValueType(typeof(UserId));

@@ -11,4 +11,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Kumunita.Authorization\Kumunita.Authorization.csproj" />
+    <ProjectReference Include="..\Kumunita.Identity\Kumunita.Identity.csproj" />
+    <ProjectReference Include="..\Kumunita.Localization\Kumunita.Localization.csproj" />
+    <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
+  </ItemGroup>
+
 </Project>

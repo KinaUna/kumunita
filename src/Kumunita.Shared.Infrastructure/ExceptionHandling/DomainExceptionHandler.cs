@@ -1,4 +1,5 @@
-﻿using Kumunita.Authorization.Exceptions;
+﻿using Kumunita.Announcements.Exceptions;
+using Kumunita.Authorization.Exceptions;
 using Kumunita.Identity.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
@@ -26,6 +27,14 @@ public class DomainExceptionHandler : IExceptionHandler
                 (StatusCodes.Status400BadRequest, e.Message),
             AlreadyUserGroupMemberException e =>
                 (StatusCodes.Status409Conflict, e.Message),
+            AnnouncementNotFoundException e =>
+                (StatusCodes.Status404NotFound, e.Message),
+            InvalidAnnouncementStatusException e =>
+                (StatusCodes.Status409Conflict, e.Message),
+            MemberSubmissionsDisabledException e =>
+                (StatusCodes.Status403Forbidden, e.Message),
+            PendingSubmissionLimitExceededException e =>
+                (StatusCodes.Status429TooManyRequests, e.Message),
             _ => (-1, null)
         };
 

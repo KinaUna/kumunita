@@ -1,5 +1,7 @@
 ﻿using Kumunita.Authorization.Infrastructure;
+using Kumunita.Authorization.Infrastructure.SeedData;
 using Marten;
+using Marten.Schema;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Kumunita.Authorization;
@@ -11,6 +13,8 @@ public static class AuthorizationModule
     {
         // No additional services needed beyond Wolverine and Marten
         // All handlers are discovered by Wolverine convention
+        services.AddSingleton<IInitialData, DefaultVisibilityPoliciesSeed>();
+
         return services;
     }
 
