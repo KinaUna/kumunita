@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/Host/">
-    <Project Path="Kumunita.ApiService/Kumunita.Host.csproj" />
+    <Project Path="Kumunita.Host/Kumunita.Host.csproj" />
     <Project Path="Kumunita.AppHost/Kumunita.AppHost.csproj" />
   </Folder>
   <Folder Name="/Modules/">

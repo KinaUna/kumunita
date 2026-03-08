@@ -1,6 +1,7 @@
 using JasperFx.Core;
 using Kumunita.Announcements;
 using Kumunita.Authorization;
+using Kumunita.Host;
 using Kumunita.Identity;
 using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
@@ -12,10 +13,25 @@ using Wolverine.ErrorHandling;
 using Wolverine.Http;
 using Wolverine.Marten;
 
+if (args.Contains("--migrate"))
+{
+    await MigrationRunner.RunAsync(args);
+    return;
+}
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
-builder.AddServiceDefaults();
+if (builder.Environment.IsDevelopment())
+{
+    builder.AddServiceDefaults();   // Aspire — dev only
+}
+else
+{
+    // Production equivalents — manual OpenTelemetry and health checks
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(builder.Configuration.GetConnectionString("kumunitadb")!);
+}
 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 

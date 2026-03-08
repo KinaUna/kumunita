@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Kumunita.ApiService\Kumunita.Host.csproj" />
+    <ProjectReference Include="..\Kumunita.Host\Kumunita.Host.csproj" />
     <ProjectReference Include="..\Kumunita.Web\Kumunita.Web.csproj" />
   </ItemGroup>
 
