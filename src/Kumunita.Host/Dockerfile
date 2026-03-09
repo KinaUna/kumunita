@@ -8,24 +8,24 @@ COPY ["Directory.Packages.props", "."]
 COPY Directory.Build.props .
 
 # Copy all project files
-COPY ["./Kumunita.Host/Kumunita.Host.csproj", "Kumunita.Host/"]
-COPY ["./Kumunita.Announcements/Kumunita.Announcements.csproj", "Kumunita.Announcements/"]
-COPY ["./Kumunita.Authorization/Kumunita.Authorization.csproj", "Kumunita.Authorization/"]
-COPY ["./Kumunita.Identity/Kumunita.Identity.csproj", "Kumunita.Identity/"]
-COPY ["./Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "Kumunita.Shared.Kernel/"]
-COPY ["./Kumunita.Localization/Kumunita.Localization.csproj", "Kumunita.Localization/"]
-COPY ["./Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "Kumunita.ServiceDefaults/"]
-COPY ["./Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "Kumunita.Shared.Infrastructure/"]
-COPY ["./Kumunita.Web/Kumunita.Web.csproj", "Kumunita.Web/"]
+COPY ["./src/Kumunita.Host/Kumunita.Host.csproj", "Kumunita.Host/"]
+COPY ["./src/Kumunita.Announcements/Kumunita.Announcements.csproj", "Kumunita.Announcements/"]
+COPY ["./src/Kumunita.Authorization/Kumunita.Authorization.csproj", "Kumunita.Authorization/"]
+COPY ["./src/Kumunita.Identity/Kumunita.Identity.csproj", "Kumunita.Identity/"]
+COPY ["./src/Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "Kumunita.Shared.Kernel/"]
+COPY ["./src/Kumunita.Localization/Kumunita.Localization.csproj", "Kumunita.Localization/"]
+COPY ["./src/Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "Kumunita.ServiceDefaults/"]
+COPY ["./src/Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "Kumunita.Shared.Infrastructure/"]
+COPY ["./src/Kumunita.Web/Kumunita.Web.csproj", "Kumunita.Web/"]
 
 # Restore dependencies
-RUN dotnet restore "./Kumunita.Host/Kumunita.Host.csproj"
+RUN dotnet restore "./src/Kumunita.Host/Kumunita.Host.csproj"
 
 # Copy all source code
 COPY . .
 
 # Publish the Host project
-RUN dotnet publish "./Kumunita.Host/Kumunita.Host.csproj" \
+RUN dotnet publish "./src/Kumunita.Host/Kumunita.Host.csproj" \
     --no-restore \
     --configuration Release \
     --output /app/publish
