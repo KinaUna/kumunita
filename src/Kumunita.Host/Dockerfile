@@ -33,6 +33,8 @@ RUN dotnet publish "./src/Kumunita.Host/Kumunita.Host.csproj" \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
+# Install necessary packages and create non-root user
+RUN apt-get update && apt-get install -y adduser
 # Create non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
