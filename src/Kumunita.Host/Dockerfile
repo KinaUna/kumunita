@@ -4,8 +4,7 @@ WORKDIR /source
 
 # Copy solution and project files first for layer caching
 COPY *.sln .
-COPY ["Directory.Packages.props", "."]
-COPY Directory.Build.props .
+COPY ["./src/Directory.Packages.props", "."]
 
 # Copy all project files
 COPY ["./src/Kumunita.Host/Kumunita.Host.csproj", "Kumunita.Host/"]
