@@ -8,15 +8,15 @@ COPY ["Directory.Packages.props", "."]
 COPY Directory.Build.props .
 
 # Copy all project files
-COPY ["Kumunita.Host/Kumunita.Host.csproj", "Kumunita.Host/"]
-COPY ["Kumunita.Announcements/Kumunita.Announcements.csproj", "Kumunita.Announcements/"]
-COPY ["Kumunita.Authorization/Kumunita.Authorization.csproj", "Kumunita.Authorization/"]
-COPY ["Kumunita.Identity/Kumunita.Identity.csproj", "Kumunita.Identity/"]
-COPY ["Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "Kumunita.Shared.Kernel/"]
-COPY ["Kumunita.Localization/Kumunita.Localization.csproj", "Kumunita.Localization/"]
-COPY ["Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "Kumunita.ServiceDefaults/"]
-COPY ["Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "Kumunita.Shared.Infrastructure/"]
-COPY ["Kumunita.Web/Kumunita.Web.csproj", "Kumunita.Web/"]
+COPY ["./Kumunita.Host/Kumunita.Host.csproj", "Kumunita.Host/"]
+COPY ["./Kumunita.Announcements/Kumunita.Announcements.csproj", "Kumunita.Announcements/"]
+COPY ["./Kumunita.Authorization/Kumunita.Authorization.csproj", "Kumunita.Authorization/"]
+COPY ["./Kumunita.Identity/Kumunita.Identity.csproj", "Kumunita.Identity/"]
+COPY ["./Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "Kumunita.Shared.Kernel/"]
+COPY ["./Kumunita.Localization/Kumunita.Localization.csproj", "Kumunita.Localization/"]
+COPY ["./Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "Kumunita.ServiceDefaults/"]
+COPY ["./Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "Kumunita.Shared.Infrastructure/"]
+COPY ["./Kumunita.Web/Kumunita.Web.csproj", "Kumunita.Web/"]
 
 # Restore dependencies
 RUN dotnet restore "./Kumunita.Host/Kumunita.Host.csproj"
