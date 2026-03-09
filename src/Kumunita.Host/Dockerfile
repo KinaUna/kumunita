@@ -18,13 +18,13 @@ COPY ["./src/Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.cspro
 COPY ["./src/Kumunita.Web/Kumunita.Web.csproj", "Kumunita.Web/"]
 
 # Restore dependencies
-RUN dotnet restore "./src/Kumunita.Host/Kumunita.Host.csproj"
+RUN dotnet restore "Kumunita.Host/Kumunita.Host.csproj"
 
 # Copy all source code
 COPY . .
 
 # Publish the Host project
-RUN dotnet publish "./src/Kumunita.Host/Kumunita.Host.csproj" \
+RUN dotnet publish "Kumunita.Host/Kumunita.Host.csproj" \
     --no-restore \
     --configuration Release \
     --output /app/publish
