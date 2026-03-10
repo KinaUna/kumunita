@@ -7,6 +7,7 @@ using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
 using Kumunita.Shared.Infrastructure.ExceptionHandling;
 using Kumunita.Shared.Infrastructure.Messaging;
+using Kumunita.Web.Client;
 using Marten;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wolverine;
@@ -119,6 +120,10 @@ builder.Services.AddLocalizationModule();
 builder.Services.AddIdentityModule(builder.Configuration, builder.Environment);
 builder.Services.AddAnnouncementsModule();
 
+// Hosted Blazor WASM — Host serves the client app as static files
+builder.Services.AddRazorComponents()
+    .AddInteractiveWebAssemblyComponents();
+
 WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -131,39 +136,22 @@ if (app.Environment.IsDevelopment())
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.UseAntiforgery();
-
-app.UseExceptionHandler();
 
 // Map Wolverine HTTP endpoints — discovers endpoints from all module assemblies
 app.MapWolverineEndpoints();
 
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+app.UseBlazorFrameworkFiles();   // serves _framework/* files (wasm, dlls, etc.)
+app.UseStaticFiles();            // serves wwwroot from both Host and Client
 
-app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
-
-app.MapGet("/weatherforecast", () =>
-{
-    WeatherForecast[] forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
-
-app.MapDefaultEndpoints();
+// Catch-all fallback — Blazor handles all unmatched routes client-side
+app.MapFallbackToFile("index.html");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

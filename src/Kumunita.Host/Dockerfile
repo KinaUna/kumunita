@@ -15,7 +15,7 @@ COPY ["./src/Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "src/Kumunit
 COPY ["./src/Kumunita.Localization/Kumunita.Localization.csproj", "src/Kumunita.Localization/"]
 COPY ["./src/Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "src/Kumunita.ServiceDefaults/"]
 COPY ["./src/Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "src/Kumunita.Shared.Infrastructure/"]
-COPY ["./src/Kumunita.Web/Kumunita.Web.csproj", "src/Kumunita.Web/"]
+COPY ["./src/Kumunita.Web.Client/Kumunita.Web.Client.csproj", "src/Kumunita.Web.Client/"]
 
 # Restore dependencies
 RUN dotnet restore "src/Kumunita.Host/Kumunita.Host.csproj"

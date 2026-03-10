@@ -16,7 +16,9 @@
   <Folder Name="/Solution Items/">
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/Web/">
+    <Project Path="Kumunita.Web.Client/Kumunita.Web.Client.csproj" />
+  </Folder>
   <Project Path="Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj" />
   <Project Path="Kumunita.Tests/Kumunita.Tests.csproj" />
-  <Project Path="Kumunita.Web/Kumunita.Web.csproj" />
 </Solution>
