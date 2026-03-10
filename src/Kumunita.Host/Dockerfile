@@ -45,7 +45,7 @@ COPY --from=build /app/publish .
 RUN chown -R appuser:appgroup /app
 USER appuser
 
-RUN apk update && apk add curl
+RUN apt-get install -y curl
 
 # Health check — Aspire ServiceDefaults registers /health automatically
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
