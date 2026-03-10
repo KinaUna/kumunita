@@ -8,6 +8,7 @@ using Kumunita.Shared.Infrastructure;
 using Kumunita.Shared.Infrastructure.ExceptionHandling;
 using Kumunita.Shared.Infrastructure.Messaging;
 using Marten;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Http;
@@ -30,6 +31,7 @@ else
 {
     // Production equivalents — manual OpenTelemetry and health checks
     builder.Services.AddHealthChecks()
+        .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"])
         .AddNpgSql(builder.Configuration.GetConnectionString("kumunitadb")!);
 }
 
