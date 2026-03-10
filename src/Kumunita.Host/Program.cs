@@ -148,8 +148,13 @@ app.UseAntiforgery();
 // Map Wolverine HTTP endpoints — discovers endpoints from all module assemblies
 app.MapWolverineEndpoints();
 
-app.UseBlazorFrameworkFiles();   // serves _framework/* files (wasm, dlls, etc.)
-app.UseStaticFiles();            // serves wwwroot from both Host and Client
+// app.UseBlazorFrameworkFiles();   // serves _framework/* files (wasm, dlls, etc.)
+//app.UseStaticFiles();            // serves wwwroot from both Host and Client
+
+// MapStaticAssets replaces both UseBlazorFrameworkFiles + UseStaticFiles in .NET 9+.
+// It reads the Static Web Assets manifest to correctly route fingerprinted URLs
+// (e.g. _framework/blazor.webassembly.{hash}.js) to their physical files.
+app.MapStaticAssets();
 
 // Catch-all fallback — Blazor handles all unmatched routes client-side
 app.MapFallbackToFile("index.html");
