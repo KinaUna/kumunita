@@ -27,7 +27,8 @@ public class AnnouncementSettings
         = DateTimeOffset.UtcNow;
     public UserId? LastUpdatedBy { get; private set; }
 
-    private AnnouncementSettings() { }
+    // Needs to be public, for JsonSerializer and Marten — but we don't want it called directly from outside the class, so we'll make it parameterless and use a factory method for creation
+    public AnnouncementSettings() { }
 
     public static AnnouncementSettings CreateDefaults()
         => new();
