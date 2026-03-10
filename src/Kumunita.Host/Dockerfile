@@ -47,9 +47,9 @@ COPY --from=build /app/publish .
 RUN chown -R appuser:appgroup /app
 USER appuser
 
-# Health check — Aspire ServiceDefaults registers /health automatically
-#HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-#    CMD curl -f http://localhost:8080/health || exit 1
+Health check — Aspire ServiceDefaults registers /health automatically
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Kumunita.Host.dll"]
