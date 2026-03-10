@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Kumunita.Identity;
 
@@ -12,7 +13,7 @@ public static class IdentityModule
 {
     public static IServiceCollection AddIdentityModule(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration, IHostEnvironment environment)
     {
         // EF Core + ASP.NET Core Identity
         services.AddDbContext<IdentityDbContext>(options =>
@@ -36,7 +37,7 @@ public static class IdentityModule
             .AddDefaultTokenProviders();
 
         // OpenIddict
-        services.AddOpenIddictForIdentity(configuration);
+        services.AddOpenIddictForIdentity(configuration, environment);
 
         // Custom claims enrichment
         services.AddScoped<CustomClaimsHandler>();

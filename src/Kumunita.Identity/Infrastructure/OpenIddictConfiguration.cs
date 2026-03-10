@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OpenIddict.Abstractions;
+using System.Security.Cryptography.X509Certificates;
 
 namespace Kumunita.Identity.Infrastructure;
 
@@ -8,7 +10,8 @@ public static class OpenIddictConfiguration
 {
     public static IServiceCollection AddOpenIddictForIdentity(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.AddOpenIddict()
             .AddCore(options =>
@@ -39,9 +42,33 @@ public static class OpenIddictConfiguration
                     "roles",
                     "groups");
 
-                // Development certificates — replaced by real certs in production
-                options.AddDevelopmentEncryptionCertificate()
-                       .AddDevelopmentSigningCertificate();
+                if (environment.IsDevelopment())
+                {
+                    // Development only — writes to X509 store, never use in production
+                    options.AddDevelopmentEncryptionCertificate()
+                        .AddDevelopmentSigningCertificate();
+                }
+                else
+                {
+                    // Production — load PFX files mounted by Coolify
+                    options.AddEncryptionCertificate(
+                        LoadCertificate(
+                            configuration["OpenIddict:EncryptionCertificatePath"]
+                            ?? throw new InvalidOperationException(
+                                "Missing OpenIddict:EncryptionCertificatePath"),
+                            configuration["OpenIddict:CertificatePassword"]
+                            ?? throw new InvalidOperationException(
+                                "Missing OpenIddict:CertificatePassword")));
+
+                    options.AddSigningCertificate(
+                        LoadCertificate(
+                            configuration["OpenIddict:SigningCertificatePath"]
+                            ?? throw new InvalidOperationException(
+                                "Missing OpenIddict:SigningCertificatePath"),
+                            configuration["OpenIddict:CertificatePassword"]
+                            ?? throw new InvalidOperationException(
+                                "Missing OpenIddict:CertificatePassword")));
+                }
 
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
@@ -57,5 +84,20 @@ public static class OpenIddictConfiguration
             });
 
         return services;
+    }
+
+    private static X509Certificate2 LoadCertificate(string path, string password)
+    {
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                $"OpenIddict certificate not found at '{path}'. " +
+                "Ensure the file is mounted correctly in Coolify.");
+
+        return new X509Certificate2(
+            path,
+            password,
+            // EphemeralKeySet avoids writing to the X509 store entirely —
+            // this is what fixes the permission error in containers
+            X509KeyStorageFlags.EphemeralKeySet);
     }
 }
