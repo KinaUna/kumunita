@@ -38,14 +38,14 @@ RUN apt-get update && apt-get install -y adduser
 # Create non-root user for security
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
+RUN apt-get install -y curl
+
 # Copy published output
 COPY --from=build /app/publish .
 
 # Set ownership
 RUN chown -R appuser:appgroup /app
 USER appuser
-
-RUN apt-get install -y curl
 
 # Health check — Aspire ServiceDefaults registers /health automatically
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
