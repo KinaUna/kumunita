@@ -12,12 +12,16 @@ using Kumunita.Shared.Infrastructure.Messaging;
 using Kumunita.Shared.Infrastructure.MultiTenancy;
 using Kumunita.Web.Client;
 using Marten;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Http;
 using Wolverine.Marten;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using OpenIddict.Validation.AspNetCore;
 
 if (args.Contains("--migrate"))
 {
@@ -38,6 +42,16 @@ else
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"])
         .AddNpgSql(builder.Configuration.GetConnectionString("kumunitadb")!);
+
+    // Trust the X-Forwarded-For and X-Forwarded-Proto headers sent by Coolify/Traefik.
+    // KnownNetworks/KnownProxies are cleared so all upstream proxies are trusted —
+    // acceptable when Traefik is the sole ingress and the container is not publicly reachable.
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
 }
 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
@@ -122,6 +136,27 @@ builder.Services.AddLocalizationModule();
 builder.Services.AddIdentityModule(builder.Configuration, builder.Environment);
 builder.Services.AddAnnouncementsModule();
 
+// When a Bearer token is present, forward authentication to OpenIddict validation
+// instead of using the Identity cookie scheme. This prevents the cookie auth handler
+// from issuing a 302 redirect to /Account/Login for API calls made by the Blazor WASM
+// client — which would cause a JsonException when HttpClient receives HTML instead of JSON.
+builder.Services.Configure<CookieAuthenticationOptions>(
+    IdentityConstants.ApplicationScheme,
+    options =>
+    {
+        options.ForwardDefaultSelector = context =>
+        {
+            string? authorization = context.Request.Headers.Authorization.FirstOrDefault();
+            if (!string.IsNullOrEmpty(authorization) &&
+                authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                return OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+            }
+
+            return null; // fall back to cookie authentication
+        };
+    });
+
 // Hosted Blazor WASM — Host serves the client app as static files
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
@@ -138,15 +173,21 @@ builder.Services.AddScoped<IQuerySession>(sp =>
 
 WebApplication app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// ── Middleware pipeline ───────────────────────────────────────────────────────
+
+// MUST be first — rewrites HttpContext.Request.Scheme to "https" before any
+// middleware that generates absolute URIs (HSTS, OpenIddict, antiforgery cookies).
+if (!app.Environment.IsDevelopment())
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-// ── Middleware pipeline ───────────────────────────────────────────────────────
 
 if (!app.Environment.IsDevelopment())
 {
