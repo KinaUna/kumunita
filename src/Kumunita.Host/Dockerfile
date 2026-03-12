@@ -9,6 +9,7 @@ COPY ["./src/Directory.Packages.props", "src/"]
 # Copy all project files (destinations mirror the src/ layout)
 COPY ["./src/Kumunita.Host/Kumunita.Host.csproj", "src/Kumunita.Host/"]
 COPY ["./src/Kumunita.Announcements/Kumunita.Announcements.csproj", "src/Kumunita.Announcements/"]
+COPY ["./src/Kumunita.Announcements.Contracts/Kumunita.Announcements.Contracts.csproj", "src/Kumunita.Announcements.Contracts/"]
 COPY ["./src/Kumunita.Authorization/Kumunita.Authorization.csproj", "src/Kumunita.Authorization/"]
 COPY ["./src/Kumunita.Identity/Kumunita.Identity.csproj", "src/Kumunita.Identity/"]
 COPY ["./src/Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "src/Kumunita.Shared.Kernel/"]
@@ -16,7 +17,9 @@ COPY ["./src/Kumunita.Localization/Kumunita.Localization.csproj", "src/Kumunita.
 COPY ["./src/Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "src/Kumunita.ServiceDefaults/"]
 COPY ["./src/Kumunita.Shared.Infrastructure/Kumunita.Shared.Infrastructure.csproj", "src/Kumunita.Shared.Infrastructure/"]
 COPY ["./src/Kumunita.Web.Client/Kumunita.Web.Client.csproj", "src/Kumunita.Web.Client/"]
+COPY ["./src/Kumunita.Communities/Kumunita.Communities.csproj", "src/Kumunita.Communities/"]
 COPY ["./src/Kumunita.Communities.Contracts/Kumunita.Communities.Contracts.csproj", "src/Kumunita.Communities.Contracts/"]
+
 
 # Restore dependencies
 RUN dotnet restore "src/Kumunita.Host/Kumunita.Host.csproj"
