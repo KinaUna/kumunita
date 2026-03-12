@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Kumunita.Announcements.Contracts\Kumunita.Announcements.Contracts.csproj" />
     <ProjectReference Include="..\Kumunita.Authorization\Kumunita.Authorization.csproj" />
     <ProjectReference Include="..\Kumunita.Identity\Kumunita.Identity.csproj" />
     <ProjectReference Include="..\Kumunita.Localization\Kumunita.Localization.csproj" />

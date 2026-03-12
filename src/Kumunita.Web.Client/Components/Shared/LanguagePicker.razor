@@ -1,0 +1,71 @@
+@using Kumunita.Shared.Kernel.ValueObjects
+@inject AuthenticationStateProvider Auth
+@inject ILocalizationClient Localization
+
+<MudMenu Icon="@Icons.Material.Filled.Language"
+         Color="Color.Inherit"
+         Direction="Direction.Bottom"
+         OffsetY="true"
+         Title="@_current?.DisplayName">
+
+    @foreach (var language in _available)
+    {
+        var lang = language; // capture for lambda
+        <MudMenuItem OnClick="() => SelectLanguage(lang)">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                @if (_current?.Code == lang.Code)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Circle"
+                             Size="Size.Small"
+                             Style="opacity:0" />
+                }
+                <MudText>@lang.DisplayName</MudText>
+            </MudStack>
+        </MudMenuItem>
+    }
+
+</MudMenu>
+
+@code {
+    private record LanguageOption(string Code, string DisplayName);
+
+    private List<LanguageOption> _available = [];
+    private LanguageOption?      _current;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // These are the platform-supported languages defined in the Localization module.
+        // TODO: fetch from GET /localization/languages once endpoint is implemented.
+        _available =
+        [
+            new(LanguageCode.English.Value,  "English"),
+            new(LanguageCode.French.Value,   "Français"),
+            new(LanguageCode.German.Value,   "Deutsch"),
+            new(LanguageCode.Italian.Value,  "Italiano"),
+        ];
+
+        var state = await Auth.GetAuthenticationStateAsync();
+        var preferred = state.User.GetPreferredLanguage().FirstOrDefault()
+            ?? LanguageCode.English.Value;
+
+        _current = _available.FirstOrDefault(l => l.Code == preferred)
+            ?? _available.First();
+    }
+
+    private async Task SelectLanguage(LanguageOption language)
+    {
+        if (_current?.Code == language.Code) return;
+
+        _current = language;
+
+        // Persist the preference — updates the claim and reloads translations.
+        // TODO: PUT /users/me/preferred-language + trigger translation reload
+        await Localization.SetPreferredLanguageAsync(language.Code);
+
+        StateHasChanged();
+    }
+}

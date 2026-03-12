@@ -34,6 +34,10 @@ public class CustomClaimsHandler : IOpenIddictServerHandler<OpenIddictServerEven
         foreach (var role in roles)
             context.Principal!.SetClaim("role", role);
 
+        // Signal the client that a password change is required
+        if (appUser.MustChangePassword)
+            context.Principal!.SetClaim("must_change_password", "true");
+
         // Load preferred language from Marten UserProfile
         var profile = await _session.LoadAsync<UserProfile>(userId);
         if (profile is not null)

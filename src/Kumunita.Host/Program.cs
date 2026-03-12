@@ -1,14 +1,18 @@
 using JasperFx.Core;
 using Kumunita.Announcements;
 using Kumunita.Authorization;
+using Kumunita.Communities;
 using Kumunita.Host;
 using Kumunita.Identity;
+using Kumunita.Identity.Infrastructure;
 using Kumunita.Localization;
 using Kumunita.Shared.Infrastructure;
 using Kumunita.Shared.Infrastructure.ExceptionHandling;
 using Kumunita.Shared.Infrastructure.Messaging;
+using Kumunita.Shared.Infrastructure.MultiTenancy;
 using Kumunita.Web.Client;
 using Marten;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -44,31 +48,29 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Register community authorization policies and handlers
+builder.Services.AddCommunityAuthorization();
+
+// Register HttpContextAccessor (needed by CommunityRoleHandler and tenant middleware)
+builder.Services.AddHttpContextAccessor();
+
 // ── Marten (all modules except Identity)
 builder.Services.AddMarten(opts =>
 {
-    // Aspire injects this connection string automatically from the AppHost
     string connectionString = builder.Configuration.GetConnectionString("kumunitadb")
                               ?? throw new InvalidOperationException("Missing 'kumunitadb' connection string.");
 
     opts.Connection(connectionString);
-
-    // Each module registers its own documents and schemas here via extension methods
-    // We'll add these as modules are built — for now the call is empty
+    opts.Policies.AllDocumentsAreMultiTenanted();
+    opts.AddCommunitiesModule();
     opts.ConfigureModuleSchemas();
 })
 .IntegrateWithWolverine(w =>
 {
-    // Wolverine's outbox and inbox tables live in the 'wolverine' schema
     w.MessageStorageSchemaName = "wolverine";
     w.TransportSchemaName = "wolverine";
 })
-.ApplyAllDatabaseChangesOnStartup()  // runs schema migrations on startup in dev
-.UseLightweightSessions();           // better performance for command handlers
-
-// ── EF Core (Identity module only)
-// This will be added when we build the Identity module
-// builder.Services.AddIdentityModule(builder.Configuration);
+.ApplyAllDatabaseChangesOnStartup();  // UseLightweightSessions() removed — TenantAwareSessionFactory handles it
 
 // ── Wolverine 
 builder.Host.UseWolverine(opts =>
@@ -124,6 +126,16 @@ builder.Services.AddAnnouncementsModule();
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
+builder.Services.AddRazorPages();
+builder.Services.AddControllersWithViews();
+builder.Services.AddScoped<TenantAwareSessionFactory>();
+
+builder.Services.AddScoped<IDocumentSession>(sp =>
+    sp.GetRequiredService<TenantAwareSessionFactory>().OpenSession());
+
+builder.Services.AddScoped<IQuerySession>(sp =>
+    sp.GetRequiredService<TenantAwareSessionFactory>().QuerySession());
+
 WebApplication app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -144,19 +156,39 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+app.MapControllers(); // Map API controllers before tenant middleware so they can return 401/403 without requiring a valid tenant
+app.MapRazorPages();  // ← ADD THIS — registers /Account/Login and any future Razor Pages
+
+// Extracts {slug} from route, validates community membership,
+// sets Marten tenant for the request.
+app.UseMiddleware<CommunityTenantMiddleware>();
 
 // Map Wolverine HTTP endpoints — discovers endpoints from all module assemblies
 app.MapWolverineEndpoints();
 
-// app.UseBlazorFrameworkFiles();   // serves _framework/* files (wasm, dlls, etc.)
-//app.UseStaticFiles();            // serves wwwroot from both Host and Client
-
-// MapStaticAssets replaces both UseBlazorFrameworkFiles + UseStaticFiles in .NET 9+.
-// It reads the Static Web Assets manifest to correctly route fingerprinted URLs
-// (e.g. _framework/blazor.webassembly.{hash}.js) to their physical files.
 app.MapStaticAssets();
 
 // Catch-all fallback — Blazor handles all unmatched routes client-side
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html").AllowAnonymous();
+
+// Apply EF Core schema before starting background services
+using (IServiceScope scope = app.Services.CreateScope())
+{
+    IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+    // Fallback: EnsureCreatedAsync builds the full schema from the current model
+    // when no migrations exist yet. Replace with MigrateAsync() once you have
+    // generated migrations.
+    if (db.Database.GetMigrations().Any())
+        await db.Database.MigrateAsync();
+    else
+        await db.Database.EnsureCreatedAsync();
+}
+
+// Seed the OpenIddict client registration and the initial admin account before
+// the server starts listening. This prevents a race condition where the first
+// prompt=none OIDC request arrives before the client exists in the database,
+// which would cause OpenIddict to return invalid_client instead of login_required,
+// showing the Blazor WASM "Sign in failed" page on the very first login attempt.
+await app.SeedIdentityAsync();
 
 app.Run();

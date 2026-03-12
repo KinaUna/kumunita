@@ -1,0 +1,84 @@
+@page "/about"
+@using MudBlazor
+
+<AppPageTitle Title="About" />
+
+<MudStack Spacing="6">
+
+    <MudText Typo="Typo.h4">About Kumunita</MudText>
+
+    <MudText Typo="Typo.body1">
+        Kumunita is a private platform for neighbourhood communities. It gives residents
+        a shared space to stay informed, connect with neighbours, and participate in local life —
+        without the noise of public social media.
+    </MudText>
+
+    <MudDivider />
+
+    <MudStack Spacing="3">
+        <MudText Typo="Typo.h6">How it works</MudText>
+
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Start">
+            <MudIcon Icon="@Icons.Material.Filled.Mail" Color="Color.Primary" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Invitation only</MudText>
+                <MudText Typo="Typo.body2">
+                    Communities are private. To join, you need an invitation from your
+                    community manager. Contact your neighbourhood association or building manager
+                    to request access.
+                </MudText>
+            </MudStack>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Start">
+            <MudIcon Icon="@Icons.Material.Filled.Announcement" Color="Color.Primary" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Announcements</MudText>
+                <MudText Typo="Typo.body2">
+                    Stay informed about what's happening in your neighbourhood — events,
+                    maintenance notices, and community news.
+                </MudText>
+            </MudStack>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Start">
+            <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Directory</MudText>
+                <MudText Typo="Typo.body2">
+                    A private directory of community members. You control what information
+                    is visible to others.
+                </MudText>
+            </MudStack>
+        </MudStack>
+
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Start">
+            <MudIcon Icon="@Icons.Material.Filled.LocationCity" Color="Color.Primary" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.subtitle2">Multiple communities</MudText>
+                <MudText Typo="Typo.body2">
+                    Belong to more than one community — for example, a primary residence
+                    and a second home — and switch between them seamlessly.
+                </MudText>
+            </MudStack>
+        </MudStack>
+    </MudStack>
+
+    <MudDivider />
+
+    <MudStack Spacing="2">
+        <MudText Typo="Typo.h6">Already have an account?</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="/authentication/login">
+                Sign in
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Href="/">
+                Back to home
+            </MudButton>
+        </MudStack>
+    </MudStack>
+
+</MudStack>

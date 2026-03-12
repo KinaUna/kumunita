@@ -1,0 +1,79 @@
+@page "/announcements"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+@inject CommunityContext CommunityContext
+
+<PageTitle>Announcements — Kumunita</PageTitle>
+
+<MudStack Spacing="4">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Announcements</MudText>
+        <MudSpacer />
+        <!-- TODO: filter chips per community -->
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!_grouped.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            No announcements yet. Join a community to see what's happening.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (CommunityAnnouncementGroup group in _grouped)
+        {
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        @group.CommunityName
+                    </MudText>
+                    <MudSpacer />
+                    <MudLink Href="@($"/announcements/{group.Slug}")"
+                             OnClick="() => CommunityContext.SetActiveWithoutNavigate(group.Slug)">
+                        See all →
+                    </MudLink>
+                </MudStack>
+
+                @foreach (AnnouncementSummary item in group.Announcements)
+                {
+                    <AnnouncementCard Announcement="item" Slug="@group.Slug" />
+                }
+            </MudStack>
+        }
+    }
+
+</MudStack>
+
+@code {
+    private List<CommunityAnnouncementGroup> _grouped = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Combined view — clear any active community
+        CommunityContext.ClearActive();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            // GET /announcements returns N per community, grouped
+            List<CommunityAnnouncementGroup>? response = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/announcements");
+            _grouped = response ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

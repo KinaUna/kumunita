@@ -1,0 +1,92 @@
+@page "/communities/{Slug}/manage"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+@inject ISnackbar Snackbar
+
+<PageTitle>Community Settings — @Slug</PageTitle>
+
+@if (!_authorized)
+{
+    <MudAlert Severity="Severity.Error">
+        Only community managers can access settings.
+    </MudAlert>
+    return;
+}
+
+<MudText Typo="Typo.h5" Class="mb-4">Community Settings</MudText>
+
+<MudTabs Elevation="1" Rounded="true">
+
+    <MudTabPanel Text="General">
+        <MudPaper Class="pa-4 mt-2" Elevation="0">
+            <!-- TODO: edit community Name, Description (LocalizedContent — one field per language) -->
+            <!-- TODO: edit Address -->
+            <MudText Color="Color.Secondary">General settings coming soon.</MudText>
+        </MudPaper>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Announcements">
+        <MudPaper Class="pa-4 mt-2" Elevation="0">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.h6">Member Submissions</MudText>
+                <MudSwitch T="bool"
+                           @bind-Value="_memberSubmissionsEnabled"
+                           Label="Allow members to submit announcements for review"
+                           Color="Color.Primary" />
+
+                @if (_memberSubmissionsEnabled)
+                {
+                    <!-- TODO: max pending submissions per member slider -->
+                }
+
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           OnClick="SaveAnnouncementSettings">
+                    Save
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </MudTabPanel>
+
+    <MudTabPanel Text="Danger Zone">
+        <MudPaper Class="pa-4 mt-2" Elevation="0">
+            <MudAlert Severity="Severity.Warning" Class="mb-3">
+                These actions affect all community members.
+            </MudAlert>
+            <!-- TODO: transfer Manager role to another member -->
+            <!-- Deactivation is a platform admin action, not available here -->
+        </MudPaper>
+    </MudTabPanel>
+
+</MudTabs>
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+
+    private bool _authorized;
+    private bool _memberSubmissionsEnabled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _authorized = state.User.IsManagerOf(Slug);
+
+        if (_authorized)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        // TODO: GET /communities/{Slug}/settings → AnnouncementSettings
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveAnnouncementSettings()
+    {
+        // TODO: PUT /communities/{Slug}/settings/announcements
+        await Task.CompletedTask;
+        Snackbar.Add("Settings saved.", Severity.Success);
+    }
+}

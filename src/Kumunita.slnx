@@ -1,11 +1,14 @@
 <Solution>
   <Folder Name="/Host/">
-    <Project Path="Kumunita.Host/Kumunita.Host.csproj" />
     <Project Path="Kumunita.AppHost/Kumunita.AppHost.csproj" />
+    <Project Path="Kumunita.Host/Kumunita.Host.csproj" />
   </Folder>
   <Folder Name="/Modules/">
+    <Project Path="Kumunita.Announcements.Contracts/Kumunita.Announcements.Contracts.csproj" Id="e1d43d7b-3a92-483b-8ed2-bb7d28de3442" />
     <Project Path="Kumunita.Announcements/Kumunita.Announcements.csproj" />
     <Project Path="Kumunita.Authorization/Kumunita.Authorization.csproj" Id="2f180386-8545-40e4-9042-7d56efbc9e4b" />
+    <Project Path="Kumunita.Communities.Contracts/Kumunita.Communities.Contracts.csproj" />
+    <Project Path="Kumunita.Communities/Kumunita.Communities.csproj" Id="4a47d4e3-6963-4976-a5cd-86e1d9321b12" />
     <Project Path="Kumunita.Identity/Kumunita.Identity.csproj" />
     <Project Path="Kumunita.Localization/Kumunita.Localization.csproj" />
   </Folder>

@@ -1,0 +1,112 @@
+@page "/communities/{Slug}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject CommunityContext CommunityContext
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>@(_community?.Name ?? Slug) — Kumunita</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_community is null)
+{
+    <MudAlert Severity="Severity.Error">Community not found or you are not a member.</MudAlert>
+}
+else
+{
+    <MudStack Spacing="4">
+
+        <!-- Community header -->
+        <MudPaper Class="pa-6" Elevation="1">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.h4">@_community.Name</MudText>
+                @if (_community.City is not null)
+                {
+                    <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                        <MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" />
+                        @_community.City@(_community.Country is not null ? $", {_community.Country}" : "")
+                    </MudText>
+                }
+                <MudText>@_community.Description</MudText>
+            </MudStack>
+        </MudPaper>
+
+        <!-- Stats row -->
+        <MudGrid>
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="pa-4 text-center" Elevation="1">
+                    <MudText Typo="Typo.h5">@_community.MemberCount</MudText>
+                    <MudText Typo="Typo.body2">Members</MudText>
+                </MudPaper>
+            </MudItem>
+            <!-- TODO: announcement count, recent activity -->
+        </MudGrid>
+
+        <!-- Quick navigation -->
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="@($"/announcements/{Slug}")"
+                       StartIcon="@Icons.Material.Filled.Announcement">
+                Announcements
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Href="@($"/directory/{Slug}")"
+                       StartIcon="@Icons.Material.Filled.People">
+                Directory
+            </MudButton>
+
+            @if (_isManagerOrAbove)
+            {
+                <MudSpacer />
+                <MudButton Variant="Variant.Text"
+                           Href="@($"/communities/{Slug}/manage")"
+                           StartIcon="@Icons.Material.Filled.Settings">
+                    Manage Community
+                </MudButton>
+            }
+        </MudStack>
+
+    </MudStack>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+
+    private CommunityResult? _community;
+    private bool _loading = true;
+    private bool _isManagerOrAbove;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Sync the community context without triggering a navigation loop
+        CommunityContext.SetActiveWithoutNavigate(Slug);
+
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _isManagerOrAbove = state.User.IsModeratorOrAbove(Slug);
+
+        await LoadAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loading)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _community = await Api.GetAsync<CommunityResult>($"/communities/{Slug}");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

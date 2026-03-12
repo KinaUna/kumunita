@@ -11,4 +11,5 @@
     <PackageReference Include="StronglyTypedId" PrivateAssets="all" ExcludeAssets="runtime" />
     <PackageReference Include="StronglyTypedId.Templates" />
   </ItemGroup>
+
 </Project>

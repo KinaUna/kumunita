@@ -1,0 +1,48 @@
+@using Kumunita.Shared.Kernel.Communities
+@inject AuthenticationStateProvider Auth
+
+@*
+    Wraps child content behind a community role requirement.
+    Renders nothing (not an error) if the user does not meet the requirement —
+    use this for progressively showing UI elements, not for page-level access control.
+    For page-level control, check the role in OnInitializedAsync and redirect.
+
+    Usage:
+        <RoleGuard Slug="@Slug" MinimumRole="CommunityRole.Moderator">
+            <MudButton>Approve</MudButton>
+        </RoleGuard>
+*@
+
+<CascadingAuthenticationState>
+    @if (_authorized)
+    {
+        @ChildContent
+    }
+    else if (NotAuthorized is not null)
+    {
+        @NotAuthorized
+    }
+</CascadingAuthenticationState>
+
+@code {
+    /// <summary>The community slug to check the role against.</summary>
+    [Parameter, EditorRequired] public string Slug { get; set; } = default!;
+
+    /// <summary>The minimum role required to see the child content.</summary>
+    [Parameter, EditorRequired] public CommunityRole MinimumRole { get; set; }
+
+    /// <summary>Content shown when the user meets the role requirement.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Optional fallback content shown when the requirement is not met.</summary>
+    [Parameter] public RenderFragment? NotAuthorized { get; set; }
+
+    private bool _authorized;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var role  = state.User.GetCommunityRole(Slug);
+        _authorized = role is not null && role >= MinimumRole;
+    }
+}

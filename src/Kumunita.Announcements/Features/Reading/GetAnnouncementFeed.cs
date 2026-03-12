@@ -3,6 +3,7 @@ using Kumunita.Authorization.Domain;
 using Kumunita.Identity.Domain;
 using Kumunita.Localization.Features.Resolution;
 using Kumunita.Shared.Kernel;
+using Kumunita.Shared.Kernel.Announcements;
 using Kumunita.Shared.Kernel.ValueObjects;
 using Marten;
 

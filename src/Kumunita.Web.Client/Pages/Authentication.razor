@@ -1,0 +1,86 @@
+@page "/authentication/{action}"
+@attribute [AllowAnonymous]
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+
+@*
+    Handles all OIDC authentication actions:
+      /authentication/login          — initiates the PKCE redirect to OpenIddict
+      /authentication/login-callback — processes the authorization code on return
+      /authentication/login-failed   — shown if login fails
+      /authentication/logout         — initiates logout
+      /authentication/logout-callback — processes the logout response
+      /authentication/logged-out     — shown after successful logout
+      /authentication/profile        — redirects to identity provider profile page
+      /authentication/register       — redirects to identity provider registration page
+
+    RemoteAuthenticatorView handles all of the above automatically based on {action}.
+    The templates below customise what the user sees during each state.
+*@
+
+<RemoteAuthenticatorView Action="@Action">
+
+    <LoggingIn>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:60vh">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                Redirecting to sign in…
+            </MudText>
+        </MudStack>
+    </LoggingIn>
+
+    <CompletingLoggingIn>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:60vh">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                Completing sign in…
+            </MudText>
+        </MudStack>
+    </CompletingLoggingIn>
+
+    <LogInFailed>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:60vh" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline"
+                     Color="Color.Error"
+                     Size="Size.Large" />
+            <MudText Typo="Typo.h6">Sign in failed</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Something went wrong during sign in. Please try again.
+            </MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="/authentication/login">
+                Try again
+            </MudButton>
+        </MudStack>
+    </LogInFailed>
+
+    <LogOut>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:60vh">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                Signing out…
+            </MudText>
+        </MudStack>
+    </LogOut>
+
+    <LogOutSucceeded>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height:60vh" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircleOutline"
+                     Color="Color.Success"
+                     Size="Size.Large" />
+            <MudText Typo="Typo.h6">You have been signed out</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Href="/">
+                Back to home
+            </MudButton>
+        </MudStack>
+    </LogOutSucceeded>
+
+</RemoteAuthenticatorView>
+
+@code {
+    [Parameter] public string Action { get; set; } = default!;
+}

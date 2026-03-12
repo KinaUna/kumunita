@@ -15,6 +15,12 @@ public class AppUser : IdentityUser<Guid>
 
     public bool IsSuspended { get; private set; }
 
+    /// <summary>
+    /// When true the user is redirected to the change-password page after their
+    /// first successful login.  The flag is cleared once they set a new password.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
     public void Suspend() => IsSuspended = true;
     public void Reactivate() => IsSuspended = false;
 }

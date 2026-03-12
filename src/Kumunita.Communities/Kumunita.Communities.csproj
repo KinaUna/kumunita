@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" />
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kumunita.Communities.Contracts\Kumunita.Communities.Contracts.csproj" />
+    <ProjectReference Include="..\Kumunita.Shared.Infrastructure\Kumunita.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
+  </ItemGroup>
+
+</Project>

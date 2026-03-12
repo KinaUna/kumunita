@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Kumunita.Announcements\Kumunita.Announcements.csproj" />
     <ProjectReference Include="..\Kumunita.Authorization\Kumunita.Authorization.csproj" />
+    <ProjectReference Include="..\Kumunita.Communities\Kumunita.Communities.csproj" />
     <ProjectReference Include="..\Kumunita.Identity\Kumunita.Identity.csproj" />
     <ProjectReference Include="..\Kumunita.Localization\Kumunita.Localization.csproj" />
     <ProjectReference Include="..\Kumunita.ServiceDefaults\Kumunita.ServiceDefaults.csproj" />
@@ -23,7 +24,12 @@
     <PackageReference Include="Aspire.Npgsql" />
     <PackageReference Include="Marten" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
     <PackageReference Include="OpenIddict.AspNetCore" />
     <PackageReference Include="OpenIddict.Quartz" />

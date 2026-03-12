@@ -12,6 +12,14 @@ public class LocalizedContent
         Set(languageCode, content);
     }
 
+    public LocalizedContent(Dictionary<string, string> name)
+    {
+        foreach (var (key, value) in name)
+        {
+            Set(key, value);
+        }
+    }
+
     // Marten serializes this dictionary directly to JSON
     public IReadOnlyDictionary<string, string> Translations
         => _translations.AsReadOnly();

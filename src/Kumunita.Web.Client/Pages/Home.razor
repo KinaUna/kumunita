@@ -1,7 +1,192 @@
 ﻿@page "/"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
+@using Kumunita.Announcements.Contracts.Queries
 
-<PageTitle>Home</PageTitle>
+<AppPageTitle Title="Home" />
 
-<h1>Hello, world!</h1>
+<AuthorizeView>
 
-Welcome to your new app.
+    @* ── Authenticated: personalized dashboard ─────────────────────────── *@
+    <Authorized>
+        <MudStack Spacing="4">
+
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h5">
+                    Welcome back, @context.User.Identity?.Name
+                </MudText>
+            </MudStack>
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else if (!_groups.Any())
+            {
+                <MudAlert Severity="Severity.Info" Icon="@Icons.Material.Filled.LocationCity">
+                    You are not a member of any community yet. Check your email for an invitation,
+                    or contact your neighbourhood manager to request access.
+                </MudAlert>
+            }
+            else
+            {
+                @* Recent announcements per community *@
+                <MudText Typo="Typo.h6">Recent Announcements</MudText>
+
+                @foreach (var group in _groups)
+                {
+                    <MudStack Spacing="1">
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                                @group.CommunityName
+                            </MudText>
+                            <MudSpacer />
+                            <MudLink Href="@($"/announcements/{group.Slug}")">
+                                See all →
+                            </MudLink>
+                        </MudStack>
+
+                        @if (!group.Announcements.Any())
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                No recent announcements.
+                            </MudText>
+                        }
+                        else
+                        {
+                            @foreach (var item in group.Announcements)
+                            {
+                                <AnnouncementCard Announcement="item" Slug="@group.Slug" />
+                            }
+                        }
+                    </MudStack>
+                }
+
+                <MudButton Variant="Variant.Text"
+                           Color="Color.Primary"
+                           Href="/announcements"
+                           StartIcon="@Icons.Material.Filled.Announcement">
+                    View all communities
+                </MudButton>
+            }
+
+        </MudStack>
+    </Authorized>
+
+    @* ── Unauthenticated: public landing ───────────────────────────────── *@
+    <NotAuthorized>
+        <MudStack Spacing="6">
+
+            @* Hero *@
+            <MudPaper Elevation="0" Class="pa-8 text-center">
+                <MudStack AlignItems="AlignItems.Center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity"
+                             Size="Size.Large"
+                             Color="Color.Primary"
+                             Style="font-size:4rem" />
+                    <MudText Typo="Typo.h3">Kumunita</MudText>
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">
+                        Your neighbourhood, connected.
+                    </MudText>
+                    <MudText Typo="Typo.body1" Style="max-width:480px">
+                        A private platform for neighbourhood communities — stay informed,
+                        connect with neighbours, and participate in local life.
+                    </MudText>
+                    <MudStack Row="true" Spacing="2" Class="mt-2">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Large"
+                                   Href="/authentication/login">
+                            Sign in
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Size="Size.Large"
+                                   Href="/about">
+                            Learn more
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            <MudDivider />
+
+            @* Feature highlights *@
+            <MudGrid Justify="Justify.Center">
+                <MudItem xs="12" sm="4">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Announcement"
+                                 Color="Color.Primary"
+                                 Size="Size.Large" />
+                        <MudText Typo="Typo.subtitle1">Announcements</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Stay informed about events, maintenance notices,
+                            and community news.
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.People"
+                                 Color="Color.Primary"
+                                 Size="Size.Large" />
+                        <MudText Typo="Typo.subtitle1">Private Directory</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            A member directory where you control what
+                            others can see.
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="12" sm="4">
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2" Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Lock"
+                                 Color="Color.Primary"
+                                 Size="Size.Large" />
+                        <MudText Typo="Typo.subtitle1">Invitation only</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Communities are private and accessible only
+                            to invited members.
+                        </MudText>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+
+        </MudStack>
+    </NotAuthorized>
+
+</AuthorizeView>
+
+@code {
+    [Inject] private IApiClient Api { get; set; } = default!;
+
+    private List<CommunityAnnouncementGroup> _groups = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Only load announcements if authenticated.
+        // AuthorizeView handles rendering the correct section, but OnInitializedAsync
+        // runs regardless — check auth state before making API calls.
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+        if (authState.User.Identity?.IsAuthenticated == true)
+            await LoadDashboardAsync();
+        else
+            _loading = false;
+    }
+
+    private async Task LoadDashboardAsync()
+    {
+        _loading = true;
+        try
+        {
+            // Reuses the combined feed endpoint — returns N announcements per community.
+            _groups = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/announcements") ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    [Inject] private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+}

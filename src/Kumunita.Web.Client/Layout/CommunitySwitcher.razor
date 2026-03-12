@@ -1,0 +1,94 @@
+@using System.Security.Claims
+@inject CommunityContext CommunityContext
+@inject AuthenticationStateProvider Auth
+@implements IDisposable
+
+<MudMenu Label="@_label"
+         StartIcon="@Icons.Material.Filled.LocationCity"
+         Color="Color.Inherit"
+         Variant="Variant.Text"
+         Direction="Direction.Bottom"
+         OffsetY="true">
+
+    <!-- Combined view option -->
+    <MudMenuItem OnClick="() => CommunityContext.ClearActive()">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            @if (CommunityContext.IsInCombinedView)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Public" Size="Size.Small" />
+            }
+            <MudText>All Communities</MudText>
+        </MudStack>
+    </MudMenuItem>
+
+    <MudDivider />
+
+    <!-- Per-community options -->
+    @foreach (CommunityEntry community in _communities)
+    {
+        string slug = community.Slug; // capture for lambda
+        <MudMenuItem OnClick="() => CommunityContext.SetActive(slug)">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                @if (CommunityContext.ActiveSlug == slug)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Circle" Size="Size.Small" Style="opacity:0" />
+                }
+                <MudText>@community.Name</MudText>
+                <MudChip T="string" Size="Size.Small" Color="Color.Default">@community.Role</MudChip>
+            </MudStack>
+        </MudMenuItem>
+    }
+
+</MudMenu>
+
+@code {
+    private record CommunityEntry(string Slug, string Name, string Role);
+
+    private List<CommunityEntry> _communities = [];
+    private string _label = "All Communities";
+
+    protected override async Task OnInitializedAsync()
+    {
+        CommunityContext.OnChange += OnCommunityChanged;
+        await LoadCommunitiesAsync();
+        UpdateLabel();
+    }
+
+    private async Task LoadCommunitiesAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        ClaimsPrincipal user  = state.User;
+
+        // TODO: fetch from /communities API endpoint and cache
+        // For now, read slugs from claims and show them
+        _communities = user.GetCommunitySlugs()
+            .Select(slug => new CommunityEntry(
+                slug,
+                slug, // TODO: replace with resolved display name
+                user.GetCommunityRole(slug)?.ToString() ?? "Member"))
+            .ToList();
+    }
+
+    private void OnCommunityChanged()
+    {
+        UpdateLabel();
+        StateHasChanged();
+    }
+
+    private void UpdateLabel() =>
+        _label = CommunityContext.ActiveSlug is not null
+            ? _communities.FirstOrDefault(c => c.Slug == CommunityContext.ActiveSlug)?.Name
+              ?? CommunityContext.ActiveSlug
+            : "All Communities";
+
+    public void Dispose() =>
+        CommunityContext.OnChange -= OnCommunityChanged;
+}

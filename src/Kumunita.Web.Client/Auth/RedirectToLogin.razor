@@ -1,0 +1,14 @@
+﻿@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        // Store the current URL so the user is returned here after login.
+        // InteractiveRequestOptions handles the PKCE redirect via OpenIddict.
+        Navigation.NavigateToLogin("authentication/login", new InteractiveRequestOptions
+        {
+            Interaction = InteractionType.SignIn,
+            ReturnUrl   = Navigation.Uri
+        });
+    }
+}

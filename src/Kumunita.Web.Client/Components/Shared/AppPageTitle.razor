@@ -1,0 +1,32 @@
+@*
+    Sets the browser tab title in a consistent format: "[Title] — Kumunita".
+    Wraps the built-in <PageTitle> to enforce the app name suffix everywhere.
+
+    Usage:
+        <AppPageTitle Title="Announcements" />
+        → "Announcements — Kumunita"
+
+        <AppPageTitle Title="@_community.Name" Subtitle="Announcements" />
+        → "Announcements — Old Town Lausanne — Kumunita"
+*@
+
+<PageTitle>@_fullTitle</PageTitle>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = default!;
+
+    /// <summary>
+    /// Optional secondary context, e.g. the community name.
+    /// Inserted between Title and the app name.
+    /// </summary>
+    [Parameter] public string? Subtitle { get; set; }
+
+    private string _fullTitle = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _fullTitle = Subtitle is not null
+            ? $"{Title} — {Subtitle} — Kumunita"
+            : $"{Title} — Kumunita";
+    }
+}

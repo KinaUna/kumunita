@@ -1,39 +1,106 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Kumunita.Web.Client</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
+﻿@inject CommunityContext CommunityContext
+@inject AuthenticationStateProvider Auth
+@implements IDisposable
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+<MudNavMenu>
+    <AuthorizeView>
+
+        <!-- ── Unauthenticated ──────────────────────────────────────── -->
+        <NotAuthorized>
+            <MudNavLink Href="/"       Match="NavLinkMatch.All"
+                        Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+            <MudNavLink Href="/about"  Icon="@Icons.Material.Filled.Info">About</MudNavLink>
+            <MudNavLink Href="/authentication/login"
+                        Icon="@Icons.Material.Filled.Login">Sign in</MudNavLink>
+        </NotAuthorized>
+
+        <!-- ── Authenticated ───────────────────────────────────────── -->
+        <Authorized>
+
+            @if (CommunityContext.IsInCombinedView)
+            {
+                <!-- Combined view: no active community -->
+                <MudNavLink Href="/announcements"
+                            Icon="@Icons.Material.Filled.Announcement">
+                    Announcements
+                </MudNavLink>
+                <MudNavLink Href="/communities"
+                            Icon="@Icons.Material.Filled.LocationCity">
+                    My Communities
+                </MudNavLink>
+            }
+            else
+            {
+                string slug = CommunityContext.ActiveSlug!;
+
+                <!-- Community-scoped navigation -->
+                <MudNavLink Href="@($"/announcements/{slug}")"
+                            Icon="@Icons.Material.Filled.Announcement">
+                    Announcements
+                </MudNavLink>
+                <MudNavLink Href="@($"/directory/{slug}")"
+                            Icon="@Icons.Material.Filled.People">
+                    Directory
+                </MudNavLink>
+                <MudNavLink Href="@($"/profile/{slug}")"
+                            Icon="@Icons.Material.Filled.Person">
+                    My Profile
+                </MudNavLink>
+                <MudNavLink Href="/communities"
+                            Icon="@Icons.Material.Filled.LocationCity">
+                    Communities
+                </MudNavLink>
+
+                <!-- Moderator+ section -->
+                @if (_user?.IsModeratorOrAbove(slug) == true)
+                {
+                    <MudDivider Class="my-2" />
+                    <MudNavLink Href="@($"/communities/{slug}/members")"
+                                Icon="@Icons.Material.Filled.ManageAccounts">
+                        Members &amp; Invitations
+                    </MudNavLink>
+                    <MudNavLink Href="@($"/communities/{slug}/moderation")"
+                                Icon="@Icons.Material.Filled.FactCheck">
+                        Moderation Queue
+                    </MudNavLink>
+                }
+
+                <!-- Manager-only section -->
+                @if (_user?.IsManagerOf(slug) == true)
+                {
+                    <MudNavLink Href="@($"/communities/{slug}/manage")"
+                                Icon="@Icons.Material.Filled.Settings">
+                        Community Settings
+                    </MudNavLink>
+                }
+            }
+
+            <!-- Platform admin section — always visible if applicable -->
+            @if (_user?.IsPlatformAdmin() == true)
+            {
+                <MudDivider Class="my-2" />
+                <MudNavLink Href="/platform"
+                            Icon="@Icons.Material.Filled.AdminPanelSettings">
+                    Platform Admin
+                </MudNavLink>
+            }
+
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>
 
 @code {
-    private bool collapseNavMenu = true;
+    private System.Security.Claims.ClaimsPrincipal? _user;
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
+    protected override async Task OnInitializedAsync()
     {
-        collapseNavMenu = !collapseNavMenu;
+        CommunityContext.OnChange += OnCommunityChanged;
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _user = state.User;
     }
+
+    private void OnCommunityChanged() => StateHasChanged();
+
+    public void Dispose() =>
+        CommunityContext.OnChange -= OnCommunityChanged;
 }

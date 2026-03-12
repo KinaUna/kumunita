@@ -7,17 +7,17 @@ public static class MigrationRunner
 {
     public static async Task RunAsync(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         // Register only what's needed for migrations
         builder.Services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(
                 builder.Configuration.GetConnectionString("kumunitadb")));
 
-        var app = builder.Build();
+        WebApplication app = builder.Build();
 
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider
+        using IServiceScope scope = app.Services.CreateScope();
+        IdentityDbContext db = scope.ServiceProvider
             .GetRequiredService<IdentityDbContext>();
 
         await db.Database.MigrateAsync();

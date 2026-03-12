@@ -1,0 +1,42 @@
+@*
+    Renders a single announcement in a card format.
+    Used in both the combined feed and the community-scoped feed.
+*@
+
+<MudCard Elevation="1" Class="mb-2">
+    <MudCardContent>
+        <MudStack Spacing="1">
+            <MudStack Row="true" AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.subtitle1">@Announcement.Title</MudText>
+                <MudSpacer />
+                @if (!Announcement.IsUniversal)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">Targeted</MudChip>
+                }
+            </MudStack>
+
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                @Announcement.AuthorName · @Announcement.PublishedAt.ToLocalTime().ToString("g")
+            </MudText>
+
+            <MudText Typo="Typo.body1">@Announcement.Excerpt</MudText>
+        </MudStack>
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Text"
+                   Color="Color.Primary"
+                   Href="@($"/announcements/{Slug}/{Announcement.Id}")">
+            Read more
+        </MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public AnnouncementSummary Announcement { get; set; } = default!;
+
+    /// <summary>
+    /// The community slug — used to build the detail page URL.
+    /// Required so cards in the combined feed link to the correct community.
+    /// </summary>
+    [Parameter, EditorRequired] public string Slug { get; set; } = default!;
+}

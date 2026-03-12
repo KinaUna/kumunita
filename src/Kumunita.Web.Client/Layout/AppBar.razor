@@ -1,0 +1,43 @@
+<MudAppBar Elevation="1">
+    <MudText Typo="Typo.h6" Class="ml-2">Kumunita</MudText>
+
+    <MudSpacer />
+
+    <AuthorizeView>
+        <Authorized>
+            <!-- Community Switcher — only shown when authenticated -->
+            <CommunitySwitcher />
+
+            <!-- Language picker -->
+            <LanguagePicker />
+
+            <!-- User account menu -->
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle"
+                     Color="Color.Inherit"
+                     Direction="Direction.Bottom"
+                     OffsetY="true">
+                <MudMenuItem Href="/profile">My Profile</MudMenuItem>
+                <MudDivider />
+                <MudMenuItem OnClick="LogOut">Sign out</MudMenuItem>
+            </MudMenu>
+        </Authorized>
+        <NotAuthorized>
+            <LanguagePicker />
+            <MudButton Href="/authentication/login"
+                       Color="Color.Inherit"
+                       Variant="Variant.Text">
+                Sign in
+            </MudButton>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudAppBar>
+
+@code {
+    // [Parameter]
+    // public EventCallback OnSidebarToggled { get; set; }
+
+    private void LogOut() =>
+        Navigation.NavigateToLogout("authentication/logout");
+
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+}

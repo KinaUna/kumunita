@@ -2,6 +2,7 @@
 using Kumunita.Announcements.Domain.Events;
 using Kumunita.Announcements.Exceptions;
 using Kumunita.Shared.Kernel;
+using Kumunita.Shared.Kernel.Announcements;
 using Kumunita.Shared.Kernel.ValueObjects;
 using Marten;
 

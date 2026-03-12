@@ -31,6 +31,10 @@ public static class MartenExtensions
         opts.RegisterValueType(typeof(TranslationKeyId));
         opts.RegisterValueType(typeof(TranslationId));
         opts.RegisterValueType(typeof(AnnouncementId));
+        opts.RegisterValueType(typeof(CapabilityTokenId));
+        opts.RegisterValueType(typeof(CommunityId));
+        opts.RegisterValueType(typeof(CommunityMembershipId));
+        opts.RegisterValueType(typeof(CommunityInvitationId));
 
         // Register LanguageCode as a value type for LINQ queries
         opts.RegisterValueType(typeof(LanguageCode));

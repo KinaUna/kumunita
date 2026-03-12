@@ -1,0 +1,43 @@
+@* PlatformDashboard.razor *@
+@page "/platform"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Platform Admin</PageTitle>
+
+@if (!_authorized)
+{
+    <MudAlert Severity="Severity.Error">Platform admin access required.</MudAlert>
+    return;
+}
+
+<MudText Typo="Typo.h5" Class="mb-4">Platform Administration</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard>
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.LocationCity" Size="Size.Large" />
+                <MudText Typo="Typo.h6">Communities</MudText>
+                <MudText>Provision and manage communities.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/platform/communities" Variant="Variant.Text" Color="Color.Primary">
+                    Manage
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+    <!-- TODO: add more platform admin cards as features are added -->
+</MudGrid>
+
+@code {
+    private bool _authorized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _authorized = state.User.IsPlatformAdmin();
+    }
+}

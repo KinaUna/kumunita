@@ -13,7 +13,7 @@ public record Language
         Name = name;
         NativeName = nativeName;
         this.IsDefault = IsDefault;
-        IsActive = IsActive;
+        this.IsActive = IsActive;
         CreatedAt = DateTime.UtcNow;
         LastUpdatedAt = DateTime.UtcNow;
     }

@@ -13,5 +13,15 @@
 [StronglyTypedId] public partial struct TranslationKeyId { }
 [StronglyTypedId] public partial struct TranslationId { }
 
-// Announcements module (ready for when it's built)
+// Communities module
+[StronglyTypedId(Template.Guid, "guid-efcore")]
+public partial struct CommunityId { }
+
+[StronglyTypedId(Template.Guid, "guid-efcore")]
+public partial struct CommunityMembershipId { }
+
+[StronglyTypedId(Template.Guid, "guid-efcore")]
+public partial struct CommunityInvitationId { }
+
+// Announcements module
 [StronglyTypedId] public partial struct AnnouncementId { }

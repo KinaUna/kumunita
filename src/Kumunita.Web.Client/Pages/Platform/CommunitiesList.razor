@@ -1,0 +1,119 @@
+@page "/platform/communities"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Communities — Platform Admin</PageTitle>
+
+@if (!_authorized)
+{
+    <MudAlert Severity="Severity.Error">Platform admin access required.</MudAlert>
+    return;
+}
+
+<MudStack Spacing="4">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Communities</MudText>
+        <MudSpacer />
+        <MudButton StartIcon="@Icons.Material.Filled.Add"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="OpenProvisionDialog">
+            Provision Community
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="_communities" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Slug</MudTh>
+                <MudTh>Active</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Slug</MudTd>
+                <MudTd>
+                    <MudIcon Icon="@(context.IsActive
+                        ? Icons.Material.Filled.CheckCircle
+                        : Icons.Material.Filled.Cancel)"
+                             Color="@(context.IsActive ? Color.Success : Color.Error)" />
+                </MudTd>
+                <MudTd>@context.CreatedAt.ToLocalTime().ToString("d")</MudTd>
+                <MudTd>
+                    @if (context.IsActive)
+                    {
+                        <MudButton Size="Size.Small"
+                                   Color="Color.Error"
+                                   OnClick="() => DeactivateCommunity(context.Slug)">
+                            Deactivate
+                        </MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+</MudStack>
+
+@code {
+    private record PlatformCommunityRow(string Slug, bool IsActive, DateTimeOffset CreatedAt);
+
+    private List<PlatformCommunityRow> _communities = [];
+    private bool _loading = true;
+    private bool _authorized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _authorized = state.User.IsPlatformAdmin();
+
+        if (_authorized)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _communities = await Api.GetAsync<List<PlatformCommunityRow>>(
+                "/platform/communities?includeInactive=true") ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenProvisionDialog()
+    {
+        // TODO: open MudDialog with form: slug, name (per language), description, address
+        // On confirm: POST /platform/communities
+        // On success: Snackbar + reload list
+        await Task.CompletedTask;
+    }
+
+    private async Task DeactivateCommunity(string slug)
+    {
+        bool? confirmed = await DialogService.ShowMessageBoxAsync(
+            $"Deactivate '{slug}'?",
+            "Members will lose access immediately. This can be reversed.",
+            yesText: "Deactivate", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        await Api.DeleteAsync($"/platform/communities/{slug}");
+        Snackbar.Add($"Community '{slug}' deactivated.", Severity.Warning);
+        await LoadAsync();
+    }
+}

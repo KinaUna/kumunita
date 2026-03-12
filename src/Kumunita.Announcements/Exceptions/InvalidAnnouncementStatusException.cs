@@ -1,5 +1,6 @@
 ﻿using Kumunita.Announcements.Domain;
 using Kumunita.Shared.Kernel;
+using Kumunita.Shared.Kernel.Announcements;
 
 namespace Kumunita.Announcements.Exceptions;
 

@@ -39,6 +39,7 @@ public static class OpenIddictConfiguration
                     OpenIddictConstants.Scopes.OpenId,
                     OpenIddictConstants.Scopes.Email,
                     OpenIddictConstants.Scopes.Profile,
+                    OpenIddictConstants.Scopes.OfflineAccess, // required for refresh tokens
                     "roles",
                     "groups");
 

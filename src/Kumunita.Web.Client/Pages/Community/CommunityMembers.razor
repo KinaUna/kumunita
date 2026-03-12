@@ -1,0 +1,157 @@
+@page "/communities/{Slug}/members"
+@using Kumunita.Shared.Kernel.Communities
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Members — @Slug</PageTitle>
+
+@if (!_authorized)
+{
+    <MudAlert Severity="Severity.Error">
+        You need to be a Moderator or Manager to access this page.
+    </MudAlert>
+    return;
+}
+
+<MudStack Spacing="4">
+
+    <!-- Members section -->
+    <MudPaper Class="pa-4" Elevation="1">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Members</MudText>
+            <MudSpacer />
+            @if (_isManager)
+            {
+                <MudButton StartIcon="@Icons.Material.Filled.PersonAdd"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           OnClick="OpenInviteDialog">
+                    Invite Member
+                </MudButton>
+            }
+        </MudStack>
+
+        <MudTable Items="_members" Dense="true" Hover="true" Class="mt-2">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Joined</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.DisplayName</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small">@context.Role</MudChip>
+                </MudTd>
+                <MudTd>@context.JoinedAt.ToLocalTime().ToString("d")</MudTd>
+                <MudTd>
+                    @if (_isManager && context.Role != CommunityRole.Manager)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.MoreVert"
+                                       Size="Size.Small"
+                                       OnClick="() => OpenMemberMenu(context)" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+
+    <!-- Pending invitations section -->
+    @if (_isManager || _isModerator)
+    {
+        <MudPaper Class="pa-4" Elevation="1">
+            <MudText Typo="Typo.h6" Class="mb-2">Pending Invitations</MudText>
+
+            @if (!_invitations.Any())
+            {
+                <MudText Color="Color.Secondary">No pending invitations.</MudText>
+            }
+            else
+            {
+                <MudTable Items="_invitations" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Expires</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.InvitedEmail</MudTd>
+                        <MudTd>@context.AssignedRole</MudTd>
+                        <MudTd>@context.ExpiresAt.ToLocalTime().ToString("g")</MudTd>
+                        <MudTd>
+                            <MudIconButton Icon="@Icons.Material.Filled.Cancel"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="() => RevokeInvitation(context.Id)" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+    }
+
+</MudStack>
+
+@code {
+    [Parameter] public string Slug { get; set; } = default!;
+
+    private List<CommunityMemberResult>    _members     = [];
+    private List<PendingInvitationResult>  _invitations = [];
+
+    private bool _authorized;
+    private bool _isManager;
+    private bool _isModerator;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _isManager   = state.User.IsManagerOf(Slug);
+        _isModerator = state.User.IsModeratorOrAbove(Slug);
+        _authorized  = _isModerator;
+
+        if (_authorized)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _members     = await Api.GetAsync<List<CommunityMemberResult>>($"/communities/{Slug}/members") ?? [];
+        _invitations = await Api.GetAsync<List<PendingInvitationResult>>($"/communities/{Slug}/invitations") ?? [];
+    }
+
+    private async Task OpenInviteDialog()
+    {
+        // TODO: open MudDialog with invite form (email, role selector)
+        // On confirm: POST /communities/{Slug}/invitations
+        // On success: Snackbar + reload invitations
+        await Task.CompletedTask;
+    }
+
+    private async Task OpenMemberMenu(CommunityMemberResult member)
+    {
+        // TODO: open MudMenu or dialog with options:
+        // - Change role (Manager only, up to Moderator)
+        // - Suspend member
+        // - Remove member
+        await Task.CompletedTask;
+    }
+
+    private async Task RevokeInvitation(CommunityInvitationId id)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Revoke invitation?",
+            "The invited person will no longer be able to use this link.",
+            yesText: "Revoke", cancelText: "Cancel");
+
+        if (confirmed != true) return;
+
+        await Api.DeleteAsync($"/communities/{Slug}/invitations/{id}");
+        Snackbar.Add("Invitation revoked.", Severity.Success);
+        await LoadAsync();
+    }
+}

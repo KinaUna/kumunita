@@ -1,4 +1,4 @@
-﻿namespace Kumunita.Announcements.Domain;
+﻿namespace Kumunita.Shared.Kernel.Announcements;
 
 public enum AnnouncementStatus
 {
