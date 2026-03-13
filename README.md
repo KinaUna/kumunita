@@ -32,7 +32,7 @@ Users can belong to multiple communities (e.g. primary residence, second home, d
 | Event store / document DB | Marten 8.x (PostgreSQL) |
 | Identity persistence | EF Core 10 (PostgreSQL) |
 | Authentication | OpenIddict (Authorization Code + PKCE) |
-| Frontend | Blazor WASM (classic hosted model) |
+| Frontend | Blazor Web App (InteractiveWebAssembly) |
 | UI components | MudBlazor |
 | Database | PostgreSQL (single database, schema-per-tenant) |
 | Dev orchestration | .NET Aspire 13 (development only, not in production) |
@@ -46,7 +46,7 @@ Users can belong to multiple communities (e.g. primary residence, second home, d
 ```
 Kumunita.sln
 ├── Host/
-│   ├── Kumunita.Host               # ASP.NET entry point, serves Blazor WASM
+│   ├── Kumunita.Host               # ASP.NET entry point, Blazor Web App host
 │   └── Kumunita.AppHost            # Aspire orchestration (dev only)
 ├── Web/
 │   └── Kumunita.Web.Client         # Blazor WASM client (all .razor files)
@@ -174,7 +174,7 @@ Communities are created by platform admins only (via `POST /platform/communities
 
 OpenIddict handles authentication using the **Authorization Code + PKCE** flow. The Blazor WASM client uses `Microsoft.AspNetCore.Components.WebAssembly.Authentication` which manages the token lifecycle, silent refresh, and redirect handling. All authentication callbacks are routed through `/authentication/{action}` in the client.
 
-**Important:** `app.MapFallbackToFile("index.html")` must include `.AllowAnonymous()` in `Program.cs`, otherwise OIDC callbacks are blocked before the user is authenticated.
+**Important:** `app.MapRazorComponents<App>()` must include `.AllowAnonymous()` in `Program.cs`, otherwise OIDC callbacks are blocked before the user is authenticated.
 
 OpenIddict certificates (signing and encryption) are loaded from PFX files mounted at `/run/secrets/` in production. Always use `X509KeyStorageFlags.EphemeralKeySet` in container environments — this avoids X.509 store permission errors.
 
@@ -339,7 +339,30 @@ Manages platform languages and translations with a fallback chain.
 
 ## Frontend
 
-The Blazor WASM client (`Kumunita.Web.Client`) is hosted by `Kumunita.Host` using the **classic hosted WASM model** (`UseBlazorFrameworkFiles()` + `UseStaticFiles()`), not the Blazor Web App model. Do not mix these — they are incompatible hosting configurations.
+The Blazor WASM client (`Kumunita.Web.Client`) is hosted by `Kumunita.Host` using the **Blazor Web App model** with `InteractiveWebAssembly` render mode. The Host project contains `App.razor` (the server-side root component) which renders the `Routes` component from the client assembly with `@rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)"`. Prerendering is disabled to avoid auth state mismatches during initial render.
+
+The Host pipeline uses `MapRazorComponents<App>().AddInteractiveWebAssemblyRenderMode()` instead of the legacy `UseBlazorFrameworkFiles()` + `MapFallbackToFile("index.html")` pattern. A catch-all route (`Pages/CatchAll.razor` with `@page "/{*path}"`) ensures that Wolverine API endpoints take priority (literal routes outrank catch-all) while Blazor still serves the shell HTML for all other URLs.
+
+### Blazor Web App hosting
+
+The client uses `Microsoft.NET.Sdk.BlazorWebAssembly` with `InteractiveWebAssembly` render mode. The Host project contains `App.razor` as the server-side root component:
+
+\```razor
+<HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+<Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+\```
+
+The host pipeline uses:
+
+\```csharp
+app.MapRazorComponents<App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AllowAnonymous();
+\```
+
+A catch-all route (`Kumunita.Host/Pages/CatchAll.razor` with `@page "/{*path}"`) ensures Wolverine API endpoints take priority over the Blazor shell. **Do not use** `AddAdditionalAssemblies` — client `@page` routes would conflict with Wolverine endpoints at the same URLs.
+
+**Do not use** `UseBlazorFrameworkFiles()` or `MapFallbackToFile("index.html")` — those belong to the legacy classic hosted model.
 
 ### Key services
 
@@ -409,14 +432,14 @@ Cross-tenant endpoints (no `{slug}`) are implemented in `Kumunita.Host.Endpoints
 
 5. **Platform admins have no community data access.** The `platform_admin` claim and `CommunityRole` are entirely separate concepts and must never intersect.
 
-6. **`MapFallbackToFile("index.html")` must call `.AllowAnonymous()`.** Without this, OIDC callbacks are blocked by the global authorization policy before the user can authenticate.
+6. **`MapRazorComponents<App>()` must call `.AllowAnonymous()`.** Without this, OIDC callbacks are blocked by the global authorization policy before the user can authenticate.
 
 7. **Use `X509KeyStorageFlags.EphemeralKeySet` for OpenIddict certificates in containers.** Standard X.509 store access fails in containerized environments without this flag.
 
 8. **All strongly typed IDs must be registered with Marten.** Add new IDs to `MartenExtensions.ConfigureModuleSchemas()` or they will be serialized as JSON objects rather than plain values.
 
-9. **Blazor WASM classic hosted model and Blazor Web App model are incompatible.** The client uses `Microsoft.NET.Sdk.BlazorWebAssembly` and the host uses `UseBlazorFrameworkFiles()`. Do not use `MapRazorComponents` — it belongs to the Web App model.
-
+9. **The Host uses the Blazor Web App model with InteractiveWebAssembly.** `App.razor` in `Kumunita.Host` is the server-side root component. The client's `Routes.razor` handles client-side routing. `Pages/CatchAll.razor` (`@page "/{*path}"`) provides the catch-all fallback — do not use `MapFallbackToFile` or `UseBlazorFrameworkFiles`.
+10. **Do not use `AddAdditionalAssemblies` with `MapRazorComponents`.** The client assembly's `@page` routes would conflict with Wolverine endpoints at the same URLs (e.g. `/announcements`). The catch-all route in `CatchAll.razor` serves the Blazor shell; the client-side `<Router>` resolves pages via its own `AppAssembly`.
 ---
 
 ## Development setup
