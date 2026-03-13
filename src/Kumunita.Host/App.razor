@@ -7,6 +7,7 @@
     <base href="/" />
 
     <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+    <ImportMap />
 
     <!-- MudBlazor styles -->
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
@@ -33,6 +34,6 @@
 <script src="_content/Microsoft.AspNetCore.Components.WebAssembly.Authentication/AuthenticationService.js"></script>
 
 <!-- Blazor Web bootstrap -->
-<script src="_framework/blazor.web.js"></script>
+<script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 </html>

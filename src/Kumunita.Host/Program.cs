@@ -201,8 +201,38 @@ app.Logger.LogInformation(
 
 if (frameworkDirExists)
 {
-    string[] files = Directory.GetFiles(frameworkDir).Select(Path.GetFileName).Take(15).ToArray()!;
-    app.Logger.LogInformation("[static-assets] _framework/ contents (first 15): {Files}", string.Join(", ", files));
+    // Show ALL blazor-related files (including fingerprinted variants)
+    string[] blazorFiles = Directory.GetFiles(frameworkDir, "blazor*")
+        .Select(Path.GetFileName).ToArray()!;
+    app.Logger.LogInformation("[static-assets] blazor* files ({Count}): {Files}",
+        blazorFiles.Length, string.Join(", ", blazorFiles));
+
+    // Also show dotnet.* JS files for context
+    string[] dotnetJsFiles = Directory.GetFiles(frameworkDir, "dotnet*.js*")
+        .Select(Path.GetFileName).ToArray()!;
+    app.Logger.LogInformation("[static-assets] dotnet*.js* files ({Count}): {Files}",
+        dotnetJsFiles.Length, string.Join(", ", dotnetJsFiles));
+}
+
+// Check the static assets manifest
+string manifestPath = Path.Combine(app.Environment.ContentRootPath, "Kumunita.Host.staticwebassets.endpoints.json");
+bool manifestExists = File.Exists(manifestPath);
+app.Logger.LogInformation("[static-assets] manifest exists={Exists}  path={Path}", manifestExists, manifestPath);
+if (manifestExists)
+{
+    string manifestContent = File.ReadAllText(manifestPath);
+    int idx = manifestContent.IndexOf("blazor.web", StringComparison.Ordinal);
+    if (idx >= 0)
+    {
+        int start = Math.Max(0, idx - 20);
+        int len = Math.Min(300, manifestContent.Length - start);
+        app.Logger.LogInformation("[static-assets] manifest 'blazor.web' context: ...{Context}...",
+            manifestContent.Substring(start, len));
+    }
+    else
+    {
+        app.Logger.LogWarning("[static-assets] 'blazor.web' NOT FOUND anywhere in manifest!");
+    }
 }
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
