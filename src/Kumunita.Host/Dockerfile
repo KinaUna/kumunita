@@ -27,6 +27,10 @@ RUN dotnet restore "src/Kumunita.Host/Kumunita.Host.csproj"
 # Copy all source code
 COPY . .
 
+# Install any workloads required by the project (wasm-tools for Blazor WASM)
+# This is needed because mcr.microsoft.com/dotnet/sdk doesn't pre-install them.
+RUN dotnet workload restore "src/Kumunita.Host/Kumunita.Host.csproj"
+
 # Publish the Host project
 RUN dotnet publish "src/Kumunita.Host/Kumunita.Host.csproj" \
     --no-restore \
