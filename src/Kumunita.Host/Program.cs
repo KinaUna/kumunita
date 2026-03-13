@@ -172,13 +172,37 @@ builder.Services.AddScoped<IQuerySession>(sp =>
 
 WebApplication app = builder.Build();
 
-// Guard: in containerised environments WebRootPath may be null or point to a
-// non-existent directory, causing both UseStaticFiles() and MapStaticAssets()
-// to use NullFileProvider and silently return 404 for every static asset.
+// Force WebRootPath to ContentRootPath/wwwroot.  In containerised environments
+// the default may resolve to null, an empty string, or a path that doesn't
+// actually contain the published static assets — causing both UseStaticFiles()
+// and MapStaticAssets() to silently 404 every request for _framework/*.
 string expectedWebRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
-if (!Directory.Exists(app.Environment.WebRootPath ?? string.Empty) && Directory.Exists(expectedWebRoot))
+app.Logger.LogInformation(
+    "[static-assets] ContentRootPath={ContentRoot}  WebRootPath(before)={WebRoot}  expected={Expected}",
+    app.Environment.ContentRootPath,
+    app.Environment.WebRootPath ?? "(null)",
+    expectedWebRoot);
+
+if (Directory.Exists(expectedWebRoot))
 {
     app.Environment.WebRootPath = expectedWebRoot;
+}
+
+// Log whether the key file actually exists on disk.
+string blazorJsPhysical = Path.Combine(app.Environment.WebRootPath ?? "", "_framework", "blazor.web.js");
+bool blazorJsExists = File.Exists(blazorJsPhysical);
+string frameworkDir = Path.Combine(app.Environment.WebRootPath ?? "", "_framework");
+bool frameworkDirExists = Directory.Exists(frameworkDir);
+app.Logger.LogInformation(
+    "[static-assets] WebRootPath(after)={WebRoot}  _framework/ exists={DirExists}  blazor.web.js exists={FileExists}",
+    app.Environment.WebRootPath ?? "(null)",
+    frameworkDirExists,
+    blazorJsExists);
+
+if (frameworkDirExists)
+{
+    string[] files = Directory.GetFiles(frameworkDir).Select(Path.GetFileName).Take(15).ToArray()!;
+    app.Logger.LogInformation("[static-assets] _framework/ contents (first 15): {Files}", string.Join(", ", files));
 }
 
 // ── Middleware pipeline ───────────────────────────────────────────────────────
@@ -191,6 +215,34 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+
+// ── Diagnostic: log _framework requests so we can see whether they reach the
+//    app at all and what status code is produced.  Remove once the 404 is fixed.
+if (!app.Environment.IsDevelopment())
+{
+    app.Use(async (context, next) =>
+    {
+        bool isFramework = context.Request.Path.StartsWithSegments("/_framework");
+        if (isFramework)
+        {
+            app.Logger.LogWarning(
+                "[static-assets] INCOMING {Method} {Path}  WebRootFileProvider={Provider}",
+                context.Request.Method,
+                context.Request.Path,
+                app.Environment.WebRootFileProvider.GetType().Name);
+        }
+
+        await next();
+
+        if (isFramework)
+        {
+            app.Logger.LogWarning(
+                "[static-assets] RESPONSE {Path} → {StatusCode}",
+                context.Request.Path,
+                context.Response.StatusCode);
+        }
+    });
+}
 
 // Serve physical wwwroot files (including _framework/*) as middleware so they
 // short-circuit the pipeline before any endpoint — including the CatchAll Razor
