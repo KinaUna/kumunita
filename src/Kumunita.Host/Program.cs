@@ -172,6 +172,15 @@ builder.Services.AddScoped<IQuerySession>(sp =>
 
 WebApplication app = builder.Build();
 
+// Guard: in containerised environments WebRootPath may be null or point to a
+// non-existent directory, causing both UseStaticFiles() and MapStaticAssets()
+// to use NullFileProvider and silently return 404 for every static asset.
+string expectedWebRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+if (!Directory.Exists(app.Environment.WebRootPath ?? string.Empty) && Directory.Exists(expectedWebRoot))
+{
+    app.Environment.WebRootPath = expectedWebRoot;
+}
+
 // ── Middleware pipeline ───────────────────────────────────────────────────────
 
 // MUST be first — rewrites HttpContext.Request.Scheme to "https" before any
