@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <UserSecretsId>5410a384-941c-4689-bb01-eeb5e8a8a638</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <!-- Force the ASP.NET Core framework to include blazor.web.js as a static web asset.
+         In .NET 10 the Blazor script is no longer embedded; it must be emitted during publish.
+         Without this flag the script may be missing from the Docker publish output. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>
