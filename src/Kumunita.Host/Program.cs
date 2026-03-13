@@ -208,8 +208,9 @@ app.MapWolverineEndpoints();
 
 app.MapStaticAssets();
 
-// Catch-all fallback — Blazor handles all unmatched routes client-side
-app.MapFallbackToFile("index.html").AllowAnonymous();
+app.MapRazorComponents<App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AllowAnonymous();
 
 // Apply EF Core schema before starting background services
 using (IServiceScope scope = app.Services.CreateScope())
