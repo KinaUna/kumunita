@@ -56,6 +56,9 @@ Kumunita.sln
 │   ├── Kumunita.Communities        # Community lifecycle, membership, invitations
 │   ├── Kumunita.Announcements      # Announcements, moderation queue
 │   └── Kumunita.Localization       # Languages, translations, fallback chain
+├── Contracts/
+│   ├── Kumunita.Communities.Contracts    # Public commands/queries (Web.Client-safe)
+│   └── Kumunita.Announcements.Contracts  # Public query result types (Web.Client-safe)
 ├── Shared/
 │   ├── Kumunita.Shared.Kernel      # Value objects, IDs, interfaces, events
 │   └── Kumunita.Shared.Infrastructure  # Marten config, middleware, auth policies
@@ -72,13 +75,18 @@ Kumunita.Host
   → Kumunita.Web.Client
 
 Kumunita.Web.Client
-  → Kumunita.Shared.Infrastructure
-  → Kumunita.Announcements (for query result types)
-  → Kumunita.Communities (for domain types)
-  → Kumunita.Shared.Kernel
+  → Kumunita.Announcements.Contracts (query result types: AnnouncementSummary, AnnouncementDetail, CommunityAnnouncementGroup)
+  → Kumunita.Communities.Contracts (commands and query types for community operations)
+  (Kumunita.Shared.Kernel is reachable transitively via both .Contracts references)
 
 Kumunita.Shared.Infrastructure
-  → Kumunita.Communities
+  → Kumunita.Announcements
+  → Kumunita.Authorization
+  → Kumunita.Identity
+  → Kumunita.Localization
+  → Kumunita.Shared.Kernel
+
+Kumunita.[Module].Contracts
   → Kumunita.Shared.Kernel
 
 Kumunita.[Module]
@@ -91,7 +99,9 @@ Kumunita.Shared.Kernel
 
 **Critical rule:** Modules communicate exclusively via Wolverine in-process messages. No direct project references between modules.
 
-**Critical rule:** `Kumunita.Shared.Infrastructure` references `Kumunita.Communities`. Therefore, anything `Shared.Infrastructure` depends on must live in `Kumunita.Shared.Kernel` — not in any module — to avoid circular references. This is why `CommunityRole` lives in `Shared.Kernel` rather than `Kumunita.Communities`.
+**Critical rule:** `Kumunita.Shared.Infrastructure` references all four domain modules (Announcements, Authorization, Identity, Localization). Therefore any type that `Shared.Infrastructure` needs from a module must instead live in `Kumunita.Shared.Kernel` to avoid circular references. This is why `CommunityRole`, `CommunityMembership`, and `AnnouncementStatus` all live in `Shared.Kernel`.
+
+**Critical rule:** `.Contracts` projects (`Kumunita.Communities.Contracts`, `Kumunita.Announcements.Contracts`) expose a module's public surface to the Blazor WASM client without requiring a full module dependency. Each `.Contracts` project references only `Kumunita.Shared.Kernel`.
 
 ---
 
@@ -146,7 +156,7 @@ The **community** is the isolation boundary. Each community gets its own Postgre
 | OpenIddict tables | No | `identity` |
 | `UserProfile` | Yes | `community_{slug}` |
 | `DirectoryEntry` | Yes | `community_{slug}` |
-| `Group`, `GroupMembership` | Yes | `community_{slug}` |
+| `UserGroup`, `UserGroupMembership` | Yes | `community_{slug}` |
 | `UserAuthorizationState` | Yes | `community_{slug}` |
 | `VisibilityPolicy` | Yes | `community_{slug}` |
 | `CapabilityToken` | Yes | `community_{slug}` |
@@ -182,7 +192,7 @@ OpenIddict certificates (signing and encryption) are loaded from PFX files mount
 }
 ```
 
-`ClaimsPrincipalExtensions` in `Kumunita.Shared.Infrastructure.Auth` provides extension methods used by both backend handlers and Blazor components:
+`ClaimsPrincipalExtensions` in `Kumunita.Shared.Kernel.Auth` provides extension methods usable from both backend handlers and Blazor WASM components:
 
 ```csharp
 user.GetUserId()                  // → UserId
@@ -195,7 +205,7 @@ user.IsManagerOf(slug)            // → bool
 user.IsModeratorOrAbove(slug)     // → bool
 ```
 
-The client's `Kumunita.Web.Client/Auth/AppClaimsPrincipal.cs` re-exports these via a `global using` — no duplication.
+Because `Kumunita.Shared.Kernel` is reachable transitively from `Kumunita.Web.Client` via the `.Contracts` project references, Blazor components can call these extensions directly without any re-export.
 
 ### Community roles
 
@@ -212,7 +222,7 @@ The client's `Kumunita.Web.Client/Auth/AppClaimsPrincipal.cs` re-exports these v
 
 ### Authorization policies
 
-Registered in `Kumunita.Shared.Infrastructure.MultiTenancy.CommunityAuthorizationExtensions`:
+Registered in `Kumunita.Shared.Infrastructure.MultiTenancy.CommunityAuthorizationPolicies`:
 
 | Policy | Requirement |
 |---|---|
@@ -249,36 +259,47 @@ Sensitivity tiers within communities:
 Contains types shared across all modules. No dependencies on other internal projects.
 
 - **Strongly typed IDs:** `UserId`, `CommunityId`, `CommunityMembershipId`, `CommunityInvitationId`, `AnnouncementId`, `CapabilityTokenId`, `GroupId`, `RoleId`, `PermissionId`, `TranslationKeyId`, `TranslationId`
-- **Value objects:** `CommunitySlug`, `LanguageCode`, `LocalizedContent`, `Address`
-- **Enums:** `CommunityRole` (Member / Moderator / Manager)
+- **Value objects:** `CommunitySlug`, `LanguageCode`, `LocalizedContent`
+- **Enums:** `CommunityRole` (Member / Moderator / Manager), `AnnouncementStatus` (Draft / PendingReview / Published / Rejected / Retracted), `MembershipStatus` (Active / Suspended / Left)
+- **Domain types:** `CommunityMembership` — platform-level membership record, stored in the `communities` schema
 - **Interfaces:** `ITenantScoped`, `IAuditableEntity`, `IUserOwned`, `ISoftDeletable`, `IDomainEvent`
+- **Auth:** `ClaimsPrincipalExtensions` (namespace `Kumunita.Shared.Kernel.Auth`) — JWT claim helpers usable from both backend and Blazor WASM
 
-All strongly typed IDs and value types must be registered with Marten via `opts.AddSharedKernelTypes()` in `Program.cs`.
+All strongly typed IDs and value types are registered with Marten via `opts.ConfigureModuleSchemas()` (defined in `Kumunita.Shared.Infrastructure.MartenExtensions`).
 
 ### Kumunita.Shared.Infrastructure
 
-Cross-cutting infrastructure. References `Kumunita.Communities` and `Kumunita.Shared.Kernel`.
+Cross-cutting infrastructure. References Announcements, Authorization, Identity, Localization, and Shared.Kernel.
 
-- `CommunityTenantMiddleware` — sets Marten tenant from `{slug}` route value
-- `CommunityAuthorizationPolicies` — registers ASP.NET Core authorization policies
-- `ClaimsPrincipalExtensions` — JWT claim helpers (used by both backend and frontend)
-- `SharedKernelMartenExtensions` — `AddSharedKernelTypes()` for Marten registration
-- `DomainExceptionHandler` — maps domain exceptions to HTTP status codes
+- `CommunityTenantMiddleware` — extracts `{slug}` from route, validates community membership via claims, sets Marten tenant for the request
+- `TenantAwareSessionFactory` — Marten `ISessionFactory` that scopes every `IDocumentSession` / `IQuerySession` to the current community tenant
+- `CommunityAuthorizationPolicies` — registers ASP.NET Core authorization policies and the `CommunityRoleHandler`
+- `DomainExceptionHandler` — maps domain exceptions from all modules to HTTP status codes
+- `DomainEventModuleRoutingConvention` — routes every `IDomainEvent` to the correct local Wolverine queue by namespace prefix (`identity`, `localization`, `announcements`)
+- `MartenExtensions.ConfigureModuleSchemas()` — registers all module Marten schemas and all strongly typed IDs
+
+### Kumunita.Communities.Contracts / Kumunita.Announcements.Contracts
+
+Lightweight contract assemblies that expose a module's public surface to the Blazor WASM client without pulling in the full module implementation. Both reference only `Kumunita.Shared.Kernel`.
+
+- `Kumunita.Communities.Contracts` — commands: `CreateCommunityCommand`, `InviteMemberCommand`, `AcceptInvitationCommand`, `DeclineInvitationCommand`, `RevokeInvitationCommand`, `ChangeMemberRoleCommand`, `SuspendMemberCommand`, `RemoveMemberCommand`, `DeactivateCommunityCommand`; result types: `CommunityResult`, `CommunityMemberResult`, `PendingInvitationResult`
+- `Kumunita.Announcements.Contracts` — result types: `AnnouncementSummary`, `AnnouncementDetail`, `CommunityAnnouncementGroup`
 
 ### Kumunita.Communities
 
 Platform-level module (not tenant-scoped). Manages community lifecycle, membership, and invitations.
 
-- Documents: `Community`, `CommunityMembership`, `CommunityInvitation` (all in `communities` schema)
+- Documents: `Community`, `CommunityInvitation` (in `communities` schema); `CommunityMembership` is defined in `Kumunita.Shared.Kernel` and also stored in the `communities` schema
+- Value objects: `CommunityAddress` — address details embedded in `Community`
 - Handlers: `PlatformCommunityHandler`, `InvitationHandler`, `MemberManagementHandler`, `CommunityQueryHandler`
-- Key events: `CommunityCreated`, `MemberJoinedCommunity`, `MemberRoleChanged`, `MemberSuspendedFromCommunity`, `InvitationCreated`
+- Key events: `CommunityCreated`, `CommunityDeactivated`, `MemberJoinedCommunity`, `MemberLeftCommunity`, `MemberRoleChanged`, `MemberSuspendedFromCommunity`, `InvitationCreated`, `InvitationDeclined`, `InvitationRevoked`
 
 ### Kumunita.Identity
 
 Manages user accounts, profiles, and groups. Split persistence:
 
 - **EF Core** (`identity` schema): `AppUser` (thin auth record), `AppRole`, OpenIddict tables
-- **Marten** (tenant-scoped): `UserProfile`, `DirectoryEntry`, `Group`, `GroupMembership`
+- **Marten** (tenant-scoped): `UserProfile`, `DirectoryEntry`, `UserGroup`, `UserGroupMembership`
 
 `AppUser.DomainId` bridges the EF Core identity record to the `UserId` used throughout the domain.
 
@@ -290,6 +311,8 @@ Manages capability tokens, visibility policies, and audit logs. All documents ar
 - `VisibilityPolicy` — per-user, per-resource visibility settings
 - `CapabilityToken` — issued per data access request; consumed on use for Sensitive tier
 - `AuditEntry` — records all token issuances, denials, and uses; requester identity is obscured for non-admins
+- `ResourceType` — enum of addressable resource types for capability tokens and visibility policies
+- Endpoints: `CapabilityTokenEndpoints`, `VisibilityPolicyEndpoints` (includes `GetMyPrivacySettings`), `AuditLogEndpoints` (`GetFullAuditLog` for admins + `GetMyAccessLog` for users)
 
 ### Kumunita.Announcements
 
@@ -298,7 +321,7 @@ Manages announcements with a staff path and a member submission path.
 - Status lifecycle: `Draft → Published` (staff) or `Draft → PendingReview → Published/Rejected` (member)
 - Targeting: `AnnouncementTarget` (roles + groups); `IsUniversal` for member submissions
 - `AnnouncementSettings` — singleton document per community; controls `MemberSubmissionsEnabled` and `MaxPendingSubmissionsPerMember`
-- Query results: `AnnouncementSummary`, `AnnouncementDetail`, `CommunityAnnouncementGroup`
+- Query result types (`AnnouncementSummary`, `AnnouncementDetail`, `CommunityAnnouncementGroup`) are in `Kumunita.Announcements.Contracts` so the Blazor client can reference them without depending on the full module
 
 ### Kumunita.Localization
 
@@ -306,8 +329,10 @@ Manages platform languages and translations with a fallback chain.
 
 - Fallback order: preferred language → browser Accept-Language → English → key itself
 - `Language` (Code = identity, IsDefault, IsActive)
+- `LocalizationSettings` — singleton document holding the active default language
 - `TranslationKey` (Module + Feature + Key hierarchy)
 - `Translation` (Status: Draft / Approved / NeedsReview)
+- `TranslationResolver` — service that walks the fallback chain to resolve a key to a localized string
 - Seeded languages: English (default), French, German, Italian
 
 ---
@@ -361,6 +386,8 @@ The Blazor WASM client (`Kumunita.Web.Client`) is hosted by `Kumunita.Host` usin
 
 The `{slug}` in the URL is the authoritative community context for every request — both on the backend (Marten tenant) and the frontend (`CommunityContext`).
 
+Cross-tenant endpoints (no `{slug}`) are implemented in `Kumunita.Host.Endpoints` rather than in a module, because they need to query across multiple module domain types in a single request. For example, `CombinedAnnouncementFeedEndpoint` (`GET /announcements`) joins `Community`, `UserProfile`, `Announcement`, and `UserAuthorizationState` data across all of the authenticated user's community tenants.
+
 | Pattern | Tenant context | Example |
 |---|---|---|
 | `GET /{resource}` | Cross-tenant (user's communities) | Combined announcements feed |
@@ -374,7 +401,7 @@ The `{slug}` in the URL is the authoritative community context for every request
 
 1. **Modules never reference each other directly.** Cross-module communication uses Wolverine in-process messages only.
 
-2. **`CommunityRole` lives in `Shared.Kernel`.** `Shared.Infrastructure` depends on `Kumunita.Communities`, so anything `Shared.Infrastructure` needs must be in `Shared.Kernel` to avoid circular references. Apply this rule to any new shared type.
+2. **Shared cross-cutting types live in `Shared.Kernel`.** `Shared.Infrastructure` references all four domain modules (Announcements, Authorization, Identity, Localization). Any type that `Shared.Infrastructure` needs from a module must instead live in `Shared.Kernel` to prevent circular references. This is why `CommunityRole`, `CommunityMembership`, and `AnnouncementStatus` are in `Shared.Kernel`.
 
 3. **The tenant is always in the URL.** Community context is never passed via headers or body. The `{slug}` route value is the single source of truth for tenant resolution.
 
@@ -386,7 +413,7 @@ The `{slug}` in the URL is the authoritative community context for every request
 
 7. **Use `X509KeyStorageFlags.EphemeralKeySet` for OpenIddict certificates in containers.** Standard X.509 store access fails in containerized environments without this flag.
 
-8. **All strongly typed IDs must be registered with Marten.** Add new IDs to `SharedKernelMartenExtensions.AddSharedKernelTypes()` or they will be serialized as JSON objects rather than plain values.
+8. **All strongly typed IDs must be registered with Marten.** Add new IDs to `MartenExtensions.ConfigureModuleSchemas()` or they will be serialized as JSON objects rather than plain values.
 
 9. **Blazor WASM classic hosted model and Blazor Web App model are incompatible.** The client uses `Microsoft.NET.Sdk.BlazorWebAssembly` and the host uses `UseBlazorFrameworkFiles()`. Do not use `MapRazorComponents` — it belongs to the Web App model.
 
@@ -416,7 +443,7 @@ Aspire provisions PostgreSQL automatically in development. The dashboard is avai
 dotnet run --project Kumunita.Host -- --migrate
 ```
 
-Marten schemas are created automatically at startup via `AutoMigrateSchemaObjects`.
+Marten schemas are created automatically at startup via `.ApplyAllDatabaseChangesOnStartup()`.
 
 ### OpenIddict certificates
 
@@ -446,7 +473,7 @@ Upload both files as Coolify file mounts at `/run/secrets/signing.pfx` and `/run
 
 | Variable | Purpose |
 |---|---|
-| `ConnectionStrings__neighborhoodapp` | PostgreSQL connection string |
+| `ConnectionStrings__kumunitadb` | PostgreSQL connection string |
 | `ASPNETCORE_ENVIRONMENT` | `Production` or `Staging` |
 | `OpenIddict__SigningCertificatePath` | Path to signing PFX (e.g. `/run/secrets/signing.pfx`) |
 | `OpenIddict__EncryptionCertificatePath` | Path to encryption PFX |
