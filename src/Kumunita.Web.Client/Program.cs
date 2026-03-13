@@ -6,8 +6,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
 
 WebAssemblyHostBuilder builder = WebAssemblyHostBuilder.CreateDefault(args);
-builder.RootComponents.Add<Routes>("#app");
-builder.RootComponents.Add<HeadOutlet>("head::after");
+
 
 // ApiClient is the primary typed client — attaches bearer token automatically.
 builder.Services
@@ -37,6 +36,8 @@ builder.Services
         options.ProviderOptions.DefaultScopes.Add("email");
         options.ProviderOptions.DefaultScopes.Add("offline_access"); // refresh tokens
     });
+
+builder.Services.AddCascadingAuthenticationState();
 
 // ── Application services ──────────────────────────────────────────────────────
 
