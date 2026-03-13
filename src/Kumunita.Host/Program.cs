@@ -183,6 +183,13 @@ if (!app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 
+// Serve physical wwwroot files (including _framework/*) as middleware so they
+// short-circuit the pipeline before any endpoint — including the CatchAll Razor
+// component — can intercept them. MapStaticAssets() (below) is endpoint-based
+// and only covers files in the build-time manifest; UseStaticFiles() covers any
+// physical file present at runtime, which is the safety net needed in production.
+app.UseStaticFiles();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
