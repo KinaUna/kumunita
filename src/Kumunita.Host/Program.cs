@@ -274,6 +274,40 @@ if (!app.Environment.IsDevelopment())
     });
 }
 
+// Fallback: in .NET 10 blazor.web.js is fingerprinted (blazor.web.<hash>.js).
+// If the browser requests the non-fingerprinted name and the physical file does
+// not exist, find the fingerprinted variant and serve it directly.
+app.Use(async (context, next) =>
+{
+    if (string.Equals(context.Request.Path.Value, "/_framework/blazor.web.js", StringComparison.Ordinal))
+    {
+        string frameworkDir = Path.Combine(app.Environment.WebRootPath!, "_framework");
+        string nonFingerprinted = Path.Combine(frameworkDir, "blazor.web.js");
+
+        if (!File.Exists(nonFingerprinted) && Directory.Exists(frameworkDir))
+        {
+            string? fingerprinted = Directory.EnumerateFiles(frameworkDir, "blazor.web.*.js")
+                .FirstOrDefault(f =>
+                    !f.EndsWith(".br", StringComparison.Ordinal) &&
+                    !f.EndsWith(".gz", StringComparison.Ordinal));
+
+            if (fingerprinted is not null)
+            {
+                app.Logger.LogInformation(
+                    "[static-assets] Fallback: serving fingerprinted {File} for /_framework/blazor.web.js",
+                    Path.GetFileName(fingerprinted));
+
+                context.Response.ContentType = "text/javascript";
+                context.Response.Headers.CacheControl = "no-cache";
+                await context.Response.SendFileAsync(fingerprinted);
+                return;
+            }
+        }
+    }
+
+    await next();
+});
+
 // Serve physical wwwroot files (including _framework/*) as middleware so they
 // short-circuit the pipeline before any endpoint — including the CatchAll Razor
 // component — can intercept them. MapStaticAssets() (below) is endpoint-based
