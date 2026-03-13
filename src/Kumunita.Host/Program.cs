@@ -10,7 +10,6 @@ using Kumunita.Shared.Infrastructure;
 using Kumunita.Shared.Infrastructure.ExceptionHandling;
 using Kumunita.Shared.Infrastructure.Messaging;
 using Kumunita.Shared.Infrastructure.MultiTenancy;
-using Kumunita.Web.Client;
 using Marten;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
