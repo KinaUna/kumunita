@@ -115,7 +115,16 @@ public static class PlatformCommunityHandler
             .OrderBy(c => c.Slug)
             .ToListAsync(ct);
 
-        // TODO: resolve member counts in a single batch query
+        Guid[] communityIds = communities.Select(c => c.Id.Value).ToArray();
+        IReadOnlyList<CommunityMembership> activeMemberships = await session
+            .Query<CommunityMembership>()
+            .Where(m => communityIds.Contains(m.CommunityId.Value) && m.Status == MembershipStatus.Active)
+            .ToListAsync(ct);
+
+        Dictionary<CommunityId, int> memberCounts = activeMemberships
+            .GroupBy(m => m.CommunityId)
+            .ToDictionary(g => g.Key, g => g.Count());
+
         IReadOnlyList<string> preferredLanguages = user.GetPreferredLanguage();
         return Results.Ok(communities.Select(c => new CommunityResult(
             c.Id,
@@ -125,6 +134,6 @@ public static class PlatformCommunityHandler
             c.Address?.City,
             c.Address?.Country,
             c.IsActive,
-            MemberCount: 0)));
+            MemberCount: memberCounts.TryGetValue(c.Id, out int count) ? count : 0)));
     }
 }
