@@ -41,7 +41,6 @@ public static class CommunityQueryHandler
             .Where(c => c.IsActive && communityIds.Contains(c.Id.Value))
             .ToListAsync(ct);
 
-        // TODO: resolve LocalizedContent Name for user's preferred language
         IReadOnlyList<string> preferredLanguages = user.GetPreferredLanguage();
         IEnumerable<UserCommunityResult> result = communities.Select(c => new UserCommunityResult(
             c.Id,

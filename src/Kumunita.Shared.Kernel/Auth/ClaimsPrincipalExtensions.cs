@@ -32,6 +32,10 @@ public static class ClaimsPrincipalExtensions
     public static bool IsPlatformAdmin(this ClaimsPrincipal user) =>
         user.GetClaimValue(PlatformAdminClaim) == "true";
 
+    public static string? GetEmail(this ClaimsPrincipal user) =>
+        user.GetClaimValue(ClaimTypes.Email)
+        ?? user.GetClaimValue("email");
+
     // ── Language ──────────────────────────────────────────────────────────────
 
     /// <summary>

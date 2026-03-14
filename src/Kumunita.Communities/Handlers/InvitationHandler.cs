@@ -85,7 +85,9 @@ public static class InvitationHandler
         CommunityInvitation invitation = await GetValidInvitation(token, session, ct);
         UserId currentUserId = user.GetUserId();
 
-        // TODO: verify the authenticated user's email matches invitation.InvitedEmail
+        string? userEmail = user.GetEmail();
+        if (userEmail is null || !userEmail.Equals(invitation.InvitedEmail, StringComparison.OrdinalIgnoreCase))
+            return Results.Json(new { error = "This invitation was sent to a different email address." }, statusCode: StatusCodes.Status403Forbidden);
 
         Community community = await session.LoadAsync<Community>(invitation.CommunityId.Value, ct)
                               ?? throw new CommunityNotFoundException("unknown");
@@ -194,11 +196,10 @@ public static class InvitationHandler
 
         IReadOnlyList<CommunityInvitation> invitations = await session
             .Query<CommunityInvitation>()
-            .Where(i => i.CommunityId == community.Id && i.Status == InvitationStatus.Pending)
+            .Where(i => i.CommunityId == community.Id && i.Status == InvitationStatus.Pending && i.ExpiresAt > DateTimeOffset.UtcNow)
             .OrderByDescending(i => i.CreatedAt)
             .ToListAsync(ct);
 
-        // TODO: filter out expired (or run a background expiry job)
         return Results.Ok(invitations.Select(i => new PendingInvitationResult(
             i.Id, i.InvitedEmail, i.AssignedRole, i.ExpiresAt, i.CreatedAt)));
     }
