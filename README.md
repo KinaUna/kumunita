@@ -440,6 +440,9 @@ Cross-tenant endpoints (no `{slug}`) are implemented in `Kumunita.Host.Endpoints
 
 9. **The Host uses the Blazor Web App model with InteractiveWebAssembly.** `App.razor` in `Kumunita.Host` is the server-side root component. The client's `Routes.razor` handles client-side routing. `Pages/CatchAll.razor` (`@page "/{*path}"`) provides the catch-all fallback — do not use `MapFallbackToFile` or `UseBlazorFrameworkFiles`.
 10. **Do not use `AddAdditionalAssemblies` with `MapRazorComponents`.** The client assembly's `@page` routes would conflict with Wolverine endpoints at the same URLs (e.g. `/announcements`). The catch-all route in `CatchAll.razor` serves the Blazor shell; the client-side `<Router>` resolves pages via its own `AppAssembly`.
+11. **The Host project file must include `<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>`.** Without this, the published output does not include the WASM `_framework/*` files, causing `blazor.web.js` to return HTML instead of JavaScript in production.
+
+
 ---
 
 ## Development setup
