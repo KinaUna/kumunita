@@ -62,8 +62,6 @@
 
         _current = language;
 
-        // Persist the preference — updates the claim and reloads translations.
-        // TODO: PUT /users/me/preferred-language + trigger translation reload
         await Localization.SetPreferredLanguageAsync(language.Code);
 
         StateHasChanged();

@@ -58,8 +58,7 @@ public class LocalizationClient : ILocalizationClient
         CurrentLanguageCode = languageCode;
         _cache.Clear(); // invalidate all cached translations
 
-        // TODO: PUT /users/me/preferred-language
-        await Task.CompletedTask;
+        await _api.PutAsync("/users/me/preferred-language", new { LanguageCode = languageCode });
 
         OnLanguageChanged?.Invoke();
     }

@@ -13,6 +13,7 @@ public interface IApiClient
     Task<TResponse?> PostAsync<TRequest, TResponse>(string url, TRequest body, CancellationToken ct = default);
     Task PostAsync<TRequest>(string url, TRequest body, CancellationToken ct = default);
     Task<TResponse?> PutAsync<TRequest, TResponse>(string url, TRequest body, CancellationToken ct = default);
+    Task PutAsync<TRequest>(string url, TRequest body, CancellationToken ct = default);
     Task DeleteAsync(string url, CancellationToken ct = default);
 }
 
@@ -53,6 +54,12 @@ public class ApiClient : IApiClient
         HttpResponseMessage response = await _http.PutAsJsonAsync(url, body, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<TResponse>(ct);
+    }
+
+    public async Task PutAsync<TRequest>(string url, TRequest body, CancellationToken ct = default)
+    {
+        HttpResponseMessage response = await _http.PutAsJsonAsync(url, body, ct);
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task DeleteAsync(string url, CancellationToken ct = default)
