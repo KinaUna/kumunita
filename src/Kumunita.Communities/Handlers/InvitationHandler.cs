@@ -37,15 +37,44 @@ public static class InvitationHandler
                                   .FirstOrDefaultAsync(c => c.Slug == slug && c.IsActive, ct)
                               ?? throw new CommunityNotFoundException(slug);
 
-        // Check the email isn't already an active member
-        // TODO: cross-reference with AppUser by email, check CommunityMembership
+        string normalizedEmail = command.InvitedEmail.ToLowerInvariant();
+
+        // Check the email isn't already an active member by tracing the most recent accepted
+        // invitation back to its resulting CommunityMembership.
+        CommunityInvitation? priorAccepted = await session
+            .Query<CommunityInvitation>()
+            .FirstOrDefaultAsync(i =>
+                i.CommunityId == community.Id &&
+                i.InvitedEmail == normalizedEmail &&
+                i.Status == InvitationStatus.Accepted, ct);
+
+        if (priorAccepted?.ResultingMembershipId is { } membershipId)
+        {
+            CommunityMembership? activeMembership = await session
+                .LoadAsync<CommunityMembership>(membershipId.Value, ct);
+
+            if (activeMembership?.Status == MembershipStatus.Active)
+                return Results.Conflict(new { error = $"'{command.InvitedEmail}' is already an active member of this community." });
+        }
+
+        // Check the email doesn't already have a live pending invitation.
+        bool hasPendingInvite = await session
+            .Query<CommunityInvitation>()
+            .AnyAsync(i =>
+                i.CommunityId == community.Id &&
+                i.InvitedEmail == normalizedEmail &&
+                i.Status == InvitationStatus.Pending &&
+                i.ExpiresAt > DateTimeOffset.UtcNow, ct);
+
+        if (hasPendingInvite)
+            return Results.Conflict(new { error = $"A pending invitation for '{command.InvitedEmail}' already exists." });
 
         CommunityInvitation invitation = new CommunityInvitation
         {
             Id = CommunityInvitationId.New(),
             CommunityId = community.Id,
             InvitedByUserId = currentUserId,
-            InvitedEmail = command.InvitedEmail.ToLowerInvariant(),
+            InvitedEmail = normalizedEmail,
             Token = GenerateToken(),
             AssignedRole = command.AssignedRole,
             Status = InvitationStatus.Pending,
