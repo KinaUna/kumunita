@@ -32,7 +32,7 @@ public static class CommunityQueryHandler
             .ToListAsync(ct);
 
         if (!memberships.Any())
-            return Results.Ok(Array.Empty<object>());
+            return Results.Ok(Array.Empty<UserCommunityResult>());
 
         Guid[] communityIds = memberships.Select(m => m.CommunityId.Value).ToArray();
 
@@ -42,15 +42,14 @@ public static class CommunityQueryHandler
             .ToListAsync(ct);
 
         // TODO: resolve LocalizedContent Name for user's preferred language
-        var result = communities.Select(c => new
-        {
+        IReadOnlyList<string> preferredLanguages = user.GetPreferredLanguage();
+        IEnumerable<UserCommunityResult> result = communities.Select(c => new UserCommunityResult(
             c.Id,
             c.Slug,
-            Name = c.Name.Resolve(user.GetPreferredLanguage()),
+            c.Name.Resolve(preferredLanguages),
             c.Address?.City,
             c.Address?.Country,
-            Role = memberships.First(m => m.CommunityId == c.Id).Role
-        });
+            memberships.First(m => m.CommunityId == c.Id).Role));
 
         return Results.Ok(result);
     }

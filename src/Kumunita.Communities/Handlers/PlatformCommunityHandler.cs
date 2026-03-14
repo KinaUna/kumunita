@@ -2,6 +2,7 @@
 using Kumunita.Communities.Domain.Events;
 using Kumunita.Communities.Exceptions;
 using Kumunita.Shared.Kernel;
+using Kumunita.Shared.Kernel.Auth;
 using Kumunita.Shared.Kernel.Communities;
 using Kumunita.Shared.Kernel.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
@@ -102,6 +103,7 @@ public static class PlatformCommunityHandler
     public static async Task<IResult> GetAllCommunities(
         GetAllCommunitiesQuery query,
         IQuerySession session,
+        ClaimsPrincipal user,
         CancellationToken ct)
     {
         IMartenQueryable<Community> q = session.Query<Community>();
@@ -113,7 +115,16 @@ public static class PlatformCommunityHandler
             .OrderBy(c => c.Slug)
             .ToListAsync(ct);
 
-        // TODO: resolve member counts, map to CommunityResult
-        return Results.Ok(communities.Select(c => new { c.Id, c.Slug, c.IsActive, c.CreatedAt }));
+        // TODO: resolve member counts in a single batch query
+        IReadOnlyList<string> preferredLanguages = user.GetPreferredLanguage();
+        return Results.Ok(communities.Select(c => new CommunityResult(
+            c.Id,
+            c.Slug,
+            c.Name.Resolve(preferredLanguages),
+            c.Description.Resolve(preferredLanguages),
+            c.Address?.City,
+            c.Address?.Country,
+            c.IsActive,
+            MemberCount: 0)));
     }
 }

@@ -66,12 +66,12 @@ public static class InvitationHandler
 
         // TODO: dispatch email notification via Wolverine message
 
-        return Results.Created($"/communities/{slug}/invitations/{invitation.Id}", new
-        {
+        return Results.Created($"/communities/{slug}/invitations/{invitation.Id}", new PendingInvitationResult(
             invitation.Id,
             invitation.InvitedEmail,
-            invitation.ExpiresAt
-        });
+            invitation.AssignedRole,
+            invitation.ExpiresAt,
+            invitation.CreatedAt));
     }
 
     [WolverinePost("/invitations/{token}/accept")]

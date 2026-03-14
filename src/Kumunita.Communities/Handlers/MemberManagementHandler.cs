@@ -1,4 +1,5 @@
 ﻿using Kumunita.Communities.Contracts.Commands;
+using Kumunita.Communities.Contracts.Queries;
 using Kumunita.Communities.Domain;
 using Kumunita.Communities.Domain.Events;
 using Kumunita.Communities.Exceptions;
@@ -171,12 +172,11 @@ public static class MemberManagementHandler
             .ToListAsync(ct);
 
         // TODO: join with UserProfile (community-scoped) to resolve DisplayName
-        return Results.Ok(members.Select(m => new
-        {
+        return Results.Ok(members.Select(m => new CommunityMemberResult(
             m.UserId,
+            string.Empty,
             m.Role,
             m.Status,
-            m.JoinedAt
-        }));
+            m.JoinedAt)));
     }
 }
