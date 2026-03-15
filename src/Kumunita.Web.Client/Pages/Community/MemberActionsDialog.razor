@@ -1,0 +1,142 @@
+@using Kumunita.Shared.Kernel.Communities
+@inject IApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Member.DisplayName</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4">
+
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Change Role</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudSelect T="CommunityRole" @bind-Value="_newRole" Label="Role" Style="min-width:160px">
+                        <MudSelectItem Value="CommunityRole.Member">Member</MudSelectItem>
+                        <MudSelectItem Value="CommunityRole.Moderator">Moderator</MudSelectItem>
+                    </MudSelect>
+                    <MudButton Color="Color.Primary"
+                               Variant="Variant.Filled"
+                               OnClick="ChangeRoleAsync"
+                               Disabled="_submitting || _newRole == Member.Role">
+                        Apply
+                    </MudButton>
+                </MudStack>
+            </div>
+
+            <MudDivider />
+
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Suspend Member</MudText>
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_suspendReason"
+                                  Label="Reason"
+                                  Placeholder="Briefly describe the reason…"
+                                  MaxLength="300" />
+                    <MudButton Color="Color.Warning"
+                               Variant="Variant.Filled"
+                               OnClick="SuspendAsync"
+                               Disabled="_submitting || string.IsNullOrWhiteSpace(_suspendReason)">
+                        Suspend
+                    </MudButton>
+                </MudStack>
+            </div>
+
+            <MudDivider />
+
+            <div>
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Remove from Community</MudText>
+                <MudButton Color="Color.Error"
+                           Variant="Variant.Filled"
+                           OnClick="RemoveAsync"
+                           Disabled="_submitting">
+                    Remove Member
+                </MudButton>
+            </div>
+
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Slug { get; set; } = default!;
+    [Parameter] public CommunityMemberResult Member { get; set; } = default!;
+
+    private bool _submitting;
+    private CommunityRole _newRole;
+    private string _suspendReason = string.Empty;
+
+    protected override void OnParametersSet()
+        => _newRole = Member.Role;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ChangeRoleAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await Api.PutAsync<ChangeMemberRoleCommand>(
+                $"/communities/{Slug}/members/{Member.UserId}/role",
+                new ChangeMemberRoleCommand(Slug, Member.UserId, _newRole));
+
+            Snackbar.Add($"{Member.DisplayName}'s role changed to {_newRole}.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add("Failed to change role.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task SuspendAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await Api.PostAsync<SuspendMemberCommand>(
+                $"/communities/{Slug}/members/{Member.UserId}/suspend",
+                new SuspendMemberCommand(Slug, Member.UserId, _suspendReason));
+
+            Snackbar.Add($"{Member.DisplayName} has been suspended.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add("Failed to suspend member.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private async Task RemoveAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await Api.DeleteAsync($"/communities/{Slug}/members/{Member.UserId}");
+
+            Snackbar.Add($"{Member.DisplayName} has been removed from the community.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add("Failed to remove member.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

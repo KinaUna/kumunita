@@ -1,0 +1,103 @@
+@inject IApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudTextField @bind-Value="_slug"
+                          Label="Slug"
+                          Required="true"
+                          RequiredError="Slug is required."
+                          HelperText="Lowercase letters, numbers, and hyphens (e.g. my-community)"
+                          Validation="@((string s) => ValidateSlug(s))" />
+            <MudTextField @bind-Value="_name"
+                          Label="Name"
+                          Required="true"
+                          RequiredError="Name is required."
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_description"
+                          Label="Description"
+                          Lines="3"
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_city"
+                          Label="City"
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_country"
+                          Label="Country"
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_street"
+                          Label="Street"
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_postalCode"
+                          Label="Postal Code"
+                          Class="mt-2" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="!_valid || _submitting">
+            Provision
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _submitting;
+
+    private string _slug        = string.Empty;
+    private string _name        = string.Empty;
+    private string _description = string.Empty;
+    private string _city        = string.Empty;
+    private string _country     = string.Empty;
+    private string _street      = string.Empty;
+    private string _postalCode  = string.Empty;
+
+    private static string? ValidateSlug(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Slug is required.";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^[a-z0-9]+(?:-[a-z0-9]+)*$"))
+            return "Slug must contain only lowercase letters, numbers, and hyphens.";
+        return null;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        try
+        {
+            await Api.PostAsync<CreateCommunityCommand>(
+                "/platform/communities",
+                new CreateCommunityCommand(
+                    _slug,
+                    new Dictionary<string, string> { ["en"] = _name },
+                    new Dictionary<string, string> { ["en"] = _description },
+                    string.IsNullOrWhiteSpace(_street)     ? null : _street,
+                    string.IsNullOrWhiteSpace(_city)       ? null : _city,
+                    string.IsNullOrWhiteSpace(_postalCode) ? null : _postalCode,
+                    string.IsNullOrWhiteSpace(_country)    ? null : _country));
+
+            Snackbar.Add($"Community '{_slug}' provisioned.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add("Failed to provision community. The slug may already be in use.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

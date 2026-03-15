@@ -97,10 +97,11 @@
 
     private async Task OpenProvisionDialog()
     {
-        // TODO: open MudDialog with form: slug, name (per language), description, address
-        // On confirm: POST /platform/communities
-        // On success: Snackbar + reload list
-        await Task.CompletedTask;
+        IDialogReference dialog = await DialogService.ShowAsync<ProvisionCommunityDialog>("Provision Community");
+        DialogResult? result = await dialog.Result;
+
+        if (result?.Data is true)
+            await LoadAsync();
     }
 
     private async Task DeactivateCommunity(string slug)

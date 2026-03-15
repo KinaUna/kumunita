@@ -141,11 +141,17 @@
 
     private async Task OpenMemberMenu(CommunityMemberResult member)
     {
-        // TODO: open MudMenu or dialog with options:
-        // - Change role (Manager only, up to Moderator)
-        // - Suspend member
-        // - Remove member
-        await Task.CompletedTask;
+        DialogParameters<MemberActionsDialog> parameters = new()
+        {
+            { x => x.Slug, Slug },
+            { x => x.Member, member }
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<MemberActionsDialog>(member.DisplayName, parameters);
+        DialogResult? result = await dialog.Result;
+
+        if (result?.Data is true)
+            await LoadAsync();
     }
 
     private async Task RevokeInvitation(CommunityInvitationId id)
