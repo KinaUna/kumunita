@@ -14,7 +14,7 @@ public class LocalizedContent
 
     public LocalizedContent(Dictionary<string, string> name)
     {
-        foreach (var (key, value) in name)
+        foreach ((string key, string value) in name)
         {
             Set(key, value);
         }
@@ -26,21 +26,21 @@ public class LocalizedContent
 
     public LocalizedContent Set(string languageCode, string content)
     {
-        var code = new LanguageCode(languageCode);
+        LanguageCode code = new LanguageCode(languageCode);
         _translations[code.Value] = content;
         return this; // fluent for builder-style usage
     }
 
     public string? Get(string languageCode)
         => _translations.TryGetValue(
-            new LanguageCode(languageCode).Value, out var value)
+            new LanguageCode(languageCode).Value, out string? value)
             ? value : null;
 
     public string Resolve(IEnumerable<string> candidateLanguages)
     {
-        foreach (var lang in candidateLanguages)
+        foreach (string lang in candidateLanguages)
         {
-            var value = Get(lang);
+            string? value = Get(lang);
             if (value is not null) return value;
         }
 

@@ -1,4 +1,5 @@
 ﻿using Kumunita.Identity.Domain;
+using Kumunita.Shared.Kernel;
 using Marten;
 using Microsoft.AspNetCore.Identity;
 using OpenIddict.Abstractions;
@@ -22,16 +23,16 @@ public class CustomClaimsHandler : IOpenIddictServerHandler<OpenIddictServerEven
     public async ValueTask HandleAsync(
         OpenIddictServerEvents.HandleTokenRequestContext context)
     {
-        var appUser = await _userManager.FindByNameAsync(
+        AppUser? appUser = await _userManager.FindByNameAsync(
             context.Principal?.Identity?.Name ?? string.Empty);
 
         if (appUser is null) return;
 
-        var userId = appUser.DomainId;
+        UserId userId = appUser.DomainId;
 
         // Load roles from ASP.NET Core Identity
-        var roles = await _userManager.GetRolesAsync(appUser);
-        foreach (var role in roles)
+        IList<string> roles = await _userManager.GetRolesAsync(appUser);
+        foreach (string role in roles)
             context.Principal!.SetClaim("role", role);
 
         // Signal the client that a password change is required
@@ -39,19 +40,19 @@ public class CustomClaimsHandler : IOpenIddictServerHandler<OpenIddictServerEven
             context.Principal!.SetClaim("must_change_password", "true");
 
         // Load preferred language from Marten UserProfile
-        var profile = await _session.LoadAsync<UserProfile>(userId);
+        UserProfile? profile = await _session.LoadAsync<UserProfile>(userId);
         if (profile is not null)
             context.Principal!.SetClaim("preferred_language",
                 profile.PreferredLanguage.Value);
 
         // Load group memberships from Marten
-        var memberships = await _session
+        IReadOnlyList<string> memberships = await _session
             .Query<UserGroupMembership>()
             .Where(m => m.UserId == userId)
             .Select(m => m.GroupId.Value.ToString())
             .ToListAsync();
 
-        foreach (var groupId in memberships)
+        foreach (string groupId in memberships)
             context.Principal!.SetClaim("group", groupId);
     }
 }

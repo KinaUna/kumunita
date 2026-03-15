@@ -21,12 +21,12 @@ public static class AddUserToUserGroupHandler
         CancellationToken ct)
     {
         // Verify group exists
-        var group = await session.LoadAsync<Group>(cmd.GroupId, ct);
+        Group? group = await session.LoadAsync<Group>(cmd.GroupId, ct);
         if (group is null)
             throw new UserGroupNotFoundException(cmd.GroupId);
 
         // Verify not already a member
-        var existing = await session
+        UserGroupMembership? existing = await session
             .Query<UserGroupMembership>()
             .FirstOrDefaultAsync(m =>
                 m.UserId == cmd.TargetUserId &&
@@ -35,7 +35,7 @@ public static class AddUserToUserGroupHandler
         if (existing is not null)
             throw new AlreadyUserGroupMemberException(cmd.TargetUserId, cmd.GroupId);
 
-        var membership = UserGroupMembership.Create(
+        UserGroupMembership membership = UserGroupMembership.Create(
             cmd.TargetUserId,
             cmd.GroupId,
             cmd.Role,

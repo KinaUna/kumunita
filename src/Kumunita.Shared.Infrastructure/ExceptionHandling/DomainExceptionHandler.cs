@@ -13,7 +13,7 @@ public class DomainExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken ct)
     {
-        var (statusCode, message) = exception switch
+        (int statusCode, string? message) = exception switch
         {
             UserNotFoundException e =>
                 (StatusCodes.Status404NotFound, e.Message),

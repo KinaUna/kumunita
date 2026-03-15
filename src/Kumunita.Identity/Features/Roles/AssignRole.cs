@@ -15,13 +15,13 @@ public static class AssignRoleHandler
         UserManager<AppUser> userManager,
         CancellationToken ct)
     {
-        var appUser = await userManager.FindByIdAsync(
+        AppUser? appUser = await userManager.FindByIdAsync(
             cmd.TargetUserId.Value.ToString());
 
         if (appUser is null)
             throw new UserNotFoundException(cmd.TargetUserId);
 
-        var result = await userManager.AddToRoleAsync(appUser, cmd.RoleName);
+        IdentityResult result = await userManager.AddToRoleAsync(appUser, cmd.RoleName);
         if (!result.Succeeded)
             throw new RoleAssignmentException(result.Errors);
 

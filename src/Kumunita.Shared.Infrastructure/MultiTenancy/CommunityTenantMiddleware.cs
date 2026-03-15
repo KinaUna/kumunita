@@ -1,4 +1,5 @@
-﻿using Kumunita.Shared.Kernel.Auth;
+﻿using System.Security.Claims;
+using Kumunita.Shared.Kernel.Auth;
 using Marten;
 using Marten.Services;
 using Microsoft.AspNetCore.Http;
@@ -21,11 +22,11 @@ public class CommunityTenantMiddleware
 
     public async Task InvokeAsync(HttpContext context, IDocumentStore store)
     {
-        if (context.Request.RouteValues.TryGetValue("slug", out var slugValue) &&
+        if (context.Request.RouteValues.TryGetValue("slug", out object? slugValue) &&
             slugValue is string slug &&
             !string.IsNullOrWhiteSpace(slug))
         {
-            var user = context.User;
+            ClaimsPrincipal user = context.User;
 
             if (user.Identity?.IsAuthenticated == true && !user.IsPlatformAdmin())
             {
@@ -60,7 +61,7 @@ public sealed class TenantAwareSessionFactory(
 
     public IQuerySession QuerySession()
     {
-        var id = TenantId;
+        string? id = TenantId;
         return id is not null
             ? store.QuerySession(new SessionOptions { TenantId = id })
             : store.QuerySession();
@@ -68,7 +69,7 @@ public sealed class TenantAwareSessionFactory(
 
     public IDocumentSession OpenSession()
     {
-        var id = TenantId;
+        string? id = TenantId;
         return id is not null
             ? store.LightweightSession(new SessionOptions { TenantId = id })
             : store.LightweightSession();

@@ -46,7 +46,7 @@ builder.Services.AddMudServices();
 
 // ── Localization ──────────────────────────────────────────────────────────────
 
-// TODO: register LocalizationClient and IStringLocalizer integration
+// Register LocalizationClient and IStringLocalizer integration
 builder.Services.AddScoped<ILocalizationClient, LocalizationClient>();
 
 await builder.Build().RunAsync();

@@ -16,7 +16,7 @@ public static class CreateUserGroupHandler
         CreateUserGroup cmd,
         IDocumentSession session)
     {
-        var group = UserGroup.Create(
+        UserGroup group = UserGroup.Create(
             cmd.RequesterId,
             cmd.NameInDefaultLanguage,
             cmd.ParentGroupId);
@@ -24,7 +24,7 @@ public static class CreateUserGroupHandler
         session.Store(group);
 
         // Creator is automatically made owner
-        var membership = UserGroupMembership.Create(
+        UserGroupMembership membership = UserGroupMembership.Create(
             cmd.RequesterId,
             group.Id,
             GroupRole.Owner,

@@ -28,7 +28,7 @@ public class CommunityRoleHandler : AuthorizationHandler<CommunityRoleRequiremen
         AuthorizationHandlerContext context,
         CommunityRoleRequirement requirement)
     {
-        var httpContext = _accessor.HttpContext;
+        HttpContext? httpContext = _accessor.HttpContext;
 
         if (httpContext is null)
         {
@@ -36,7 +36,7 @@ public class CommunityRoleHandler : AuthorizationHandler<CommunityRoleRequiremen
             return Task.CompletedTask;
         }
 
-        var slug = httpContext.Request.RouteValues["slug"]?.ToString();
+        string? slug = httpContext.Request.RouteValues["slug"]?.ToString();
 
         if (string.IsNullOrWhiteSpace(slug))
         {
@@ -45,7 +45,7 @@ public class CommunityRoleHandler : AuthorizationHandler<CommunityRoleRequiremen
             return Task.CompletedTask;
         }
 
-        var userRole = context.User.GetCommunityRole(slug);
+        CommunityRole? userRole = context.User.GetCommunityRole(slug);
 
         if (userRole >= requirement.MinimumRole)
             context.Succeed(requirement);

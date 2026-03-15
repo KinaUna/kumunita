@@ -33,7 +33,7 @@ public class UserAuthorizationState : IAuditableEntity
 
     public void ApplyRoleAssigned(string roleName)
     {
-        var roles = Roles.ToList();
+        List<string> roles = Roles.ToList();
         if (!roles.Contains(roleName))
             roles.Add(roleName);
         Roles = roles;
@@ -48,7 +48,7 @@ public class UserAuthorizationState : IAuditableEntity
 
     public void ApplyAddedToGroup(GroupId groupId)
     {
-        var groups = GroupIds.ToList();
+        List<GroupId> groups = GroupIds.ToList();
         if (!groups.Contains(groupId))
             groups.Add(groupId);
         GroupIds = groups;
@@ -75,7 +75,7 @@ public class UserAuthorizationState : IAuditableEntity
 
     public void TrackToken(CapabilityTokenId tokenId)
     {
-        var tokens = ActiveTokenIds.ToList();
+        List<CapabilityTokenId> tokens = ActiveTokenIds.ToList();
         tokens.Add(tokenId);
         ActiveTokenIds = tokens;
         UpdatedAt = DateTimeOffset.UtcNow;

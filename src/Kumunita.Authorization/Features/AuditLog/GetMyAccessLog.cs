@@ -27,7 +27,7 @@ public static class GetMyAccessLogHandler
         IQuerySession session,
         CancellationToken ct)
     {
-        var entries = await session
+        IReadOnlyList<AuditEntry> entries = await session
             .Query<AuditEntry>()
             .Where(e => e.OwnerId == query.RequesterId)
             .OrderByDescending(e => e.OccurredAt)
@@ -36,7 +36,7 @@ public static class GetMyAccessLogHandler
             .ToListAsync(ct);
 
         // Load requester's own state to check if they're admin
-        var requesterState = await session
+        UserAuthorizationState? requesterState = await session
             .LoadAsync<UserAuthorizationState>(query.RequesterId, ct);
 
         return entries.Select(e => new AccessLogEntry(

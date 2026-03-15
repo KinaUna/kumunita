@@ -22,16 +22,16 @@ public static class SubmitAnnouncementHandler
         CancellationToken ct)
     {
         // Check feature flag
-        var settings = await session
-                           .LoadAsync<AnnouncementSettings>(
-                               AnnouncementSettings.SingletonId, ct)
-                       ?? AnnouncementSettings.CreateDefaults();
+        AnnouncementSettings settings = await session
+                                            .LoadAsync<AnnouncementSettings>(
+                                                AnnouncementSettings.SingletonId, ct)
+                                        ?? AnnouncementSettings.CreateDefaults();
 
         if (!settings.MemberSubmissionsEnabled)
             throw new MemberSubmissionsDisabledException();
 
         // Enforce pending submission limit
-        var pendingCount = await session
+        int pendingCount = await session
             .Query<Announcement>()
             .CountAsync(a =>
                 a.OwnerId == cmd.MemberId &&
@@ -42,7 +42,7 @@ public static class SubmitAnnouncementHandler
                 cmd.MemberId,
                 settings.MaxPendingSubmissionsPerMember);
 
-        var announcement = Announcement.SubmitByMember(
+        Announcement announcement = Announcement.SubmitByMember(
             cmd.MemberId,
             cmd.Title,
             cmd.Body,

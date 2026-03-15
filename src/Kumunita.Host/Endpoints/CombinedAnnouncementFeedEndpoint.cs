@@ -58,7 +58,7 @@ public static class CombinedAnnouncementFeedEndpoint
             c => c.Slug,
             c => c.Name.Resolve(preferredLanguages));
 
-        var groups = new List<CommunityAnnouncementGroup>();
+        List<CommunityAnnouncementGroup> groups = new List<CommunityAnnouncementGroup>();
 
         foreach (string slug in slugs)
         {

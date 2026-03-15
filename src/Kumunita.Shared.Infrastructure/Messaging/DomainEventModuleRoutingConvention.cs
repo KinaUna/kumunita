@@ -27,7 +27,7 @@ public sealed class DomainEventModuleRoutingConvention : IMessageRoutingConventi
         if (!typeof(IDomainEvent).IsAssignableFrom(messageType))
             yield break;
 
-        foreach (var (prefix, queue) in ModuleQueues)
+        foreach ((string prefix, string queue) in ModuleQueues)
         {
             if (messageType.FullName?.StartsWith(prefix, StringComparison.Ordinal) == true)
             {

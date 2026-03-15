@@ -41,8 +41,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var state = await Auth.GetAuthenticationStateAsync();
-        var role  = state.User.GetCommunityRole(Slug);
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        CommunityRole? role  = state.User.GetCommunityRole(Slug);
         _authorized = role is not null && role >= MinimumRole;
     }
 }

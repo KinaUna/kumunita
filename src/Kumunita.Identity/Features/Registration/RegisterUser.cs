@@ -25,33 +25,33 @@ public static class RegisterUserHandler
         CancellationToken ct)
     {
         // Step 1 — create the ASP.NET Core Identity user
-        var appUser = new AppUser
+        AppUser appUser = new AppUser
         {
             Id = Guid.NewGuid(),
             Email = cmd.Email,
             UserName = cmd.Email,
         };
 
-        var result = await userManager.CreateAsync(appUser, cmd.Password);
+        IdentityResult result = await userManager.CreateAsync(appUser, cmd.Password);
         if (!result.Succeeded)
             throw new RegistrationException(result.Errors);
 
         // Step 2 — assign default Member role
         await userManager.AddToRoleAsync(appUser, AppRole.SystemRoles.Member);
 
-        var userId = appUser.DomainId;
+        UserId userId = appUser.DomainId;
 
         // Step 3 — create Marten UserProfile
-        var profile = UserProfile.Create(userId, cmd.DisplayName, cmd.PreferredLanguage);
+        UserProfile profile = UserProfile.Create(userId, cmd.DisplayName, cmd.PreferredLanguage);
         session.Store(profile);
 
         // Step 4 — create Marten DirectoryEntry
-        var directory = DirectoryEntry.Create(userId, cmd.DisplayName, userId);
+        DirectoryEntry directory = DirectoryEntry.Create(userId, cmd.DisplayName, userId);
         session.Store(directory);
 
         // Step 5 — return result and event
         // Wolverine publishes UserRegistered after Marten commits
-        var registrationResult = new UserRegistrationResult(
+        UserRegistrationResult registrationResult = new UserRegistrationResult(
             userId,
             RequiresEmailConfirmation: !appUser.EmailConfirmed);
 

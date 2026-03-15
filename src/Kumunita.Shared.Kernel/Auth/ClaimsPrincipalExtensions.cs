@@ -22,9 +22,9 @@ public static class ClaimsPrincipalExtensions
 
     public static UserId GetUserId(this ClaimsPrincipal user)
     {
-        var sub = user.GetClaimValue(ClaimTypes.NameIdentifier)
-            ?? user.GetClaimValue("sub")
-            ?? throw new InvalidOperationException("User has no subject claim.");
+        string sub = user.GetClaimValue(ClaimTypes.NameIdentifier)
+                     ?? user.GetClaimValue("sub")
+                     ?? throw new InvalidOperationException("User has no subject claim.");
 
         return new UserId(Guid.Parse(sub));
     }
@@ -44,7 +44,7 @@ public static class ClaimsPrincipalExtensions
     /// </summary>
     public static IReadOnlyList<string> GetPreferredLanguage(this ClaimsPrincipal user)
     {
-        var pref = user.GetClaimValue(PreferredLanguageClaim);
+        string? pref = user.GetClaimValue(PreferredLanguageClaim);
         return pref is not null
             ? [pref, LanguageCode.English.Value]
             : [LanguageCode.English.Value];
@@ -66,7 +66,7 @@ public static class ClaimsPrincipalExtensions
     /// </summary>
     public static CommunityRole? GetCommunityRole(this ClaimsPrincipal user, string slug)
     {
-        var entry = GetCommunityEntries(user)
+        CommunityClaim? entry = GetCommunityEntries(user)
             .FirstOrDefault(c => c.Slug.Equals(slug, StringComparison.OrdinalIgnoreCase));
 
         return entry is null ? null : Enum.Parse<CommunityRole>(entry.Role, ignoreCase: true);
@@ -82,7 +82,7 @@ public static class ClaimsPrincipalExtensions
 
     private static IReadOnlyList<CommunityClaim> GetCommunityEntries(ClaimsPrincipal user)
     {
-        var raw = user.GetClaimValue(CommunitiesClaim);
+        string? raw = user.GetClaimValue(CommunitiesClaim);
 
         if (string.IsNullOrWhiteSpace(raw))
             return [];

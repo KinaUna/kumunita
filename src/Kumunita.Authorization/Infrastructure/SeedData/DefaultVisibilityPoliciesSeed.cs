@@ -19,24 +19,24 @@ public class DefaultVisibilityPoliciesSeed : IInitialData
 
     public async Task Populate(IDocumentStore store, CancellationToken ct)
     {
-        await using var session = store.LightweightSession();
+        await using IDocumentSession session = store.LightweightSession();
 
-        var allUsers = await session
+        IReadOnlyList<UserAuthorizationState> allUsers = await session
             .Query<UserAuthorizationState>()
             .ToListAsync(ct);
 
         if (allUsers.Count == 0) return;
 
-        foreach (var user in allUsers)
+        foreach (UserAuthorizationState user in allUsers)
         {
-            var existingResourceNames = (await session
+            HashSet<string> existingResourceNames = (await session
                 .Query<VisibilityPolicy>()
                 .Where(p => p.OwnerId == user.Id)
                 .Select(p => p.ResourceTypeName)
                 .ToListAsync(ct))
                 .ToHashSet(StringComparer.Ordinal);
 
-            foreach (var (resourceTypeName, defaultVisibility) in Defaults)
+            foreach ((string resourceTypeName, VisibilityLevel defaultVisibility) in Defaults)
             {
                 if (existingResourceNames.Contains(resourceTypeName))
                     continue;

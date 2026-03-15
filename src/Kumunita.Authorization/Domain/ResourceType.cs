@@ -51,7 +51,7 @@ public static class ResourceType
     }.ToDictionary(r => r.Name);
 
     public static ResourceDescriptor? Find(string name)
-        => _all.TryGetValue(name, out var descriptor) ? descriptor : null;
+        => _all.TryGetValue(name, out ResourceDescriptor? descriptor) ? descriptor : null;
 }
 
 public record ResourceDescriptor(string Name, SensitivityTier SensitivityTier);

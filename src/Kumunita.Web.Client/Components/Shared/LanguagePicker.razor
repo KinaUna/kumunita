@@ -8,9 +8,9 @@
          OffsetY="true"
          Title="@_current?.DisplayName">
 
-    @foreach (var language in _available)
+    @foreach (LanguageOption language in _available)
     {
-        var lang = language; // capture for lambda
+        LanguageOption lang = language; // capture for lambda
         <MudMenuItem OnClick="() => SelectLanguage(lang)">
             <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                 @if (_current?.Code == lang.Code)
@@ -48,9 +48,9 @@
             new(LanguageCode.Italian.Value,  "Italiano"),
         ];
 
-        var state = await Auth.GetAuthenticationStateAsync();
-        var preferred = state.User.GetPreferredLanguage().FirstOrDefault()
-            ?? LanguageCode.English.Value;
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        string preferred = state.User.GetPreferredLanguage().FirstOrDefault()
+                           ?? LanguageCode.English.Value;
 
         _current = _available.FirstOrDefault(l => l.Code == preferred)
             ?? _available.First();

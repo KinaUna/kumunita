@@ -31,18 +31,18 @@ public static class GetAnnouncementFeedHandler
         CancellationToken ct)
     {
         // Load requester's authorization state for targeting evaluation
-        var authState = await session
+        UserAuthorizationState? authState = await session
             .LoadAsync<UserAuthorizationState>(query.RequesterId, ct);
 
         // Load requester's profile for language preference
-        var profile = await session
+        UserProfile? profile = await session
             .LoadAsync<UserProfile>(query.RequesterId, ct);
 
-        var preferredLanguage = profile?.PreferredLanguage
-            ?? LanguageCode.English;
+        LanguageCode preferredLanguage = profile?.PreferredLanguage
+                                         ?? LanguageCode.English;
 
         // Load all currently visible announcements
-        var announcements = await session
+        IReadOnlyList<Announcement> announcements = await session
             .Query<Announcement>()
             .Where(a => a.Status == AnnouncementStatus.Published
                 && (a.ExpiresAt == null
@@ -52,10 +52,10 @@ public static class GetAnnouncementFeedHandler
 
         // Filter by targeting — only include announcements
         // the member is in the target audience for
-        var memberRoles = authState?.Roles ?? [];
-        var memberGroups = authState?.GroupIds ?? [];
+        IReadOnlyList<string> memberRoles = authState?.Roles ?? [];
+        IReadOnlyList<GroupId> memberGroups = authState?.GroupIds ?? [];
 
-        var targeted = announcements
+        List<Announcement> targeted = announcements
             .Where(a => a.Target.Includes(memberRoles, memberGroups))
             .Skip((query.PageNumber - 1) * query.PageSize)
             .Take(query.PageSize)

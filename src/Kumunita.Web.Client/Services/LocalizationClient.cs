@@ -39,16 +39,16 @@ public class LocalizationClient : ILocalizationClient
 
     public async ValueTask<string> GetAsync(string module, string feature, string key)
     {
-        var cacheKey = $"{module}:{feature}:{key}:{CurrentLanguageCode}";
+        string cacheKey = $"{module}:{feature}:{key}:{CurrentLanguageCode}";
 
-        if (_cache.TryGetValue(cacheKey, out var cached))
+        if (_cache.TryGetValue(cacheKey, out string? cached))
             return cached;
 
         // TODO: batch translation fetches rather than one per key
-        var result = await _api.GetAsync<TranslationResult>(
+        TranslationResult? result = await _api.GetAsync<TranslationResult>(
             $"/localization/{module}/{feature}/{key}?lang={CurrentLanguageCode}");
 
-        var value = result?.Value ?? key;
+        string value = result?.Value ?? key;
         _cache[cacheKey] = value;
         return value;
     }

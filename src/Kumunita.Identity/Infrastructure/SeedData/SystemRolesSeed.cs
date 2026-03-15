@@ -15,11 +15,11 @@ public class SystemRolesSeed : IInitialData
 
     public async Task Populate(IDocumentStore store, CancellationToken ct)
     {
-        using var scope = _services.CreateScope();
-        var roleManager = scope.ServiceProvider
+        using IServiceScope scope = _services.CreateScope();
+        RoleManager<AppRole> roleManager = scope.ServiceProvider
             .GetRequiredService<RoleManager<AppRole>>();
 
-        foreach (var roleName in new[]
+        foreach (string roleName in new[]
         {
             AppRole.SystemRoles.Admin,
             AppRole.SystemRoles.Moderator,

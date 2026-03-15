@@ -21,7 +21,7 @@ public static class CreateAnnouncementHandler
         IDocumentSession session,
         CancellationToken ct)
     {
-        var announcement = Announcement.CreateByStaff(
+        Announcement announcement = Announcement.CreateByStaff(
             cmd.AuthorId,
             cmd.Title,
             cmd.Body,
@@ -35,7 +35,7 @@ public static class CreateAnnouncementHandler
 
         // Only publish event if published immediately —
         // draft announcements don't notify anyone yet
-        var evt = cmd.PublishImmediately
+        AnnouncementSubmitted? evt = cmd.PublishImmediately
             ? null
             : new AnnouncementSubmitted(
                 announcement.Id,

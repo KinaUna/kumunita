@@ -20,9 +20,9 @@ public static class ApproveAnnouncementHandler
         IDocumentSession session,
         CancellationToken ct)
     {
-        var announcement = await session
-                               .LoadAsync<Announcement>(cmd.AnnouncementId, ct)
-                           ?? throw new AnnouncementNotFoundException(cmd.AnnouncementId);
+        Announcement announcement = await session
+                                        .LoadAsync<Announcement>(cmd.AnnouncementId, ct)
+                                    ?? throw new AnnouncementNotFoundException(cmd.AnnouncementId);
 
         // Apply targeting override if provided
         if (cmd.OverrideTarget is not null)

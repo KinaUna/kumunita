@@ -15,7 +15,7 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = UserAuthorizationState.CreateForNewUser(evt.UserId);
+        UserAuthorizationState state = UserAuthorizationState.CreateForNewUser(evt.UserId);
         // New members get the Member role by default
         state.ApplyRoleAssigned(AppRole.SystemRoles.Member);
         session.Store(state);
@@ -29,8 +29,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         state.ApplyRoleAssigned(evt.RoleName);
         session.Store(state);
@@ -41,8 +41,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         state.ApplyRoleRevoked(evt.RoleName);
         session.Store(state);
@@ -53,8 +53,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         state.ApplyAddedToGroup(evt.GroupId);
         session.Store(state);
@@ -65,8 +65,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         state.ApplyRemovedFromGroup(evt.GroupId);
         session.Store(state);
@@ -77,8 +77,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         // Revoke all active tokens immediately on suspension
         state.ApplySuspended();
@@ -95,8 +95,8 @@ public static class IdentityEventHandlers
         IDocumentSession session,
         CancellationToken ct)
     {
-        var state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
-            ?? throw new AuthorizationStateNotFoundException(evt.UserId);
+        UserAuthorizationState state = await session.LoadAsync<UserAuthorizationState>(evt.UserId, ct)
+                                       ?? throw new AuthorizationStateNotFoundException(evt.UserId);
 
         state.ApplyReactivated();
         session.Store(state);
@@ -108,7 +108,7 @@ public static class IdentityEventHandlers
         CancellationToken ct)
     {
         // Default policies — conservative, user can relax them later
-        var defaults = new[]
+        (string Name, VisibilityLevel)[] defaults = new[]
         {
             (ResourceType.ProfileBio.Name, VisibilityLevel.Members),
             (ResourceType.ProfilePhoneNumber.Name, VisibilityLevel.Private),
@@ -118,9 +118,9 @@ public static class IdentityEventHandlers
             (ResourceType.GroupMembership.Name, VisibilityLevel.Members),
         };
 
-        foreach (var (resourceType, defaultVisibility) in defaults)
+        foreach ((string resourceType, VisibilityLevel defaultVisibility) in defaults)
         {
-            var policy = VisibilityPolicy.CreateDefault(
+            VisibilityPolicy policy = VisibilityPolicy.CreateDefault(
                 userId, resourceType, defaultVisibility);
             session.Store(policy);
         }

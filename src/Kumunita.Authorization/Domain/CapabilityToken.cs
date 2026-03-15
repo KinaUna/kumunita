@@ -50,7 +50,7 @@ public class CapabilityToken : IAuditableEntity
         SensitivityTier sensitivityTier,
         string? requestContext)
     {
-        var expiresAt = sensitivityTier switch
+        DateTimeOffset expiresAt = sensitivityTier switch
         {
             SensitivityTier.Public => DateTimeOffset.UtcNow.AddHours(24),
             SensitivityTier.Standard => DateTimeOffset.UtcNow.AddMinutes(60),

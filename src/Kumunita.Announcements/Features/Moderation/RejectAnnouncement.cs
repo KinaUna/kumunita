@@ -18,9 +18,9 @@ public static class RejectAnnouncementHandler
         IDocumentSession session,
         CancellationToken ct)
     {
-        var announcement = await session
-                               .LoadAsync<Announcement>(cmd.AnnouncementId, ct)
-                           ?? throw new AnnouncementNotFoundException(cmd.AnnouncementId);
+        Announcement announcement = await session
+                                        .LoadAsync<Announcement>(cmd.AnnouncementId, ct)
+                                    ?? throw new AnnouncementNotFoundException(cmd.AnnouncementId);
 
         announcement.Reject(cmd.ModeratorId, cmd.Reason);
         session.Store(announcement);

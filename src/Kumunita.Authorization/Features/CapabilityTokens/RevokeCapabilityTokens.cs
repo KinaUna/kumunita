@@ -14,14 +14,14 @@ public static class RevokeAllUserTokensHandler
         CancellationToken ct)
     {
         // Load all active tokens for this user
-        var activeTokens = await session
+        IReadOnlyList<CapabilityToken> activeTokens = await session
             .Query<CapabilityToken>()
             .Where(t =>
                 t.RequesterId == cmd.UserId &&
                 t.Status == CapabilityTokenStatus.Active)
             .ToListAsync(ct);
 
-        foreach (var token in activeTokens)
+        foreach (CapabilityToken token in activeTokens)
         {
             token.Revoke();
             session.Store(token);

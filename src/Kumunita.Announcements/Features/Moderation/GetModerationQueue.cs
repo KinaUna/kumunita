@@ -24,7 +24,7 @@ public static class GetModerationQueueHandler
         IQuerySession session,
         CancellationToken ct)
     {
-        var pending = await session
+        IReadOnlyList<Announcement> pending = await session
             .Query<Announcement>()
             .Where(a => a.Status == AnnouncementStatus.PendingReview)
             .OrderBy(a => a.CreatedAt) // oldest first — FIFO queue

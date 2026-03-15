@@ -8,9 +8,9 @@ public class DefaultLanguagesSeed : IInitialData
 {
     public async Task Populate(IDocumentStore store, CancellationToken ct)
     {
-        await using var session = store.LightweightSession();
+        await using IDocumentSession session = store.LightweightSession();
 
-        var existing = await session.Query<Language>().AnyAsync(ct);
+        bool existing = await session.Query<Language>().AnyAsync(ct);
         if (existing) return; // already seeded
 
         session.StoreObjects(new[]

@@ -18,7 +18,7 @@ public static class ValidateCapabilityTokenHandler
         IDocumentSession session,
         CancellationToken ct)
     {
-        var token = await session.LoadAsync<CapabilityToken>(cmd.TokenId, ct);
+        CapabilityToken? token = await session.LoadAsync<CapabilityToken>(cmd.TokenId, ct);
 
         if (token is null)
             return new TokenValidationResult(false, "Token not found");

@@ -8,9 +8,9 @@ public class AnnouncementSettingsSeed : IInitialData
 {
     public async Task Populate(IDocumentStore store, CancellationToken ct)
     {
-        await using var session = store.LightweightSession();
+        await using IDocumentSession session = store.LightweightSession();
 
-        var existing = await session
+        AnnouncementSettings? existing = await session
             .LoadAsync<AnnouncementSettings>(
                 AnnouncementSettings.SingletonId, ct);
 

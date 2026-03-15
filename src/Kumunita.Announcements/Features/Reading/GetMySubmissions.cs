@@ -22,7 +22,7 @@ public static class GetMySubmissionsHandler
         IQuerySession session,
         CancellationToken ct)
     {
-        var submissions = await session
+        IReadOnlyList<Announcement> submissions = await session
             .Query<Announcement>()
             .Where(a =>
                 a.OwnerId == query.MemberId &&

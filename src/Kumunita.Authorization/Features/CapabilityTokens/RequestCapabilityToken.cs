@@ -28,18 +28,18 @@ public static class RequestCapabilityTokenHandler
         CancellationToken ct)
     {
         // Step 1 — validate resource type exists
-        var resource = ResourceType.Find(cmd.ResourceTypeName);
+        ResourceDescriptor? resource = ResourceType.Find(cmd.ResourceTypeName);
         if (resource is null)
         {
-            var denied = Deny("Unknown resource type", cmd, resource?.SensitivityTier
-                ?? SensitivityTier.Restricted, session);
+            (CapabilityTokenResponse response, CapabilityTokenDenied evt) denied = Deny("Unknown resource type", cmd, resource?.SensitivityTier
+                                                                                                                      ?? SensitivityTier.Restricted, session);
             return (denied.response, denied.evt);
         }
 
         // Step 2 — public resources need no token
         if (resource.SensitivityTier == SensitivityTier.Public)
         {
-            var token = CapabilityToken.Issue(
+            CapabilityToken token = CapabilityToken.Issue(
                 cmd.RequesterId, cmd.OwnerId,
                 cmd.ResourceTypeName, cmd.Action,
                 resource.SensitivityTier, cmd.RequestContext);
@@ -49,12 +49,12 @@ public static class RequestCapabilityTokenHandler
         }
 
         // Step 3 — load requester's authorization state
-        var requesterState = await session
+        UserAuthorizationState? requesterState = await session
             .LoadAsync<UserAuthorizationState>(cmd.RequesterId, ct);
 
         if (requesterState is null || requesterState.IsSuspended)
         {
-            var denied = Deny("Requester account is suspended or not found",
+            (CapabilityTokenResponse response, CapabilityTokenDenied evt) denied = Deny("Requester account is suspended or not found",
                 cmd, resource.SensitivityTier, session);
             return (denied.response, denied.evt);
         }
@@ -64,7 +64,7 @@ public static class RequestCapabilityTokenHandler
             && !requesterState.HasRole(AppRole.SystemRoles.Admin)
             && !requesterState.HasRole(AppRole.SystemRoles.Moderator))
         {
-            var denied = Deny("Insufficient role for restricted resource",
+            (CapabilityTokenResponse response, CapabilityTokenDenied evt) denied = Deny("Insufficient role for restricted resource",
                 cmd, resource.SensitivityTier, session);
             return (denied.response, denied.evt);
         }
@@ -72,19 +72,19 @@ public static class RequestCapabilityTokenHandler
         // Step 5 — admins can always access non-restricted resources
         if (requesterState.HasRole(AppRole.SystemRoles.Admin))
         {
-            var token = IssueAndStore(cmd, resource, session);
+            CapabilityToken token = IssueAndStore(cmd, resource, session);
             return (Grant(token), new CapabilityTokenIssued(token.Id, cmd.RequesterId, cmd.OwnerId, cmd.ResourceTypeName, cmd.Action, resource.SensitivityTier, token.ExpiresAt));
         }
 
         // Step 6 — owner can always access their own data
         if (cmd.RequesterId == cmd.OwnerId)
         {
-            var token = IssueAndStore(cmd, resource, session);
+            CapabilityToken token = IssueAndStore(cmd, resource, session);
             return (Grant(token), new CapabilityTokenIssued(token.Id, cmd.RequesterId, cmd.OwnerId, cmd.ResourceTypeName, cmd.Action, resource.SensitivityTier, token.ExpiresAt));
         }
 
         // Step 7 — evaluate visibility policy
-        var policy = await session
+        VisibilityPolicy? policy = await session
             .Query<VisibilityPolicy>()
             .FirstOrDefaultAsync(p =>
                 p.OwnerId == cmd.OwnerId &&
@@ -93,12 +93,12 @@ public static class RequestCapabilityTokenHandler
         if (policy is null)
         {
             // No policy means private by default — deny
-            var denied = Deny("No visibility policy found — defaulting to private",
+            (CapabilityTokenResponse response, CapabilityTokenDenied evt) denied = Deny("No visibility policy found — defaulting to private",
                 cmd, resource.SensitivityTier, session);
             return (denied.response, denied.evt);
         }
 
-        var accessGranted = policy.Visibility switch
+        bool accessGranted = policy.Visibility switch
         {
             VisibilityLevel.Members => true, // any authenticated member
             VisibilityLevel.SharedGroups =>
@@ -115,13 +115,13 @@ public static class RequestCapabilityTokenHandler
 
         if (!accessGranted)
         {
-            var denied = Deny("Visibility policy denied access",
+            (CapabilityTokenResponse response, CapabilityTokenDenied evt) denied = Deny("Visibility policy denied access",
                 cmd, resource.SensitivityTier, session);
             return (denied.response, denied.evt);
         }
 
         // Step 8 — all checks passed, issue token
-        var grantedToken = IssueAndStore(cmd, resource, session);
+        CapabilityToken grantedToken = IssueAndStore(cmd, resource, session);
         return (Grant(grantedToken), new CapabilityTokenIssued(grantedToken.Id, cmd.RequesterId, cmd.OwnerId, cmd.ResourceTypeName, cmd.Action, resource.SensitivityTier, grantedToken.ExpiresAt));
     }
 
@@ -130,7 +130,7 @@ public static class RequestCapabilityTokenHandler
         ResourceDescriptor resource,
         IDocumentSession session)
     {
-        var token = CapabilityToken.Issue(
+        CapabilityToken token = CapabilityToken.Issue(
             cmd.RequesterId, cmd.OwnerId,
             cmd.ResourceTypeName, cmd.Action,
             resource.SensitivityTier, cmd.RequestContext);

@@ -45,14 +45,14 @@ public class AnnouncementTarget
     {
         if (IsUniversal) return true;
 
-        var roles = memberRoles.ToList();
-        var groups = memberGroupIds.ToList();
+        List<string> roles = memberRoles.ToList();
+        List<GroupId> groups = memberGroupIds.ToList();
 
-        var roleMatch = TargetRoles.Count == 0
-                        || TargetRoles.Any(r => roles.Contains(r));
+        bool roleMatch = TargetRoles.Count == 0
+                         || TargetRoles.Any(r => roles.Contains(r));
 
-        var groupMatch = TargetGroupIds.Count == 0
-                         || TargetGroupIds.Any(g => groups.Contains(g));
+        bool groupMatch = TargetGroupIds.Count == 0
+                          || TargetGroupIds.Any(g => groups.Contains(g));
 
         // Must match both role and group criteria if both are specified
         return roleMatch && groupMatch;

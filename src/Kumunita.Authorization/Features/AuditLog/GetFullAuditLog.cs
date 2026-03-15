@@ -22,7 +22,7 @@ public static class GetFullAuditLogHandler
     {
         // Admin check enforced at endpoint level via capability token
         // Handler trusts that a valid Restricted token was presented
-        var q = session.Query<AuditEntry>().AsQueryable();
+        IQueryable<AuditEntry> q = session.Query<AuditEntry>().AsQueryable();
 
         if (query.FilterByOwnerId.HasValue)
             q = q.Where(e => e.OwnerId == query.FilterByOwnerId.Value);

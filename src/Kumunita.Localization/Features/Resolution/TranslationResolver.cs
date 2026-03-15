@@ -11,12 +11,12 @@ public class TranslationResolver
         CancellationToken ct)
     {
         // Step 1 — build candidate language list
-        var candidates = BuildCandidateChain(
+        IEnumerable<string> candidates = BuildCandidateChain(
             query.PreferredLanguage,
             query.BrowserLanguages);
 
         // Step 2 — find the TranslationKey by module/feature/key
-        var key = await session
+        TranslationKey? key = await session
             .Query<TranslationKey>()
             .FirstOrDefaultAsync(k =>
                 k.Module == query.Module &&
@@ -28,15 +28,15 @@ public class TranslationResolver
                 $"{query.Module}.{query.Feature}.{query.Key}", "none");
 
         // Step 3 — load all translations for this key
-        var translations = await session
+        IReadOnlyList<Translation> translations = await session
             .Query<Translation>()
             .Where(t => t.TranslationKeyId == key.Id)
             .ToListAsync(ct);
 
         // Step 4 — walk the candidate chain, prefer Approved
-        foreach (var lang in candidates)
+        foreach (string lang in candidates)
         {
-            var match = translations.FirstOrDefault(t =>
+            Translation? match = translations.FirstOrDefault(t =>
                 t.LanguageCode == lang &&
                 t.Status == TranslationStatus.Approved);
 
@@ -45,7 +45,7 @@ public class TranslationResolver
         }
 
         // Step 5 — Draft English fallback
-        var draftEn = translations.FirstOrDefault(t =>
+        Translation? draftEn = translations.FirstOrDefault(t =>
             t.LanguageCode == "en");
 
         if (draftEn is not null)
@@ -60,20 +60,20 @@ public class TranslationResolver
         string? preferredLanguage,
         IEnumerable<string> browserLanguages)
     {
-        var candidates = new List<string>();
+        List<string> candidates = new List<string>();
 
         if (!string.IsNullOrEmpty(preferredLanguage))
             candidates.Add(Normalize(preferredLanguage));
 
-        foreach (var lang in browserLanguages)
+        foreach (string lang in browserLanguages)
         {
-            var normalized = Normalize(lang);
+            string normalized = Normalize(lang);
             // Add both region variant and base language
             // e.g. "fr-BE" → adds "fr-BE" then "fr"
             if (!candidates.Contains(normalized))
                 candidates.Add(normalized);
 
-            var baseLang = normalized.Split('-')[0];
+            string baseLang = normalized.Split('-')[0];
             if (!candidates.Contains(baseLang))
                 candidates.Add(baseLang);
         }

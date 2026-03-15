@@ -143,7 +143,7 @@
 
     private async Task RevokeInvitation(CommunityInvitationId id)
     {
-        var confirmed = await DialogService.ShowMessageBoxAsync(
+        bool? confirmed = await DialogService.ShowMessageBoxAsync(
             "Revoke invitation?",
             "The invited person will no longer be able to use this link.",
             yesText: "Revoke", cancelText: "Cancel");

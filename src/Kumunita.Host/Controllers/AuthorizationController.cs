@@ -26,11 +26,11 @@ public sealed class AuthorizationController(
     [HttpPost("~/connect/authorize")]
     public async Task<IActionResult> Authorize()
     {
-        var request = HttpContext.GetOpenIddictServerRequest()
-            ?? throw new InvalidOperationException("The OpenIddict request cannot be retrieved.");
+        OpenIddictRequest request = HttpContext.GetOpenIddictServerRequest()
+                                    ?? throw new InvalidOperationException("The OpenIddict request cannot be retrieved.");
 
         // Try to retrieve the user principal stored in the authentication cookie.
-        var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+        AuthenticateResult result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
 
         // If the user is not logged in (or a login prompt was explicitly requested), redirect to login.
         if (!result.Succeeded || HasPrompt(request, Prompts.Login))
@@ -56,7 +56,7 @@ public sealed class AuthorizationController(
                 });
         }
 
-        var user = await userManager.GetUserAsync(result.Principal);
+        AppUser? user = await userManager.GetUserAsync(result.Principal);
         if (user is null)
         {
             // Cookie is stale (user deleted, or claim mismatch) — force re-login
@@ -70,7 +70,7 @@ public sealed class AuthorizationController(
                 });
         }
 
-        var identity = new ClaimsIdentity(
+        ClaimsIdentity identity = new ClaimsIdentity(
             authenticationType: TokenValidationParameters.DefaultAuthenticationType,
             nameType: Claims.Name,
             roleType: Claims.Role);
@@ -186,7 +186,7 @@ public sealed class AuthorizationController(
                 }));
         }
 
-        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        Dictionary<string, object> claims = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             [Claims.Subject]  = await userManager.GetUserIdAsync(user),
             [Claims.Email]    = await userManager.GetEmailAsync(user)  ?? string.Empty,
