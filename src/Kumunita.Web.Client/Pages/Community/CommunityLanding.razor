@@ -42,7 +42,12 @@ else
                     <MudText Typo="Typo.body2">Members</MudText>
                 </MudPaper>
             </MudItem>
-            <!-- TODO: announcement count, recent activity -->
+            <MudItem xs="6" sm="3">
+                <MudPaper Class="pa-4 text-center" Elevation="1">
+                    <MudText Typo="Typo.h5">@_announcementCount</MudText>
+                    <MudText Typo="Typo.body2">Announcements</MudText>
+                </MudPaper>
+            </MudItem>
         </MudGrid>
 
         <!-- Quick navigation -->
@@ -79,6 +84,7 @@ else
     private CommunityResult? _community;
     private bool _loading = true;
     private bool _isManagerOrAbove;
+    private int _announcementCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,6 +109,7 @@ else
         try
         {
             _community = await Api.GetAsync<CommunityResult>($"/communities/{Slug}");
+            _announcementCount = await Api.GetAsync<int>($"/announcements/{Slug}/count");
         }
         finally
         {
