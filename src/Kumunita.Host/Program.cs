@@ -2,6 +2,7 @@ using JasperFx.Core;
 using Kumunita.Announcements;
 using Kumunita.Authorization;
 using Kumunita.Communities;
+using Kumunita.Communities.Handlers;
 using Kumunita.Host;
 using Kumunita.Identity;
 using Kumunita.Identity.Infrastructure;
@@ -96,6 +97,7 @@ builder.Host.UseWolverine(opts =>
     opts.Discovery.IncludeAssembly(typeof(IdentityModule).Assembly);
     opts.Discovery.IncludeAssembly(typeof(LocalizationModule).Assembly);
     opts.Discovery.IncludeAssembly(typeof(AnnouncementsModule).Assembly);
+   opts.Discovery.IncludeAssembly(typeof(CommunityQueryHandler).Assembly);
 
     // All local queues use a durable inbox — unprocessed messages survive app restarts
     opts.Policies.AllLocalQueues(q => q.UseDurableInbox());

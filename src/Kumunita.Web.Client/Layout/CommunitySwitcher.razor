@@ -1,6 +1,5 @@
-@using System.Security.Claims
 @inject CommunityContext CommunityContext
-@inject AuthenticationStateProvider Auth
+@inject IApiClient Api
 @implements IDisposable
 
 <MudMenu Label="@_label"
@@ -64,16 +63,11 @@
 
     private async Task LoadCommunitiesAsync()
     {
-        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
-        ClaimsPrincipal user  = state.User;
+        List<UserCommunityResult> results =
+            await Api.GetAsync<List<UserCommunityResult>>("/communities") ?? [];
 
-        // TODO: fetch from /communities API endpoint and cache
-        // For now, read slugs from claims and show them
-        _communities = user.GetCommunitySlugs()
-            .Select(slug => new CommunityEntry(
-                slug,
-                slug, // TODO: replace with resolved display name
-                user.GetCommunityRole(slug)?.ToString() ?? "Member"))
+        _communities = results
+            .Select(r => new CommunityEntry(r.Slug, r.Name, r.Role.ToString()))
             .ToList();
     }
 
