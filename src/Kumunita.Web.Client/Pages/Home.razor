@@ -180,7 +180,7 @@
         try
         {
             // Reuses the combined feed endpoint — returns N announcements per community.
-            _groups = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/announcements") ?? [];
+            _groups = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/api/announcements") ?? [];
         }
         finally
         {

@@ -31,7 +31,7 @@ public static class CombinedAnnouncementFeedEndpoint
     /// (DEFAULT) tenant; announcements and targeting state are loaded per community
     /// tenant via <see cref="IDocumentStore"/> to respect multi-tenancy.
     /// </summary>
-    [WolverineGet("/announcements")]
+    [WolverineGet("/api/announcements")]
     [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
     public static async Task<IResult> GetCombinedFeed(
         ClaimsPrincipal user,

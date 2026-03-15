@@ -17,7 +17,7 @@ public static class CommunityQueryHandler
     /// Returns all communities the authenticated user belongs to.
     /// Used to populate the community switcher in the frontend.
     /// </summary>
-    [WolverineGet("/communities")]
+    [WolverineGet("/api/communities")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     public static async Task<IResult> GetUserCommunities(
         IQuerySession session,
@@ -57,7 +57,7 @@ public static class CommunityQueryHandler
     /// Returns the community overview for the landing page.
     /// Only accessible to active members of the community.
     /// </summary>
-    [WolverineGet("/communities/{slug}")]
+    [WolverineGet("/api/communities/{slug}")]
     [Microsoft.AspNetCore.Authorization.Authorize]
     public static async Task<IResult> GetCommunity(
         string slug,

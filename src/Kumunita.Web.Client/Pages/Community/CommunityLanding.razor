@@ -108,8 +108,8 @@ else
         _loading = true;
         try
         {
-            _community = await Api.GetAsync<CommunityResult>($"/communities/{Slug}");
-            _announcementCount = await Api.GetAsync<int>($"/announcements/{Slug}/count");
+            _community = await Api.GetAsync<CommunityResult>($"/api/communities/{Slug}");
+            _announcementCount = await Api.GetAsync<int>($"/api/announcements/{Slug}/count");
         }
         finally
         {

@@ -68,7 +68,7 @@
         try
         {
             // GET /announcements returns N per community, grouped
-            List<CommunityAnnouncementGroup>? response = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/announcements");
+            List<CommunityAnnouncementGroup>? response = await Api.GetAsync<List<CommunityAnnouncementGroup>>("/api/announcements");
             _grouped = response ?? [];
         }
         finally

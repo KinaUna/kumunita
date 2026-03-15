@@ -16,7 +16,7 @@ namespace Kumunita.Host.Endpoints;
 /// </summary>
 public static class AnnouncementCountEndpoint
 {
-    [WolverineGet("/announcements/{slug}/count")]
+    [WolverineGet("/api/announcements/{slug}/count")]
     [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
     public static async Task<IResult> GetCount(
         string slug,

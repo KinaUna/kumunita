@@ -64,7 +64,7 @@
     private async Task LoadCommunitiesAsync()
     {
         List<UserCommunityResult> results =
-            await Api.GetAsync<List<UserCommunityResult>>("/communities") ?? [];
+            await Api.GetAsync<List<UserCommunityResult>>("/api/communities") ?? [];
 
         _communities = results
             .Select(r => new CommunityEntry(r.Slug, r.Name, r.Role.ToString()))
