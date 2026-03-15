@@ -3,6 +3,7 @@ using Kumunita.Communities.Contracts.Queries;
 using Kumunita.Communities.Domain;
 using Kumunita.Communities.Domain.Events;
 using Kumunita.Communities.Exceptions;
+using Kumunita.Identity.Domain;
 using Kumunita.Shared.Kernel;
 using Kumunita.Shared.Kernel.Auth;
 using Kumunita.Shared.Kernel.Communities;
@@ -171,10 +172,13 @@ public static class MemberManagementHandler
             .OrderBy(m => m.JoinedAt)
             .ToListAsync(ct);
 
-        // TODO: join with UserProfile (community-scoped) to resolve DisplayName
+        Guid[] memberGuids = members.Select(m => m.UserId.Value).ToArray();
+        IReadOnlyList<UserProfile> profiles = await session.LoadManyAsync<UserProfile>(ct, memberGuids);
+        Dictionary<Guid, string> displayNames = profiles.ToDictionary(p => p.Id.Value, p => p.DisplayName);
+
         return Results.Ok(members.Select(m => new CommunityMemberResult(
             m.UserId,
-            string.Empty,
+            displayNames.GetValueOrDefault(m.UserId.Value, string.Empty),
             m.Role,
             m.Status,
             m.JoinedAt)));

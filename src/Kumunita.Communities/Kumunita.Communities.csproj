@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Kumunita.Communities.Contracts\Kumunita.Communities.Contracts.csproj" />
+    <ProjectReference Include="..\Kumunita.Identity\Kumunita.Identity.csproj" />
     <ProjectReference Include="..\Kumunita.Shared.Infrastructure\Kumunita.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\Kumunita.Shared.Kernel\Kumunita.Shared.Kernel.csproj" />
   </ItemGroup>
