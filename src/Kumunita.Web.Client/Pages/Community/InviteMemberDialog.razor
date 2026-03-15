@@ -1,0 +1,74 @@
+@using Kumunita.Shared.Kernel.Communities
+@using System.ComponentModel.DataAnnotations
+@inject IApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudTextField @bind-Value="_email"
+                          Label="Email address"
+                          InputType="InputType.Email"
+                          Required="true"
+                          RequiredError="Email is required."
+                          Validation="@(new EmailAddressAttribute())" />
+            @if (IsManager)
+            {
+                <MudSelect T="CommunityRole" @bind-Value="_role" Label="Role" Class="mt-2">
+                    <MudSelectItem Value="CommunityRole.Member">Member</MudSelectItem>
+                    <MudSelectItem Value="CommunityRole.Moderator">Moderator</MudSelectItem>
+                </MudSelect>
+            }
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="!_valid || _submitting">
+            Send Invite
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public string Slug { get; set; } = default!;
+    [Parameter] public bool IsManager { get; set; }
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _submitting;
+    private string _email = string.Empty;
+    private CommunityRole _role = CommunityRole.Member;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        try
+        {
+            await Api.PostAsync<InviteMemberCommand>(
+                $"/communities/{Slug}/invitations",
+                new InviteMemberCommand(Slug, _email, _role));
+
+            Snackbar.Add($"Invitation sent to {_email}.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add(
+                "Failed to send invitation. The address may already have a pending invite or be an active member.",
+                Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

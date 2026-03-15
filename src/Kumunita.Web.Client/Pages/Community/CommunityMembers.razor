@@ -126,10 +126,17 @@
 
     private async Task OpenInviteDialog()
     {
-        // TODO: open MudDialog with invite form (email, role selector)
-        // On confirm: POST /communities/{Slug}/invitations
-        // On success: Snackbar + reload invitations
-        await Task.CompletedTask;
+        DialogParameters<InviteMemberDialog> parameters = new()
+        {
+            { x => x.Slug, Slug },
+            { x => x.IsManager, _isManager }
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<InviteMemberDialog>("Invite Member", parameters);
+        DialogResult? result = await dialog.Result;
+
+        if (result?.Data is true)
+            await LoadAsync();
     }
 
     private async Task OpenMemberMenu(CommunityMemberResult member)
