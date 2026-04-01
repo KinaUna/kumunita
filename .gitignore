@@ -417,3 +417,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 /.publish-test
+/.claude/settings.local.json
