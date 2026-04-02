@@ -21,7 +21,9 @@ using Wolverine.Http;
 using Wolverine.Marten;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using OpenIddict.Validation.AspNetCore;
+using System.Threading.RateLimiting;
 
 if (args.Contains("--migrate"))
 {
@@ -55,6 +57,24 @@ else
 }
 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+
+// Rate limiting for auth and invitation endpoints
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 10;
+        o.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter("invitation", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 5;
+        o.QueueLimit = 0;
+    });
+    options.RejectionStatusCode = 429;
+});
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -185,6 +205,16 @@ if (!app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 
+// Security headers
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    await next();
+});
+
 app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
@@ -199,6 +229,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.UseAntiforgery();
 app.MapControllers(); // Map API controllers before tenant middleware so they can return 401/403 without requiring a valid tenant
 app.MapRazorPages();  // ← ADD THIS — registers /Account/Login and any future Razor Pages

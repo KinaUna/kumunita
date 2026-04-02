@@ -40,9 +40,6 @@ public static class IdentityModule
         // OpenIddict
         services.AddOpenIddictForIdentity(configuration, environment);
 
-        // Custom claims enrichment
-        services.AddScoped<CustomClaimsHandler>();
-
         // Registered as singletons (not hosted services) so they can be resolved and
         // called explicitly before app.Run() — ensuring seeding completes before the
         // server accepts its first request. See IdentityModule.SeedIdentityAsync.

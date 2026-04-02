@@ -35,6 +35,11 @@ public static class OpenIddictConfiguration
                 // Refresh tokens for session continuity
                 options.AllowRefreshTokenFlow();
 
+                // Token lifetimes — 15min access tokens ensure stale community/role
+                // claims are refreshed promptly after membership changes.
+                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(15));
+                options.SetRefreshTokenLifetime(TimeSpan.FromDays(7));
+
                 options.RegisterScopes(
                     OpenIddictConstants.Scopes.OpenId,
                     OpenIddictConstants.Scopes.Email,
