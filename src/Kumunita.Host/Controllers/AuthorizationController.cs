@@ -5,7 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using System.Security.Claims;
+using System.Text.Json;
+using Kumunita.Communities.Domain;
 using Kumunita.Identity.Domain;
+using Kumunita.Shared.Kernel;
+using Kumunita.Shared.Kernel.Communities;
+using Marten;
 using Microsoft.IdentityModel.Tokens;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -13,7 +18,8 @@ namespace Kumunita.Host.Controllers;
 
 public sealed class AuthorizationController(
     UserManager<AppUser> userManager,
-    SignInManager<AppUser> signInManager) : Controller
+    SignInManager<AppUser> signInManager,
+    IDocumentStore documentStore) : Controller
 {
     // OIDC prompt values (OpenIddictConstants.Prompts was removed in OpenIddict 7.x)
     private static class Prompts
@@ -80,6 +86,8 @@ public sealed class AuthorizationController(
                 .SetClaim(Claims.Name, await userManager.GetUserNameAsync(user))
                 .SetClaims(Claims.Role, [.. (await userManager.GetRolesAsync(user))]);
 
+        await EnrichClaimsAsync(identity, user);
+
         identity.SetScopes(request.GetScopes());
         identity.SetDestinations(GetDestinations);
 
@@ -93,6 +101,7 @@ public sealed class AuthorizationController(
     [HttpPost("~/connect/token")]
     [IgnoreAntiforgeryToken]   // token requests use PKCE, not antiforgery cookies
     [Produces("application/json")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public async Task<IActionResult> Exchange()
     {
         OpenIddictRequest request = HttpContext.GetOpenIddictServerRequest()
@@ -151,6 +160,8 @@ public sealed class AuthorizationController(
         if (user.MustChangePassword)
             identity.SetClaim("must_change_password", "true");
 
+        await EnrichClaimsAsync(identity, user);
+
         identity.SetScopes(tokenResult.Principal!.GetScopes());
         identity.SetDestinations(GetDestinations);
 
@@ -197,13 +208,38 @@ public sealed class AuthorizationController(
         if (roles.Count > 0)
             claims[Claims.Role] = roles.Count == 1 ? (object)roles[0] : roles;
 
+        if (roles.Contains(AppRole.SystemRoles.Admin))
+            claims["platform_admin"] = "true";
+
         if (user.MustChangePassword)
             claims["must_change_password"] = "true";
+
+        // Include community memberships in userinfo response
+        using IQuerySession session = documentStore.QuerySession();
+        IReadOnlyList<CommunityMembership> memberships = await session
+            .Query<CommunityMembership>()
+            .Where(m => m.UserId == user.DomainId && m.Status == MembershipStatus.Active)
+            .ToListAsync();
+
+        if (memberships.Count > 0)
+        {
+            List<CommunityId> communityIds = memberships.Select(m => m.CommunityId).ToList();
+            IReadOnlyList<Community> communities = await session
+                .Query<Community>()
+                .Where(c => c.Id.IsOneOf(communityIds.ToArray()))
+                .ToListAsync();
+
+            Dictionary<CommunityId, string> slugMap = communities.ToDictionary(c => c.Id, c => c.Slug);
+
+            claims["communities"] = memberships
+                .Where(m => slugMap.ContainsKey(m.CommunityId))
+                .Select(m => new { slug = slugMap[m.CommunityId], role = m.Role.ToString() })
+                .ToList();
+        }
 
         return Ok(claims);
     }
 
-    [HttpGet("~/connect/logout")]
     [HttpPost("~/connect/logout")]
     public async Task<IActionResult> Logout()
     {
@@ -224,6 +260,76 @@ public sealed class AuthorizationController(
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Contains(prompt, StringComparer.OrdinalIgnoreCase) ?? false;
 
+    /// <summary>
+    /// Enriches the claims identity with community memberships, platform admin status,
+    /// preferred language, and group memberships. Queries Marten directly using
+    /// IDocumentStore to avoid HTTP-scoped tenant context.
+    /// </summary>
+    private async Task EnrichClaimsAsync(ClaimsIdentity identity, AppUser user)
+    {
+        IList<string> roles = await userManager.GetRolesAsync(user);
+
+        // platform_admin — derived from the Admin system role
+        if (roles.Contains(AppRole.SystemRoles.Admin))
+            identity.SetClaim("platform_admin", "true");
+
+        // communities — query platform-level CommunityMembership + Community documents
+        using IQuerySession session = documentStore.QuerySession();
+
+        IReadOnlyList<CommunityMembership> memberships = await session
+            .Query<CommunityMembership>()
+            .Where(m => m.UserId == user.DomainId && m.Status == MembershipStatus.Active)
+            .ToListAsync();
+
+        if (memberships.Count > 0)
+        {
+            List<CommunityId> communityIds = memberships.Select(m => m.CommunityId).ToList();
+            IReadOnlyList<Community> communities = await session
+                .Query<Community>()
+                .Where(c => c.Id.IsOneOf(communityIds.ToArray()))
+                .ToListAsync();
+
+            Dictionary<CommunityId, string> slugMap = communities.ToDictionary(c => c.Id, c => c.Slug);
+
+            var communityEntries = memberships
+                .Where(m => slugMap.ContainsKey(m.CommunityId))
+                .Select(m => new { slug = slugMap[m.CommunityId], role = m.Role.ToString() })
+                .ToList();
+
+            identity.SetClaim("communities",
+                JsonSerializer.Serialize(communityEntries, JsonSerializerOptions.Web));
+
+            // preferred_language — load from the first community's tenant-scoped UserProfile
+            foreach (string slug in communityEntries.Select(c => c.slug))
+            {
+                using IQuerySession tenantSession = documentStore.QuerySession(
+                    new Marten.Services.SessionOptions { TenantId = slug });
+
+                UserProfile? profile = await tenantSession.LoadAsync<UserProfile>(user.DomainId);
+                if (profile is not null)
+                {
+                    identity.SetClaim("preferred_language", profile.PreferredLanguage.Value);
+                    break;
+                }
+            }
+
+            // group — load from all community tenants
+            foreach (string slug in communityEntries.Select(c => c.slug))
+            {
+                using IQuerySession tenantSession = documentStore.QuerySession(
+                    new Marten.Services.SessionOptions { TenantId = slug });
+
+                IReadOnlyList<UserGroupMembership> groups = await tenantSession
+                    .Query<UserGroupMembership>()
+                    .Where(g => g.UserId == user.DomainId)
+                    .ToListAsync();
+
+                foreach (UserGroupMembership group in groups)
+                    identity.AddClaim(new Claim("group", group.GroupId.Value.ToString()));
+            }
+        }
+    }
+
     private static IEnumerable<string> GetDestinations(Claim claim)
     {
         return claim.Type switch
@@ -232,6 +338,9 @@ public sealed class AuthorizationController(
             Claims.Email                          => [Destinations.AccessToken, Destinations.IdentityToken],
             Claims.Role                           => [Destinations.AccessToken, Destinations.IdentityToken],
             "must_change_password"                => [Destinations.AccessToken, Destinations.IdentityToken],
+            "communities"                         => [Destinations.AccessToken, Destinations.IdentityToken],
+            "platform_admin"                      => [Destinations.AccessToken, Destinations.IdentityToken],
+            "preferred_language" or "group"        => [Destinations.AccessToken],
             _                                     => [Destinations.AccessToken]
         };
     }

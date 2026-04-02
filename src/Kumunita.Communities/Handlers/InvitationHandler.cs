@@ -161,7 +161,14 @@ public static class InvitationHandler
         return Results.Ok(new { community.Slug, membership.Role });
     }
 
+    /// <summary>
+    /// Declines a community invitation using the secure random token.
+    /// Intentionally unauthenticated: recipients can decline via email link
+    /// without creating an account. The 256-bit random token provides
+    /// authorization. Rate limiting mitigates enumeration.
+    /// </summary>
     [WolverinePost("/invitations/{token}/decline")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("invitation")]
     public static async Task<IResult> DeclineInvitation(
         string token,
         IDocumentSession session,

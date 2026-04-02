@@ -35,6 +35,7 @@ builder.Services
         options.ProviderOptions.DefaultScopes.Add("profile");
         options.ProviderOptions.DefaultScopes.Add("email");
         options.ProviderOptions.DefaultScopes.Add("offline_access"); // refresh tokens
+        options.ProviderOptions.DefaultScopes.Add("roles");
     });
 
 builder.Services.AddCascadingAuthenticationState();
