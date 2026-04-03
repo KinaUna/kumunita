@@ -28,6 +28,8 @@ dotnet ef migrations add <Name> --project src/Kumunita.Identity --startup-projec
 
 Marten schemas are auto-created at startup via `.ApplyAllDatabaseChangesOnStartup()` — no manual migration needed for document DB changes.
 
+Aspire also starts a **MailDev** container for local email testing — web UI at `http://localhost:1080`.
+
 Solo-developer project. No branching strategy or PR gates — work happens directly on `main`.
 
 ## Architecture
@@ -39,6 +41,7 @@ Solo-developer project. No branching strategy or PR gates — work happens direc
 - **Document DB / event store:** Marten (PostgreSQL)
 - **Identity persistence:** EF Core (PostgreSQL, separate `identity` schema)
 - **Auth:** OpenIddict (Authorization Code + PKCE)
+- **Email:** MailKit (SMTP) — `IEmailSender<AppUser>` in Identity module
 - **Frontend:** Blazor Web App (InteractiveWebAssembly) with MudBlazor
 - **Dev orchestration:** .NET Aspire (dev only, not deployed)
 
@@ -98,6 +101,16 @@ When adding a new module with domain events: register its queue in `Program.cs` 
 ### Exception handling
 
 Module-specific exceptions are mapped to HTTP status codes in `DomainExceptionHandler` (`Shared.Infrastructure`). When adding new domain exceptions, add the mapping there.
+
+### Email confirmation
+
+Email confirmation is required for all users (`RequireConfirmedEmail = true`). When a user is created (via `PlatformUserEndpoints.CreateUser`), the `UserRegistered` domain event triggers `SendConfirmationEmailHandler`, which generates a token and sends a confirmation email via `IEmailSender<AppUser>`.
+
+- **`SmtpEmailSender`** (`Kumunita.Identity/Infrastructure/`) implements `IEmailSender<AppUser>` using MailKit.
+- **SMTP config** is in the `"Smtp"` section (`SmtpOptions`): Host, Port, Username, Password, UseSsl, SenderEmail, SenderName.
+- **Dev email:** Aspire runs a MailDev container (SMTP on port 1025, web UI on port 1080 at `http://localhost:1080`).
+- **Account pages** are server-rendered Razor Pages in `Kumunita.Host/Pages/Account/`: `ConfirmEmail` (validates token), `ResendConfirmation` (resends the email), `Login` (shows resend link on unconfirmed error).
+- **Base URL** for confirmation links is resolved from `Kumunita:BaseUrl` config (same pattern as `OpenIddictSeeder`).
 
 ### Authorization model
 

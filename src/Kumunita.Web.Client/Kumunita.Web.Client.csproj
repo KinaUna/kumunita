@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Kumunita.Announcements.Contracts\Kumunita.Announcements.Contracts.csproj" />
     <ProjectReference Include="..\Kumunita.Communities.Contracts\Kumunita.Communities.Contracts.csproj" />
+    <ProjectReference Include="..\Kumunita.Identity.Contracts\Kumunita.Identity.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

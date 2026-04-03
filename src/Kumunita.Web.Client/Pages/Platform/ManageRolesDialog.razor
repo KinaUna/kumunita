@@ -1,0 +1,106 @@
+@inject IApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.subtitle1" Class="mb-2">Current Roles</MudText>
+        @if (_roles.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No roles assigned.</MudText>
+        }
+        else
+        {
+            <MudChipSet T="string">
+                @foreach (string role in _roles)
+                {
+                    <MudChip T="string"
+                             Color="Color.Primary"
+                             Variant="Variant.Outlined"
+                             OnClose="() => RevokeRole(role)">
+                        @role
+                    </MudChip>
+                }
+            </MudChipSet>
+        }
+
+        <MudDivider Class="my-3" />
+
+        <MudStack Row="true" AlignItems="AlignItems.End">
+            <MudSelect T="string" @bind-Value="_selectedRole" Label="Add Role" Variant="Variant.Outlined" Dense="true">
+                @foreach (string role in _availableRoles.Except(_roles))
+                {
+                    <MudSelectItem Value="role">@role</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       Disabled="string.IsNullOrEmpty(_selectedRole) || _busy"
+                       OnClick="AssignRole">
+                Assign
+            </MudButton>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Guid UserId { get; set; }
+    [Parameter] public IList<string> CurrentRoles { get; set; } = [];
+
+    private List<string> _roles = [];
+    private string? _selectedRole;
+    private bool _busy;
+
+    private static readonly string[] _availableRoles = ["Admin", "Moderator", "Member", "Guest"];
+
+    protected override void OnInitialized()
+    {
+        _roles = [.. CurrentRoles];
+    }
+
+    private async Task AssignRole()
+    {
+        if (string.IsNullOrEmpty(_selectedRole)) return;
+
+        _busy = true;
+        try
+        {
+            await Api.PutAsync<object>($"/platform/users/{UserId}/roles", new { RoleName = _selectedRole });
+            _roles.Add(_selectedRole);
+            Snackbar.Add($"Role '{_selectedRole}' assigned.", Severity.Success);
+            _selectedRole = null;
+        }
+        catch
+        {
+            Snackbar.Add("Failed to assign role.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeRole(string roleName)
+    {
+        _busy = true;
+        try
+        {
+            await Api.DeleteAsync($"/platform/users/{UserId}/roles/{roleName}");
+            _roles.Remove(roleName);
+            Snackbar.Add($"Role '{roleName}' revoked.", Severity.Warning);
+        }
+        catch
+        {
+            Snackbar.Add("Failed to revoke role.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Close() => MudDialog.Close();
+}

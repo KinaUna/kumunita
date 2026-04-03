@@ -1,0 +1,82 @@
+@inject IApiClient Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form" @bind-IsValid="_valid">
+            <MudTextField @bind-Value="_email"
+                          Label="Email"
+                          Required="true"
+                          RequiredError="Email is required."
+                          InputType="InputType.Email"
+                          Validation="@((string v) => ValidateEmail(v))" />
+            <MudTextField @bind-Value="_displayName"
+                          Label="Display Name"
+                          Required="true"
+                          RequiredError="Display name is required."
+                          Class="mt-2" />
+            <MudTextField @bind-Value="_temporaryPassword"
+                          Label="Temporary Password"
+                          Required="true"
+                          RequiredError="Password is required."
+                          InputType="InputType.Password"
+                          HelperText="User will be required to change this on first login."
+                          Class="mt-2" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="!_valid || _submitting">
+            Create User
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _submitting;
+
+    private string _email = string.Empty;
+    private string _displayName = string.Empty;
+    private string _temporaryPassword = string.Empty;
+
+    private static string? ValidateEmail(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "Email is required.";
+        if (!value.Contains('@') || !value.Contains('.')) return "Please enter a valid email address.";
+        return null;
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Submit()
+    {
+        await _form.Validate();
+        if (!_form.IsValid) return;
+
+        _submitting = true;
+        try
+        {
+            await Api.PostAsync<object>(
+                "/platform/users",
+                new { Email = _email, TemporaryPassword = _temporaryPassword, DisplayName = _displayName });
+
+            Snackbar.Add($"User '{_email}' created.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch
+        {
+            Snackbar.Add("Failed to create user. The email may already be in use.", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

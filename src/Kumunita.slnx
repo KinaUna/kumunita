@@ -22,6 +22,7 @@
   <Folder Name="/Web/">
     <Project Path="Kumunita.Web.Client/Kumunita.Web.Client.csproj" />
   </Folder>
+  <Project Path="Kumunita.Identity.Contracts/Kumunita.Identity.Contracts.csproj" />
   <Project Path="Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj" />
   <Project Path="Kumunita.Tests/Kumunita.Tests.csproj" />
 </Solution>

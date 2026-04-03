@@ -19,6 +19,7 @@ public sealed class LoginModel(
     public string? ReturnUrl { get; set; }
 
     public string? ErrorMessage { get; set; }
+    public bool ShowResendConfirmation { get; set; }
 
     public async Task OnGetAsync()
     {
@@ -54,6 +55,8 @@ public sealed class LoginModel(
             { IsNotAllowed: true } => "Sign in is not allowed. Please confirm your email address first.",
             _                      => "Invalid email or password."
         };
+
+        ShowResendConfirmation = result.IsNotAllowed;
 
         if (result.IsLockedOut)
             logger.LogWarning("User '{Email}' account locked out.", Input.Email);

@@ -13,6 +13,7 @@ Kumunita is a **modular monolith** community platform built on .NET 10, using **
 | Messaging & handlers | **Wolverine** (command/query dispatch, durable local queues) |
 | Document store | **Marten** (PostgreSQL-backed, multi-tenant) |
 | Identity & auth | ASP.NET Core Identity + **OpenIddict** (OIDC Authorization Code + PKCE) |
+| Email | **MailKit** (SMTP) — `IEmailSender<AppUser>` in Identity module |
 | HTTP endpoints | **Wolverine.Http** (`[WolverineGet]`, `[WolverinePost]`, etc.) |
 | Identity persistence | **EF Core** (PostgreSQL, separate from Marten) |
 | UI framework | **MudBlazor** components in Blazor WASM |
@@ -39,7 +40,7 @@ Kumunita.<Module>/
 
 ### Module List
 
-- **Identity** — User accounts, roles, user groups (EF Core + Marten hybrid)
+- **Identity** — User accounts, roles, user groups, email confirmation (EF Core + Marten hybrid)
 - **Communities** — Community CRUD, membership, invitations (Marten)
 - **Announcements** — Authoring, moderation, publishing workflow (Marten)
 - **Authorization** — Capability tokens, visibility policies, audit log (Marten)
@@ -85,6 +86,14 @@ Domain events implement `IDomainEvent` and are routed to **durable local queues*
 
 When adding a new module with domain events, register its queue in `Program.cs` (`opts.LocalQueue(...)`) and add its prefix mapping in `DomainEventModuleRoutingConvention`.
 
+### Email Confirmation
+
+Email confirmation is required for all users (`RequireConfirmedEmail = true`). The `UserRegistered` domain event triggers `SendConfirmationEmailHandler` (in the Identity module), which generates a token and sends a confirmation email via `SmtpEmailSender` (`IEmailSender<AppUser>`, backed by MailKit).
+
+- **SMTP config** is in the `"Smtp"` section (`SmtpOptions`): Host, Port, Username, Password, UseSsl, SenderEmail, SenderName.
+- **Dev email:** Aspire runs a **MailDev** container (SMTP on port 1025, web UI at `http://localhost:1080`).
+- **Account pages** are server-rendered Razor Pages in `Kumunita.Host/Pages/Account/`: `Login`, `ConfirmEmail`, `ResendConfirmation`.
+
 ### Strongly-Typed IDs
 
 All entity IDs use the `[StronglyTypedId]` source generator (defined in `Kumunita.Shared.Kernel/Ids.cs`). New IDs must also be registered in `Kumunita.Shared.Infrastructure/MartenExtensions.cs` via `opts.RegisterValueType(typeof(NewId))`.
@@ -110,7 +119,7 @@ Solo-developer project. No branching strategy or PR gates — work happens direc
 
 ### Running Locally
 
-Start via the **Aspire AppHost** (`Kumunita.AppHost`). It provisions PostgreSQL + pgAdmin and launches the Host project. The `ServiceDefaults` project is dev-only and is excluded from production builds.
+Start via the **Aspire AppHost** (`Kumunita.AppHost`). It provisions PostgreSQL + pgAdmin + **MailDev** (fake SMTP with web UI at `http://localhost:1080`) and launches the Host project. The `ServiceDefaults` project is dev-only and is excluded from production builds.
 
 ### Database Migrations
 

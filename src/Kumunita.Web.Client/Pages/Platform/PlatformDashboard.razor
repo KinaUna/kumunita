@@ -29,7 +29,20 @@
             </MudCardActions>
         </MudCard>
     </MudItem>
-    <!-- TODO: add more platform admin cards as features are added -->
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard>
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" />
+                <MudText Typo="Typo.h6">Users</MudText>
+                <MudText>Create and manage platform users.</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Href="/platform/users" Variant="Variant.Text" Color="Color.Primary">
+                    Manage
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
 </MudGrid>
 
 @code {

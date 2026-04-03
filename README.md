@@ -32,6 +32,7 @@ Users can belong to multiple communities (e.g. primary residence, second home, d
 | Event store / document DB | Marten 8.x (PostgreSQL) |
 | Identity persistence | EF Core 10 (PostgreSQL) |
 | Authentication | OpenIddict (Authorization Code + PKCE) |
+| Email | MailKit (SMTP) |
 | Frontend | Blazor Web App (InteractiveWebAssembly) |
 | UI components | MudBlazor |
 | Database | PostgreSQL (single database, schema-per-tenant) |
@@ -296,12 +297,14 @@ Platform-level module (not tenant-scoped). Manages community lifecycle, membersh
 
 ### Kumunita.Identity
 
-Manages user accounts, profiles, and groups. Split persistence:
+Manages user accounts, profiles, groups, and email confirmation. Split persistence:
 
 - **EF Core** (`identity` schema): `AppUser` (thin auth record), `AppRole`, OpenIddict tables
 - **Marten** (tenant-scoped): `UserProfile`, `DirectoryEntry`, `UserGroup`, `UserGroupMembership`
 
 `AppUser.DomainId` bridges the EF Core identity record to the `UserId` used throughout the domain.
+
+**Email confirmation:** When a user is created, the `UserRegistered` domain event triggers `SendConfirmationEmailHandler`, which generates a confirmation token and sends an email via `SmtpEmailSender` (implements `IEmailSender<AppUser>` using MailKit). SMTP settings are configured via the `Smtp` config section (`SmtpOptions`). Users must confirm their email before they can sign in (`RequireConfirmedEmail = true`).
 
 ### Kumunita.Authorization
 
@@ -460,7 +463,7 @@ Cross-tenant endpoints (no `{slug}`) are implemented in `Kumunita.Host.Endpoints
 dotnet run --project Kumunita.AppHost
 ```
 
-Aspire provisions PostgreSQL automatically in development. The dashboard is available at `https://localhost:15888`.
+Aspire provisions PostgreSQL and a **MailDev** container automatically in development. The Aspire dashboard is available at `https://localhost:15888`. The MailDev web UI (for inspecting sent emails) is at `http://localhost:1080`.
 
 ### Database migrations (Identity / EF Core)
 
@@ -504,6 +507,13 @@ Upload both files as Coolify file mounts at `/run/secrets/signing.pfx` and `/run
 | `OpenIddict__SigningCertificatePath` | Path to signing PFX (e.g. `/run/secrets/signing.pfx`) |
 | `OpenIddict__EncryptionCertificatePath` | Path to encryption PFX |
 | `OpenIddict__CertificatePassword` | PFX password |
+| `Smtp__Host` | SMTP server hostname |
+| `Smtp__Port` | SMTP server port |
+| `Smtp__Username` | SMTP username (optional for dev) |
+| `Smtp__Password` | SMTP password (optional for dev) |
+| `Smtp__UseSsl` | Use SSL for SMTP connection (`true`/`false`) |
+| `Smtp__SenderEmail` | From address for outgoing emails |
+| `Smtp__SenderName` | Display name for outgoing emails |
 
 ### CI/CD pipeline
 

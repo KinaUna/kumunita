@@ -1,0 +1,173 @@
+@page "/platform/users"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IApiClient Api
+@inject AuthenticationStateProvider Auth
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>Users — Platform Admin</PageTitle>
+
+@if (!_authorized)
+{
+    <MudAlert Severity="Severity.Error">Platform admin access required.</MudAlert>
+    return;
+}
+
+<MudStack Spacing="4">
+
+    <MudStack Row="true" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h5">Users</MudText>
+        <MudSpacer />
+        <MudButton StartIcon="@Icons.Material.Filled.PersonAdd"
+                   Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="OpenCreateDialog">
+            Create User
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudTable Items="_users" Hover="true" Dense="true">
+            <HeaderContent>
+                <MudTh>Email</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Roles</MudTh>
+                <MudTh>Created</MudTh>
+                <MudTh>Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>
+                    @context.Email
+                    @if (context.MustChangePassword)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined" Class="ml-1">
+                            Pending
+                        </MudChip>
+                    }
+                </MudTd>
+                <MudTd>
+                    <MudIcon Icon="@(context.IsSuspended
+                        ? Icons.Material.Filled.Cancel
+                        : Icons.Material.Filled.CheckCircle)"
+                             Color="@(context.IsSuspended ? Color.Error : Color.Success)" />
+                </MudTd>
+                <MudTd>@string.Join(", ", context.Roles)</MudTd>
+                <MudTd>@context.CreatedAt.ToLocalTime().ToString("d")</MudTd>
+                <MudTd>
+                    <MudStack Row="true" Spacing="1">
+                        @if (context.IsSuspended)
+                        {
+                            <MudButton Size="Size.Small"
+                                       Color="Color.Success"
+                                       OnClick="() => ToggleSuspension(context)">
+                                Reactivate
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="() => ToggleSuspension(context)">
+                                Suspend
+                            </MudButton>
+                        }
+                        <MudButton Size="Size.Small"
+                                   Color="Color.Primary"
+                                   OnClick="() => OpenManageRolesDialog(context)">
+                            Roles
+                        </MudButton>
+                    </MudStack>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+
+</MudStack>
+
+@code {
+    private List<PlatformUserRow> _users = [];
+    private bool _loading = true;
+    private bool _authorized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthenticationState state = await Auth.GetAuthenticationStateAsync();
+        _authorized = state.User.IsPlatformAdmin();
+
+        if (_authorized)
+            await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _users = await Api.GetAsync<List<PlatformUserRow>>("/platform/users") ?? [];
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        IDialogReference dialog = await DialogService.ShowAsync<CreateUserDialog>("Create User");
+        DialogResult? result = await dialog.Result;
+
+        if (result?.Data is true)
+            await LoadAsync();
+    }
+
+    private async Task ToggleSuspension(PlatformUserRow userRow)
+    {
+        if (!userRow.IsSuspended)
+        {
+            bool? confirmed = await DialogService.ShowMessageBoxAsync(
+                $"Suspend '{userRow.Email}'?",
+                "The user will be unable to log in while suspended.",
+                yesText: "Suspend", cancelText: "Cancel");
+
+            if (confirmed != true) return;
+        }
+
+        try
+        {
+            await Api.PutAsync<object>($"/platform/users/{userRow.Id}/suspension", new { Reason = (string?)null });
+
+            Snackbar.Add(
+                userRow.IsSuspended
+                    ? $"User '{userRow.Email}' reactivated."
+                    : $"User '{userRow.Email}' suspended.",
+                userRow.IsSuspended ? Severity.Success : Severity.Warning);
+
+            await LoadAsync();
+        }
+        catch
+        {
+            Snackbar.Add("Failed to update user suspension status.", Severity.Error);
+        }
+    }
+
+    private async Task OpenManageRolesDialog(PlatformUserRow userRow)
+    {
+        DialogParameters<ManageRolesDialog> parameters = new()
+        {
+            { x => x.UserId, userRow.Id },
+            { x => x.CurrentRoles, userRow.Roles }
+        };
+
+        IDialogReference dialog = await DialogService.ShowAsync<ManageRolesDialog>(
+            $"Manage Roles — {userRow.Email}", parameters);
+        await dialog.Result;
+
+        await LoadAsync();
+    }
+}

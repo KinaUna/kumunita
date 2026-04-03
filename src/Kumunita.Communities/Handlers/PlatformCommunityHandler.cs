@@ -101,14 +101,14 @@ public static class PlatformCommunityHandler
     [WolverineGet("/platform/communities")]
     [Authorize(Policy = "PlatformAdmin")]
     public static async Task<IResult> GetAllCommunities(
-        GetAllCommunitiesQuery query,
+        bool includeInactive,
         IQuerySession session,
         ClaimsPrincipal user,
         CancellationToken ct)
     {
         IMartenQueryable<Community> q = session.Query<Community>();
 
-        if (!query.IncludeInactive)
+        if (!includeInactive)
             q = (IMartenQueryable<Community>)q.Where(c => c.IsActive);
 
         IReadOnlyList<Community> communities = await q

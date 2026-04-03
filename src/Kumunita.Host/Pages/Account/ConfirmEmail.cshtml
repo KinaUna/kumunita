@@ -1,0 +1,66 @@
+@page
+@model Kumunita.Host.Pages.Account.ConfirmEmailModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirm email – Kumunita</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 16px rgba(0,0,0,.1);
+            padding: 2.5rem 2rem;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+        p { margin-bottom: 1rem; font-size: 1rem; color: #333; }
+        .success { color: #2e7d32; }
+        .error {
+            background: #fdecea; color: #c62828;
+            border: 1px solid #f5c6cb; border-radius: 4px;
+            padding: .75rem 1rem; margin-bottom: 1rem; font-size: .875rem;
+        }
+        a.btn {
+            display: inline-block; padding: .65rem 1.5rem;
+            background: #1976d2; color: #fff;
+            text-decoration: none; border-radius: 4px;
+            font-size: 1rem; font-weight: 600;
+            margin-top: 1rem;
+        }
+        a.btn:hover { background: #1565c0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        @if (Model.Succeeded)
+        {
+            <h1 class="success">Email confirmed</h1>
+            <p>Your email address has been confirmed. You can now sign in to your account.</p>
+            <a class="btn" href="/Account/Login">Sign in</a>
+        }
+        else
+        {
+            <h1>Confirmation failed</h1>
+            <div class="error">@Model.ErrorMessage</div>
+            <p>The confirmation link may have expired or already been used.</p>
+            <a class="btn" href="/Account/ResendConfirmation">Resend confirmation email</a>
+        }
+    </div>
+</body>
+</html>

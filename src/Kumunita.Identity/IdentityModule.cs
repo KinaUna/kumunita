@@ -37,6 +37,10 @@ public static class IdentityModule
             .AddEntityFrameworkStores<IdentityDbContext>()
             .AddDefaultTokenProviders();
 
+        // Email
+        services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.Section));
+        services.AddTransient<IEmailSender<AppUser>, SmtpEmailSender>();
+
         // OpenIddict
         services.AddOpenIddictForIdentity(configuration, environment);
 
