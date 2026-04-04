@@ -12,6 +12,7 @@ COPY ["./src/Kumunita.Announcements/Kumunita.Announcements.csproj", "src/Kumunit
 COPY ["./src/Kumunita.Announcements.Contracts/Kumunita.Announcements.Contracts.csproj", "src/Kumunita.Announcements.Contracts/"]
 COPY ["./src/Kumunita.Authorization/Kumunita.Authorization.csproj", "src/Kumunita.Authorization/"]
 COPY ["./src/Kumunita.Identity/Kumunita.Identity.csproj", "src/Kumunita.Identity/"]
+COPY ["./src/Kumunita.Identity.Contracts/Kumunita.Identity.Contracts.csproj", "src/Kumunita.Identity.Contracts/"]
 COPY ["./src/Kumunita.Shared.Kernel/Kumunita.Shared.Kernel.csproj", "src/Kumunita.Shared.Kernel/"]
 COPY ["./src/Kumunita.Localization/Kumunita.Localization.csproj", "src/Kumunita.Localization/"]
 COPY ["./src/Kumunita.ServiceDefaults/Kumunita.ServiceDefaults.csproj", "src/Kumunita.ServiceDefaults/"]
