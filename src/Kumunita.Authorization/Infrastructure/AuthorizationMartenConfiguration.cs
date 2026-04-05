@@ -8,23 +8,23 @@ public static class AuthorizationMartenConfiguration
     public static StoreOptions AddAuthorizationMartenSchema(this StoreOptions opts)
     {
         opts.Schema.For<UserAuthorizationState>()
-            .DatabaseSchemaName("authorization")
+            .DatabaseSchemaName("authz")
             .Identity(x => x.Id);
 
         opts.Schema.For<VisibilityPolicy>()
-            .DatabaseSchemaName("authorization")
+            .DatabaseSchemaName("authz")
             .Index(x => x.OwnerId)
             .Index(x => x.ResourceTypeName);
 
         opts.Schema.For<CapabilityToken>()
-            .DatabaseSchemaName("authorization")
+            .DatabaseSchemaName("authz")
             .Index(x => x.RequesterId)
             .Index(x => x.OwnerId)
             .Index(x => x.Status)
             .Index(x => x.ExpiresAt);
 
         opts.Schema.For<AuditEntry>()
-            .DatabaseSchemaName("authorization")
+            .DatabaseSchemaName("authz")
             .Index(x => x.OwnerId)
             .Index(x => x.RequesterId)
             .Index(x => x.OccurredAt);

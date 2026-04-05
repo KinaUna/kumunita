@@ -24,7 +24,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Marten" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Weasel.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Kumunita.AppHost\Kumunita.AppHost.csproj" />
+    <ProjectReference Include="..\Kumunita.Announcements\Kumunita.Announcements.csproj" />
+    <ProjectReference Include="..\Kumunita.Authorization\Kumunita.Authorization.csproj" />
   </ItemGroup>
 
   <ItemGroup>

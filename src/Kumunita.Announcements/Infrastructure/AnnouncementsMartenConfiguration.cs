@@ -16,8 +16,7 @@ public static class AnnouncementsMartenConfiguration
             .SoftDeleted(); // retracted announcements soft-deleted
 
         opts.Schema.For<AnnouncementSettings>()
-            .DatabaseSchemaName("announcements")
-            .SingleTenanted(); // one settings document ever exists
+            .DatabaseSchemaName("announcements");
 
         return opts;
     }

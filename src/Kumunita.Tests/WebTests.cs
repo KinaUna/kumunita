@@ -31,8 +31,8 @@ public class WebTests
         await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
 
         // Act
-        HttpClient httpClient = app.CreateHttpClient("webfrontend");
-        await app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+        HttpClient httpClient = app.CreateHttpClient("kumunitahost");
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("kumunitahost", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
         HttpResponseMessage response = await httpClient.GetAsync("/", cancellationToken);
 
         // Assert
