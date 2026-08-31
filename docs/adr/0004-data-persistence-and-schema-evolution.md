@@ -1,0 +1,73 @@
+# ADR 0004 — Data persistence & schema evolution
+
+Status: Accepted
+Date: 2026-08-26
+Amends: 0001 (Decision A — "Marten in place of EF Core"; Consequences — "no EF migration
+tooling")
+
+## Context
+
+ADR 0001 chose Marten over EF Core, but ASP.NET Core Identity's default persistence *is*
+EF Core (`IdentityDbContext`). Two data-layer decisions therefore need an explicit home:
+
+1. **Schema evolution.** The original plan leaned on Marten auto-upgrade (schema derived
+   from document shapes). That is fragile in production: it cannot express destructive
+   changes safely, gives no review gate, and makes "DB rollback" a hand-wave.
+2. **Identity store.** Either (a) accept EF Core for the Identity tables, or (b) implement
+   the Identity store interfaces over Marten by hand.
+
+## Decision
+
+### A. Two schemas, one Postgres
+
+One Postgres per instance (unchanged), split into schemas with a hard ownership boundary:
+
+| Schema     | Owner               | Contents                        | Migrations                          |
+|------------|---------------------|---------------------------------|-------------------------------------|
+| `mt`       | Marten (default)    | all domain documents, projections | Marten versioned migrations (`mt.migrations`) |
+| `identity` | EF Core (Identity)  | `AspNet*` user/role/token tables | EF Core migrations (`identity.__EFMigrationsHistory`) |
+
+Set via `modelBuilder.HasDefaultSchema("identity")` on the Identity `DbContext`.
+Neither ORM touches the other schema. `Core` references EF only for the Identity stores;
+**no domain model ever uses EF**.
+
+### B. Schema evolution is versioned, never auto-upgrade
+
+- **Marten:** every domain schema change is an ordered `IMigration` step registered in
+  `StoreOptions.Migrations`; applied steps are recorded in `mt.migrations`.
+- **Identity:** standard EF Core migrations, applied at startup.
+- **Auto-upgrade is dev-only**, if used at all — never against production.
+- Both are forward-only: rolling a schema back means restoring a backup (OPS.md §5).
+
+### C. Identity keeps the stock EF Core store (rejected: custom Marten store)
+
+Use the default `IdentityUser` + `UserStore<>` over `IdentityDbContext` unchanged. Lockout,
+email confirmation, security stamps, and recovery codes all come framework-supported.
+
+**Rejected:** hand-rolling the Identity store interfaces (`IUserStore`,
+`IUserPasswordStore`, `IUserSecurityStampStore`, `IUserEmailConfirmationStore`,
+`IUserLockoutStore`, `IUserAuthenticationTokenStore`, ...) over Marten. The surface is
+~10 interfaces and 60+ methods, it churns across framework versions, and it would force us
+to test credential plumbing we did not design. The benefit — one less ORM in the tree —
+does not justify that standing cost for a small team.
+
+## Consequences
+
+Positive
+- Zero custom Identity plumbing; the credential surface stays framework-supported.
+- Single Postgres, single `pg_dump` backup story (both schemas in one dump).
+- Clean boundary: each ORM owns exactly one schema; each migration system tracks its own.
+- Reviewable, forward-only schema changes with a real review gate (the migration code).
+
+Negative / accepted risks
+- Two ORMs (Marten + EF Core) in the dependency tree — **scoped**: EF is Identity-only.
+- Two migration systems — **scoped**: each confined to its own schema and tracking table.
+- ADR 0001's "Marten in place of EF Core" is amended to: Marten for the domain; EF
+  strictly for the Identity tables.
+
+## Revisit when
+
+- Federation replaces local Identity with an OpenIddict IdP (the `identity` schema may
+  move to the IdP and be dropped here).
+- An Identity framework version changes store contracts enough to re-cost the Marten
+  store option.

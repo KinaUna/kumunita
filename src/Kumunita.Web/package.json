@@ -1,0 +1,9 @@
+{
+  "name": "kumunita-web-client",
+  "private": true,
+  "description": "Plain TypeScript front-end, compiled with tsc only (no bundler, no dev server). Output: wwwroot/js.",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  }
+}

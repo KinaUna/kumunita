@@ -1,0 +1,17 @@
+﻿@model HomeViewModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="text-center py-5">
+    <h1 class="display-5">@Model.CommunityName</h1>
+    <p class="lead text-muted">
+        Welcome to your neighborhood's Kumunita. This is the M0 scaffold —
+        the app is running and the community name is configured.
+    </p>
+    @if (Model.SupportEmail is not null)
+    {
+        <p class="text-muted">Support: <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a></p>
+    }
+</div>
+
