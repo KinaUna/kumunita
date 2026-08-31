@@ -13,8 +13,12 @@ not a code concern.
 
 ## Status
 
-Pre-spike. The architecture and access model are decided; code scaffolding begins at
-**M0**. This repository currently holds documentation only.
+**M0 is in place.** Deployable scaffold: `Kumunita.slnx` (`Kumunita.Core`,
+`Kumunita.Web`, `Kumunita.Core.Tests`), multi-stage Docker image, the first
+versioned schema change (`mt.community`, `KumunitaFeature`), a `/health`
+liveness probe that requires a reachable Postgres, and a home page that renders
+`Community__Name`. First Coolify deployment is the remaining M0 item. **M1** next:
+Identity, groups, delegation, and the authorization model above.
 
 ## Principles
 
@@ -107,9 +111,21 @@ stays trivial and the authorization rules can grow freely.
 
 ## Running
 
-*Planned — pending M0.* Intended flow: `docker compose up` for app + Postgres + Mailpit;
-`tsc` for the front-end; a seeded admin from environment. Details will live here once
-the scaffold exists.
+*Dev (Docker):* `docker compose up -d --build` — Postgres on
+`localhost:5433`, the app on `http://localhost:5080` (built from `Dockerfile`,
+running `Development` so the `mt` schema auto-applies on a fresh database —
+ADR 0004), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
+Smoke test: `GET /health` → `{"status":"ok","database":"ok"}` and `/` renders the
+configured `Community__Name`.
+
+*Dev (no app container):* `docker compose up -d db`,
+`npm run build` in `src/Kumunita.Web/`, then
+`dotnet run --project src/Kumunita.Web` (settings from
+`appsettings.Development.json`, DB on `localhost:5433`).
+
+*Prod:* one neighborhood per instance — identical image + dedicated Postgres +
+env per the [OPS.md configuration reference](docs/OPS.md), TLS via
+Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 
 ## Documentation
 

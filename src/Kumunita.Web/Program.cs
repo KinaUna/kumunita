@@ -44,7 +44,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// No app-level HTTP→HTTPS redirect: in production TLS terminates at the edge
+// (Coolify/Let's Encrypt, in front of the plain-HTTP container); the "https"
+// dev launch profile binds an https port directly when you want one locally.
 app.UseRouting();
 
 app.UseAuthorization();

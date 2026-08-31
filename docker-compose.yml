@@ -1,6 +1,7 @@
-# Dev-only. Matches appsettings.Development.json (Host=localhost;Port=5433;Database=kumunita;
-# Username=kumunita;Password=kumunita). Host port 5433 is used because a local Postgres
-# already occupies 5432. Postgres 16 (OPS.md: dev env). Mailpit lands in M0.
+# Kumunita dev environment. The app mirrors appsettings.Development.json, except the
+# database host is `db` (compose service) on the standard port instead of localhost:5433.
+# Postgres 16 per OPS.md. Mailpit: SMTP mail sink on :1025, UI on :8025. The app runs
+# in Development so Marten auto-applies the `mt` schema on a fresh database (M0, ADR 0004).
 services:
   db:
     image: postgres:16
@@ -18,6 +19,30 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kumunita_mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI
+
+  app:
+    build:
+      context: .
+    container_name: kumunita_app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Community__Name: "Maplewood Residents"
+      Community__SupportEmail: "maplewood@example.com"
+      ConnectionStrings__Kumunita: "Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=kumunita;Include Error Detail=true"
+    ports:
+      - "5080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
 
 volumes:
   kumunita_pgdata:
