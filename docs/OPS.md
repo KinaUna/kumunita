@@ -46,9 +46,9 @@ alongside the database, or a rebuilt VPS won't know who it is.
 
 Keep one row per neighborhood. This is your map.
 
-| Neighborhood | Domain | VPS | DB name | Image version | Admin contact | Created | Last backup verified | Notes |
+| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created | Last backup verified | Notes |
 |--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|              |        |     |         |               |               |         |                      |       |
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|173fa6c|admin@examplium.com|2026-08-31|                      |First instance|
 
 ---
 

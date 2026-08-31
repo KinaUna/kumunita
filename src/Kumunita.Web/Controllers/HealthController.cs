@@ -41,6 +41,8 @@ public sealed class HealthController : Controller
         {
             status = "ok",
             app = "Kumunita",
+            version = Environment.GetEnvironmentVariable("GITHUB_REF_NAME") ?? "dev",
+            build = Environment.GetEnvironmentVariable("GITHUB_SHA") ?? "local",
             database = "ok",
             elapsedMs = sw.ElapsedMilliseconds
         });
