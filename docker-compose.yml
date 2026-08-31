@@ -1,0 +1,23 @@
+# Dev-only. Matches appsettings.Development.json (Host=localhost;Port=5433;Database=kumunita;
+# Username=kumunita;Password=kumunita). Host port 5433 is used because a local Postgres
+# already occupies 5432. Postgres 16 (OPS.md: dev env). Mailpit lands in M0.
+services:
+  db:
+    image: postgres:16
+    container_name: kumunita_db
+    environment:
+      POSTGRES_DB: kumunita
+      POSTGRES_USER: kumunita
+      POSTGRES_PASSWORD: kumunita
+    ports:
+      - "5433:5432"
+    volumes:
+      - kumunita_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kumunita -d kumunita"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kumunita_pgdata:
