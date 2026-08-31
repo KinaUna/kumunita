@@ -13,12 +13,14 @@ not a code concern.
 
 ## Status
 
-**M0 is in place.** Deployable scaffold: `Kumunita.slnx` (`Kumunita.Core`,
-`Kumunita.Web`, `Kumunita.Core.Tests`), multi-stage Docker image, the first
-versioned schema change (`mt.community`, `KumunitaFeature`), a `/health`
-liveness probe that requires a reachable Postgres, and a home page that renders
-`Community__Name`. First Coolify deployment is the remaining M0 item. **M1** next:
-Identity, groups, delegation, and the authorization model above.
+**M0 complete** — deployed live on a VPS via Coolify. Deployable scaffold:
+`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`),
+multi-stage Docker image, the first versioned schema change (`mt.community`,
+`KumunitaFeature`), a `/health` liveness probe that requires a reachable
+Postgres, a home page that renders `Community__Name`, and a production
+deployment (Coolify app + dedicated Postgres 18, Postgres image parity with
+dev: **18**). **M1** next: Identity, groups, delegation, and the authorization
+model above.
 
 ## Principles
 
