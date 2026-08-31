@@ -1,12 +1,11 @@
-**/.git
-**/.gitignore
-**/node_modules
-**/*.md
-**/Dockerfile
-**/.vs
-**/.vscode
-**/bin
-**/obj
-**/TestResults
-**/Kumunita.AppHost
-**/*.Tests
+**/bin/
+**/obj/
+**/node_modules/
+# Generated front-end — rebuilt inside the image by the tsc stage
+src/Kumunita.Web/wwwroot/js/
+.git/
+.vscode/
+docs/
+tests/
+*.md
+docker-compose.yml

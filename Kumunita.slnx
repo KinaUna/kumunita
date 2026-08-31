@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kumunita.Core/Kumunita.Core.csproj" />
+    <Project Path="src/Kumunita.Web/Kumunita.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kumunita.Core.Tests/Kumunita.Core.Tests.csproj" />
+  </Folder>
+</Solution>

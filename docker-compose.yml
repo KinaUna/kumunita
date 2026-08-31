@@ -1,0 +1,48 @@
+# Kumunita dev environment. The app mirrors appsettings.Development.json, except the
+# database host is `db` (compose service) on the standard port instead of localhost:5433.
+# Postgres 16 per OPS.md. Mailpit: SMTP mail sink on :1025, UI on :8025. The app runs
+# in Development so Marten auto-applies the `mt` schema on a fresh database (M0, ADR 0004).
+services:
+  db:
+    image: postgres:16
+    container_name: kumunita_db
+    environment:
+      POSTGRES_DB: kumunita
+      POSTGRES_USER: kumunita
+      POSTGRES_PASSWORD: kumunita
+    ports:
+      - "5433:5432"
+    volumes:
+      - kumunita_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kumunita -d kumunita"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: kumunita_mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI
+
+  app:
+    build:
+      context: .
+    container_name: kumunita_app
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Community__Name: "Maplewood Residents"
+      Community__SupportEmail: "maplewood@example.com"
+      ConnectionStrings__Kumunita: "Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=kumunita;Include Error Detail=true"
+    ports:
+      - "5080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+volumes:
+  kumunita_pgdata:
