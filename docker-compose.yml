@@ -1,10 +1,11 @@
 # Kumunita dev environment. The app mirrors appsettings.Development.json, except the
 # database host is `db` (compose service) on the standard port instead of localhost:5433.
-# Postgres 16 per OPS.md. Mailpit: SMTP mail sink on :1025, UI on :8025. The app runs
-# in Development so Marten auto-applies the `mt` schema on a fresh database (M0, ADR 0004).
+# Postgres 18, matching the Coolify VPS database addon (post-Docker-29 default). Mailpit:
+# SMTP mail sink on :1025, UI on :8025. The app runs in Development so Marten
+# auto-applies the `mt` schema on a fresh database (M0, ADR 0004).
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     container_name: kumunita_db
     environment:
       POSTGRES_DB: kumunita
@@ -13,7 +14,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - kumunita_pgdata:/var/lib/postgresql/data
+      - kumunita_pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kumunita -d kumunita"]
       interval: 5s

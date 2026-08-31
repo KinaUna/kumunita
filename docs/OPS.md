@@ -14,7 +14,7 @@ you haven't restored are not backups. Update the "Last tested" date when you run
 
 | Env  | Where            | DB          | Email     | Purpose                 |
 |------|------------------|-------------|-----------|-------------------------|
-| dev  | local (compose)  | postgres:16 | Mailpit   | development, tests      |
+| dev  | local (compose)  | postgres:18 | Mailpit   | development, tests      |
 | prod | VPS via Coolify  | per instance| real SMTP | a live neighborhood     |
 
 No shared "staging cluster" — a throwaway prod-style instance is enough to verify an upgrade.
