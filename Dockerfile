@@ -21,6 +21,11 @@ RUN dotnet publish src/Kumunita.Web -c Release -o /app/publish
 # --- 3. Runtime: slim ASP.NET Core image ---
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# curl is the healthcheck client: Coolify pings the /health endpoint with it
+# (the slim image ships neither curl nor wget).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080
 COPY --from=build /app/publish ./
