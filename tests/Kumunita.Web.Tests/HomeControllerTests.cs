@@ -33,7 +33,7 @@ public class HomeControllerTests
     {
         var (_, vm) = RunIndex("Maplewood Residents", "maps@example.com");
 
-        Assert.Equal("Maplewood Residents", vm.CommunityName);
+        Assert.Equal("Maplewood Residents", vm!.CommunityName);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public class HomeControllerTests
     {
         var (_, vm) = RunIndex("Maplewood", "resident@example.org");
 
-        Assert.Equal("resident@example.org", vm.SupportEmail);
+        Assert.Equal("resident@example.org", vm!.SupportEmail);
     }
 
     [Fact]

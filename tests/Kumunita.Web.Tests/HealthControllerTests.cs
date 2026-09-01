@@ -42,10 +42,10 @@ public class HealthControllerTests
     {
         var (controller, _) = CreateController(databaseReachable: true);
 
-        var result = await controller.Get(default) as OkObjectResult;
+        var result = await controller.Get(TestContext.Current.CancellationToken) as OkObjectResult;
 
         Assert.NotNull(result);
-        Assert.Equal(200, (int)result.StatusCode);
+        Assert.Equal(200, (int)result.StatusCode!);
 
         // The controller returns a C# anonymous object — assert on its property
         // names via reflection (the keys the probe consumers read: OPS.md §8).
@@ -67,10 +67,10 @@ public class HealthControllerTests
     {
         var (controller, _) = CreateController(databaseReachable: false);
 
-        var result = await controller.Get(default) as ObjectResult;
+        var result = await controller.Get(TestContext.Current.CancellationToken) as ObjectResult;
 
         Assert.NotNull(result);
-        Assert.Equal(503, (int)result.StatusCode);
+        Assert.Equal(503, (int)result.StatusCode!);
 
         var payload = result.Value!;
         var type = payload.GetType();
@@ -86,7 +86,7 @@ public class HealthControllerTests
     {
         var (controller, _) = CreateController(databaseReachable: true);
 
-        var result = await controller.Get(default) as OkObjectResult;
+        var result = await controller.Get(TestContext.Current.CancellationToken) as OkObjectResult;
 
         Assert.NotNull(result);
         var elapsed = result!.Value!.GetType().GetProperty("elapsedMs")!.GetValue(result!.Value);
