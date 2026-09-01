@@ -36,7 +36,14 @@ Neither ORM touches the other schema. `Core` references EF only for the Identity
 - **Marten:** every domain schema change is an ordered `IMigration` step registered in
   `StoreOptions.Migrations`; applied steps are recorded in `mt.migrations`.
 - **Identity:** standard EF Core migrations, applied at startup.
-- **Auto-upgrade is dev-only**, if used at all — never against production.
+- **Applied at boot in all environments (incl. production):** the versioned steps only —
+  `mt` feature changes (delta-detected, so a pristine database gets its initial state
+  with no operator step — this *is* the first-boot initialization) and EF
+  `Database.MigrateAsync`. Re-running an already-applied step is a no-op (OPS §2, first
+  deploy = first seeder run on a live instance).
+- **Document-shape auto-creation/updating (dev loop)** — the current `mt` schema is
+  derived from code and applied on startup *in Development only*
+  (`ApplyAllDatabaseChangesOnStartup`); never against production.
 - Both are forward-only: rolling a schema back means restoring a backup (OPS.md §5).
 
 ### C. Identity keeps the stock EF Core store (rejected: custom Marten store)
