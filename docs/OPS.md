@@ -48,7 +48,7 @@ Keep one row per neighborhood. This is your map.
 
 | Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created | Last backup verified | Notes |
 |--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|Examplium Residents|example.kumunita.com|Hetzner|kumunita|940a9c09ca4e6ef5b8b5c2bc83bd3e3a1fac75e7|admin@examplium.com|2026-08-31|                      |First instance|
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|3862ea2bbf1472d2ace840ddcc9f2989283d4b0e|admin@examplium.com|2026-08-31|                      |First instance|
 
 ---
 
@@ -81,14 +81,21 @@ and all translations live in the DB (`mt` schema; admin-managed under
 DB backup; nothing extra to provision.
 
 Operator steps:
-1. Generate a strong one-time token (e.g. `openssl rand -hex 24`); store it in the
-   secrets manager, then set `SeedAdmin__Email` + `SeedAdmin__Token` in Coolify.
-2. Deploy; open `https://<domain>`; confirm it renders with the correct `Community__Name`.
+1. Generate a strong one-time token (pre-M1: `openssl rand -hex 24`; M1+: the seeded
+   admin arrives pre-initialized — confirm it was created and use the token exactly
+   once); store it in your secrets manager, then set `SeedAdmin__Email` +
+   `SeedAdmin__Token` in Coolify.
+2. Deploy; open `https://<domain>`; confirm it renders with the correct
+   `Community__Name`.
 3. Log in as the seeded admin **using the token** — first login is "set your password";
    the token is invalidated by the app on this first use.
 4. **Remove `SeedAdmin__*` from env** in Coolify (nothing reusable remains to leak).
-5. Verify: `/health` returns OK, a test email arrives (check the provider, not just "sent"),
-   and the default components appear.
+   First M1 deploy, on a live instance: confirm the log shows schema-init ran once
+   (subsequent boots are a no-op), a **new** Postgres addon: schema-init happens on the
+   first M1 deploy (it is the first boot that creates it).
+5. Verify: `/health` returns OK, the seeded admin exists, a test email arrives
+   (check the provider's inbox, not just "sent"), and the default components (incl.
+   the language catalog) appear in-app.
 6. Update the inventory (image version, admin contact).
 
 Why a token, not a password: env is a config store — visible to ops tooling, shell

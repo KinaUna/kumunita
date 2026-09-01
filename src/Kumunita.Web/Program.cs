@@ -1,5 +1,10 @@
 using Kumunita.Core;
+using Kumunita.Core.Identity;
+using Kumunita.Web;
 using Marten;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -34,7 +39,30 @@ if (builder.Environment.IsDevelopment())
     marten.ApplyAllDatabaseChangesOnStartup();
 }
 
+// Identity (the only EF Core in the tree, ADR 0004): same Postgres, `identity` schema.
+builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));
+
 var app = builder.Build();
+
+// Versioned schema steps apply on boot in ALL environments (ADR 0004 B, OPS.md §2/§3):
+// a pristine database gets its initial state with no operator step (a first boot is
+// also the first seeder run), an existing one is a no-op, or forward-only when the
+// image carries new steps. Document-shape auto-creation remains the dev-only loop above.
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
+    var identity = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    var firstBoot = await DbBootstrap.IsPristineAsync(identity);
+
+    await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync();
+    await identity.Database.MigrateAsync();
+
+    if (firstBoot)
+        logger.LogInformation("First boot: schema initialization complete. " +
+                              "The initialization seeder (M0-deployed instances: M1's first deploy) runs next.");
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
