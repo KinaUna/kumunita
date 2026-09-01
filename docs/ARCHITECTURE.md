@@ -103,6 +103,11 @@ Dependency rule: feature modules depend on the three identity/access modules (an
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never
 calls feature modules.
 
+The M1 design for these modules is in [`docs/design/m1-identity-access.md`](design/m1-identity-access.md);
+the interface set, the thin-principal shape, and change management are
+frozen by [ADR 0006](adr/0006-module-boundary-contracts.md) — §4.2 is a
+draft sketch; the ADR is authoritative for what changes and through what.
+
 ## 4. Identity & access
 
 ### 4.1 Thin token, fat authorization
@@ -155,6 +160,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
   candidate set* (e.g. the directory lists only verified residents; an unverified user
   sees themselves) is a product query, applied before `CanSeeAsync`, and is never
   audited as an access decision.
+
 ### 4.4 Decision algorithm
 
 Shared by both entry points below is the group-matching core, written once so the two
@@ -436,11 +442,19 @@ Components (Safety, Maintenance, Social, Governance) -> seed the language catalo
 materialized from the image, ADR 0005). Re-running the seeder is a no-op if the admin
 already exists.
 
-**Schema evolution is versioned, not auto-upgrade** (ADR 0004). Every domain schema change
-is an ordered `IMigration` step registered in `StoreOptions.Migrations`, recorded in
-`mt.migrations`; Identity schema changes are EF Core migrations recorded in
-`identity.__EFMigrationsHistory`. Both are forward-only. Auto-upgrade (schema derived from
-document shapes) is dev-only, if used at all — it is never run against production.
+**Schema evolution is versioned, not auto-upgrade** (ADR 0004). Every domain
+schema change is a Marten storage feature — a `FeatureSchemaBase` subclass
+(Weasel objects — tables, indexes, etc.) registered in `StoreOptions.Storage`;
+`KumunitaFeature` is the first (`mt.community`, ADR 0004 §B). Applied idempotently by
+`ApplyAllConfiguredChangesToDatabaseAsync()` (each object delta-detected against the
+live catalog, so a second run over an existing database is a no-op); forward-only.
+(In Marten 9 the pre-9.x `IMigration`/`StoreOptions.Migrations` step model no longer
+exists; the DDL is exportable for review via `WriteMigrationFileAsync()` — see
+`KumunitaFeature`. The `mt` schema has no operator-visible applied-step ledger —
+idempotency is delta-detection, not a recorded sequence. Identity schema changes are
+EF Core migrations recorded in `identity.__EFMigrationsHistory`.) Both are forward-only.
+Auto-upgrade (schema derived from document shapes) is dev-only, if used at all — it
+is never run against production.
 
 Ops: TLS via Coolify / Let's Encrypt; `/health` (reports **degraded** when the email
 dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.

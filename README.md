@@ -143,4 +143,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/SECURITY.md` — **security & privacy: the top priority** — threat model, data classes, control map
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
-- `docs/adr/` — architecture decision records (0001–0005)
+- `docs/adr/` — architecture decision records (0001–0006)
+- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization)

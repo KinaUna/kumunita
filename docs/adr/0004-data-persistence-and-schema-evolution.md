@@ -22,9 +22,9 @@ EF Core (`IdentityDbContext`). Two data-layer decisions therefore need an explic
 
 One Postgres per instance (unchanged), split into schemas with a hard ownership boundary:
 
-| Schema     | Owner               | Contents                        | Migrations                          |
+| Schema     | Owner               | Contents                        | Schema evolution                          |
 |------------|---------------------|---------------------------------|-------------------------------------|
-| `mt`       | Marten (default)    | all domain documents, projections | Marten versioned migrations (`mt.migrations`) |
+| `mt`       | Marten (default)    | all domain documents, projections | versioned storage features (`FeatureSchemaBase`, e.g. `KumunitaFeature`) — delta-detected, idempotent, no `mt.migrations` ledger; DDL reviewable via `WriteMigrationFileAsync()` (§B) |
 | `identity` | EF Core (Identity)  | `AspNet*` user/role/token tables | EF Core migrations (`identity.__EFMigrationsHistory`) |
 
 Set via `modelBuilder.HasDefaultSchema("identity")` on the Identity `DbContext`.
@@ -33,8 +33,16 @@ Neither ORM touches the other schema. `Core` references EF only for the Identity
 
 ### B. Schema evolution is versioned, never auto-upgrade
 
-- **Marten:** every domain schema change is an ordered `IMigration` step registered in
-  `StoreOptions.Migrations`; applied steps are recorded in `mt.migrations`.
+- **Marten:** every domain schema change is a Weasel-backed storage feature — a
+  `FeatureSchemaBase` subclass (`KumunitaFeature` is the first) registered via
+  `StoreOptions.Storage.Add<T>()`. Marten 9 removed the pre-9.x `IMigration` /
+  `StoreOptions.Migrations` step model; the modern equivalent is a feature that yields
+  `ISchemaObject`s. Applied idempotently by `ApplyAllConfiguredChangesToDatabaseAsync()`
+  (each object delta-detected against the live Postgres catalog, so a re-run is a no-op);
+  the DDL is exportable for review via `WriteMigrationFileAsync()`.
+  Note on the table name: this feature pattern does not write to an operator-visible
+  `mt.migrations` ledger (that model was IMigration-era) — the applied-state contract is
+  "delta-detection against the live catalog => idempotent," not "already recorded."
 - **Identity:** standard EF Core migrations, applied at startup.
 - **Applied at boot in all environments (incl. production):** the versioned steps only —
   `mt` feature changes (delta-detected, so a pristine database gets its initial state

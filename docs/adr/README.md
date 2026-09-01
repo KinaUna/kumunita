@@ -10,3 +10,4 @@ Decision / Consequences. New decisions take the next number.
 | 0003 | Roles & moderator scoping                    | Accepted |
 | 0004 | Data persistence & schema evolution          | Accepted |
 | 0005 | Multilingual support (UI & static pages)     | Accepted |
+| 0006 | Module boundary contracts (Identity, UserInfo, Authorization) | Accepted |
