@@ -21,9 +21,10 @@ var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
                              "ConnectionStrings:Kumunita is required. Set it in appsettings.Development.json " +
                              "(dev) or the ConnectionStrings__Kumunita env var (OPS.md).");
 
-// Dev-only auto-upgrade (ADR 0004): in dev, apply the configured schema on startup so a
-// fresh database comes up with the `mt` schema. Production relies on explicit, reviewed
-// migrations (the exported DDL) and never auto-upgrades.
+// Dev-only document-shape loop (ADR 0004 / 0001): document-shape auto-creation applies
+// the current `mt` schema derived from code on startup in Development only; the versioned
+// boot block below (after `app.Build`) applies the reviewed storage-feature steps in all
+// environments — a pristine database gets its initial state with no operator step.
 var marten = builder.Services.AddMarten(opts =>
 {
     opts.Connection(kumunitaConnection);

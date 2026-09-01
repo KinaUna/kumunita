@@ -46,9 +46,9 @@ alongside the database, or a rebuilt VPS won't know who it is.
 
 Keep one row per neighborhood. This is your map.
 
-| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created | Last backup verified | Notes |
+| Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created (Y/M/D) | Last backup verified (Y/M/D) | Notes |
 |--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|Examplium Residents|example.kumunita.com|Hetzner|kumunita|13a15c5ec06c6294cd22a1820bb9c47fca1ffb4d|admin@examplium.com|2026-09-01|                      |First instance|
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|f8b8432ce7b5b2a6c4eaca26fd363029dde104f0|admin@examplium.com|2026-09-01|2026-09-01 15:20|First instance|
 
 ---
 
@@ -105,25 +105,37 @@ change-then-remove race entirely.
 
 ### 3. Upgrade the application
 
+Production deploys from the **`release` branch only** — `main` never deploys. Coolify
+builds the image from the selected commit, so the git state *is* the image version; there
+is no registry, and the inventory's "Version (Commit)" comes from the deployed app's
+`/health` → `build` (the `SOURCE_COMMIT` env var).
+
 1. Announce a maintenance window to residents.
-2. **Take a fresh backup** (Procedure 4) and note the current image tag.
-3. In Coolify, upgrade the app to the new image tag and redeploy.
+2. **Take a fresh backup** (Procedure 4) and note the current **commit SHA** (from
+   `/health` → `build`, or Coolify's deploy history) — this is the rollback target.
+3. Merge the tested `main` tip into **`release`** (which Coolify deploys from). Deploy.
 4. On boot, pending **versioned migrations** are applied — Marten steps (tracked in
    `mt.migrations`) and Identity migrations (`identity.__EFMigrationsHistory`); check the
    logs confirm each step ran. Migrations are forward-only and live in the image, so the
    new image must always carry a superset of the running schema's steps (ADR 0004).
-5. Smoke test: login, create a post, open a component, check `/health`.
-6. **Rollback (if needed):** redeploy the previous image tag. App rollback is easy; **DB
+5. Smoke test: home page renders, `/health` OK; the `build` SHA matches the deployed
+   commit. (The full smoke set — login, create a post, open a component — exists from M1/M3.)
+6. **Rollback (if needed):** reselect the **previous commit SHA** recorded in step 2 in
+   Coolify and deploy it. App rollback is easy; **DB
    rollback requires a restore** (Procedure 5) because schema changes are forward-only.
-7. Record the new version + date in the inventory.
+7. Record the new **commit SHA** + date in the inventory.
 
 ### 4. Backups
 
 **What:** the Postgres DB is the crown jewels (all Marten documents + Identity). Back it up.
 
 - **Format:** `pg_dump -Fc` (custom format — fast restore, compression).
-- **Schedule:** at least daily. Example host cron:
-  `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita kumunita | rclone rcat backup:kumunita/<instance>/$(date +\%F).dump`
+- **Schedule:** the `postgres` addon on the VPS is backed up **hourly via the Coolify
+  backup task** (examplium instance; daily is the documented floor for a new instance).
+  The dump target is the app database `kumunita` — owned by the `kumunita` role, so it
+  can be taken by `kumunita` or `postgres`. (Example host cron, if operating without
+  Coolify's task: `0 3 * * * pg_dump -Fc -h 127.0.0.1 -U kumunita kumunita | rclone rcat
+  backup:kumunita/<instance>/$(date +\%F).dump`.)
 - **Offsite:** to object storage (S3 / Backblaze B2 / rclone) — **not** only on the same VPS.
 - **Retention:** e.g. 7 daily, 4 weekly, 6 monthly (tune to need).
 - **Config:** include the instance's env set (encrypted) in the same backup set.
@@ -134,7 +146,10 @@ change-then-remove race entirely.
 
 **Same instance (corruption / bad data):**
 1. Stop the app (Coolify).
-2. Restore: `pg_restore -h 127.0.0.1 -U kumunita -d kumunita --clean < dump.dump`
+2. Restore: `pg_restore … < dump.dump` — **connect as `postgres`** (superuser) while
+   targeting the app database; the `kumunita` role cannot drop/recreate a database it is
+   itself connected *as* (the first live restore — both roles `kumunita` — failed on
+   exactly this).
 3. Start the app; verify `/health`, login, and a representative page.
 
 **Disaster recovery (new VPS):**
@@ -237,9 +252,11 @@ slice of that map.
 - **SSH:** key-based only; consider fail2ban; disable password login.
 - **Secrets:** never baked into the image. Env / secrets manager only. Rotate SMTP, DB, and
   admin credentials on a schedule and after any suspected exposure.
-- **DB user:** dedicated, non-superuser for normal operation. Note: Marten needs to create
-  extensions on **first** run — the setup user may need elevated rights initially, then
-  drop to least privilege.
+- **DB user:** dedicated **database owner**, non-superuser — `CREATE DATABASE kumunita
+  OWNER kumunita`. Ownership grants schema creation and `CREATE EXTENSION` inside that
+  database, so **no elevated/rights dance is ever needed** (and none was required on the
+  live instance). The `postgres` superuser is admin/restore-only and is **never** the app
+  connection.
 - **App:** HTTPS-only + HSTS, secure cookies, anti-forgery tokens, rate limiting (all
   planned in the app):
   - **Cookies:** `Secure`, `HttpOnly`, `SameSite=Lax`; sliding expiry with an absolute
