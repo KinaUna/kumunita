@@ -58,31 +58,51 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
 ## 2. Solution layout
 
     kumunita/
+    ├── Kumunita.slnx
     ├── README.md
+    ├── Dockerfile                  # multi-stage (PowerShell, tsc → publish → runtime)
+    ├── docker-compose.yml          # dev: postgres:18 + mailpit
+    ├── dev-db-init/                # Postgres init scripts (app role, port parity with prod)
+    ├── .github/workflows/          # CI
     ├── docs/
     │   ├── ARCHITECTURE.md
-    │   └── adr/
+    │   ├── SECURITY.md             # threat model, data classes, control map
+    │   ├── OPS.md                  # operations runbook
+    │   ├── adr/                    # 0001–0006
+    │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
+    │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
-    │   ├── Kumunita.Core/          # domain, services, Marten store, handlers
-    │   │   ├── Identity/           # IdentityModule
-    │   │   ├── UserInfo/           # UserInfoModule (profiles, groups, delegation)
-    │   │   ├── Authorization/      # AuthorizationModule (audiences, policy, audit)
-    │   │   ├── Directory/          # profiles / households
-    │   │   ├── Posts/              # posts, announcements, components
-    │   │   ├── Events/
-    │   │   ├── Projects/
-    │   │   └── Moderation/         # reports, moderator scope
-    │   └── Kumunita.Web/           # MVC, Razor, client/ (TS), wwwroot
-    │       ├── Areas/
-    │       ├── Views/
-    │       └── client/             # TS sources -> wwwroot/js via tsc
+    │   ├── Kumunita.Core/          # domain, services, Marten, Wolverine handlers
+    │   │   ├── CommunityOptions.cs # per-instance config (ADR 0002)
+    │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
+    │   │   ├── Bootstrap/          # DbBootstrap, FirstBootSeeder
+    │   │   ├── Identity/           # IdentityModule     (M1 — not yet created)
+    │   │   ├── UserInfo/           # UserInfoModule     (M1 — not yet created)
+    │   │   ├── Authorization/      # AuthorizationModule (M1 — not yet created)
+    │   │   ├── Directory/          # M2 — not yet created
+    │   │   ├── Posts/              # M3 — not yet created
+    │   │   ├── Events/             # M4 — not yet created
+    │   │   ├── Projects/           # M5 — not yet created
+    │   │   └── Moderation/         # M3 — not yet created
+    │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
+    │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs
+    │       ├── appsettings*.json
+    │       ├── Controllers/        # Home today; `/admin` M1
+    │       ├── Views/              # Razor views + Layout
+    │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
+    │       ├── client/             # plain TS sources; per-page modules
+    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash
+    │       └── wwwroot/js/         # tsc output (compiled, not committed)
     └── tests/
-        ├── Kumunita.Core.Tests/    # authorization + handler tests
-        └── Kumunita.Web.Tests/     # Playwright e2e (later)
+        ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
+        │                           #   fresh scratch DB per test (matches prod db image)
+        └── Kumunita.Web.Tests/     # XUnit; today: config binding + HomeController;
+                                     # Playwright e2e arrives later (§7)
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
-layer. `Web` is a thin HTTP/Razor/TS shell.
+layer. `Web` is a thin HTTP/Razor/TS shell. Directories marked *not yet created* are
+the M1+ plan from §3.
 
 ## 3. Modular monolith & bounded contexts
 
