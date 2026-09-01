@@ -1,22 +1,28 @@
-# Kumunita dev environment. The app mirrors appsettings.Development.json, except the
-# database host is `db` (compose service) on the standard port instead of localhost:5433.
-# Postgres 18, matching the Coolify VPS database addon (post-Docker-29 default). Mailpit:
-# SMTP mail sink on :1025, UI on :8025. The app runs in Development so Marten
-# auto-applies the `mt` schema on a fresh database (M0, ADR 0004).
+# Kumunita dev environment. Postgres mirrors the production Coolify addon: bootstrap
+# superuser `postgres` (admin + restore only — the restore connects to it and targets
+# the scratch/app database), plus a dedicated non-superuser app role `kumunita`
+# created by dev-db-init/01-app-role.sql (dev credentials are weak-by-design; the app
+# connection string and its host/port differ from prod by exactly those two things).
 services:
   db:
     image: postgres:18
     container_name: kumunita_db
     environment:
-      POSTGRES_DB: kumunita
-      POSTGRES_USER: kumunita
-      POSTGRES_PASSWORD: kumunita
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
+    # Single mount at /var/lib/postgresql (NOT .../data): the 18+ image stores data in
+    # major-version-specific subdirectories under the mount point (docker-library/postgres#37)
+    # and refuses to start over a leftover layout with data directly at /var/lib/postgresql/data.
     volumes:
       - kumunita_pgdata:/var/lib/postgresql
+      - ./dev-db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kumunita -d kumunita"]
+      # Probe as the bootstrap user — `kumunita` only exists once the init script
+      # has run (i.e. after this healthcheck first passes), so it can't be the probe user.
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -36,6 +42,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Community__Name: "Maplewood Residents"
       Community__SupportEmail: "maplewood@example.com"
+      # kumunita role (created by dev-db-init/01-app-role.sql), not the bootstrap superuser
       ConnectionStrings__Kumunita: "Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=kumunita;Include Error Detail=true"
     ports:
       - "5080:8080"

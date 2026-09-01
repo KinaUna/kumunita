@@ -48,7 +48,7 @@ Keep one row per neighborhood. This is your map.
 
 | Neighborhood | Domain | VPS | DB name | Version (Commit) | Admin contact | Created | Last backup verified | Notes |
 |--------------|--------|-----|---------|---------------|---------------|---------|----------------------|-------|
-|Examplium Residents|example.kumunita.com|Hetzner|kumunita|3862ea2bbf1472d2ace840ddcc9f2989283d4b0e|admin@examplium.com|2026-08-31|                      |First instance|
+|Examplium Residents|example.kumunita.com|Hetzner|kumunita|13a15c5ec06c6294cd22a1820bb9c47fca1ffb4d|admin@examplium.com|2026-09-01|                      |First instance|
 
 ---
 
