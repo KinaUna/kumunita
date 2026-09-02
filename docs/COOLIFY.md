@@ -32,7 +32,8 @@ configured (OPS §10):
 1. Run the official one-click installer:
 `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`
 This provisions Coolify and its components behind Caddy (reverse proxy;
-issues and renews Let's Encrypt automatically).
+issues and renews Let's Encrypt automatically). For more information and
+up to date instructions, see [Coolify Installation docs](https://coolify.io/docs/get-started/installation).
 
 2. Open the wizard in the browser at `http://<vps-ip>`, choose the
 installation type (Cloud — default; no external services needed for this
@@ -75,6 +76,8 @@ that is what makes them network-adjacent and shares one scoped env-var set.
 
 One **dedicated** Postgres per neighborhood (never shared — ADR 0002).
 
+For more information see Coolify docs: [PostgreSQL](https://coolify.io/docs/databases/postgresql).
+
 1. Inside the neighborhood's environment (`production`, §3): **Add a resource
    → Postgres**. Name it after the neighborhood (`maplewood-postgres`).
 2. **Version: 18** — image parity with dev (`docker-compose.yml`) and the test
@@ -108,6 +111,8 @@ smoke below).
 writes to object storage, not only this VPS.
 
 ## 5. The app — once per neighborhood
+
+For more information see Coolify docs: [Deploy Public Repository](https://coolify.io/docs/applications/ci-cd/github/public-repository).
 
 1. Inside the same `production` environment (same one the Postgres addon
    lives in): **Add a resource → Application** → **GitHub source** →
