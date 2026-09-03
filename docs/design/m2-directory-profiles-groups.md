@@ -412,30 +412,106 @@ namespace Kumunita.Core.UserInfo;
 
 /// <summary>
 /// Directory-side composition (M2). Caller of the two frozen modules:
-/// <see cref="IUserInfoService"/> (candidate set + writes) and
+/// <see cref="IUserInfoService"/> (candidate set + single-row read) and
 /// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/>
 /// (the single decision path, ADR 0006-D). Applies the §4.3 candidate
 /// filter *before* calling `CanSeeAsync` — invariant C-M2·2 (candidate
-/// ≠ access decision).
+/// ≠ access decision); the §2.4 two-gate (Visibility → ContactVisibility)
+/// ordering — invariant C-M2·1 — is the same two methods, same shared
+/// matching pass (C6), in order, as two separate decisions.
 /// </summary>
 public sealed class DirectoryService
 {
     public DirectoryService(IUserInfoService userInfo,
                             Kumunita.Core.Authorization.IAuthorizationService authz);
 
-    // Exact method set (pinned for U5–U11):
-    //   Task<IReadOnlyList<Profile>> ListAsync(string viewerSubjectId, bool viewerVerified);
-    //   Task<Profile?>               DetailAsync(string viewerSubjectId, string targetSubjectId);
-    //   Task<Profile?>               PreviewAsAsync(string authorSubjectId, string asSubjectId);   // read-only (F6)
-    // The three public methods are the *only* surface; anything else is a drift event.
+    /// <summary>The §2.3 candidate filter applied *here* (C-M2·2 names this
+    /// service as the filter's owner — see §2.2's Note, revised U5): the
+    /// caller-state table maps onto the two arguments, then one
+    /// `CanSeeAsync` over the survivor set. `HiddenCount` counts only
+    /// candidates `CanSeeAsync` actually evaluated — a profile dropped by the
+    /// filter is not "hidden" here, it was excluded before any decision ran.</summary>
+    Task<DirectoryList>   ListAsync(string viewerSubjectId, bool viewerVerified);
+
+    /// <summary>F3/F4: Visibility first; ContactVisibility *only if* Visibility
+    /// allowed (C-M2·1). Missing target profile is fail-closed (no decision,
+    /// no audit row). `Profile` is the source `<see cref="Profile"/>` document
+    /// (null only in the missing-profile case).</summary>
+    Task<DirectoryDetail> DetailAsync(string viewerSubjectId, string targetSubjectId);
+
+    /// <summary>F6: same two gates as `DetailAsync`, with `asSubjectId` standing
+    /// in as the viewer over `authorSubjectId`'s saved profile. Read-only —
+    /// no write path (M2's scope pin); the two decisions still commit their own
+    /// `<see cref="Kumunita.Core.Authorization.AccessAudit"/>` rows (C3).</summary>
+    Task<PreviewRow>      PreviewAsAsync(string authorSubjectId, string asSubjectId);
+    // The three public methods above are the *only* public method surface; the
+    // three records below are the *only* public return-type surface — both
+    // shipped U5 (the defining unit), frozen going forward like the rest of §2.2.
 }
+
+/// <summary>`ListAsync`'s result — the §2.3-filtered, §"Profile enumeration vs
+/// privacy" risk-line-safe projection of the `CanSeeAsync` visible set.</summary>
+public sealed record DirectoryList(IReadOnlyList<Profile> Visible, int HiddenCount);
+
+/// <summary>`DetailAsync`'s result — the two-gate (Visibility, then ContactVisibility)
+/// shape, plus the source `<see cref="Profile"/>` document (nullable: the missing-
+/// profile fail-closed case).</summary>
+public sealed record DirectoryDetail(bool IsVisible, bool ShowContactBlock, Profile? Profile);
+
+/// <summary>`PreviewAsAsync`'s result — the same two-gate shape as
+/// `<see cref="DirectoryDetail"/>`, applied to the *author's* saved profile with a
+/// chosen resident standing in as the viewer (F6).</summary>
+public sealed record PreviewRow(bool IsVisible, bool ShowContactBlock, Profile? Profile);
 ```
 
-> *Note to U5:* the `ListAsync` / `DetailAsync` / `PreviewAsAsync`
-> signatures above are the U5 target. `DirectoryService` must be
-> constructible with the two module seams, nothing more. The *Web
-> controller* is the one that applies the caller-state table in §2.3
-> to build the candidate list before calling these three methods.
+> *Note to U5 (revised U5 — U5 is the defining unit, so this note ships in the same
+> commit as the code, per the Drift-guard's own "the unit updates this file in the same
+> commit and appends a one-line drift note to the handoff" policy):* the
+> `ListAsync` / `DetailAsync` / `PreviewAsAsync` names and the
+> `(IUserInfoService, IAuthorizationService)` ctor were already pinned in U2's §2.2;
+> U5 confirms and ships them **unchanged** as the method names, and adds the **return
+> type** (the 3 records above — the plan's own U5 spec names the shapes
+> `(Visible, HiddenCount)` / `(IsVisible, ShowContactBlock, Profile?)` and the §2.3
+> "unverified viewer sees only themselves" rule is *only* testable — U5's own
+> self-check test, U6's `F8_UnverifiedViewer_SeesOnlyThemselves_NoAccessDecisionAuditRow`,
+> and F8 all require it — as `ListAsync` *itself* applying the §2.3 table, given the
+> `(viewerSubjectId, viewerVerified)` arguments it already receives. The plan-U5 spec,
+> C-M2·2 (the Part 1 Invariants block names `DirectoryService` as the filter's owner —
+> not the Web controller), and the §2.3 table's `viewerVerified`-dependent rows all
+> agree on this; the older inline `#`-comment block + the pre-revision "Note to U5"
+> (Web controller applies §2.3) are the stale half. **Frozen surface, post-revision:**
+> the 3 named methods + their 3 records + the ctor. This is the *same* drift-guard lane
+> §2.7 already uses for `ProfileToAuditableResource` — "frozen once U4 lands
+> [`Id`, `Name`, `OwnerId`, `Audience`, `ComponentId`, `TargetKind`]" — with U5 as the
+> defining unit: U2 froze the 3 *names* + ctor (already inside its stated 12-seam
+> count, `DirectoryService` counting as one entry, ctor + 3 methods — U2's handoff
+> note says "and the `DirectoryService` ctor + 3 public methods"); U5 lands the 3
+> records as that same entry's *return-type shape*, exactly as U4 landed the 6
+> member shape on the same already-frozen *name* `ProfileToAuditableResource`. One
+> line U6
+> should read before writing §2.4's "separate call" tests: §2.4's prose says
+> "a distinct `CanSeeAsync` call" for the second (contact) decision, but U5
+> deliberately uses the single-resource form — `IAuthorizationService.CanAsync` —
+> for *both* `DetailAsync`'s decisions, since each decision is one resource
+> (not a list), the standalone overloads commit their own audit row (correct
+> C3 lane — no in-flight caller transaction here), and both `CanAsync` and
+> `CanSeeAsync` reduce to the *exact same* pure `Decide` call inside
+> `AuthorizationService` (the C6 shared-pass property holds structurally, since
+> `Decide` is the one matching core and `EvaluateAudience` the one matcher — the
+> §2.4/C6 "separate call, shared matching core" pin is honored; the only
+> difference is the audit row *shape*, and `CanAsync`'s single-row shape is
+> exactly the more precise lane for a one-resource decision — the same reason
+> `I`/`AuthorizationService.CanAsync`'s own `/// <summary>` names it "detail
+> views"). U6's tests should assert the decision's `Via`/`Outcome` and the audit
+> lane's row *existence* / `TargetKind` / `TargetId`, not the overload's *name*
+> (which is a Core-internal implementation detail, invisible to the test's
+> `store.QuerySession()` read of `AccessAudit`). `DetailAsync`/`PreviewAsAsync`
+> deliberately **share** one private two-gate path (C6's no-drift property, applied
+> to this service's own two public methods — they cannot disagree on the ordering or
+> shape of the two decisions, since they are the same calls in the same order) and
+> the §2.4 `null`-ContactVisibility row is a documented *short-circuit with no call
+> and no audit row* (the literal "not evaluated" wording) — not a fourth method and
+> not a hidden fourth decision.
 
 **`IUserInfoService.GetGroupOwnersAsync(string userId)` — M1-seam
 assumption — needs confirmation (U9/U10/U11 to verify).** F14 ("my

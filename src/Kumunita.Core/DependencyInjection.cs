@@ -45,6 +45,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IIdentityService, IdentityService>();
         services.AddTransient<IMailerStage, OutboxEmailStager>();
 
+        // M2 (plan U5): the directory-side composition root — a concrete class (it
+        // composes two *seams*, not itself a seam: no interface, ADR 0006-D's
+        // "single seam" rule applies to the *modules* it calls, not to the caller).
+        services.AddTransient<DirectoryService>(sp =>
+            new DirectoryService(
+                sp.GetRequiredService<IUserInfoService>(),
+                sp.GetRequiredService<IAuthorizationService>()));
+
         // Step-8 (M1 plan): the /health degraded seam (OPS §8) — counts
         // EmailDeadLetter rows through a Marten IQuerySession. Web-side consumers
         // (HealthController) resolve this, so tests can substitute a canned count
