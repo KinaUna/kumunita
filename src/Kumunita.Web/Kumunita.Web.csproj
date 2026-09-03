@@ -2,6 +2,26 @@
 
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <!-- M1 step 7: durable side effects (plan line 40). WolverineFx is the durable
+         handler + scheduled job framework; WolverineFx.Marten gives us the
+         transactional outbox integration (`IntegrateWithWolverine()`) that
+         ARCHITECTURE.md §6.1 relies on ("a failed SMTP connection can never roll
+         back a domain write") — the outbox row + the domain write commit atomically
+         in the same Postgres transaction.
+         Version pin: 6.33.0 is the current pairing (WolverineFx.Marten 6.33 pulls
+         WolverineFx >= 6.33 via WolverineFx.RDBMS, so the two are locked together;
+         6.32/6.33 was the pairing in the Critter-Stack `versions.md` snapshot, but
+         the transitive graph forces both to 6.33 as of 2026-09). These are the only
+         two Wolverine-related assemblies the whole repo references (per the repo's
+         own convention — `IMailerStage.cs` and `DependencyInjection.cs` both call
+         out "Wolverine is a *Web* package"). -->
+    <PackageReference Include="WolverineFx" Version="6.33.0" />
+    <PackageReference Include="WolverineFx.Marten" Version="6.33.0" />
+    <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)
+         in the core package. This reference auto-registers it so TypeLoadMode.Dynamic
+         handlers (OutboxEmail, Fault<>, AuditPurge) compile at startup — see
+         wolverinefx.net/guide/codegen.html. -->
+    <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.33.0" />
   </ItemGroup>
 
   <ItemGroup>

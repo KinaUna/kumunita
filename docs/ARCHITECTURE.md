@@ -72,21 +72,22 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
-    │   ├── Kumunita.Core/          # domain, services, Marten, Wolverine handlers
+    │   ├── Kumunita.Core/          # domain, services, Marten, the Wolverine-free side-effect business logic
     │   │   ├── CommunityOptions.cs # per-instance config (ADR 0002)
     │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
     │   │   ├── Bootstrap/          # DbBootstrap, FirstBootSeeder
-    │   │   ├── Identity/           # IdentityModule     (M1 — not yet created)
-    │   │   ├── UserInfo/           # UserInfoModule     (M1 — not yet created)
-    │   │   ├── Authorization/      # AuthorizationModule (M1 — not yet created)
+    │   │   ├── Identity/           # IdentityModule (M1) — also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter
+    │   │   ├── UserInfo/           # UserInfoModule     (M1)
+    │   │   ├── Authorization/      # AuthorizationModule (M1) — also AuditPurgeService (Wolverine-free tiering)
     │   │   ├── Directory/          # M2 — not yet created
     │   │   ├── Posts/              # M3 — not yet created
     │   │   ├── Events/             # M4 — not yet created
     │   │   ├── Projects/           # M5 — not yet created
     │   │   └── Moderation/         # M3 — not yet created
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
-    │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs
+    │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── appsettings*.json
+    │       ├── SideEffects/        # M1 step 7: OutboxEmailHandler (durable send + Fault<OutboxEmail> dead-letter hook), AuditPurgeHandler/Tick
     │       ├── Controllers/        # Home today; `/admin` M1
     │       ├── Views/              # Razor views + Layout
     │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
@@ -319,7 +320,7 @@ Moderation / audit
   // visibleCount/hiddenCount instead of a single targetId
   AccessAudit      { id, at, actorId, effectivePrincipalId?, action, targetKind, targetId?,
                      visibleCount?, hiddenCount?,
-                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass,
+                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin,
                      outcome: Allow|Deny }
 
 Email outbox

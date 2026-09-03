@@ -1,0 +1,40 @@
+@using Kumunita.Web.Security
+@{
+    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
+    // KumunitaPrincipal.IsGlobalAdmin reads the Kumunita.Role claim type (not the BCL
+    // default) — see the helper's doc; ClaimsPrincipal.IsInRole would not match this shape.
+    bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+}
+
+<ul class="navbar-nav">
+    @if (isAuthenticated)
+    {
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Profile">Profile</a>
+        </li>
+        @if (isGlobalAdmin)
+        {
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index">Admin</a>
+            </li>
+        }
+        <li class="nav-item">
+            <form class="form-inline" asp-controller="Account" asp-action="Logout" method="post"
+                  style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-link nav-link text-dark" style="border:none; background:none;">
+                    Sign out
+                </button>
+            </form>
+        </li>
+    }
+    else
+    {
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Sign in</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup">Sign up</a>
+        </li>
+    }
+</ul>

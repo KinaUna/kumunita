@@ -1,0 +1,34 @@
+## U1 — Design doc Part 1
+- Wrote `docs/design/m2-directory-profiles-groups.md` (Part 1: scope, invariants, FACES).
+- Invariants used: ADR 0006 **C1, C3, C4, C6** (directory + contact block); ADR 0006 **C2** (delegation on a profile); ADR 0006 **C5** (moderator default-OFF); ADR 0001-B (author's choice absolute); ADR 0003 (SoD — group owner/GlobalAdmin only). ADRef 0006-D / 0006-E honored (single seam, compatible-lane addition).
+- New M2-owned invariants: **C-M2·1** (contact gating ordering after `Visibility`), **C-M2·2** (candidate filter ≠ authz separation, §4.3), **C-M2·3** (group SoD).
+- FACES count: **15** (F1–F15), each row pinned to a C/ADRef invariant above.
+- Closed M1's "out of scope" line: "profile editing UI and directory visibility rules (M2)".
+- No code. No build. U2: name the test list + the one new `IUserInfoService` signature + acceptance gate from these pins.
+
+## U2 — Design doc Part 2
+- Appended `## Seams & contracts (Part 2, written by U2)` (~150 lines) to `docs/design/m2-directory-profiles-groups.md`:
+  - §2.1 frozen seam list (exact C#): `IAuthorizationService` × 4, `Audience`/`AudienceGrant`/`AudienceMode`/`GrantKind`, `Decision`, `VisibleSet`, `AccessAction`, `IAuditableResource`, `AccessAudit`, `IUserInfoService` (M1 frozen surface + the `GetProfilesAsync(bool)` M2 ADD), `Profile`, `ProfileUpdate`, `Group`, `GroupMembership`.
+  - §2.2 new M2-owned Core types (exact C#): `ProfileToAuditableResource` (Id / Name / OwnerId / Audience / ComponentId / TargetKind) and `DirectoryService` (ctor taking `IUserInfoService` + `IAuthorizationService`; public methods `ListAsync`, `DetailAsync`, `PreviewAsAsync`).
+  - §2.3 §4.3 candidate-filter rule (invariant C-M2·2): 5-state table (unauth ⇒ empty; verified ⇒ `GetProfilesAsync(verifiedOnly:true)`; unverified ⇒ self only; moderator ⇒ same as verified; missing profile ⇒ empty). Filter is a **precondition**, never an audit subject.
+  - §2.4 Contact-block gating rule (invariant C-M2·1): 4-shape table (null / Any+empty / Any+non-empty / All+empty) — evaluated **only after** `Visibility` allowed; the contact call is a *separate* `CanSeeAsync` on the same `MatchGroups` core (C6), *not* a merged compound audience.
+  - §2.5 **22 seam tests** with exact names. Each name carries its FACES row (F1–F15) and invariant (C-M2·1/2/3 or ADR 0006-C1/C2/C3/C4/C5/C6 or ADR 0001-B/0003). File: `tests/Kumunita.Core.Tests/DirectoryServiceTests.cs`.
+  - §2.6 acceptance gate (U12 records): same three-test shape as M1 step 9 (closed-loop / handoff / part-vs-whole), with the 22-test seam list as the part-vs-whole evidence. Record goes into `### Run result (M2 acceptance gate — <date>)` in the design doc.
+  - §2.7 drift-guard: 22-test list, `IUserInfoService` frozen surface + `GetProfilesAsync` ADD, `ProfileToAuditableResource` 6-member shape, §2.4 4-shape table, and FACES count are all frozen pins.
+- **Pinned seam signatures: 12** (4 on `IAuthorizationService`, `IUserInfoService.GetProfilesAsync(bool)` — M2 ADD, the `ProfileToAuditableResource` × 6 members, and the `DirectoryService` ctor + 3 public methods).
+- **1 M1-seam assumption flagged** (contingent, U9/U10/U11 must verify): `IUserInfoService.GetGroupsForUserAsync(string userId)`. M1's frozen surface exposes only `GetGroupIdsAsync` (a `HashSet<string>`); F14 ("my group list shows only groups I own + groups I belong to") requires reading `Group` documents. The §2.2 flag says: **if M1 lacks it, U9 opens the drift-guard in the same commit as U9's first Web consumer** (new method on a frozen interface, ADR 0006-E lane, mirroring the `GetProfilesAsync` ADD).
+- FACES count: **15** (unchanged from U1 — U2 pins *how* those 15 outcomes are tested, does not add any; the Part 1 count is the handoff field).
+- Invariant pins used (unchanged from U1): ADR 0006 C1, C2, C3, C4, C5, C6; ADR 0001-B; ADR 0003 (SoD); ADR 0006-D / E; M2-owned C-M2·1, C-M2·2, C-M2·3.
+- No code. No build. U3: implement `GetProfilesAsync(bool)` on `IUserInfoService` (exact signature in §2.1) + `UserInfoService.GetProfilesAsync_VerifiedOnly_Filters` test that asserts *no audit row* is appended (the C-M2·2 unit-level pin).
+
+## U3 — `GetProfilesAsync(bool verifiedOnly)` + DI
+- **Signature pinned (exact, per design doc §2.1):** `Task<IReadOnlyList<Profile>> GetProfilesAsync(bool verifiedOnly)` on `Kumunita.Core.UserInfo.IUserInfoService` — the single M2 `ADD` on a frozen interface (ADR 0006-E compatible lane; precedent `IDocumentSession` overloads on M1's `IAuthorizationService`). Doc-comment anchored to C3/C4/C6 + the §4.3 candidate-filter note (returns a *candidate* set, never a visible set, no audit row).
+- **Files touched (U3 deliverables, both):**
+  - `src/Kumunita.Core/UserInfo/IUserInfoService.cs` — appended the new method with the pinned doc-comment, in an annotated "M2 additions (ADR 0006-E)" block before the existing M1 block.
+  - `src/Kumunita.Core/UserInfo/UserInfoService.cs` — implemented `GetProfilesAsync(bool verifiedOnly)` as a *read* (mirrors `GetProfileAsync`'s `store.QuerySession()` shape, not `UpsertProfileAsync`'s write session — reads stay live per C4). Server-side `Where(p => p.Verified)` when `verifiedOnly:true`, no filter when `false`.
+- **DI note:** no change needed — `IUserInfoService → UserInfoService` is already registered (transient) in `src/Kumunita.Core/DependencyInjection.cs` (line 43); the new method rides that registration. Confirmed against the plan's "exit if singleton" prompt — it's transient, matching the M1 pattern.
+- **Impl deviation (recorded, not patched):** Marten's Linq parser rejected a captured-bool ternary (`verifiedOnly ? p.Verified : true`) with `System.ArgumentNullException` at query-parse time. Fixed by branching *C#-side* (two queries, chosen by `verifiedOnly`) instead of one server-side conditional `Where`. The plan's "one `LoadDocumentsAsync<Profile>(...)` + client-side `Where`" shape is functionally equivalent; the two-query shape is strictly the same read, no behavior difference.
+- **Test added (1):** `tests/Kumunita.Core.Tests/UserInfoServiceTests.cs` → `GetProfilesAsync_VerifiedOnly_Filters` — plants 2 verified + 1 unverified profile via `UpsertProfileAsync`, asserts `verifiedOnly:true` returns exactly the 2 verified, `verifiedOnly:false` returns all 3, and asserts the **zero** rows in `AccessAudit` after both calls (the C-M2·2 "candidate filter is not an access decision" pin at the unit level).
+`UserInfoServiceTests` (11 tests, including the new one)
+- **No deviations to record against U1/U2's pinned signatures or the 12-seam freeze list.** The `IUserInfoService` frozen surface is now: 11 M1 methods + 1 M2 `ADD` = 12 public methods, matching §2.1 exactly.
+- U4: `ProfileToAuditableResource` — the adapter. Read `IAuthorizationService`'s `IAuditableResource` definition first (confirm the 6 members before choosing Shape A vs B per the plan).

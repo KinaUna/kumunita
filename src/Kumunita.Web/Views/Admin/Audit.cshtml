@@ -1,0 +1,91 @@
+@model Kumunita.Web.Models.AdminAuditPageViewModel
+@{
+    ViewData["Title"] = "Admin — Audit";
+}
+
+<h1>Access audit</h1>
+<p class="text-muted">
+    Every access decision on audience-restricted content — Allow and Deny — plus admin
+    actions and bulk list aggregate rows. Always-on; purged on a per-instance tier (§6.4).
+</p>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <label class="visually-hidden">Via</label>
+        <select name="via" class="form-select form-select-sm">
+            <option value="">all (via)</option>
+            <option value="Owner" selected="@(Model.Via is "Owner" ? "selected" : null)">via:Owner</option>
+            <option value="Admin" selected="@(Model.Via is "Admin" ? "selected" : null)">via:Admin</option>
+            <option value="BreakGlass" selected="@(Model.Via is "BreakGlass" ? "selected" : null)">via:BreakGlass</option>
+            <option value="Delegation" selected="@(Model.Via is "Delegation" ? "selected" : null)">via:Delegation</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="visually-hidden">Outcome</label>
+        <select name="outcome" class="form-select form-select-sm">
+            <option value="">all (outcome)</option>
+            <option value="Allow" selected="@(Model.Outcome is "Allow" ? "selected" : null)">Allow</option>
+            <option value="Deny" selected="@(Model.Outcome is "Deny" ? "selected" : null)">Deny</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>At (UTC)</th>
+                <th>Actor</th>
+                <th>Effective</th>
+                <th>Action</th>
+                <th>Target</th>
+                <th>Aggregate</th>
+                <th>Via</th>
+                <th>Outcome</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td>@r.At.ToString("u")</td>
+                    <td class="text-break">@r.ActorId</td>
+                    <td class="text-break">@(r.EffectivePrincipal ?? "—")</td>
+                    <td>@r.Action</td>
+                    <td>
+                        @r.TargetKind
+                        @if (r.TargetId is not null)
+                        {
+                            <span class="text-break text-muted small">@r.TargetId</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        @if (r.VisibleCount is not null || r.HiddenCount is not null)
+                        {
+                            <span>visible @r.VisibleCount / hidden @r.HiddenCount</span>
+                        }
+                    </td>
+                    <td>@r.Via</td>
+                    <td>
+                        @if (r.Outcome == "Allow")
+                        {
+                            <span class="badge text-bg-success">@r.Outcome</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-danger">@r.Outcome</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="text-muted small mt-2">
+    Showing @Model.Rows.Count most recent (the full log is paginated by the purge job per
+    instance configuration — this view shows a window, not the whole history).
+</p>

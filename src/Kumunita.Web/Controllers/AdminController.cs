@@ -1,0 +1,255 @@
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
+using Kumunita.Web.Models;
+using Kumunita.Web.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Marten;
+
+namespace Kumunita.Web.Controllers;
+
+/// <summary>
+/// The /admin shell surface (M1 step 8): roles + component-scope assignment, the
+/// unverified-account safety valve (the admin manual-verify lane), — all
+/// <see cref="Roles.GlobalAdmin"/>-gated. <c>/admin/audit</c> and
+/// <c>/admin/break-glass</c> live under the same controller but on distinct routes:
+/// <c>Index</c> (shell), <c>Audit</c>, <c>BreakGlass</c>.
+/// </summary>
+[Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
+public sealed class AdminController(
+    AppDbContext identities,
+    IDocumentStore store,
+    IIdentityService identity,
+    IUserInfoService userInfo) : Controller
+{
+    private static string? AdminSubjectId(System.Security.Claims.ClaimsPrincipal user) =>
+        user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
+
+    // ── /admin — the shell: account list + role/scope assignment + safety valve ─────────
+
+    [HttpGet]
+    public async Task<IActionResult> Index()
+    {
+        // The identity schema is the only source of account + role facts — the `mt`
+        // documents (Profile, ModeratorAssignment) are joined via IUserInfoService
+        // reads, per ADR 0004 A/C (no domain model touches the EF context, and vice versa).
+        // Both EF Core and Marten define ToListAsync/FirstOrDefaultAsync extensions, so
+        // qualify the EF one explicitly wherever this controller mixes the two.
+        var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            identities.Users
+                .OrderBy(u => u.Email ?? u.UserName ?? string.Empty)
+                .AsNoTracking());
+
+        var accountsWithRoles = new List<AdminIndexViewModel.AccountRow>();
+
+        foreach (var user in users)
+        {
+            var subject = user.Id ?? string.Empty;
+            // A single join covers every account's role rows (no N UserManager round trips).
+            var roles = identities.UserRoles
+                .Where(ur => ur.UserId == subject)
+                .Select(ur => ur.RoleId)
+                .ToHashSet();
+            var roleNames = identities.Roles
+                .Where(r => roles.Contains(r.Id))
+                .Select(r => r.Name!)
+                .ToList();
+
+            // Only a Moderator's scope matters per ADR 0003 — a non-Moderator's
+            // ModeratorAssignment rows (if any — shouldn't exist post-demotion but
+            // defensively) are never read by the authorization path.
+            var componentIds = roleNames.Contains(Kumunita.Core.Identity.Roles.Moderator)
+                ? (await userInfo.GetAssignmentsAsync(subject)).Select(a => a.ComponentId).ToList()
+                : new List<string>();
+
+            var profile = await userInfo.GetProfileAsync(subject);
+            var verified = profile?.Verified ?? false;
+
+            accountsWithRoles.Add(new AdminIndexViewModel.AccountRow
+            {
+                SubjectId    = subject,
+                Email        = profile?.Email ?? user.Email ?? user.UserName,
+                DisplayName  = profile?.DisplayName ?? user.UserName,
+                Verified     = verified,
+                Roles        = roleNames,
+                ComponentIds = componentIds
+            });
+        }
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        // Fully-qualify the Marten async extension — this file also imports EF Core's
+        // EntityFrameworkQueryableExtensions, so a bare .ToListAsync() is ambiguous.
+        var components = await Marten.QueryableExtensions.ToListAsync(
+            session.Query<Component>().OrderBy(c => c.SortOrder));
+        var componentOptions = components
+            .Select(c => new AdminIndexViewModel.ComponentOption
+            {
+                Id              = c.Id,
+                Name            = c.Name,
+                ModeratorAccess = c.ModeratorAccess
+            })
+            .ToList();
+
+        return View(new AdminIndexViewModel
+        {
+            Accounts   = accountsWithRoles,
+            Components = componentOptions
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetRole(SetRoleViewModel model)
+    {
+        if (string.IsNullOrEmpty(model.TargetSubjectId))
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        var componentIds = model.ComponentIds
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .ToList();
+
+        try
+        {
+            // "Member" is the "no elevated role" value (Core's SetRoleAsync removes any
+            // GlobalAdmin/Moderator when the role string is neither of those).
+            var role = string.IsNullOrWhiteSpace(model.Role) || model.Role == Kumunita.Core.Identity.Roles.Member
+                ? Kumunita.Core.Identity.Roles.Member
+                : model.Role;
+            await identity.SetRoleAsync(
+                targetSubjectId: model.TargetSubjectId,
+                adminSubjectId: admin,
+                role: role,
+                componentIds: componentIds);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
+            // but Core's lane enforces it too as a second gate — map to a clean 403.
+            TempData["error"] = "You are not permitted to perform this action.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Role updated.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ManuallyVerify([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.ManuallyVerifyAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account verified. It can now sign in.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to verify this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── /admin/audit — the always-on access-decision log (GlobalAdmin) ────────────────
+
+    [HttpGet]
+    public async Task<IActionResult> Audit([FromQuery] int? last = null, [FromQuery] string? via = null, [FromQuery] string? outcome = null)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        // Type the running query as the (non-ordered) IQueryable so .Where() filters below
+        // don't need to re-assign into an IOrderedQueryable; the ordering is already applied.
+        System.Linq.IQueryable<AccessAudit> query = session.Query<AccessAudit>()
+            .OrderByDescending(a => a.At);
+
+        // Filter on the enum directly (Marten translates an enum comparison to a SQL
+        // comparison); a `.ToString().Equals(...)` would not translate. Parse to the enum
+        // value, ignoring invalid strings (treated as "no filter").
+        if (Enum.TryParse<AccessVia>(via, ignoreCase: true, out var viaEnum))
+            query = query.Where(a => a.Via == viaEnum);
+        if (Enum.TryParse<AccessOutcome>(outcome, ignoreCase: true, out var outcomeEnum))
+            query = query.Where(a => a.Outcome == outcomeEnum);
+
+        const int page = 50;
+        // Fully-qualify the Marten async extension (same EF/Marten ambiguity as elsewhere).
+        var rows = await Marten.QueryableExtensions.ToListAsync(query.Take(page));
+
+        return View(new AdminAuditPageViewModel
+        {
+            Rows = rows.Select(r => new AdminAuditPageViewModel.Row
+            {
+                Id                  = r.Id,
+                At                  = r.At,
+                ActorId             = r.ActorId,
+                EffectivePrincipal = r.EffectivePrincipalId,
+                Action              = r.Action,
+                TargetKind          = r.TargetKind,
+                TargetId            = r.TargetId,
+                VisibleCount        = r.VisibleCount,
+                HiddenCount         = r.HiddenCount,
+                Via                 = r.Via.ToString(),
+                Outcome             = r.Outcome.ToString()
+            }).ToList(),
+            Via = via,
+            Outcome = outcome,
+            Page    = last ?? 0
+        });
+    }
+
+    // ── /admin/break-glass — consume the operator-written AdminOverride (once) ─────────
+
+    [HttpGet]
+    public async Task<IActionResult> BreakGlass()
+    {
+        var subject = AdminSubjectId(User) ?? string.Empty;
+
+        // This page is [Authorize(Roles=GlobalAdmin)] already, but break-glass is the
+        // elevation path itself — the row targets the specific account that will consume
+        // the token. Show the row's state read-only (never list/created here — the
+        // operator writes it in psql, OPS §9).
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        // The break-glass rows for one account are rare (one-shot, operator-written) so a
+        // small in-memory ordering is fine and avoids the EF/Marten FirstOrDefaultAsync ambiguity.
+        var candidates = await Marten.QueryableExtensions.ToListAsync(
+            session.Query<AdminOverride>().Where(o => o.UserId == subject));
+        var row = candidates.OrderByDescending(o => o.GrantedAt).FirstOrDefault();
+
+        return View(new BreakGlassViewModel
+        {
+            HasOverride = row is not null,
+            Consumed    = row?.ConsumedAt is not null,
+            ExpiresAt   = row?.ExpiresAt,
+            GrantedAt   = row?.GrantedAt
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BreakGlass(BreakGlassConsumeViewModel model)
+    {
+        var subject = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.ConsumeBreakGlassAsync(subject, model.Token);
+            TempData["info"] = "Break-glass elevation activated. It lasts until its expiry; every privileged decision under it is audited with via:BreakGlass.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            // "Not recognized, already consumed, or expired" — the single-use guarantee.
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(BreakGlass));
+    }
+}

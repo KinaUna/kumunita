@@ -1,0 +1,52 @@
+@model Kumunita.Web.Models.ProfileViewModel
+@using Kumunita.Core.Identity
+@{
+    ViewData["Title"] = "Your profile";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <h1>Your profile</h1>
+
+        @if (!Model.Verified)
+        {
+            <div class="alert alert-warning">
+                Your account is not verified yet — some features are unavailable until
+                verification completes.
+            </div>
+        }
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success">@info</div>
+        }
+
+        <form asp-action="Profile" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="mb-3">
+                <label asp-for="DisplayName" class="form-label"></label>
+                <input asp-for="DisplayName" class="form-control" />
+                <span asp-validation-for="DisplayName" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <p class="text-muted small">
+                Who can see this profile defaults to you alone until you change it (M2 adds
+                the audience editor).
+            </p>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
