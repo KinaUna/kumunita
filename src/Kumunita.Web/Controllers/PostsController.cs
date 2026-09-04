@@ -254,7 +254,7 @@ public sealed class PostsController(
     /// GET's "missing <c>Profile</c> row ⇒ empty editor" precedent).
     /// </summary>
     [HttpGet("/posts/new")]
-    public async Task<IActionResult> NewGet()
+    public async Task<IActionResult> New()
     {
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
 
@@ -268,7 +268,7 @@ public sealed class PostsController(
         var model = new PostComposeViewModel
         {
             Components = components.Select(c => (c.Id, c.Name)).ToList(),
-            ComponentId = components.FirstOrDefault().Id, // empty string when zero components
+            ComponentId = components.FirstOrDefault()!.Id, // empty string when zero components
             // ADR 0001-B — the composer's choice is absolute: the
             // editor's <b>default</b> shape is the *bootstrap* self-only
             // audience (invariant C1: an empty audience is the
@@ -328,7 +328,7 @@ public sealed class PostsController(
     /// </summary>
     [HttpPost("/posts/new")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> NewPost([FromForm] PostComposeViewModel model)
+    public async Task<IActionResult> New([FromForm] PostComposeViewModel model)
     {
         var actor = SubjectId(User);
         if (string.IsNullOrEmpty(actor))

@@ -32,6 +32,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- TS toolchain version for the (npm/tsc) front-end. VS reads this to pick the
+         TypeScript language service; without it Visual Studio 2026 falls back to the
+         semver range in package.json ("^7.0.2") which isn't a parseable Version and
+         warns "invalid value for TypeScriptToolsVersion". Pinned to the exact installed
+         version so it stays in sync. Does NOT affect the build (TS is compiled by
+         `npm run build`/tsc, not MSBuild). -->
+    <TypeScriptToolsVersion>7.0.2</TypeScriptToolsVersion>
   </PropertyGroup>
 
 </Project>
