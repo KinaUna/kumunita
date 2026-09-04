@@ -25,4 +25,13 @@
     <ProjectReference Include="..\..\src\Kumunita.Web\Kumunita.Web.csproj" />
   </ItemGroup>
 
+  <!-- e2e-m2.spec.ts is paused (U13 — no Playwright runtime in the repo yet).
+       Classified as None so it does not participate in any C# or T4 build path
+       and the VS TypeScript service cannot pick it up as a project file.
+       When M3 lands the Playwright runtime, move it to a dedicated
+       tests/Kumunita.E2E/ project with its own package.json. -->
+  <ItemGroup>
+    <None Include="e2e-m2.spec.ts" />
+  </ItemGroup>
+
 </Project>

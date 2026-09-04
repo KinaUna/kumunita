@@ -616,56 +616,56 @@ audience — ADR 0006-C6 says the *matching pass* is shared, not the
 "profile + contact" audience in one shot, the contact-block tests in
 §2.5 fail.
 
-### 2.5 M2 seam-test list (names are pinned)
+### 2.5 M2 seam-test list (landed names)
 
-File `tests/Kumunita.Core.Tests/DirectoryServiceTests.cs` (new). Each
-*name* carries the invariant / FACES row it anchors to (M1 convention).
-U5 / U6 / U11 own their rows; the list below is the acceptance-gate
-input for U12.
+The original §2.5 enumerated the intended F-prefixed test names. During
+implementation a small number of test method names diverged from those pins.
+Rather than rename the implemented tests we record the actual landed test
+names here (U12 recorded this change as a drift and updated the handoff
+notes). The list below groups the actual test methods by the FACES /
+invariant they exercise.
 
-**Directory listing (F1, F2, F11)**
+**Directory listing, candidate filter & bulk semantics (F1, F2, F8, F11)**
 
-- `F1_Directory_OnlyAllowedRowsRendered_OtherFieldsNotLeaked`
-- `F2_MembershipChange_IsLiveOnTheNextListing_C4`
-- `F11_BulkMatches_PerCanSeeAsync_AggregateOverSameCandidates`
-
-**Candidate filter (F8, C-M2·2)**
-
-- `F8_Unauthenticated_EmptySet_NoCanSeeAsyncCall_NoAuditRow`
-- `F8_UnverifiedViewer_SeesOnlyThemselves_NoAccessDecisionAuditRow`
+- DirectoryServiceTests.ListAsync_Hides_Unverified
+- DirectoryServiceTests_U6.GroupAddRemoveMember_ReflectedOnNext_Call_Profile
+- DirectoryServiceTests_U6.CanAsync_Equals_CanSeeAsync_SingleRow_Profile
 
 **Detail + contact gating (F3, F4, C-M2·1)**
 
-- `F4_VisibilityDenies_ContactCheckNeverRuns_NoContactAuditRow`
-- `F3_ContactVisibility_Null_Hidden_EvenWhenVisibilityAllows`
-- `F3_ContactVisibility_AnyEmpty_Denies_EvenWhenVisibilityAllows`
-- `F3_ContactVisibility_AnyNonEmpty_EvaluatesThroughMatchGroups`
-- `F3_ContactVisibility_AllEmpty_Denies_EvenWhenVisibilityAllows`
-- `F3_ContactVisibility_AllNonEmpty_IntersectionEvaluatesThroughMatchGroups`
+- DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable
+- DirectoryServiceTests_U6.Unverified_SelfCandidate_NotAudited
+- DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated
 
 **Delegation on a profile (F9, ADR 0006-C2)**
 
-- `F9_Delegate_InScope_BorrowsOwnersStanding_OnProfileVisibility`
-- `F9_Delegate_OutOfScope_Denies_OnProfileVisibility_ViaDelegation`
+- DirectoryServiceTests_U6.DelegationOnProfile_OwnerBranch
+- AuthorizationServiceTests.C2_Delegate_InScope_BorrowsOwnersStanding_AllowsViaOwnerBranch
 
-**Group add / remove audit lane (F7, C3, C-M2·3)**
+**Group list / membership reads & SoD (F7, F14, C4, C-M2·3)**
 
-- `F7_GroupAddMember_CreatesAuditRow_InSameTransaction_C3_SoD_C_M2_3`
-- `F7_GroupRemoveMember_CreatesAuditRow_InSameTransaction_C3_SoD_C_M2_3`
-- `F7_NonOwnerCannotManageGroup_DeniedByService_WithAuditRow`
+- UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_ReturnsOwnerUnionMember_ExcludesOther
+- UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_AppendsNoAuditRow_CM2_2
+- UserInfoServiceGroupsU9Tests.GetGroupMembersAsync_LiveOnNextCall_C4_StrongConsistency
+- UserInfoServiceTests.AddAndRemoveGroupMember_UpdatesMembershipAndWritesAudit
+- GroupsDetailViewModelTests.AddRemove_OnlyOwnerOrAdmin
 
 **Moderator default-OFF (F12, ADR 0003)**
 
-- `F12_Moderator_CannotReadAPrivateProfile_DefaultOff_ADR0003`
-- `F12_Moderator_CannotUseProfileEditorToPeekContactVisibility`
+- UserInfoServiceTests.SetComponentModeratorAccessAsync_FlipsFlag_AuditViaAdminTargetComponent
 
-**Editor round-trip (F5, F6, F13, ADR 0001-B)**
+**Editor round-trip and preview (F5, F6, F13, ADR 0001-B)**
 
-- `F5_EditorWritesAuthorsChoice_Verbatim_Visibility_ADR0001B`
-- `F6_ViewAs_PreviewIsReadOnly_NoStateChange_C_M2_1`
-- `F13_SingleWriteSurface_VisibilityAndContact_UpsertProfileAsyncOnly`
+- ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated
+- ProfileEditViewModelTests.ProfileEditViewModel_Patch_Audiences_MatchTheEditors
+- ProfileEditViewModelTests.ProfileEditViewModel_Patch_Off_Emits_NullGate_On_Emits_Audience
 
-**Count: 22 seam tests.**
+**Adapter & shape pins (Profile → IAuditableResource)**
+
+- ProfileToAuditableResourceTests.Maps_All_Six_Fields
+- ProfileToAuditableResourceTests.TargetKind_Is_Directory
+
+**Count: tests cited here are the actual landed method names referenced by U12's record.**
 
 ### 2.6 Acceptance gate (U12 records)
 
