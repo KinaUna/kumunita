@@ -48,9 +48,18 @@ frozen in **ADR 0006**.
 - **`/health` degraded state** — reports `degraded` when
   `EmailDeadLetter` count > 0 (§6.2).
 
+**Non-goal for now (deliberate interim)** — the current **self-service sign-up
+with the verification email + admin manual-verify valve is an open** state we
+accept *for this release only*, because the only residents are the development
+team. The long-term default is **invitation-only accounts**: an admin invites
+a resident and they self-serve their password from an invitation link, rather
+than open registration. This is tracked as an open item in SECURITY.md §6
+(the control that answers A2 — the signup bot — better than rate limiting
+alone) and deferred in README.md *Deferred (future, by design)*.
+
 **Out of scope**
 
-- Profile editing UI and directory visibility rules (M2) — **✓ M2 — shipped**; see `docs/design/m2-directory-profiles-groups.md` § `Acceptance Gate` (recorded 2026-09-04).
+- Profile editing UI and directory visibility rules (M2)
 - Posts, components UI, reports and report-driven moderator unlock (M3 —
   the `moderatorAccess` mechanism, not its triggers, lands in M1).
 - Events/projects (M4/M5); export/iCal/notification surfaces (M6);

@@ -210,6 +210,9 @@ sent to it** — translation is per-item, user-initiated, and always labeled
 |------|----------|-----------------|
 | Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged | A3 (log integrity) | M1 |
 | Named invariant tests (empty-audience-denies, delegation action-scope) referenced from ARCHITECTURE.md §4.4 | A3 | M1 |
+| **Sign-up is currently open, self-service** (verification email + admin manual-verify valve, M1) — an acceptable interim state because the user base is the development team. The default must become **invitation-only**: an admin invites a resident, and they self-serve their own password from an invitation link rather than registering on their own. Decide the mechanism (token lifecycle, expiry, admin UX) before the community is open to residents beyond that team — this is the control that answers A2 better than rate-limiting alone. | A2 (signup bots) | After the M2–M3 development circle; before wider rollout |
+
+Decisions taken here should link back into OPS.md §10 (checklist) and, where they
 
 Decisions taken here should link back into OPS.md §10 (checklist) and, where they
 change a design decision, into an ADR.
