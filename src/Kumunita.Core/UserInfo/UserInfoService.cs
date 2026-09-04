@@ -70,6 +70,21 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Component>> GetComponentsAsync(bool enabledOnly)
+    {
+        // M3 ADD (ADR 0006-E lane, mirrors M2's GetProfilesAsync U3): the composer's
+        // component picker / /community/{id} grouping / the feed's candidate
+        // filter (M3 design §2.3). A candidate set, NOT a visible set — no
+        // AccessAudit row (C-M3·2); visibility is the caller's job via
+        // IAuthorizationService (C3). Live rows, no projection, no cache (C4).
+        await using var session = store.QuerySession();
+        var components = enabledOnly
+            ? await session.Query<Component>().Where(c => c.Enabled).ToListAsync().ConfigureAwait(false)
+            : await session.Query<Component>().ToListAsync().ConfigureAwait(false);
+        return components;
+    }
+
+    /// <inheritdoc />
     public async Task<HashSet<string>> GetGroupIdsAsync(string userId)
     {
         // Live membership rows, no projection (invariant C4): a change is live on
