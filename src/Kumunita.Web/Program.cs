@@ -65,6 +65,11 @@ var marten = builder.Services.AddMarten(opts =>
     // M1's Marten-native documents + their non-default conventions (Profile identity,
     // GroupMembership business-key index). ADR 0004 §B.1.
     M1DocTypes.Configure(opts);
+
+    // M3's Marten-native documents (Post, PostReply, Report — report table-in-M3 /
+    // flow-in-M3b). Conventional string Id, so no non-default convention needed.
+    // ADR 0004 §B.1.
+    M3DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
