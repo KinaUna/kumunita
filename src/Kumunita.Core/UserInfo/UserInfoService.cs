@@ -84,6 +84,79 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId)
+    {
+        // F14 (M2 design doc §2.2): owner ∪ member, deduped, sorted by Created desc.
+        // Live rows (invariant C4) — a membership add/remove in the same commit is
+        // live on the *very next* call. No audit row (M2 C-M2·2: a read, not a
+        // decision). Single QuerySession (C3: read-only reads stay in the live-row
+        // lane — no transaction needed).
+        if (string.IsNullOrEmpty(userId))
+            return Array.Empty<Group>();
+
+        await using var session = store.QuerySession();
+
+        // Two live-row reads, one session: (a) groups whose OwnerId is the user,
+        // (b) membership rows for this user, from which we resolve group ids.
+        var owned = await session
+            .Query<Group>()
+            .Where(g => g.OwnerId == userId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var memberships = await session
+            .Query<GroupMembership>()
+            .Where(m => m.UserId == userId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        // Union of group ids (dedupe by id), preserving a stable id → Group lookup.
+        var byId = owned
+            .ToDictionary(g => g.Id);
+
+        var missingIds = memberships
+            .Select(m => m.GroupId)
+            .Where(id => !byId.ContainsKey(id))
+            .Distinct()
+            .ToList();
+
+        if (missingIds.Count > 0)
+        {
+            var groups = await session
+                .Query<Group>()
+                .Where(g => missingIds.Contains(g.Id))
+                .ToListAsync()
+                .ConfigureAwait(false);
+            foreach (var g in groups)
+                byId[g.Id] = g;
+        }
+
+        // Sort by Created desc ("most recently created first" — the plan-U9 pin).
+        return byId.Values
+            .OrderByDescending(g => g.Created)
+            .ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId)
+    {
+        // F14 (M2 design doc §2.2; U9's GroupViewModel.MemberCount + U10's
+        // Detail.Members both live off this one read lane — no drift churn).
+        // Live rows (invariant C4): an add/remove is live on the next call.
+        // No audit row (M2 C-M2·2: a read, not a decision).
+        if (string.IsNullOrEmpty(groupId))
+            return Array.Empty<GroupMembership>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId)
+            .OrderBy(m => m.At)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<DelegationGrant?> GetActiveGrantAsync(string delegateId)
     {
         // Live rows (invariant C4); "active" = DelegationGrant.IsActiveAt — the

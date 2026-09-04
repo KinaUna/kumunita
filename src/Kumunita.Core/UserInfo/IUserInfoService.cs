@@ -75,6 +75,40 @@ public interface IUserInfoService
     /// </summary>
     Task<IReadOnlyList<Profile>> GetProfilesAsync(bool verifiedOnly);
 
+    /// <summary>
+    /// The <b>group list surface</b> (M2 design doc §2.2 F14 — "my group list shows
+    /// only groups I own plus groups I belong to"; invariants C4 + C-M2·3). Returns
+    /// exactly the <see cref="Group"/> documents <paramref name="userId"/> is the
+    /// owner of (the <see cref="Group.OwnerId"/> row) **∪** the membership of
+    /// (<see cref="GroupMembership"/> rows where <c>UserId == userId</c>), deduped
+    /// and sorted by <see cref="Group.Created"/> descending. This is a *candidate
+    /// projection*, not an access decision (C-M2·2): it produces no
+    /// <see cref="Authorization.AccessAudit"/> row itself, and it is the
+    /// <b>single</b> "groups for this user" read — the Web <c>GroupsController</c>
+    /// (M2 U9) must render from it, never by re-querying <see cref="Group"/> /
+    /// <see cref="GroupMembership"/> directly (ADR 0006-D). Strong-consistency live
+    /// rows (C4): a membership add/remove in the same commit is live on the *very
+    /// next* call. ADR 0003 (SoD) is *not* re-gated here: the projection rule
+    /// ("owner ∪ member") is the *product* definition of "my groups"; the *write*
+    /// paths (<see cref="CreateGroupAsync"/>, <see cref="AddGroupMemberAsync"/>,
+    /// <see cref="RemoveGroupMemberAsync"/>) enforce SoD by caller-identity, not
+    /// by a role check.
+    /// </summary>
+    Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId);
+
+    /// <summary>
+    /// The <b>membership rows</b> of a single <see cref="Group"/> (M2 F14 — U9's
+    /// <c>GroupViewModel</c> projects <c>MemberCount = this.Count</c>; U10's
+    /// <c>Groups/Detail</c> renders the member list from the same read +
+    /// <see cref="GetProfileAsync"/> — one read lane serves both, no drift churn
+    /// between U9 and U10). A *candidate projection*, not an access decision
+    /// (C-M2·2): no <see cref="Authorization.AccessAudit"/> row. Strong-consistency
+    /// live rows (C4): an add/remove in the same commit is live on the very next
+    /// call. ADR 0006-D: this is the <b>single</b> "members of a group" read —
+    /// the Web controller must never query <see cref="GroupMembership"/> directly.
+    /// </summary>
+    Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId);
+
     // ── M1 lifecycle additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

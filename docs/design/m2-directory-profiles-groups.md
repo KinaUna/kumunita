@@ -287,8 +287,9 @@ public sealed class AccessAudit
 }
 ```
 
-`Kumunita.Core.UserInfo.IUserInfoService` (frozen; `// M2 ADD` is the one
-new method, landed in U3):
+`Kumunita.Core.UserInfo.IUserInfoService` (frozen; the three `// M2 ADD`
+methods are the new ones — `GetProfilesAsync` landed U3, the two group reads
+landed U9 — all ADR 0006-E compatible lane):
 
 ```csharp
 public interface IUserInfoService
@@ -311,12 +312,27 @@ public interface IUserInfoService
     Task               SetComponentModeratorAccessAsync(string componentId, bool on, string actorId);
     Task<IReadOnlyList<ModeratorAssignment>> GetAssignmentsAsync(string userId);
 
-    // M2 ADD — the *one* new method on a frozen interface (ADR 0006-E compatible
-    // lane; precedent: the `IDocumentSession` overloads on `IAuthorizationService`,
-    // M1). Returns the *candidate* set for the directory, NOT a visible set; the
-    // caller must pass every element through `CanAsync` / `CanSeeAsync` before
-    // rendering (F15 pin). Produces no audit row itself (C-M2·2).
+    // M2 ADD (U3) — the *one* new method on a frozen interface (ADR 0006-E
+    // compatible lane; precedent: the `IDocumentSession` overloads on
+    // `IAuthorizationService`, M1). Returns the *candidate* set for the
+    // directory, NOT a visible set; the caller must pass every element
+    // through `CanAsync` / `CanSeeAsync` before rendering (F15 pin).
+    // Produces no audit row itself (C-M2·2).
     Task<IReadOnlyList<Profile>> GetProfilesAsync(bool verifiedOnly);
+
+    // M2 ADD (U9, resolves §2.2's contingent-ADD flag) — F14 "my group list".
+    // Owner ∪ member, deduped, sorted by Created desc. Candidate *projection*,
+    // not an access decision; no audit row (C-M2·2). The Web GroupsController
+    // renders from this, never re-querying Group / GroupMembership (ADR 0006-D).
+    Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId);
+
+    // M2 ADD (U9) — member read for one group (F14's MemberCount projection,
+    // and U10's Detail.Members). U9's GroupViewModel pin {Id, Name, MemberCount}
+    // requires a per-group member read M1's frozen surface lacks (only the
+    // user-axis GetGroupIdsAsync exists). One read lane serves U9's count and
+    // U10's member list (no drift churn between units). Candidate projection;
+    // no audit row (C-M2·2).
+    Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId);
 }
 ```
 
@@ -513,38 +529,43 @@ public sealed record PreviewRow(bool IsVisible, bool ShowContactBlock, Profile? 
 > and no audit row* (the literal "not evaluated" wording) — not a fourth method and
 > not a hidden fourth decision.
 
-**`IUserInfoService.GetGroupOwnersAsync(string userId)` — M1-seam
-assumption — needs confirmation (U9/U10/U11 to verify).** F14 ("my
-group list shows only groups I own plus groups I belong to") requires
-*reading* `Group` documents keyed by `userId`. M1's frozen interface
-exposes `GetGroupIdsAsync` (a `HashSet<string>` of ids — no `Group`
-documents), but not a "groups for this user" read. For the
-`GroupsController` (U9/U10) to render F14, one of the following must
-hold:
-
-1. M1 already exposes `Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId)` —
-   **not in the frozen surface as of M1, so this is not the case** —
-   *or*
-2. M2 opens the drift-guard in the *same* commit that U9's first Web
-   consumer ships, adding the following to `IUserInfoService` in the
-   ADR 0006-E compatible-lane style used for `GetProfilesAsync`:
+**`IUserInfoService.GetGroupsForUserAsync(string userId)` — M1-seam
+contingent-ADD — RESOLVED by U9 (drift-guard opened in the same commit
+as U9's first Web consumer, per this §2.2 note + §2.7).** F14 ("my group
+list shows only groups I own plus groups I belong to") requires *reading*
+`Group` documents keyed by `userId`. M1's frozen interface exposes
+`GetGroupIdsAsync` (a `HashSet<string>` of ids — no `Group` documents),
+but not a "groups for this user" read. **U9 confirmed M1 lacks it (drift
+branch 2), so U9 landed two M2 ADDs on `IUserInfoService` (ADR 0006-E
+compatible lane, mirroring §2.1's `GetProfilesAsync`)** — both now pinned
+in §2.1 and frozen by §2.7:
 
 ```csharp
-// ── M2 ADD (contingent on U9 finding M1 lacks this — FLAGGED, NOT ASSUMED) ──
+// ── M2 ADD (U9 — RESOLVES this flag) — F14 "groups I own ∪ belong to" ──
 // Returns: groups where (OwnerId == userId)  ∪  (∃ GroupMembership g
 //         where g.GroupId = <group>.Id ∧ g.UserId == userId),
 //          deduped, sorted by Group.Created descending.
-// No audit row (a read).
+// No audit row (a read — C-M2·2). Single read lane the Web
+// GroupsController renders from (never re-queries Group/GroupMembership — ADR 0006-D).
 Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId);
+
+// ── M2 ADD (U9) — per-group member read, required by U9's GroupViewModel
+//    pin {Id, Name, MemberCount} and reused by U10's Detail.Members.
+//    M1's frozen surface has no per-group member read (only the
+//    user-axis GetGroupIdsAsync), so U9 opens this lane too. One read
+//    serves U9's count + U10's member list (no drift churn). No audit row. ──
+Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId);
 ```
 
-> *Drift decision for U9:* **verify M1 first**. If the method is
-> missing (this doc's expectation), **open the drift-guard in the same
-> commit as U9's Web consumer** — a *new* method on the frozen
-> interface, exactly mirroring §2.1's `GetProfilesAsync` ADD. If the
-> method *is* present (drift against M1's own surface), update §2.1 in
-> the same commit and log the drift note. The *GroupsController* cannot
-> ship without this read.
+> *Drift decision for U9 (EXECUTED):* U9 verified M1 first — `CreateGroupAsync`
+> confirmed present (no pause), `GetGroupsForUserAsync` **absent** → U9 opened
+> the drift-guard in the same commit as U9's Web consumer: two new methods on
+> the frozen interface (above), pinned in §2.1 + §2.7, with the `GroupViewModel`
+> shape `{ Id, Name, MemberCount }` frozen as the sole list projection.
+> *Note:* the original flag named the method `GetGroupOwnersAsync`; U9 landed it
+> as `GetGroupsForUserAsync` (owner ∪ membership, matching M1's `GetGroupIdsAsync`
+> axis) — the name change is recorded here so a future unit does not look for
+> `GetGroupOwnersAsync`.
 
 ### 2.3 The §4.3 candidate-filter rule (invariant C-M2·2)
 
@@ -681,9 +702,21 @@ Carried forward from Part 1. Additions:
   them. Renaming or re-scoping a name is a drift event: the unit
   updates §2.5 in the same commit and appends a drift note.
 - The **`IUserInfoService`** frozen surface (§2.1) and the
-  `GetProfilesAsync` ADD, once U3 lands them, are **frozen**. The
-  *contingent* ADD `GetGroupsForUserAsync` (§2.2) is resolved in the
-  U9 commit that first consumes it, via the drift-guard above.
+  `GetProfilesAsync` ADD, once U3 lands them, are **frozen**.
+- The **two U9 group-read ADDs** (§2.1 / §2.2:
+  `GetGroupsForUserAsync(string)` and `GetGroupMembersAsync(string)`)
+  are **frozen once U9 lands them** (landed — this doc's same commit):
+  both signatures, the owner-∪-member projection + `Created`-desc sort
+  rule, and the "candidate projection, no audit row" (C-M2·2) shape are
+  the frozen pins. Adding, removing, or re-scoping either is a drift
+  event: the unit updates §2.1 + this line in the same commit and
+  appends a drift note. `U10`'s `Detail.Members` must reuse
+  `GetGroupMembersAsync` (one read lane — do **not** open a third).
+- U9's **`GroupViewModel`** list projection (`{ Id, Name, MemberCount }`
+  — a `string Id`, an opaque `Group.Id`, not a `Guid`) is frozen as the
+  sole `/groups` list row shape (mirrors U7's `VisibleProfile` "exactly
+  the pinned fields" pin). A unit that ships a new list field updates
+  this line + the view in the same commit.
 - The **`ProfileToAuditableResource`** shape (§2.2: `Id`, `Name`,
   `OwnerId`, `Audience`, `ComponentId`, `TargetKind`) is frozen once
   U4 lands it. A change to any of the six members is a drift event.
