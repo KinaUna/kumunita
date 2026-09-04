@@ -113,4 +113,190 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
         TempData["info"] = $"Group “{group.Name}” created.";
         return RedirectToAction(nameof(Index));
     }
+
+    /// <summary>
+    /// The group detail + add/remove member surface (M2 plan U10):
+    /// <c>GET /groups/{id}</c>. Renders the group's identity (name, owner),
+    /// the owner's display name, the <see cref="Kumunita.Web.Models.GroupDetailViewModel.IsOwner"/>
+    /// badge, and the member list (owner included — M1's
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService.CreateGroupAsync"/>
+    /// commits the owner's own <see cref="Kumunita.Core.UserInfo.GroupMembership"
+    /// "/> in one session, so the owner is a member *row* like any other).
+    /// <para>
+    /// **Web SoD pin (M2 plan U10 line 152):** the gate on *this* surface is the
+    /// U9 <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupsForUserAsync"/>
+    /// projection (owner ∪ member) — a group the actor does not own and is not a
+    /// member of is not visible, and 404s here (structural SoD; the audit lane is
+    /// M1's per-<see cref="Kumunita.Core.UserInfo.GroupMembership"/>
+    /// <c>Via: Owner</c>/<c>Via: Admin</c> derivation, the Web does not re-gate).
+    /// <para>
+    /// **ADR 0006-D:** the Web reads through the frozen
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupsForUserAsync"/>
+    /// (the owner ∪ member set), <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupMembersAsync"/>
+    /// (the member rows), and <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/>
+    /// (the per-row display names) — never a direct
+    /// <see cref="Kumunita.Core.UserInfo.Group"/> or
+    /// <see cref="Kumunita.Core.UserInfo.GroupMembership"/> query.
+    /// <para>
+    /// **U9's note (line 131):** reuse <c>GetGroupMembersAsync</c>, do not open
+    /// a third member-read seam (design doc §2.7 freeze line).
+    /// </para>
+    /// </summary>
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Detail(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        // Web SoD gate: the actor must be in the owner ∪ member projection for this
+        // group id (U9's GetGroupsForUserAsync pin, the single "groups for user"
+        // read — ADR 0006-D). A non-visible group is a 404, not a redirect.
+        var groups = await userInfo.GetGroupsForUserAsync(actor);
+        var group = groups.FirstOrDefault(g => g.Id == id);
+        if (group is null)
+            return NotFound();
+
+        // The member list (U9's second M2 read; the owner ∪ members set is already
+        // the strong-consistency live rows — C4). One read lane serves U9's count
+        // and U10's member list (design doc §2.7 — no third seam).
+        var memberRows = await userInfo.GetGroupMembersAsync(group.Id);
+
+        // The owner's display name (a single GetProfileAsync read; falls back to
+        // the raw subject id if the owner's profile is absent — fail-safe, not a
+        // silent "(owner)" stub on the header).
+        var ownerProfile = await userInfo.GetProfileAsync(group.OwnerId);
+
+        // Each member's display name (a per-row GetProfileAsync read — the same
+        // single-document read as U9's MemberCount pattern; N+1 is acceptable
+        // per the U9 precedent and the "single identity source" ADR 0003 SoD
+        // pin).
+        var members = new List<GroupMemberViewModel>(memberRows.Count);
+        foreach (var row in memberRows)
+        {
+            var p = await userInfo.GetProfileAsync(row.UserId);
+            members.Add(new GroupMemberViewModel(row.UserId, p?.DisplayName ?? row.UserId));
+        }
+
+        // The IsOwner badge (a display-only pin; not a gate — M1's audit lane owns
+        // the SoD derivation at the *write* path). A non-owner who is a member
+        // sees "You are a member" (not "You own the group") but still sees the
+        // Add/Remove forms (the plan's U10 line 152 pin: "the controller passes
+        // the actor's subjectId as addedBy/removedBy and does not re-gate").
+        var isOwner = group.OwnerId == actor;
+
+        return View(new GroupDetailViewModel(
+            group.Id,
+            group.Name,
+            group.OwnerId,
+            ownerProfile?.DisplayName ?? group.OwnerId,
+            isOwner,
+            members));
+    }
+
+    // ── Shared write-path helper (M2 plan U10, line 152) ────────────────
+    // Both AddMember and RemoveMember share the same SoD gate (the actor
+    // must be in the owner ∪ member projection for this group id; the
+    // plan's U10 line 152 pin: "GlobalAdmin reach (ADR 0003) is enforced by
+    // M1's AddGroupMemberAsync/RemoveGroupMemberAsync — the controller
+    // passes the actor's subjectId as addedBy/removedBy and does not
+    // re-gate"). The helper resolves the (group, actor) pair once; it
+    // returns a small value type (no `out` param on an async method).
+    // A non-visible group ⇒ (null, _) and the action 404s (consistent
+    // failure shape on both routes; no re-gate in either route).
+    private sealed record ActorGroup(string Actor, Kumunita.Core.UserInfo.Group Group);
+
+    private async Task<ActorGroup?> TryResolveWriteSurface(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(actor))
+            return null;
+
+        // Web SoD gate: the actor must be in the owner ∪ member projection
+        // (U9's GetGroupsForUserAsync pin; the single "groups for user" read —
+        // ADR 0006-D). A non-visible group is a 404, not a 200 + error text.
+        var groups = await userInfo.GetGroupsForUserAsync(actor);
+        var group = groups.FirstOrDefault(g => g.Id == id);
+        return group is null ? null : new ActorGroup(actor, group);
+    }
+
+    /// <summary>
+    /// Add a member (M2 plan U10, line 152):
+    /// <c>POST /groups/{id}/add-member</c>. The actor is the caller
+    /// (<c>KumunitaPrincipal.SubjectId(User)</c>) — the form does not carry an
+    /// owner id (a so-called "addedBy" field would be a Web-layer SoD hole;
+    /// the plan's U10 line 152 pin: "the controller passes the actor's
+    /// <c>subjectId</c> as <c>addedBy</c> and does not re-gate"). The Core
+    /// seam <see cref="Kumunita.Core.UserInfo.IUserInfoService.AddGroupMemberAsync"
+    /// "/> loads the group's <c>OwnerId</c> in the same session and derives the
+    /// <see cref="Kumunita.Core.Authorization.AccessVia"/> for the
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row —
+    /// <c>actor == OwnerId ⇒ Owner</c>, else <c>Admin</c>. The write is
+    /// strong-consistency (C4): the new member is live on the very next
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupMembersAsync"/>
+    /// call, and visible in the directory the next request (C4 + M2 plan U10's
+    /// e2e c.).
+    /// </summary>
+    [HttpPost("{id}/add-member")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddMember(string id, [FromForm] string? subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        // The Core seam owns the SoD audit lane (Via: Owner / Via: Admin). The
+        // Web passes the *actor* subject as `addedBy` and does not re-derive
+        // the role — ADR 0006-D: Web shapes HTTP, Core decides; the M1 seam's
+        // owner derivation is the single SoD source.
+        await userInfo.AddGroupMemberAsync(
+            groupId: resolved.Group.Id,
+            userId: subjectId!,
+            addedBy: resolved.Actor);
+
+        TempData["info"] = $"Added a member to “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    /// <summary>
+    /// Remove a member (M2 plan U10, line 152):
+    /// <c>POST /groups/{id}/remove-member</c>. Same SoD gate as
+    /// <see cref="AddMember"/> (the shared <see cref="TryResolveWriteSurface"/>
+    /// helper). The actor is the caller — the form does not carry an owner id
+    /// (the <c>removedBy</c> field the M1 seam takes is always the
+    /// <c>KumunitaPrincipal.SubjectId(User)</c>; a form-bound owner id would
+    /// defeat the seam's derivation). The Core seam's
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row carries
+    /// <c>Via: Owner</c>/<c>Via: Admin</c> per the M1 rule (actor == OwnerId
+    /// ⇒ Owner, else Admin); the "who removed, when" fact is on that audit
+    /// row (not on the <see cref="Kumunita.Core.UserInfo.GroupMembership"/>
+    /// row, M1 design line 49).
+    /// </summary>
+    [HttpPost("{id}/remove-member")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveMember(string id, [FromForm] string? subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        // The shared Web-layer SoD pin: no re-derive. The M1 seam loads the
+        // group's OwnerId in the same session and derives the audit row's Via.
+        await userInfo.RemoveGroupMemberAsync(
+            groupId: resolved.Group.Id,
+            userId: subjectId!,
+            removedBy: resolved.Actor);
+
+        TempData["info"] = $"Removed {subjectId} from “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
 }

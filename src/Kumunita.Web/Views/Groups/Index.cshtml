@@ -30,7 +30,9 @@
                 @foreach (var g in Model.Groups)
                 {
                     <li class="list-group-item d-flex align-items-center justify-content-between">
-                        <span>@g.Name</span>
+                        <span>
+                            <a href="@Url.Action("Detail", "Groups", new { id = g.Id })">@g.Name</a>
+                        </span>
                         <span class="text-muted">
                             @g.MemberCount
                             member@(g.MemberCount == 1 ? "" : "s")
