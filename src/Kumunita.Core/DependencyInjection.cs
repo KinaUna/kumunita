@@ -57,6 +57,14 @@ public static class ServiceCollectionExtensions
         // EmailDeadLetter rows through a Marten IQuerySession. Web-side consumers
         // (HealthController) resolve this, so tests can substitute a canned count
         // without a live Postgres.
+        // M3 (plan U6): the posts-side composition root — a concrete class pairing
+        // the two frozen seams with the host-registered Marten IDocumentStore
+        // (mirrors the M2 DirectoryService registration shape above).
+        services.AddTransient<Posts.PostService>(sp => new Posts.PostService(
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 
         // Step-7 (M1 plan): the per-attempt SMTP seam. The durable policy (6 attempts
