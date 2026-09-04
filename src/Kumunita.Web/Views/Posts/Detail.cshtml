@@ -1,0 +1,95 @@
+@model Kumunita.Web.Models.PostDetailViewModel
+@{
+    ViewData["Title"] = Model.Post.Title ?? "Post";
+    string postId = Model.Post.Id;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <a href="@Url.Action("Index","Posts", new { componentId = Model.Post.ComponentId })" class="text-muted small">
+            &larr; back to @Model.Post.ComponentId
+        </a>
+
+        <div class="card mt-2 mb-4">
+            <div class="card-body">
+                <h4>
+                    @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                        ? Model.Post.Title
+                        : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
+                </h4>
+                <p class="text-muted small mb-3">
+                    @Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")
+                </p>
+
+                <div class="mb-3">
+                    @Model.Post.Body
+                </div>
+
+                <div class="text-muted small mb-0">
+                    You can see this post because you matched its audience
+                    (a grant of yours, or you are the author — the "owner branch"
+                    of the C1 empty-audience deny rule).
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            Replies <span class="text-muted">(@Model.Replies.Count)</span>
+        </h5>
+
+        @if (Model.Replies.Count == 0)
+        {
+            <p class="text-muted">No replies yet. If you can see this post, you can reply to it.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-4">
+                @foreach (var r in Model.Replies)
+                {
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
+                            <div class="text-end text-muted small">
+                                <div>@r.AuthorDisplayName</div>
+                                <div>@r.Created.LocalDateTime.ToString("d")</div>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            @if (Model.IsAuthor)
+            {
+                <text>Reply (you are the author of this post)</text>
+            }
+            else
+            {
+                <text>Reply</text>
+            }
+        </h5>
+
+        <div class="card">
+            <div class="card-body">
+                <form class="mb-0" method="post"
+                      action="@($"/posts/{postId}/replies")">
+                    @Html.AntiForgeryToken()
+                    <label class="form-label" for="reply-body" style="font-weight:600;">
+                        Reply
+                    </label>
+                    <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
+                              required
+                              placeholder="…"></textarea>
+                    <div class="text-muted small mb-3">
+                        Replies have no own audience — they are visible under
+                        this post's single audience decision (the C-M3·1
+                        "reply-inherits" rule). You are replying only where
+                        the post itself is visible.
+                    </div>
+                    <button type="submit" class="btn btn-primary">Reply</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
