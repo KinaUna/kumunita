@@ -52,7 +52,7 @@
 //   POST   /groups/{id}/add-member    (form field: subjectId)
 //   POST   /groups/{id}/remove-member (form field: subjectId)
 
-import { test, expect, Page } from '@playwright/test';
+import { test as baseTest, expect, type Page } from '@playwright/test';
 
 // ── Fixture shapes (documented; implementations live in the M1/M3
 //    Playwright runtime — U13 does not extend the fixture by plan) ──
@@ -105,19 +105,15 @@ interface Kumunita {
   lastCreatedGroupId(): Promise<string>;
 }
 
-// Declare the `kumunita` fixture on `test` so the three test bodies
-// can destructure `{ page, kumunita }` without any type error.
-// The *shape* is the contract above (U13 pins it); the *value* is
-// deliberately a runtime thrower — a stub that fails loudly so
-// "this test is not yet runnable" is the correct state, not a
-// silent no-op.
-declare module '@playwright/test' {
-  interface Fixtures {
-    kumunita: Kumunita;
-  }
-}
-
-test.use({
+// The `baseTest.extend<Kumunita>` call below returns a NEW typed
+// `test` that knows about `kumunita` (the U13 contract shape).
+// Re-binding that back into the name `test` — so every
+// `test('a. ...')` / `test.describe(...)` call in this file sees
+// the extended fixture type — is Playwright's canonical pattern
+// for a custom fixture. No `declare module '@playwright/test'`
+// needed (that collides with the library's own `Fixtures`
+// interface).
+const extended = baseTest.extend<{ kumunita: Kumunita }>({
   kumunita: async ({}, use) => {
     throw new Error(
       'kumunita fixture not implemented. ' +
@@ -126,15 +122,17 @@ test.use({
       '`signup / login / lastCreatedGroupId` per the fixture contract ' +
       'in the header of e2e-m2.spec.ts. See m2-handoff-notes.md § U13.',
     );
-    // `use` is required by the Playwright fixture API but is never
-    // reached (the throw above fires first). TS exhaustiveness is
-    // satisfied by the `return` below the throw (unreachable, but
-    // the compiler requires it).
+    // `use` is required by the Playwright fixture API. The throw
+    // above fires first (before `use` is ever called), so we simply
+    // `return` to satisfy TS exhaustiveness — no `use(...)` call to
+    // make and nothing to clean up.
     return;
-    // eslint-disable-next-line no-unreachable
-    await use(undefined);
   },
 });
+// Re-bind: every test body below now destructures
+// `{ page, kumunita }` with full typing. `test` is the extended
+// test; the `baseTest` name is no longer needed after this point.
+const test = extended;
 
 // A tiny helper (spec-local, not fixture-local): submit the *single*
 // form on the current page (the M1/M2 Razor views use Bootstrap forms

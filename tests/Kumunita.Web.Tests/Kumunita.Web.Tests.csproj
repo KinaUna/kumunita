@@ -25,13 +25,26 @@
     <ProjectReference Include="..\..\src\Kumunita.Web\Kumunita.Web.csproj" />
   </ItemGroup>
 
-  <!-- e2e-m2.spec.ts is paused (U13 — no Playwright runtime in the repo yet).
-       Classified as None so it does not participate in any C# or T4 build path
-       and the VS TypeScript service cannot pick it up as a project file.
-       When M3 lands the Playwright runtime, move it to a dedicated
-       tests/Kumunita.E2E/ project with its own package.json. -->
+  <!-- e2e-m2.spec.ts (U13) is authored but the `kumunita` Playwright
+       fixture still throws per the M3 runtime contract: see the
+       "Not yet runnable" header in the spec itself and
+       m2-handoff-notes.md § U13.
+
+       The C# build classifies it as None so the xUnit pipeline
+       doesn't pick it up. The spec is independently type-checkable
+       and Playwright-listable from this folder:
+         npm install           # devDeps in ./package.json
+         npm run typecheck     # tsc noEmit against the spec
+         npx playwright test   # list or run the specs (see playwright.config.ts)
+       When the M3 Playwright unit lands the kumunita fixture
+       implementation, `npx playwright test` will run the three
+       specs against `dotnet run` (see playwright.config.ts). -->
   <ItemGroup>
     <None Include="e2e-m2.spec.ts" />
+    <None Include="playwright.config.ts" />
+    <None Include="package.json" />
+    <None Include="package-lock.json" Condition="Exists('package-lock.json')" />
+    <None Include="tsconfig.json" />
   </ItemGroup>
 
 </Project>
