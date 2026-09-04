@@ -1,17 +1,47 @@
-﻿@model HomeViewModel
+@model HomeViewModel
 @{
     ViewData["Title"] = "Home";
 }
 
-<div class="text-center py-5">
-    <h1 class="display-5">@Model.CommunityName</h1>
+<div class="py-4">
+    <h1 class="display-6">@Model.CommunityName</h1>
     <p class="lead text-muted">
-        Welcome to your neighborhood's Kumunita. This is the M0 scaffold —
-        the app is running and the community name is configured.
+        Welcome to your neighborhood's Kumunita. The site is still under active
+        development — here's where we are in the build.
     </p>
     @if (Model.SupportEmail is not null)
     {
-        <p class="text-muted">Support: <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a></p>
+        <p class="text-muted mb-4">Support: <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a></p>
     }
+    else
+    {
+        <div class="mb-4"></div>
+    }
+
+    <h2 class="h5 mb-3">Development roadmap</h2>
+    <ul class="list-unstyled mb-0">
+        @foreach (var milestone in Milestones.All)
+        {
+            <li class="d-flex align-items-start border-top py-2">
+                <span class="fw-bold text-nowrap me-3">@milestone.Id</span>
+                <span class="me-auto me-3">@milestone.Title</span>
+                <span class="badge rounded-pill @Milestones.BadgeClass(milestone.Status)">@Milestones.LabelFor(milestone.Status)</span>
+            </li>
+        }
+    </ul>
+
+    <h2 class="h5 mt-4 mb-3">Code &amp; documentation</h2>
+    <p class="text-muted mb-2">
+        Kumunita is open source. The code and all the documentation that explain how it works
+        are published on GitHub.
+    </p>
+    <ul class="list-unstyled mb-0">
+        @foreach (var link in RepositoryInfo.Links)
+        {
+            <li class="border-top py-2">
+                <a href="@link.Url" target="_blank" rel="noopener noreferrer">@link.Label</a>
+            </li>
+        }
+    </ul>
 </div>
 
