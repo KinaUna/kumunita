@@ -1,0 +1,56 @@
+@model Kumunita.Web.Models.DirectoryViewModel.Detail
+
+@{
+    ViewData["Title"] = Model.DisplayName;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p>
+            <a href="@Url.Action("Index", "Directory")" class="btn btn-link p-0">
+                &larr; Back to the directory
+            </a>
+        </p>
+        <h1>
+            @Model.DisplayName
+            @if (Model.Verified)
+            {
+                <span class="badge text-bg-success">Verified</span>
+            }
+        </h1>
+
+        @*
+          §9 pin (M2 design doc §2.4, invariant C-M2·1, ARCHITECTURE.md §9):
+          the contact block is rendered ONLY when the service's two-gate evaluation
+          allowed both Visibility AND ContactVisibility for *this* viewer. A hidden
+          or contact-unauthorized row gets ShowContactBlock=false and null
+          Email/Phone — see DirectoryController.ProjectDetail — so even a hand-edited
+          model has nowhere to put a contact value (the Razor view cannot render
+          Email/Phone independently of ShowContactBlock).
+        *@
+        @if (Model.ShowContactBlock)
+        {
+            <dl class="row mt-4">
+                @if (!string.IsNullOrEmpty(Model.Email))
+                {
+                    <dt class="col-sm-3">Email</dt>
+                    <dd class="col-sm-9">
+                        <a href="mailto:@Model.Email">@Model.Email</a>
+                    </dd>
+                }
+                @if (!string.IsNullOrEmpty(Model.Phone))
+                {
+                    <dt class="col-sm-3">Phone</dt>
+                    <dd class="col-sm-9">@Model.Phone</dd>
+                }
+            </dl>
+        }
+        else if (string.IsNullOrEmpty(Model.Email) && string.IsNullOrEmpty(Model.Phone))
+        {
+            <p class="text-muted mt-3">
+                This resident hasn't shared a contact method with you (yet). You can
+                still see their profile page.
+            </p>
+        }
+    </div>
+</div>

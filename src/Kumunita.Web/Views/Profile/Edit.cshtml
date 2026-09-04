@@ -1,0 +1,97 @@
+@using Kumunita.Web.Models
+@model ProfileEditViewModel
+@{
+    ViewData["Title"] = "Edit your profile";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <h1>Your profile</h1>
+        <p class="text-muted">
+            M2's write surface — the
+            <b>who-can-see-what</b> editor. Every save is one
+            <c>UpsertProfileAsync</c> call (the F13 single-write-surface pin)
+            and the two <c>Audience</c> gates are exactly the two
+            <c>IAuthorizationService</c> decisions the
+            <c>DirectoryService</c> makes per viewer — what you save
+            <b>is</b> what the directory shows (C6's no-drift pin).
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+
+        <form method="post" action="@Url.Action("Edit","Profile")">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <h5 class="mt-4 mb-2" style="font-weight:600;">Your name + email</h5>
+            <div class="row g-2">
+                <div class="col-sm-6">
+                    <label asp-for="DisplayName" class="form-label"></label>
+                    <input asp-for="DisplayName" class="form-control" required maxlength="100" />
+                    <span asp-validation-for="DisplayName" class="text-danger"></span>
+                </div>
+                <div class="col-sm-6">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" required type="email" />
+                    <span asp-validation-for="Email" class="text-danger"></span>
+                </div>
+            </div>
+
+            <h5 class="mt-4 mb-2" style="font-weight:600;">Who can see what</h5>
+
+            @* The two audience editors share ONE partial (the U11 "only one
+               _AudienceEditor.cshtml exists" pin). Each invocation is
+               discriminated by ViewData["EditorName"] — the partial's form
+               fields are named <Name>.Mode + <Name>.Grants, which the
+               default complex binder lands on ProfileEditViewModel. *@
+            @{
+                ViewContext.ViewData["EditorName"] = "Visibility";
+                ViewContext.ViewData["OptIn"] = true;
+            }
+            <partial name="_AudienceEditor" model="Model" />
+
+            @* The §2.4 "null ==> short-circuit" opt-in gate. A checkbox in
+               the parent, not a second editor block: unchecked leaves
+               ContactVisibility at the "null" shape (the patch emits null),
+               checked enables the editor block below. *@
+            <div class="form-check form-switch mt-3 mb-3">
+                <input class="form-check-input"
+                       type="checkbox" id="optin-contact"
+                       name="OptInContactVisibility"
+                       value="true"
+                       @(Model.OptInContactVisibility ? "checked" : null) />
+                <label class="form-check-label" for="optin-contact">
+                    <b>Opt in the contact block (email/phone)</b>
+                    <br/>
+                    <span class="text-muted small">
+                        Leave unchecked to hide email/phone from every viewer
+                        (the "null ==> short-circuit" row of
+                        section 2.4 — the contact decision is never
+                        evaluated at all; no audit row is appended).</span>
+                </label>
+            </div>
+
+            @{
+                ViewContext.ViewData["EditorName"] = "ContactVisibility";
+                ViewContext.ViewData["OptIn"] = Model.OptInContactVisibility;
+            }
+            <partial name="_AudienceEditor" model="Model" />
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a class="btn btn-outline-secondary"
+                   href="@Url.Action("Preview","Profile")">
+                    Preview — how I appear
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+

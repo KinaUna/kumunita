@@ -5,5 +5,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Kumunita.Core.Tests/Kumunita.Core.Tests.csproj" />
+    <Project Path="tests/Kumunita.Web.Tests/Kumunita.Web.Tests.csproj" />
   </Folder>
 </Solution>
+

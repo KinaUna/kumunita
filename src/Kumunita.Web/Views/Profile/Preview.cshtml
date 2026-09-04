@@ -1,0 +1,72 @@
+@using Kumunita.Web.Models
+@model ProfilePreviewViewModel
+@{
+    ViewData["Title"] = "Preview — how I appear";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p>
+            <a class="text-muted" href="@Url.Action("Edit","Profile")">← Back to the editor</a>
+        </p>
+        <h1>Preview — how I appear</h1>
+
+        <p class="text-muted">
+            Read-only "view as" (the F6 preview pin): the same two-gate
+            evaluation the directory uses, with <b>@Model.AsDisplayName</b>
+            standing in as the viewer. This
+            <b>does not</b> change anything in the saved profile — the
+            preview is a composition read, never a write (M2's scope pin;
+            the only write lane is
+            <a asp-controller="Profile" asp-action="Edit">the editor</a>).
+            <br/>
+            <br/>
+            The two decisions still commit their own
+            <c>AccessAudit</c> rows (C3, F6's preview pin: "a preview is an
+            evaluation, not an exemption") — that's the
+            <c>DirectoryService.PreviewAsAsync</c>'s job, not this view
+            model's.
+        </p>
+
+        @if (!Model.IsVisible)
+        {
+            <div class="alert alert-info">
+                <b>Hidden.</b> As <b>@Model.AsDisplayName</b>, you would
+                not see this profile at all — so there is no contact
+                block to evaluate (the §2.4 / §9 "contact block never on
+                a hidden profile" pin: the second decision does not
+                run when the first denies).
+            </div>
+        }
+        else if (Model.ShowContactBlock)
+        {
+            <dl class="row mt-3">
+                @if (!string.IsNullOrEmpty(Model.Email))
+                {
+                    <dt class="col-sm-3">Email</dt>
+                    <dd class="col-sm-9"><a href="mailto:@Model.Email">@Model.Email</a></dd>
+                }
+                @if (!string.IsNullOrEmpty(Model.Phone))
+                {
+                    <dt class="col-sm-3">Phone</dt>
+                    <dd class="col-sm-9">@Model.Phone</dd>
+                }
+            </dl>
+        }
+        else
+        {
+            <div class="alert alert-secondary">
+                <b>Visible, contact hidden.</b> As <b>@Model.AsDisplayName</b>,
+                you would see the profile but not its email/phone — the
+                contact decision (the §2.4 row "non-null gate, mode Any +
+                empty grants denies in either mode") did not allow it.
+            </div>
+        }
+
+        <div class="d-flex gap-2 mt-4">
+            <a class="btn btn-primary" href="@Url.Action("Edit","Profile")">
+                Edit profile
+            </a>
+        </div>
+    </div>
+</div>

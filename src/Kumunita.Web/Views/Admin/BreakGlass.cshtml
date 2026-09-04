@@ -1,0 +1,76 @@
+@model Kumunita.Web.Models.BreakGlassViewModel
+@using Kumunita.Core.Authorization
+@{
+    ViewData["Title"] = "Admin — Break glass";
+}
+
+<h1>Break-glass</h1>
+<p class="text-muted">
+    A break-glass elevation is written by the <strong>operator, in psql</strong> (OPS §9),
+    directly into the <code>mt."AdminOverride"</code> table — never by any in-app endpoint.
+    This page only <em>consumes</em> the token once, to activate the elevation that the
+    operator has already written. Consumption is single-use (the row's <code>consumedAt</code>
+    is set on first presentation) and the elevation lapses at its own <code>expiresAt</code>.
+</p>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (!Model.HasOverride)
+{
+    <div class="alert alert-secondary">
+        No operator-provided break-glass row exists for your account. Ask the operator to
+        write one into <code>mt."AdminOverride"</code> before using this page.
+    </div>
+}
+else
+{
+    <dl class="row">
+        <dt class="col-sm-3">Granted at (UTC)</dt>
+        <dd class="col-sm-9">@(Model.GrantedAt?.ToString("u") ?? "—")</dd>
+        <dt class="col-sm-3">Expires at (UTC)</dt>
+        <dd class="col-sm-9">@(Model.ExpiresAt?.ToString("u") ?? "—")</dd>
+        <dt class="col-sm-3">Status</dt>
+        <dd class="col-sm-9">
+            @if (Model.Consumed)
+            {
+                <span class="badge text-bg-success">consumed — elevation active until expiry</span>
+            }
+            else
+            {
+                <span class="badge text-bg-warning">presented but not yet consumed</span>
+            }
+        </dd>
+    </dl>
+
+    @if (!Model.Consumed)
+    {
+        <form method="post" asp-action="BreakGlass">
+            @Html.AntiForgeryToken()
+            <div class="mb-3">
+                <label class="form-label" for="token">One-time token (from the operator)</label>
+                <input type="text" class="form-control" id="token" name="token" autocomplete="off" required />
+                <div class="form-text">
+                    Consuming this token is a one-time action. It activates the elevation
+                    until its expiry.
+                </div>
+            </div>
+            <button type="submit" class="btn btn-danger">Consume token</button>
+        </form>
+    }
+    else
+    {
+        <p class="text-muted">
+            Once consumed, the elevation remains in effect until its own
+            <em>expiry</em>; every subsequent privileged decision made under it is audited
+            with <code>via:BreakGlass</code> (see <a asp-action="Audit">the audit log</a>).
+            This page will not re-present a consumed row to the same account.
+        </p>
+    }
+}

@@ -1,0 +1,45 @@
+@model Kumunita.Web.Models.DirectoryViewModel
+@{
+    ViewData["Title"] = "Directory";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <h1>Directory</h1>
+        <p class="text-muted">The residents who have chosen to be visible to you.</p>
+
+        @if (Model.Profiles.Count == 0)
+        {
+            <div class="alert alert-info">
+                No residents to show yet. A profile appears here once its owner shares it
+                with you or your community.
+            </div>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var p in Model.Profiles)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between">
+                        <span>@p.DisplayName</span>
+                        <span>
+                            @if (p.Verified)
+                            {
+                                <span class="badge text-bg-success">Verified</span>
+                            }
+                        </span>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.HiddenCount > 0)
+            {
+                <p class="text-muted small mt-3">
+                    @Model.HiddenCount
+                    resident@(Model.HiddenCount == 1 ? "" : "s") not shown — they (or their
+                    community's rules) haven't made their profile visible to you.
+                </p>
+            }
+        }
+    </div>
+</div>

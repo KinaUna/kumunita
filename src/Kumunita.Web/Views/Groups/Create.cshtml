@@ -1,0 +1,38 @@
+@model Kumunita.Web.Models.GroupCreateModel
+@{
+    ViewData["Title"] = "Create a group";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p>
+            <a href="@Url.Action("Index", "Groups")" class="btn btn-link p-0">
+                &larr; Back to groups
+            </a>
+        </p>
+        <h1>Create a group</h1>
+        <p class="text-muted">
+            A name for a community of residents (e.g. "Building 4", "Volunteers", "Bike owners").
+            You own the group — you can add and remove members from the group's detail page (M2, plan U10).
+        </p>
+
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label"></label>
+                <input asp-for="Name" class="form-control" maxlength="100" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label"></label>
+                <textarea asp-for="Description" class="form-control" rows="3" maxlength="500"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+                <div class="form-text">Optional — a short note other residents will see.</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Create group</button>
+        </form>
+    </div>
+</div>

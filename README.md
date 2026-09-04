@@ -110,6 +110,14 @@ stays trivial and the authorization rules can grow freely.
 - **Cross-neighborhood federation** — a standalone OpenIddict IdP; global identity, local authorization.
 - **Group helpers** — suggest/populate groups (neighbors from addresses, family from household).
 - **MCP**, calendar integration, cross-neighborhood data migration.
+- **Invitation-only sign-up** — self-service sign-up (with the verification
+  email + admin manual-verify valve) is deliberately left open for now so
+  the team can create development accounts without an admin. The long-term
+  default should be **invitation-only accounts** (an invited resident
+  self-serves their password from an admin-sent invitation link; open
+  sign-up is an opt-in, not the default). Decide and land before the
+  community is open beyond the development circle (SECURITY.md §6 open
+  items — the control that answers adversary A2, the signup bot).
 
 ## Running
 
@@ -117,8 +125,10 @@ stays trivial and the authorization rules can grow freely.
 `localhost:5433`, the app on `http://localhost:5080` (built from `Dockerfile`,
 running `Development` so the `mt` schema auto-applies on a fresh database —
 ADR 0004), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
-Smoke test: `GET /health` → `{"status":"ok","database":"ok"}` and `/` renders the
-configured `Community__Name`.
+Smoke test: `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and `/`
+renders the configured `Community__Name`. On a **fresh** database the versioned boot block
+initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**
+exactly once, and subsequent boots are a no-op.
 
 *Dev (no app container):* `docker compose up -d db`,
 `npm run build` in `src/Kumunita.Web/`, then
@@ -141,4 +151,6 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/SECURITY.md` — **security & privacy: the top priority** — threat model, data classes, control map
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
-- `docs/adr/` — architecture decision records (0001–0005)
+- `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
+- `docs/adr/` — architecture decision records (0001–0006)
+- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization)

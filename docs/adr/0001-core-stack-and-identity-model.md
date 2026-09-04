@@ -68,9 +68,11 @@ Negative / accepted risks
   invocation state), a 6-attempt/~24 h retry cap, and a small `EmailDeadLetter` table —
   no new service, no queue broker (ARCHITECTURE.md §6.2).
 - Smaller ecosystem / fewer ready-made answers than EF.
-- No EF migration tooling — instead Marten's own **versioned migrations** (ordered
-  `IMigration` steps, recorded in `mt.migrations`) give reviewable, forward-only schema
-  evolution. Auto-upgrade is dev-only and never run against production.
+- No EF migration tooling for the domain — instead Marten's own **versioned schema
+  features** (`FeatureSchemaBase` subclasses registered in `StoreOptions.Storage`,
+  applied idempotently via `ApplyAllConfiguredChangesToDatabaseAsync()`) give reviewable,
+  forward-only schema evolution. Auto-upgrade is dev-only and never run against
+  production. (Details and the Marten 9 note in ADR 0004 Decision B.)
 - First feature costs more time while learning; later features cost the same or less.
 
 Revisit when

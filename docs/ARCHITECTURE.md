@@ -58,31 +58,52 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
 ## 2. Solution layout
 
     kumunita/
+    ├── Kumunita.slnx
     ├── README.md
+    ├── Dockerfile                  # multi-stage (PowerShell, tsc → publish → runtime)
+    ├── docker-compose.yml          # dev: postgres:18 + mailpit
+    ├── dev-db-init/                # Postgres init scripts (app role, port parity with prod)
+    ├── .github/workflows/          # CI
     ├── docs/
     │   ├── ARCHITECTURE.md
-    │   └── adr/
+    │   ├── SECURITY.md             # threat model, data classes, control map
+    │   ├── OPS.md                  # operations runbook
+    │   ├── adr/                    # 0001–0006
+    │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
+    │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
-    │   ├── Kumunita.Core/          # domain, services, Marten store, handlers
-    │   │   ├── Identity/           # IdentityModule
-    │   │   ├── UserInfo/           # UserInfoModule (profiles, groups, delegation)
-    │   │   ├── Authorization/      # AuthorizationModule (audiences, policy, audit)
-    │   │   ├── Directory/          # profiles / households
-    │   │   ├── Posts/              # posts, announcements, components
-    │   │   ├── Events/
-    │   │   ├── Projects/
-    │   │   └── Moderation/         # reports, moderator scope
-    │   └── Kumunita.Web/           # MVC, Razor, client/ (TS), wwwroot
-    │       ├── Areas/
-    │       ├── Views/
-    │       └── client/             # TS sources -> wwwroot/js via tsc
+    │   ├── Kumunita.Core/          # domain, services, Marten, the Wolverine-free side-effect business logic
+    │   │   ├── CommunityOptions.cs # per-instance config (ADR 0002)
+    │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
+    │   │   ├── Bootstrap/          # DbBootstrap, FirstBootSeeder
+    │   │   ├── Identity/           # IdentityModule (M1) — also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter
+    │   │   ├── UserInfo/           # UserInfoModule     (M1)
+    │   │   ├── Authorization/      # AuthorizationModule (M1) — also AuditPurgeService (Wolverine-free tiering)
+    │   │   ├── Directory/          # M2 ✓ — DirectoryService (list/detail/preview) + profile editor + groups — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 115 unit specs 0-failed; see design/m2-directory-profiles-groups.md § Acceptance Gate (2026-09-04)
+    │   │   ├── Posts/              # M3 — not yet created
+    │   │   ├── Events/             # M4 — not yet created
+    │   │   ├── Projects/           # M5 — not yet created
+    │   │   └── Moderation/         # M3 — not yet created
+    │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
+    │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
+    │       ├── appsettings*.json
+    │       ├── SideEffects/        # M1 step 7: OutboxEmailHandler (durable send + Fault<OutboxEmail> dead-letter hook), AuditPurgeHandler/Tick
+    │       ├── Controllers/        # Home today; `/admin` M1
+    │       ├── Views/              # Razor views + Layout
+    │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
+    │       ├── client/             # plain TS sources; per-page modules
+    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash
+    │       └── wwwroot/js/         # tsc output (compiled, not committed)
     └── tests/
-        ├── Kumunita.Core.Tests/    # authorization + handler tests
-        └── Kumunita.Web.Tests/     # Playwright e2e (later)
+        ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
+        │                           #   fresh scratch DB per test (matches prod db image)
+        └── Kumunita.Web.Tests/     # XUnit; today: config binding + HomeController;
+                                     # Playwright e2e arrives later (§7)
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
-layer. `Web` is a thin HTTP/Razor/TS shell.
+layer. `Web` is a thin HTTP/Razor/TS shell. Directories marked *not yet created* are
+the M1+ plan from §3.
 
 ## 3. Modular monolith & bounded contexts
 
@@ -102,6 +123,11 @@ the seam for later extraction.
 Dependency rule: feature modules depend on the three identity/access modules (and Marten),
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never
 calls feature modules.
+
+The M1 design for these modules is in [`docs/design/m1-identity-access.md`](design/m1-identity-access.md);
+the interface set, the thin-principal shape, and change management are
+frozen by [ADR 0006](adr/0006-module-boundary-contracts.md) — §4.2 is a
+draft sketch; the ADR is authoritative for what changes and through what.
 
 ## 4. Identity & access
 
@@ -155,6 +181,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
   candidate set* (e.g. the directory lists only verified residents; an unverified user
   sees themselves) is a product query, applied before `CanSeeAsync`, and is never
   audited as an access decision.
+
 ### 4.4 Decision algorithm
 
 Shared by both entry points below is the group-matching core, written once so the two
@@ -293,7 +320,7 @@ Moderation / audit
   // visibleCount/hiddenCount instead of a single targetId
   AccessAudit      { id, at, actorId, effectivePrincipalId?, action, targetKind, targetId?,
                      visibleCount?, hiddenCount?,
-                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass,
+                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin,
                      outcome: Allow|Deny }
 
 Email outbox
@@ -436,11 +463,19 @@ Components (Safety, Maintenance, Social, Governance) -> seed the language catalo
 materialized from the image, ADR 0005). Re-running the seeder is a no-op if the admin
 already exists.
 
-**Schema evolution is versioned, not auto-upgrade** (ADR 0004). Every domain schema change
-is an ordered `IMigration` step registered in `StoreOptions.Migrations`, recorded in
-`mt.migrations`; Identity schema changes are EF Core migrations recorded in
-`identity.__EFMigrationsHistory`. Both are forward-only. Auto-upgrade (schema derived from
-document shapes) is dev-only, if used at all — it is never run against production.
+**Schema evolution is versioned, not auto-upgrade** (ADR 0004). Every domain
+schema change is a Marten storage feature — a `FeatureSchemaBase` subclass
+(Weasel objects — tables, indexes, etc.) registered in `StoreOptions.Storage`;
+`KumunitaFeature` is the first (`mt.community`, ADR 0004 §B). Applied idempotently by
+`ApplyAllConfiguredChangesToDatabaseAsync()` (each object delta-detected against the
+live catalog, so a second run over an existing database is a no-op); forward-only.
+(In Marten 9 the pre-9.x `IMigration`/`StoreOptions.Migrations` step model no longer
+exists; the DDL is exportable for review via `WriteMigrationFileAsync()` — see
+`KumunitaFeature`. The `mt` schema has no operator-visible applied-step ledger —
+idempotency is delta-detection, not a recorded sequence. Identity schema changes are
+EF Core migrations recorded in `identity.__EFMigrationsHistory`.) Both are forward-only.
+Auto-upgrade (schema derived from document shapes) is dev-only, if used at all — it
+is never run against production.
 
 Ops: TLS via Coolify / Let's Encrypt; `/health` (reports **degraded** when the email
 dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.
