@@ -213,10 +213,493 @@ without re-deriving them.
   Part 2 (U2) at §2.5 / §2.6 — mirroring M2's structure. The FACES table
   above is the *input* to Part 2; Part 2's test names are the *output*.
 
+## Seams & contracts (Part 2, written by U2)
+
+### 2.0 Preambles — what this section pins, and what wins on conflict
+
+Every C# fragment below is **exact**: parameter lists, return types, and
+namespaces are the contract U3–U11 must implement against. If a later unit
+discovers an implemented signature that does not exist verbatim here, the
+drift-guard (§2.7) applies: **this file wins**; the unit updates this file in
+the same commit and appends a drift note to
+`docs/plans-milestones/m3-handoff-notes.md`.
+
+Namespace conventions:
+
+- Frozen / new-Core seams: `Kumunita.Core.Authorization` (M1 surface,
+  unchanged by M3) and `Kumunita.Core.UserInfo` (module-owned; M3's **one**
+  ADD is on this surface).
+- M3's new bounded context: `Kumunita.Core.Posts`
+  (`Post`, `PostReply`, `Report`, `PostToAuditableResource`, `PostService`,
+  `FeedResult`, `PostDetailResult`, `PostDraft`).
+- Web-side composition: `Kumunita.Web.Controllers` / `Kumunita.Web.Models`
+  (never in `Kumunita.Core`).
+
+**Count reconciliation (U1 → U2):** U1's body pins **11 invariants** (the
+plan's "12" headline is a documentation slip recorded in U1's handoff). U2
+confirms 11 and pins the §2.5 test list accordingly — 18 named tests, each
+anchored to an invariant id and/or FACES row from Part 1. No C-M3·4 is
+introduced by this section.
+
+### 2.1 Frozen seam list (exact C#)
+
+Seams that exist as of M1/M2. M3 *calls* them; M3 does not modify.
+
+`Kumunita.Core.Authorization.IAuthorizationService` (frozen, ADR 0006 §A):
+
+```csharp
+public interface IAuthorizationService
+{
+    Task<Decision>   CanAsync(string actorId, AccessAction action,
+                              IAuditableResource target);
+    Task<Decision>   CanAsync(string actorId, AccessAction action,
+                              IAuditableResource target,
+                              Marten.IDocumentSession session);
+    Task<VisibleSet> CanSeeAsync(string actorId, AccessAction action,
+                                  IEnumerable<IAuditableResource> candidates);
+    Task<VisibleSet> CanSeeAsync(string actorId, AccessAction action,
+                                  IEnumerable<IAuditableResource> candidates,
+                                  Marten.IDocumentSession session);
+}
+```
+
+`Kumunita.Core.Authorization` frozen types (as they stand in M1; quoted
+verbatim from `Audience.cs`, `Decision.cs`, `AccessAction.cs`):
+
+```csharp
+public enum AudienceMode { Any, All }
+public enum GrantKind    { User, Group }
+public sealed record AudienceGrant(GrantKind Kind, string Id);
+
+public sealed class Audience
+{
+    public AudienceMode Mode { get; set; } = AudienceMode.Any;
+    public System.Collections.Generic.List<AudienceGrant> Grants { get; set; } = new();
+    public Audience();
+    public Audience(AudienceMode mode,
+                    System.Collections.Generic.IReadOnlyList<AudienceGrant> grants);
+    public bool IsEmpty => Grants.Count == 0;
+}
+
+public enum AccessVia     { Owner, Audience, Delegation, Moderator,
+                            Report, BreakGlass, Admin }
+public enum AccessOutcome { Allow, Deny }
+
+public sealed record Decision(bool Allowed, AccessVia Via,
+                              string EffectivePrincipalId);
+
+public sealed record VisibleSet(
+    System.Collections.Generic.IReadOnlyList<(string Id, AccessVia Via)> Visible,
+    int HiddenCount);
+
+public sealed record AccessAction(string Id)
+{
+    public static readonly AccessAction Read     = new("read");
+    public static readonly AccessAction Moderate = new("moderate");
+}
+
+public interface IAuditableResource
+{
+    string    Id          { get; }
+    string    Name        { get; }
+    string?   OwnerId     { get; }
+    Audience? Audience    { get; }    // `null` = not audience-restricted
+    string?   ComponentId { get; }
+    string    TargetKind  { get; }
+}
+```
+
+> **M3 exercises `Read` only.** `Moderate` is reserved for M3b (C5 — OFF by
+> default; M3 tests assert the *absence*, `F3_FeedDeniesModeratorOnAudiencePost`
+> / `F8_ComponentIsFilterNotAccessGate`, F3/F8).
+
+`Kumunita.Core.UserInfo.IUserInfoService` — M3's frozen M1/M2 surface plus
+M3's **one** ADD (ADR 0006-E compatible lane, mirroring M2's
+`GetProfilesAsync(bool)`):
+
+```csharp
+public interface IUserInfoService
+{
+    // ── M1 frozen surface (unchanged by M3) ──
+    Task<Profile?> GetProfileAsync(string subjectId);
+    Task<HashSet<string>> GetGroupIdsAsync(string userId);
+    Task<DelegationGrant?> GetActiveGrantAsync(string delegateId);
+    Task<Group> CreateGroupAsync(string ownerId, string name, string? description);
+    Task AddGroupMemberAsync(string groupId, string userId, string addedBy);
+    Task RemoveGroupMemberAsync(string groupId, string userId, string removedBy);
+    Task<DelegationGrant> GrantDelegationAsync(string ownerId, string delegateId,
+                              System.Collections.Generic.IReadOnlyList<string> scope,
+                              DateTimeOffset from, DateTimeOffset? to);
+    Task RevokeDelegationAsync(string grantId, string revokedBy);
+    Task UpsertProfileAsync(Profile profile, ProfileUpdate patch);
+    Task<System.Collections.Generic.IReadOnlyList<Component>> SeedComponentsAsync();
+    Task SetComponentModeratorAccessAsync(string componentId, bool on, string actorId);
+    Task<System.Collections.Generic.IReadOnlyList<ModeratorAssignment>> GetAssignmentsAsync(string userId);
+
+    // ── M2 ADD (frozen for M3; reused by the composer's audience selector) ──
+    Task<System.Collections.Generic.IReadOnlyList<Profile>> GetProfilesAsync(bool verifiedOnly);
+    Task<System.Collections.Generic.IReadOnlyList<Group>> GetGroupsForUserAsync(string userId);
+    Task<System.Collections.Generic.IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId);
+
+    // ── M3 ADD — the single M3 new method on a frozen interface
+    //    (ADR 0006-E compatible lane, precedent: M2 `GetProfilesAsync`, U3) ──
+
+    /// <summary>
+    /// The composer's *component picker* / the <c>/community/{id}</c>
+    /// *grouping* / the feed's *candidate filter* (M3 design §2.3). A
+    /// *candidate set*, NOT a visible set (C-M3·2): the caller must pass every
+    /// post through <c>IAuthorizationService</c> before rendering, and this
+    /// read produces **no** <c>Authorization.AccessAudit</c> row itself
+    /// (C-M3·2; pinned by the §2.4 seam test
+    /// <c>F9_CandidateFilterEmitsNoAuditRow</c> at the service level and by
+    /// U4's <c>UserInfoServiceTests.GetComponentsAsync_CandidateFilterEmitsNoAuditRow</c>
+    /// at the unit level — same C-M3·2 pin, two test files). Strong-consistency
+    /// live rows (C4): a component enable/disable flip in the same commit is
+    /// live on the very next call.
+    /// </summary>
+    Task<System.Collections.Generic.IReadOnlyList<Component>> GetComponentsAsync(bool enabledOnly);
+}
+```
+
+> **Drift note (U2):** U1's handoff pinned the ADD's doc-comment as
+> "returns a *candidate* set; C-M3·2 says never a visible set; C-M3·2 says no
+> own `AccessAudit` row; C-M3·3 says the row shape is fixed to feed aggregate
+> + detail decision" — the pinned prose, not a verbatim C# body, and that is
+> honored here (candidate-set language, no-audit-row, C-M3·2/3 references) and
+> the shape frozen.
+
+### 2.2 New M3-owned Core types (exact C#)
+
+Namespace `Kumunita.Core.Posts`. All three documents are **Marten-native**
+POCOs with the conventional `string Id` identity (ADR 0004 §B.1; the carve-out
+for a hand-rolled `FeatureSchemaBase` is *not* used in M3 — that pin is
+reserved for operator-written tables like `AdminOverride`, mirroring
+`M1DocTypes`).
+
+```csharp
+namespace Kumunita.Core.Posts;
+
+/// <summary>
+/// A post (M3). `Audience` is **non-null** (invariant C1 — empty audience
+/// denies; the author's bootstrap default is an *empty* audience, so the owner
+/// branch is the *only* lane that lets the author see their own draft).
+/// `ComponentId` is a **feed organizer**, never an access boundary (C-M3·2).
+/// </summary>
+public sealed class Post
+{
+    public string Id { get; set; } = string.Empty;
+    public string ComponentId { get; set; } = string.Empty;
+    public string AuthorId { get; set; } = string.Empty;
+    public string? Title { get; set; }
+    public string Body { get; set; } = string.Empty;
+    public Authorization.Audience Audience { get; set; } = null!;
+    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset? Modified { get; set; }
+    // No Status — the hidden/removed surface is M3b (the M3b deferral close,
+    // §Scope "Out of scope — M3b deferral"): M3's post has no Status column.
+}
+
+/// <summary>
+/// A one-level reply to a post (M3). **No `Audience` field** (invariant
+/// C-M3·1): a reply's visibility inherits its parent post's single `Read`
+/// decision — there is no second authorization evaluation for the reply and
+/// the reply produces **no** `Authorization.AccessAudit` row of its own.
+/// </summary>
+public sealed class PostReply
+{
+    public string Id { get; set; } = string.Empty;
+    public string PostId { get; set; } = string.Empty;
+    public string AuthorId { get; set; } = string.Empty;
+    public string Body { get; set; } = string.Empty;
+    public DateTimeOffset Created { get; set; }
+}
+
+/// <summary>
+/// A *dormant* report row (M3b workflow). The **table** is registered in M3
+/// for forward compatibility (the Q1↔Q3 resolution: the table in M3, the
+/// flow in M3b); M3's surface ships **no** workflow, **no** tests, and **no**
+/// `Status` writes against it. `Status` is nullable until M3b lands a write
+/// lane that sets it.
+/// </summary>
+public sealed class Report
+{
+    public string Id { get; set; } = string.Empty;
+    public string PostId { get; set; } = string.Empty;
+    public string ReporterId { get; set; } = string.Empty;
+    public string? ComponentId { get; set; }
+    public string? Reason { get; set; }
+    public string? Status { get; set; }   // null until M3b's write lane sets it
+    public DateTimeOffset At { get; set; }
+}
+
+/// <summary>
+/// The single `IAuthorizableResource` projection of a `Post` (M3 U4's
+/// composition unit — the *only* path through which a post reaches
+/// `IAuthorizationService`, ADR 0006-D). Frozen 6-member shape (mirrors M2's
+/// `ProfileToAuditableResource` pin), `TargetKind = "post"` for the aggregate
+/// audit rows (C-M3·3).
+/// </summary>
+public sealed class PostToAuditableResource : Authorization.IAuditableResource
+{
+    public Post Post { get; }
+    public PostToAuditableResource(Post post) { Post = post; }
+
+    public string Id           => Post.Id;
+    public string Name         => Post.Title ?? (Post.Body.Length > 60 ? Post.Body[..60] : Post.Body);
+    public string? OwnerId     => Post.AuthorId;
+    public Authorization.Audience? Audience => Post.Audience;   // non-null by invariant C1
+    public string? ComponentId => Post.ComponentId;
+    public string TargetKind   => "post";
+}
+
+/// <summary>
+/// The list/read composition service for M3 posts (bounded context
+/// `Kumunita.Core.Posts`, ADR 0006-D lane). Composes **only** the two
+/// frozen modules — `IUserInfoService` (candidate set + single-row read) and
+/// `IAuthorizationService` (the single decision path) — plus its own
+/// `IDocumentStore`; it never reads `GroupMembership` / `DelegationGrant`
+/// for its own access decisions (the same "feature modules never re-derive
+/// access" boundary that pins M1/M2). Owns M3's two product rules: the §2.3
+/// candidate filter (invariant C-M3·2) and the §2.4 reply-inherits rule
+/// (invariant C-M3·1).
+/// </summary>
+public sealed class PostService
+{
+    public PostService(UserInfo.IUserInfoService userInfo,
+                       Authorization.IAuthorizationService authz,
+                       Marten.IDocumentStore store);
+
+    /// <summary>
+    /// The §2.3 candidate filter applied *here* (C-M3·2 names this service as
+    /// the filter's owner): `GetComponentsAsync(true)` → the candidate posts
+    /// for <paramref name="componentId"/> → one `CanSeeAsync(..., "read")`
+    /// over the survivor set. `HiddenCount` counts only the candidates
+    /// `CanSeeAsync` actually evaluated. One aggregate `AccessAudit` row
+    /// (`TargetKind = "post"`), the C-M3·3 pin.
+    /// </summary>
+    Task<FeedResult> ListFeedAsync(string componentId, string actorId, int page);
+
+    /// <summary>
+    /// A post + its one-level replies, the replies evaluated **only** under
+    /// the parent's `Read` decision (C-M3·1): parent Deny ⇒ reply *not
+    /// evaluated*, no reply of its own produces an audit row, and the
+    /// aggregate row for the *post* is a **single decision row** (not an
+    /// aggregate), per C-M3·3.
+    /// </summary>
+    Task<PostDetailResult> GetPostAsync(string postId, string actorId);
+
+    /// <summary>
+    /// Creates a post in the caller's in-flight session (the C3 same-transaction
+    /// lane, ADR 0006-E `IDocumentSession` overload). The author's chosen
+    /// `Audience` is written **verbatim** (ADR 0001-B); `AuthorId = actorId`,
+    /// `ComponentId = draft.ComponentId`.
+    /// </summary>
+    Task<Post> CreatePostAsync(PostDraft draft, string actorId,
+                               Marten.IDocumentSession session);
+
+    /// <summary>
+    /// Creates a one-level reply in the caller's session (C3). No `Audience`
+    /// (C-M3·1): the parent's `Read` decision has already been made by the
+    /// caller — this method does not re-check.
+    /// </summary>
+    Task<PostReply> CreateReplyAsync(string postId, string actorId,
+                                     string body, Marten.IDocumentSession session);
+}
+
+/// <summary>`ListFeedAsync`'s result — the C-M3·3 aggregate shape.</summary>
+public sealed record FeedResult(
+    System.Collections.Generic.IReadOnlyList<Post> Visible,
+    int HiddenCount,
+    int Page,
+    int Total);
+
+/// <summary>`GetPostAsync`'s result — the C-M3·3 single-decision-row shape,
+/// with the one-level reply list evaluated under the parent's decision.</summary>
+public sealed record PostDetailResult(Post Post,
+                                      System.Collections.Generic.IReadOnlyList<PostReply> Replies);
+
+/// <summary>The `CreatePostAsync` input — `Audience` is non-null (C1).</summary>
+public sealed record PostDraft(string ComponentId, string? Title,
+                               string Body, Authorization.Audience Audience);
+```
+
+**M3 document registration surface** (U3 lands this, mirroring `M1DocTypes`):
+
+```csharp
+namespace Kumunita.Core;
+
+/// M3's Marten-native document registration surface (ADR 0004 §B.1). Mirrors
+/// `M1DocTypes` exactly: all three POCOs use the conventional `string Id`
+/// identity and need no `Identity(...)` or `UniqueIndex(...)` call — Marten's
+/// defaults apply.
+public static class M3DocTypes
+{
+    public static void Configure(Marten.StoreOptions opts)
+    {
+        opts.Schema.For<Posts.Post>();
+        opts.Schema.For<Posts.PostReply>();
+        opts.Schema.For<Posts.Report>();
+    }
+}
+```
+
+Wired by U3 into both boot paths:
+`Kumunita.Core/Bootstrap/SchemaBootstrap.cs` (called from
+`ApplyAllConfiguredChangesToDatabaseAsync`) and `Kumunita.Web/Program.cs`
+(the dev-loop + all-env paths, adjacent to `M1DocTypes.Configure`).
+
+### 2.3 Candidate-filter + reply-inherits rule (M3-owned invariants)
+
+**Candidate-filter rule (C-M3·2) — the §4.3 analog for M3.** The *component
+feed's product query* is fixed here; it is a **product rule**, not an
+`AccessAudit` subject.
+
+| Caller state | Candidate set / outcome (before `CanSeeAsync`) |
+|---|---|
+| Unauthenticated (no principal) | **401 at the Web layer** (U7's `PostsController` `[Authorize]`). Core never sees an empty actor — the Core service requires a non-empty `actorId`. No candidate set is loaded, no audit row. |
+| Authenticated, verified, component **missing or disabled** | **404 at the Web layer** (`GetComponentsAsync(enabledOnly: true)` returns the component set; the component is absent). No candidate posts are loaded, no audit row. |
+| Authenticated, verified, present enabled component | `PostListComponent(componentId)` — *candidate posts* for that component (never a visible set; C-M3·2). The candidate posts are then passed to **one** `CanSeeAsync("read")` over the adapter projections — one aggregate `AccessAudit` row (C-M3·3). |
+| Authenticated, unverified, present enabled component | Same verified row — the *candidate filter* is the component's posts, not the viewer's verification state (M3's §2.3 differs from M2's here on purpose: M2's §2.3 is a *viewer-side* filter because the candidate set is "every profile"; M3's candidate set is "this component's posts", whose audience is the *author's* choice and the viewer's standing is evaluated by `CanSeeAsync`). |
+| Moderator standing on this component | **Same candidate set as verified**, and the same `CanSeeAsync` run — the *moderator* branch, if one ever applies, is *inside* `CanAsync` / `CanSeeAsync` (M1), never in the candidate filter. Today (C5) no moderator branch on a post is exercised; §2.5's `F3_FeedDeniesModeratorOnAudiencePost` asserts the absence. |
+
+The filter is **never** logged as an `AccessAudit` row — a violation is
+C-M3·2; §2.5's `F9_CandidateFilterEmitsNoAuditRow` pins it.
+
+**Reply-inherits rule (C-M3·1) — the 4-shape table.** Given a parent post
+`p` and a reply `r`, the reply is **rendered iff** `p`'s `Read` decision is
+`Allow` for the viewer. The reply is *not* independently evaluated.
+
+| Shape | What happens to the reply |
+|---|---|
+| Parent Allow (via Owner / Audience / Delegation) | Reply **rendered** — no separate `AccessAudit` row for the reply (C-M3·1 + C-M3·3: the row for the visit is the parent's single-decision row). |
+| Parent Deny | Reply **not evaluated** (short-circuits at the parent). No *reply* row at all; the parent's row is `Deny`. |
+| Empty-audience parent, viewer == author | Parent Allow via Owner branch (C1 exception); reply rendered as in row 1. |
+| Empty-audience parent, viewer ≠ author, or `Mode == All && Grants.Count == 0` (explicit "deny everyone") | Parent Deny ⇒ reply **not** rendered, not evaluated — row 2. The *explicit* `All + empty` case (F3) has the same outcome as the *implicit* empty case. |
+
+**All four rows reduce to the parent's *one* `Read` decision (C6):** there is
+exactly one decision call for a visit (feed: `CanSeeAsync`; detail:
+`CanAsync`), and the reply's visibility follows from *that* decision's
+`Allowed` flag. A second `Can*` call on the reply is a C-M3·1 violation and §2.5's
+`F10_ReplyNotEvaluatedOnParentDeny` / `F10_ReplyVisibleIffParentVisible` pin its
+absence.
+
+### 2.4 Pinned seam tests (exact names)
+
+File: `tests/Kumunita.Core.Tests/PostServiceTests.cs`. All 18 names below are
+**pinned** by this section (U9 is responsible for the file per the plan
+register; U5 / U6 / U7 may add their own *named* tests to the same file but
+must not rename these). Each name carries the FACES row and/or invariant
+anchor from Part 1:
+
+1. `F1_FeedVisibleToAudienceMember`            — F1, C-M3·3 (aggregate row).
+2. `F2_FeedHiddenFromNonMember`                 — F2, C-M3·3, C1.
+3. `F3_FeedDeniesModeratorOnAudiencePost`       — F3, C5 (absence), C1.
+4. `F4_EmptyAudiencePostAuthorSeesOwnDraft`     — F4, C1 (owner-branch exception).
+5. `F4_EmptyAudiencePostDeniesNonAuthor`        — F4, C1.
+6. `F5_MembershipChangeReScopesNextRequest`     — F5, C4 (strong consistency).
+7. `F6_DelegateWithReadInScopeSeesAuthorPost`   — F6, C2 (delegation scoped).
+8. `F7_DelegateWithoutReadDenies`               — F7, C2.
+9. `F8_ComponentIsFilterNotAccessGate`          — F8, C-M3·2, C5 (absence).
+10. `F9_CandidateFilterEmitsNoAuditRow`          — F9, C-M3·2.
+11. `F10_ReplyVisibleIffParentVisible`           — F10, C-M3·1.
+12. `F10_ReplyNotEvaluatedOnParentDeny`          — F10, C-M3·1, C3 (no own row).
+13. `Feed_AggregateAuditRowShape`                — C-M3·3 (`VisibleCount`/`HiddenCount`
+    set, `Action="read"`, `TargetKind="post"`).
+14. `Detail_DecisionAuditRowShape_ViaOwner`      — C-M3·3, C1 (single-row, `Via=Owner`).
+15. `Detail_DecisionAuditRowShape_ViaAudience`   — C-M3·3 (single-row, `Via=Audience`).
+16. `Detail_DecisionAuditRowShape_ViaDelegation` — C-M3·3, C2 (single-row, `Via=Delegation`).
+17. `AuthorAudienceWrittenVerbatim`              — ADR 0001-B (the composer's choice
+    is absolute; the DB row's `Audience` is bit-identical to the draft's).
+18. `PostService_MakesNoModerateCall`            — C5 (absence; `Moderate` is
+    never invoked on a post in M3; the call is asserted to be `Read` only).
+
+> **Note to U6 → U9 (unit numbers from the plan register):** U6 lands
+> `FeedResult` + `PostDetailResult` + `PostDraft` + the 4 public methods +
+> the C-M3·1 reply-inherits rule + the C-M3·2 candidate filter. U9 owns the
+> file `tests/Kumunita.Core.Tests/PostServiceTests.cs` and its 18 `[Fact]`s
+> (the plan names U9 "seam tests only (the 18 pinned names)"); U10 records
+> the three-test gate. §2.6's gate names reference this list — **renaming
+> any of the 18 after U9 owns them is a drift event** (§2.7).
+
+### 2.5 Acceptance gate (U10 records)
+
+The three-test shape (mirroring M2 §2.6 verbatim; M3's *handoff* lane is the
+audience's author→group-recipient arrow, not a second `Can*` call):
+
+| # | Test | Shape (M3's reading of the M2 lane) |
+|---|------|-------------------------------------|
+| 1 | **Closed-loop** | Author creates a post → it appears in their own feed on the next request; the aggregate `AccessAudit` row for the feed visit is present with `VisibleCount ≥ 1` and `TargetKind = "post"` (C-M3·3, F1). |
+| 2 | **Handoff** | A group member is **added after the post was created** and sees the post on the **next** feed render — strong consistency (C4, F5); the *delegate* branch is the "handoff to a delegate" case for the same pin (F6, C2). |
+| 3 | **Part-vs-whole** | The 18-test list in §2.4 is the **whole**; the closed-loop + handoff tests are the **parts**; all three — plus the M1-inherited (C1–C6) and M2-inherited (C-M2·1..3) anchors re-run unchanged — must pass together for M3's gate to record. U10's record cites the *actual* landed test names (drift lane: if a U2-pinned test name did not land verbatim, U10 renames the *test file / `[Fact]`* in the same commit and records a one-line drift in the handoff note — mirroring M2 §2.5's own handling). |
+
+**The gate is recorded by U10** (per the plan register: U9 is "seam tests
+only"; U10 is "run + record the M3 acceptance gate"). U11 (the
+`ARCHITECTURE.md` flip + M3→M3b deferral note) and U12 (the final
+`## M3 — Closed (recorded)` append) are the close units, the M2 U12 / U15
+analogs re-indexed to M3.
+
+### 2.6 Drift-guard (frozen once written)
+
+The following pins are **frozen** in this doc, and any violation is a `## U<m>
+— Drift pause` per unit-series rule §6 (unit-series rule in the plan):
+
+- The **11** invariants from Part 1 (C-M3·1/2/3, ADR 0006 C1–C6, ADR 0001-B,
+  ADR 0003 §SoD, ADR 0004 §B.1, ADR 0006-D, ADR 0006-E) — the *numbers*
+  (not the prose) are stable for the rest of M3; rename / renumber is a
+  breaking change (Part 1 already pins this; it repeats here because
+  Part 2's own §2.5 / §2.4 names hang off them).
+- The **10** FACES rows (F1–F10) in Part 1 — FACES *count* is a handoff field
+  (U1 → U2, and forward); a new FACES row (F11+) is added **only** by the
+  unit that ships the outcome it pins, in the same commit as the feature
+  (Part 1 already pins this).
+- **`IUserInfoService`** frozen surface (§2.1) plus M3's **one** ADD
+  (`GetComponentsAsync(bool enabledOnly)`) — both signature and "candidate
+  set, no audit row, C-M3·2" doc-comment are **frozen** once U4 lands them
+  (U4 owns the `IUserInfoService` ADD per the plan), mirroring M2's
+  `GetProfilesAsync(bool)` pin. Adding, removing, or re-scoping the ADD is a
+  drift event **before** U4; a drift event **after** too (this file wins).
+- The **`Post`** 8-field shape (Id, ComponentId, AuthorId, Title?, Body,
+  Audience, Created, Modified?) and the **absence of `Status`** on a post —
+  frozen once U3 lands `Post`. A `Status` column is a **M3b drift event** if
+  it appears in M3.
+- The **`PostReply`** 5-field shape (Id, PostId, AuthorId, Body, Created) and
+  the **absence of `Audience`** — frozen once U3 lands `PostReply`.
+- The **`Report`** 7-field shape (Id, PostId, ReporterId, ComponentId?,
+  Reason?, Status?, At) and the **`Status?` nullable, M3b-owned** pin —
+  frozen once U3 lands `Report`.
+- The **`PostToAuditableResource`** 6-member shape (Id, Name, OwnerId,
+  Audience, ComponentId, TargetKind) and the **`TargetKind = "post"`** pin —
+  frozen once U5 lands the adapter (U5 is "PostToAuditableResource adapter" in
+  the plan register; mirrors M2's `ProfileToAuditableResource` pin).
+- The **`PostService`** ctor `(IUserInfoService, IAuthorizationService,
+  IDocumentStore)` and the 4 public methods (`ListFeedAsync`,
+  `GetPostAsync`, `CreatePostAsync`, `CreateReplyAsync`) + their 3 records
+  (`FeedResult`, `PostDetailResult`, `PostDraft`) — the **frozen Core
+  surface**, named + signatures + record shapes, frozen once U6 (the defining
+  unit, per the plan register) lands them. Renaming a public method or
+  reshaping a record is a drift event (U6 owns the shapes; U7 / U8 consume
+  them, no re-shaping; U9 tests against them).
+- The **§2.3** two tables (the 5-row candidate-filter table + the 4-shape
+  reply-inherits table) — frozen once written (U2's commit); a new row is a
+  drift event **or** a new FACES row (F11+), whichever the unit's change
+  actually pins, in the same commit + the same drift note.
+- The **18 test names** in §2.4 — frozen once U9 owns the file (the unit
+  named in §2.4 "Note to U6 → U9"). Renaming or re-scoping a name is a
+  drift event; the unit updates §2.4 in the same commit and appends a drift
+  note to the handoff.
+
+> **U2 records, here, the `12 vs 11` plan-documentation slip as closed:**
+> the 11 invariants (not 12) are the pin, confirmed against U1's body.
+> The 18 test names (not a smaller or larger set) are the pin. The 2 tables
+> (5 + 4 rows) are the pin. The 11 + 10 + 18 + 5 + 4 (and the 3 records,
+> 4 methods, 6-member adapter, 3 POCOs) are the *frozen counts* of Part 2.
+
+---
+
 ## M3 — Closed (recorded)
 
 > **Placeholder — this section is empty until U10 (gate record) and U11 / U12
-> (close) have appended the final entry.** U1 (this unit) does not close M3;
+> (close) have appended the final entry.**
 > it opens the record. The three-test gate table, the `ARCHITECTURE.md` §2
 > note update, and the M3b deferral list (the "Out of scope" block above,
 > each with a one-line M3b candidate) will be appended here by U12 in its

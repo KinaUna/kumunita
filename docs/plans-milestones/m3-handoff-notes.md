@@ -106,3 +106,62 @@
   Adding a new FACES row (F11+) is only by the unit that ships the outcome
   it pins, in the same commit as the feature; FACES count is a handoff
   field (U1 → U2, and forward).
+
+## U2 — design doc Part 2
+- Appended `## Seams & contracts (Part 2, written by U2)` to
+  `docs/design/m3-posts-design.md` **above** the `## M3 — Closed (recorded)`
+  placeholder (that section stays last), with §2.0 preamble through §2.6
+  drift-guard — mirroring M2's §2.1–§2.7 structure. **No code. No build.**
+- **(a) The single M3 ADD (sealed, §2.1):**
+  `Task<IReadOnlyList<Component>> IUserInfoService.GetComponentsAsync(bool enabledOnly)`
+  — the composer's *component picker* + `/community/{id}` *grouping* +
+  feed's *candidate filter*. Doc-comment pins: candidate set (never a
+  visible set — C-M3·2), no `AccessAudit` row (C-M3·2), strong-consistency
+  live rows (C4). ADR 0006-E compatible lane; precedent: M2's
+  `GetProfilesAsync(bool)` (U3). **FROZEN** in §2.6 once U4 lands them.
+- **(b) 18 pinned seam-test names (§2.4, `tests/Kumunita.Core.Tests/PostServiceTests.cs`):**
+  `F1_FeedVisibleToAudienceMember` · `F2_FeedHiddenFromNonMember` ·
+  `F3_FeedDeniesModeratorOnAudiencePost` · `F4_EmptyAudiencePostAuthorSeesOwnDraft` ·
+  `F4_EmptyAudiencePostDeniesNonAuthor` · `F5_MembershipChangeReScopesNextRequest` ·
+  `F6_DelegateWithReadInScopeSeesAuthorPost` · `F7_DelegateWithoutReadDenies` ·
+  `F8_ComponentIsFilterNotAccessGate` · `F9_CandidateFilterEmitsNoAuditRow` ·
+  `F10_ReplyVisibleIffParentVisible` · `F10_ReplyNotEvaluatedOnParentDeny` ·
+  `Feed_AggregateAuditRowShape` · `Detail_DecisionAuditRowShape_ViaOwner` ·
+  `Detail_DecisionAuditRowShape_ViaAudience` · `Detail_DecisionAuditRowShape_ViaDelegation` ·
+  `AuthorAudienceWrittenVerbatim` · `PostService_MakesNoModerateCall`.
+- **(c) Three-test acceptance gate (§2.5, U10 records):** (1) **closed
+  loop** (author's post appears in their own feed next request; aggregate
+  `AccessAudit` row `VisibleCount ≥ 1` + `TargetKind = "post"`), (2)
+  **handoff** (a group member added after the post sees it on the next
+  request — C4 strong consistency; the *delegate* branch is the "handoff to
+  a delegate" case — C2), (3) **part-vs-whole** (the 18-test list is the
+  whole, closed-loop + handoff are the parts; all must pass together,
+  plus the M1-inherited + M2-inherited anchors re-run unchanged).
+- **(d) `Report` table-in-M3 / flow-in-M3b flag (§2.2 + §2.6):** `Report`
+  is registered in M3 (`M3DocTypes.Configure(StoreOptions)`, U3 lands
+  this) as a *dormant* table — 7 fields
+  `(Id, PostId, ReporterId, ComponentId?, Reason?, Status?, At)`,
+  `Status` **nullable** (M3b's write lane sets it), **no** surface /
+  workflow / tests in M3. The *flow* (file / assign / unlock /
+  resolve), the *`Via = Report`* read branch, and the *moderator
+  surfaces* are **M3b's** (the Part 1 "Out of scope — M3b deferral" block
+  is M3's M1-style close; U11 flips `ARCHITECTURE.md` §2 and writes the
+  handoff-note close).
+- **(e) Count reconciliation (12 vs 11):** U2 confirms **11 invariants**
+  (the plan's "12" headline is a documentation slip — U1's handoff records
+  it; the body list is authoritative). U2's §2.4 pins **18 test names**
+  (not a smaller/larger set). Part 2's *frozen counts* are: **11**
+  invariants + **10** FACES + **18** test names + **2 tables** (5-row
+  candidate-filter + 4-shape reply-inherits) + **3 records**
+  (`FeedResult` / `PostDetailResult` / `PostDraft`) + **4** `PostService`
+  public methods + **6-member** adapter + **3 POCOs**
+  (`Post` / `PostReply` / `Report`). All frozen in §2.6; any mismatch is a
+  `## U<m> — Drift pause`.
+- **(f) Unit-owner references in Part 2 follow the plan register:**
+  U3 = `Post/PostReply/Report` + `M3DocTypes`; U4 = `GetComponentsAsync`
+  + `F9` unit-test; U5 = `PostToAuditableResource`; U6 = `PostService` +
+  records + the 4 methods; U7 = `PostsController` + VMs; U8 = Razor views;
+  U9 = the 18-test file; U10 = the gate record; U11/U12 = the close.
+  If a later unit discovers the plan register and Part 2 mismatch, the
+  Part 2 text wins (the drift-guard lane, §2.6).
+- **No code, no build** (design-only unit, per the plan). U3 is next.
