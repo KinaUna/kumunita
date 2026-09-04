@@ -26,7 +26,7 @@ This milestone is executed as a sequence of **sealed units** (U1…U15 below), o
 
 **Shared state (the three-tier contract):**
 - **Primary — the design doc** (`docs/design/m2-directory-profiles-groups.md`, written in U1/U2). Every unit cites invariants/seam names from this doc, never from memory of the M1 conversation. U1/U2 pin the exact C# signatures of every seam U3–U14 must match; if a later agent finds a mismatch, the design doc wins and the agent updates it in the same commit (the drift-guard below).
-- **Secondary — this file** (`docs/plans-milestones/plan-m2-directory,-profiles,-groups.md`) — the unit registry with each unit's deliverables and exit criteria.
+- **Secondary — this file** (`docs/plans-milestones/plan-m2-directory-profiles-groups.md`) — the unit registry with each unit's deliverables and exit criteria.
 - **Scratch — the rolling handoff note** (`docs/plans-milestones/m2-handoff-notes.md`). One section per unit, appended (never rewritten). Each unit writes exactly one short section before it exits; the next unit reads only that section + its own entry read-list.
 
 **Per-unit template** (each `U` below follows this):
