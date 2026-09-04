@@ -50,7 +50,7 @@ frozen in **ADR 0006**.
 
 **Out of scope**
 
-- Profile editing UI and directory visibility rules (M2).
+- Profile editing UI and directory visibility rules (M2) — **✓ M2 — shipped**; see `docs/design/m2-directory-profiles-groups.md` § `Acceptance Gate` (recorded 2026-09-04).
 - Posts, components UI, reports and report-driven moderator unlock (M3 —
   the `moderatorAccess` mechanism, not its triggers, lands in M1).
 - Events/projects (M4/M5); export/iCal/notification surfaces (M6);

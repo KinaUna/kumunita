@@ -727,3 +727,69 @@ Carried forward from Part 1. Additions:
   U2 does *not* add a new FACES row (the seams are the same 15 rows
   F1–F15). A unit that ships a *new* outcome updates the FACES *and*
   this count in Part 1, same commit, same drift note.
+
+---
+
+## Acceptance Gate (recorded)
+
+**Run result (M2 acceptance gate — 2026-09-04).**
+
+Command: VS Test Explorer `run_tests` (filter `Project=Kumunita.Core.Tests` + `Project=Kumunita.Web.Tests`), per U11's precedent (CLI `dotnet test` returns platform exit-code 5 "Zero tests ran" in this workspace — see U11's handoff note `m2-handoff-notes.md` line 177: the VS Test Explorer is the working runner). Testcontainers `postgres:18`; `PostgresFixture` fresh scratch DB per class.
+
+**`Kumunita.Core.Tests` 86/86 passed. `Kumunita.Web.Tests` 29/29 passed. Total: 115/115, 0 failed.**
+
+Record (shape mirrored from M1 step 9 — `docs/design/m1-identity-access.md` lines 247–273):
+
+| # | Test | Evidence (actual test names — all passed) |
+|---|------|-------------------------------------------|
+| 1 | **Closed-loop** (signup → verify → profile visible in directory → contact on if opt-in → hidden if visibility empty) | Core: `DirectoryServiceTests.ListAsync_Hides_Unverified` (F8 self-only for unverified viewer; verified resident excluded from `Visible` *and* `HiddenCount` *before* any `CanSeeAsync` ran — §2.3 candidate filter is a precondition, never an audit subject; C-M2·2), `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (§2.4 four-shape table against a `Visibility` that already allows the viewer — `null` row: 1 audit row (short-circuit); `Any+empty`/`All+empty`: 2 rows, contact = Deny; `Any+grant`/`All+grant`: 2 rows, contact = Allow; C-M2·1 + C1), `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` (the §2.3 candidate-filter source: `verifiedOnly:true` → verified only; both calls → zero `AccessAudit` rows; C-M2·2 at the seam), `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_ReturnsOwnerUnionMember_ExcludesOther` (F14: the named-group source for an audience that references a *group* not just a user), `ProfileToAuditableResourceTests.Maps_All_Six_Fields` + `TargetKind_Is_Directory` (C6: `Audience` is *only* `Profile.Visibility`, never `ContactVisibility`; C3: `TargetKind = "directory"`). Web: `DirectoryIndexViewModelTests.Profile_Projection_Excludes_Contact_Fields` (F1 pin: hidden row's `Email`/`Phone` null even though `DirectoryViewModel` *can* carry them — "only allowed rows rendered, other fields not leaked"), `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (§9 view-model pin: hidden ⇒ `ShowContactBlock=false` ⇒ contact null), `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (write-boundary §9 pin: `ContactVisibility` settable only when `Visibility` is non-null). |
+| 2 | **Handoff** (the profile editor's audience choice is the single designed handoff) | The single designed handoff is `IUserInfoService.UpsertProfileAsync(profile, patch)` — the M1 frozen write seam (M1 design step 4 "single write lane"). M2 does *not* invent any new handoff. The directory's `CanSeeAsync` is a *decision*, not a handoff (ADR 0006-D). Evidence: `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Audiences_MatchTheEditors` (`Patch`'s `Visibility` + `ContactVisibility` are two independent `Audience?` slots, written verbatim from the editor's two *separate* fields — no merged compound; actor identity is `KumunitaPrincipal.SubjectId(User)`, never form-bound — ADR 0001-B + C-M2·2 actor pin), `ProfileEditViewModelTests.ProfileEditViewModel_Patch_Off_Emits_NullGate_On_Emits_Audience` (editor's "off" switch → *null* `ContactVisibility` in the `Patch`, not a synthesized `Any+empty` audience — §2.4 "row 1 / not evaluated / short-circuit" is the *only* "off" representation), `UserInfoServiceTests.UpsertProfileAsync_CreatesWhenAbsent_LeavesNullPatchFieldsUntouched` (single-write-seam null-patch semantics: other `Patch` fields unaffected by a null `ContactVisibility`). |
+| 3 | **Part-vs-whole** (all of M2's invariants pass; no new rule invented) | The full M2-anchored seam list (U3–U11), all passing — names cite the *actual* landed `[Fact]` methods (the per-invariant rows in the next two tables enumerate them; §2.5's `F…`-name pins are unlanded drift — see drift note below) — **plus** the M1-inherited anchors (C1–C6, B, break-glass, `/health`) re-run unchanged and still passing. **35 M2-anchored unit specs (U3–U11: 13 Core + 22 Web) + 80 M1-inherited (73 Core + 7 Web) = 115/115, 0 failed.** The per-seam → invariant mapping for the 35 M2-anchored specs is in the two tables below; the M1-inherited rows follow unchanged. |
+
+Seam-list → invariant mapping (M2- *new* invariants only, anchored to their ADR/FACES row):
+
+| Invariant | Seam test(s) that anchor it (all passed) |
+|-----------|------------------------------------------|
+| **C-M2·1** (contact-gating: contact check runs *only after* `Visibility` allowed) | `DirectoryServiceTests_U6.ContactVisibility_FourShape_TrightTable` (service-layer: each of the 4 §2.4 rows — `null`/`Any+empty`/`Any+grant`/`All+empty`/`All+grant` — is evaluated against a `Visibility` that already allowed the viewer; the "not evaluated" row (1) produces exactly 1 `AccessAudit` row, the "evaluated" rows (2–5) produce exactly 2 (a distinct second `Can*` call, not a merged compound — C6), and the contact row's `Via`/`Outcome` match the decision); `DirectoryDetailViewModelTests.DirectoryDetailViewModel_ContactBlock_Gated` (view-model layer: hidden row ⇒ `ShowContactBlock=false` ⇒ `Email`/`Phone=null` — "contact block never on a hidden profile", `ARCHITECTURE.md` §9); `ProfileEditViewModelTests.ProfileEditViewModel_ContactVisibility_Gated` (editor's write-boundary: `ContactVisibility` settable only when `Visibility` non-null — the editor does not *produce* a "hidden profile + contact opt-in" state) |
+| **C-M2·2** (candidate filter ≠ access decision, §4.3; never logged as an audit row) | `DirectoryServiceTests.ListAsync_Hides_Unverified` (unverified row: exactly one candidate — the viewer themself — survives the §2.3 filter before `CanSeeAsync` runs; the filtered-out verified resident is absent from `Visible` *and* `HiddenCount`, and appears in *no* `AccessAudit` row as actor, effective principal, or target); `DirectoryServiceTests_U6.Unverified_SelfCandidate_NotAudited` (the *only* audit row for an unverified self-sighting is the Owner branch on their own profile); `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` (the candidate-filter *source*: `verifiedOnly:true` → verified set, `verifiedOnly:false` → all, and *neither* appends an `AccessAudit` row); `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_AppendsNoAuditRow_CM2_2` (group-read is a *read*, not an access decision — zero audit rows); `UserInfoServiceGroupsU9Tests.GetGroupMembersAsync_LiveOnNextCall_C4_StrongConsistency` (per-group member read is also a read — no audit row) |
+| **C-M2·3** (group SoD — owner ∪ GlobalAdmin only) | `DirectoryServiceTests_U6.GroupAddRemoveMember_ReflectedOnNext_Call_Profile` (the SoD gate — owner ∪ GlobalAdmin — is enforced by M1's frozen `AddGroupMemberAsync` / `RemoveGroupMemberAsync`; M2 does not invent a `CanManageGroup` decision; ADR 0006-D: Web shapes HTTP, Core decides); `GroupsDetailViewModelTests.AddRemove_OnlyOwnerOrAdmin` (view-model pin: `IsOwner` field is a *badge*, not a route-level gate — the SoD gate lives in M1's write seam); `GroupsDetailViewModelTests.GroupMemberViewModel_Excludes_SourceProfileContactFields` (a member row never carries a contact field — C-M2·1 + C-M2·3 projection); `UserInfoServiceGroupsU9Tests.GetGroupsForUserAsync_ReturnsOwnerUnionMember_ExcludesOther` (F14: the *audience source* for a profile that references a named group — owner ∪ member, not an arbitrary other's group) |
+
+Inherited M1 invariants (C1–C6, B, break-glass, `/health`) — unchanged, still passing in this run:
+
+| Invariant | M1-inherited seam test(s), unchanged (all passed) |
+|---|---|
+| C1 (empty-audience guard) | `AuthorizationServiceTests.EvaluateAudience_EmptyAudience_AnyMode_Denies`, `…_AllMode_Denies` |
+| C2 (delegation action-scoped, `Via = Delegation`) | `AuthorizationServiceTests.C2_Delegate_InScope_BorrowsOwnersStanding_AllowsViaOwnerBranch`, `…_OutOfScope_Denies_WithDelegationViaRecorded` |
+| C3 (audit with the domain write, Allow *and* Deny) | `AuthorizationServiceTests.C3_AuditRow_CommitsWithTheDecision_AllowAndDeny`, `UserInfoServiceTests.AddAndRemoveGroupMember_UpdatesMembershipAndWritesAudit`, `…_GrantDelegationAsync_…`, `…_RevokeDelegationAsync_…`, `…_SetComponentModeratorAccessAsync_…` |
+| C4 (membership live on next request) | `UserInfoServiceTests.GetGroupIdsAsync_LiveMembership_C4_StrongConsistency`, `AuthorizationServiceTests.C4_MembershipChange_IsLiveOnTheNextDecision` |
+| C5 (moderator access OFF by default) | `AuthorizationServiceTests.C5_ModeratorAccess_OffByDefault_ModeratorCannotSee`, `…_OnWithAssignment_ModeratorCanSee` |
+| C6 (bulk ≡ per-item aggregate) | `AuthorizationServiceTests.C6_BulkMatches_PerCanAsync_AggregateOverSameCandidates` |
+| B (claim set = whole principal, no relational data) | `ClaimShapingInvariantBTests` (11 tests incl. `Build_NeverProduces_ForbiddenKT`) |
+| Break-glass (inline, no job) | `AuthorizationServiceTests.BreakGlass_ConsumedAndUnexpired_Elevates`, `…_NotConsumed_DoesNotElevate`, `…_Expired_DoesNotElevate` |
+| `/health` degraded (OPS §8) | `HealthControllerTests.Get_When_EmailDeadLetters_Returns_DegradedStatus_WithCount` (unit) + `EmailDeadLetterCounterTests.GetCountAsync_ReflectsStoredDeadLetters_AgainstRealPostgres` (prod counter) |
+
+M2 unit-spec count (U3–U11, landed & passing in this run):
+
+| Unit | Project | Spec(s) | Count |
+|---|---|---|---|
+| U3 | Core | `UserInfoServiceTests.GetProfilesAsync_VerifiedOnly_Filters` | 1 |
+| U4 | Core | `ProfileToAuditableResourceTests.Maps_All_Six_Fields`, `TargetKind_Is_Directory` | 2 |
+| U5 | Core | `DirectoryServiceTests.ListAsync_Hides_Unverified` | 1 |
+| U6 | Core | `DirectoryServiceTests_U6` × 5 (`ContactVisibility_FourShape_TrightTable`, `Unverified_SelfCandidate_NotAudited`, `DelegationOnProfile_OwnerBranch`, `CanAsync_Equals_CanSeeAsync_SingleRow_Profile`, `GroupAddRemoveMember_ReflectedOnNext_Call_Profile`) | 5 |
+| U7 | Web | `DirectoryIndexViewModelTests` × 3 | 3 |
+| U8 | Web | `DirectoryDetailViewModelTests` × 3 | 3 |
+| U9 | Core + Web | `UserInfoServiceGroupsU9Tests` × 4 (Core) + `GroupsViewModelTests` × 3 (Web) | 7 |
+| U10 | Web | `GroupsDetailViewModelTests` × 6 | 6 |
+| U11 | Web | `ProfileEditViewModelTests` × 7 | 7 |
+| **M2 total (U3–U11)** | | | **35** |
+| M1-inherited (unchanged, re-run by M2) | Core + Web | `AuthorizationServiceTests` + `UserInfoServiceTests` (non-M2) + `ClaimShapingInvariantBTests` + `SideEffectHarnessTests` + `AdminOverrideDdlTests` + `KumunitaFeatureDdlTests` + `DbBootstrapIsPristineTests` + `EmailDeadLetterCounterTests` (Core) + `HomeControllerTests` + `HealthControllerTests` (Web) | 80 |
+| **Grand total (this run)** | | **115/115 passed, 0 failed** | **115** |
+
+**Drift note (recorded by U12, not fixed by U12 — the fix is the next unit's job):**
+
+This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-prefixed test names — e.g. `F1_Directory_OnlyAllowedRowsRendered_OtherFieldsNotLeaked`, `F4_VisibilityDenies_ContactCheckNeverRuns_NoContactAuditRow`, `F7_NonOwnerCannotManageGroup_DeniedByService_WithAuditRow`. A `Select-String` across `tests/Kumunita.Core.Tests/*.cs` and `tests/Kumunita.Web.Tests/*.cs` for `[Fact]`/`[Theory]` methods matching `F[0-9]_` returns **zero** matches — no such method exists in the landed code. U5/U6/U9/U10/U11 landed the *invariant coverage* §2.5 intended (every invariant row above maps to one or more real, passing tests) but under *different* names. Per §2.7's own rule ("Renaming or re-scoping a name is a drift event: the unit updates §2.5 in the same commit and appends a drift note"), that is the *seam-authoring* unit's drift (U5/U6/U9/U10/U11), not U12's. U12 is the *recording* unit only (plan line 161: "the *record* step — not a new test-writing step"; plan line 168: "No new test file. The three tests are *existing* unit specs being *named* as the gate"). This record therefore cites the **actual** landed names (ground truth) in the "Evidence" columns above and does not cite the §2.5 `F…`-name pins as if they had passed. **Follow-up for the next unit to touch the M2 test files or §2.5:** either (a) rename the `[Fact]` methods to match §2.5's pins, or (b) rewrite §2.5 to match the landed names — and in either case append a §2.7 drift note. U12 flags it here so the next unit does not look for the `F…`-names and find them missing.
+
+**Closed forward-references (this commit):**
+
+1. `docs/ARCHITECTURE.md` §2 — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in ARCHITECTURE.md's §2 tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the ARCHITECTURE.md §2 line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
+2. `docs/design/m1-identity-access.md` — "Profile editing UI and directory visibility rules (M2)" → closed: "✓ M2 — see `docs/design/m2-directory-profiles-groups.md` § Acceptance Gate (recorded 2026-09-04)".
