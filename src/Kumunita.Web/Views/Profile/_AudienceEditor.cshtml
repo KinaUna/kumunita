@@ -1,0 +1,117 @@
+@using Kumunita.Web.Models
+@model ProfileEditViewModel
+@{
+    // The parent-model discriminator (the Edit view sets it before each
+    // <partial> invocation): "Visibility" or "ContactVisibility". The
+    // form field names are "<Name>.Mode" and "<Name>.Grants" — the
+    // default complex model binder lands them on
+    // ProfileEditViewModel.Visibility / .ContactVisibility on the
+    // POST (the U11 "only one _AudienceEditor.cshtml exists" pin).
+    string editorName = ViewData["EditorName"] as string ?? "Visibility";
+    bool optIn = ViewData["OptIn"] is bool b && b; // only meaningful for ContactVisibility
+    var editor = string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase)
+        ? Model.Visibility
+        : (optIn ? Model.ContactVisibility : null);
+
+    var modePrefix = editorName + ".Mode";
+    var grantsPrefix = editorName + ".Grants";
+    string[] modes = { "Any", "All" };
+
+    // When opt-in is off, the editor is disabled (the "null ⇒ short-circuit"
+    // §2.4 shape — not "an empty audience"; a null gate is the "not
+    // evaluated at all" shape, which is different from an empty audience's
+    // "deny everyone" shape).
+    bool disabled = !(editor is not null);
+    var disabledAttr = disabled ? "disabled" : null;
+}
+
+<div class="audience-editor card mb-4 @(disabled ? "opacity-75" : "")">
+    <div class="card-body">
+        <h6 class="card-title" style="font-weight:600;">
+            @if (string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase))
+            {
+                <text>Visibility — who can see this profile</text>
+            }
+            else
+            {
+                <text>Contact visibility — who can see email/phone (opt-in)</text>
+            }
+        </h6>
+
+        @if (disabled)
+        {
+            <p class="text-muted" style="margin-bottom:0;">
+                Contact info is hidden for every viewer (the "null ⇒
+                short-circuit" shape of §2.4). To change this, check
+                "Opt in the contact block" below this box.
+            </p>
+        }
+        else
+        {
+            <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
+            @foreach (var m in modes)
+            {
+                var checkedMark = (editor is not null &&
+                                   string.Equals(editor.Mode, m, StringComparison.OrdinalIgnoreCase))
+                    ? "checked"
+                    : null;
+            <div class="form-check" style="margin-left:0.5rem;">
+                <input class="form-check-input" type="radio"
+                       name="@modePrefix" id="@($"{modePrefix}-{m}")"
+                       value="@m" @checkedMark @disabledAttr />
+                <label class="form-check-label" for="@($"{modePrefix}-{m}")">
+                    @m @(" — " + (m == "Any"
+                        ? "any matching grant is enough"
+                        : "every matching grant must apply (an empty grant list with \"All\" denies everyone, per C1)"))
+                </label>
+            </div>
+            }
+
+            <label class="form-label mt-3" for="@grantsPrefix" style="font-weight:600;">
+                Grants
+            </label>
+            @* The grants textarea: a JSON array of
+                {"Kind":"User"|"Group","Id":"<id>"}. The U11 single-source
+                pin: the <c>BuildAudience</c> deserializer on
+                AudienceEditorModel is the only deserialization site; this
+                textarea is the only serialization site (the controller's
+                ToEditorModel, the dual on the GET). The JSON shape is the
+                transport, not a second audience object — the <c>Audience</c>
+                document is the only audience the M1 write seam receives
+                (F13). *@
+            <textarea class="form-control font-monospace"
+                      name="@grantsPrefix" id="@grantsPrefix" rows="3"
+                      placeholder='[{"Kind":"User","Id":"&lt;subject-id&gt;"}] — or leave empty for "no one"'
+                      @disabledAttr>@(editor is not null ? (editor.Grants ?? string.Empty) : string.Empty)</textarea>
+
+            @if (editor is not null && editor.IsEmpty)
+            {
+                <div class="alert alert-warning mt-2 mb-0">
+                    <b>Empty audience.</b>
+                    @if (editor.Mode is "All")
+                    {
+                        <text>With <b>All</b> mode + an empty grant list, <b>zero
+                        grants must all apply</b> — vacuously <b>no one
+                        matches</b>, so this denies everyone (C1's "empty
+                        audience denies" invariant).</text>
+                    }
+                    else
+                    {
+                        <text>With <b>Any</b> mode + an empty grant list, <b>no
+                        grant matches</b>, so this denies everyone (C1's "empty
+                        audience denies" invariant).</text>
+                    }
+                </div>
+            }
+        }
+
+        <small class="text-muted d-block mt-2">
+            The grants are bound as a JSON array of
+            <code>{ "Kind": "User" | "Group", "Id": "&lt;id&gt;" }</code>
+            elements — the <c>AudienceEditorModel.BuildAudience</c>
+            single-source deserializer (the F13 single-write pin: the
+            <c>Audience</c> document field is the <b>only</b> audience the
+            <c>UpsertProfileAsync</c> patch ever receives).
+        </small>
+    </div>
+</div>
