@@ -25,6 +25,29 @@ public sealed class DirectoryViewModel
 
     /// <summary>How many of the viewer's candidate set were hidden (count only — no names).</summary>
     public int HiddenCount { get; set; }
+
+    /// <summary>
+    /// The directory **detail** surface (M2, plan U8) — a single-row projection of
+    /// <c>DirectoryService.DetailAsync</c>'s <see cref="Kumunita.Core.UserInfo.DirectoryDetail"/>.
+    /// <see cref="DirectoryViewModel"/> itself stays the list model (Profiles + HiddenCount);
+    /// the detail route renders <see cref="Detail"/> directly, so this is a *nested type*, not a
+    /// new property on the list model (U7's shape-pinning test on <c>DirectoryViewModel</c> stays green).
+    /// </summary>
+    /// <remarks>
+    /// The §9 pin ("contact block never on a hidden profile") at the view-model layer: a
+    /// <see cref="Detail"/> for a hidden or missing profile is projected with
+    /// <c>DisplayName = string.Empty</c>, <c>ShowContactBlock = false</c>, and
+    /// <c>Email</c>/<c>Phone = null</c> — so the view *cannot* render a contact block or even a
+    /// name/verified badge for a profile <c>Visibility</c> denied. <c>Email</c>/<c>Phone</c> are
+    /// a *subset* of <see cref="Kumunita.Core.UserInfo.Profile"/> — never
+    /// <c>Visibility</c>/<c>ContactVisibility</c>/<c>HouseholdId</c>/<c>ExternalId</c>.
+    /// </remarks>
+    public sealed record Detail(
+        string DisplayName,
+        bool Verified,
+        bool ShowContactBlock,
+        string? Email,
+        string? Phone);
 }
 
 /// <summary>
