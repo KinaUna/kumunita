@@ -793,3 +793,29 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 1. `docs/ARCHITECTURE.md` §2 — `src/Kumunita.Core/Directory/  # M2 — not yet created` → closed (the `Directory` module name in ARCHITECTURE.md's §2 tree is a *forward-reference to the layout*, not a live module name — U5's `DirectoryService` landed in `src/Kumunita.Core/UserInfo/` per its frozen `Kumunita.Core.UserInfo` namespace; the ARCHITECTURE.md §2 line is now annotated with the recorded gate + counts pointing to this doc's § Acceptance Gate).
 2. `docs/design/m1-identity-access.md` — "Profile editing UI and directory visibility rules (M2)" → closed: "✓ M2 — see `docs/design/m2-directory-profiles-groups.md` § Acceptance Gate (recorded 2026-09-04)".
+
+## M2 — Closed (recorded)
+
+**Closed 2026-09-04 by U15** (the final M2 unit; the M2→M3 handoff lives in `docs/plans-milestones/m2-handoff-notes.md` § Summary). This section freezes M2's closure. The M2→M3 handoff artifact is the *sole* one: this doc's § Acceptance Gate + the handoff-notes § Summary. There is no U16.
+
+**Recorded acceptance gate (the three tests, from U12 — see § Acceptance Gate above):**
+
+1. **Closed-loop** — signup → verify → profile visible in directory → contact on (opt-in) / hidden (empty `Visibility`).
+2. **Handoff** — the profile editor's audience choice is the *single* designed handoff: `IUserInfoService.UpsertProfileAsync(profile, patch)` (the M1 frozen write seam). M2 invents no new handoff.
+3. **Part-vs-whole** — all of M2's invariants pass, no new rule invented. **35 M2-anchored unit specs (U3–U11) + 80 M1-inherited = 115/115 passed, 0 failed.**
+
+**Two doc updates folded into the closure (both landed by U12, confirmed consistent by U15):**
+
+1. `docs/ARCHITECTURE.md` §2 — the `Directory/` tree line now names the live module + the gate + the 115/0 count, pointing at this doc's § Acceptance Gate (confirmed consistent, line 82).
+2. `docs/design/m1-identity-access.md` — the "out of scope … profile editing UI and directory visibility rules (M2)" line is **closed** (`✓ M2 — shipped`, confirmed line 53). The line is retained (the surrounding "out of scope" list's ordering depends on it); it is *not* deleted.
+
+**Deferred (still open after U1–U14; each is a clean M3 follow-up, none blocks M3):**
+
+| # | Deferred item | Source | M3 action (one line) |
+|---|---|---|---|
+| D1 | **§2.5 22-test-name drift** — §2.5's `F[0-9]_`-prefixed name pins do not exist in the landed `[Fact]` methods (U5/U6/U9/U10/U11 landed the same invariant coverage under different names). | U12 drift note | Rename the landed `[Fact]` methods to §2.5's pins **or** rewrite §2.5 to the landed names, with a §2.7 drift note in the same commit. |
+| D2 | **Playwright e2e runtime absent** — U13 authored `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (three specs) but paused: no `@playwright/test` dep, no fixture, no Postgres boot, no token channel in the repo. The specs are *not runnable*; `docs/ARCHITECTURE.md` §7 "Playwright e2e arrives later" is still a forward reference. | U13 (paused) | Land the bounded runtime (package + webServer/globalSetup booting Postgres + the `signup`/`login`/`lastCreatedGroupId` helpers in the spec footer); run the three specs and record the pass count in a new handoff-notes section (append-only). |
+| D3 | **`Models/ProfileViewModel.cs` orphaned** — zero live references after U14 removed `AccountController.Profile` + `Views/Account/Profile.cshtml`; U11's `ProfileEditViewModel` already carries the `DisplayName` + `Email` bootstrap fields. | U14 deviation 1 | Safe to delete (or keep if a later unit wants the shape). Zero live references; a one-file surface-area prune. |
+| D4 | **`IUserInfoService` unused in `AccountController` ctor** — after U14, no `IUserInfoService` method is called in `AccountController.cs`; the ctor param is retained to avoid a M2-unit DI shape change. | U14 deviation 3 | Optional: drop `IUserInfoService` from the `AccountController` ctor (and its DI wiring in `Program.cs`) if a later unit owns the controller. |
+
+**No new code, no new test, no build** — U15 is the record unit (plan line 186: "No new code, no new test"). This closes the M1-established loop: "a step-by-step plan, then run and record the three tests against the design doc's acceptance gate."

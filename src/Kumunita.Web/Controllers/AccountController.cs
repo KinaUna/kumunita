@@ -43,7 +43,7 @@ public sealed class AccountController(
     [HttpGet]
     public IActionResult Signup() =>
         User.Identity?.IsAuthenticated == true
-            ? RedirectToAction(nameof(Profile))
+            ? Redirect("/profile/edit")
             : View();
 
     [AllowAnonymous]
@@ -77,7 +77,7 @@ public sealed class AccountController(
     public async Task<IActionResult> Verify([FromQuery] string id)
     {
         if (User.Identity?.IsAuthenticated == true)
-            return RedirectToAction(nameof(Profile));
+            return Redirect("/profile/edit");
 
         await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         var token = await session.LoadAsync<IdentityToken>(id);
@@ -115,7 +115,7 @@ public sealed class AccountController(
                 scheme: CookieAuthenticationDefaults.AuthenticationScheme,
                 principal: identityPrinciple);
 
-            return RedirectToAction(nameof(Profile));
+            return Redirect("/profile/edit");
         }
         catch (InvalidOperationException ex)
         {
@@ -129,7 +129,7 @@ public sealed class AccountController(
     [HttpGet]
     public IActionResult Login([FromQuery] string? returnUrl = null) =>
         User.Identity?.IsAuthenticated == true
-            ? RedirectToAction(nameof(Profile))
+            ? Redirect("/profile/edit")
             : View(new LoginViewModel { ReturnUrl = returnUrl });
 
     [AllowAnonymous]
@@ -156,7 +156,7 @@ public sealed class AccountController(
         {
             return Url.IsLocalUrl(model.ReturnUrl)
                 ? Redirect(model.ReturnUrl)
-                : RedirectToAction(nameof(Profile));
+                : Redirect("/profile/edit");
         }
 
         ModelState.AddModelError(string.Empty,
@@ -181,52 +181,22 @@ public sealed class AccountController(
     [AllowAnonymous]
     public IActionResult AccessDenied() => View();
 
-    // ── Profile bootstrap (M1: name + email; visibility editing is M2) ─────────────────
-
+    // ── Profile (U14: M1 bootstrap page redirected to M2's editor) ─────────────────────
+    //
+    // U14 (M2) closed M1's name/email bootstrap page. The M1 action's
+    // read + write lanes are both superseded by /profile/edit (U11's write
+    // lane, the single profile-editor surface M2 promised). The M2 plan's
+    // line 184 ("the /Account/Profile route returns a 301 redirect to
+    // /profile/edit, or 404 if removed") chose the 301 stub path: a
+    // permanent redirect so any M1 bookmarks / mail links that still
+    // reference the old address land on the live editor. The M1
+    // <c>ProfileViewModel</c> (name + email + Verified) is now dead
+    // surface-level code; M2's <c>ProfileEditViewModel</c> (U11) carries
+    // the two audience fields (Visibility, ContactVisibility) + the two
+    // M1 bootstrap fields. M3 may delete the M1 VM; U14 does not (the M2
+    // plan line 183 limits U14 to the controller / nav / view).
     [Authorize]
     [HttpGet]
-    public async Task<IActionResult> Profile()
-    {
-        var subject = SubjectId(User) ?? string.Empty;
-        var model = new ProfileViewModel { Verified = false };
-
-        if (await userInfo.GetProfileAsync(subject) is { } profile)
-        {
-            model.DisplayName = profile.DisplayName;
-            model.Email = profile.Email;
-            model.Verified = profile.Verified;
-        }
-        else if (await userManager.FindByIdAsync(subject) is { } user)
-        {
-            // No Profile doc yet (pre-bootstrap edge) — seed the page from the account.
-            model.DisplayName = user.UserName;
-            model.Email = user.Email;
-        }
-
-        return View(model);
-    }
-
-    [Authorize]
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Profile(ProfileViewModel model)
-    {
-        if (!ModelState.IsValid)
-            return View(model);
-
-        var subject = SubjectId(User) ?? string.Empty;
-
-        // UpsertProfileAsync (Core) owns the session + patch semantics: non-null patch
-        // fields win, nulls leave the current row untouched (so Verified, Visibility etc.
-        // survive — only name/email change from this page). Fully qualify the type because
-        // the bare `Profile` collides with this controller's Profile() methods, which the
-        // compiler otherwise prefers over the type.
-        var baseProfile = new Kumunita.Core.UserInfo.Profile { SubjectId = subject };
-        var patch = new Kumunita.Core.UserInfo.ProfileUpdate(
-            model.DisplayName, model.Email, null, null, null);
-        await userInfo.UpsertProfileAsync(baseProfile, patch);
-
-        TempData["info"] = "Profile updated.";
-        return RedirectToAction(nameof(Profile));
-    }
+    public IActionResult Profile() =>
+        RedirectPermanent("/profile/edit");
 }
