@@ -1,0 +1,88 @@
+@model Kumunita.Web.Models.GroupDetailViewModel
+@{
+    ViewData["Title"] = Model.Name;
+
+    // The add / remove member routes each carry the same [FromForm] subjectId —
+    // the route distinguishes the two (the plan's U10 line 152 pin). The
+    // owner id the write seam takes (`addedBy` / `removedBy`) is the *actor's*
+    // subject (minted from the signed-in principal by the controller), never a
+    // form field (ADR 0003 SoD by structural identity — a form-bound owner id
+    // would defeat M1's Via: Owner / Admin derivation).
+    var addHref  = Url.Action(nameof(Kumunita.Web.Controllers.GroupsController.AddMember),  new { id = Model.GroupId });
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Groups")">← All groups</a></p>
+
+        <h1>@Model.Name</h1>
+
+        <p class="text-muted">
+            Owned by <strong>@Model.OwnerDisplayName</strong>
+            @if (Model.IsOwner)
+            {
+                <span class="badge bg-success">You own this group</span>
+            }
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        <h2>Members</h2>
+        @if (Model.Members.Count == 0)
+        {
+            <p class="text-muted">No members yet.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var m in Model.Members)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between"
+                        id="@($"remove-{m.SubjectId}")">
+                        <span>@m.DisplayName</span>
+                        <form method="post" action="@Url.Action("RemoveMember", "Groups", new { id = Model.GroupId })">
+                            <input type="hidden" name="RequestVerificationToken"
+                                   value="@Html.AntiForgeryToken()" />
+                            <input name="subjectId" type="hidden" value="@m.SubjectId" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                Remove
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            The add-member form. It carries only the target subject (the route
+            already encodes "add"; the owner id the seam takes is the actor's
+            subject, minted from the signed-in principal in the controller —
+            ADR 0003 SoD by structural identity, never a form field).
+        *@
+        <h2 class="mt-4">Add a member</h2>
+        <form method="post" action="@addHref" class="row g-2">
+            <input type="hidden" name="RequestVerificationToken"
+                   value="@Html.AntiForgeryToken()" />
+            <div class="col-sm-8">
+                <label class="visually-hidden" for="add-subjectId">Subject id</label>
+                <input type="text" class="form-control" id="add-subjectId"
+                       name="subjectId"
+                       placeholder="resident subject id" required />
+                <div class="text-muted small">
+                    The resident's subject id (the same id
+                    <a asp-controller="Directory" asp-action="Index">the directory</a> lists).
+                </div>
+            </div>
+            <div class="col-sm-auto">
+                <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+        </form>
+    </div>
+</div>

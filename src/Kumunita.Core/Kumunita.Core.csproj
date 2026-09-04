@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,8 +6,33 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Marten" Version="9.30.0" />
+    <PackageReference Include="Marten" Version="9.31.2" />
+    <!-- Raw parameterised SQL on the hand-rolled mt."AdminOverride" table
+         (ConsumeBreakGlassAsync, the break-glass consume write). Matches the Npgsql
+         10.0.x the rest of the tree (Web, Core.Tests) already pins; makes the
+         direct ADO.NET surface explicit instead of relying on Marten's transitive pull. -->
+    <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+    <!-- Explicit for AddKumunitaCore's public API (IServiceCollection); Bootstrap's DI
+         usings previously flowed transitively. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <!-- M1 step 7: Core carries the *business logic* of the durable side effects
+         (ISmtpSender, OutboxEmailSender, EmailDeadLetterWriter, AuditPurgeService —
+         all Wolverine-free). Per the repo's own convention (IMailerStage.cs and
+         DependencyInjection.cs: "Wolverine is a *Web* package"; "the step-7 Wolverine
+         handler replaces ... in the host"), the thin Wolverine 8.2.1 handler +
+         scheduled-job wrappers live in Kumunita.Web (see SideEffects/ in Kumunita.Web);
+         Core's ADR 0006-D "no HTTP types / testable" boundary is fully preserved —
+         the two stores share one Postgres through `IDocumentStore` injection, not
+         through any Wolverine-specific type in Core. -->
+    <!-- EF Core design-time: lets `dotnet ef migrations add ...` discover AppDbContext
+         without booting the Web host (the DesignTimeDbContextFactory seam). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
 </Project>

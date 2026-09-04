@@ -160,6 +160,32 @@ the interfaces; none may re-derive access on its own.
   - adding an `AccessAction` case — new actions **deny by default** on
 	audience-restricted resources until a policy opts in;
   - adding `Profile` document fields.
+
+  **Named here (M1, against this ADR):**
+  - `IAuthorizationService` gains an `IDocumentSession` overload on
+	`CanAsync`/`CanSeeAsync`; the session carries the decision's
+	`AccessAudit` row in the caller's transaction (the invariant-C3
+	same-transaction guarantee for read decisions made inside a command
+	handler's work — the frozen no-session methods retain their
+	own-commit semantics). An added method, not a change to the frozen
+	two signatures.
+  - `AccessVia` gains `Admin` — a plain-GlobalAdmin management action
+	(role change, component-scope assignment, manual-verify,
+	`moderatorAccess` toggle, delegation grant/revoke). The §5
+	vocabulary previously named six values with no slot for "an admin
+	acting as admin"; naming one keeps those rows' audit story honest
+	(recording them as `Moderator` or `BreakGlass` would answer "who
+	did this, by what right" incorrectly). Adding an enum case is an
+	extension, not a redefinition of the existing six, and no stored
+	row's meaning changes.
+  - `IIdentityService` / `IUserInfoService` gain the M1 lifecycle surface
+	(`RegisterAsync`, `VerifyWithTokenAsync`, `ManuallyVerifyAsync`,
+	`CompleteSeedAdminSetupAsync`, `ConsumeBreakGlassAsync`, `SetRoleAsync`,
+	`ChangePasswordAsync`; `UpsertProfileAsync`, `SeedComponentsAsync`,
+	`SetComponentModeratorAccessAsync`, `GetAssignmentsAsync`) — all
+	additions to the owning modules' surfaces, each appending its own
+	`AccessAudit` `<via: Admin | Owner | BreakGlass>` row in the same
+	commit as its own writes.
 - Per `in-code.md`, public surface is permanent integration cost: every
   public method is paid for by every other part. Add few, add stable.
 

@@ -43,6 +43,29 @@ Neither ORM touches the other schema. `Core` references EF only for the Identity
   Note on the table name: this feature pattern does not write to an operator-visible
   `mt.migrations` ledger (that model was IMigration-era) — the applied-state contract is
   "delta-detection against the live catalog => idempotent," not "already recorded."
+
+#### B.1 — M1 documents: Marten-native, with one hand-rolled carve-out
+
+For M1's domain documents (UserInfo: `Profile`, `Group`, `GroupMembership`,
+`DelegationGrant`, `Component`, `ModeratorAssignment`; Identity: `IdentityToken`;
+Authorization: `AccessAudit`, `AuditPurgeSummary`) the `mt` tables are **derived from
+the POCO shapes** by Marten's own document-mapping pipeline and applied through the
+same `ApplyAllConfiguredChangesToDatabaseAsync()` boot path. In other words, M1's
+Marten documents do not each need their own `FeatureSchemaBase`; the dev-loop in
+`Program.cs` (`ApplyAllDatabaseChangesOnStartup` in Development) and the versioned
+boot block (`SchemaBootstrap.ApplyAsync` in all environments) keep the `mt` tables in
+sync with the code, and a delta-detection against the live catalog makes re-runs no-ops.
+
+**The one deliberate exception:** `mt."AdminOverride"` is *not* a Marten document
+(OPS §9 — the host operator writes it directly into Postgres via psql; the app only
+reads it, and only on the hot inline break-glass path). Adding a fake C# type with a
+fake `[Id]` to force Marten to own the table would misrepresent the ownership model.
+So the DDL is a hand-rolled `IFeatureSchema` (`AuthorizationFeature`, in
+`Kumunita.Core.Authorization`) that yields the `mt."AdminOverride"` table and its
+non-unique index on `(userId, consumedAt)`, registered alongside `KumunitaFeature`
+via `StoreOptions.Storage.Add<T>()`. This is an ADR-gated carve-out: any future
+hand-rolled `mt` table must be justified the same way (operator-written, no in-app
+write path) and named in the ADR.
 - **Identity:** standard EF Core migrations, applied at startup.
 - **Applied at boot in all environments (incl. production):** the versioned steps only —
   `mt` feature changes (delta-detected, so a pristine database gets its initial state

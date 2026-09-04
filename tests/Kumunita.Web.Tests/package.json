@@ -1,0 +1,15 @@
+{
+  "name": "kumunita-web-tests",
+  "private": true,
+  "description": "TypeScript-side test plumbing for e2e-m2.spec.ts (U13). The spec's `kumunita` fixture intentionally throws per the U13 contract; the M3 Playwright runtime unit will supply the real implementation. See docs/design/m2-directory-profiles-groups.md and m2-handoff-notes.md § U13.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "typescript": "^5.9.3"
+  }
+}

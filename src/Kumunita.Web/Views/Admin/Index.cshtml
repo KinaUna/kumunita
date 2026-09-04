@@ -1,0 +1,126 @@
+@model Kumunita.Web.Models.AdminIndexViewModel
+@using Kumunita.Core.Identity
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<h1>Admin</h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<h2>Accounts</h2>
+<p class="text-muted">
+    @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified.
+</p>
+
+<form method="post" asp-action="ManuallyVerify" id="verify-queue" class="mb-4">
+    @Html.AntiForgeryToken()
+    <label for="verifySubject" class="form-label">Verify an unverified account (safety valve)</label>
+    <div class="input-group">
+        <select class="form-select" name="subjectId" autocomplete="off">
+            @foreach (var a in Model.Accounts.Where(a => !a.Verified))
+            {
+                <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
+            }
+        </select>
+        <button class="btn btn-outline-primary" type="submit">Verify</button>
+    </div>
+    @if (Model.UnverifiedCount == 0)
+    {
+        <div class="text-muted small mt-1">No unverified accounts to verify.</div>
+    }
+</form>
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Account</th>
+                <th>Roles</th>
+                <th>Scope</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var a in Model.Accounts)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@(a.DisplayName ?? a.Email ?? a.SubjectId)</div>
+                        @if (a.Email is not null && a.DisplayName != a.Email)
+                        {
+                            <div class="text-muted small">@a.Email</div>
+                        }
+                        @if (!a.Verified)
+                        {
+                            <span class="badge text-bg-warning">unverified</span>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var r in a.Roles)
+                        {
+                            <span class="badge text-bg-secondary">
+                                @r
+                                @if (r == Roles.Moderator)
+                                {
+                                    <span class="small">(@a.ComponentIds.Count component(s))</span>
+                                }
+                            </span>
+                        }
+                    </td>
+                    <td>
+                        @if (a.Roles.Contains(Roles.Moderator))
+                        {
+                            var names = Model.Components
+                                .Where(c => a.ComponentIds.Contains(c.Id))
+                                .Select(c => c.Name)
+                                .ToList();
+                            @string.Join(", ", names)
+                        }
+                    </td>
+                    <td class="text-end">
+                        <form method="post" asp-action="SetRole" class="d-inline-flex">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
+
+                            <label class="visually-hidden">Role</label>
+                            <select name="role" class="form-select form-select-sm me-2">
+                                <option value="@Roles.Member" selected="@(a.Roles.Count == 0 ? "selected" : null)">Member (no elevated role)</option>
+                                <option value="@Roles.Moderator" selected="@(a.Roles.Contains(Roles.Moderator) ? "selected" : null)">Moderator</option>
+                                <option value="@Roles.GlobalAdmin" selected="@(a.Roles.Contains(Roles.GlobalAdmin) ? "selected" : null)">GlobalAdmin</option>
+                            </select>
+
+                            @if (Model.Components.Any())
+                            {
+                                <span class="text-muted small ms-1 me-1">scope:</span>
+                            }
+                            @foreach (var c in Model.Components)
+                            {
+                                <label title="@c.Name" aria-label="@c.Name"
+                                       style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                    @* checked="" is the null-conditional attribute idiom: renders the
+                                       checked keyword when true, emits nothing when false *@
+                                    <input type="checkbox" name="componentIds" value="@c.Id" class="d-none"
+                                           checked="@(a.ComponentIds.Contains(c.Id) ? "checked" : null)" />
+                                    <span class="badge text-bg-light border">@c.Name</span>
+                                </label>
+                            }
+
+                            <button class="btn btn-sm btn-primary" type="submit">Set</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@* The "scope" checkbox set is only meaningful when the selected role is Moderator; the
+   Core SetRoleAsync ignores componentIds for non-Moderator targets (deletes them). *@

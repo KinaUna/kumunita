@@ -34,8 +34,12 @@ frozen in **ADR 0006**.
   invocation state, 6 attempts / ~24 h, `EmailDeadLetter` on final
   failure; transactional outbox so a failed send never rolls back a domain
   write — §6.2) and the `AuditPurge` scheduled job (tiered expiry, §6.4).
-- **Schema** — versioned forward-only `mt` steps for the M1 documents
-  (M0's `KumunitaFeature` pattern); `identity` EF migrations for stock
+- **Schema** — M1 domain documents are **Marten-native** (Marten owns their
+  `mt` tables from the POCO shapes, applied through the same dev-loop +
+  boot path as M0; ADR 0004 §B.1). The one hand-rolled exception is
+  `mt."AdminOverride"` (operator-written in psql, app only reads it),
+  contributed by a small `AuthorizationFeature` registered alongside
+  M0's `KumunitaFeature`. `identity` schema: EF migrations for stock
   Identity tables (+ `ExternalId` reserved). `FirstBootSeeder` extended:
   components seed (Safety, Maintenance, Social, Governance) + admin
   bootstrap, idempotent.
@@ -44,9 +48,18 @@ frozen in **ADR 0006**.
 - **`/health` degraded state** — reports `degraded` when
   `EmailDeadLetter` count > 0 (§6.2).
 
+**Non-goal for now (deliberate interim)** — the current **self-service sign-up
+with the verification email + admin manual-verify valve is an open** state we
+accept *for this release only*, because the only residents are the development
+team. The long-term default is **invitation-only accounts**: an admin invites
+a resident and they self-serve their password from an invitation link, rather
+than open registration. This is tracked as an open item in SECURITY.md §6
+(the control that answers A2 — the signup bot — better than rate limiting
+alone) and deferred in README.md *Deferred (future, by design)*.
+
 **Out of scope**
 
-- Profile editing UI and directory visibility rules (M2).
+- Profile editing UI and directory visibility rules (M2)
 - Posts, components UI, reports and report-driven moderator unlock (M3 —
   the `moderatorAccess` mechanism, not its triggers, lands in M1).
 - Events/projects (M4/M5); export/iCal/notification surfaces (M6);
@@ -73,13 +86,9 @@ risk is a *wrong* access decision, not load).
 
 ## Parts affected
 
-- `Kumunita.Core`: new `Identity/` module (issues principal), `UserInfo/`,
-  `Authorization/`; `Bootstrap/FirstBootSeeder` extended; Wolverine email
-  handler + `AuditPurge` job; `mt` versioned steps.
-- `Kumunita.Web`: signup/login/profile pages; `/admin` area; `/health`
-  degraded wiring.
-- `tests/Kumunita.Core.Tests`: seam tests (against the `PostgresFixture`'s
-  fresh-scratch-DB shape — no fixture change needed).
+- **`Kumunita.Core`:** new `Identity/` module (issues principal), `UserInfo/`, `Authorization/`; `Bootstrap/FirstBootSeeder` extended; the Wolverine-free business-logic seam of the side effects (`ISmtpSender` + `SmtpSender`, `IMailerStage`/`OutboxEmailStager`, `EmailDeadLetterWriter`, `AuditPurgeService` — all testable against `PostgresFixture`); schema: M1 Marten documents (POCO-derived `mt` tables) + hand-rolled `AuthorizationFeature` for `mt."AdminOverride"` (ADR 0004 §B.1).
+- **`Kumunita.Web`:** signup/login/profile pages; `/admin` area; `/health` degraded wiring. Wolverine side-effects host: `WolverineFx` + `WolverineFx.Marten` packages, `src/Kumunita.Web/SideEffects/OutboxEmailHandler.cs` (durable `OutboxEmail` send + `Fault<OutboxEmail>` dead-letter hook) and `src/Kumunita.Web/SideEffects/AuditPurgeHandler.cs` (`AuditPurgeTick` self-rescheduling `TimeoutMessage`), wired in `Program.cs` (`UseWolverine`, `RetryWithCooldown`, `PublishFaultEvents`). Per the `IMailerStage` doc-comment convention ("Wolverine is a *Web* package"), Core references no Wolverine types.
+- **`tests/Kumunita.Core.Tests`:** seam tests (against the `PostgresFixture`'s fresh-scratch-DB shape — no fixture change needed) plus the step-7 side-effect harness (`SideEffectHarnessTests.cs` — dead-letter row shape, the failing-send handoff guarantee, `AuditPurge` tiering), written against the Wolverine-free business logic so no live message host is required.
 
 ## Seams & contracts (mandatory)
 
@@ -237,12 +246,40 @@ it, later content is a bag of parts nobody can route trust through.
 1. **Closed-loop:** sign-up → verification → verified sign-in (and
    first-boot admin → verified sign-in) completes entirely on-platform;
    the only exit is the verification link, which returns the resident to
-   the platform. ✔
+   the platform.
 2. **Handoff:** exactly one designed handoff (the verification email,
-   single send); no re-explaining, no re-keying anywhere in M1. ✔
+   single send); no re-explaining, no re-keying anywhere in M1.
 3. **Part-vs-whole:** no resident-facing metric to over-fit; the cost is
    team time spent on seam tests — the whole's insurance policy, not a
-   part's output. ✔
+   part's output.
+
+### Run result (M1 step 9 acceptance gate — 2026-07-08)
+
+Ran via VS Test Explorer (Testcontainers `postgres:18`, fresh scratch DB
+per class via `PostgresFixture`): **`Kumunita.Core.Tests` 73/73 passed,
+`Kumunita.Web.Tests` 7/7 passed.**
+
+Evidence per test:
+
+| # | Test | Evidence (all passed) |
+|---|------|----------------------|
+| 1 | Closed-loop | `UserInfoServiceTests` profile verify round-trip + dead-lettered-email recovery path (`SideEffectHarnessTests`); `/health` keeps the app *live* (200) while degraded (`HealthControllerTests.Get_When_EmailDeadLetters_Returns_DegradedStatus_WithCount`) — nothing in the loop requires leaving the platform |
+| 2 | Handoff | `SideEffectHarnessTests.FailedSend_NeverRollsBackTheCommittedDomainWrite_TheHandoff` — the single designed handoff (staged email → durable send) is the only cross-seam, and its failure never tears down the on-platform state; `EmailDeadLetterCounterTests.GetCountAsync_ReflectsStoredDeadLetters_AgainstRealPostgres` — the handoff's failure signal is operator-visible via the production counter |
+| 3 | Part-vs-whole | the full invariant-anchored seam list below, all passing — the whole's insurance, run before M1 ships, not as follow-up |
+
+Seam-list → test mapping (each anchored to its ADR 0006 invariant):
+
+| Invariant | Seam test(s) | Result |
+|-----------|--------------|--------|
+| C1 (empty-audience guard) | `EvaluateAudience_EmptyAudience_AnyMode_Denies`, `…_AllMode_Denies` | ✔ |
+| C2 (delegation action-scoped, `Via = Delegation`) | `C2_Delegate_InScope_BorrowsOwnersStanding_AllowsViaOwnerBranch`, `C2_Delegate_OutOfScope_Denies_WithDelegationViaRecorded` | ✔ |
+| C3 (audit with the domain write, Allow *and* Deny) | `C3_AuditRow_CommitsWithTheDecision_AllowAndDeny`, `UserInfoServiceTests.AddAndRemoveGroupMember_UpdatesMembershipAndWritesAudit`, `…_GrantDelegationAsync_…`, `…_RevokeDelegationAsync_…`, `…_SetComponentModeratorAccessAsync_…` | ✔ |
+| C4 (membership live on next request) | `GetGroupIdsAsync_LiveMembership_C4_StrongConsistency`, `C4_MembershipChange_IsLiveOnTheNextDecision` | ✔ |
+| C5 (moderator access OFF by default) | `C5_ModeratorAccess_OffByDefault_ModeratorCannotSee`, `C5_ModeratorAccess_OnWithAssignment_ModeratorCanSee`, `SeedComponentsAsync_CreatesFour_AllModeratorAccessFalse_IdempotentReRun` | ✔ |
+| C6 (bulk ≡ per-item aggregate) | `C6_BulkMatches_PerCanAsync_AggregateOverSameCandidates` | ✔ |
+| §B (claim set = whole principal, no relational data) | `ClaimShapingInvariantBTests` (11 tests incl. `Build_NeverProduces_ForbiddenKT`) | ✔ |
+| Break-glass (inline, no job) | `BreakGlass_ConsumedAndUnexpired_Elevates`, `BreakGlass_NotConsumed_DoesNotElevate`, `BreakGlass_Expired_DoesNotElevate` | ✔ |
+| `/health` degraded (OPS §8) | `HealthControllerTests.Get_When_EmailDeadLetters_Returns_DegradedStatus_WithCount` (unit) + `EmailDeadLetterCounterTests` (production counter vs Postgres) | ✔ |
 
 FACES name-carry (per definition-of-done, in-code.md): strengths =
 **Stable + Coherent**, spend = **Flexible** (`Any`/`All` frozen early;
