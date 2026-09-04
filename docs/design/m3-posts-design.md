@@ -694,13 +694,149 @@ The following pins are **frozen** in this doc, and any violation is a `## U<m>
 > (5 + 4 rows) are the pin. The 11 + 10 + 18 + 5 + 4 (and the 3 records,
 > 4 methods, 6-member adapter, 3 POCOs) are the *frozen counts* of Part 2.
 
+### Run result (M3 acceptance gate — 2026-09-04)
+
+Command: VS Test Explorer `run_tests` (filter `Project=Kumunita.Core.Tests`,
+`Project=Kumunita.Web.Tests`).
+Testcontainers `postgres:18`; `PostgresFixture` fresh scratch DB per class.
+M2's U11 precedent still applies: CLI `dotnet test` returns exit-code 5 "Zero
+tests ran" in this workspace, the VS Test Explorer is the working runner.
+
+**`Kumunita.Core.Tests` 105/105 passed, 0 failed** (18 M3-pinned
+`PostServiceTests` per U9 + 87 inherited M1/M2 — `AuthorizationServiceTests`,
+`ClaimShapingInvariantBTests`, `AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`,
+`DbBootstrapIsPristineTests`, `SideEffectHarnessTests`, `DirectoryServiceTests`,
+`DirectoryServiceTests_U6`, `ProfileToAuditableResourceTests`, `UserInfoServiceTests`,
+`UserInfoServiceGroupsU9Tests`). **`Kumunita.Web.Tests` 37/37 passed, 0 failed**
+(`HealthControllerTests`, `HomeControllerTests`, `DirectoryIndexViewModelTests`,
+`DirectoryDetailViewModelTests`, `ProfileEditViewModelTests`, `GroupsViewModelTests`,
+`GroupsDetailViewModelTests`, `MilestonesTests`, `RepositoryInfoTests`).
+**Total: 142/142 passed, 0 failed.** No reds.
+
+Record (shape mirrored from M2 — `#` | `Test` | `Evidence (actual test names)`):
+
+| # | Test | Evidence (actual test names — all passed) |
+|---|------|-------------------------------------------|
+| 1 | **Closed-loop** (author creates a post → it appears in their own feed on the next request; the aggregate `AccessAudit` row for the feed visit is present with `VisibleCount ≥ 1` and `TargetKind = "post"`) | `PostServiceTests.F1_FeedVisibleToAudienceMember` (F1, C6, C3 — the audience member's feed contains the post and the decision row is `Allowed`; the author's own feed is the closed-loop instance of the same `F1` pin, where `Owner` is the `Via` the feed's `CanSeeAsync` resolves), `PostServiceTests.F4_EmptyAudiencePostAuthorSeesOwnDraft` (F4, C1 — the owner-branch exception when `Audience` is `Any+empty`: the author's feed still contains the draft; the non-author's does not), `PostServiceTests.Feed_AggregateAuditRowShape` (C-M3·3 — the feed's *single* `AccessAudit` row has `TargetKind = "post"`, `Action = "read"`, `VisibleCount`/`HiddenCount` set as pinned; the closed-loop's `VisibleCount ≥ 1` is the observable in this test). |
+| 2 | **Handoff** (a group member is added **after the post was created** and sees the post on the **next** feed render — strong consistency (C4, F5); the *delegate* branch is the "handoff to a delegate" case for the same pin (F6, C2)) | `PostServiceTests.F5_MembershipChangeReScopesNextRequest` (F5, C4 — a `GroupMembership` row added *after* `CreatePostAsync` re-scopes the *next* `ListFeedAsync` call: the new member's feed now contains the post on the subsequent render; M1's `AuthorizationService` is unchanged — M3's pin *is* that the next call sees the live row; no caching in M3), `PostServiceTests.F6_DelegateWithReadInScopeSeesAuthorPost` (F6, C2 — the *delegate* branch: a `DelegationGrant` with `Read` in scope lets the delegate see the owner's post on the feed; the same *strong-consistency* lane as F5, through `CanSeeAsync`'s delegate pass), `PostServiceTests.F7_DelegateWithoutReadDenies` (F7, C2 — the boundary: a delegate without `Read` in scope sees *nothing*; the handoff is *action-scoped*, not blanket). |
+| 3 | **Part-vs-whole** (the 18-test list is the **whole**; the closed-loop + handoff tests are the **parts**; all three — plus the M1-inherited (C1–C6) and M2-inherited (C-M2·1..3) anchors re-run unchanged — must pass together) | U9's 18 pinned `[Fact]`s in `tests/Kumunita.Core.Tests/PostServiceTests.cs` (`F1_FeedVisibleToAudienceMember` · `F2_FeedHiddenFromNonMember` · `F3_FeedDeniesModeratorOnAudiencePost` · `F4_EmptyAudiencePostAuthorSeesOwnDraft` · `F4_EmptyAudiencePostDeniesNonAuthor` · `F5_MembershipChangeReScopesNextRequest` · `F6_DelegateWithReadInScopeSeesAuthorPost` · `F7_DelegateWithoutReadDenies` · `F8_ComponentIsFilterNotAccessGate` · `F9_CandidateFilterEmitsNoAuditRow` · `F10_ReplyVisibleIffParentVisible` · `F10_ReplyNotEvaluatedOnParentDeny` · `Feed_AggregateAuditRowShape` · `Detail_DecisionAuditRowShape_ViaOwner` · `Detail_DecisionAuditRowShape_ViaAudience` · `Detail_DecisionAuditRowShape_ViaDelegation` · `AuthorAudienceWrittenVerbatim` · `PostService_MakesNoModerateCall`) — all 18 green — **plus** the M1-inherited anchors (`AuthorizationServiceTests`, `ClaimShapingInvariantBTests`, `AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`, `DbBootstrapIsPristineTests`, `SideEffectHarnessTests`) and the M2-inherited anchors (`DirectoryServiceTests`, `DirectoryServiceTests_U6`, `ProfileToAuditableResourceTests`, `UserInfoServiceTests`, `UserInfoServiceGroupsU9Tests`) — all re-run unchanged in the same execution, still passing. **`Kumunita.Core.Tests` 105/105 passed, 0 failed** in this run. |
+
+**E2E status.** The Playwright scaffolding (M2's U13 spec +
+`tests/Kumunita.Web.Tests/package.json` + `playwright.config.ts`) is
+**present** in the repo and the M2 spec is **enumerable** (`npx playwright
+test --list` reports 3 M2 specs at `e2e-m2.spec.ts:156/202/258`). Two
+observations block M3's e2e from running in this unit:
+
+1. **No `e2e-m3.spec.ts` exists** in `tests/Kumunita.Web.Tests/`. The M3
+   plan register does not name any unit that authors the M3 e2e spec;
+   U9's handoff exit says "no e2e authored (U11)", but U11's own spec is
+   the `ARCHITECTURE.md` flip + `## Summary` handoff and does not author
+   an e2e either — that attribution is a **plan-documentation slip**,
+   recorded here per U1's unit-series convention (flag slips in the
+   handoff, body/spec authoritative; not a §2.6 drift-pause since no
+   frozen pin is touched). **No M3 unit lands the Playwright runtime
+   implementation** (`kumunita.signup / login / lastCreatedGroupId`
+   helpers) the M2 spec — and thus any M3 spec — would need.
+2. **M2's D2 deviation** (`m2-directory-profiles-groups.md` § Deviation
+   register — "the `kumunita` fixture is a documented *throw*, pending an
+   M3-landed runtime") is **still open** in this workspace; U10's check
+   (`npx playwright test --list` enumerates cleanly but executing the
+   spec would fail on the `throw`) confirms the runtime has not been
+   landed by any M3 unit.
+
+Per U10's fallback path (the runtime is **not present**, and U10's
+Deliverables are the design doc only — "No code, no build"), the e2e is
+therefore **neither authored nor run** in this unit, and the gap is
+recorded here + in the handoff note. **The gate is evidenced at the
+seam-test layer** by U9's 18 `PostServiceTests`: per §2.5 the three
+gate tests (closed-loop row 1 / handoff row 2 / part-vs-whole row 3) are
+*defined by* the 18 (rows 1 and 2 are the F1/F4/F5/F6/F7 + `Feed_...`
+pins; row 3 is the 18 itself). **This is not a gate fail** — 18/18 pin
++ 142/142 inherited + M1/M2 anchors re-run unchanged in this unit, 0
+failed.
+
+The *unit that lands* the Playwright runtime (`kumunita` fixture
+implementation + M3-authored `e2e-m3.spec.ts`) — a **future milestone**
+(M3b or M4, whichever owns the moderation surface the runtime would end
+to end) — records the M3 e2e pass count in a subsequent `### Run result
+(M3 e2e — <date>)` section of this doc.
+
+**Drift status.** No `## U<m> — Drift pause` sections exist in the handoff note. The plan-documentation slips recorded by U1, U3, U4, and U9 (invariant count 12 vs 11, `IUserInfoService` method count 15 vs 16, `site.js` `JSON.stringify` vs `FormData`, F3/F8 C5-reading interpretation) are all flagged as **not §2.6 drift-pauses** and **do not affect the frozen pins**; they are carried into U11's close for the M3b-reconcile pass. No still-open §2.6 drift.
+
 ---
 
 ## M3 — Closed (recorded)
 
-> **Placeholder — this section is empty until U10 (gate record) and U11 / U12
-> (close) have appended the final entry.**
-> it opens the record. The three-test gate table, the `ARCHITECTURE.md` §2
-> note update, and the M3b deferral list (the "Out of scope" block above,
-> each with a one-line M3b candidate) will be appended here by U12 in its
-> close.
+M3 is closed. The three-test gate is recorded above in § `Run result (M3
+acceptance gate — 2026-09-04)` (all PASS: closed-loop · handoff ·
+part-vs-whole, `Kumunita.Core.Tests` 105/105 + `Kumunita.Web.Tests` 37/37 =
+142/142, 0 failed, M1 + M2 anchors re-run unchanged). The `ARCHITECTURE.md`
+§2 `Posts/` line is flipped to **M3 ✓ live** with the gate summary (the
+`Moderation/` line is re-marked **M3b — not yet created**; the `Events/` and
+`Projects/` lines are untouched). **This design-doc close is the *record*
+close; the sole M3→M3b *handoff* artifact is `docs/plans-milestones/
+m3-handoff-notes.md` § `## Summary` (U11's close)** — read that section first
+when starting M3b's U1 (it holds the 11-unit table + the reconciled count
+drift + the 6-item deferral list in a single artifact).
+
+### M3b deferral list (each named, each with a one-line M3b candidate)
+
+The Part 1 "Out of scope — M3b deferral" block is M3's M1-style "out-of-scope"
+close; the six items below are the reconciled, named list U11's `## Summary`
+carries forward — the same six, in the same order, with the next-owner cue
+each one carries. M3b's U1 (the design-doc author for the `Moderation`
+module) reads this list on entry; the *sole* M3→M3b handoff artifact (U11's
+`## Summary`) holds the table + the reconciled count drift + the same six
+items.
+
+1. **Report workflow — file / assign / unlock / resolve.** The `Report`
+   *table* is registered (U3, 7 fields, `Status` nullable, no index, no
+   surface, no tests); the *workflow* (the `FileReportAsync` /
+   `AssignReportAsync` / `UnlockAsync` / `ResolveReportAsync` command surface
+   + the assignment UI + the resolve-UI) is M3b's. **M3b candidate:** the
+   M3b U1 design-doc unit for a new `Kumunita.Core/Moderation/` module that
+   lands the C5 carve-out (moderator default-OFF at the component's
+   `ModeratorAccess` flag — M1 branch #2, the pin F3/F8's "absence" tests
+   name).
+2. **The `Via = Report` read branch on a post** (a moderator sees a
+   previously-invisible post *through* a filed report). **M3b candidate:**
+   the M3b U1 design-doc unit — a read-lane pin on a (new)
+   `IReportService.CanReadWithReportAsync`-shaped seam, or a direct branch
+   on `AuthorizationService.Decide` (the thinner lane is decided in that
+   unit; ADR 0006-E compatible-lane applies, mirroring the M3 lane U4 just
+   landed).
+3. **Moderator surfaces — the moderator queue, the resolve UI, the "assign
+   to a moderator" form.** `/admin` (M1's admin surface) is **unchanged** in
+   M3 (the ADR 0003-SoD pin names this). **M3b candidate:** a new
+   `/moderation` surface — its own controller + Razor views; the queue is a
+   read over `Report` ordered `At` desc + `Status` desc; the resolve form is
+   a `Report` write lane that sets `Status`.
+4. **The post `Status` field (hidden / removed) and the M3b removal path.**
+   M3's `Post` POCO has **no** `Status` column (U3 registered the field
+   *absent*, not nullable-not-set). **M3b candidate:** the M3b design-doc
+   unit owns the `Post.Status` enum (`active` / `hidden` / `removed`) + the
+   two write lanes (`HidePostAsync` / `RemovePostAsync`) + the C5 `Moderate`
+   action id it will exercise (the pin U1's C5 carve-out says M3b owns).
+5. **The reply `POST /posts/{id}/replies` route** — U7's 4-route set
+   (3 GET + `POST /posts/new`) does not include it; U8's `Detail.cshtml`
+   links to it and it currently 404s. The Core write lane
+   (`PostService.CreateReplyAsync`, U6) is present and is the *only* write
+   seam (C3's single-write pin) — a ~10-line action closes the route (no new
+   seam, no new seam-test name, the design-doc §2.2 `CreateReplyAsync` pin
+   already exists). **M3b candidate:** M3b's U1 registers it as a small
+   "close-the-loop" micro-unit *before* the `Moderation` design doc (or
+   the M3b U1 design-doc unit owns it inline — the register's U9
+   "the 18-test file" ordering in M3 does not pre-empt this, so M3b decides).
+6. **The E2E spec (`e2e-m3.spec.ts`).** The Playwright scaffolding is
+   present-and-enumerable but no M3 unit authors the spec; M2's D2
+   deviation (`kumunita` fixture is a documented *throw*) is still open.
+   **M3b candidate:** whichever future milestone lands the runtime (M3b or
+   M4, whichever owns the surface the runtime ends-to-end) authors + runs
+   the spec and records the pass count in a subsequent `### Run result (M3
+   e2e — <date>)` section of this doc (above this close, not replacing it).
+
+---
+
+*M3 is closed. M3b opens from U11's `## Summary` in the handoff note —
+that section is the sole M3→M3b handoff artifact (the 11-unit table + the
+reconciled count drift + the six items above, in one place).*

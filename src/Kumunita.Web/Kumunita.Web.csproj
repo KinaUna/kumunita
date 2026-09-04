@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.TypeScript.MSBuild" Version="7.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- M1 step 7: durable side effects (plan line 40). WolverineFx is the durable
          handler + scheduled job framework; WolverineFx.Marten gives us the
@@ -32,13 +36,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- TS toolchain version for the (npm/tsc) front-end. VS reads this to pick the
-         TypeScript language service; without it Visual Studio 2026 falls back to the
-         semver range in package.json ("^7.0.2") which isn't a parseable Version and
-         warns "invalid value for TypeScriptToolsVersion". Pinned to the exact installed
-         version so it stays in sync. Does NOT affect the build (TS is compiled by
-         `npm run build`/tsc, not MSBuild). -->
-    <TypeScriptToolsVersion>7.0.2</TypeScriptToolsVersion>
   </PropertyGroup>
 
 </Project>

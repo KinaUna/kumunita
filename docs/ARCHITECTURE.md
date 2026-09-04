@@ -80,10 +80,10 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── UserInfo/           # UserInfoModule     (M1)
     │   │   ├── Authorization/      # AuthorizationModule (M1) — also AuditPurgeService (Wolverine-free tiering)
     │   │   ├── Directory/          # M2 ✓ — DirectoryService (list/detail/preview) + profile editor + groups — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 115 unit specs 0-failed; see design/m2-directory-profiles-groups.md § Acceptance Gate (2026-09-04)
-    │   │   ├── Posts/              # M3 — not yet created
+    │   │   ├── Posts/              # M3 ✓ — post/reply documents (M3DocTypes) + PostService (feed/detail/create/reply) + component-organized feeds — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 18 M3-pinned unit specs 0-failed; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Events/             # M4 — not yet created
     │   │   ├── Projects/           # M5 — not yet created
-    │   │   └── Moderation/         # M3 — not yet created
+    │   │   └── Moderation/         # M3b — not yet created (the `Report` *table* shipped dormant in M3; the report file/assign/unlock/resolve workflow, the `Via = Report` read branch, and the moderator queue/resolve UI are M3b's — see design/m3-posts-design.md § Out of scope — M3b deferral)
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── appsettings*.json
