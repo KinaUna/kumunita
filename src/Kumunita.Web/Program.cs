@@ -114,6 +114,15 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
     .AddEntityFrameworkStores<AppDbContext>()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
 
+// AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory> registers the factory
+// against the abstract base (UserClaimsPrincipalFactory<User, IdentityRole>) — that
+// is how SignInManager resolves it. It does NOT make the concrete type resolvable,
+// so the /admin/setup handoff (AdminSetupController) and Verify (AccountController)
+// must register it by name too; otherwise DI throws "Unable to resolve service
+// for type KumunitaClaimsPrincipalFactory". Keep the two registrations pointing at
+// the same concrete class so there is still exactly one minting path per sign-in.
+builder.Services.AddScoped<KumunitaClaimsPrincipalFactory, KumunitaClaimsPrincipalFactory>();
+
 // Data protection key persistence (OPS §10, SECURITY.md hardening).
 //
 // Default ASP.NET behavior is in-memory keyring: the container's keyring is
