@@ -35,6 +35,7 @@ All per-instance identity and integration is env. The *image* is identical every
 | `SMTP__User` / `SMTP__Pass` | If auth   | — / Yes| SMTP credentials                               |
 | `SeedAdmin__Email`          | First-run | No     | Initial GlobalAdmin address                    |
 | `SeedAdmin__Token`          | First-run | Yes    | **One-time** setup token, consumed on first login — never a reusable password |
+| `DataProtection__KeysDirectory` | Recommended | No | Persistent directory holding the data-protection keyring — keeps sign-in + antiforgery state across redeploys (COOLIFY §5.2). Omit = in-memory (sessions die on restart) |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
