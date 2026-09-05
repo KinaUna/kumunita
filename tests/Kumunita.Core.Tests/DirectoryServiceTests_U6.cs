@@ -434,8 +434,8 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // denial (`Visible` empty ⇔ `Allowed` false, `Via` and effective
         // principal pinned to the actor's own standing).
         Assert.False(singleDeny.Allowed);
-        Assert.Equal(singleDeny.Via, AccessVia.Audience);
-        Assert.Equal(singleDeny.EffectivePrincipalId, other);
+        Assert.Equal(AccessVia.Audience, singleDeny.Via);
+        Assert.Equal(other, singleDeny.EffectivePrincipalId);
 
         // C3's audit-row shape (3 rows total: CanAsync's 1 + CanSeeAsync's 1
         // aggregate + 1 per-item) agrees with the Deny decision.
@@ -524,7 +524,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // hidden profile (the owner's group-scoped one, denied by the group-scoped
         // audience).
         var before = await svc.ListAsync(member, viewerVerified: true);
-        Assert.Equal(1, before.Visible.Count);
+        Assert.Single(before.Visible);
         Assert.Equal(1, before.HiddenCount);
         Assert.Contains(before.Visible, p => p.SubjectId == member);
         Assert.DoesNotContain(before.Visible, p => p.SubjectId == owner);
@@ -572,7 +572,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         // (e) The loss of access is live on the very next `ListAsync` (C4/F2, the
         // `RemoveGroupMemberAsync` interface doc's own wording).
         var afterRemove = await svc.ListAsync(member, viewerVerified: true);
-        Assert.Equal(1, afterRemove.Visible.Count);
+        Assert.Single(afterRemove.Visible);
         Assert.Equal(1, afterRemove.HiddenCount);
         Assert.Contains(afterRemove.Visible, p => p.SubjectId == member);
         Assert.DoesNotContain(afterRemove.Visible, p => p.SubjectId == owner);

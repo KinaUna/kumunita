@@ -1,0 +1,175 @@
+@model Kumunita.Web.Models.PostComposeViewModel
+@{
+    ViewData["Title"] = "Write a post";
+    string[] modes = { "Any", "All" };
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1>Write a post</h1>
+        <p class="text-muted">
+            A post is visible only to the audience you choose below — the
+            component picks which *feed* it lands in (a label, not a gate).
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (Model.Components.Count == 0)
+        {
+            <div class="alert alert-warning">
+                No enabled community to post to. Ask a resident
+                (or, via <code>/admin</code>, a global admin) to enable one
+                under the components list — the seeded defaults are
+                <code>safety</code>, <code>maintenance</code>,
+                <code>social</code>, <code>governance</code>.
+            </div>
+        }
+
+        <form id="new-post-form" method="post" action="/posts/new">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="component" style="font-weight:600;">
+                        Community (the feed this post lands in)
+                    </label>
+                    <select class="form-control" id="component" name="ComponentId" required>
+                        @foreach (var (id, name) in Model.Components)
+                        {
+                            <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">
+                                @name
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        The community is the *feed label* — it is never a
+                        privacy decision (invariant C-M3·2). Only the
+                        audience below decides who can see the post.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col">
+                            <label class="form-label" for="title" style="font-weight:600;">
+                                Title
+                            </label>
+                            <input class="form-control" type="text" id="title" name="Title"
+                                   maxlength="120"
+                                   placeholder="optional" />
+                            <div class="text-muted small mt-1">
+                                A short headline (≤ 120 chars). Leave blank for a
+                                body-only post — the list will show your first
+                                line of the body instead.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="body" style="font-weight:600;">
+                                Body
+                            </label>
+                            <textarea class="form-control" id="body" name="Body" rows="6" required
+                                      placeholder="…"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;">
+                        Audience — who can see this post
+                    </h6>
+
+                    <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
+                    @foreach (var m in modes)
+                    {
+                        var checkedMark =
+                            string.Equals(Model.Audience.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                ? "checked"
+                                : null;
+                        <div class="form-check" style="margin-left:0.5rem;">
+                            <input class="form-check-input" type="radio"
+                                   name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                   value="@m" @checkedMark required />
+                            <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                @m @(" — " + (m == "Any"
+                                    ? "any matching grant is enough"
+                                    : "every matching grant must apply (an empty grant list with \"All\" denies everyone, per C1)"))
+                            </label>
+                        </div>
+                    }
+
+                    <label class="form-label mt-3" for="aud-grants" style="font-weight:600;">
+                        Grants
+                    </label>
+                    <textarea class="form-control font-monospace"
+                              name="Audience.Grants" id="aud-grants" rows="3"
+                              placeholder='[{"Kind":"User","Id":"&lt;subject-id&gt;"}] — or leave empty for "no one (except you as the author)"'>
+                        @(Model.Audience.Grants ?? string.Empty)
+                    </textarea>
+
+                    @if (Model.Audience.IsEmpty)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0">
+                            <b>Empty audience.</b>
+                            @if (string.Equals(Model.Audience.Mode, "All", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <text>With <b>All</b> mode + an empty grant list,
+                                <b>zero</b> grants must all apply — vacuously <b>no
+                                one</b> matches, so this denies everyone. Only
+                                you (the author) will see your own post, via the
+                                owner branch of C1.</text>
+                            }
+                            else
+                            {
+                                <text>With <b>Any</b> mode + an empty grant list,
+                                <b>no</b> grant matches, so this denies everyone.
+                                Only you (the author) will see your own post, via
+                                the owner branch of C1.</text>
+                            }
+                        </div>
+                    }
+
+                    <small class="text-muted d-block mt-2">
+                        A single-JSON-array of
+                        <code>{ "Kind": "User" | "Group", "Id": "&lt;id&gt;" }</code>
+                        elements. This is the *only* audience on the post —
+                        never auto-augmented by any logic above or below this
+                        form (ADR 0001-B; the
+                        <c>Post</c> document's
+                        <c>Audience</c> field is
+                        written verbatim to exactly what you post).
+                    </small>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Post it</button>
+                <button type="button" class="btn btn-outline-secondary"
+                        onclick="this.form.reset();">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+
+}

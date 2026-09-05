@@ -12,6 +12,18 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
         </li>
+        @* M3 (U8): the single-entry Community nav link. The "exact routing is
+           U8's call" line of the plan pins the nav to *one* entry linking to
+           the Posts feed (the "default community" — the first-seeded component,
+           id "safety", per FirstBootSeeder's seed order) — one line, not three
+           (the "part sprawl" anti-pattern). *@
+        <li class="nav-item">
+            <a class="nav-link text-dark"
+               asp-controller="Posts" asp-action="Index"
+               asp-route-componentId="safety">
+                Community
+            </a>
+        </li>
         @if (isGlobalAdmin)
         {
             <li class="nav-item">

@@ -2,7 +2,7 @@
 
 ## Context
 
-Steps 1–3 of M1 are complete (per `docs/plans-milestones/plan-m1-implement-identity,-groups,-delegation,-authorization.md`):
+Steps 1–3 of M1 are complete (per `docs/plans-milestones/plan-m1-identity-groups-delegation-authorization.md`):
 - ADR 0006 interfaces materialized (`IUserInfoService` fully sketched at `src/Kumunita.Core/UserInfo/IUserInfoService.cs`, 89 lines).
 - M1 document POCOs land next to `Kumunita.Core/UserInfo/` and `Kumunita.Core/Authorization/` (`Profile`, `Group`, `GroupMembership`, `DelegationGrant`, `AccessAudit`, `AccessAction`, `IAuditableResource`, `Audience`); `M1DocTypes.cs` pins the non-default Marten conventions (e.g. `Profile`'s identity is `SubjectId`).
 - M0's `KumunitaFeature` + Marten 9 `FeatureSchemaBase` pattern already in use; M1's `mt` tables are versioned through the same path.
@@ -94,7 +94,7 @@ Total: 11 tests (one per mutating method + the C5 idempotent re-run as its own t
 - **C4 proof** — the "membership flips on the very next call" tests (2, 5, 6) show live reads.
 - **C5 proof** — test 9 pins `ModeratorAccess = false` through an idempotent re-run.
 - **C3 proof** — each mutating test asserts both the domain row and the `AccessAudit` row are present *after* the service returns; the two rows are written in the same session/`SaveChangesAsync`.
-- Update `docs/plans-milestones/plan-m1-implement-identity,-groups,-delegation,-authorization.md` step-4 line (checkmark / status) once green.
+- Update `docs/plans-milestones/plan-m1-identity-groups-delegation-authorization.md` step-4 line (checkmark / status) once green.
 
 ## Risks
 
@@ -111,4 +111,4 @@ Total: 11 tests (one per mutating method + the C5 idempotent re-run as its own t
 4. **Implement the group lifecycle** (`CreateGroupAsync`, `AddGroupMemberAsync`, `RemoveGroupMemberAsync`), each in one Marten session ending in a single `SaveChangesAsync`; add/remove append their `AccessAudit` row with `Via` per the derivation rule. Add tests 4–6. Build → test → green.
 5. **Implement delegation** (`GrantDelegationAsync`, `RevokeDelegationAsync`), one session each; both append `AccessAudit` rows with `Via` per the rule. Add tests 7–8. Build → test → green.
 6. **Implement components + profile upsert** — `SeedComponentsAsync` (read-then-decide upsert by key, `ModeratorAccess = false` per C5), `SetComponentModeratorAccessAsync` (audit via Admin, Target "component"), `GetAssignmentsAsync`, `UpsertProfileAsync` (non-null patch takes priority). Add tests 9–11. Build → test → green.
-7. **Final acceptance.** Run the full `tests/Kumunita.Core.Tests` project via the repo's `.vscode/tasks.json` test task; confirm no warning/error in `dotnet build`; update the status of step 4 in `docs/plans-milestones/plan-m1-implement-identity,-groups,-delegation,-authorization.md` (checkmark / "complete — 11/11 handler tests green"); note the `AccessVia` derivation in the step-4 doc entry so step 6/7 authors can confirm or flag it (ADR 0006-E lane if a change is needed).
+update the status of step 4 in `docs/plans-milestones/plan-m1-identity-groups-delegation-authorization.md` (checkmark / "complete — 11/11 handler tests green");

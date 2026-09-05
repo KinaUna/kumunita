@@ -116,3 +116,5 @@ UpgradeLog*.htm
 # SQL Server files
 *.mdf
 *.ldf
+# Playwright e2e artifacts
+test-results/

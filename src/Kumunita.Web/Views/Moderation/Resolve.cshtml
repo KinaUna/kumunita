@@ -1,0 +1,166 @@
+@using Kumunita.Web.Models
+@model ModerationResolveViewModel
+@{
+    ViewData["Title"] = $"Moderation: report {Model.ReportId[..Math.Min(8, Model.ReportId.Length)]}…";
+}
+
+<h1>Moderation — Review report</h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Report details</span>
+        <span class="badge text-bg-secondary">@Model.Status</span>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Post</dt>
+            <dd class="col-sm-9">@(Model.PostTitle ?? Model.PostId)</dd>
+
+            <dt class="col-sm-3">Component</dt>
+            <dd class="col-sm-9">@(Model.ComponentName ?? "—")</dd>
+
+            <dt class="col-sm-3">Reporter</dt>
+            <dd class="col-sm-9">@(Model.ReporterName ?? "—")</dd>
+
+            <dt class="col-sm-3">Post author</dt>
+            <dd class="col-sm-9">@(Model.PostAuthorName ?? "—")</dd>
+
+            <dt class="col-sm-3">Filed</dt>
+            <dd class="col-sm-9">@Model.At.ToLocalTime().ToString("g")</dd>
+
+            <dt class="col-sm-3">Reason</dt>
+            <dd class="col-sm-9">@(Model.Reason ?? "(no reason given)")</dd>
+
+            @if (!string.IsNullOrEmpty(Model.PostBody))
+            {
+                <dt class="col-sm-3">Post body</dt>
+                <dd class="col-sm-9">
+                    <blockquote class="blockquote mb-0">
+                        <div>@Model.PostBody</div>
+                        <footer class="blockquote-footer">post preview</footer>
+                    </blockquote>
+                </dd>
+            }
+        </dl>
+    </div>
+</div>
+
+@* ── The three forms — assign / unlock / resolve ────────────────────
+    Each is a POST /moderation/{id}/{action} form (the U7 route
+    shape; the design-doc line-91–98 surface list used the
+    `POST /moderation/reports/{assign|unlock|resolve}` naming —
+    the U7 plan's U7 body line 254–257 shape `{id}/{action}` is
+    what U7 ships, the more RESTful shape matching M2/M3's thin-
+    controller precedent; the design-doc's `reports/` is a
+    shorthand for "the three GlobalAdmin-gated write actions on
+    a report" and is not a route-position pin).
+
+    The §2.3 item-2 four Status-literal predicates drive which
+    forms appear (display-level only):
+    - A "filed" report: assignable + unlockable + resolvable.
+    - An "assigned" report: unlockable + resolvable.
+    - An "unlocked" report: resolvable only.
+    - A "resolved" report: none (the report is closed).
+
+    The real SoD / authorization gate is the [Authorize(Roles =
+    GlobalAdmin)] attribute on the ModerationController class +
+    the Core's CanAsync(..., AccessAction.Moderate, ...) inside
+    each U5 method (C3 / ADR 0006-C, "audit-row + no-domain-
+    write on denial" — the "audit-row written, domain-write NOT
+    executed" shape). *@
+
+@if (Model.IsAssignable)
+{
+    <div class="card mb-4">
+        <div class="card-header">Assign to a standing moderator</div>
+        <div class="card-body">
+            <form method="post" action="/moderation/@Model.ReportId/assign">
+                @Html.AntiForgeryToken()
+                <div class="mb-2">
+                    <label class="form-label" for="assignedToModeratorId">
+                        Standing moderator on this report's component
+                    </label>
+                    <select class="form-select" name="assignedToModeratorId" id="assignedToModeratorId" required>
+                        <option value="" disabled selected hidden>Choose a standing moderator …</option>
+                        @foreach (var m in Model.Moderators)
+                        {
+                            <option value="@m.SubjectId">@(m.DisplayName ?? m.SubjectId)</option>
+                        }
+                    </select>
+                    @* The §9 "SoD" note: only a standing moderator
+                       on this report's component (ModeratorAssignment
+                       row on the report's ComponentId) is offered —
+                       the Core's AssignReportAsync writes the
+                       ModeratorAssignment row with GrantedBy =
+                       the acting GlobalAdmin (U5's shape).*@
+                </div>
+                <button class="btn btn-primary" type="submit">Assign</button>
+                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+            </form>
+        </div>
+    </div>
+}
+
+@if (Model.IsUnlockable)
+{
+    <div class="card mb-4">
+        <div class="card-header">
+            Unlock (activate <code>Component.ModeratorAccess</code> for this report's component)
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                This is the <b>C5 activation event</b> — it flips the
+                <code>Component.ModeratorAccess</code> flag to <code>true</code>
+                (the ADR 0003 / C5 carve-out going live) and marks the
+                report <code>unlocked</code>. The M1
+                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
+                flag-flip seam opens its own session (a separate commit
+                per the M1 seam's contract — U5's doc-comment); the
+                report's <code>Status</code> write and the
+                <code>AccessAudit</code> row commit atomically in this
+                transaction.
+            </p>
+            <form method="post" action="/moderation/@Model.ReportId/unlock">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-warning" type="submit">Unlock</button>
+                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+            </form>
+        </div>
+    </div>
+}
+
+@if (Model.IsResolvable)
+{
+    <div class="card mb-4">
+        <div class="card-header">Resolve (close this report)</div>
+        <div class="card-body">
+            <p class="text-muted">
+                Marks the report <code>resolved</code> (the final
+                state in the §2.3 item-2 four Status literals) and
+                — per U5's behavior note — also calls the M1
+                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
+                flag-flip seam with <code>on = true</code> (the
+                resolve lane's "final close" event; the unlock
+                lane's "activation event" is separate).
+            </p>
+            <form method="post" action="/moderation/@Model.ReportId/resolve">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-success" type="submit">Resolve</button>
+                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+            </form>
+        </div>
+    </div>
+}
+
+<div>
+    <a href="/moderation" class="btn btn-link">← Back to queue</a>
+</div>
