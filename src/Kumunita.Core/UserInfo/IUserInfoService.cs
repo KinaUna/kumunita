@@ -60,6 +60,24 @@ public interface IUserInfoService
     /// or <c>via: Owner</c>).</summary>
     Task RevokeDelegationAsync(string grantId, string revokedBy);
 
+    // ── M3 additions (ADR 0006-E compatible lane — added to the owning
+    // module's public surface, named) ──────────────────────────────────────
+
+    /// <summary>
+    /// The composer's *component picker* / the <c>/community/{id}</c>
+    /// *grouping* / the feed's *candidate filter* (M3 design §2.3). A
+    /// *candidate set*, not a visible set (C-M3·2): the caller must pass every
+    /// post through <c>IAuthorizationService</c> before rendering, and this
+    /// read produces **no** <see cref="Authorization.AccessAudit"/> row itself
+    /// (C-M3·2; pinned by the §2.4 seam test
+    /// <c>F9_CandidateFilterEmitsNoAuditRow</c> at the service level and by
+    /// <c>UserInfoServiceTests.GetComponentsAsync_CandidateFilterEmitsNoAuditRow</c>
+    /// at the unit level — same C-M3·2 pin, two test files). Strong-consistency
+    /// live rows (C4): a component enable/disable flip in the same commit is
+    /// live on the very next call.
+    /// </summary>
+    Task<IReadOnlyList<Component>> GetComponentsAsync(bool enabledOnly);
+
     // ── M2 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

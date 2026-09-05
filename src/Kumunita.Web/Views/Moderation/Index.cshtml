@@ -1,0 +1,82 @@
+@using Kumunita.Web.Models
+@model ModerationQueueViewModel
+@{
+    ViewData["Title"] = "Moderation";
+}
+
+<h1>Moderation</h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<p class="text-muted">
+    @Model.TotalCount report(s) — @Model.ByStatus.GetValueOrDefault("filed", 0) filed,
+    @Model.ByStatus.GetValueOrDefault("assigned", 0) assigned,
+    @Model.ByStatus.GetValueOrDefault("unlocked", 0) unlocked,
+    @Model.ByStatus.GetValueOrDefault("resolved", 0) resolved.
+</p>
+
+@if (Model.TotalCount == 0)
+{
+    <div class="alert alert-secondary">
+        No reports yet. The queue is empty.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Post</th>
+                    <th>Component</th>
+                    <th>Reporter</th>
+                    <th>Filmed</th>
+                    <th class="text-end">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Reports)
+                {
+                    <tr>
+                        <td>
+                            @* The §2.3 item-2 four Status literals: filed /
+                               assigned / unlocked / resolved — each gets a
+                               distinct Bootstrap badge (no new literal
+                               introduced, per C-M3b·1 / §2.3 item 3).*@
+                            <span class="badge text-bg-secondary">@r.Status</span>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">@(r.PostTitle ?? $"Post {r.PostId}")</div>
+                            @if (!string.IsNullOrEmpty(r.Reason))
+                            {
+                                <div class="text-muted small">@r.Reason</div>
+                            }
+                        </td>
+                        <td>
+                            @(r.ComponentName ?? "—")
+                        </td>
+                        <td>
+                            @(r.ReporterName ?? $"Resident {r.PostId[..Math.Min(8, r.PostId.Length)]}…")
+                        </td>
+                        <td>
+                            @r.At.ToLocalTime().ToString("g")
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-primary" href="/moderation/@r.Id">
+                                Review →
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -80,10 +80,10 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── UserInfo/           # UserInfoModule     (M1)
     │   │   ├── Authorization/      # AuthorizationModule (M1) — also AuditPurgeService (Wolverine-free tiering)
     │   │   ├── Directory/          # M2 ✓ — DirectoryService (list/detail/preview) + profile editor + groups — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 115 unit specs 0-failed; see design/m2-directory-profiles-groups.md § Acceptance Gate (2026-09-04)
-    │   │   ├── Posts/              # M3 — not yet created
+    │   │   ├── Posts/              # M3 ✓ — post/reply documents (M3DocTypes) + PostService (feed/detail/create/reply) + component-organized feeds — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 18 M3-pinned unit specs 0-failed; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Events/             # M4 — not yet created
     │   │   ├── Projects/           # M5 — not yet created
-    │   │   └── Moderation/         # M3 — not yet created
+    │   │   └── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve + the `Via = Report` read branch) + `PostStatus` (Active/Hidden/Removed) + the hide/remove lanes + the `/moderation` queue/resolve UI — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 13 M3b-pinned unit specs 0-failed; see design/m3b-moderation.md § Run result (M3b acceptance gate — 2026-09-12) + § M3b — Closed (recorded)
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── appsettings*.json

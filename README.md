@@ -13,14 +13,20 @@ not a code concern.
 
 ## Status
 
-**M0 complete** — deployed live on a VPS via Coolify. Deployable scaffold:
+**M3 complete** (`docs/design/m3-posts-design.md`,
+`docs/design/m3b-moderation.md`). The live loop now includes M1 identity /
+groups / delegation / authorization, M2 directory + profile editor + groups,
+M3 posts + audience-scoped feeds + the M3b moderation lane
+(file/assign/resolve + `PostStatus`) — all server-rendered MVC + Razor, with
+a durable Wolverine outbox, retry + dead-letter, and the `/health` degraded
+gate. The deployable surface has grown but the topology hasn't changed:
 `Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`),
-multi-stage Docker image, the first versioned schema change (`mt.community`,
-`KumunitaFeature`), a `/health` liveness probe that requires a reachable
-Postgres, a home page that renders `Community__Name`, and a production
-deployment (Coolify app + dedicated Postgres 18, Postgres image parity with
-dev: **18**). **M1** next: Identity, groups, delegation, and the authorization
-model above.
+multi-stage Docker image, the versioned schema boot (Marten feature + EF
+Identity migration + first-boot seeder), a `/health` liveness probe, and a
+`Coolify`-based deploy (Coolify `app` + dedicated Postgres 18, image parity
+with `dev-db-init` + `docker-compose.yml`: **18**).
+**M4** next: events, RSVPs, reminders (per the roadmap table in
+`docs/ARCHITECTURE.md`); **M5**: projects.
 
 ## Principles
 

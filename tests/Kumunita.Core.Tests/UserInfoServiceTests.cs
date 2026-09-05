@@ -134,6 +134,58 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         }
     }
 
+    // ── U4 — GetComponentsAsync candidate set (M3 design §2.1 / §2.3, F9) ──
+    // enabledOnly=true filters to enabled components; enabledOnly=false returns
+    // every component. Crucially: NEITHER call appends an AccessAudit row — the
+    // C-M3·2 "candidate filter is not an access decision" pin at the unit
+    // level. Component.Id is the document identity (M1DocTypes, conventional
+    // string), so two enabled + one disabled rows are planted directly through
+    // a write session.
+
+    [Fact]
+    public async Task GetComponentsAsync_CandidateFilterEmitsNoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        // Two enabled components and one disabled, planted directly (Component.Id
+        // is the identity — distinct stable ids).
+        const string enabledA = "c-u4-a";
+        const string enabledB = "c-u4-b";
+        const string disabledC = "c-u4-c";
+
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Store(new Component { Id = enabledA, Name = "Comp A", Enabled = true });
+            session.Store(new Component { Id = enabledB, Name = "Comp B", Enabled = true });
+            session.Store(new Component { Id = disabledC, Name = "Comp C", Enabled = false });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // enabledOnly: true → only the two enabled components.
+        var enabledOnly = await svc.GetComponentsAsync(enabledOnly: true);
+        Assert.Equal(2, enabledOnly.Count);
+        Assert.Contains(enabledOnly, c => c.Id == enabledA);
+        Assert.Contains(enabledOnly, c => c.Id == enabledB);
+        Assert.DoesNotContain(enabledOnly, c => c.Id == disabledC);
+
+        // enabledOnly: false → every component, including the disabled one.
+        var all = await svc.GetComponentsAsync(enabledOnly: false);
+        Assert.Equal(3, all.Count);
+        Assert.Contains(all, c => c.Id == disabledC);
+
+        // C-M3·2 pin: the candidate filter is *not* an access decision — neither
+        // call above appends an AccessAudit row. The seeded write session stored
+        // components, not an audit lane, so a global count of AccessAudit rows is
+        // expected to be exactly zero.
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Empty(audits);
+        }
+    }
+
     [Fact]
     public async Task CreateGroupAsync_CreatesGroupAndOwnerMembership()
     {

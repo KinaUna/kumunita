@@ -1,6 +1,4 @@
-using Kumunita.Core.Identity;
-
-namespace Kumunita.Core.UserInfo;
+namespace Kumunita.Core.Identity;
 
 /// <summary>
 /// A resident's single-use token (verification link or seed-admin setup credential).

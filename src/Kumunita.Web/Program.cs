@@ -65,6 +65,11 @@ var marten = builder.Services.AddMarten(opts =>
     // M1's Marten-native documents + their non-default conventions (Profile identity,
     // GroupMembership business-key index). ADR 0004 §B.1.
     M1DocTypes.Configure(opts);
+
+    // M3's Marten-native documents (Post, PostReply, Report — report table-in-M3 /
+    // flow-in-M3b). Conventional string Id, so no non-default convention needed.
+    // ADR 0004 §B.1.
+    M3DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -135,6 +140,13 @@ builder.Services.Configure<SeedAdminOptions>(
     builder.Configuration.GetSection(SeedAdminOptions.SectionName));
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
+// The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP
+// section (SmtpOptions.SectionName = "SMTP") — same pattern as the two lines above.
+// Without this binding IOptions<SmtpSender> resolves a bare SmtpOptions and the
+// first SendAsync throws before any delivery attempt, so the SMTP__Host/Port/From
+// env values (OPS.md §config reference) would never reach the client.
+builder.Services.Configure<SmtpOptions>(
+    builder.Configuration.GetSection(SmtpOptions.SectionName));
 
 // Cookie-based authentication (the Web's only scheme; the thin-principal claim set
 // IS the authentication artifact, per ADR 0001-B / ADR 0006-D). The scheme name and
@@ -207,6 +219,15 @@ await SchemaBootstrap.ApplyAsync(app.Services);
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
+    // In production the app sits behind the edge proxy (Coolify/Caddy, OPS §1/§5),
+    // which terminates TLS and forwards X-Forwarded-For / X-Forwarded-Proto. Honoring
+    // those headers (this is the proxy, the only trusted hop) restores the real client
+    // IP — SECURITY.md §6 rate-limit "real client IP is a hard requirement" — and makes
+    // Request.IsHttps reflect the client's TLS, so the session cookie is correctly
+    // marked Secure (the cookie default, CookieSecurePolicy.SameHost, then upgrades
+    // itself — no explicit SecurePolicy needed). Must run before UseExceptionHandler /
+    // UseHsts so those see the resolved scheme and remote IP.
+    app.UseForwardedHeaders();
     app.UseExceptionHandler("/Home/Error");
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();

@@ -136,12 +136,53 @@ port (OPS §10).
 | `Community__Name` | the neighborhood's display name |
 | `Community__SupportEmail` | support contact from the inventory |
 | `ConnectionStrings__Kumunita` | `Host=<addon-service-name>;Port=5432;Database=kumunita;Username=kumunita;Password=<from §4>;Include Error Detail=true` — **secret** |
-| `SMTP__Host/Port/User/Pass/Secure` | the instance's provider (OPS §7) |
+| `SMTP__Host` / `SMTP__Port` | the relay for verification + seed-admin mail — see **§5.1** (and OPS §7) |
 | `SeedAdmin__Email` / `SeedAdmin__Token` | one-time setup token — **created per OPS Procedure 2, removed from env after first login** |
 
 The `Host` value is the addon's internal service name (visible on the
 addon's page / psql connection block).
-5. **Domains:** attach the neighborhood's domain (§2). **TLS: automatic**
+
+### 5.1 SMTP — concrete env values
+
+The `SmtpSender` reads exactly three options from the `SMTP` section — `Host`,
+`Port`, and `From` (`SmtpSender.cs`; bound via `Configure<SmtpOptions>` in
+`Program.cs`). `From` is optional (a strict relay may reject no-`From`). The
+rest of the env set is **not** applied by the sender and is documented in OPS §7
+for consistency; the BCL `SmtpClient` is used as-is.
+
+**A. Local dev loop (compose / Mailpit):** `docker-compose.yml` in
+dev-db-init + Mailpit. Only reachable from inside the compose network —
+this is the `ASPNETCORE_ENVIRONMENT=Development` path, not a Coolify deploy:
+
+| Variable | Value |
+|---|---|
+| `SMTP__Host` | `mailpit` (the compose service name, port 1025) |
+| `SMTP__Port` | `1025` |
+| `SMTP__From` | (optional; leave unset unless your relay requires it) |
+
+**B. Real relay — the recommended shape for a test server or production:
+
+| Variable | Value |
+|---|---|
+| `SMTP__Host` | e.g. `smtp.mailgun.org`, `smtp.resend.com`, `relay.mailprovider.com` — your provider's host |
+| `SMTP__Port` | `587` (STARTTLS) or `465` (implicit TLS), per your provider's docs |
+| `SMTP__From` | the resident-facing address shown in verification emails (often the same as `Community__SupportEmail`) |
+
+Whichever shape you pick, **one strong `SeedAdmin__Email` / one strong token**
+is required for the first-boot admin lane (OPS Procedure 2, step 1). Generate it
+with `openssl rand -hex 24`, store it in your secrets manager, and set it before
+the first boot. The token is **one-time** — the app invalidates it on the admin's
+first login (OPS Procedure 2, step 4: then remove `SeedAdmin__*` from env so
+nothing reusable remains).
+
+> **Why this matters:** verification + admin handoff both depend on a *delivered*
+> email. An unconfigured SMTP host **throws** on first send (SmtpSender is
+deliberate about not "sending to nowhere") — the durable handler then
+retries/dead-letters per §6.2 and `/health` flips to `degraded` so it is visible.
+Verify the mail landed on the real inbox (OPS Procedure 2, step 5) before
+considering the test "working".
+
+5. **Domains:** attach the neighborhood's domain (§2).
 (Coolify + Let's Encrypt) — nothing else to do (OPS §6).
 6. **Health check:** path `GET /health`, expected `200`.
 7. **Deploy.**
