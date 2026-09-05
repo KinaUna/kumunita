@@ -89,13 +89,15 @@ public sealed class ModerationService
     /// <param name="reason">Optional free-text reason supplied by the
     /// resident (nullable).</param>
     /// <param name="session">The caller's in-flight
-    /// <see cref="IDocumentSession"/> — U4 does not open one (the
-    /// caller owns the transaction, per the IDocumentSession-overload
-    /// convention C3 / ADR 0006-E, shared by M3's
+    /// <see cref="IDocumentSession"/> — this service does not open one
+    /// (the caller owns the transaction, per the shared
+    /// IDocumentSession-overload convention C3 / ADR 0006-E: the same
+    /// contract the write lanes on
+    /// <see cref="Kumunita.Core.Posts.PostService"/> follow — e.g.
     /// <see cref="Kumunita.Core.Posts.PostService.CreatePostAsync"/> /
     /// <see cref="Kumunita.Core.Posts.PostService.CreateReplyAsync"/> /
-    /// U3's <see cref="Kumunita.Core.Posts.PostService.HidePostAsync"/>
-    /// / <see cref="Kumunita.Core.Posts.PostService.RemovePostAsync"/>).</param>
+    /// <see cref="Kumunita.Core.Posts.PostService.HidePostAsync"/> /
+    /// <see cref="Kumunita.Core.Posts.PostService.RemovePostAsync"/>).</param>
     /// <returns>1 — the count of <see cref="Report"/> rows created by
     /// this call (a success signal; the only path past the guards
     /// wrote exactly one row).</returns>

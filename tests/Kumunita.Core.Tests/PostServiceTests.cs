@@ -875,7 +875,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // The post's Status flipped to the exact PostStatus.Hidden literal
         // (the C-M3b·3 F3 pin).
         await using var s2 = store.QuerySession();
-        var post = await s2.LoadAsync<Post>("m9-post");
+        var post = await s2.LoadAsync<Post>("m9-post", TestContext.Current.CancellationToken);
         Assert.Equal(PostStatus.Hidden, post!.Status);
 
         // The canonical write record from the M1-frozen seam: the audit
@@ -919,7 +919,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // The post's Status must remain PostStatus.Active (no partial
         // write — the lane's "if (decision.Allowed)" gate did not fire).
         await using var s2 = store.QuerySession();
-        var post = await s2.LoadAsync<Post>("m10-post");
+        var post = await s2.LoadAsync<Post>("m10-post", TestContext.Current.CancellationToken);
         Assert.Equal(PostStatus.Active, post!.Status);
 
         // The Deny audit row for the write attempt is committed.
@@ -963,7 +963,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         // The post's Status flipped to the exact PostStatus.Removed
         // literal (the C-M3b·3 F4 pin — hard-remove).
         await using var s2 = store.QuerySession();
-        var post = await s2.LoadAsync<Post>("m11-post");
+        var post = await s2.LoadAsync<Post>("m11-post", TestContext.Current.CancellationToken);
         Assert.Equal(PostStatus.Removed, post!.Status);
 
         var rows = await PostAudits(store, actor: moderator);
@@ -1000,7 +1000,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             await svc.RemovePostAsync("m12-post", caller, session));
 
         await using var s2 = store.QuerySession();
-        var post = await s2.LoadAsync<Post>("m12-post");
+        var post = await s2.LoadAsync<Post>("m12-post", TestContext.Current.CancellationToken);
         Assert.Equal(PostStatus.Active, post!.Status);
 
         var rows = await PostAudits(store, actor: caller);

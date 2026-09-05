@@ -31,7 +31,6 @@ public sealed class AccountController(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IIdentityService identity,
-    IUserInfoService userInfo,
     IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>

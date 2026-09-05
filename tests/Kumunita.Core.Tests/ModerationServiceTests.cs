@@ -95,14 +95,15 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             await svc.FileReportAsync("f2-post", reporter, "abuse", session);
             var filed = await session.Query<Report>()
-                .Where(r => r.PostId == "f2-post").ToListAsync();
+                .Where(r => r.PostId == "f2-post")
+                .ToListAsync(TestContext.Current.CancellationToken);
             createdReportId = Assert.Single(filed).Id;
         });
 
         // Re-load in a fresh session — the "filed" literal must be there.
         await using (var s2 = store.QuerySession())
         {
-            var report = await s2.LoadAsync<Report>(createdReportId);
+            var report = await s2.LoadAsync<Report>(createdReportId!, TestContext.Current.CancellationToken);
             Assert.NotNull(report);
             Assert.Equal("filed", report!.Status);
         }
@@ -241,7 +242,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // The report's Status must remain "filed" (no partial write).
         await using (var s2 = store.QuerySession())
         {
-            var report = await s2.LoadAsync<Report>("f5-report");
+            var report = await s2.LoadAsync<Report>("f5-report", TestContext.Current.CancellationToken);
             Assert.Equal("filed", report!.Status);
         }
 
@@ -250,7 +251,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             var assignments = await s3.Query<ModeratorAssignment>()
                 .Where(a => a.UserId == target && a.ComponentId == ComponentId)
-                .ToListAsync();
+                .ToListAsync(TestContext.Current.CancellationToken);
             Assert.Empty(assignments);
         }
 
@@ -313,7 +314,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // Status flipped to the exact "assigned" literal.
         await using (var s2 = store.QuerySession())
         {
-            var report = await s2.LoadAsync<Report>("f6-report");
+            var report = await s2.LoadAsync<Report>("f6-report", TestContext.Current.CancellationToken);
             Assert.Equal("assigned", report!.Status);
         }
 
@@ -323,7 +324,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         {
             var assignments = await s3.Query<ModeratorAssignment>()
                 .Where(a => a.UserId == newMod && a.ComponentId == ComponentId)
-                .ToListAsync();
+                .ToListAsync(TestContext.Current.CancellationToken);
             var row = Assert.Single(assignments);
             Assert.Equal(globalAdmin, row.GrantedBy);
         }
@@ -380,7 +381,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // Status flipped to the exact "resolved" literal.
         await using (var s2 = store.QuerySession())
         {
-            var report = await s2.LoadAsync<Report>("f7-report");
+            var report = await s2.LoadAsync<Report>("f7-report", TestContext.Current.CancellationToken);
             Assert.Equal("resolved", report!.Status);
         }
 
@@ -392,7 +393,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // verifies the value is true now.
         await using (var s3 = store.QuerySession())
         {
-            var comp = await s3.LoadAsync<Component>(ComponentId);
+            var comp = await s3.LoadAsync<Component>(ComponentId, TestContext.Current.CancellationToken);
             Assert.True(comp!.ModeratorAccess);
         }
 
@@ -439,7 +440,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // Status remains "filed" (no partial write).
         await using (var s2 = store.QuerySession())
         {
-            var report = await s2.LoadAsync<Report>("f8-report");
+            var report = await s2.LoadAsync<Report>("f8-report", TestContext.Current.CancellationToken);
             Assert.Equal("filed", report!.Status);
         }
 
@@ -448,7 +449,7 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         // flag-flip was never reached).
         await using (var s3 = store.QuerySession())
         {
-            var comp = await s3.LoadAsync<Component>(ComponentId);
+            var comp = await s3.LoadAsync<Component>(ComponentId, TestContext.Current.CancellationToken);
             Assert.False(comp!.ModeratorAccess);
         }
 
