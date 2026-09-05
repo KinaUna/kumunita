@@ -37,7 +37,9 @@
         </form>
 
         <p class="mt-3 text-muted">
-            No account yet? <a asp-action="Signup">Sign up</a>.
+            No account yet? <a asp-action="Signup">Sign up</a>.<br />
+            Received a first-boot setup token? <a asp-controller="AdminSetup" asp-action="Setup"
+                asp-route-returnUrl="@Model.ReturnUrl">Complete setup</a>.
         </p>
     </div>
 </div>
