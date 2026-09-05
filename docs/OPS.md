@@ -30,8 +30,8 @@ All per-instance identity and integration is env. The *image* is identical every
 | `Community__SupportEmail`   | Yes       | No     | Contact shown in footer / reports              |
 | `ConnectionStrings__Kumunita` | Yes      | Yes    | Postgres connection string                     |
 | `SMTP__Host`                | Yes       | No     | SMTP server                                    |
-| `SMTP__Port`                | Yes       | No     | 587 (STARTTLS) or 465 (implicit TLS)           |
-| `SMTP__Secure`              | Optional  | No     | `Ssl` \| `Tls` \| `None`                       |
+| `SMTP__Port`                | Yes       | No     | The relay's STARTTLS port (conventionally 587; the BCL `SmtpClient` does not support implicit TLS / 465) |
+| `SMTP__Secure`              | Optional  | No     | `Tls` (STARTTLS — default; the BCL's only TLS mode) \| `None` (plain, local-only)                      |
 | `SMTP__User` / `SMTP__Pass` | If auth   | — / Yes| SMTP credentials                               |
 | `SeedAdmin__Email`          | First-run | No     | Initial GlobalAdmin address                    |
 | `SeedAdmin__Token`          | First-run | Yes    | **One-time** setup token, consumed on first login — never a reusable password |
