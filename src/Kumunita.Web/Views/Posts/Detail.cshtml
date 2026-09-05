@@ -10,6 +10,15 @@
             &larr; back to @Model.Post.ComponentId
         </a>
 
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success mt-2" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger mt-2" role="alert">@err</div>
+        }
+
         <div class="card mt-2 mb-4">
             <div class="card-body">
                 <h4>

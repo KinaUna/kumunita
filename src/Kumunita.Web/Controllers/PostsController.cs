@@ -405,4 +405,81 @@ public sealed class PostsController(
         return Redirect($"/posts/{post.Id}");
     }
 
+    // ── Reply (POST /posts/{id}/replies) — M3b U6 micro-fix ─────────────────
+
+    /// <summary>
+    /// A one-level reply write (M3b deferral item 5; M3 deferral list § U6).
+    /// The M3 read path (GET <c>/posts/{id}</c>) already showed the reply form
+    /// but left the route 404 — this action closes it. A **thin** Web lane
+    /// (ADR 0006-D: routes + authz + shape): it **delegates** the write to the
+    /// existing, frozen M3 U6 seam
+    /// <see cref="PostService.CreateReplyAsync"/> — **no new Core seam, no new
+    /// seam-test name** (the §2.5 test-14 shape/absence anchor).
+    /// <para>
+    /// <b>Authz shape:</b> the reply inherits the parent's single
+    /// <c>Read</c> decision (C-M3·1; <see cref="PostService.CreateReplyAsync"/>
+    /// re-checks no access). Before opening a write session we re-run the
+    /// parent's <c>Read</c> decision via
+    /// <see cref="PostService.GetPostAsync"/> — the same fail-closed shape as
+    /// this file's <c>Detail</c> GET: the <see cref="PostDetailResult"/> is
+    /// <c>Post = null</c> for **both** "does not exist" and "audience
+    /// denied" (Core doesn't distinguish — the audit row does), and this
+    /// action maps that to the <c>Forbid()</c> 403 shape (the M3 U7 "403 on
+    /// denied, not a blank page" pin; a 404 is information-leaky about
+    /// which ids are real). This keeps the reply against an
+    /// <b>existing, visible</b> parent without reshaping the Core seam.
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3 same-transaction lane):</b> the controller opens its
+    /// own <see cref="IDocumentStore.LightweightSession()"/> and passes it to
+    /// <see cref="PostService.CreateReplyAsync"/> (the M3 U6
+    /// <c>IDocumentSession</c> overload). That service method performs the
+    /// single <c>SaveChangesAsync</c>, so the <c>PostReply</c> document and any
+    /// in-session audit row commit or roll back atomically — the
+    /// <see cref="PostService.CreatePostAsync"/> <c>LightweightSession</c>
+    /// precedent in this file.
+    /// </para>
+    /// </summary>
+    [HttpPost("/posts/{id}/replies")]
+    public async Task<IActionResult> Replies([FromRoute] string id, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            // [Authorize] is the primary gate (class level); this is the
+            // fail-closed shape in case the principal carries no subject.
+            return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            // A reply is a body-only write (C-M3·1: no own audience, no title).
+            // Fail-closed to the detail page — the form is re-presented there.
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        // Authz via the parent's single Read decision (C-M3·1; the reply
+        // inherits this, so the decision is the pre-write gate). GetPostAsync
+        // returns Post = null for **both** "missing" and "denied" (Core
+        // doesn't distinguish; the audit row does), so both map to the
+        // Forbid() 403 shape — the M3 U7 "403 on denied, not a blank page"
+        // pin and the Detail-GET precedent (a 404 leaks which ids are real).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's SaveChangesAsync is the single write (the M3 U6 precedent
+        // in this file — cf. New()'s CreatePostAsync).
+        await using var session = store.LightweightSession();
+        await posts.CreateReplyAsync(id, actor, body, session);
+
+        TempData["info"] = "Reply added.";
+        return Redirect($"/posts/{id}");
+    }
+
     }

@@ -999,3 +999,121 @@ assert both independently.
   + `src/Kumunita.Web/Controllers/PostsController.cs` (the M3
   precedent) + `src/Kumunita.Web/Views/Posts/Detail.cshtml`.
 
+
+## U6 — Reply route micro-fix (`POST /posts/{id}/replies`)
+
+- **Deliverable:** the `POST /posts/{id}/replies` route now resolves —
+  the M3 404 (reply route, M3 deferral item 5) is closed. **Web-only**: a
+  thin controller action on `PostsController` delegating the write to the
+  existing, frozen M3 U6 seam `PostService.CreateReplyAsync`. **No new Core
+  seam, no new seam-test name** (the §2.5 test-14 shape/absence anchor
+  holds). U6 does not touch `ModerationService` or any Core file.
+- **Entry-reads confirmed:**
+  - `docs/design/m3b-moderation.md` §2.2.4 (the reply-route pin) + §2.5
+    test-14 (the shape/absence pin) + the reply-route note (U8-vs-U6
+    attribution corrected below).
+  - `src/Kumunita.Web/Controllers/PostsController.cs` (the M3 U7
+    precedent — `Detail`'s fail-closed 403 shape, `New()`'s
+    `LightweightSession` + `CreatePostAsync` + `TempData`-redirect
+    write lane, the `SubjectId(User)` helper).
+  - `src/Kumunita.Web/Views/Posts/Detail.cshtml` (the existing reply form).
+- **Action landed** (`PostsController`, `[HttpPost("/posts/{id}/replies")]`):
+  - `[FromRoute] string id` + `[FromForm] string? body`.
+  - Fail-closed guard order: empty id ⇒ 404; no subject ⇒ `Forbid()`
+    ([Authorize] is the class-level gate); empty `body` ⇒ `TempData["error"]`
+    + redirect back to the detail (a reply is body-only — C-M3·1, no own
+    audience/title).
+  - **Authz via the parent's single `Read` decision** (the plan's pin):
+    re-runs `PostService.GetPostAsync(id, actor)` — **not** the
+    `ModerationService` read branch. A `Post = null` result (both "missing"
+    and "audience denied" — Core doesn't distinguish, the audit row does)
+    maps to `Forbid()` 403 (the M3 U7 "403 on denied" shape, same as the
+    `Detail` GET). This keeps the reply against an *existing, visible* parent
+    without reshaping the Core seam.
+  - **C3 same-transaction lane:** the controller opens
+    `store.LightweightSession()`, delegates to
+    `posts.CreateReplyAsync(id, actor, body, session)` (the M3 U6
+    `IDocumentSession` overload), then `TempData["info"]` +
+    `Redirect("/posts/{id}")`. Matches `New()`'s `CreatePostAsync` write-lane
+    precedent in this file.
+- **`CreateReplyAsync` unchanged** (frozen M3 U6 seam — no new Core seam,
+  signature + behavior untouched). **No new test added in U6** (per "no new
+  seam-test name"; §2.5 test-14 + U9's lane are the anchors — see the
+  "What U7 / U9 needs" attribution below).
+- **View change** (`Views/Posts/Detail.cshtml`): the existing reply form
+  already posts `method="post"` to `/posts/{id}/replies` with a `body`
+  field + `@Html.AntiForgeryToken()` — the route now resolves. Two minimal,
+  safe additions only: a `TempData["info"]`/`["error"]` flash block (the
+  Groups/Detail precedent) so the "Reply added." / "A reply needs some
+  text." messages render; no `action` string change, no new model file
+  (kept within the pinned "2 files" deliverable — the `ReplyForm` from
+  §2.2.4's illustrative pseudocode was **not** introduced, since a
+  `[FromForm] string? body` binds the existing form).
+- **Deviations from §2.2.4's illustrative pseudocode (documented, not a
+  drift):** the §2.2.4 block is explicitly marked "the signature is
+  **frozen** by this section" but is *illustrative* and wrong in three
+  places against the real codebase; U6 reconciled to the actual frozen
+  seam + the file's precedent:
+  1. **`[FromRoute] string id`, not `[FromRoute] long id`** —
+     `PostReply.Id` / the post id are `Guid`→string
+     (`"N"`-formatted); a `long` route param would 404 on every real id.
+  2. **Body via `[FromForm] string? body`, not `[FromBody] ReplyForm`** —
+     the existing form is a real POST form posting a `body` field with an
+     anti-forgery token; `[FromBody]` + a nonexistent `ReplyForm` model
+     would not bind.
+  3. **No extra `await session.SaveChangesAsync()` after
+     `CreateReplyAsync`** — `CreateReplyAsync` performs its **own**
+     `SaveChangesAsync` internally (the C3 same-transaction lane); a second
+     save would be redundant (M3's `New()` relies on `CreatePostAsync`
+     committing itself).
+  Net effect: the *behavioral contract* §2.2.4 pins (thin action,
+  `SubjectId(User)`/the existing `Read` decision as the authz gate,
+  delegate to `CreateReplyAsync` verbatim, one `LightweightSession` C3
+  write, redirect to `/posts/{id}`) is honored; only the three
+  illustrative type-shape details above were reconciled to the real
+  `string` id + `[FromForm]` body + the service's self-committing write.
+- **Attribution note (M3b plan § U6 vs. U8):** the M3b plan text labels
+  this unit "U6 — Reply route micro-fix", and §2.2.4's note says "U8 lands
+  in … PostsController.cs". These refer to **different** deliverables: **U6
+  (this unit) = the `POST /posts/{id}/replies` reply-route micro-fix**;
+  **U8 = the "Report this" filing action (the `Report` POST)**, a *separate*
+  route + action. The reply route is U6's (M3 deferral item 5), and this
+  handoff section records it as U6's completed deliverable. U7 (the
+  `/moderation` surface) must **not** re-add a reply route, and U8's
+  "Reply" note should be read as U8's own *filing* surface, not a second
+  reply-write lane. U9's lane-1 (`RepliesPOST` shape/absence) test targets
+  **U6's** reply action, not U8's filing action.
+- **Files touched**
+  - `src/Kumunita.Web/Controllers/PostsController.cs` (modified — added the
+    `Replies` `[HttpPost("/posts/{id}/replies")]` action; nothing else).
+  - `src/Kumunita.Web/Views/Posts/Detail.cshtml` (modified — added the
+    `TempData` info/error flash block; existing form unchanged).
+  - `docs/plans-milestones/m3b-u6-plan.md` (new — the execution plan).
+  - `docs/plans-milestones/m3b-handoff-notes.md` (this section appended).
+- **Build / test state**
+  - `run_build` on `Kumunita.Web` — **green**. No route conflict:
+    `New()` is `/posts/new`, this action is `/posts/{id}/replies` (distinct
+    shapes).
+  - `run_tests` — **0 new tests added in U6** (unit-series convention: no new
+    seam-test name; §2.5 test-14 is U9's shape/absence anchor, and M3's own
+    U6 behavioral test still pins `CreateReplyAsync`'s behavior). U6's gate
+    is build-green + the route now resolving (the Exit criterion), not a new
+    passing test.
+- **What U7 (`/moderation` surface) needs**
+  - U7 is a *separate* controller + views (`ModerationController`), reading
+    over the `Report` set and calling `ModerationService`'s four write
+    lanes; it does **not** add a reply route (that is U6's, now closed) and
+    does **not** touch the `New()`/`Detail`/`Replies` actions in
+    `PostsController`. U7's Entry reads are `AdminController.cs` +
+    `DirectoryController.cs` + `docs/design/m3b-moderation.md` §2.2 +
+    `ModerationService.cs`.
+  - **U7's authz note (for the record, not a U6 gap):** the M3b plan § U7
+    gate is "the actor having `ModeratorAccess` on the report's component
+    **or being GlobalAdmin**". U5's handoff notes `SetComponentModeratorAccessAsync`
+    as *GlobalAdmin-gated* (it *sets* the flag), but **reading** a
+    component's `ModeratorAccess` bool is a plain read seam — so a resident
+    moderator (flag ON, not GlobalAdmin) can legitimately open the queue.
+    U7 should implement the "flag ON" branch via the read seam, not via
+    `SetComponentModeratorAccessAsync`. This is a U7 scoping clarification;
+    it does not change U6's (web reply-route) work.
+
