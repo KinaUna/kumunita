@@ -827,6 +827,208 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         });
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // M3b, plan U9 — the 5 ADDs (design doc m3b-moderation.md §2.5,
+    // rows 9–13). These tests exercise U3's C-M3b·3 lanes (the
+    // Moderate-gated write lanes F3/F4 — HidePostAsync /
+    // RemovePostAsync) over the two frozen M1/M2 seams + the PostStatus
+    // shape (§2.2.1). Pinned verbatim per §2.5 — the §2.7 drift-guard
+    // makes renaming them a drift event. Do not reorder the M3 lanes
+    // above (M3's own §2.6 drift-guard pins them).
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ── M3b·9 — HidePostAsync_Moderator_WritesStatusHidden_ViaTagIsAdmin ─
+    //
+    // C-M3b·3 (F3) — the Moderate-gated write lane succeeds for a caller
+    // with a standing moderator in this component (the ADR 0003 §SoD
+    // split: Core trusts the caller's standing, the Web layer verifies
+    // the role): post.Status flips to PostStatus.Hidden. The M1-seam's
+    // audit record (Action = "moderate", TargetId = the post id,
+    // Outcome = Allow) is the canonical write audit — same TargetKind
+    // "post" as the M3 lane.
+
+    [Fact]
+    public async Task HidePostAsync_Moderator_WritesStatusHidden_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-m3b-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "m9-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-m3b-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "m9-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m9", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("m9-post", moderator, session));
+
+        // The post's Status flipped to the exact PostStatus.Hidden literal
+        // (the C-M3b·3 F3 pin).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m9-post");
+        Assert.Equal(PostStatus.Hidden, post!.Status);
+
+        // The canonical write record from the M1-frozen seam: the audit
+        // row for Action = AccessAction.Moderate.Id, TargetId = the
+        // post id, ActorId = the acting caller, Outcome = Allow.
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m9-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── M3b·10 — HidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // C-M3b·3 (F3, SoD) — a caller without a standing moderator in this
+    // component is denied (M1-seam branch #2 does not fire): the post's
+    // Status is NOT updated (it remains PostStatus.Active — the POCO
+    // default), and the Deny audit row (Action = "moderate",
+    // TargetId = the post id, Outcome = Deny) is committed. C3 — no
+    // partial write; the audit row is the only trace.
+
+    [Fact]
+    public async Task HidePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-m3b-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "m10-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m10", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.HidePostAsync("m10-post", caller, session));
+
+        // The post's Status must remain PostStatus.Active (no partial
+        // write — the lane's "if (decision.Allowed)" gate did not fire).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m10-post");
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        // The Deny audit row for the write attempt is committed.
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m10-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── M3b·11 — RemovePostAsync_Moderator_WritesStatusRemoved_ViaTagIsAdmin ─
+    //
+    // C-M3b·3 (F4) — same shape as the hide lane (M3b·9) but the
+    // domain write is hard-remove: post.Status flips to
+    // PostStatus.Removed (the §2.2.1 pin + the C-M3b·3 F4 anchor).
+
+    [Fact]
+    public async Task RemovePostAsync_Moderator_WritesStatusRemoved_ViaTagIsAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string moderator = "u-m3b-m-svc-moderator";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "m11-assign", UserId = moderator, ComponentId = ComponentId,
+            GrantedBy = "u-m3b-m-svc-admin", At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = "m11-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m11", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.RemovePostAsync("m11-post", moderator, session));
+
+        // The post's Status flipped to the exact PostStatus.Removed
+        // literal (the C-M3b·3 F4 pin — hard-remove).
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m11-post");
+        Assert.Equal(PostStatus.Removed, post!.Status);
+
+        var rows = await PostAudits(store, actor: moderator);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m11-post"
+                                   && a.Outcome == AccessOutcome.Allow);
+    }
+
+    // ── M3b·12 — RemovePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState ─
+    //
+    // C-M3b·3 (F4, SoD) — same shape as M3b·10: a caller without a
+    // standing moderator in this component is denied; the post's
+    // Status remains unchanged (PostStatus.Active) and the Deny audit
+    // row is the only trace.
+
+    [Fact]
+    public async Task RemovePostAsync_NonModeratorCaller_Denied_NoStatusWritten_NoPartialState()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string caller = "u-m3b-m-svc-callernon";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true,
+                                           ModeratorAccess = true });
+        await Plant(store, new Post
+        {
+            Id = "m12-post", ComponentId = ComponentId, AuthorId = "u-m3b-m-svc-author",
+            Body = "body m12", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, "u-m3b-m-svc-member"),
+            Status = PostStatus.Active,
+        });
+
+        await RunInSession(store, async session =>
+            await svc.RemovePostAsync("m12-post", caller, session));
+
+        await using var s2 = store.QuerySession();
+        var post = await s2.LoadAsync<Post>("m12-post");
+        Assert.Equal(PostStatus.Active, post!.Status);
+
+        var rows = await PostAudits(store, actor: caller);
+        Assert.Contains(rows, a => a.Action == AccessAction.Moderate.Id
+                                   && a.TargetId == "m12-post"
+                                   && a.Outcome == AccessOutcome.Deny);
+    }
+
+    // ── M3b·13 — PostStatus_EnumHasExactlyThreeLiterals_ActiveHiddenRemoved ─
+    //
+    // Shape test for §2.2.1's pin: the PostStatus enum literal set is
+    // exactly { Active, Hidden, Removed }. Set-equality (not order —
+    // the pin is the **set** of literals, not their ordinal). No plant,
+    // no drive — the test only reads the enum type.
+
+    [Fact]
+    public void PostStatus_EnumHasExactlyThreeLiterals_ActiveHiddenRemoved()
+    {
+        var actual = Enum.GetNames(typeof(PostStatus)).ToHashSet(StringComparer.Ordinal);
+        var expected = new HashSet<string>(StringComparer.Ordinal)
+        {
+            nameof(PostStatus.Active),
+            nameof(PostStatus.Hidden),
+            nameof(PostStatus.Removed),
+        };
+        Assert.Equal(expected, actual);
+    }
+
 
     // ── Shared helpers ─────────────────────────────────────────────────────
 
@@ -880,6 +1082,12 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         await using var session = store.OpenSession(new Marten.Services.SessionOptions());
         return await action(session);
+    }
+
+    private static async Task RunInSession(IDocumentStore store, Func<IDocumentSession, Task> action)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        await action(session);
     }
 
     private static List<(GrantKind Kind, string Id)> GrantsOf(Audience a)

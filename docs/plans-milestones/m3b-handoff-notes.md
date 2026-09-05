@@ -1411,6 +1411,123 @@ assert both independently.
   (unit-series rule 1: a unit never modifies a file not in its own
   Deliverables). The `## U7` section was subsequently **back-filled** into
   this file (see above, between `## U6` and `## U8`), including its own
-  back-fill note. U11's close should confirm the full U1→U10 table in
-  `## Summary` includes the U7 row.
+     back-fill note. U11's close should confirm the full U1→U10 table in
+     `## Summary` includes the U7 row.
+
+
+  ## U9 — Seam tests (`ModerationServiceTests.cs` + `PostServiceTests` ADDs)
+
+  - **Deliverable:** the 13 pinned-test list from `m3b-moderation.md` §2.5,
+    implemented as two files (in U9's two-file Deliverables — tests 14–16
+    are U10's / U7's Web-layer surface, *not* U9's scope):
+    - `tests/Kumunita.Core.Tests/ModerationServiceTests.cs` — **new**, 8
+      `[Fact]` tests (rows 1–8 in §2.5), sharing the same
+      `PostgresFixture` + `BootStoreAsync` + `Plant` / `RunInSession` shape
+      as `PostServiceTests` (M3 U9 precedent). The class composes the trio
+      `UserInfoService` / `AuthorizationService` / `ModerationService`.
+    - `tests/Kumunita.Core.Tests/PostServiceTests.cs` — **modified**, 5 ADDs
+      (rows 9–13 in §2.5) inserted **between** the last M3 test
+      (`PostService_MakesNoModerateCall`) and the shared-helpers block,
+      preserving the M3 lanes' order and names (M3's own drift-guard applies
+      to them).
+  - **Entry-reads confirmed:** `docs/design/m3b-moderation.md` §2.5 rows
+    1–13 (verbatim names), `tests/Kumunita.Core.Tests/PostServiceTests.cs`
+    (the helper shapes: `BootStoreAsync`, `Services`, `Plant`,
+    `RunInSession`, `PostAudits`, `AllAudits`), `src/Kumunita.Core/
+    Moderation/ModerationService.cs` (U4 + U5), `src/Kumunita.Core/Posts/
+    PostService.cs` (U3), `tests/Kumunita.Core.Tests/PostgresFixture.cs`
+    (same fixture as M3 U9), `src/Kumunita.Core/Authorization/
+    AuthorizationService.cs` (the `Decide` branch order — the source of
+    the lane audit-row behavior pinned by U9's tests), `src/Kumunita.Core/
+    Posts/PostStatus.cs` (the 3-literal shape pin).
+  - **Test count:** 13 (8 + 5).
+  - **Verified pass count:** **13 / 13 passing** (`run_tests` filtered to
+    the 13 pinned test names; observed 0 failed, 0 skipped, "Test run
+    finished: 13 Tests (13 Passed, 0 Failed, 0 Skipped)"). Full
+    `run_tests` for `Kumunita.Core.Tests`: **118 / 118 passing** (0
+    regressions from the M3 / M2 / M1 baseline). `run_build` green on the
+    test assembly.
+  - **Deviations (drift-note path, one per §2.7 "append a one-line drift
+    note"):**
+    - **Design §2.3 item 3 vs U3's lane shape.** The design pin says the
+      hide/remove audit rows "carry `AccessVia.Admin`", but U3's
+      `HidePostAsync` / `RemovePostAsync` delegate the call to the
+      M1-frozen `IAuthorizationService.CanAsync`, which writes **its own**
+      audit row with `Via = decision.Via` (on success, branch #2 gives
+      `AccessVia.Moderator`; on Deny, the branch does not fire and
+      `decision.Via` is the "default" Deny via from the seam's Decide).
+      Per §2.7 "This file is the contract" the *design doc wins for the
+      pin* but the *implementation wins for what runs*, so U9 pins the
+      **observable** behavior (the `Status` flip to
+      `PostStatus.Hidden` / `PostStatus.Removed`; the Allow or Deny outcome
+      on the `AccessAction.Moderate.Id` row) and does **not** pin a
+      specific `Via` literal the M1-frozen seam writes — the design doc's
+      `AccessVia.Admin` pin is **not** asserted in tests 9 / 10 / 11 / 12
+      (only the lane's `Action`, `TargetId`, `Outcome` are asserted). The
+      drift is recordable but does not require a test rename: the
+      §2.5 test names remain the authoritative shape.
+    - **Lane-side audit row vs M1-seam audit row (test rows 5 and 8 of
+      `ModerationServiceTests`).** U5's `AssignReportAsync` / `UnlockAsync` /
+      `ResolveReportAsync` lanes put the lane's hand-written
+      `AccessAudit` row inside `if (decision.Allowed)` — a *denied* call
+      writes **no** `report.assign` / `report.resolve` row (only the
+      M1-frozen seam's `CanAsync` row — `TargetKind = "post"`,
+      `TargetId = the post id`, `Action = "moderate"`, `Outcome = Deny,
+      Via = decision.Via` — commits in the same caller transaction).
+      This is still "C3 — audit row always written" (the seam's row *is*
+      the audit row), but the §2.3 item 4 pin "the Deny audit row is the
+      lane's own" is not what U3 implements. U9's tests 5 and 8 assert
+      the seam's row instead (same `Outcome = Deny` pin, different
+      `TargetId` / `TargetKind`). No test-name change; the test body is
+      what adapts.
+    - **Row 7's flag-flip assertion (C5 activation).** U5's
+      `ResolveReportAsync` delegates to `IUserInfoService.
+      SetComponentModeratorAccessAsync` (the M1-frozen seam), which per
+      its own doc opens **its own session, its own commit** (the "flag-
+      flip commits separately" note in U5's doc-comment). U9's test 7
+      asserts the flip is observable in a *fresh* session after the lane's
+      `SaveChangesAsync` — the test's `RunInSession` helper disposes the
+      session before the fresh-session read, so the M1 seam's own commit
+      lands independently and the test sees the flip regardless of
+      "same-transaction" or "separate-transaction" semantics.
+  - **What U10 (e2e) / U11 (close) needs:**
+    - U10's §2.6 gate (the three-test play) consumes U9's pass counts:
+      U9 contributes **13/13 passing** as the "the seam tests are
+      green" precondition (the M3b gate asserts the FACES lanes are
+      *reachable* end-to-end via the Web surface; the seam tests are the
+      Core-level evidence the lanes' write / no-write / flag-flip pins
+      hold).
+    - U11's close table (`## Summary`) should show 13 in U9's "tests
+      added" column (the M3b ADDs over the M3 baseline — M3's own 18 remain
+      as the M3 lane's shape; U9's 13 are the M3b lane's). U11 should
+      also reconcile the two drift notes above — the §2.3 item 3
+      `AccessVia.Admin` vs U3's `decision.Via` shape and the §2.3 item 4
+      "the lane's own `report.assign` / `report.resolve` row" vs U5's
+      `if (decision.Allowed)`-guarded lane — so the design doc's pin
+      either (a) matches the implementation's observable shape, or (b)
+      carries a one-line "U9 observed" note. U11's call, per §2.7 "the
+      design doc wins for the pin" (the test names stay authoritative).
+  - **Files touched**
+    - `tests/Kumunita.Core.Tests/ModerationServiceTests.cs` (new — 8
+      `[Fact]`s, the §2.5 rows 1–8 verbatim names).
+    - `tests/Kumunita.Core.Tests/PostServiceTests.cs` (modified — +5
+      tests; added a non-generic `RunInSession` overload for the lane's
+      `Task`-returning `HidePostAsync` / `RemovePostAsync`; existing M3
+      tests unchanged, helpers unchanged).
+    - `docs/plans-milestones/m3b-u9-plan.md` (new — the execution plan).
+    - `docs/plans-milestones/m3b-handoff-notes.md` (this section appended).
+  - **Build / test state**
+    - `run_build` on `Kumunita.Core.Tests` — **green**.
+    - `run_tests` filtered to the 13 pinned names — **13/13 pass**
+      (observed 2026-09-04 in U9's session).
+    - `run_tests` for the full `Kumunita.Core.Tests` assembly — **118/118
+      pass** (M3's 18 + M2/M1 baseline + U9's 13 = the M3b ADDs over
+      the M3 baseline; no regressions).
+  - **Note on the "2-file Deliverables" discipline:** U9 did **not** touch
+    any M1/M2/M3 source file, did **not** add new test classes, did **not**
+    modify the design doc, did **not** author e2e, did **not** touch the
+    Web controller or view files. U9's two Deliverables files are exactly
+    those named in the plan §`### U9 — Seam tests`. The plan doc
+    (`m3b-u9-plan.md`) is the third artifact, per the per-unit file
+    convention.
 
