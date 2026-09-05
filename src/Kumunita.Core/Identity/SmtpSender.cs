@@ -61,12 +61,61 @@ public sealed class SmtpOptions
     public int Port { get; set; } = 587;
 
     /// <summary>
-    /// If true, the sender authenticates with the process's Windows/OS credentials.
-    /// If false (default) no credentials are sent — a relay that requires
-    /// authentication will fail the first send (surfaced as an
-    /// <c>EmailDeadLetter</c> per §6).
+    /// If true, the sender authenticates with the process's Windows/OS credentials
+    /// (BCL <c>SmtpClient.UseDefaultCredentials</c>). Mutually exclusive with
+    /// <see cref="User"/> — if both are set <see cref="User"/> wins (per the BCL
+    /// precedence: explicitly-set credentials take effect over the default-credential
+    /// flag). Left at the default (false) everywhere except the rare case of a
+    /// Windows-service relay with the process already in the right domain.
     /// </summary>
     public bool UseDefaultCredentials { get; set; } = false;
+
+    /// <summary>
+    /// The SMTP relay username for authentication. Empty + <see cref="Pass"/> empty
+    /// = no AUTH sent at all (Mailpit / local-only relay — the dev compose shape).
+    /// Exactly one of <c>User</c> / <c>Pass</c> set is a configuration error —
+    /// <see cref="SmtpSender.SendAsync"/> throws a clear <see cref="InvalidOperationException"/>
+    /// before it opens a connection, instead of failing opaquely at the <c>AUTH</c>
+    /// handshake once on the wire (which would otherwise surface only as a dead-
+    /// lettered <c>OutboxEmail</c> row — see <c>OPS.md</c> §6 / §7).
+    /// </summary>
+    public string? User { get; set; }
+
+    /// <summary>
+    /// The SMTP relay password; required iff <see cref="User"/> is set. See
+    /// <see cref="User"/> for the "exactly one or zero" invariant.
+    /// </summary>
+    public string? Pass { get; set; }
+
+    /// <summary>
+    /// Encryption policy for the relay handshake. Recognized values (case-insensitive):
+    /// <see cref="SecureTls"/> (<c>Tls</c>) → <c>STARTTLS</c> (the conventional 587
+    /// shape; the default); <see cref="SecureNone"/> (<c>None</c>) → no encryption,
+    /// plain SMTP (Mailpit / a loopback-only relay — **not** a production shape).
+    /// <para>
+    /// <b>Why only these two:</b> the BCL <see cref="System.Net.Mail.SmtpClient"/>
+    /// supports only STARTTLS (RFC 3207). <c>EnableSsl</c> is a boolean; there is no
+    /// separate "implicit TLS" flag, and the .NET API reference is explicit that
+    /// the alternate "SSL session established up front" model (port 465, a.k.a.
+    /// SMTPS) is <i>not</i> supported by <c>SmtpClient</c>. Offering an <c>Ssl</c>
+    /// value here would mislead the operator into thinking 465 works — it does not.
+    /// If a relay exposes <b>only</b> 465, swap out this implementation for a
+    /// hand-rolled <c>Sockets</c>/<c>SslStream</c> client before setting
+    /// <c>SMTP__Port=465</c> in env; do not configure it on this code path.
+    /// </para>
+    /// <para>
+    /// Anything else is a configuration error and <see cref="SmtpSender.SendAsync"/>
+    /// throws before opening the client, so a typo'd value fails fast instead of
+    /// silently talking plain to a relay that expects TLS.
+    /// </para>
+    /// </summary>
+    public string Secure { get; set; } = SecureTls;
+
+    /// <summary>STARTTLS (conventional 587). The default — the only encrypted shape the BCL supports.</summary>
+    public const string SecureTls = "Tls";
+
+    /// <summary>No encryption — plain SMTP. Local-only (Mailpit, localhost relay).</summary>
+    public const string SecureNone = "None";
 
     /// <summary>
     /// The <c>From</c> header. Empty = the relay's default (which may be rejected
@@ -97,6 +146,84 @@ public sealed class SmtpSender(
 {
     private readonly SmtpOptions _cfg = options.Value;
 
+    /// <summary>
+    /// Maps <see cref="SmtpOptions.Secure"/> onto the BCL's single
+    /// <see cref="System.Net.Mail.SmtpClient.EnableSsl"/> switch. Only two shapes
+    /// are legitimate: <c>Tls</c> → <c>EnableSsl = true</c> (STARTTLS),
+    /// <c>None</c> → <c>EnableSsl = false</c> (plain). The BCL's <c>EnableSsl</c>
+    /// is STARTTLS-only (the .NET reference document is explicit that the implicit
+    /// TLS / SMTPS model — port 465 — is <b>not</b> supported by <c>SmtpClient</c>);
+    /// an <c>Ssl</c> / 465 relay therefore does not work on this code path and the
+    /// operator needs to either swap the relay to one that exposes a STARTTLS
+    /// port (most do — 587 is the standard) or replace this implementation before
+    /// attempting it.
+    /// </summary>
+    private static bool ResolveEnableSsl(string? secure)
+    {
+        if (string.IsNullOrWhiteSpace(secure)) return true;     // default: Tls
+        return secure.Trim().ToLowerInvariant() switch
+        {
+            "tls"  => true,
+            "none" => false,
+            // Fail fast: a typo'd value (e.g. "starttls", "STARTTLS", "Ssl")
+            // should not silently fall through to a default the operator did
+            // not intend — the .NET API reference is explicit that the BCL
+            // does not support the port-465 implicit TLS shape that "Ssl"
+            // might suggest, so the guard message needs to say so.
+            _ => throw new InvalidOperationException(
+                $"SMTP__Secure value '{secure}' is not supported. " +
+                $"Recognized values: {SmtpOptions.SecureTls} (STARTTLS, the BCL's only TLS mode; " +
+                "use the relay's STARTTLS port, conventionally 587), or " +
+                $"{SmtpOptions.SecureNone} (plain SMTP, local-only). " +
+                "Note: the BCL SmtpClient does not support implicit TLS (port 465 / SMTPS) — " +
+                "pick a relay that exposes a STARTTLS port instead.")
+        };
+    }
+
+    /// <summary>
+    /// The "exactly one or zero" invariant on credentials (SmtpOptions.User /
+    /// SmtpOptions.Pass): both set → AUTH, neither set → no AUTH sent — and
+    /// exactly one set is a configuration error, not a silent relay handshake
+    /// failure. Throwing here (before the <c>SmtpClient</c> is even constructed)
+    /// keeps the failure in the "SMTP is not configured" message shape the
+    /// durable handler's retry policy already inspects (SmtpException /
+    /// TimeoutException / MailAddressException / ArgumentNullException), not a
+    /// half-open connection failure that shows up as something new.
+    /// </summary>
+    private static SmtpClient CreateClient(SmtpOptions cfg)
+    {
+        bool hasUser  = !string.IsNullOrWhiteSpace(cfg.User);
+        bool hasPass  = !string.IsNullOrWhiteSpace(cfg.Pass);
+        if (hasUser != hasPass)
+            throw new InvalidOperationException(
+                "SMTP__User and SMTP__Pass must be set together (or neither). " +
+                "Current shape: " +
+                $"User={(hasUser ? "set" : "unset")}, Pass={(hasPass ? "set" : "unset")}. " +
+                "No email was sent; the durable handler will retry / dead-letter per the configured policy.");
+
+        var client = new SmtpClient
+        {
+            Host = cfg.Host!,
+            Port = cfg.Port,
+            EnableSsl = ResolveEnableSsl(cfg.Secure),
+            // BCL precedence (when both are set, the explicit credentials win —
+            // UseDefaultCredentials is only used as a fallback). We set it only
+            // when explicitly requested; the default (false) is the common case.
+            UseDefaultCredentials = cfg.UseDefaultCredentials
+        };
+
+        if (hasUser && hasPass)
+        {
+            // The BCL exposes SMTP auth via the `Credentials` property (a
+            // NetworkCredential) — assign the pair rather than calling a method.
+            // This is the shape Mailgun / Resend / MailerSend / Postmark /
+            // corporate SMTP expect.
+            client.Credentials = new System.Net.NetworkCredential(cfg.User, cfg.Pass);
+        }
+
+        return client;
+    }
+
     /// <inheritdoc />
     public async Task SendAsync(OutboxEmail email, CancellationToken ct = default)
     {
@@ -110,12 +237,7 @@ public sealed class SmtpSender(
                 "(appsettings.Development.json for dev, SMTP__Host env var in production per OPS.md §2). " +
                 "No email was sent; the durable handler will retry / dead-letter per the configured policy.");
 
-        using var client = new SmtpClient
-        {
-            Host = _cfg.Host,
-            Port = _cfg.Port,
-            UseDefaultCredentials = _cfg.UseDefaultCredentials
-        };
+        using var client = CreateClient(_cfg);
 
         var msg = new MailMessage
         {

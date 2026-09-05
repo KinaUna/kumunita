@@ -137,6 +137,8 @@ port (OPS §10).
 | `Community__SupportEmail` | support contact from the inventory |
 | `ConnectionStrings__Kumunita` | `Host=<addon-service-name>;Port=5432;Database=kumunita;Username=kumunita;Password=<from §4>;Include Error Detail=true` — **secret** |
 | `SMTP__Host` / `SMTP__Port` | the relay for verification + seed-admin mail — see **§5.1** (and OPS §7) |
+| `SMTP__User` / `SMTP__Pass` | required by most real relays — see **§5.1** |
+| `SMTP__Secure` | optional; `Tls` (STARTTLS, default) or `None` (plain, local-only) — **see BCL constraint in §5.1** |
 | `SeedAdmin__Email` / `SeedAdmin__Token` | one-time setup token — **created per OPS Procedure 2, removed from env after first login** |
 
 The `Host` value is the addon's internal service name (visible on the
@@ -144,29 +146,59 @@ addon's page / psql connection block).
 
 ### 5.1 SMTP — concrete env values
 
-The `SmtpSender` reads exactly three options from the `SMTP` section — `Host`,
-`Port`, and `From` (`SmtpSender.cs`; bound via `Configure<SmtpOptions>` in
-`Program.cs`). `From` is optional (a strict relay may reject no-`From`). The
-rest of the env set is **not** applied by the sender and is documented in OPS §7
-for consistency; the BCL `SmtpClient` is used as-is.
+The `SmtpSender` reads six options from the `SMTP` section: `Host`, `Port`,
+`User`, `Pass`, `Secure`, and `From` (`SmtpOptions` in
+`src/Kumunita.Core/Identity/SmtpSender.cs`); all are bound through
+`Configure<SmtpOptions>` in `Program.cs`. The BCL `SmtpClient` is used as-is,
+and the BCL **only supports STARTTLS** (`EnableSsl = true`) — there is no
+implicit-TLS / SMTPS mode (the .NET API reference for `SmtpClient.EnableSsl`
+is explicit that an "SSL session established up front," i.e. port 465, is
+**not currently supported**). Practical consequence: **pick a relay that
+exposes a STARTTLS port** (conventionally 587). Virtually every SaaS relay —
+Mailgun, Resend, MailerSend, Postmark, SendGrid, MS 365 — does; if yours is
+465-only, it needs a relay swap or a `SmtpSender` implementation change before
+deploy (see note in §5.1B).
 
-**A. Local dev loop (compose / Mailpit):** `docker-compose.yml` in
-dev-db-init + Mailpit. Only reachable from inside the compose network —
-this is the `ASPNETCORE_ENVIRONMENT=Development` path, not a Coolify deploy:
+**A. Local dev loop (compose / Mailpit):** run via `docker-compose.yml` at the
+repo root, which brings up `Mailpit` (SMTP on port 1025, web UI on 8025) plus
+Postgres 18 in the same network. Only reachable from inside that network — this
+is the `ASPNETCORE_ENVIRONMENT=Development` path, not a Coolify deploy:
 
 | Variable | Value |
 |---|---|
-| `SMTP__Host` | `mailpit` (the compose service name, port 1025) |
-| `SMTP__Port` | `1025` |
-| `SMTP__From` | (optional; leave unset unless your relay requires it) |
+| `SMTP__Host` | `mailpit` (the compose service name) |
+| `SMTP__Port` | `1025` (Mailpit's SMTP port; no AUTH, no TLS needed — Mailpit is a local relay) |
+| `SMTP__Secure` | `None` (plain SMTP; the honest shape for a loopback-only relay) |
+| `SMTP__User` / `SMTP__Pass` | leave unset (Mailpit doesn't require auth) |
+| `SMTP__From` | optional; the dev loop has no strict relay to reject a missing `From` |
 
-**B. Real relay — the recommended shape for a test server or production:
+**B. A real relay (test server or production):** most relays require `User` +
+`Pass` **and** a STARTTLS port. The shape to use:
 
 | Variable | Value |
 |---|---|
 | `SMTP__Host` | e.g. `smtp.mailgun.org`, `smtp.resend.com`, `relay.mailprovider.com` — your provider's host |
-| `SMTP__Port` | `587` (STARTTLS) or `465` (implicit TLS), per your provider's docs |
+| `SMTP__Port` | the relay's **STARTTLS** port — conventionally **587**; use the port your provider documents for STARTTLS (some are 2525 or 5870 — check the provider's SMTP-settings page, not a "webmail login" port) |
+| `SMTP__Secure` | `Tls` (the default; `None` would talk plain SMTP, which leaks credentials in transit and is not a production shape) |
+| `SMTP__User` | the relay's username (often the sender's email or an API-issued account) — **secret** |
+| `SMTP__Pass` | the relay's password / API key — **secret**; store in the secrets manager, inject via env, never in the runbook |
 | `SMTP__From` | the resident-facing address shown in verification emails (often the same as `Community__SupportEmail`) |
+
+> **465 / implicit TLS (SMTPS) is not supported by the BCL `SmtpClient`.** If
+> the only relay available to the instance is 465-only, your options are
+> (a) pick a different relay that also exposes a STARTTLS port (most do), or
+> (b) replace `SmtpSender`'s BCL `SmtpClient` with a hand-rolled `Sockets`
+> client that wraps the stream in `SslStream.AuthenticateAsClient(...)` before
+> speaking SMTP — i.e. a real code change, not an env value. Do **not** set
+> `SMTP__Secure=Ssl`: the value is rejected with an actionable error message
+> that says exactly this.
+>
+> **`SMTP__User` and `SMTP__Pass` are a pair.** Setting only one (or an empty
+> string for one and a real value for the other) is a configuration error:
+> `SmtpSender.SendAsync` throws an `InvalidOperationException` before opening
+> the client rather than failing opaquely at the `AUTH` handshake once on the
+> wire. See the `SmtpOptions.User` doc comment in `SmtpSender.cs` for the
+> invariant.
 
 Whichever shape you pick, **one strong `SeedAdmin__Email` / one strong token**
 is required for the first-boot admin lane (OPS Procedure 2, step 1). Generate it
