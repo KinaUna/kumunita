@@ -1117,3 +1117,300 @@ assert both independently.
     `SetComponentModeratorAccessAsync`. This is a U7 scoping clarification;
     it does not change U6's (web reply-route) work.
 
+
+## U7 — /moderation surface (queue + resolve UI + assign form)
+
+- **Deliverable:** the moderator-facing Web surface over `ModerationService`
+  — the `/moderation` queue (list reports), the single-report detail page,
+  and the assign / unlock / resolve write-lane forms for one report. This
+  closes M3b deferral item 4 ("moderator surfaces — `/moderation` queue +
+  resolve UI, the assign form") and the F5/F6 FACES rows (C-M3b·4 SoD).
+  **Web-only surface** (plus a 3-line DI prerequisite in Core). No Core seam
+  reshaped; no new seam-test name (U9 owns the tests); no tests added here
+  (the M3 U7 handoff shape: controller + view-models + views, no tests).
+- **Entry-reads confirmed:**
+  - `docs/design/m3b-moderation.md` §2.2.3 (the frozen `ModerationService`
+    five-method signatures: `FileReportAsync` / `AssignReportAsync` /
+    `UnlockAsync` / `ResolveReportAsync` + `CanReadWithReportAsync`), §2.3
+    (the four Status-literal pins: `"filed"` / `"assigned"` / `"unlocked"` /
+    `"resolved"`), §2.4 (`Via = Report` read branch) — U7 composes the write
+    lanes; the read branch is U9's seam-test target.
+  - `src/Kumunita.Core/Moderation/ModerationService.cs` (U4 + U5) — the
+    frozen method signatures U7 calls.
+  - `src/Kumunita.Web/Controllers/AdminController.cs` (M1
+    GlobalAdmin-gated thin-controller precedent) + `DirectoryController.cs`
+    (M2 "route + authz + shape" pattern — queue-as-scoped-read, not a
+    decision lane).
+  - `src/Kumunita.Web/Models/ModerationQueueViewModel.cs` (new, this unit),
+    `ModerationResolveViewModel.cs` (new, this unit).
+- **Gate shape (two-tier, C-M3b·4 / ADR 0003 SoD):**
+  - **Read lanes** (`Index`, `Resolve` GETs) — `[Authorize]` at class level
+    (signed-in). A **GlobalAdmin** sees every report. A **standing
+    moderator** (M1 `ModeratorAssignment` row on the report's `ComponentId`
+    + `Component.ModeratorAccess == true`, read via the plain
+    `IUserInfoService` read seams — the U6 handoff's "flag ON branch via
+    the read seam" clarification, NOT via
+    `SetComponentModeratorAccessAsync`) sees only reports on components
+    they moderate whose flag is ON. A **plain resident** sees no reports.
+    Read lanes make **no** `CanAsync` call and write **no** `AccessAudit`
+    row (the M1 `AdminController` / M2 `DirectoryController` queue shape —
+    a scoped read, not a decision lane; ADR 0006-D).
+  - **Write lanes** (`Assign`, `Unlock`, `ResolvePost` POSTs) —
+    `[Authorize(Roles = Roles.GlobalAdmin)]` at **action** level (not
+    class — the class stays `[Authorize]` so a standing-moderator can still
+    *read* the report detail but cannot execute the write lanes; a standing
+    moderator is rejected by ASP.NET Core before the action body runs).
+    The `CanAsync(actor, AccessAction.Moderate, target, session)` decision
+    gate is **inside** each U5 method (C3 / ADR 0006-C: `Allowed = false`
+    path writes the audit row but NOT the domain write — "no partial write").
+    Two independent gates, both required (SoD holds by construction).
+- **Routes added (5):**
+
+  | Method | Route | Action | Gate |
+  |--------|-------|--------|------|
+  | GET | `/moderation` | `Index()` | `[Authorize]` (class) + scoped-read |
+  | GET | `/moderation/{id}` | `Resolve(id)` | `[Authorize]` (class) + scoped-read |
+  | POST | `/moderation/{id}/assign` | `Assign(id, assignedToModeratorId)` | `[Authorize(Roles = GlobalAdmin)]` (action) |
+  | POST | `/moderation/{id}/unlock` | `Unlock(id)` | `[Authorize(Roles = GlobalAdmin)]` (action) |
+  | POST | `/moderation/{id}/resolve` | `ResolvePost(id)` | `[Authorize(Roles = GlobalAdmin)]` (action) |
+
+  All POSTs are `[ValidateAntiForgeryToken]`.
+
+- **Session shape (C3 same-transaction lane):** each action opens its own
+  `store.OpenSession(new SessionOptions())` and delegates to the U5
+  `ModerationService` method. The **service** performs the
+  `SaveChangesAsync` (C3 single-write commit). U7 never calls
+  `SaveChangesAsync` itself.
+- **Route-naming variance (a clarification, NOT a §2.7 drift):** the design
+  doc's surface list (line 89–100 of `m3b-moderation.md`) names
+  `POST /moderation/reports/{assign|unlock|resolve}` — a *naming shorthand*
+  for "the three GlobalAdmin-gated write actions on a single report." U7
+  ships the `{id}/{action}` shape (the plan body's pin; matches
+  `DirectoryController` / `PostsController` / M1 `AdminController`
+  route-position conventions). No C# contract is broken; no Core seam is
+  affected.
+- **Display-level predicates (NOT decision gates):**
+  `ModerationResolveViewModel` carries `IsAssignable`, `IsUnlockable`,
+  `IsResolvable` — each derived from the report's `Status` literal +
+  `IsGlobalAdminView`. These control which `<form>` block the Razor view
+  **renders** (display-level projection); the actual gate is the
+  action-level `[Authorize(Roles = GlobalAdmin)]` + the Core's
+  `CanAsync(Moderate)`. A standing-moderator reads the report detail +
+  their assignee row (if any) but sees **no** action forms.
+  - `IsAssignable = Status == "filed" && IsGlobalAdminView &&
+    Moderators.Count > 0`
+  - `IsUnlockable = IsGlobalAdminView && Status in {filed, assigned}`
+  - `IsResolvable = IsGlobalAdminView && Status in {filed, assigned,
+    unlocked}`
+- **`Assign` defense-in-depth (Web-side only, Core does not validate):**
+  the `assignedToModeratorId` must be a standing-moderator on the report's
+  `ComponentId` (a `ModeratorAssignment` row exists for that
+  component + user); a report with `ComponentId == null` is rejected (the
+  C-M3b·4 "no fabricated component" pin — the form shouldn't have offered
+  the choice). A mismatch yields `TempData["error"]` + redirect back to
+  the detail page (the "stale form" shape).
+- **Files touched (6 — 5 new + 1 modified):**
+  - `src/Kumunita.Web/Controllers/ModerationController.cs` (new — 5 actions,
+    primary ctor `(IDocumentStore, IUserInfoService, ModerationService)`,
+    class-level `[Authorize]`, action-level `[Authorize(Roles =
+    Roles.GlobalAdmin)]` on the three POSTs,
+    `[ValidateAntiForgeryToken]` on the three POSTs; nothing else).
+  - `src/Kumunita.Web/Models/ModerationQueueViewModel.cs` (new —
+    `ModerationQueueViewModel{Reports, ByStatus, TotalCount}` +
+    `ReportRow(Id, PostId, PostTitle, ComponentName, ReporterName, Reason,
+    Status, At)` — the M2 §9 low-entropy projection).
+  - `src/Kumunita.Web/Models/ModerationResolveViewModel.cs` (new —
+    `ModerationResolveViewModel{ReportId, PostId, ComponentId, Reason,
+    Status, At, ReporterName, PostTitle, PostBody, ComponentName,
+    PostAuthorName, Moderators, IsAssignable, IsUnlockable, IsResolvable,
+    IsGlobalAdminView}` + `StandingModerator(SubjectId, DisplayName)`).
+  - `src/Kumunita.Web/Views/Moderation/Index.cshtml` (new — the queue table,
+    by-status counts, per-row "Review →" links, `TempData` flash block).
+  - `src/Kumunita.Web/Views/Moderation/Resolve.cshtml` (new — the
+    single-report detail + three `<form>` blocks (assign / unlock / resolve),
+    each with `@Html.AntiForgeryToken()`, each gated by the corresponding
+    display-level predicate; `TempData` flash block).
+  - `src/Kumunita.Core/DependencyInjection.cs` (modified — the 3-line DI
+    registration block for `ModerationService` in `AddKumunitaCore`, after
+    the M3 `PostService` registration; no other change). This is a Core-side
+    *prerequisite* shared with U3/U4/U5's "Core-side DI" precedent, NOT a
+    Core seam reshaping (unit-series rule 5 does not apply: `Report` POCO
+    shape is untouched).
+- **`/admin` untouched confirmation (ADR 0003 SoD pin):** no change to
+  `src/Kumunita.Web/Controllers/AdminController.cs` or any
+  `src/Kumunita.Web/Views/Admin/*` file (the U7 plan § Exit criterion; the
+  M3b plan § U7 Exit line 257–258). ADR 0003's SoD holds by construction —
+  see gate shape above.
+- **Deviations:** none. The five method-call sites
+  (`AssignReportAsync`, `UnlockAsync`, `ResolveReportAsync`,
+  `CanReadWithReportAsync` — U7 does not call the read branch directly;
+  `FileReportAsync`) all use the frozen U4/U5 signatures verbatim.
+- **Build / test state**
+  - `run_build` on `Kumunita.slnx` — **green** (0 Warnings, 0 Errors).
+  - `run_tests` — **0 new tests added in U7** (unit-series convention: no
+    new seam-test name; U9's `ModerationServiceTests` lanes are the seam
+    tests; the 2 `ModerationControllerTests` in the §2.5 list (tests 15–16)
+    are U9's deliverable, not U7's). U7's gate is build-green + the 5 routes
+    now resolving (the Exit criterion), consistent with U6's gate shape.
+- **What U8 (`Report this`) / U9 (seam tests) / U10 (e2e) needs**
+  - **U8:** the resident-facing filing surface is a **separate** action on
+    `PostsController` (`POST /posts/{id}/report`) delegating to U4's
+    `FileReportAsync` — U7's surface does **not** add or re-shape a filing
+    action on the `/moderation` surface (U7 is GlobalAdmin-gated; the
+    filing lane is resident-facing, C-M3b·1). U7's assign / unlock /
+    resolve forms are the *moderator-side* surfaces; U8's is the
+    *resident-side* surface on the post detail view. They are distinct
+    files, distinct controllers, distinct routes.
+  - **U9:** the §2.5 seam-test list's `ModerationControllerTests` (tests
+    15–16) target U7's queue + one write-lane action — U9 should plant a
+    component + report + `ModeratorAssignment` via the existing read seams,
+    then invoke the `Index` / `Resolve` / `Assign` / `Unlock` / `ResolvePost`
+    actions and assert the expected `IActionResult` shape + the
+    `ModerationService` call (mock / fake, the M2 `DirectoryController` test
+    precedent). U7's session shape (`store.OpenSession(new
+    SessionOptions())`) is the test-target — U9's test harness should
+    provide a fake `IDocumentStore` with a matching `OpenSession`.
+  - **U10 (e2e):** the five routes above are the moderator surfaces U10's
+    Playwright spec should exercise — GlobalAdmin login → `/moderation`
+    queue assertion → `/moderation/{id}` → assign / unlock / resolve form
+    POSTs → redirected to the queue with the `TempData` flash message. The
+    standing-moderator read lane (flag ON, scoped to their component) and
+    the plain-resident empty-queue case should also be covered (the two-tier
+    gate shape documented above). U10's e2e spec is the acceptance-gate
+    evidence that exercises FACES rows F5/F6 (assign/resolve) — the filing
+    row F1 is U8's surface (the `POST /posts/{id}/report` action).
+- **Back-fill note (for the record):** this section was authored during the
+  U8 execution pass. The U7 plan file
+  (`docs/plans-milestones/m3b-u7-plan.md`) and all five U7 Web files
+  (`ModerationController.cs`, both view-models, both views) plus the DI
+  registration in `DependencyInjection.cs` all existed at the time of
+  U8's entry reads; this section retro-fills the handoff-note entry that
+     was omitted when U7 completed. U8's handoff section
+     (`## U8` below) flags this omission; U11's close should confirm the full
+     U1→U10 table in `## Summary` includes the U7 row.
+
+
+  ## U8 — "Report this" resident-facing action
+
+  - **Deliverable:** the `POST /posts/{id}/report` resident-facing **report
+    filing** action — M3b deferral item 1's *Web surface* (the F1 filing FACES
+    row). A thin Web lane (ADR 0006-D) on `PostsController` that delegates the
+    write to U4's frozen `ModerationService.FileReportAsync` and a "Report this
+    post" form on the post detail view. **Web-only**: no new Core seam, no new
+    seam-test name (U9 owns the tests; the §2.5 list pins the Core lanes, not a
+    Web-route test — consistent with U6, which added 0 tests). U8 does **not**
+    touch `ModerationService`, any Core file, or the `/moderation` surface
+    (U7's).
+- **Entry-reads confirmed:**
+  - `docs/design/m3b-moderation.md` Part 1 C-M3b·1 (report filing is a
+    resident-facing *intake* action — **no** `CanAsync` call; the filing
+    `AccessAudit` row carries the pinned filing tag `AccessVia.Admin`, two
+    negatives: not `Via = Report` [reserved for the read branch, C-M3b·2],
+    not `Via = Owner` [C1 owner-branch]) + Part 2 §2.2.3/§2.3 (the frozen
+    `FileReportAsync` signature + the four Status-literal pins, of which
+    `"filed"` is this lane's).
+  - `src/Kumunita.Core/Moderation/ModerationService.cs` (U4) — the frozen
+    signature `Task<int> FileReportAsync(string postId, string actorId,
+    string? reason, IDocumentSession session)`; the service throws
+    `KeyNotFoundException` on a missing post and performs its own
+    `SaveChangesAsync` (C3 same-transaction). `ModerationService` is already
+    DI-registered (transient, `src/Kumunita.Core/DependencyInjection.cs:75`) —
+    no DI change needed.
+  - `src/Kumunita.Web/Controllers/PostsController.cs` — the M3 thin-controller
+    and the closest precedents: `Replies` (U6) guard order + pre-write
+    `GetPostAsync` read decision; `New()`'s `[ValidateAntiForgeryToken]`
+    + `LightweightSession` + temp-data-then-redirect write lane.
+  - `src/Kumunita.Web/Views/Posts/Detail.cshtml` — the existing detail
+    surface, `postId` scoped local, the reply form (posts `body` to
+    `/posts/{id}/replies`), and the `TempData` info/error flash block (U6).
+- **Action landed** (`PostsController`, `[HttpPost("/posts/{id}/report")]`):
+  - Constructor: added `ModerationService moderation` to the primary
+    constructor parameter list (after `PostService posts`) + a
+    `using Kumunita.Core.Moderation;` — no other constructor change.
+  - `[ValidateAntiForgeryToken]` (the `New()` precedent; the form renders
+    `@Html.AntiForgeryToken()`).
+  - `[FromRoute] string id` + `[FromForm] string? reason`.
+  - Guard order: empty id ⇒ `NotFound()`; no subject ⇒ `Forbid()`
+    ([Authorize] is the class-level gate) — mirrors `Replies`.
+  - **C-M3b·1 precondition, enforced at the Web layer:** re-run the post's
+    single `Read` decision via `PostService.GetPostAsync(id, actor)`; a
+    `Post = null` result (both "missing" and "denied" — Core doesn't
+    distinguish, the audit row does) maps to `Forbid()` 403 (the M3 U7 "403
+    on denied, not a blank page" shape). This is the "any resident who can
+    currently *see* the post may file a report" gate. Because this pre-gates
+    on an existing, visible post, the lane reaches `FileReportAsync` only for
+    a post that exists — its `KeyNotFoundException` path is not hit in U8's
+    flow. The Core lane still makes **no** `CanAsync` call (C-M3b·1 holds
+    verbatim: the intake lane is not an access decision; the *Web layer*
+    gates on the existing read decision).
+  - **C3 same-transaction lane:** `await using var session =
+    store.LightweightSession();` then `await
+    moderation.FileReportAsync(id, actor, reason, session);` — the controller
+    owns the session; the service's `SaveChangesAsync` is the single write
+    (the `New()` / `Replies()` precedent). The `reason` is optional and
+    passed through as-is (`FileReportAsync` accepts `null`).
+  - `TempData["info"] = "Report submitted. A moderator may review it.";`
+    then `Redirect($"/posts/{id}")` — the `Replies`/`New()` temp-data-then-
+    redirect shape; the existing flash block renders it.
+- **`FileReportAsync` unchanged** (frozen U4 seam — no new Core seam,
+  signature + behavior + `AccessVia.Admin` filing tag + `"filed"` Status
+  untouched). **No new test added in U8** (unit-series convention: no new
+  seam-test name; U9's lanes are the Core seam tests, and M3's own Web
+  controller tests are the anchors — see the U6 "run_tests" note).
+- **View change** (`Views/Posts/Detail.cshtml`): a small "Report this post"
+  `<form>` added below the post card and above the Replies section — an
+  optional `reason` textarea + a Report submit button, posting to
+  `/posts/{id}/report` with `@Html.AntiForgeryToken()`. Kept within the pinned
+  "2 files" deliverable: no new view-model file; `[FromForm] string? reason`
+  binds the field (the same pattern as the existing reply form's
+  `[FromForm] string? body`). The existing post card, reply form, and U6's
+  flash block are untouched.
+- **Deviations:** none — the action mirrors the `Replies` lane's guard order,
+  the pre-write read decision, the C3 session ownership, and the
+  temp-data-then-redirect shape exactly, swapping the Core lane for
+  `FileReportAsync` and the required `body` for an optional `reason`.
+- **Files touched**
+  - `src/Kumunita.Web/Controllers/PostsController.cs` (modified — added
+    `using Kumunita.Core.Moderation;`, the `ModerationService moderation`
+    constructor parameter, and the `Report`
+    `[HttpPost("/posts/{id}/report")]` action; nothing else).
+  - `src/Kumunita.Web/Views/Posts/Detail.cshtml` (modified — added the
+    "Report this post" form; existing card / reply form / U6 flash block
+    unchanged).
+  - `docs/plans-milestones/m3b-u8-plan.md` (new — the execution plan).
+  - `docs/plans-milestones/m3b-handoff-notes.md` (this section appended).
+- **Build / test state**
+  - `run_build` on `Kumunita.Web` — **green**. No route conflict: `New()` is
+    `/posts/new`, U6's action is `/posts/{id}/replies`, this action is
+    `/posts/{id}/report` (three distinct literal shapes).
+  - `run_tests` — **0 new tests added in U8** (unit-series convention: no new
+    seam-test name; U9's lanes are the Core seam tests). U8's gate is
+    build-green + the route now resolving (the Exit criterion), not a new
+    passing test (the same gate shape U6 used).
+- **What U9 (seed tests) / U10 (e2e) needs**
+  - **U9:** the FACES F1 filing row's *Core* lanes are what U9's
+    `ModerationServiceTests` pin (the §2.5 list: file / assign / unlock /
+    resolve + the `Via = Report` branch + the SoD-denied case); U8's Web
+    action is not itself a seam-test target — U9 does **not** need to add a
+    `PostsController` test for the `Report` action (the §2.5 Web-test names
+    target U6's reply action and U7's `/moderation` surface). If U9 or a
+    later Web layer wants to exercise the filing route, it should
+    `POST /posts/{id}/report` (optional `reason`) and assert the redirect to
+    `/posts/{id}` + the `TempData["info"]` flash.
+  - **U10 (e2e):** the filing FACES row (F1) is now reachable at
+    `POST /posts/{id}/report` from the resident detail surface — the spec
+    should exercise the resident-visible detail view → "Report this post"
+    form → redirected detail with the confirmation flash. The `/moderation`
+    read branch (F2) is U7's surface + U5's `CanReadWithReportAsync`; U10
+    exercises filing as a distinct actor path from the moderator queue.
+- **Note (resolved — U7 back-filled):** when U8 began, the handoff notes
+  ended at `## U6`; there was **no `## U7` section** even though
+  `ModerationController.cs` + `Views/Moderation/{Index,Resolve}.cshtml` +
+  `Models/Moderation{Queue,Resolve}ViewModel.cs` + the `DependencyInjection.cs`
+  DI block all existed and built. U8 did **not** re-do or rewrite U7's work
+  (unit-series rule 1: a unit never modifies a file not in its own
+  Deliverables). The `## U7` section was subsequently **back-filled** into
+  this file (see above, between `## U6` and `## U8`), including its own
+  back-fill note. U11's close should confirm the full U1→U10 table in
+  `## Summary` includes the U7 row.
+

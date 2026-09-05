@@ -42,6 +42,27 @@
             </div>
         </div>
 
+        @* M3b U8 — resident-facing "Report this" intake (C-M3b·1, F1). *@
+        <form class="card mb-3" method="post"
+              action="@($"/posts/{postId}/report")">
+            <div class="card-body">
+                <h6 class="mb-2" style="font-weight:600;">Report this post</h6>
+                <label class="form-label" for="report-reason" style="font-weight:600;">
+                    What's wrong? <span class="text-muted small">(optional)</span>
+                </label>
+                <textarea class="form-control mb-3" id="report-reason" name="reason" rows="2"
+                          placeholder="Optionally add a reason for a moderator…"></textarea>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted small">
+                        Filing a report is an intake action — it doesn't change
+                        what you can see, and a moderator may follow up.
+                    </div>
+                    <button type="submit" class="btn btn-outline-danger ms-2">Report</button>
+                </div>
+                @Html.AntiForgeryToken()
+            </div>
+        </form>
+
         <h5 class="mt-4 mb-2" style="font-weight:600;">
             Replies <span class="text-muted">(@Model.Replies.Count)</span>
         </h5>

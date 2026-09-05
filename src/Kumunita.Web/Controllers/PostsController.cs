@@ -1,3 +1,4 @@
+using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -71,6 +72,7 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class PostsController(
     PostService posts,
+    ModerationService moderation,
     IUserInfoService userInfo,
     IDocumentStore store) : Controller
 {
@@ -479,6 +481,74 @@ public sealed class PostsController(
         await posts.CreateReplyAsync(id, actor, body, session);
 
         TempData["info"] = "Reply added.";
+        return Redirect($"/posts/{id}");
+    }
+
+    // ── Report (POST /posts/{id}/report) — M3b U8 resident-facing intake ────
+
+    /// <summary>
+    /// A resident-facing **report intake** action (M3b U8; C-M3b·1, F1). The
+    /// M3b deferral item 1 surface: any resident who can *currently see* the
+    /// post may file a report against it. This is a Web-layer **thin** lane
+    /// (ADR 0006-D: routes + shape) that delegates the write to U4's frozen
+    /// <see cref="ModerationService.FileReportAsync"/> — the Core lane makes
+    /// **no** <c>IAuthorizationService</c> call (it is an *intake* action, not
+    /// an access decision; the C-M3b·1 pin holds verbatim), so this action's
+    /// only gate is the pre-write **read decision** on the post itself.
+    /// <para>
+    /// <b>Authz shape</b> (C-M3b·1): the precondition "the resident can see
+    /// the post" is enforced here at the Web layer — re-run the post's single
+    /// <c>Read</c> decision via <see cref="PostService.GetPostAsync"/>
+    /// (the exact <c>Replies</c> precedent above). A <see
+    /// cref="PostDetailResult"/> with <c>Post = null</c> covers **both**
+    /// "does not exist" and "audience denied" (Core doesn't distinguish — the
+    /// audit row does), and this action maps that to the <c>Forbid()</c> 403
+    /// shape (the M3 U7 "403 on denied, not a blank page" pin; a 404 is
+    /// information-leaky about which ids are real). After this gate the post is
+    /// confirmed *existing and visible*, so the lane cannot
+    /// <see cref="KeyNotFoundException"/> on a missing post.
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3 / ADR 0006-C):</b> the controller opens its own
+    /// <see cref="IDocumentStore.LightweightSession"/> and passes it to
+    /// <see cref="ModerationService.FileReportAsync"/>; that service performs
+    /// the single <c>SaveChangesAsync</c>, so the <c>Report</c> row and the
+    /// filing <c>AccessAudit</c> row (the pinned filing tag
+    /// <c>AccessVia.Admin</c>) commit or roll back atomically — no partial
+    /// write, one <c>SaveChangesAsync</c> (the <c>New()</c> / <c>Replies</c>
+    /// session precedent in this file).
+    /// </para>
+    /// </summary>
+    [HttpPost("/posts/{id}/report")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Report([FromRoute] string id, [FromForm] string? reason)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            // [Authorize] is the primary gate (class level); this is the
+            // fail-closed shape in case the principal carries no subject.
+            return Forbid();
+        }
+
+        // C-M3b·1 precondition: the resident must be able to *see* the post.
+        // GetPostAsync returns Post = null for **both** "missing" and "denied"
+        // (Core doesn't distinguish; the audit row does), so both map to the
+        // Forbid() 403 shape — the same fail-closed gate the Replies lane uses.
+        var existing = await posts.GetPostAsync(id, actor);
+        if (existing.Post is null)
+            return Forbid();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's SaveChangesAsync is the single write (the New()/Replies()
+        // precedent). The "reason" is optional — FileReportAsync accepts null.
+        await using var session = store.LightweightSession();
+        await moderation.FileReportAsync(id, actor, reason, session);
+
+        TempData["info"] = "Report submitted. A moderator may review it.";
         return Redirect($"/posts/{id}");
     }
 
