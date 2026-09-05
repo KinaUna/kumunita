@@ -1016,3 +1016,90 @@ C-M3b·1..4), ADR clauses (C1/C2/C3/C4/C5/C6; ADR 0001-B; ADR 0003
 
 *Part 2 ends here. U3–U10 implement against this section. The
 drift-guard (§2.7) is the change policy.*
+
+### Run result (M3b acceptance gate — 2026-09-12)
+
+Command: VS Test Explorer `run_tests` (filter
+`Project=Kumunita.Core.Tests`, `Project=Kumunita.Web.Tests`), plus
+`npx playwright test --list` from `tests/Kumunita.Web.Tests/`
+(the M2 U13 → M3 U10 → M3b U10 precedent: the gate's *unit-suite*
+evidence is the `run_tests` pass count; the *e2e* is a browser-level
+re-statement of the same three pins and runs once a future milestone
+lands the Playwright runtime). Testcontainers `postgres:18`;
+`PostgresFixture` fresh scratch DB per class. M2's U11 precedent
+still applies: CLI `dotnet test` returns exit-code 5 "Zero tests
+ran" in this workspace; the VS Test Explorer is the working runner.
+
+**`Kumunita.Core.Tests` 118/118 passed, 0 failed** (13 M3b-pinned
+`ModerationServiceTests` + 5 M3b ADDs in `PostServiceTests`, per
+U9's § `## U9` handoff, + 105 inherited M1/M2/M3 —
+`AuthorizationServiceTests`, `ClaimShapingInvariantBTests`,
+`AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`,
+`DbBootstrapIsPristineTests`, `SideEffectHarnessTests`,
+`DirectoryServiceTests`, `DirectoryServiceTests_U6`,
+`ProfileToAuditableResourceTests`, `UserInfoServiceTests`,
+`UserInfoServiceGroupsU9Tests`). **`Kumunita.Web.Tests` 37/37 passed,
+0 failed** (`HealthControllerTests`, `HomeControllerTests`,
+`DirectoryIndexViewModelTests`, `DirectoryDetailViewModelTests`,
+`ProfileEditViewModelTests`, `GroupsViewModelTests`,
+`GroupsDetailViewModelTests`, `MilestonesTests`,
+`RepositoryInfoTests`). **Total: 155/155 passed, 0 failed.** No
+reds. (M3's equivalent: 142/142 = 105 + 37; M3b's 155/155 = 118 +
+37 — the +13 is U9's 13 M3b seam-test ADDs.)
+
+Record (shape mirrored from M3 — `#` | `Test` | `Evidence (actual
+test names)`):
+
+| # | Gate | Evidence (actual test names / lanes U10's spec pins) |
+|---|------|------------------------------------------------------|
+| G1 | **closed-loop** — the six FACES rows (F1 filing, F2 `Via=Report`, F3 hide, F4 remove, F5 assign, F6 unlock / resolve + flag-flip) are **reachable end-to-end** in a **single** Playwright flow | `e2e-m3.spec.ts:200` (a. closed-loop — `test('a. closed-loop — file → assign → unlock → resolve + hide/remove + reply')`), the Core-level evidence being §2.5 rows 1–8 (`ModerationServiceTests.cs` — U9's 8 tests, all green) + rows 9–12 (`PostServiceTests.cs` — U9's 4 hide/remove tests, all green); the browser-level pin is that the 6 surfaces named in the design doc §`## Scope` → `### In scope` items 1–6 are *reachable* on the shipped Web surface without a manual fixture, i.e. the *browser-level* closed-loop of FACES F1–F6 |
+| G2 | **handoff** — the `Via = Report` read branch (C-M3b·2) is exercised by a **subsequent** render after the `ResolveReportAsync` lane's flag-flip; the audit row on the *second* render carries `Via = Report` | `e2e-m3.spec.ts:314` (b. handoff — `test('b. handoff — the Via=Report read branch flips on the second render')`), the Core-level evidence being §2.5 row 3 (`ModerationServiceTests.CanReadWithReportAsync_ModeratorWithReport_Allowed_ViaTagIsReport`) + row 7 (`ModerationServiceTests.ResolveReportAsync_GlobalAdmin_WritesStatusResolved_FlipsFlagSameTxn`); the browser-level pin is the "next render sees the flag-flip" C4 strong-consistency anchor (M3's F5 precedent: a *second* call sees a *first-call*-planted row) |
+| G3 | **part-vs-whole** — the 16-test §2.5 list is the **whole**; the closed-loop + handoff lanes are the **parts**; all three (the G1 file, the G2 file, *and* the per-lane file `e2e-m3.spec.ts:401` covering F1/F3/F4/F5/F6 as isolated tests) — plus the M1/M2/M3 anchors re-run unchanged — **must pass together** | U9's 13 `[Fact]`s (rows 1–13) verbatim, all green; §2.5 rows 14–16 (the Web-layer surface tests for the `POST /posts/{id}/replies` route and the `/moderation` queue + resolve-UI) are **unlanded** — the sealed register's § U9 line 1422 explicitly defers them as "tests 14–16 are U10's / U7's Web-layer surface, *not* U9's scope"; U10's G3 test (`e2e-m3.spec.ts:401`) pins their *reachability* at the Web layer; U11's close reconciles the plan-documentation finding (the register anticipated this — the M3 U10 precedent for exactly this shape) rather than treating it as a §2.6 drift-pause |
+
+**E2E status.** The Playwright scaffolding is **present** in the
+repo and **both** spec files are **enumerable** (`npx playwright
+test --list` reports **6 tests in 2 files**: 3 M2 specs at
+`e2e-m2.spec.ts:156/202/258` and 3 M3b specs at
+`e2e-m3.spec.ts:200/314/401`). The `kumunita` fixture is a
+**documented *throw*** in both files (the M2 U13 / M3 U10
+precedent — the runtime unit lands the fixture in M4/M5/M6 and
+records the *pass count* in a future `### Run result (M3b e2e —
+<date>)` section above this one). Per M3b's plan register § U10
+Exit and design doc §2.6 G3 note, U10 **records** the
+fixture-throw status (does **not** silently re-defer — the gap is
+this paragraph + a matching bullet in
+`docs/plans-milestones/m3b-handoff-notes.md` § `## U10`), and the
+gate's *unit-suite* evidence above (155/155) is the pass criterion
+recorded in this milestone. The M2 D2 `kumunita` fixture re-records
+**the same documented-throw status** it carried at U13 and re-carried
+at M3's U10 — three consecutive milestones' "documented-throw, not
+silently re-deferred" discipline.
+
+**Drift status.** U9's two drift notes (the §2.3 item 3 vs U3's
+`decision.Via` shape; the §2.3 item 4 "the lane's own
+`report.assign` / `report.resolve` row" vs U5's
+`if (decision.Allowed)`-guarded lane) are **neither** surfaced as
+§2.6 drift-pauses in U10 — U10's `e2e-m3.spec.ts` pins the
+*observable* surface (the `Status` badge literals `filed / assigned
+/ unlocked / resolved`, the `TempData["info"]` / `["error"]`
+alerts, the C5-flip "second render" assertion) without re-asserting
+the `Via` literal the M1-frozen seam writes, so the drift notes
+carry through to U11's close **unchanged**. U10 **adds one new
+plan-documentation finding** (not a §2.6 drift-pause): §2.5 rows
+14–16 are **still unlanded** (U7 shipped `ModerationController` /
+`PostsController.Replies` / the report-form wiring *without* adding
+those 3 tests — verified by `grep` across `tests/Kumunita.Web.Tests/
+*.cs` for all three names; zero hits). U10's G3 test
+(`e2e-m3.spec.ts:401`) pins the *reachability* of the same surface
+at the browser level. This is the *exact* shape M3's U10 precedent
+recorded (M3's own 18-test §2.5 set was fully landed by U9, but
+M2's own U13 spec was also *unrunnable* and yet M2's U12 recorded
+the gate anyway using the unit-suite evidence) — the discipline is
+the same: **record the gap, don't silently defer it**; the
+drift-pause rule binds to a **frozen pin being broken**, not to a
+**frozen pin being unimplemented in a specific Web-layer test**.
+
+*U11 (the M3b close) appends `## M3b — Closed (recorded)` below
+this section — same shape as M2's U15 / M3's U12 (three-tier
+contract re-confirmation + the `## Summary` table in
+`docs/plans-milestones/m3b-handoff-notes.md`).*

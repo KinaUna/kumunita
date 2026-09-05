@@ -1531,3 +1531,248 @@ assert both independently.
     (`m3b-u9-plan.md`) is the third artifact, per the per-unit file
     convention.
 
+  ## U10 — E2E spec + acceptance gate record
+
+  - **Date: 2026-09-12.** Gate recorded in `docs/design/m3b-moderation.md`
+    § `### Run result (M3b acceptance gate — 2026-09-12)` — three-gate
+    table (G1 closed-loop / G2 handoff / G3 part-vs-whole, shape
+    mirrored from M3 § `Run result (M3 acceptance gate — 2026-09-04)`
+    verbatim — the "command + pass counts + three-test table +
+    E2E status + drift status" five-paragraph shape) + an e2e-status
+    paragraph + a drift-status paragraph, **above** the
+    `## M3b — Closed (recorded)` placeholder (which U11 fills in its
+    close).
+  - **Deliverables (two files, per the sealed register § U10, in
+    order):**
+    1. **`tests/Kumunita.Web.Tests/e2e-m3.spec.ts` — NEW.** The M3
+       deferral item 6 verbatim name, inherited by M3b (the sealed
+       register § U10 "path per the existing `tests/Kumunita.Web.
+       Tests/` convention — confirm exact location in the entry read
+       before naming it"; the M3 deferral list + the M3b Assumptions
+       both name `e2e-m3.spec.ts`, and the repo convention is
+       `e2e-m<milestone>.spec.ts`). Three tests, mirroring
+       `e2e-m2.spec.ts:156/202/258`:
+       - (a) `a. closed-loop — file → assign → unlock → resolve +
+         hide/remove + reply` — the §2.6 G1 pin (all six FACES rows
+         reachable in a single flow).
+       - (b) `b. handoff — the Via=Report read branch flips on the
+         second render` — the §2.6 G2 pin (C-M3b·2 `Via = Report`
+         branch; two sequential renders; the "second render sees the
+         flag-flip" strong-consistency anchor).
+       - (c) `c. per-lane — F1 filing, F3 hide, F4 remove, F5 SoD-
+         denied, F6 SoD-denied` — the §2.6 G3 "per-lane" pin (the
+         part-vs-whole separation: each lane isolated).
+
+       The `kumunita` fixture in this file is a **documented throw**
+       (the M2 U13 / M3 U10 precedent — the runtime is landed by the
+       M4/M5/M6 "Playwright runtime" unit; U10's fixture contract
+       above it names the `signup / signupGlobalAdmin / login /
+       lastCreatedPostId / lastCreatedReportId / assignModerator-
+       ToComponent` methods the spec needs, and the "reuse the M2
+       U13 fixture contract for the signup/login shape" comment pins
+       the shared shape). The spec's *browser-level* assertions pin
+       the **observable** surface (the four `Status` badge literals
+       `filed / assigned / unlocked / resolved`; the `TempData[
+       "info"]` / `["error"]` alerts; the "Review →" queue link; the
+       `#assignedToModeratorId` `<select>` + `Assign` button; the
+       `Unlock` / `Resolve` action buttons; the C5-flip "second
+       render" assertion) — **never** the Core-level `AccessAudit.
+       Via` literal (that is U9 test row 3's job at the Core level).
+    2. **`docs/design/m3b-moderation.md` — MODIFY.** Appended
+       `### Run result (M3b acceptance gate — 2026-09-12)` between
+       the *"Part 2 ends here..."* footer and a new *"U11 (the
+       M3b close) appends `## M3b — Closed (recorded)`..."*
+       trailer, mirroring M3's § `Run result (M3 acceptance gate
+       — 2026-09-04)` shape verbatim. The five paragraphs, in
+       order:
+       - **Command + Testcontainers / CLI note** (CLI `dotnet test`
+         returns exit-code 5 in this workspace; the VS Test Explorer
+         is the working runner — same as M2 U11 precedent).
+       - **Pass counts — verified run, not assumed** (see below).
+       - **Three-gate table** (`#` | `Gate` | `Evidence (actual test
+         names / lanes U10's spec pins)`) with G1 / G2 / G3 mapping
+         to the three new tests in `e2e-m3.spec.ts` + the Core-level
+         §2.5 names U9 landed.
+       - **E2E status** (both spec files enumerable; `kumunita`
+         fixture is a documented throw in both; the M2 D2
+         documented-throw **re-records** — the M2 U13 / M3 U10 /
+         M3b U10 "documented-throw, not silently re-deferred"
+         discipline).
+       - **Drift status** (U9's two drift notes carry through
+         unchanged; U10 adds one new **plan-documentation** finding
+         — see below).
+
+  - **Entry-reads confirmed:**
+    - `docs/design/m3b-moderation.md` §2.5 (rows 1–13 are U9's 13
+      tests that pass; rows 14–16 are U10's evidence / U7's surface
+      tests — **unlanded**, see the "still open" finding below).
+      §2.6 (G1 / G2 / G3 + the G3 note on the D2 fixture). §2.7 (the
+      drift-guard — "this file is the contract" + the "append a one-
+      line drift note" rule).
+    - `docs/design/m3-posts-design.md` § `Run result (M3 acceptance
+      gate — 2026-09-04)` lines 697–760 — **the shape to mirror
+      verbatim** (M3's precedent).
+    - `docs/plans-milestones/m3-handoff-notes.md` § `## U10 — gate
+      recorded` lines 225–237 — the **same** three-test gate shape
+      M3b reuses, with the Core.Tests count updated from M3's
+      105/105 (+ 18 M3-pinned + 87 inherited) to M3b's 118/118 (+
+      13 M3b-pinned + 105 inherited).
+    - `docs/plans-milestones/m2-handoff-notes.md` lines 239–250 (U13
+      e2e authored, paused — the documented-throw context; the D2
+      deviation) — the M2 D2 context the M3b U10 G3 note references.
+    - `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` (the 299-line M2
+      spec; the fixture-throw pattern + the 3-test shape U10
+      mirrors).
+    - `tests/Kumunita.Web.Tests/playwright.config.ts` (`testMatch:
+      ['**/*.spec.ts']` — the new `e2e-m3.spec.ts` is picked up
+      automatically, no config change needed).
+    - `tests/Kumunita.Web.Tests/package.json` (the `@playwright/
+      test` 1.62.1 + `typescript` 5.9.3 deps + `npm scripts:
+      typecheck/test/test:headed/test:ui` — already scaffolded by
+      M2 U13).
+    - `tests/Kumunita.Web.Tests/node_modules/` — present on-disk
+      (verified by `Get-ChildItem -Recurse`; the `npx playwright
+      test --list` command runs cleanly without a `npm install`).
+    - `src/Kumunita.Web/Views/Posts/Detail.cshtml` (the resident-
+      facing "Report this" card — M3b U8; the reply card — M3b U6
+      micro-fix closure) + `src/Kumunita.Web/Views/Moderation/
+      Resolve.cshtml` (the F5 / F6 action cards: the `#assigned-
+      ToModeratorId` `<select>` in the `assign` form; the `Unlock`
+      button in the `unlock` form; the `Resolve` button in the
+      `resolve` form) + `src/Kumunita.Web/Views/Moderation/
+      Index.cshtml` (the queue — one `<tr>` per `Report` row with a
+      `<span class="badge">` Status literal cell and the `Review →`
+      `<a href="/moderation/{Id}">` action link) — the **selector
+      pins** U10's spec uses.
+    - `src/Kumunita.Web/Views/Posts/New.cshtml` (M3 U7 composer —
+      the `#component` `<select>`, `#title` `<input>`, `#body`
+      `<textarea>` — the form-bound field names U10's spec uses).
+    - `src/Kumunita.Web/Controllers/PostsController.cs` (M3 U7 +
+      M3b U6 + M3b U8 deliverable — the `Replies` / `Report`
+      actions) and `src/Kumunita.Web/Controllers/ModerationControl-
+      ler.cs` (U7's delivery of the `/moderation` queue + resolve-
+      UI; the `[Authorize]` + `GlobalAdmin` gate per ADR 0003
+      §SoD).
+
+  - **Pass counts (verified run, not assumed — 2026-09-12):**
+    - `run_tests` filter `Project=Kumunita.Core.Tests` → **118/118
+      passed, 0 failed** (13 M3b-pinned from U9 + 105 inherited
+      M1/M2/M3; same composition as M3's 105/105 + 18 but with
+      different invariants/lanes — `F1`…`F8` replaced by the
+      `FileReportAsync_*` / `CanReadWithReportAsync_*` /
+      `AssignReportAsync_*` / `ResolveReportAsync_*` /
+      `HidePostAsync_*` / `RemovePostAsync_*` / `PostStatus_*`
+      rows in §2.5).
+    - `run_tests` filter `Project=Kumunita.Web.Tests` → **37/37
+      passed, 0 failed** (unchanged since M3 — U7's / U6's /
+      U8's Web deliverables are the *controller / view* files, not
+      tests; the §2.5 rows 14–16 Web-layer surface tests are
+      **unlanded** — see the "still open" finding below).
+    - `npx playwright test --list` (from `tests/Kumunita.Web.
+      Tests/`) → **6 tests in 2 files** (3 M2 at
+      `e2e-m2.spec.ts:156/202/258`; 3 M3b at
+      `e2e-m3.spec.ts:200/314/401`). **Enumerability confirmed**;
+    - the tests are **not runnable** in this unit — the `kumunita`
+      fixture is a documented throw (see below).
+    - `run_build` on `Kumunita.Web.Tests.csproj` → green (U10
+      touched no C# source file; the two files are a new `.ts` and
+      a `.md`).
+    - **Total xUnit gate: 155/155 passed, 0 failed** (vs. M3's
+      142/142 = 105 + 37; the +13 is U9's 13 M3b seam-test ADDs).
+  - **E2E status (the M2 D2 re-record, per the sealed register §
+    U10 Exit + design doc §2.6 G3 note + U1's handoff item 6):**
+    - The Playwright scaffolding (`package.json`,
+      `playwright.config.ts`, `node_modules`, the M2 spec
+      `e2e-m2.spec.ts`) is **present** in the repo and **both**
+      spec files are **enumerable** (`npx playwright test --list`
+      reports **6 tests in 2 files** — the M2 U13 → M3 U10 → M3b
+      U10 precedent's "present and enumerable" pin, re-confirmed).
+    - The `kumunita` fixture (both `e2e-m2.spec.ts:118` — M2 U13's
+      spec, and `e2e-m3.spec.ts` — the U10 new spec — the same
+      contract, re-declared with the M3b `signupGlobalAdmin` ADD
+      for ADR 0003 §SoD) is a **documented *throw*** in both
+      files. The M2 D2 deviation (`m2-directory-profiles-groups.
+      md` § `## U13`) is **still open** in this workspace; U10's
+      `npx playwright test --list` reports the 6 specs cleanly
+      but executing the spec would fail on the `throw` — the
+      runtime has not been landed by any M1 / M2 / M3 / M3b unit.
+      Per the M2 U13 → M3 U10 precedent ("documented throw, not
+      silently re-deferred"), U10 **re-records** the status with
+      an explicit note (this section + the design-doc § `E2E status`
+      paragraph) rather than silently dropping it.
+    - Per U10's Deliverables plan ("2 files: the e2e spec file for
+      M3b surfaces; the design doc § Run result section") and the
+      sealed register § U10 Exit ("the gate result, e2e pass count
+      **or the fixture-throw status if still open**" — U10 takes
+      the latter path), U10 **neither implements the fixture nor
+      runs the tests** in this unit. The M2 U13 / M3 U10 discipline
+      (the runtime unit lands the fixture in M4/M5/M6 and
+      records the pass count in a future `### Run result (M3b
+      e2e — <date>)` section **above** this handoff section)
+      carries over — and **U10's record is the third consecutive
+      "documented-throw, not silently re-deferred" entry in the
+      M2 → M3 → M3b chain.**
+  - **Still-open drift / reconciliations for U11's close (all
+    flagged as **not §2.6 drift-pauses**):**
+    - **U9's two drift notes carry through unchanged** (the §2.3
+      item 3 `AccessVia.Admin` vs U3's `decision.Via` shape; the
+      §2.3 item 4 "the lane's own `report.assign` / `report.
+      resolve` row" vs U5's `if (decision.Allowed)`-guarded
+      lane). U10's `e2e-m3.spec.ts` pins the *observable* surface
+      only (the `Status` badge literals, the `TempData` alerts,
+      the C5-flip "second render" assertion), **not** the
+      `Via` literal the M1-frozen seam writes — U9's shape
+      remains the authoritative test-level pin, and U10's
+      browser-level assertions do not contradict it.
+    - **U10 adds one new plan-documentation finding (not a §2.6
+      drift-pause):** §2.5 rows 14, 15, 16 are **unlanded**.
+      - Row 14 — `PostReply_Controller_DelegatesToExistingCreate-
+        ReplyAsync_NoNewCoreSeam` — the sealed register's own
+        § U9 line 1422 explicitly defers rows 14–16 as "tests
+        14–16 are U10's / U7's Web-layer surface, *not* U9's
+        scope"; U7 shipped the `ModerationController` /
+        `PostsController.Replies` / the report-form wiring
+        **without** landing these 3 tests (verified by
+        `grep` across `tests/Kumunita.Web.Tests/*.cs` for all
+        three `§2.5` row 14–16 names — zero hits). U10's G3
+        test (`e2e-m3.spec.ts:401`) pins the *reachability*
+        of the same surface at the browser level; U11's close
+        should record the finding (the M3 U10 precedent's
+        "plan-documentation slip, not §2.6 drift-pause" shape)
+        and decide (a) U11 lands the 3 tests, or (b) M3b's
+        `## Summary` records them as a deferred M4 follow-up
+        (with a §2.7 one-line drift note in this file).
+      - Row 15 — `ModerationController_QueueRead_ReturnsAll
+        ReportsOrderByAtDesc` — the queue read + ordering pin
+        (the `At` desc + `Status` desc shape).
+      - Row 16 — `ModerationController_ResolvePostAction_
+        InvokesResolveReportAsync` — the thin-controller
+        delegation pin.
+    - **U10's "2-file" deliverable discipline is preserved** —
+      U10 did **not** touch any M1 / M2 / M3 source file, did
+      **not** add a new xUnit test, did **not** implement the
+      `kumunita` fixture, did **not** touch any `package.json`
+      or `playwright.config.ts` (both already present from M2
+      U13's scaffolding). U10's two Deliverables files are
+      exactly those named in the plan §`### U10`. The plan doc
+      (`m3b-u10-plan.md`) is the third artifact, per the per-
+      unit file convention.
+  - **What U11 (the close) needs:**
+    - The three-gate table above (G1 / G2 / G3) is the **shape**
+      U11's `## M3b — Closed (recorded)` section re-uses (the
+      `## Summary` table + the `ARCHITECTURE.md` `Moderation/`
+      flip per the sealed register § U11).
+    - The "still-open" list: U9's 2 drift notes (carry through)
+      + U10's new finding (§2.5 rows 14–16 unlanded). U11's
+      call — either land the 3 tests, or defer to M4 with a
+      §2.7 one-line drift note, per the sealed register § U11
+      "the three gate tests from U10, the `ARCHITECTURE.md`
+      `Moderation/` line flip to 'M3b ✓ live', any still-open
+      item named explicitly rather than silently dropped."
+    - The M2 D2 `kumunita` fixture is **still open** — the M4 /
+      M5 / M6 "Playwright runtime" unit lands it and records the
+      pass count in a future `### Run result (M3b e2e — <date>)`
+      section above this `## U10` note. (Same discipline as the
+      M2 U13 → M3 U10 → M3b U10 chain; the third milestone in
+      a row to re-record rather than silently re-defer.)
+
