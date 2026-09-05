@@ -163,4 +163,359 @@ public sealed class ModerationService
 
         return 1;   // one row created
     }
+
+    /// <summary>
+    /// Assign a report to a standing moderator (F5; C-M3b·4, SoD).
+    /// GlobalAdmin-gated write lane: calls
+    /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource, Marten.IDocumentSession)"/>
+    /// with <see cref="AccessAction.Moderate"/> *before* writing, in the
+    /// caller's <see cref="Marten.IDocumentSession"/> (ADR 0006-E
+    /// compatible lane — the audit row lands in the same transaction).
+    /// <para>
+    /// A <c>Decision.Allowed = false</c> result still writes the audit
+    /// row (C3, ADR 0006-C — Allow and Deny) but does **not** write the
+    /// <see cref="Report.Status"/> update or the
+    /// <see cref="ModeratorAssignment"/> row (the "no partial write"
+    /// discipline — §2.3 item 4 pin).
+    /// </para>
+    /// <para>
+    /// On success: <see cref="Report.Status"/> = <c>"assigned"</c>
+    /// (the §2.3 item 2 literal), <see cref="ModeratorAssignment"/>
+    /// row written for (<paramref name="assignedToModeratorId"/>,
+    /// <c>report.ComponentId</c>) with <c>GrantedBy =
+    /// <paramref name="globalAdminId"/></c> (the SoD audit trail),
+    /// <see cref="AccessAudit"/> row with <c>Via = decision.Via</c>.
+    /// One <see cref="Marten.IDocumentSession.SaveChangesAsync"/>
+    /// commits atomically (C3 — the domain write and the audit row are
+    /// the same commit).
+    /// </para>
+    /// <para>
+    /// The GlobalAdmin-only standing is *enforced by the Web layer*
+    /// (U7's <c>ModerationController</c>, <c>[Authorize(Roles =
+    /// GlobalAdmin)]</c>) — the Core <see cref="AccessAction.Moderate"/>
+    /// gate is the SoD discriminator between a standing-moderator and a
+    /// GlobalAdmin actor; the M1 <c>SetComponentModeratorAccessAsync</c>
+    /// precedent holds the same split (Core trusts the caller, Web
+    /// verifies the standing).
+    /// </para>
+    /// </summary>
+    public async Task AssignReportAsync(
+        string reportId,
+        string assignedToModeratorId,
+        string globalAdminId,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(reportId))              throw new ArgumentException("A report id is required.",             nameof(reportId));
+        if (string.IsNullOrEmpty(assignedToModeratorId)) throw new ArgumentException("An assigned moderator id is required.", nameof(assignedToModeratorId));
+        if (string.IsNullOrEmpty(globalAdminId))         throw new ArgumentException("A GlobalAdmin actor id is required.",   nameof(globalAdminId));
+        if (session is null)                             throw new ArgumentNullException(nameof(session));
+
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to assign.");
+
+        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+
+        // SoD gate: the `Moderate` action discriminates a GlobalAdmin
+        // writer from a standing-moderator writer (the M1 §A decision
+        // algorithm's moderation branch is gated on
+        // `Component.ModeratorAccess = true` AND a
+        // `ModeratorAssignment` row — that's the *reader* side; the
+        // *writer* side gate lives in the Web layer per ADR 0003). The
+        // decision's audit row lands in the caller's transaction (ADR
+        // 0006-E compatible lane) — no partial write either way.
+        var decision = await _authz.CanAsync(
+            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            report.Status = "assigned";   // §2.3 item 2 literal
+            session.Store(report);
+
+            if (report.ComponentId is not null)
+            {
+                var existingAssignments = await session
+                    .Query<ModeratorAssignment>()
+                    .Where(a => a.UserId == assignedToModeratorId && a.ComponentId == report.ComponentId)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                var assignmentAssignment = existingAssignments.Count > 0
+                    ? existingAssignments[0]
+                    : new ModeratorAssignment
+                    {
+                        Id          = Guid.NewGuid().ToString("N"),
+                        UserId      = assignedToModeratorId,
+                        ComponentId = report.ComponentId
+                    };
+                assignmentAssignment.GrantedBy = globalAdminId;
+                assignmentAssignment.At        = now;
+                session.Store(assignmentAssignment);
+            }
+
+            session.Store(new AccessAudit
+            {
+                Id                   = Guid.NewGuid().ToString("N"),
+                At                   = DateTimeOffset.UtcNow,
+                ActorId              = globalAdminId,
+                EffectivePrincipalId = globalAdminId,
+                Action               = "report.assign",
+                TargetKind           = "report",
+                TargetId             = reportId,
+                Via                  = decision.Via,
+                Outcome              = AccessOutcome.Allow
+            });
+        }
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Unlock the report (F6; C-M3b·4, the "report-driven unlock" —
+    /// the C5 activation event). GlobalAdmin-gated: the same SoD gate
+    /// shape as <see cref="AssignReportAsync"/>. On success, calls
+    /// <see cref="IUserInfoService.SetComponentModeratorAccessAsync"/>
+    /// (the M1 flag-flip seam, *unchanged*, GlobalAdmin-gated) with
+    /// <c>on = true</c> — the activation that enables the
+    /// <see cref="CanReadWithReportAsync"/> read branch (C-M3b·2) for
+    /// the standing moderator on *subsequent* renders.
+    /// <para>
+    /// The M1 seam opens its own session (M1's frozen shape — a
+    /// separate commit from the caller's transaction); the
+    /// <see cref="Report.Status"/> update and the
+    /// <see cref="AccessAudit"/> row land in the caller's
+    /// <see cref="Marten.IDocumentSession"/> transaction (C3 — the
+    /// report-domain and report-audit rows commit atomically). The
+    /// flag-flip is a separate commit per the M1 seam's contract;
+    /// this is the "flag-flip commits separately" tension the §2.0
+    /// drift-guard applies — the M1 seam is frozen (unit-series
+    /// rule 4: never reshapes frozen M1 interfaces).
+    /// </para>
+    /// <para>
+    /// <see cref="Report.Status"/> = <c>"unlocked"</c> (the §2.3
+    /// item 2 literal).
+    /// </para>
+    /// </summary>
+    public async Task UnlockAsync(
+        string reportId,
+        string globalAdminId,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
+        if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
+        if (session is null)                     throw new ArgumentNullException(nameof(session));
+
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to unlock.");
+
+        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+
+        var decision = await _authz.CanAsync(
+            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            // M1 seam (frozen shape — own session, own commit). The
+            // "same IDocumentSession transaction" pin in §2.4 item 2
+            // applies to the report-domain + audit rows (the caller's
+            // transaction); the flag-flip seam commits separately per
+            // its M1 contract.
+            if (report.ComponentId is not null)
+                await _userInfo.SetComponentModeratorAccessAsync(
+                    report.ComponentId, true, globalAdminId)
+                    .ConfigureAwait(false);
+
+            report.Status = "unlocked";
+            session.Store(report);
+
+            session.Store(new AccessAudit
+            {
+                Id                   = Guid.NewGuid().ToString("N"),
+                At                   = DateTimeOffset.UtcNow,
+                ActorId              = globalAdminId,
+                EffectivePrincipalId = globalAdminId,
+                Action               = "report.unlock",
+                TargetKind           = "report",
+                TargetId             = reportId,
+                Via                  = decision.Via,
+                Outcome              = AccessOutcome.Allow
+            });
+        }
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Resolve the report (F6; C-M3b·4, the "resolve" counterpart to
+    /// <see cref="UnlockAsync"/>). Same SoD / audit shape as
+    /// <see cref="UnlockAsync"/>; <see cref="Report.Status"/> =
+    /// <c>"resolved"</c> (the §2.3 item 2 literal). Also calls
+    /// <see cref="IUserInfoService.SetComponentModeratorAccessAsync"/>
+    /// with <c>on = true</c> on success (the flag-flip — see
+    /// <see cref="UnlockAsync"/>'s doc-comment for the "separate
+    /// commit" note).
+    /// </summary>
+    public async Task ResolveReportAsync(
+        string reportId,
+        string globalAdminId,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(reportId))      throw new ArgumentException("A report id is required.",         nameof(reportId));
+        if (string.IsNullOrEmpty(globalAdminId)) throw new ArgumentException("A GlobalAdmin actor id is required.", nameof(globalAdminId));
+        if (session is null)                     throw new ArgumentNullException(nameof(session));
+
+        var report = await session.LoadAsync<Report>(reportId).ConfigureAwait(false);
+        if (report is null)
+            throw new KeyNotFoundException($"Report '{reportId}' was not found in the session; nothing to resolve.");
+
+        var post = await session.LoadAsync<Post>(report.PostId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{report.PostId}' (referenced by report '{reportId}') was not found in the session.");
+
+        var decision = await _authz.CanAsync(
+            globalAdminId, AccessAction.Moderate, new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            if (report.ComponentId is not null)
+                await _userInfo.SetComponentModeratorAccessAsync(
+                    report.ComponentId, true, globalAdminId)
+                    .ConfigureAwait(false);
+
+            report.Status = "resolved";
+            session.Store(report);
+
+            session.Store(new AccessAudit
+            {
+                Id                   = Guid.NewGuid().ToString("N"),
+                At                   = DateTimeOffset.UtcNow,
+                ActorId              = globalAdminId,
+                EffectivePrincipalId = globalAdminId,
+                Action               = "report.resolve",
+                TargetKind           = "report",
+                TargetId             = reportId,
+                Via                  = decision.Via,
+                Outcome              = AccessOutcome.Allow
+            });
+        }
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The <see cref="AccessVia.Report"/> read branch (F2; C-M3b·2) —
+    /// the **standalone read lane** (ADR 0006-E "compatible lane"; the
+    /// **single** new authorization-surface addition M3b makes).
+    /// <para>
+    /// The shape, per §2.4 item 1: **new method on
+    /// <see cref="ModerationService"/>** (NOT a branch inside
+    /// <c>AuthorizationService.Decide</c> — that would couple the
+    /// M1-frozen decision algorithm to <see cref="Report"/> reads, a
+    /// rule 4 violation), calling the **standalone**
+    /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
+    /// overload (the **own-commit** variant — M3's
+    /// <c>PostService.GetPostAsync</c> precedent, the "audit-row in
+    /// own commit" shape).
+    /// </para>
+    /// <para>
+    /// **C5 unactivated = still no access** (C-M3b·2, §2.4 item 4):
+    /// a <see cref="ModeratorAssignment"/>-holding viewer with **no**
+    /// filed <see cref="Report"/> for this post's
+    /// (<c>PostId</c>) is **denied** — the branch is triggered by the
+    /// *filed report*, not by the <see cref="AccessAction.Moderate"/>
+    /// action alone. The "moderator with no filed report" case is
+    /// handled explicitly here: a Deny <see cref="AccessAudit"/> row
+    /// with <see cref="AccessVia.Report"/> is written (the §2.4 item 3
+    /// literal pin) and the call returns a deny decision.
+    /// </para>
+    /// <para>
+    /// When a **filed report exists** for the post, this method
+    /// delegates to the **standalone** <see cref="CanAsync(string,
+    /// AccessAction, IAuditableResource)"/> overload (the own-commit
+    /// variant) — the audit row is written by the M1 frozen seam in
+    /// its own commit, and the <see cref="Decision"/> it returns is
+    /// the result to the caller.
+    /// </para>
+    /// </summary>
+    /// <returns>The <see cref="Decision"/> — <c>Allowed = true</c> iff
+    /// the actor's standing (via the M1-§A decision algorithm) allows
+    /// a <see cref="AccessAction.Read"/> on the post *and* a filed
+    /// <see cref="Report"/> exists for that post. The Web layer
+    /// renders 403 on <c>Allowed = false</c>.</returns>
+    public async Task<Decision> CanReadWithReportAsync(
+        string postId, string actorId)
+    {
+        if (string.IsNullOrEmpty(postId))  throw new ArgumentException("A post id is required.",  nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An actor id is required.", nameof(actorId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+        {
+            // A missing post is a decision-less failure (no audit row
+            // to write — there's no access decision being made; the
+            // caller should handle a 404 in the Web layer).
+            return new Decision(false, AccessVia.Report, actorId);
+        }
+
+        var filedReports = await session
+            .Query<Report>()
+            .Where(r => r.PostId == postId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        if (filedReports.Count == 0)
+        {
+            // C5 unactivated — no filed report for this post. The
+            // C-M3b·2 pin: the branch is triggered by the *filed
+            // report*, not by the `Moderate` action alone. We write
+            // the Deny audit row *here* (this method's own commit —
+            // the standalone lane's C3 shape), carrying the pinned
+            // `AccessVia.Report` (the §2.4 item 3 literal on the read
+            // branch — one of the only two `Via` tags M3b writes:
+            // this one and the filing `Admin` literal in
+            // `FileReportAsync`).
+            session.Store(new AccessAudit
+            {
+                Id                   = Guid.NewGuid().ToString("N"),
+                At                   = DateTimeOffset.UtcNow,
+                ActorId              = actorId,
+                EffectivePrincipalId = actorId,
+                Action               = "read",
+                TargetKind           = "post",
+                TargetId             = postId,
+                Via                  = AccessVia.Report,
+                Outcome              = AccessOutcome.Deny
+            });
+            await session.SaveChangesAsync().ConfigureAwait(false);
+
+            return new Decision(false, AccessVia.Report, actorId);
+        }
+
+        // A filed report exists — delegate to the **standalone
+        // <see cref="IAuthorizationService.CanAsync(string,
+        // AccessAction, IAuditableResource)"/> overload (the
+        // own-commit variant — §2.4 item 1 pin: the "audit-row in own
+        // commit" shape, the M3 <c>PostService.GetPostAsync</c>
+        // precedent). The M1 frozen seam handles the §A decision
+        // algorithm; its audit row commits in its own transaction.
+        // If the decision denies even with a filed report, the
+        // denial is the M1 seam's (the C-M3b·2 read branch is a gate,
+        // not an override — it only enables the standing-moderator
+        // branch to run; it does not force-allow).
+        return await _authz.CanAsync(
+            actorId, AccessAction.Read, new PostToAuditableResource(post))
+            .ConfigureAwait(false);
+    }
 }

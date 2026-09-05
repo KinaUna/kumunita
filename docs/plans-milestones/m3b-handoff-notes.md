@@ -802,3 +802,200 @@ self-contained plan for this unit per the sealed-unit convention).
     are **sufficient for all of M3b** (M1's U1 pin, re-confirmed
     here).
 
+## U5 — Assign / unlock / resolve + Via=Report read branch
+
+- **Deliverable:** `src/Kumunita.Core/Moderation/ModerationService.cs` —
+  four methods added to U4's class (no new file, no new seam, no test
+  file; U5's Exit is `run_build` green, which is verified).
+
+### Signatures (as landed — verbatim, matching §2.2.3)
+
+```csharp
+// F5, C-M3b·4 — GlobalAdmin-gated SoD write lane
+public async Task AssignReportAsync(
+    string reportId,
+    string assignedToModeratorId,
+    string globalAdminId,
+    IDocumentSession session);
+
+// F6, C-M3b·4 — GlobalAdmin-gated; calls SetComponentModeratorAccessAsync
+public async Task UnlockAsync(
+    string reportId,
+    string globalAdminId,
+    IDocumentSession session);
+
+// F6, C-M3b·4 — GlobalAdmin-gated; calls SetComponentModeratorAccessAsync
+public async Task ResolveReportAsync(
+    string reportId,
+    string globalAdminId,
+    IDocumentSession session);
+
+// F2, C-M3b·2 — standalone read branch (§2.4 item 1 — new method, NOT
+// a Decide branch); no IDocumentSession parameter (§2.4 item 1 —
+// the M3 GetPostAsync precedent: plain read with no in-flight
+// caller transaction; opens its own session for the Deny audit row)
+public async Task<Decision> CanReadWithReportAsync(
+    string postId, string actorId);
+```
+
+### Behavior (as landed)
+
+**All three write lanes** (the common SoD gate shape):
+
+1. Guard args (empty string / null session → `ArgumentException` /
+   `ArgumentNullException`).
+2. `session.LoadAsync<Report>(reportId)` → null →
+   `KeyNotFoundException` (no partial write).
+3. `session.LoadAsync<Post>(report.PostId)` → null →
+   `KeyNotFoundException`.
+4. **SoD gate:** `_authz.CanAsync(actorId, AccessAction.Moderate,
+   new PostToAuditableResource(post), session)` — the
+   `IDocumentSession` overload (ADR 0006-E compatible lane — the
+   decision's audit row lands in the caller's transaction, C3).
+5. **If denied** (`decision.Allowed = false`): the decision's own
+   audit row (written by the M1 seam, into the caller's session)
+   commits; **no domain write** (no `Report.Status` update, no
+   `ModeratorAssignment` upsert, no `SetComponentModeratorAccessAsync`
+   call) — the §2.3 item 4 / C-M3b·3 "no partial write" discipline,
+   satisfied by the single `SaveChangesAsync` at the end of the
+   method. `UnlockAsync` / `ResolveReportAsync` return without
+   writing anything.
+6. **If allowed:**
+   - `AssignReportAsync`:
+     - `report.Status = "assigned"` (§2.3 item 2 literal).
+     - `session.Store(report)`.
+     - `report.ComponentId` non-null → upsert `ModeratorAssignment`
+       row for `(assignedToModeratorId, report.ComponentId)`, set
+       `GrantedBy = globalAdminId`, `At = now` (the SoD audit trail).
+     - `report.ComponentId` null → skip the upsert (no fabricated
+       component).
+     - Write `AccessAudit`:
+       `{ Id = guid(N), At = now, ActorId = globalAdminId,
+       EffectivePrincipalId = decision.EffectivePrincipalId,
+       Action = "report.assign", TargetKind = "report",
+       TargetId = reportId, Via = decision.Via,
+       Outcome = AccessOutcome.Allow }` — the `Via` tag mirrors the
+       decision's own `Via` (the write lane is a *decision* lane,
+       not a *fixed-literal* lane — the fixed-literal pin
+       (`AccessVia.Admin`) applies to `FileReportAsync` /
+       `HidePostAsync` / `RemovePostAsync`, where the `Via` tag IS
+       a domain-pinned literal).
+     - `await session.SaveChangesAsync()` — C3, atomic commit.
+   - `UnlockAsync`:
+     - `report.Status = "unlocked"` (§2.3 item 2 literal).
+     - `session.Store(report)`.
+     - `report.ComponentId` non-null →
+       `_userInfo.SetComponentModeratorAccessAsync(report.ComponentId,
+       true, globalAdminId)` (the M1 flag-flip seam — opens **its
+       own** session; a **separate commit** from the caller's
+       transaction; documented in the XML doc-comment as a §2.0
+       drift note — see below).
+     - Write `AccessAudit`:
+       `{ …, Action = "report.unlock", …, Via = decision.Via,
+       Outcome = Allow }`.
+     - `await session.SaveChangesAsync()`.
+   - `ResolveReportAsync`: identical to `UnlockAsync` except
+     `report.Status = "resolved"` and `Action = "report.resolve"`.
+
+**`CanReadWithReportAsync`** (F2, C-M3b·2, standalone read branch):
+
+1. Args guard.
+2. Opens its own full writable session
+   (`_store.OpenSession(new Marten.Services.SessionOptions())`) —
+   the "audit-row in own commit" shape (§2.4 item 1, the M3
+   `GetPostAsync` precedent).
+3. `LoadAsync<Post>(postId)` → null → return synthetic
+   `new Decision(false, AccessVia.Report, actorId)` (no audit row —
+   the post doesn't exist; Web layer handles 404).
+4. Query `Report` rows for this `PostId`; **if zero** (C5
+   unactivated — the §2.4 item 4 "branch triggers on filed
+   report, not on Moderate alone" pin):
+   - Write `AccessAudit`: `{ ActorId = actorId,
+     EffectivePrincipalId = actorId, Action = "read",
+     TargetKind = "post", TargetId = postId, Via =
+     AccessVia.Report ← §2.4 item 3 pin, Outcome = Deny }`.
+   - `await session.SaveChangesAsync()` (own commit).
+   - Return `new Decision(false, AccessVia.Report, actorId)`.
+5. **If a filed report exists** — delegate:
+   `await _authz.CanAsync(actorId, AccessAction.Read,
+   new PostToAuditableResource(post))` (the **standalone**
+   overload; own commit; the M1 seam's audit row is written by the
+   M1 seam in **its own** session — its own commit). The
+   `Decision` returned from the M1 seam (whatever its `Via`) is
+   returned to the Web layer.
+
+### What U9 must anchor
+
+- **Test 3** (`CanReadWithReportAsync_ModeratorWithReport_Allowed_ViaTagIsReport`):
+  the "with report" case **delegates** to the M1 seam — the
+  audit row is written by the M1 seam (in its own commit),
+  carrying the M1 §A decision's `Via`. U9 must structure the
+  assertion to check the `Decision.Allowed` outcome, not the
+  `Via` tag on the audit row (the `Via` in that case comes from
+  the M1 seam's resolve, not from U5's early-reject path).
+- **Test 4** (`CanReadWithReportAsync_ModeratorWithoutReport_Denied_C5Unactivated`):
+  U5's early-reject path; the audit row carries
+  `AccessVia.Report` (the §2.4 item 3 pin), `Action = "read"`,
+  `Outcome = Deny`, `TargetKind = "post"`, `TargetId = postId`.
+- **Test 5** (`AssignReportAsync_ModeratorCaller_Denied_NoWrite_NoPartialState`):
+  the SoD-denied path — U5 commits the decision's audit row only;
+  no `Report.Status` write, no `ModeratorAssignment` write.
+- **Test 6** (`AssignReportAsync_GlobalAdmin_WritesStatusAssigned_ModAssignmentRow`):
+  the SoD-allowed path — U5 writes `Report.Status = "assigned"`,
+  upserts `ModeratorAssignment` (if `ComponentId` non-null),
+  writes the `AccessAudit`.
+- **Test 7** (`ResolveReportAsync_GlobalAdmin_WritesStatusResolved_FlipsFlagSameTxn`):
+  U5 writes `Report.Status = "resolved"` + the `AccessAudit` in the
+  caller's transaction (the C3 pair), and calls
+  `SetComponentModeratorAccessAsync` (separate M1 commit). The test
+  must assert the *report-domain + audit row* pair (same commit)
+  and the *flag-flip* (separate commit) — both are observable.
+- **Test 8** (`ResolveReportAsync_NonGlobalAdminCaller_Denied_NoWrite_NoPartialState`):
+  the SoD-denied path (analogous to test 5).
+
+### Drift note (§2.0 — the design doc wins)
+
+**§2.4 item 2** pins the flag-flip as "in the same
+`IDocumentSession` transaction". U5's `UnlockAsync` /
+`ResolveReportAsync` **cannot** satisfy this literally: M1's
+`SetComponentModeratorAccessAsync` opens **its own** session
+(the M1 seam's own `SaveChangesAsync` — a **frozen** shape that
+unit-series rule 4 forbids reshaping). The **report-domain +
+report-audit pair** still commits atomically in the caller's
+transaction (the C3 pin **is** honored for that pair); the
+flag-flip is a **separate, pre-existing M1 commit**. U5 chose the
+"call the M1 seam (own session, own commit) before the
+caller's `SaveChangesAsync`" order, and documented the C3
+tension in the XML doc-comment. The `report-domain + audit row`
+pair is the C3-honored pair; the flag-flip is a **separate**
+commit by design (M1's frozen contract). U9's test 7 should
+assert both independently.
+
+### Files touched
+
+- `src/Kumunita.Core/Moderation/ModerationService.cs` (modified —
+  added four methods, no other changes).
+- `docs/plans-milestones/m3b-u5-plan.md` (new — the execution plan).
+- `docs/plans-milestones/m3b-handoff-notes.md` (this section
+  appended).
+
+### Build / test state
+
+- `run_build` — **green** on `Kumunita.Core`.
+- `run_tests` (`Kumunita.Core.Tests`) — **105 passed, 0 failed**
+  (U5 does not introduce a new test, per unit-series rule 3; the
+  105 existing tests are the regression check — U4's tests are
+  still green, all M1/M2/M3 tests are still green).
+
+### What U6 (reply route) needs
+
+- U6 is the `POST /posts/{id}/replies` Web micro-fix (route +
+  controller action delegating to M3's
+  `PostService.CreateReplyAsync` — **no** new Core seam, **no**
+  new test). U5's work is **Core only** — U6 does not touch
+  `ModerationService`; U6's deliverable is entirely in
+  `Kumunita.Web` (controller action + view wiring). U6 reads
+  `docs/design/m3b-moderation.md` §2.2.4 (the reply-route pin)
+  + `src/Kumunita.Web/Controllers/PostsController.cs` (the M3
+  precedent) + `src/Kumunita.Web/Views/Posts/Detail.cshtml`.
+
