@@ -30,4 +30,15 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080
 COPY --from=build /app/publish ./
 EXPOSE 8080
+# Persistence safety net (see docs/COOLIFY.md §5.2 for the operator-facing
+# step). Declares /data/dataprotection-keys — the ASP.NET Core data-protection
+# keyring directory when DataProtection__KeysDirectory points there — as a
+# volume, so that if the container starts without an operator-attached named
+# volume, Docker still promotes it to an anonymous named volume and the
+# keyring survives a bare `docker restart`. This is strictly less robust than
+# a Coolify-managed named volume (anonymous volumes can be pruned; Coolify
+# redeploy replaces the container and may drop them), so the VOLUME line is
+# a floor, not a replacement for the operator attaching a named volume to the
+# Application in the Coolify UI.
+VOLUME /data/dataprotection-keys
 ENTRYPOINT ["dotnet", "Kumunita.Web.dll"]
