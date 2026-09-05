@@ -6,7 +6,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <!-- M1 step 7: durable side effects (plan line 40). WolverineFx is the durable
+    <!-- M1 step 7: durable side effects
          handler + scheduled job framework; WolverineFx.Marten gives us the
          transactional outbox integration (`IntegrateWithWolverine()`) that
          ARCHITECTURE.md §6.1 relies on ("a failed SMTP connection can never roll

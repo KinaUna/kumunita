@@ -6,6 +6,7 @@ using Kumunita.Web;
 using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Marten;
 using Marten.Services;
@@ -112,6 +113,32 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
+
+// Data protection key persistence (OPS §10, SECURITY.md hardening).
+//
+// Default ASP.NET behavior is in-memory keyring: the container's keyring is
+// regenerated on every restart, so every cookie (session, antiforgery, .AspNet
+// Identity) set before the last restart can no longer be decrypted. On a
+// Coolify instance with redeploys (a rolling replace after a new build is the
+// common case) this means a user who loaded the login page is immediately
+// un-logged in the moment Coolify swaps the container — a hard-to-diagnose
+// "I keep getting bounced back to login" bug, and the "antiforgery token
+// could not be decrypted / key not found in key ring" error in the logs.
+//
+// Opt-in: set the `DataProtection__KeysDirectory` env var to a persistent
+// host path (Coolify: a directory on the `/data` volume) and we persist keys
+// there under the default keyring name. Unset → in-memory (dev, unit tests,
+// any one-shot container without a persistent volume). The directory must be
+// writable by the container user; a misconfigured path fails *at startup*
+// (the first key-ring access would throw lazily at the first encrypted write
+// if we didn't catch it here, so we CreateDirectory once and let that throw).
+var dataProtectionKeysDir = builder.Configuration["DataProtection:KeysDirectory"] as string;
+if (!string.IsNullOrWhiteSpace(dataProtectionKeysDir))
+{
+    Directory.CreateDirectory(dataProtectionKeysDir);  // throws on EACCES — deliberate
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
+}
 
 // Step 6 (claim wiring, plan item 8): the Identity ↔ cookie seam.
 //

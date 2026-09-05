@@ -138,6 +138,7 @@ port (OPS §10).
 | `ConnectionStrings__Kumunita` | `Host=<addon-service-name>;Port=5432;Database=kumunita;Username=kumunita;Password=<from §4>;Include Error Detail=true` — **secret** |
 | `SMTP__Host` / `SMTP__Port` | the relay for verification + seed-admin mail — see **§5.1** (and OPS §7) |
 | `SeedAdmin__Email` / `SeedAdmin__Token` | one-time setup token — **created per OPS Procedure 2, removed from env after first login** |
+| `DataProtection__KeysDirectory` | **recommended** — a persistent directory (Coolify's `/data` volume, e.g. `/data/keys`) holding the data-protection keyring. See **§5.2** below. Omit to keep the in-memory default. |
 
 The `Host` value is the addon's internal service name (visible on the
 addon's page / psql connection block).
@@ -182,10 +183,46 @@ retries/dead-letters per §6.2 and `/health` flips to `degraded` so it is visibl
 Verify the mail landed on the real inbox (OPS Procedure 2, step 5) before
 considering the test "working".
 
-5. **Domains:** attach the neighborhood's domain (§2).
-(Coolify + Let's Encrypt) — nothing else to do (OPS §6).
-6. **Health check:** path `GET /health`, expected `200`.
-7. **Deploy.**
+### 5.2 Data-protection key persistence (recommended)
+
+ASP.NET's default data-protection keyring is **in-memory**. On a Coolify
+instance, every redeploy (Coolify replaces the container on each push)
+**regenerates** the key, so every previously-set cookie — the session, the
+antiforgery token, the `.AspNetCore.Identity` cookie — can no longer be
+decrypted. Consequence: a signed-in user is bounced to the login screen on
+the next redeploy, and the log shows
+`AntiforgeryValidationException: The antiforgery token could not be decrypted`
+/ `The key {…} was not found in the key ring`.
+
+Set **one** env variable to a **persistent** directory and the keyring is
+stored there (the app creates it at boot and fails fast if it can't). On
+Coolify, a directory on the `/data` volume survives container replacement:
+
+| Variable | Value |
+|---|---|
+| `DataProtection__KeysDirectory` | e.g. `/data/dataprotection-keys` — a path on a volume mounted at `/data` |
+
+Omit it (in-memory) only where the instance is truly single-container and
+you accept that any restart invalidates existing sessions. Dev, unit tests,
+and the compose stack in `docker-compose.yml` all leave it unset.
+
+1. Create a persistent directory (Coolify's `/data` volume already exists;
+   just point the app at a subdirectory of it).
+2. Set `DataProtection__KeysDirectory=/data/dataprotection-keys` at the
+   **environment** level (so the app can see it).
+3. Confirm the app boot logs have no data-protection errors on *first* boot
+   (first write of the keyring) and *second* boot (re-read of it).
+
+### 5.3 Domains
+
+Attach the neighborhood's domain (§2). Coolify + Let's Encrypt issue it —
+see OPS §6.
+
+### 5.4 Health check
+
+Path `GET /health`, expected `200`.
+
+### 5.5 Deploy.
 
 ## 6. Verify (then switch to the runbook)
 
@@ -209,6 +246,7 @@ SHA, admin contact, dates).
 
 | Symptom | First look |
 |---|---|
+| Logged out / bounced to login after a redeploy, or log shows `antiforgery token could not be decrypted` / `key not found in the key ring` | data-protection keyring is ephemeral — set `DataProtection__KeysDirectory` to a persistent dir (§5.2) |
 | Health check `database` failed on boot | `Host` in the connection string (should be the internal addon name, not `localhost`) |
 | Boot loops, "permission denied: schema" | the `kumunita` role isn't the **owner** of the `kumunita` database — re-run §4 step 5 |
 | TLS not issued | DNS not pointing at the VPS yet (§2), or port 80/443 closed |

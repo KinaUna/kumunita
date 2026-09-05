@@ -13,6 +13,13 @@
          direct ADO.NET surface explicit instead of relying on Marten's transitive pull. -->
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+    <!-- EF Core's Npgsql provider. Needed in Core (not just Web): the Identity schema's
+         EF Core migrations live next to AppDbContext in this assembly (ADR 0004 —
+         "standard EF Core migrations, applied at startup"), and the generated migration
+         C# references the provider's builder types. Runtime-only: SchemaBootstrap calls
+         Database.MigrateAsync() at boot in ALL environments; Web's Program.cs already
+         pins the same 10.0.3. -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- Explicit for AddKumunitaCore's public API (IServiceCollection); Bootstrap's DI
          usings previously flowed transitively. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
