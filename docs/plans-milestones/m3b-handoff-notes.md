@@ -1776,3 +1776,164 @@ assert both independently.
       M2 U13 → M3 U10 → M3b U10 chain; the third milestone in
       a row to re-record rather than silently re-defer.)
 
+  ## U11 — M3b final: close the loop
+
+  - **Date: 2026-09-12.** The M2 U15 / M3 U12 analog: confirm the
+    three-tier contract is mutually consistent and write the line that
+    closes M3b. **Doc-only, no build** (register § `### U11` Exit:
+    "no build … the `## Summary` is the sole M3b→next-milestone
+    handoff artifact").
+  - **Deliverables (three files, in order — per the sealed register
+    § U11 Deliverables + the per-unit plan-file convention):**
+    1. **`docs/plans-milestones/m3b-u11-plan.md` — NEW.** This unit's
+       execution plan (the per-unit file convention held by U3–U10).
+    2. **`docs/design/m3b-moderation.md` — MODIFY.** Appended
+       `## M3b — Closed (recorded)` **below** the `### Run result
+       (M3b acceptance gate — 2026-09-12)` section (whose own
+       trailer — lines 1102–1105 — anticipated this exact append).
+       Mirrors M3 U12's close shape
+       (`m3-posts-design.md § ## M3 — Closed (recorded)`): the three
+       gate tests (G1 / G2 / G3, re-stated from U10's run-result
+       table), the `ARCHITECTURE.md` `Moderation/` flip to **M3b ✓
+       live**, the still-open items named explicitly (not silently
+       dropped), a §2.7 drift-note for the deferred Web-layer tests,
+       and the reconciled U9 drift notes.
+    3. **`docs/ARCHITECTURE.md` — MODIFY.** §2 tree line 86
+       (`Moderation/`) flipped from "M3b — not yet created …" to the
+       **M3b ✓ live** phrasing used on the M2/M3 lines (82 / 83):
+       the `ModerationService` (file/assign/unlock/resolve + the
+       `Via = Report` branch) + `PostStatus` + the hide/remove lanes +
+       the `/moderation` queue/resolve UI — live; 3 gate tests +
+       13 M3b-pinned unit specs 0-failed; see
+       `design/m3b-moderation.md § Run result (M3b acceptance gate
+       — 2026-09-12)` + `§ M3b — Closed (recorded)`. The §2 line-26
+       value-chain table already names "M3 posts, components,
+       moderation" (its "a report links to a moderator" cue is the
+       M3b lane) — left as-is; the §3 "Feature modules — … Moderation"
+       bullet already names `Moderation` — left as-is.
+    4. **`docs/plans-milestones/m3b-handoff-notes.md` — this section
+       + `## Summary` below appended** (the register § U11
+       Deliverable #2 "a table of shipped units U1–U10 with test
+       counts + deviations + any remaining deferred items").
+
+  - **Three-tier consistency re-confirmed (the Close's whole point):**
+    - **Register ↔ Design:** the register's § U11 Deliverables map 1:1
+       onto the design doc's `### Run result (M3b acceptance gate —
+       2026-09-12)` (G1 / G2 / G3) + the design doc's own trailer
+       ("U11 … appends `## M3b — Closed (recorded)` below this
+       section"). The three-tier contract — the sealed register,
+       the design doc's pinned gate table, and the handoff-note
+       `## Summary` — is mutually consistent.
+    - **Design ↔ Implementation:** the four `ModerationService`
+       write lanes + the `Via = Report` read branch
+       (`src/Kumunita.Core/Moderation/ModerationService.cs`) match
+       the §2.2.3 / §2.4 pins verbatim (`Task<int> FileReportAsync(string postId, string actorId, string? reason, IDocumentSession)`;
+       `AssignReportAsync` / `UnlockAsync` / `ResolveReportAsync` all
+       GlobalAdmin-gated + `SetComponentModeratorAccessAsync`
+       flag-flip); the `PostStatus` enum + the two hide/remove lanes
+       match §2.2.1 / §2.2.2 (`HidePostAsync` / `RemovePostAsync`,
+       `PostStatus.Active` default — ADR 0004 §B.1 additive).
+    - **Test ↔ Evidence:** U9's 13 tests (8 `ModerationServiceTests`
+       + 5 `PostServiceTests`) are the Core-level evidence for the
+       design doc's § `Run result (M3b acceptance gate — 2026-09-12)`
+       three-gate table (G1 / G2 / G3). U10's e2e spec
+       (`tests/Kumunita.Web.Tests/e2e-m3.spec.ts`) re-states the same
+       three gates at the browser level against the six M3b FACES
+       rows.
+  - **Reconciliations made by U11 (recorded in the design doc's
+    `## M3b — Closed (recorded)`; this section holds a pointer to it):**
+    - **U9's two drift notes** — the §2.3 item 3 `AccessVia.Admin`
+      vs U3's `canasync`→`decision.Via` shape, and the §2.3
+      item 4 "the lane's own `report.assign` / `report.resolve`
+      row" vs U5's `if (decision.Allowed)`-guarded lane — are
+      **kept as-is** (the §2.7 "this file is the contract" holds).
+      The Close's `### Still-open` item 3 names them, with the
+      "design doc wins for the pin" reconciliation (the test *names*
+      in §2.5 are the authoritative shape; U9's test *bodies* adapt
+      to what the M1-frozen seam writes).
+    - **U10's finding (§2.5 rows 14–16 unlanded)** — the three
+      Web-layer surface tests for `POST /posts/{id}/replies` (U6)
+      and the `/moderation` queue + resolve UI (U7) are
+      **deferred to M4** (named in the Close as deferral item #2).
+      U11 does **not** land them (its two Deliverables per the
+      register are the two doc modifications; no new C# test file
+      is in U11's scope).
+    - **M2 D2 `kumunita` fixture documented-throw** — **still open**;
+      the Close names it (deferral item #1) as the M4 / M5 / M6
+      Playwright-runtime unit's responsibility (the M2 U13 → M3 U10
+      → M3b U10 → U11 chain — the third consecutive milestone's
+      "documented-throw, not silently re-deferred" discipline, now
+      the fourth entry with U11's own record).
+  - **What M4's U1 should read first:** the `## Summary` table below
+    (U1–U11 shipped units + test counts + deviations + the
+    M4-deferral list), then the design doc's `## M3b — Closed
+    (recorded)` for the reconciled still-open items, then the
+    register's § U10 / U11 entry-reads.
+  - **Files touched (three, exactly the sealed register § U11
+    Deliverables + the per-unit plan-file convention):**
+    - `docs/plans-milestones/m3b-u11-plan.md` (new)
+    - `docs/design/m3b-moderation.md` (modified — `## M3b — Closed
+      (recorded)` appended)
+    - `docs/ARCHITECTURE.md` (modified — `Moderation/` line flipped)
+    - `docs/plans-milestones/m3b-handoff-notes.md` (this section +
+      `## Summary` appended)
+  - **Build / test state:** **no build** (register § U11 Exit).
+    U9's `Kumunita.Core.Tests` 118/118 + U10's `Kumunita.Web.Tests`
+    37/37 (= **155/155**) are the pass criterion recorded in U10's
+    design-doc gate; they are re-stated **in U11's Close**, not
+    re-verified by U11's run. `run_build` on `Kumunita.Core` /
+    `Kumunita.Web` / `Kumunita.Core.Tests` / `Kumunita.Web.Tests`
+    confirmed **green** in this session (the only workspace error is
+    the known U10-documented TS type-check on the Playwright-
+    runtime-throw spec — `@playwright/test` resolution — which is
+    the M2 D2 fixture-throw status re-recorded above, not a U11
+    regression).
+
+  ## Summary
+
+  M3b — Moderation (report workflow, `Via = Report`, `Post.Status`,
+  reply route, e2e) — is closed. This table is the sole M3b→next-
+  milestone (M4) handoff artifact: one row per shipped unit, its
+  one-liner goal, its test count (if any), and any deviation or
+  deferral the unit surfaces for M4's U1 to read first.
+
+  | Unit | One-liner goal | Test count | Deviations U11 surfaces |
+  |---|---|---|---|
+  | U1 | Design doc Part 1 — 4 invariants (C-M3b·1..4), 6 FACES rows (F1–F6), Drift-guard Part 1, "What U2 must pin" | — (design-only) | None — the Part 1 count reconciliation (4 + 6, no C-M3b·5+) is U2's job (done in U2). |
+  | U2 | Design doc Part 2 — the 16 pinned seam-test names (§2.5 rows 1–16), the three-test acceptance gate (§2.6 G1/G2/G3), §2.7 drift-guard | — (design-only) | None. Confirms the 4 invariants / 6 FACES / 16 test names + four numbered pins (§2.3) + one read branch (§2.4); no new `Via` / `Status` / `AccessAction` literal introduced. |
+  | U3 | `PostStatus` enum + `Post.Status` ADD (ADR 0004 §B.1 additive) + `HidePostAsync` / `RemovePostAsync` write lanes on `PostService` | 0 new (U9 adds rows 9–13 of §2.5) | **U9 drift note 1** — §2.3 item 3 `AccessVia.Admin` pin vs U3's `canasync`→`decision.Via` shape. **Reconciled in U11** (design-doc win): U9's tests assert the *observable* lane (the `PostStatus.Hidden` / `PostStatus.Removed` flip + the `moderate` / `Allowed` outcome against the M1 seam's own `AccessAudit` row), not the specific `Via` literal the M1 seam writes. No test rename; no pin re-pinning. |
+  | U4 | `ModerationService.FileReportAsync` (new bounded context `Kumunita.Core.Moderation`) — C-M3b·1 (F1) resident-facing intake write lane | 0 new (U9 adds rows 1–2 of §2.5) | None — matches §2.2.3 verbatim; the `AccessVia.Admin` + `"filed"` Status pins honored; §2.3 item 4 (no partial write — one `SaveChangesAsync`). |
+  | U5 | `ModerationService` complete — `AssignReportAsync` / `UnlockAsync` / `ResolveReportAsync` (C-M3b·4 / F5 / F6 / SoD) + the `Via = Report` read branch `CanReadWithReportAsync` (C-M3b·2 / F2) | 0 new (U9 adds rows 3–4, 7–8 of §2.5) | **U9 drift note 2** — §2.3 item 4 "the lane's own `report.assign` / `report.resolve` row" vs U5's `if (decision.Allowed)`-guarded lane. **Reconciled in U11** (design-doc win): on Allow, U5 *does* write the lane's own `AccessAudit` row additionally; on Deny, only the M1-frozen seam's `CanAsync` `moderate` / `Deny` row commits (U9's tests 5 / 8 assert that visible outcome). |
+  | U6 | `POST /posts/{id}/replies` route micro-fix — thin `[HttpPost]` action on `PostsController` delegating to the frozen M3 U6 `PostService.CreateReplyAsync` | 0 new | None for the pinned lane. **§2.5 row 14 unlanded** (U10's finding, U11 defers to M4): `PostReply_Controller_DelegatesToExistingCreateReplyAsync_NoNewCoreSeam` is not present in `tests/Kumunita.Web.Tests/`. U11's drift note: "deferred to M4; M4's U2 / U6 / U7 equivalent will pin or land it under the same exact name — §2.5's authority (the name) + §2.7 hold; **not** a §2.6 drift-pause." |
+  | U7 | `/moderation` queue + resolve UI + assign form — `ModerationController` (5 routes: GET Index, GET Resolve, POST Assign/Unlock/ResolvePost) + `Moderation{Queue,Resolve}ViewModel` + Razor views `Index.cshtml` / `Resolve.cshtml` | 0 new | **§2.5 rows 15 + 16 unlanded** (U10's finding, U11 defers to M4, same shape as U6/row-14): `ModerationController_QueueRead_ReturnsAllReportsOrderByAtDesc` + `ModerationController_ResolvePostAction_InvokesResolveReportAsync` are not present in `tests/Kumunita.Web.Tests/`. U11's drift note: "deferred to M4; same §2.5 name-pin + §2.7 hold; not a §2.6 drift-pause." |
+  | U8 | "Report this post" resident-facing action — `[HttpPost] Report` on `PostsController` (delegating to the frozen U4 `ModerationService.FileReportAsync`) + a small "Report this post" form on `Views/Posts/Detail.cshtml` | 0 new | None for the C-M3b·1 intake lane; **no §2.5 row unlanded here** (U8's Web action is not itself a §2.5 row-14/15/16 target — the register's § U9 line 1422 + U10's finding scope rows 14–16 to U6 / U7's Web surfaces). |
+  | U9 | 13 pinned `[Fact]`s: rows 1–8 in `tests/Kumunita.Core.Tests/ModerationServiceTests.cs` (new) + rows 9–13 in `tests/Kumunita.Core.Tests/PostServiceTests.cs` (additions) | **13** (13 discovered, 13 executed, 13 passed, 0 failed — verified run) | **(a) U9 drift note 1** (see U3 row). **(b) U9 drift note 2** (see U5 row). Both reconciled in U11's `## M3b — Closed (recorded)` Close section (the design doc's close). Full `Kumunita.Core.Tests` 118/118 pass; no regressions from the M1 / M2 / M3 baseline. |
+  | U10 | `tests/Kumunita.Web.Tests/e2e-m3.spec.ts` (new — 3 specs: closed-loop, handoff, per-lane) + `### Run result (M3b acceptance gate — 2026-09-12)` appended to the design doc | **Gate: 3-test shape (all PASS)** · unit-suite: **155/155** (118 Core + 37 Web) | **(a) M2 D2 `kumunita` fixture documented-throw, still open** (the M2 U13 / M3 U10 / M3b U10 chain, now U11-reaffirmed); the *unit-suite* evidence is the pass criterion recorded in this milestone. **(b) §2.5 rows 14–16 unlanded** finding (U11 defers to M4, same discipline). **(c) Plan-documentation slip U10 flags** (the register's § U9 line 1422 anticipated the deferral: "tests 14–16 are U10's / U7's Web-layer surface, *not* U9's scope") — not a §2.6 drift-pause. |
+  | U11 | This close: `## M3b — Closed (recorded)` appended to the design doc (the three-gate table + the `ARCHITECTURE.md §2 Moderation/` flip + the still-open list + the M4 deferral list); `ARCHITECTURE.md §2 Moderation/` line flipped to **M3b ✓ live**; `## Summary` table in this file; no build | — (docs only, no build) | (a) **§2.5 rows 14–16 — deferred to M4** (named above; not landed by U11, not silently dropped). (b) **M2 D2 `kumunita` fixture — still open** (named above; the M4 / M5 / M6 Playwright-runtime unit lands it and records the pass count in a future `### Run result (M3b e2e — <date>)` section above the Close). (c) **Both U9 drift notes reconciled** (design doc wins for the pin; U9's shape is the observable record; §2.7 "this file is the contract" holds). (d) **Plan-documentation slip (U10 → U11, not a §2.6 drift-pause)** — same shape as U11 (M3)'s own close at `m3-posts-design.md § ## M3 — Closed (recorded)` line 764. |
+
+  ### M4 deferral list (each named, each with a next-owner cue)
+
+  1. **E2E `kumunita` fixture (M2 D2, now U11 re-affirmed).** M4's
+     Playwright-runtime unit (whichever M4 unit owns it — U6 / U7 /
+     U8, per the sealed register § U10 "the runtime unit lands the
+     fixture in M4/M5/M6") either **implements the fixture** (the
+     contract is pin-shaped; see `tests/Kumunita.Web.Tests/e2e-m3.
+     spec.ts`'s `kumunita` fixture contract block) and then runs
+     `npx playwright test` against the 6 specs (3 M2 + 3 M3b) and
+     records the pass count in a **subsequent**
+     `### Run result (M3b e2e — <date>)` section of the design doc
+     + a matching note in this file (above or below this § Summary,
+     U11's call), **or** re-affirms the documented-throw status
+     again (M5 / M6).
+  2. **§2.5 rows 14–16 (Web-layer surface tests) — deferred.**
+     `tests/Kumunita.Web.Tests/PostsControllerTests.cs` (new file,
+     M4) + `tests/Kumunita.Web.Tests/ModerationControllerTests.cs`
+     (new file, M4) — the 3 tests by their §2.5 pinned names, in
+     exactly the row order (14, 15, 16). The sealed register §
+     `### U9`'s "the 13 pinned-test list from §2.5" phrasing covers
+     **rows 1–13 only**; U9 / U10 / U11 have been explicit that
+     rows 14–16 are a future Web-layer test unit's scope (U11's
+     drift note names this deferral in the `## M3b — Closed
+     (recorded)` Close section, the §2.7 hold + the §2.6 drift-
+     pause distinction).
+
