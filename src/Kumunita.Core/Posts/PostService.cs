@@ -196,4 +196,80 @@ public sealed class PostService
         await session.SaveChangesAsync().ConfigureAwait(false);
         return reply;
     }
+
+    // ─── M3b C-M3b·3 — the two Moderate-gated write lanes (F3/F4) ─────────────
+
+    /// <summary>
+    /// Hide a post (F3; C-M3b·3). The <see cref="AccessAction.Moderate"/>-gated
+    /// write lane: calls <see cref="IAuthorizationService.CanAsync(string,
+    /// AccessAction, IAuditableResource, IDocumentSession)"/> with
+    /// <c>AccessAction.Moderate</c> **before** writing, in the **same**
+    /// <c>IDocumentSession</c> transaction as the <c>Status</c> write
+    /// (invariant C3 — same-transaction; ADR 0006-C: audit always on — Allow
+    /// *and* Deny). A denied call is **not executed at all** (no
+    /// <c>Status</c> write, no partial state) — the audit row still commits
+    /// in the caller's <c>SaveChangesAsync</c> (C3). The acting identity is
+    /// <paramref name="actorId"/>; the audit <c>Via</c> tag is written by the
+    /// frozen <see cref="IAuthorizationService"/> (M1 surface), not here.
+    /// </summary>
+    public async Task HidePostAsync(string postId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A moderating actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to hide.");
+
+        // C3 / ADR 0006-C — audit row always written (Allow or Deny), in the
+        // caller's transaction. The decision gate runs *before* any write.
+        var decision = await _authz.CanAsync(actorId, AccessAction.Moderate,
+                new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            post.Status = PostStatus.Hidden;
+            post.Modified = DateTimeOffset.UtcNow;
+            session.Store(post);
+        }
+
+        // One SaveChangesAsync — the C3 same-transaction lane (ADR 0006-E): the
+        // audit row and (if Allowed) the Status write commit atomically.
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Remove a post (F4; C-M3b·3). The <see cref="AccessAction.Moderate"/>-gated
+    /// write lane (the "hard remove" counterpart to
+    /// <see cref="HidePostAsync"/>). Same semantics as
+    /// <see cref="HidePostAsync"/> but writes
+    /// <see cref="PostStatus.Removed"/>. A denied call is not executed at all
+    /// (no <c>Status</c> write, no partial state); the audit row still commits
+    /// in the caller's <c>SaveChangesAsync</c> (C3).
+    /// </summary>
+    public async Task RemovePostAsync(string postId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A moderating actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to remove.");
+
+        var decision = await _authz.CanAsync(actorId, AccessAction.Moderate,
+                new PostToAuditableResource(post), session)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+        {
+            post.Status = PostStatus.Removed;
+            post.Modified = DateTimeOffset.UtcNow;
+            session.Store(post);
+        }
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
 }

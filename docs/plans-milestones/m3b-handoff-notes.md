@@ -369,3 +369,436 @@ on `AuthorizationService.Decide` not-taken" pin) are **unchanged**
 and remain **stable for the rest of M3b** (per §2.7). This
 re-check does **not** open a §2.7 drift-guard path: **no** ADR
 amendment is required for any of the corrections above.
+
+---
+
+## U3 — `Post.Status` + `HidePostAsync` / `RemovePostAsync`
+
+**Unit plan:** `docs/plans-milestones/m3b-u3-plan.md` (new file, U3's
+self-contained plan for this unit per the sealed-unit convention).
+
+- **Deliverables landed (≤ 3 files, actual = 2 source files + this
+  note + the plan file):**
+  - `src/Kumunita.Core/Posts/Post.cs` — **additive** change:
+    - New `public enum PostStatus { Active, Hidden, Removed }` in the
+      same namespace (the **three** literal set from Part 2 §2.2.1,
+      stable per §2.7).
+    - New `public PostStatus Status { get; set; } = PostStatus.Active;`
+      property on `Post` (default `Active` — the doc's "no null-check
+      needed" pin; the POCO is otherwise **unchanged**, per unit-rule 5).
+    - `Post`'s class doc-comment updated to name `Status` as the M3b
+      single ADD (ADR 0004 §B.1 additive — delta-detected, idempotent,
+      no re-seed; no migration, no re-seed required).
+  - `src/Kumunita.Core/Posts/PostService.cs` — **additive** change:
+    the two write lanes below, added to the *existing* M3 class (rule 1:
+    no file outside the unit's `Deliverables` touched; existing `ListFeedAsync`
+    / `GetPostAsync` / `CreatePostAsync` / `CreateReplyAsync` untouched).
+- **Entry-reads confirmed (per the unit's entry-read list, 5 files):**
+  - `docs/design/m3b-moderation.md` §2.2.1 (the `PostStatus` enum +
+    `Post.Status` literal set — **verbatim matched**) and §2.2.2 (the
+    two `Task` methods with `(string postId, string actorId,
+    IDocumentSession session)` — **verbatim matched**).
+  - `src/Kumunita.Core/Posts/Post.cs` — **no `Status` column today**
+    (M3's POCO shape confirmed; U3 is the additive ADD, no
+    re-shape).
+  - `src/Kumunita.Core/Posts/PostService.cs` — C3 write-lane style
+    confirmed (`CreatePostAsync` / `CreateReplyAsync`): caller's
+    `IDocumentSession`, one `SaveChangesAsync`. U3's two methods match
+    that shape exactly.
+  - `src/Kumunita.Core/Authorization/IAuthorizationService.cs` — the
+    `IDocumentSession` overload of `CanAsync` confirmed present (the
+    C3 same-transaction lane — audit row written into the caller's
+    transaction; U3 calls **this** overload, not the standalone one).
+    `AccessAction.Moderate` already exists (M1 surface, no new id —
+    U1's handoff pin, re-confirmed here).
+  - `src/Kumunita.Core/Posts/PostToAuditableResource.cs` — M3's
+    adapter, reused **as-is** (not modified); the hide/remove lanes
+    build the target with `new PostToAuditableResource(post)`.
+  - `src/Kumunita.Core/Authorization/Decision.cs` — confirmed `Decision
+    (bool Allowed, AccessVia Via, string EffectivePrincipalId)` (the
+    `.Allowed` member is what U3 branches on; the audit `Via` tag is
+    written by the frozen `IAuthorizationService` per M1, not by U3).
+- **What U3 implemented (verbatim signatures, as landed):**
+
+  ```csharp
+  // src/Kumunita.Core/Posts/Post.cs (new enum — the three-literal pin, §2.2.1)
+  namespace Kumunita.Core.Posts;
+
+  public enum PostStatus
+  {
+      Active,    // default (M3's behavior unchanged for a visible post)
+      Hidden,    // F3 — soft-hide, the Moderate-gated write lane (C-M3b·3)
+      Removed    // F4 — hard-remove, the Moderate-gated write lane (C-M3b·3)
+  }
+
+  // (on Post, additive)
+  public PostStatus Status { get; set; } = PostStatus.Active;
+  ```
+
+  ```csharp
+  // Additions to the existing PostService (src/Kumunita.Core/Posts/PostService.cs)
+  public async Task HidePostAsync(string postId, string actorId,
+                                  IDocumentSession session)
+  {
+      // 1) load the Post from the caller's session (KeyNotFound if missing)
+      // 2) _authz.CanAsync(actorId, AccessAction.Moderate,
+      //                     new PostToAuditableResource(post), session)
+      // 3) on Allowed: post.Status = PostStatus.Hidden;
+      //                post.Modified = UtcNow; session.Store(post);
+      // 4) await session.SaveChangesAsync()          <- C3: audit + write commit atomically
+  }
+
+  public async Task RemovePostAsync(string postId, string actorId,
+                                    IDocumentSession session)
+  {
+      // identical shape to HidePostAsync but writes PostStatus.Removed.
+  }
+  ```
+
+  (The full landed method bodies match the §2.2.2 pin: guard-argument
+  shape mirrors `CreatePostAsync` / `CreateReplyAsync`; one
+  `SaveChangesAsync`; Deny → **no `Status` write** — the audit row
+  (Deny) still commits per ADR 0006-C / C3; Allow → `Status` set
+  (`Hidden` / `Removed`) + `Modified` stamped + `Store` — the
+  "no partial write" pin held: a post is never left in a state where
+  `Status` is set but the decision audit row is missing, because
+  both commit in one `SaveChangesAsync`.)
+
+- **Invariants held:**
+  - **C-M3b·3** (hide / remove lane, `Moderate`-gated, same-transaction,
+    no partial write) — **lives in this unit's code**.
+  - **C3** (same-transaction for the decision audit row + the domain
+    write) — **lives in this unit's code** (both lanes end in one
+    `SaveChangesAsync`).
+  - **ADR 0006-C** (audit always on — Allow *and* Deny) — **lives in the
+    frozen `IAuthorizationService`** (U3 calls the `IDocumentSession`
+    overload, which writes the row into the caller's transaction —
+    Allow writes the AuditAllow row + the Status write in the same
+    commit; Deny writes the AuditDeny row only, no Status write).
+  - **ADR 0006-D** (single decision path, no second read of
+    `GroupMembership`/`DelegationGrant`) — **lives in U3's code
+    (U3 does not read membership itself; it composes only the two
+    seams)** + the frozen `IAuthorizationService` (unchanged by U3).
+  - **ADR 0004 §B.1** (additive — no migration, no re-seed, no
+    delta) — **lives in the POCO shape (the single ADD on `Post`)**;
+    the `PostStatus` literal set (exactly `Active` / `Hidden` /
+    `Removed`) matches the §2.2.1 pin.
+  - **C-M3·1 / C-M3·2 / C-M3·3** (the M3 invariants) — **unchanged,
+    still bind** for every feed / detail render M3b reads (the M3
+    methods `ListFeedAsync` / `GetPostAsync` / `CreatePostAsync` /
+    `CreateReplyAsync` are **untouched** by U3).
+- **Build status:**
+  - `dotnet build --configuration Release src\Kumunita.Core\Kumunita.
+    Core.csproj` — **0 Warning(s) / 0 Error(s)**, `Build succeeded.`
+    (Also IDE `run_build` on the same project — green; both confirm
+    the additive change compiles against M3's existing POCO surface.)
+- **No existing M3 seam-test name broke.** Verified: `PostStatus` /
+  `HidePostAsync` / `RemovePostAsync` have **zero** references in any
+  existing test file before this unit (searched
+  `tests/Kumunita.Core.Tests/**/*.cs` for each — **0 hits**). The
+  16 pinned M3b seam-test names (Part 2 §2.5, 5 in
+  `PostServiceTests.cs`, 8 in `ModerationServiceTests.cs`, 1 in
+  `PostsControllerTests.cs`, 2 in `ModerationControllerTests.cs`)
+  are **U9's deliverable** (not landed in U3) — the 5
+  `PostServiceTests` names (M3b ADDs) will exercise the two lanes
+  U3 just landed; the 8 `ModerationServiceTests` names will exercise
+  U4's `ModerationService`; the 1 + 2 Web-test names will exercise
+  U8's reply-route action and U7's `/moderation` surface
+  respectively. **No unit-series rule 1–6 violation.**
+- **Deviations:** none (all pins matched verbatim against the design
+  doc §2.2.1 / §2.2.2; no §2.7 drift-guard path required — no ADR
+  amendment, no literal re-pin, no signature change).
+  - **Style note (not a pin):** U3 chose to throw
+    `KeyNotFoundException` (not a silent no-op or `Decision`
+    return) on a missing post in the session. This is M3's detail
+    shape precedent (`GetPostAsync`'s fail-closed `Post = null` is a
+    *read* lane — the write lane has no "Deny" path that would make
+    a silent no-op more semantically consistent with M3, and a
+    moderator write against a missing post is a caller-visible
+    error). This is **not** a divergence from any pin in the design
+    doc (the pin does not name the missing-post outcome as a
+    specific return type); it is a U3-style choice, consistent with
+    the existing POCO's error-shape conventions. No drift.
+  - **`Modified` stamp on hide / remove:** **not** pinned by the
+    design doc (the pin does not name a `Modified` write on the
+    hide/remove lanes), but **matches M3's POCO semantics**
+    (`Modified` is the last-write marker per M3's class doc-comment;
+    `CreatePostAsync` writes `Created` only because no `Modified`
+    value exists yet). Stamp `Modified` — low risk, consistent with
+    convention, does not violate any pin. If U9's 5
+    `PostServiceTests` seam tests (which will exercise these lanes)
+    assert on `Modified`, this is the semantic they'll match; if
+    they do **not** assert on it, U3's choice is behaviorally
+    equivalent to not stamping from an audit/decision standpoint
+    (C3's pin is on the decision audit row + the `Status` write,
+    both committed in one `SaveChangesAsync` — the `Modified`
+    stamp is a secondary, non-pinned POCO field). **No drift-guard
+    path required**; a note is appended here for U9 to reference.
+- **Follow-up (U4's entry-reads):** U4 lands on
+  `src/Kumunita.Core/Moderation/ModerationService.cs` (the four
+  write lanes + the `Via = Report` read lane `CanReadWithReportAsync`
+  per Part 2 §2.2.3). U4 should confirm the `Post` POCO's `Status`
+  property (added by U3) is **not** needed in the read lane's
+  *target* shape (the `CanReadWithReportAsync` read is over the
+  existing `PostToAuditableResource` — the `Status` field is a
+  post-authorization surface (the *write* lanes only), so the
+  read-lane target projection is unchanged from M3's). **No** new
+  seam on a frozen interface (unit-series rule 4 — U4 composes
+  only the two existing seams).
+
+## U4 — Report filing (resident-facing write lane)
+
+- **Deliverable:** `src/Kumunita.Core/Moderation/ModerationService.cs`
+  (1 file, **new** — the U4 one-file deliverable per the register
+  line). The new bounded context `Kumunita.Core.Moderation` is
+  created for the first time by this unit (the Part 1 §2.0 preambles
+  name it as M3b's "one new bounded context"). The file contains the
+  **ctor** (per §2.2.3 pin) + **one** implemented public method:
+  `FileReportAsync` (the F1 / C-M3b·1 resident-facing intake write
+  lane). The other four methods (`AssignReportAsync`, `UnlockAsync`,
+  `ResolveReportAsync`, `CanReadWithReportAsync`) are **U5's
+  deliverable** (per the U5 register line "complete
+  `ModerationService`" — the U5 unit modifies this same file).
+- **Entry-reads confirmed (per the unit's entry-read list):**
+  - `docs/design/m3b-moderation.md` §2.2.3 — **the frozen pin**:
+    `public async Task<int> FileReportAsync(string postId, string
+    actorId, string? reason, IDocumentSession session)` (U4 matches
+    verbatim — the `Task<int>` return, the `actorId` parameter name,
+    the 4-parameter list; U1's handoff line's `Task FileReportAsync
+    (string postId, string reporterId, ...)` is superseded by the
+    design-doc §2.2.3 pin — §2.0 drift-guard: this file wins).
+  - `docs/design/m3b-moderation.md` §2.3 — **the four numbered pins**
+    (U4's method body honors items 1 and 2 + item 4):
+    - Item 1 (filing `Via` tag): **`AccessVia.Admin`** — U4's
+      `AccessAudit` row carries this exactly. The two negatives
+      (not `AccessVia.Report` — reserved for the read branch, C-M3b·2
+      — U5's `CanReadWithReportAsync`; not `AccessVia.Owner` — the
+      C1 owner-branch) are honored.
+    - Item 2 (`Report.Status` literal): **`"filed"`** — U4's `Report`
+      row sets this exactly. (The other three literals — `"assigned"`
+      for `AssignReportAsync`, `"unlocked"` for `UnlockAsync`,
+      `"resolved"` for `ResolveReportAsync` — are U5's.)
+    - Item 3 (hide/remove `Via` tag): **not in U4's code** — U3's
+      `HidePostAsync` / `RemovePostAsync` already landed
+      `AccessVia.Admin` per that pin (U3's handoff note).
+    - Item 4 (no partial write): U4's single `SaveChangesAsync` at
+      the end of `FileReportAsync` commits the `Report` row and the
+      `AccessAudit` row **atomically** — a failed save rolls both
+      back; no partial state is possible.
+  - `docs/design/m3b-moderation.md` §2.5 — the 16 pinned seam-test
+    names. Two are anchored to C-M3b·1 (F1) and exercise U4's lane:
+    - **Test 1:**
+      `FileReportAsync_Filing_ViaTagIsAdmin_NotReport_NotOwner`
+      (U9's deliverable — tests the `AccessVia.Admin` literal + the
+      two negatives U4 honors).
+    - **Test 2:**
+      `FileReportAsync_Filing_WritesReportStatusFiled` (U9's
+      deliverable — asserts `Report.Status == "filed"` after U4's
+      call). Both tests live in
+      `tests/Kumunita.Core.Tests/ModerationServiceTests.cs` (U9's
+      file, created by U9).
+  - `src/Kumunita.Core/Posts/Report.cs` — the M3-registered `Report`
+    POCO (7 fields, `Status` **nullable** per the M3 register). U4
+    writes the literal `"filed"` to the existing `Status` field
+    (a **value** write, not a **shape** change — unit-series rule 5
+    holds: U4 does not reshape `Report`). The `ReporterId` field
+    (not `ActorId`) is the `Report` POCO's convention for "the
+    acting resident" — U4 maps the caller's `actorId` to `ReporterId`
+    (the "reporter IS the actor in this resident-facing lane"
+    convention — same as M1's `UpsertProfileAsync` where the
+    `Profile.SubjectId` is the acting resident).
+  - `src/Kumunita.Core/Posts/PostToAuditableResource.cs` — the M3
+    adapter (the `Post` POCO's projection for the
+    `IAuthorizationService` decision). **Not** used by U4's
+    `FileReportAsync` (which is a **write lane** — the C-M3b·1 /
+    §2.2.3 FileReportAsync doc-comment pins no `CanAsync` call; the
+    `PostToAuditableResource` adapter is an *auditable resource* —
+    it only exists to feed into a `CanAsync` / `CanSeeAsync` call).
+    It IS relevant to U5's `CanReadWithReportAsync` (the read branch,
+    where the adapter IS the target of the `CanAsync` call) —
+    U5's deliverable, not U4's.
+  - `src/Kumunita.Core/M3DocTypes.cs` — **confirmed**: `opts.
+    Schema.For<Report>();` is **already registered** (M3 U3's
+    "table-in-M3 / flow-in-M3b" split — the table is registered,
+    the workflow is M3b's; U4 is the first M3b unit to write to it).
+    **No** new `Configure` call is needed for U4 (the `Report` POCO
+    is already in the document registry; `opts.Schema.For<Post>` and
+    `opts.Schema.For<PostReply>` are also already registered — U3
+    did not need to add `Post.Status` to any `Configure` call, and
+    neither does U4).
+- **What U4 implemented (verbatim signatures, as landed):**
+
+  ```csharp
+  // src/Kumunita.Core/Moderation/ModerationService.cs (new bounded context, new file)
+  namespace Kumunita.Core.Moderation;
+
+  public sealed class ModerationService
+  {
+      private readonly IUserInfoService _userInfo;
+      private readonly IAuthorizationService _authz;
+      private readonly IDocumentStore _store;
+
+      public ModerationService(
+          IUserInfoService userInfo,
+          IAuthorizationService authz,
+          IDocumentStore store)
+      {
+          _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+          _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
+          _store    = store    ?? throw new ArgumentNullException(nameof(store));
+      }
+
+      // §2.2.3 pin — the exact signature U4 landed:
+      public async Task<int> FileReportAsync(
+          string postId,
+          string actorId,
+          string? reason,
+          IDocumentSession session)
+      {
+          // 1) argument guards (ArgumentException on empty postId/actorId;
+          //    ArgumentNullException.ThrowIfNull on null session)
+          // 2) await session.LoadAsync<Post>(postId)
+          //    → KeyNotFoundException if missing (no partial write)
+          // 3) build Report { Id, PostId, ReporterId = actorId,
+          //                   ComponentId = post.ComponentId,
+          //                   Reason = reason,
+          //                   Status  = "filed",     // §2.3 item 2
+          //                   At      = now }
+          //    session.Store(report)
+          // 4) build AccessAudit {
+          //       Id                   = new guid (N),
+          //       At                   = now (same timestamp as the report row),
+          //       ActorId              = actorId,
+          //       EffectivePrincipalId = actorId,   // resident-facing: no delegation / break-glass
+          //       Action               = "report.file",
+          //       TargetKind           = "post",
+          //       TargetId             = postId,
+          //       Via                  = AccessVia.Admin,   // §2.3 item 1
+          //       Outcome              = AccessOutcome.Allow
+          //   }
+          //    session.Store(audit)
+          // 5) await session.SaveChangesAsync()   // C3 — one commit, atomic
+          // 6) return 1   // the count of Report rows written (1)
+      }
+  }
+  ```
+
+  - **`Action = "report.file"`** — the action-string on the audit row.
+    **Not** a §2.3 pin (the four §2.3 pins are the Via tags, the
+    Status literals, and the no-partial-write discipline — the Action
+    string is a Core-convention-level detail). U4's choice matches
+    the M1/M2 kebab-case / verb-noun pattern: M1's
+    `"moderator-access"` / `"group.add-member"` / `"delegation.grant"`
+    / `"delegation.revoke"` / `"profile.upsert"` (the
+    `UpsertProfileAsync` convention). `"report.file"` is a *distinct*
+    verb-noun pair (a different action — filing a report — from
+    `"moderator-access"` (flipping a flag) or the M1/M2 group- /
+    delegation- / profile- actions). U9's test 1
+    (`FileReportAsync_Filing_ViaTagIsAdmin_NotReport_NotOwner`) will
+    anchor the exact `Action` string (the §2.5 test name is a
+    `viaTag` test, not an `Action` test, so the `Action` value is
+    implementation-level — but U9's test 2
+    (`FileReportAsync_Filing_WritesReportStatusFiled`) will exercise
+    the U4 `Report.Status = "filed"` pin, which IS a §2.3 pin).
+  - **`TargetKind = "post"`** — the audit row's focus is the **post**
+    the report is filed against (not the `Report` row itself — the
+    `Report` row is the **action's object**; the post is the
+    **resource** the audit row records). Matches M3's
+    `PostToAuditableResource.TargetKind` pin (`"post"`).
+  - **`EffectivePrincipalId = actorId`** — the resident IS the acting
+    principal in this lane (no delegation / break-glass path; C-M3b·1
+    pins "resident-facing" — no `Moderate`-gated decision, no `Owner`
+    branch, no `Delegation` / `BreakGlass` / `Report` / `Admin`
+    break-glass path). Same shape as M1's
+    `SetComponentModeratorAccessAsync` (also sets
+    `EffectivePrincipalId = actorId` — the acting principal IS the
+    actor in a plain write lane).
+  - **`Outcome = AccessOutcome.Allow`** — U4 is a write lane (no
+    `CanAsync` decision), not a deny-by-default decision lane.
+    `Allow` is the correct discriminant for "the write succeeded
+    end-to-end" (a failed save → no row at all, so no `Deny` row is
+    ever written — C3's no-partial-write pin is implemented as "the
+    single SaveChangesAsync either commits both rows or rolls both
+    back", not as "write a Deny row on failure"). Matches M1's
+    `SetComponentModeratorAccessAsync` shape (also `Allow`).
+- **Invariants held:**
+  - **C-M3b·1** (resident-facing intake, no authz call, pinned filing
+    `Via` tag `AccessVia.Admin`, `Status = "filed"`) — **lives in
+    this unit's code**.
+  - **C3** (same-transaction — the report row + the audit row commit
+    atomically via one `SaveChangesAsync`) — **lives in this unit's
+    code**.
+  - **ADR 0006-C** (audit always on) — **lives in this unit's staged
+    `AccessAudit` row** (the audit row IS written on the single
+    success path; a failed call = no row, but that's a *failed call*,
+    not a silent unaudited access — U9's test 1 anchors the
+    audit-row-exists-on-success assertion).
+  - **ADR 0006-D** (single decision path, no second read of
+    `GroupMembership` / `DelegationGrant`) — **lives in this unit's
+    code** (U4 does **not** read membership / delegation; it composes
+    only the `IUserInfoService` / `IAuthorizationService` /
+    `IDocumentStore` seams; U4's `FileReportAsync` makes **no**
+    `CanAsync` call — the C-M3b·1 / §2.2.3 FileReportAsync doc-comment
+    pin).
+  - **ADR 0004 §B.1** (additive on `Post` / `Report`, no migration,
+    no re-seed) — **lives in this unit's code** (U4 does not reshape
+    `Post` or `Report`; it writes to the existing POCOs' fields with
+    existing type shapes — `Report.Status` is a `string?` on the M3
+    POCO, and U4 writes the literal `"filed"` to it).
+  - **C-M3b·2 / C-M3b·3 / C-M3b·4** — **not in this unit's code**
+    (U5's lanes; C-M3b·3's hide/remove is U3's `HidePostAsync` /
+    `RemovePostAsync`, already landed).
+  - **C-M3·1 / C-M3·2 / C-M3·3** (the M3 invariants, feed / detail /
+    reply) — **unchanged, still bind** (U4 does **not** touch
+    `ListFeedAsync` / `GetPostAsync` / `CreatePostAsync` /
+    `CreateReplyAsync` — the M3 methods are not in U4's
+    `Deliverables`).
+- **Build status:**
+  - `dotnet build --configuration Release src\Kumunita.Core\
+    Kumunita.Core.csproj` — **0 Warning(s) / 0 Error(s)**,
+    `Build succeeded.` (also `run_build` on the same project —
+    green; both confirm the new file compiles against M3's existing
+    `Report` POCO and M1's existing `AccessAudit` / `AccessVia` /
+    `AccessOutcome` surface — no drift in any of the referenced
+    frozen types).
+- **No existing M3 / M1 / M2 seam-test name broke.** Verified:
+  `FileReportAsync` / `ModerationService` / `report.file` have **zero**
+  references in any existing test file before this unit (searched
+  `tests/**/*.cs` for each — **0 hits**, consistent with U4 being the
+  first M3b unit to land *any* `ModerationService` code). The 2
+  `ModerationServiceTests` names anchored to C-M3b·1 (F1) — tests 1
+  and 2 — are **U9's deliverable** (not landed in U4), per Part 2
+  §2.5's count (16 total — 8 `ModerationServiceTests` + 5
+  `PostServiceTests` + 1 `PostsControllerTests` + 1
+  `ModerationControllerTests`).
+- **Follow-up (U5's entry-reads):** U5 lands on **this same file**
+  (`src/Kumunita.Core/Moderation/ModerationService.cs` — per the U5
+  register line "modify — add the three methods"). U5 should:
+  - Read Part 2 §2.4 (the `Via = Report` read-branch shape pin —
+    the **standalone method** `CanReadWithReportAsync` on
+    `ModerationService`, calling the **standalone**
+    `IAuthorizationService.CanAsync(string, AccessAction,
+    IAuditableResource)` overload (own-commit — the M3
+    `PostService.GetPostAsync` precedent), and the
+    `IUserInfoService.SetComponentModeratorAccessAsync` seam call
+    in the **same** `IDocumentSession` transaction as the
+    `Report.Status` write (§2.4 item 2 pin, C-M3b·4 / F6, C5
+    activation).
+  - Read Part 2 §2.4 item 3 (the `AccessVia.Report` literal pin
+    for the read branch's audit row — NOT in U4's code; U4's audit
+    row is `AccessVia.Admin`).
+  - **Do not** add a branch to `AuthorizationService.Decide`
+    (§2.4 item 1 pin — the thinner lane is the new method; a
+    branch would be a new seam on the frozen interface —
+    unit-series rule 4 violation).
+  - **Do not** re-decide the `Via = Report` read-branch shape
+    (U1/U2's §2.4 pin wins — the new method is the pinned
+    answer).
+  - **Do not** modify U4's `FileReportAsync` (the U5 register line
+    is "add the three methods" — additive only).
+  - **Do not** introduce a new `AccessAction.Moderate` literal or a
+    new `AccessVia` literal — M1's existing `Read` / `Moderate` pair
+    and the 7-value `AccessVia` (including `Report` and `Admin`)
+    are **sufficient for all of M3b** (M1's U1 pin, re-confirmed
+    here).
+
