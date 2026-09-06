@@ -160,7 +160,7 @@ public sealed class AnnouncementController(
             var created = await announcements.CreateAsync(
                 new Announcement
                 {
-                    Title = string.IsNullOrWhiteSpace(model.Title) ? null : model.Title!,
+                    Title = string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title.Trim(),
                     Body  = model.Body!,
                     Scope = scope,
                 },

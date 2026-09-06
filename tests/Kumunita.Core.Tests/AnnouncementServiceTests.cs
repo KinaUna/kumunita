@@ -243,7 +243,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("Maintenance", created.Title);
 
         await using var q = store.QuerySession();
-        var stored = await q.LoadAsync<Announcement>(created.Id);
+        var stored = await q.LoadAsync<Announcement>(created.Id, TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.Equal("Sat 02:00 UTC", stored!.Body);
         Assert.Equal(AnnouncementScope.Public, stored.Scope);
@@ -277,7 +277,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         // observable: the write is *not executed*, not just refused at
         // the UI.
         await using var q = store.QuerySession();
-        var count = await q.Query<Announcement>().CountAsync();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, count);
     }
 
@@ -307,7 +307,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
                 session));
 
         await using var q = store.QuerySession();
-        var count = await q.Query<Announcement>().CountAsync();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, count);
     }
 
@@ -336,12 +336,12 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal(AnnouncementScope.Community, created.Scope);
 
         await using var q = store.QuerySession();
-        var stored = await q.LoadAsync<Announcement>(created.Id);
+        var stored = await q.LoadAsync<Announcement>(created.Id, TestContext.Current.CancellationToken);
         Assert.Equal(AnnouncementScope.Community, stored!.Scope);
     }
 
     /// <summary>
-    /// The split pin, moderator case, Community scope: a Moderator CAN
+    /// The split pin, moderator case, Community scope
     /// create a <see cref="AnnouncementScope.Community"/> announcement —
     /// Community is the *only* scope a Moderator may author, and this is
     /// exactly where that split is exercisable at the Core layer (the
@@ -365,12 +365,12 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal(actor, created.AuthorId);
 
         await using var q = store.QuerySession();
-        var stored = await q.LoadAsync<Announcement>(created.Id);
+        var stored = await q.LoadAsync<Announcement>(created.Id, TestContext.Current.CancellationToken);
         Assert.Equal(AnnouncementScope.Community, stored!.Scope);
     }
 
     /// <summary>
-    /// The split pin, a third actor, Community scope: a <c>Member</c>
+    /// The split pin, a third actor, Community scope
     /// cannot create a Community-scope announcement either (the "help us"
     /// lane is for moderators/admins, not for verified residents).
     /// Symmetric with the <see cref="Create_Public_AsMember_Denied"/>
@@ -393,12 +393,12 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
                 session));
 
         await using var q = store.QuerySession();
-        var count = await q.Query<Announcement>().CountAsync();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, count);
     }
 
     /// <summary>
-    /// The split pin, empty role set: a caller with <em>no roles at all</em>
+    /// The split pin, empty role set
     /// (a blocked account's claim shape, or a mis-shaped principal) cannot
     /// create <em>either</em> scope. This is the "defense-in-depth" pin —
     /// even though the [Authorize] gate should have stopped the unauthed
@@ -429,11 +429,11 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
                 session2));
 
         await using var q = store.QuerySession();
-        var count = await q.Query<Announcement>().CountAsync();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, count);
     }
 
-    // ── Delete (the hard-delete lane) ──────────────────────────────────────
+    // ── Delete (the hard-delete lane)
 
     /// <summary>
     /// Deleting an existing <see cref="Announcement"/> removes it — the
@@ -459,8 +459,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         await svc.DeleteAsync("delete-me", session);
 
         await using var q = store.QuerySession();
-        Assert.Null(await q.LoadAsync<Announcement>("delete-me"));
-        var count = await q.Query<Announcement>().CountAsync();
+        Assert.Null(await q.LoadAsync<Announcement>("delete-me", TestContext.Current.CancellationToken));
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(0, count);
     }
 
