@@ -66,6 +66,7 @@ public sealed class AdminController(
 
             var profile = await userInfo.GetProfileAsync(subject);
             var verified = profile?.Verified ?? false;
+            var blocked  = profile?.Blocked ?? false;
 
             accountsWithRoles.Add(new AdminIndexViewModel.AccountRow
             {
@@ -73,6 +74,7 @@ public sealed class AdminController(
                 Email        = profile?.Email ?? user.Email ?? user.UserName,
                 DisplayName  = profile?.DisplayName ?? user.UserName,
                 Verified     = verified,
+                Blocked      = blocked,
                 Roles        = roleNames,
                 ComponentIds = componentIds
             });
@@ -273,6 +275,72 @@ public sealed class AdminController(
         catch (UnauthorizedAccessException)
         {
             TempData["error"] = "You are not permitted to verify this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── Block / Unblock — the admin account suspension lane (GlobalAdmin) ─────────────
+    // Reversible suspension: Block strips the account's standing (no Member/Moderator/
+    // GlobalAdmin) at the Identity↔cookie seam; Unblock restores it. Both delegate to the
+    // Core admin lane (audited via:Admin + security-stamp rotation) — the controller is a
+    // thin wrapper, matching the other /admin account actions.
+    //
+    // Self-block is refused up-front in the controller (defense in depth): the row
+    // renders an Unblock button (if currently blocked) but *no* Block button on the
+    // admin's own row, so the UI never offers the action it would refuse. A GlobalAdmin
+    // who blocks themselves becomes a blocked, standing-less admin (Member/Moderator/
+    // GlobalAdmin all stripped) — if they were the only GlobalAdmin, every /admin surface
+    // (including the unblock lane) requires GlobalAdmin, so they could not self-restore.
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Block([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // Guard: an admin cannot block themselves. Refuse before touching the Core lane,
+        // so no Profile.Blocked flip / audit row / security-stamp rotation happens at all.
+        if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
+        {
+            TempData["error"] = "You cannot block your own account. Have another GlobalAdmin perform this, or use a different admin account.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await identity.BlockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account blocked. It has no standing until unblocked.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
+            // but the Core lane enforces it too — map to a clean 403-style message.
+            TempData["error"] = "You are not permitted to block this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Unblock([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.UnblockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account unblocked. Its standing is available again.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to unblock this account.";
         }
         catch (InvalidOperationException ex)
         {

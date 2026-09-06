@@ -10,12 +10,14 @@ public sealed class AdminIndexViewModel
         public string? Email { get; init; }
         public string? DisplayName { get; init; }
         public bool Verified { get; init; }
+        public bool Blocked { get; init; }
         public IReadOnlyList<string> Roles { get; init; } = [];
         public IReadOnlyList<string> ComponentIds { get; init; } = [];
     }
 
     public IReadOnlyList<AccountRow> Accounts { get; init; } = [];
     public int UnverifiedCount => Accounts.Count(a => !a.Verified);
+    public int BlockedCount => Accounts.Count(a => a.Blocked);
 
     public sealed class ComponentOption
     {

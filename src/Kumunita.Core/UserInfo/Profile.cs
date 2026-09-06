@@ -42,6 +42,15 @@ public sealed class Profile
     /// is minted from here at sign-in). Unverified accounts cannot sign in.</summary>
     public bool Verified { get; set; }
 
+    /// <summary>Blocked resident (a GlobalAdmin's suspension; ADR-style admin lane). A blocked
+    /// account loses all role standing (no <c>Member</c>/<c>Moderator</c>/<c>GlobalAdmin</c>,
+    /// so it cannot act or be granted standing) until unblocked — a reversible suspension that
+    /// preserves the account and its documents. Evaluated at the Identity↔cookie seam
+    /// (<see cref="Identity.ClaimShaping"/>'s Web factory) exactly as <see cref="Verified"/> is;
+    /// no claim type is minted for it (the no-relational-data invariant holds: the effect is
+    /// "no roles", read from <c>mt</c> at sign-in).</summary>
+    public bool Blocked { get; set; }
+
     /// <summary>Who may see this profile. The author-controlled audience (ADR 0003: the author
     /// always controls their own content's audience). Bootstrap default: self-only.</summary>
     public Audience Visibility { get; set; } = new();

@@ -17,7 +17,7 @@
 
 <h2>Accounts</h2>
 <p class="text-muted">
-    @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified.
+    @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.
 </p>
 
 <form method="post" asp-action="ManuallyVerify" id="verify-queue" class="mb-4">
@@ -61,6 +61,10 @@
                         @if (!a.Verified)
                         {
                             <span class="badge text-bg-warning">unverified</span>
+                        }
+                        @if (a.Blocked)
+                        {
+                            <span class="badge text-bg-danger">blocked</span>
                         }
                     </td>
                     <td>
@@ -115,6 +119,35 @@
 
                             <button class="btn btn-sm btn-primary" type="submit">Set</button>
                         </form>
+
+                        @* Block / Unblock — suspend/restore the account's standing (audited
+                           in the Core admin lane). A plain client confirm() guard mirrors the
+                           "dangerous action" intent without a framework dependency.
+                           The Block button is hidden on the admin's *own* row (self-block is
+                           refused by the controller too — the button just isn't offered in
+                           the first place). An Unblock button is still shown on their own row
+                           if they're blocked by another admin, so they can self-restore. *@
+                        @{
+                            var _mySubject = User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
+                            var _isSelf = string.Equals(a.SubjectId, _mySubject, StringComparison.Ordinal);
+                            if (!(_isSelf && !a.Blocked))
+                            {
+                                var _action = a.Blocked ? "Unblock" : "Block";
+                                var _confirm = a.Blocked
+                                    ? "Unblock this account? Their standing will be restored."
+                                    : "Block this account? It loses all standing until unblocked.";
+                                <form method="post"
+                                      asp-action="@_action"
+                                      class="d-inline-flex ms-2"
+                                      onsubmit="return confirm('@_confirm');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="subjectId" value="@a.SubjectId" />
+                                    <button class="btn btn-sm @(a.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
+                                        @(_action)
+                                    </button>
+                                </form>
+                            }
+                        }
                     </td>
                 </tr>
             }

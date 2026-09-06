@@ -57,6 +57,27 @@ public interface IIdentityService
     Task<Profile> ManuallyVerifyAsync(string targetSubjectId, string adminSubjectId);
 
     /// <summary>
+    /// Block a resident (the admin suspension lane): a GlobalAdmin marks the target
+    /// <see cref="Profile.Blocked"/>; the account immediately loses all role standing
+    /// (no <c>Member</c>/<c>Moderator</c>/<c>GlobalAdmin</c>, so it cannot act or be
+    /// granted standing) until unblocked. The account and its documents are preserved
+    /// (a reversible suspension, not a delete). Rotates the security stamp (existing
+    /// sessions invalidate on their next re-mint) and appends an audit row
+    /// (<c>via: Admin</c>, action <c>"block"</c>, target the account). Only a GlobalAdmin
+    /// may call this.
+    /// </summary>
+    Task BlockAsync(string targetSubjectId, string adminSubjectId);
+
+    /// <summary>
+    /// Unblock a resident (the inverse of <see cref="BlockAsync"/>): restores the target's
+    /// <see cref="Profile.Blocked"/> to false, so its standing (roles) is available again at
+    /// next sign-in / re-mint. Rotates the security stamp and appends an audit row
+    /// (<c>via: Admin</c>, action <c>"unblock"</c>, target the account). Only a GlobalAdmin
+    /// may call this.
+    /// </summary>
+    Task UnblockAsync(string targetSubjectId, string adminSubjectId);
+
+    /// <summary>
     /// Seed-admin bootstrap (OPS §2, FirstBootSeeder): the one-time setup token is
     /// consumed, invalidating it; the account is sign-in-ready (verified), a password set;
     /// a duplicate token use is rejected (single-use). Audited (<c>via: Admin</c>).
