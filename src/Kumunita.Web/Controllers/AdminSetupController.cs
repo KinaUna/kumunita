@@ -82,9 +82,19 @@ public sealed class AdminSetupController(
             ?? throw new InvalidOperationException("Seed-admin account missing after setup completed.");
 
         var claimsPrincipal = await claimsFactory.CreateAsync(user);
+
+        // Mint the same persistent, 14-day cookie every other sign-in lane issues so
+        // the first-boot setup handoff leaves the operator on a long-lived cookie
+        // rather than a session cookie that dies when the browser closes.
+        var authProperties = new AuthenticationProperties
+        {
+            IsPersistent = true,
+            ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
+        };
         await HttpContext.SignInAsync(
             scheme: CookieAuthenticationDefaults.AuthenticationScheme,
-            principal: claimsPrincipal);
+            principal: claimsPrincipal,
+            properties: authProperties);
 
         // The setup token is now consumed (Core marked IdentityToken.ConsumedAt),
         // the account has a password hash, and the audit row is written. The

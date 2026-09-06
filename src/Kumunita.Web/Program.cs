@@ -192,7 +192,18 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
+        options.Cookie.Name = "kumunita.auth";
+        // Absolute 14-day ticket span: the handler uses it for any sign-in that
+        // omits an explicit ExpiresUtc. Every sign-in lane also sets its own 14-day
+        // ExpiresUtc + IsPersistent (AuthenticationProperties), so a login neither
+        // "expires after a short while" (Identity's 30-min default ticket) nor dies
+        // when the browser closes (session cookies). The security boundary is the
+        // claim set, not the cookie, so all lanes mint the same long-lived cookie.
         options.ExpireTimeSpan = TimeSpan.FromDays(14);
+        // Sliding renewal: refresh the ticket (and reissue the cookie) once the
+        // elapsed time passes the halfway point of the 14-day window, so an active
+        // resident stays signed in and only an idle one lapses at the boundary.
+        options.SlidingExpiration = true;
     });
 
 // Authorization: policies the /admin surfaces (step 8) will opt into; the claim-set
