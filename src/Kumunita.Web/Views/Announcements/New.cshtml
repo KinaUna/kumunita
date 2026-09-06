@@ -1,0 +1,106 @@
+@model Kumunita.Web.Models.AnnouncementComposeViewModel
+@using Kumunita.Core.Announcements
+@{
+    ViewData["Title"] = "New announcement";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1>New announcement</h1>
+        <p class="text-muted">
+            Platform notices visible outside the community feeds. A
+            <b>public</b> announcement is visible to everyone
+            (e.g. scheduled maintenance); a <b>resident</b> announcement
+            is visible to all signed-in users (e.g. "help us with X"
+            calls).
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form id="new-announcement-form" method="post" action="/announcements/new">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="scope" style="font-weight:600;">
+                        Who sees this?
+                    </label>
+                    <select class="form-control" id="scope" name="Scope" required>
+                        @foreach (var s in Model.AllowedScopes)
+                        {
+                            string scopeValue = s.ToString();
+                            bool isSelected = scopeValue == (Model.Scope ?? "Community");
+                            <option value="@scopeValue" selected="@(isSelected ? "selected" : null)">
+                                @(s == AnnouncementScope.Public
+                                    ? "Everyone (public — visible to visitors and residents)"
+                                    : "Residents (community — visible only when signed in)")
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        The platform's visibility split, not a per-user audience
+                        (unlike a <a href="/community" target="_blank">community post</a>).
+                        Public announcements are visible to anonymous visitors too —
+                        e.g. a maintenance window or an outage notice.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="title" style="font-weight:600;">
+                        Title
+                    </label>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="120" placeholder="optional"
+                           value="@Model.Title" />
+                    <div class="text-muted small mt-1">
+                        A short headline (≤ 120 chars).
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="body" style="font-weight:600;">
+                        Body
+                    </label>
+                    <textarea class="form-control" id="body" name="Body"
+                              rows="6" required>@Model.Body</textarea>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Create announcement</button>
+                <a href="/announcements" class="btn btn-link p-0">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

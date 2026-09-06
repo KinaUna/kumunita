@@ -65,7 +65,16 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
-        // M3b (plan U7): the moderation-side composition root — a concrete class
+        // M4 (the "platform announcements" lane, bounded context
+        // Kumunita.Core.Announcements): the service seam — a store-composing
+        // service kept behind an interface so the Web-side consumer (the
+        // AnnouncementController) can be tested without a live Postgres
+        // (mirrors IEmailDeadLetterCounter's registration pattern; the
+        // scope-vs-role split lives inside CreateAsync, not in a
+        // separate IUserInfoService / IAuthorizationService pairing).
+        services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
+
+        // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
         // seams with the host-registered Marten IDocumentStore (the same
         // "concrete service in the Core composition root" shape as M2 U5's

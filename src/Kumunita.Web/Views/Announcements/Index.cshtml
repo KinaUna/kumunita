@@ -1,0 +1,93 @@
+@model Kumunita.Web.Models.AnnouncementIndexViewModel
+@using Kumunita.Core.Announcements
+@{
+    ViewData["Title"] = "Announcements";
+    bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <h1>Announcements</h1>
+        <p class="text-muted">
+            Platform notices: public ones are visible to everyone (e.g.
+            scheduled maintenance); resident-only ones are visible to all
+            signed-in users (e.g. "help us with X" calls).
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">All announcements</span>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="btn btn-sm btn-outline-primary" href="/announcements/new">
+                        New announcement
+                    </a>
+                }
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    @if (Model.Announcements.Count == 0)
+                    {
+                        <li class="list-group-item text-muted">
+                            No announcements yet.
+                        </li>
+                    }
+                    @foreach (var a in Model.Announcements)
+                    {
+                        var badgeClass = a.Scope == AnnouncementScope.Public
+                            ? "text-bg-secondary"
+                            : "text-bg-primary";
+
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="me-3">
+                                    @if (!string.IsNullOrWhiteSpace(a.Title))
+                                    {
+                                        <h5 class="mb-1">@a.Title</h5>
+                                    }
+                                    <div class="text-body">
+                                        @a.Body
+                                    </div>
+                                    <div class="text-muted small mt-1">
+                                        by @a.AuthorDisplayName — @a.Created.DateTime.ToString("ddd, MMM d yyyy")
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-column align-items-end gap-2">
+                                    <span class="badge @badgeClass">
+                                        @(a.Scope == AnnouncementScope.Public ? "everyone" : "residents")
+                                    </span>
+                                    @if (isGlobalAdmin)
+                                    {
+                                        <form method="post" action="/announcements/@a.Id/delete"
+                                              onsubmit="return confirm('Delete this announcement? This cannot be undone.');"
+                                              style="margin:0; display:inline;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0">
+                                                Delete
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

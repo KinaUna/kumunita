@@ -71,6 +71,11 @@ var marten = builder.Services.AddMarten(opts =>
     // flow-in-M3b). Conventional string Id, so no non-default convention needed.
     // ADR 0004 §B.1.
     M3DocTypes.Configure(opts);
+
+    // M4's Marten-native documents (Announcement — the "platform announcements"
+    // lane: public-scope + community-scope). Conventional string Id, so no
+    // non-default convention needed. ADR 0004 §B.1.
+    M4DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
