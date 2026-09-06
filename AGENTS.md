@@ -1,53 +1,57 @@
-# AGENTS.md — Critter Stack docs & tools
+# AGENTS.md — Kumunita
 
-This repo is a documentation + tooling companion for projects built on the JasperFx
-Critter Stack (**Marten**, **Wolverine**, **Weasel**), written specifically to stop AI
-coding agents from burning time and context re-deriving these libraries' APIs from
-general training data — which for this stack is unusually likely to be **stale**: see
-`docs/marten/marten-9-breaking-changes.md` for why.
+Kumunita is a **self-hosted community platform for one neighborhood**. Each
+deployment serves a single community (its own container + Postgres) — there is
+no multi-tenant data model.
 
-## What's here
+## Start here
 
-- `docs/` — condensed, version-pinned reference docs. Start at `docs/README.md`.
-- `snippets/` — small, runnable-style code templates matching a real project's
-  conventions (not generic library samples).
-- `mcp-server/` — an MCP server that serves `docs/` and `snippets/` on demand
-  (`search_docs`, `get_doc`, `list_docs`) so you don't have to load the whole corpus
-  into context. Setup instructions for VS Code, Claude Code, and Cursor are in
-  `mcp-server/README.md`.
+- `README.md` — what the platform is, its current status (M3 shipped, M4 next),
+  principles, tech stack, and the **Running** instructions.
+- `docs/ARCHITECTURE.md` — the detailed map: stack, data model, the three
+  bounded contexts (Identity / UserInfo / Authorization), the module-boundary
+  contracts, and the CQRS-lite & side-effects (Wolverine) convention.
+- `docs/adr/` — decision records. **ADR 0004** (persistence & schema evolution)
+  and **ADR 0006** (module boundary contracts) constrain how data is stored and
+  how contexts talk to each other — read them before touching persistence,
+  schema, or cross-context calls.
+- `docs/design/` — the per-milestone design docs (M1 identity/access, M2
+  directory/profiles/groups, M3/m3b posts + moderation). The M1–M3 scope is the
+  shipped surface.
+- `docs/SECURITY.md` — the privacy model, threat model, and access-control
+  rules. This repo is privacy-first; treat the author's audience choice as the
+  authoritative constraint.
 
-## If you have MCP tool access
+## The shape of the code
 
-Register the `critter-stack-docs` MCP server (see `mcp-server/README.md`) and prefer
-`search_docs`/`get_doc` over reading files directly — it's already indexed and
-returns just the relevant section.
+- **`Kumunita.Core`** — domain + services. Bounded contexts live in
+  `Identity/`, `UserInfo/`, `Authorization/`, `Posts/`, `Announcements/`,
+  `Moderation/`, `Bootstrap/`. `DependencyInjection.cs` registers each feature.
+- **`Kumunita.Web`** — Razor Pages / MVC (server-rendered), `Program.cs`
+  bootstrap, `Milestones.cs` (home-page roadmap — keep in sync with `README.md`).
+- **Persistence** (ADR 0004 §B): **Marten** owns the domain documents and
+  versioned schema (the `M1DocTypes` / `M3DocTypes` / `M4DocTypes` registration
+  surfaces). **EF Core is used only for ASP.NET Identity tables** — do not put
+  domain data in EF.
 
-## If you don't have MCP tool access
+## The one thing to internalize before writing code here
 
-Read `docs/README.md` first — it's a short index/table mapping "what I'm trying to do"
-to the one doc file to open. Don't read the whole `docs/` tree; open only the file(s)
-the index points you to.
+This repo uses **Marten and Wolverine** on **.NET 10**. The idiomatic patterns
+in training data are frequently **older major versions** of both libraries. Before
+writing Marten schema/migration code or Wolverine handler code, check the actual
+APIs in the current dependency versions in the `.csproj` files — do not copy a
+"common" Marten or Wolverine pattern from memory. The ADRs above encode this
+project's *specific* choices (CQRS-lite, documents + projections, no event sourcing,
+a single durable email handler rather than a saga) — follow them.
 
-## The one thing to internalize before writing any code here
+## Conventions to preserve
 
-**Version numbers matter more than usual for this stack.** Marten 9 removed APIs
-(`IMigration`, all synchronous data access, lambda-based projections) that are still
-extremely common in blog posts, Stack Overflow answers, and therefore training data.
-Code that looks completely idiomatic for "Marten" is frequently Marten 7/8 code that
-no longer compiles against 9.x. Check `docs/versions.md` for the versions this doc set
-targets, and `docs/marten/marten-9-breaking-changes.md` before trusting a remembered
-Marten pattern.
-
-## Project-specific vs general-purpose docs
-
-Some docs in here encode one real project's architecture decisions, not general
-Critter Stack advice — most notably `docs/wolverine/cqrs-lite-patterns.md`, which is
-explicitly the CQRS-lite convention *that one project's ADRs settled on* (documents +
-projections, no event sourcing, a single durable email handler instead of a saga).
-Each such doc says so at the top. If you're using this repo for a different project
-built on the same stack, treat those as worked examples to adapt, not rules to copy —
-the version-specific API docs (Marten/Wolverine/Weasel proper) are the general-purpose
-part.
+- Server-rendered Razor Pages / MVC over Blazor or SPA patterns.
+- Audit-by-default: access to audience-restricted content is always logged.
+- Thin token, fat authorization: "may this actor see that resource?" is resolved
+  by the `Authorization` service per request, not encoded in an identity claim.
+- Keep `Milestones.cs` and the README **Roadmap** section together — `Milestones.cs`
+  has a comment that says this is the contract.
 
 ## Don't pause mid-task to check in
 
@@ -65,9 +69,21 @@ workspace's `.vscode/settings.json` also raises `chat.agent.maxRequests`
 from its default of 25, since that cap alone can force a stop mid-task even
 when you intend to keep going.
 
-## Keeping this repo current
+## Keeping the docs in sync with the code
 
-See "Refreshing this doc set" in `docs/versions.md`.
+This repo is deliberate about doc ↔ code parity, so keep these pairs together
+when you change behavior:
+
+- The **README Roadmap** and `src/Kumunita.Web/Milestones.cs` — the home page
+  renders `Milestones.cs`, and its doc-comment names the README as the source
+  of truth. Bump a milestone to "done" in one when it ships and the other
+  follows.
+- The **bounded-context / persistence layout** described in `docs/ARCHITECTURE.md`
+  and ADR 0004/0006 — if you add a new context, doc-type surface, or change how
+  contexts are registered in `DependencyInjection.cs`, reflect it in the relevant
+  ADR rather than leaving the design doc stale.
+- A **new capability that settles a design question** gets an ADR under `docs/adr/`
+  (numbered after the current highest), not just a prose note in the README.
 
 ## Running PowerShell commands safely (Windows agents)
 
