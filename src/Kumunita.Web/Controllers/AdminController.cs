@@ -66,6 +66,7 @@ public sealed class AdminController(
 
             var profile = await userInfo.GetProfileAsync(subject);
             var verified = profile?.Verified ?? false;
+            var blocked  = profile?.Blocked ?? false;
 
             accountsWithRoles.Add(new AdminIndexViewModel.AccountRow
             {
@@ -73,17 +74,22 @@ public sealed class AdminController(
                 Email        = profile?.Email ?? user.Email ?? user.UserName,
                 DisplayName  = profile?.DisplayName ?? user.UserName,
                 Verified     = verified,
+                Blocked      = blocked,
                 Roles        = roleNames,
                 ComponentIds = componentIds
             });
         }
 
-        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
-        // Fully-qualify the Marten async extension — this file also imports EF Core's
-        // EntityFrameworkQueryableExtensions, so a bare .ToListAsync() is ambiguous.
-        var components = await Marten.QueryableExtensions.ToListAsync(
-            session.Query<Component>().OrderBy(c => c.SortOrder));
-        var componentOptions = components
+        // Components come in two projections:
+        //   - `Components` — the enabled-only set for the role-assignment "scope"
+        //     checkbox list (the M1 shape; a disabled component is not a valid
+        //     moderator scope).
+        //   - `Communities` — the full set (enabled + disabled) for the new
+        //     "Communities" section (add / edit / enable-disable). The admin
+        //     needs to *see* the disabled rows to re-enable them.
+        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: false);
+        var componentOptions = allComponents
+            .Where(c => c.Enabled)
             .Select(c => new AdminIndexViewModel.ComponentOption
             {
                 Id              = c.Id,
@@ -91,12 +97,126 @@ public sealed class AdminController(
                 ModeratorAccess = c.ModeratorAccess
             })
             .ToList();
+        var communityRows = allComponents
+            .OrderBy(c => c.SortOrder)
+            .Select(c => new AdminIndexViewModel.CommunityRow
+            {
+                Id              = c.Id,
+                Name            = c.Name,
+                Description     = c.Description,
+                SortOrder       = c.SortOrder,
+                Enabled         = c.Enabled,
+                ModeratorAccess = c.ModeratorAccess
+            })
+            .ToList();
 
         return View(new AdminIndexViewModel
         {
-            Accounts   = accountsWithRoles,
-            Components = componentOptions
+            Accounts    = accountsWithRoles,
+            Components  = componentOptions,
+            Communities = communityRows
         });
+    }
+
+    // ── /admin — community management (add / edit / enable-disable) ──────
+    // The "communities" are the per-instance <see cref="Component"/> rows
+    // (Safety, Maintenance, Social, Governance by default — ADR 0002's
+    // "a single Kumunita row per instance" + the four seeded feeds). A
+    // GlobalAdmin can add a new one, edit an existing one, or hide one
+    // (Enabled=false — the user-chosen "remove"; the row + posts + any
+    // moderator assignments remain intact for recovery). Every write
+    // delegates to <see cref="IUserInfoService"/> (the single Core write
+    // lane, ADR 0006-D) and appends an AccessAudit row (via:Admin) in the
+    // same transaction — the C3/C4 invariants live in the service, the
+    // controller is a thin wrapper.
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddCommunity(AddCommunityViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
+            TempData["info"] = $"Community “{model.Name}” added.";
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateCommunity(UpdateCommunityViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            // The "edit" form only exposes name / description / sort — description
+            // and sort arrive from the hidden inputs, both optional at the Core
+            // patch (null = keep-as-is). The Core also accepts icon / flag toggles,
+            // but they're not exposed here (the moderator-access flag has its own
+            // surface; the icon picker is a separate future piece of UI).
+            await userInfo.UpdateCommunityAsync(
+                componentId: model.ComponentId,
+                name: model.Name,
+                description: model.Description,
+                sortOrder: model.SortOrder,
+                moderatorAccess: null,
+                enabled: null,
+                actorId: admin);
+            TempData["info"] = $"Community “{model.Name}” updated.";
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleCommunityEnabled([FromForm] string componentId, [FromForm] bool enabled)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await userInfo.SetCommunityEnabledAsync(componentId, enabled, admin);
+            TempData["info"] = enabled
+                ? "Community re-enabled. It is visible on the feed and in the moderator scope list."
+                : "Community disabled. It is hidden from the /community feed and the moderator scope list; its posts and assignments remain intact.";
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost]
@@ -155,6 +275,72 @@ public sealed class AdminController(
         catch (UnauthorizedAccessException)
         {
             TempData["error"] = "You are not permitted to verify this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── Block / Unblock — the admin account suspension lane (GlobalAdmin) ─────────────
+    // Reversible suspension: Block strips the account's standing (no Member/Moderator/
+    // GlobalAdmin) at the Identity↔cookie seam; Unblock restores it. Both delegate to the
+    // Core admin lane (audited via:Admin + security-stamp rotation) — the controller is a
+    // thin wrapper, matching the other /admin account actions.
+    //
+    // Self-block is refused up-front in the controller (defense in depth): the row
+    // renders an Unblock button (if currently blocked) but *no* Block button on the
+    // admin's own row, so the UI never offers the action it would refuse. A GlobalAdmin
+    // who blocks themselves becomes a blocked, standing-less admin (Member/Moderator/
+    // GlobalAdmin all stripped) — if they were the only GlobalAdmin, every /admin surface
+    // (including the unblock lane) requires GlobalAdmin, so they could not self-restore.
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Block([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // Guard: an admin cannot block themselves. Refuse before touching the Core lane,
+        // so no Profile.Blocked flip / audit row / security-stamp rotation happens at all.
+        if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
+        {
+            TempData["error"] = "You cannot block your own account. Have another GlobalAdmin perform this, or use a different admin account.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        try
+        {
+            await identity.BlockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account blocked. It has no standing until unblocked.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
+            // but the Core lane enforces it too — map to a clean 403-style message.
+            TempData["error"] = "You are not permitted to block this account.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Unblock([FromForm] string subjectId)
+    {
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            await identity.UnblockAsync(targetSubjectId: subjectId, adminSubjectId: admin);
+            TempData["info"] = "Account unblocked. Its standing is available again.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            TempData["error"] = "You are not permitted to unblock this account.";
         }
         catch (InvalidOperationException ex)
         {

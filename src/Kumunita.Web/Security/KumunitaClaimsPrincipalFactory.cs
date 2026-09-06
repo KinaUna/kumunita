@@ -41,13 +41,21 @@ public sealed class KumunitaClaimsPrincipalFactory(
     /// </remarks>
     public override async Task<System.Security.Claims.ClaimsPrincipal> CreateAsync(User user)
     {
-        // Read the mt-side state that drives the claim shape:
-        // Profile.Verified gates the Member role; ModeratorAssignment drives the
+        // Read the mt-side state that drives the claim shape: Profile.Verified gates the
+        // Member role; Profile.Blocked strips ALL standing; ModeratorAssignment drives the
         // per-component scope claims. Both are single-row loads keyed on user.Id.
         var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
         var verified = profile?.Verified ?? false;
+        var blocked = profile?.Blocked ?? false;
 
-        var roles = await BuildRoleListAsync(user, verified);
+        // A blocked resident has NO standing: mint no roles (no Member / Moderator /
+        // GlobalAdmin), exactly as an unverified resident is denied Member. The suspension
+        // is carried inside the admissible claim set (no new claim type — the no-relational-
+        // data invariant holds), and this factory is the single place the claim set is minted
+        // (ADR 0006-B), so the cookie never holds standing for a blocked account.
+        var roles = blocked
+            ? Array.Empty<string>()
+            : await BuildRoleListAsync(user, verified);
 
         return ClaimShaping.Build(
             subjectId: user.Id ?? string.Empty,

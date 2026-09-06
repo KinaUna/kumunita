@@ -31,6 +31,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 [Authorize]
+[Route("groups")]
 public sealed class GroupsController(IUserInfoService userInfo) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>

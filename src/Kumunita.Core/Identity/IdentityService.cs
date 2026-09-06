@@ -62,9 +62,12 @@ public sealed class IdentityService(
 
         var profile = await userInfo.GetProfileAsync(subjectId);
         var verified = profile?.Verified ?? false;
+        var blocked = profile?.Blocked ?? false;
 
         var identityRoles = (await userManager.GetRolesAsync(user)).ToList();
         var roles = new List<string>();
+        if (blocked)
+            return new ThinPrincipal(user.Id ?? subjectId, user.ExternalId, verified, ThinPrincipal.NoRoles);
         if (verified)
             roles.Add(Roles.Member);                    // Member is the verified-resident standing (implicit).
         foreach (var r in identityRoles)
@@ -192,6 +195,54 @@ public sealed class IdentityService(
 
         logger.LogInformation("Admin {Admin} manually verified {Target}.", adminSubjectId, targetSubjectId);
         return profile;
+    }
+
+    // ── Block / Unblock (the admin suspension lane — mirrors the verify/role lanes) ────
+
+    /// <inheritdoc />
+    public async Task BlockAsync(string targetSubjectId, string adminSubjectId)
+    {
+        var target = await SetBlockedAsync(targetSubjectId, adminSubjectId, blocked: true);
+        logger.LogInformation("Admin {Admin} blocked {Target}.", adminSubjectId, target.Id);
+    }
+
+    /// <inheritdoc />
+    public async Task UnblockAsync(string targetSubjectId, string adminSubjectId)
+    {
+        var target = await SetBlockedAsync(targetSubjectId, adminSubjectId, blocked: false);
+        logger.LogInformation("Admin {Admin} unblocked {Target}.", adminSubjectId, target.Id);
+    }
+
+    private async Task<User> SetBlockedAsync(string targetSubjectId, string adminSubjectId, bool blocked)
+    {
+        var admin = await RequireGlobalAdminAsync(adminSubjectId);
+        _ = admin;
+        var target = await userManager.FindByIdAsync(targetSubjectId)
+            ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
+
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var profile = (await session.LoadAsync<Profile>(targetSubjectId)) ?? new Profile
+        {
+            SubjectId = targetSubjectId,
+            Email = target.Email,
+            DisplayName = target.UserName ?? target.Email ?? string.Empty
+        };
+        profile.Blocked = blocked;
+        session.Store(profile);
+
+        var now = DateTimeOffset.UtcNow;
+        session.Store(AuditRow(now, adminSubjectId, adminSubjectId,
+            blocked ? "block" : "unblock", AccountKind, targetSubjectId,
+            Authorization.AccessVia.Admin, Authorization.AccessOutcome.Allow));
+        await session.SaveChangesAsync();
+
+        // The block takes effect at the Identity↔cookie seam: a blocked account mints no
+        // roles, so it has no standing (no Member/Moderator/GlobalAdmin). Rotate the
+        // security stamp — the same invalidation the demotion/password lanes rely on (OPS §10)
+        // — so existing sessions must re-mint to reflect the change.
+        await userManager.UpdateSecurityStampAsync(target);
+
+        return target;
     }
 
     /// <inheritdoc />

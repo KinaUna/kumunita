@@ -109,10 +109,20 @@ public sealed class AccountController(
             // The verification link's purpose is to end the handoff with the resident
             // signed-in — this branch bypasses the password check (the link IS the proof
             // the user owns the account) while keeping the same admissible claim shape
-            // the rest of the request pipeline expects.
+            // the rest of the request pipeline expects. Mint the same persistent,
+            // 14-day cookie every sign-in lane issues: the handler honors the explicit
+            // ExpiresUtc and, with sliding expiration on, refreshes the ticket as the
+            // resident keeps the tab open. Without this, the handler falls back to a
+            // session cookie that dies when the browser closes.
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true,  // persistent cookie — survives a browser close
+                ExpiresUtc = DateTimeOffset.UtcNow.Add(TimeSpan.FromDays(14)),
+            };
             await HttpContext.SignInAsync(
                 scheme: CookieAuthenticationDefaults.AuthenticationScheme,
-                principal: identityPrinciple);
+                principal: identityPrinciple,
+                properties: authProperties);
 
             return Redirect("/profile/edit");
         }
@@ -148,8 +158,16 @@ public sealed class AccountController(
             return View(model);
         }
 
+        // Always mint a persistent, long-lived cookie. PasswordSignInAsync's
+        // `isPersistent` flag sets AuthenticationProperties.IsPersistent — the
+        // app wants long-lived logins (not a browser-session cookie that dies
+        // when the tab closes), so pass true unconditionally: the RememberMe
+        // checkbox stays for the form but the cookie is persistent either way.
+        // The ticket (and hence the cookie's) lifetime is set by the cookie
+        // handler's ExpireTimeSpan (14 days, Program.cs) and its sliding
+        // expiration refreshes it while the resident keeps the tab active.
         var result = await signInManager.PasswordSignInAsync(
-            user, model.Password, model.RememberMe, lockoutOnFailure: true);
+            user, model.Password, isPersistent: true, lockoutOnFailure: true);
 
         if (result.Succeeded)
         {

@@ -1030,6 +1030,164 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
 
+    // ── All-sections feed: ListAllFeedAsync (M3b "feed organizer" ext) ────
+    //
+    // The all-sections lane mirrors the single-section F1/F2/F3 invariants:
+    // exactly one CanSeeAsync pass over the union candidate set → one
+    // aggregate AccessAudit row (C-M3·3, not one component-per-row; a
+    // per-component call would leak "which components hold content" via
+    // the audit lane). The candidate filter is a feed organizer, never a
+    // gate (C-M3·2): a post in a disabled/missing component is not a
+    // candidate, so it is not in the audit row's VisibleCount/HiddenCount.
+
+    [Fact]
+    public async Task ListAllFeed_VisiblePostsAcrossMultipleComponents_IncludesAll()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all1-member";
+        const string compA = "c-all1-a";
+        const string compB = "c-all1-b";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compB, Name = "Maintenance", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "all1-a-post", ComponentId = compA, AuthorId = "u-all1-owner-a",
+            Body = "body all1 a", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all1-b-post", ComponentId = compB, AuthorId = "u-all1-owner-b",
+            Body = "body all1 b", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        var ids = new[] { compA, compB };
+        var feed = await svc.ListAllFeedAsync(ids, member, page: 1);
+
+        var visibleIds = feed.Visible.Select(p => p.Id).ToHashSet();
+        Assert.Contains("all1-a-post", visibleIds);
+        Assert.Contains("all1-b-post", visibleIds);
+        Assert.Equal(2, feed.Total);
+        Assert.Equal(0, feed.HiddenCount);
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(2, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
+        Assert.Equal("post", aggregate.TargetKind);
+    }
+
+    [Fact]
+    public async Task ListAllFeed_HiddenInOneComponent_CountsInAggregate_NoAuthorLeak()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all2-member";
+        const string hiddenOwner = "u-all2-hidden-owner";
+        const string compA = "c-all2-a";
+        const string compB = "c-all2-b";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compB, Name = "Maintenance", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "all2-visible", ComponentId = compA, AuthorId = "u-all2-owner-a",
+            Body = "body all2 visible", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all2-hidden", ComponentId = compB, AuthorId = hiddenOwner,
+            Body = "body all2 hidden", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, hiddenOwner), // member is not in audience
+        });
+
+        var ids = new[] { compA, compB };
+        var feed = await svc.ListAllFeedAsync(ids, member, page: 1);
+        Assert.Single(feed.Visible);
+        Assert.Equal(1, feed.HiddenCount);
+
+        // C-M3·3 — exactly ONE aggregate row across the whole visit (not two,
+        // one per component). The per-item Deny row still names the hidden post.
+        var rows = await PostAudits(store, actor: member);
+        var aggregates = rows.Where(a => a.TargetId is null).ToList();
+        var agg = Assert.Single(aggregates);
+        Assert.Equal(1, agg.VisibleCount);
+        Assert.Equal(1, agg.HiddenCount);
+
+        // F2 shape — the hidden post's author never appears in the member's
+        // rows (audience membership is never logged).
+        Assert.All(rows, r =>
+        {
+            Assert.NotEqual(hiddenOwner, r.ActorId);
+            Assert.NotEqual(hiddenOwner, r.EffectivePrincipalId);
+        });
+    }
+
+    [Fact]
+    public async Task ListAllFeed_PostsOfComponentNotInCandidateSet_NotEvaluated()
+    {
+        // C-M3·2 — a post in a component that is NOT in the Web-resolved
+        // enabled set is not part of the candidate set: even if the actor
+        // has standing, the post's author is never named, and the aggregate
+        // row's counts do not include it.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all3-member";
+        const string compA = "c-all3-a";
+        const string compExcluded = "c-all3-excluded";
+
+        await Plant(store, new Component { Id = compA, Name = "Safety", Enabled = true });
+        await Plant(store, new Component { Id = compExcluded, Name = "Disabled", Enabled = false });
+        await Plant(store, new Post
+        {
+            Id = "all3-in-set", ComponentId = compA, AuthorId = "u-all3-owner-a",
+            Body = "body all3 in-set", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+        await Plant(store, new Post
+        {
+            Id = "all3-excluded", ComponentId = compExcluded, AuthorId = "u-all3-excl-owner",
+            Body = "body all3 excluded", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, member),
+        });
+
+        // The Web layer would only pass the enabled component's id.
+        var feed = await svc.ListAllFeedAsync(new[] { compA }, member, page: 1);
+        var ids = feed.Visible.Select(p => p.Id).ToHashSet();
+        Assert.Contains("all3-in-set", ids);
+        Assert.DoesNotContain("all3-excluded", ids);
+        Assert.Equal(0, feed.HiddenCount); // the excluded post is not a candidate
+
+        var rows = await PostAudits(store, actor: member);
+        var aggregate = Assert.Single(rows, a => a.TargetId is null);
+        Assert.Equal(1, aggregate.VisibleCount);
+        Assert.Equal(0, aggregate.HiddenCount);
+        Assert.DoesNotContain(rows, r => r.TargetId == "all3-excluded");
+    }
+
+    [Fact]
+    public async Task ListAllFeed_EmptyComponentIds_ReturnsEmpty_NoAuditRow()
+    {
+        // §2.3 precondition shape — the Web layer returns the "no posts yet"
+        // view (not a 404); the Core seam short-circuits with no audit row.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string member = "u-all4-member";
+
+        var feed = await svc.ListAllFeedAsync(Array.Empty<string>(), member, page: 1);
+        Assert.Empty(feed.Visible);
+        Assert.Equal(0, feed.HiddenCount);
+        Assert.Equal(0, feed.Total);
+
+        var rows = await PostAudits(store, actor: member);
+        Assert.Empty(rows);
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

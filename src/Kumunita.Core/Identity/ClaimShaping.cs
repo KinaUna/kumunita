@@ -41,7 +41,20 @@ public static class ClaimShaping
         // and silently mis-evaluate. (The host cannot set this per-scheme — the cookie has
         // no role-claim-type option — so it belongs on the identity at mint time, which is
         // exactly the Identity↔cookie seam this class owns.)
-        var identity = new ClaimsIdentity(roleType: ClaimTypes.Role);
+        // name: subjectId makes IsAuthenticated=true. For ClaimsIdentity that property
+        // is read-only and derives from "Name is non-null", so a name-less identity
+        // reports IsAuthenticated=false — exactly the failure the first-boot setup
+        // sign-in hit: SignInAsync rejects an unauthenticated principal when
+        // AuthenticationOptions.RequireAuthenticatedSignIn is set (on by default for
+        // the cookie scheme), throwing the InvalidOperationException seen on the live
+        // server. Setting the constructor Name does NOT add a <see cref="Claim"/> to the
+        // identity (only AddClaim does), so the admissible claim *type* set is unchanged
+        // and the invariant-set-B tests still pass. Using SubjectId keeps the name
+        // stable, non-sensitive, and unique per resident.
+        // Positional — the ClaimsIdentity overload here is
+        // (string name, string nameType, string roleType); named args failed to bind
+        // to this specific overload on .NET 10.
+        var identity = new ClaimsIdentity(subjectId, null, ClaimTypes.Role);
 
         identity.AddClaim(new Claim(ClaimTypes.Subject, subjectId));
         if (externalId is not null)

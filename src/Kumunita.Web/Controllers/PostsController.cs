@@ -154,6 +154,74 @@ public sealed class PostsController(
         });
     }
 
+    // ── All-sections feed (GET /community) ────────────────────────────────
+
+    /// <summary>
+    /// The all-sections community feed: the union of visible posts across
+    /// every <b>enabled</b> <c>Component</c>, each row labelled with its
+    /// section name (the <see cref="PostListItem.ComponentName"/> badge).
+    /// <para>
+    /// The same ADR invariants as the single-section feed apply:
+    /// <see cref="PostService.ListAllFeedAsync"/> is the seam — one
+    /// <c>CanSeeAsync</c> pass over the whole candidate set (C6/C-M3·3),
+    /// one aggregate <c>AccessAudit</c> row (not one per component; a
+    /// per-component call would leak "which components hold content" via
+    /// the audit lane). The <see cref="IUserInfoService.GetComponentsAsync(bool)"/>
+    /// candidate set (enabled only) is the *feed organizer* — never an
+    /// access decision (C-M3·2).
+    /// </para>
+    /// <para>
+    /// When no enabled components exist (a bootstrap edge), the action
+    /// renders an empty feed (the "no posts yet" shape, not a 404 — a 404
+    /// would be indistinguishable from a missing route).
+    /// </para>
+    /// </summary>
+    [HttpGet("/community")]
+    public async Task<IActionResult> AllSections()
+    {
+        var actor = SubjectId(User) ?? string.Empty;
+
+        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        if (components.Count == 0)
+        {
+            return View("Index", new FeedViewModel
+            {
+                ComponentName = "Community",
+                Items = [],
+                Total = 0,
+            });
+        }
+
+        var componentIds = components.Select(c => c.Id).ToList();
+        var nameByComponentId = components.ToDictionary(c => c.Id, c => c.Name);
+
+        var feed = await posts.ListAllFeedAsync(componentIds, actor, page: 1);
+
+        var items = new List<PostListItem>(feed.Visible.Count);
+        foreach (var post in feed.Visible)
+        {
+            var profile = await userInfo.GetProfileAsync(post.AuthorId);
+            const int previewLength = 200;
+            var preview = post.Body.Length <= previewLength
+                ? post.Body
+                : post.Body[..previewLength].TrimEnd() + "…";
+            items.Add(new PostListItem(
+                post.Id,
+                post.Title,
+                preview,
+                post.Created,
+                profile?.DisplayName ?? post.AuthorId,
+                nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null));
+        }
+
+        return View("Index", new FeedViewModel
+        {
+            ComponentName = "Community",
+            Items = items,
+            Total = feed.Total,
+        });
+    }
+
     // ── Detail + one-level replies (GET /posts/{id}) ─────────────────────
 
     /// <summary>

@@ -12,15 +12,15 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
         </li>
-        @* M3 (U8): the single-entry Community nav link. The "exact routing is
-           U8's call" line of the plan pins the nav to *one* entry linking to
-           the Posts feed (the "default community" — the first-seeded component,
-           id "safety", per FirstBootSeeder's seed order) — one line, not three
-           (the "part sprawl" anti-pattern). *@
+        @* M3 (U8): the single-entry Community nav link. Originally pinned to
+           one component (id "safety", per FirstBootSeeder's seed order) —
+           the "default community". Now repointed to the all-sections feed
+           (GET /community) so the link shows the union of every enabled
+           section; each per-section feed remains one click away at
+           /community/{sectionId}. *@
         <li class="nav-item">
             <a class="nav-link text-dark"
-               asp-controller="Posts" asp-action="Index"
-               asp-route-componentId="safety">
+               asp-controller="Posts" asp-action="AllSections">
                 Community
             </a>
         </li>

@@ -96,7 +96,69 @@ public sealed class PostService
     }
 
     /// <summary>
-    /// A post's detail + its one-level replies (F10, §2.4): one
+    /// The **all-sections** community feed (M3b "feed organizer" extension):
+    /// the same shape as <see cref="ListFeedAsync"/> (the candidate filter —
+    /// a *feed organizer*, never an access decision — C-M3·2) but the candidate
+    /// set is the union of the actor-visible posts across every <see cref="IReadOnlyCollection{T} componentIds"/>
+    /// that the Web layer resolved as <c>Enabled</c> (the same
+    /// <see cref="IUserInfoService.GetComponentsAsync(bool)"/> candidate set the
+    /// single-component feed and the composer both already use).
+    /// <para>
+    /// <b>Auditing pin (C-M3·3):</b> exactly **one**
+    /// <see cref="IAuthorizationService.CanSeeAsync(string, AccessAction, IEnumerable{IAuditableResource})"/>
+    /// over the whole candidate set — so the all-sections feed emits a
+    /// <b>single</b> aggregate <see cref="AccessAudit"/> row per visit
+    /// (invariant C3, C-M3·3 — same lane as <see cref="ListFeedAsync"/>) and
+    /// never a per-component row (a per-component call would leak "which
+    /// components hold content" via the audit lane). The
+    /// <see cref="FeedResult.HiddenCount"/> counts only candidates this call
+    /// evaluated; a post in a <c>Disabled</c> or missing component is not in
+    /// the candidate set (the §2.3 precondition shape).
+    /// </para>
+    /// <param name="componentIds">The enabled component ids this feed spans.
+    /// Empty ⇒ empty candidate set (no audit row — the §2.3 404 shape, not a
+    /// Web-layer 0-candidate edge).</param>
+    /// </summary>
+    public async Task<FeedResult> ListAllFeedAsync(
+            IReadOnlyCollection<string> componentIds, string actorId, int page)
+    {
+        if (componentIds is null) throw new ArgumentNullException(nameof(componentIds));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
+        if (page < 1) page = 1;
+
+        if (componentIds.Count == 0)
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+
+        await using var session = _store.QuerySession();
+        var candidates = await session
+            .Query<Post>()
+            .Where(p => componentIds.Contains(p.ComponentId))
+            .OrderByDescending(p => p.Created)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+
+        // C-M3·3 — one shared matching pass over the whole candidate set
+        // (across all enabled components), one aggregate audit row (the
+        // F1/F2 shape, the same "candidate filter is not a gate" pin as
+        // ListFeedAsync's single-section lane).
+        var visibleSet = await _authz.CanSeeAsync(
+                actorId, AccessAction.Read,
+                candidates.Select(p => new PostToAuditableResource(p)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        var visible = candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
+
+        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: visible.Count);
+    }
+
+    /// <summary>
+    /// A post's detail + its one-level replies (F10, §2.4):
     /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
     /// — the post's **single decision row** (C-M3·3, not an aggregate). **No second
     /// <c>CanSeeAsync</c> on the replies** (C-M3·1): the replies are loaded and

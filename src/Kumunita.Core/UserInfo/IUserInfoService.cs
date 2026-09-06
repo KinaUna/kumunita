@@ -153,4 +153,57 @@ public interface IUserInfoService
     /// roles/scope assignment — ADR 0003's "delegating moderation
     /// is… promote + pick components").</summary>
     Task<IReadOnlyList<ModeratorAssignment>> GetAssignmentsAsync(string userId);
+
+    // ── Admin community management (add / edit / enable-disable, GlobalAdmin
+    // surface — the <c>/admin</c> shell. ADR 0006-D: the Core is the single write
+    // lane for the <see cref="Component"/> rows; the Web controller is a thin
+    // wrapper over these three, never re-deriving identity/authz or opening
+    // its own session.) ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Create a new community (a <see cref="Component"/> row) for the
+    /// <c>/admin</c> "add community" form. The <c>id</c> is derived from
+    /// <paramref name="name"/> (slug + short suffix) — the controller
+    /// doesn't mint ids itself. Defaults: <see cref="Component.Enabled"/>
+    /// <c>true</c>, <see cref="Component.ModeratorAccess"/>
+    /// <c>false</c> (invariant C5's OFF-by-default), <see cref="Component.
+    /// SortOrder"/> = one past the current maximum (or 0 when there are
+    /// none yet) so the new row lands at the end of the existing list.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.add", targetKind "component", via Admin, outcome Allow)
+    /// in the same session/transaction as the row (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="name"/> or <paramref name="actorId"/> is null/whitespace.</exception>
+    Task<Component> CreateCommunityAsync(string name, string? description, string actorId);
+
+    /// <summary>
+    /// Patch an existing community (a <see cref="Component"/> row) from
+    /// the <c>/admin</c> "edit community" form. **Null arguments are
+    /// "keep as-is"** (the form's contract: an untouched field doesn't
+    /// erase the current value). <see cref="Component.Id"/> itself is
+    /// never changed here — identity is identity. Appends an audit row
+    /// (action "community.update", targetKind "component", via Admin,
+    /// outcome Allow) in the same transaction as the row (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> or <paramref name="actorId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task UpdateCommunityAsync(string componentId,
+        string? name, string? description,
+        int? sortOrder, bool? moderatorAccess, bool? enabled,
+        string actorId);
+
+    /// <summary>
+    /// Enable or disable an existing community (the <c>/admin</c>
+    /// "remove a community" form — the user-chosen hide, not
+    /// a delete: this sets <see cref="Component.Enabled"/> so the
+    /// row, its posts, and any moderator assignments remain intact;
+    /// the <c>/community/{id}</c> feed 404s for disabled rows
+    /// (the read path's <c>enabledOnly</c> filter handles this)).
+    /// Appends an audit row (action "community.toggle-enabled",
+    /// targetKind "component", via Admin, outcome Allow) in the
+    /// same transaction as the flag change (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task SetCommunityEnabledAsync(string componentId, bool enabled, string actorId);
 }
