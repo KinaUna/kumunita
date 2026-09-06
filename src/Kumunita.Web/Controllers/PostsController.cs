@@ -184,7 +184,7 @@ public sealed class PostsController(
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
         if (components.Count == 0)
         {
-            return View(new FeedViewModel
+            return View("Index", new FeedViewModel
             {
                 ComponentName = "Community",
                 Items = [],
@@ -214,7 +214,7 @@ public sealed class PostsController(
                 nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null));
         }
 
-        return View(new FeedViewModel
+        return View("Index", new FeedViewModel
         {
             ComponentName = "Community",
             Items = items,
