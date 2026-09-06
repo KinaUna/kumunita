@@ -124,3 +124,134 @@
 
 @* The "scope" checkbox set is only meaningful when the selected role is Moderator; the
    Core SetRoleAsync ignores componentIds for non-Moderator targets (deletes them). *@
+
+<h2 class="mt-5">Communities</h2>
+<p class="text-muted">
+    @Model.Communities.Count community(ies), @Model.DisabledCommunityCount disabled.
+    Adding a community creates a new <code>/community/{id}</code> feed. Disabling one
+    hides it from the feed but keeps its posts and assignments (re-enable to restore).
+</p>
+
+@* ── Add community ── *@
+<form method="post" asp-action="AddCommunity" class="mb-4">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label for="addName" class="form-label">Name</label>
+            <input name="Name" id="addName" type="text" class="form-control" maxlength="100" required autocomplete="off" />
+        </div>
+        <div class="col-md-5">
+            <label for="addDesc" class="form-label">Description (optional)</label>
+            <input name="Description" id="addDesc" type="text" class="form-control" maxlength="500" autocomplete="off" />
+        </div>
+        <div class="col-md-3 text-end">
+            <button class="btn btn-primary" type="submit">Add community</button>
+        </div>
+    </div>
+</form>
+
+@if (Model.Communities.Count == 0)
+{
+    <div class="text-muted small">No communities yet. Use the form above to add the first one.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Sort</th>
+                    <th>Standing vis.</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in Model.Communities)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">@c.Name</div>
+                            @if (!string.IsNullOrWhiteSpace(c.Description))
+                            {
+                                <div class="text-muted small">@c.Description</div>
+                            }
+                        </td>
+                        <td class="text-muted small">@c.SortOrder</td>
+                        <td>
+                            @if (c.ModeratorAccess)
+                            {
+                                <span class="badge text-bg-secondary">on</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">off</span>
+                            }
+                        </td>
+                        <td>
+                            @if (c.Enabled)
+                            {
+                                <span class="badge text-bg-success">enabled</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-warning">disabled</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                            <form method="post" asp-action="ToggleCommunityEnabled" class="d-inline-flex">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="componentId" value="@c.Id" />
+                                <input type="hidden" name="enabled" value="@(c.Enabled ? "false" : "true")" />
+                                <button class="btn btn-sm @(c.Enabled ? "btn-outline-warning" : "btn-outline-success")"
+                                        type="submit"
+                                        title="@(c.Enabled ? "Hide from the feed — posts and assignments are kept." : "Restore this community to the feed.")">
+                                    @(c.Enabled ? "Disable" : "Re-enable")
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    @* Collapsed edit row *@
+                    <tr class="edit-row" style="display:none" id="edit-@c.Id">
+                        <td colspan="5" class="p-0">
+                            <form method="post" asp-action="UpdateCommunity" class="p-3 border-top bg-light">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ComponentId" value="@c.Id" />
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Name</label>
+                                        <input type="text" name="Name" value="@c.Name" class="form-control form-control-sm" maxlength="100" required />
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label small">Description</label>
+                                        <input type="text" name="Description" value="@c.Description" class="form-control form-control-sm" maxlength="500" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Sort order</label>
+                                        <input type="number" name="SortOrder" value="@c.SortOrder" class="form-control form-control-sm" min="0" step="1" />
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-end">
+                                    <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* Minimal toggle script — no dependency on Bootstrap JS for the collapse *@
+    <script>
+        document.querySelectorAll('[data-edit-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                var row = document.querySelector(btn.getAttribute('data-edit-toggle'));
+                if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+            });
+        });
+    </script>
+}

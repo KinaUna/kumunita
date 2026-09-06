@@ -583,6 +583,277 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         }
     }
 
+    // ── Admin community management — add / edit / enable-disable ───────────
+    // These cover the /admin "communities" surface (the user-chosen ability
+    // for a GlobalAdmin to add a new community, edit one, or hide one). The
+    // shape mirrors the existing SetComponentModeratorAccessAsync tests:
+    // the Core method commits the domain row + an AccessAudit row in the
+    // same transaction (invariant C3), and reads see the change on the very
+    // next call (invariant C4).
+
+    // Test A1 — CreateCommunityAsync (admin add)
+    // Creates a new Component row (Enabled=true, ModeratorAccess=false — the
+    // C5 OFF-by-default; id is minted by the service, slug-ified name + a
+    // short hex suffix) and appends an AccessAudit row (action
+    // "community.add", targetKind "component", Via Admin, Outcome Allow).
+    // A fresh call lands at the end of the existing SortOrder sequence
+    // (one past the current maximum).
+
+    [Fact]
+    public async Task CreateCommunityAsync_CreatesRow_WithC5Defaults_AuditsCommunityAdd()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string actor = "admin-create";
+        var created = await svc.CreateCommunityAsync("Greenridge", "A quiet corner community.", actor);
+
+        // Defaults the admin never has to type (C5: ModeratorAccess is OFF by
+        // default — only a deliberate flip sets it). Enabled is on by default,
+        // so the new community is immediately visible on the /community feed.
+        Assert.Equal("Greenridge", created.Name);
+        Assert.Equal("A quiet corner community.", created.Description);
+        Assert.True(created.Enabled);
+        Assert.False(created.ModeratorAccess);
+        Assert.False(string.IsNullOrWhiteSpace(created.Id));
+        // SortOrder: appended after any existing components (none seeded in
+        // this fresh DB), so 0 is the correct "first in the list" value.
+        Assert.Equal(0, created.SortOrder);
+
+        // Live read (invariant C4): the very next GetComponentsAsync call sees it.
+        var live = await svc.GetComponentsAsync(enabledOnly: true);
+        Assert.Contains(live, c => c.Id == created.Id);
+
+        // The audit row (invariant C3): one "community.add" row targeting the
+        // new component, via Admin (the only path to this lane — the class
+        // surface is [Authorize(Roles=GlobalAdmin)]), outcome Allow.
+        await using var session = store.QuerySession();
+        var audit = await session.Query<AccessAudit>()
+            .Where(a => a.Action == "community.add" && a.TargetId == created.Id)
+            .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(audit);
+        Assert.Equal("community.add", audit!.Action);
+        Assert.Equal("component", audit.TargetKind);
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal(actor, audit.ActorId);
+        Assert.Equal(actor, audit.EffectivePrincipalId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    // Test A2 — CreateCommunityAsync requires a non-blank name (the form
+    // enforces [Required], the Core enforces it too — the "defense in depth at
+    // both layers" rule the other admin-action tests pin).
+
+    [Fact]
+    public async Task CreateCommunityAsync_RejectsBlankName()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateCommunityAsync("   ", "desc", "admin"));
+    }
+
+    // Test A3 — UpdateCommunityAsync null-patch (admin edit)
+    // A null argument is "keep as-is"; a non-null one is applied. The form
+    // round-trips safely: untouched fields don't erase their stored value.
+    // Appends an AccessAudit "community.update" row (targetKind "component").
+
+    [Fact]
+    public async Task UpdateCommunityAsync_AppliesNonNull_LeavesNullFields_AuditsCommunityUpdate()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string actor = "admin-update";
+        var component = await svc.CreateCommunityAsync("Old Name", "Old description", actor);
+
+        // Update: rename + change sort, but leave the stored description
+        // untouched (null patch field = keep as-is — the form's contract; an
+        // admin who doesn't know the current description can still rename the
+        // community without wiping what's there).
+        await svc.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: "New Name",
+            description: null,
+            sortOrder: 42,
+            moderatorAccess: null,
+            enabled: null,
+            actorId: actor);
+
+        await using var session = store.QuerySession();
+        var read = await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(read);
+        Assert.Equal("New Name", read!.Name);
+        Assert.Equal(42, read.SortOrder);
+        Assert.Equal("Old description", read.Description); // unchanged — the null patch is "keep"
+        Assert.True(read.Enabled);                          // unchanged
+        Assert.False(read.ModeratorAccess);                 // still OFF (C5)
+
+        var audit = await session.Query<AccessAudit>()
+            .Where(a => a.Action == "community.update" && a.TargetId == component.Id)
+            .FirstOrDefaultAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(audit);
+        Assert.Equal(AccessVia.Admin, audit!.Via);
+        Assert.Equal(actor, audit.ActorId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    // Test A4 — UpdateCommunityAsync flips a flag (moderator access / enabled)
+    // when the non-null argument is present. The form passes a non-null value
+    // for a checkbox the admin checked; passes null for one they didn't. This
+    // test proves the "non-null = set" half of the patch rule.
+
+    [Fact]
+    public async Task UpdateCommunityAsync_FlagsOnlyWhenArgumentIsNonNull()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string actor = "admin-flip";
+        var component = await svc.CreateCommunityAsync("Flip", null, actor);
+
+        // Flip moderator access ON (the ADR 0003 standing; C5's deliberate
+        // ON) — and leave Enabled untouched.
+        await svc.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: true, enabled: null, actorId: actor);
+
+        await using (var q1 = store.QuerySession())
+        {
+            var after = await q1.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+            Assert.True(after!.ModeratorAccess);
+            Assert.True(after.Enabled); // unchanged
+        }
+
+        // Flip enabled OFF (the hide path; the user-chosen "remove") — and
+        // leave ModeratorAccess untouched.
+        await svc.UpdateCommunityAsync(
+            componentId: component.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: null, enabled: false, actorId: actor);
+
+        await using (var q2 = store.QuerySession())
+        {
+            var after = await q2.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken);
+            Assert.False(after!.Enabled);
+            Assert.True(after.ModeratorAccess); // unchanged
+        }
+
+        // Two audit rows (one per call); both "community.update".
+        await using var q3 = store.QuerySession();
+        Assert.Equal(2, await q3.Query<AccessAudit>()
+            .Where(a => a.Action == "community.update" && a.TargetId == component.Id)
+            .CountAsync(TestContext.Current.CancellationToken));
+    }
+
+    // Test A5 — UpdateCommunityAsync rejects an unknown id (the controller maps this to a
+    // TempData error; the Core is the single source of truth for "not found").
+
+    [Fact]
+    public async Task UpdateCommunityAsync_UnknownId_Throws()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateCommunityAsync("does-not-exist", "n", "d", 1, null, null, "admin"));
+    }
+
+    // Test A6 — SetCommunityEnabledAsync (admin hide / restore)
+    // Flips the Enabled flag with the action string reflecting the new state
+    // ("community.enable" / "community.disable") — the audit row is the
+    // always-on access-decision log, and the verb distinguishes "hide" from
+    // "restore", both of which are admin-visible events in the /admin/audit
+    // view.
+
+    [Fact]
+    public async Task SetCommunityEnabledAsync_FlipsFlag_AuditsEnableOrDisable()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string actor = "admin-toggle";
+        var component = await svc.CreateCommunityAsync("Toggle", null, actor);
+        Assert.True(component.Enabled);
+
+        // Disable (the "remove a community" path the user chose — the hide, not the delete).
+        await svc.SetCommunityEnabledAsync(component.Id, false, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.False((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
+            Assert.Contains(await session.Query<AccessAudit>()
+                .Where(a => a.Action == "community.disable" && a.TargetId == component.Id && a.Via == AccessVia.Admin)
+                .ToListAsync(TestContext.Current.CancellationToken),
+                a => a.ActorId == actor);
+        }
+
+        // Re-enable (the restore path — the "the row + posts + assignments remain
+        // intact" guarantee). The next enabledOnly:true read sees it.
+        await svc.SetCommunityEnabledAsync(component.Id, true, actor);
+        await using (var session = store.QuerySession())
+        {
+            Assert.True((await session.LoadAsync<Component>(component.Id, TestContext.Current.CancellationToken))!.Enabled);
+            Assert.Contains(await session.Query<AccessAudit>()
+                .Where(a => a.Action == "community.enable" && a.TargetId == component.Id && a.Via == AccessVia.Admin)
+                .ToListAsync(TestContext.Current.CancellationToken),
+                a => a.ActorId == actor);
+        }
+
+        // The component remains in the GetComponentsAsync(enabledOnly:true) set
+        // (it's back on) — the hide/restore round-trip preserves the row.
+        var visible = await svc.GetComponentsAsync(enabledOnly: true);
+        Assert.Contains(visible, c => c.Id == component.Id);
+    }
+
+    // Test A7 — SeedComponentsAsync idempotency with an admin-added community
+    // The seed lane (first boot) is idempotent by seed id (safety,
+    // maintenance, social, governance). An admin-created community has a
+    // slug+suffix id and is NOT touched by a re-seed: the seed lane's
+    // upsert-by-id only creates the four known ids, never creates or
+    // mutates rows with other ids. The admin-created community's fields
+    // (including a deliberate ON flag from UpdateCommunityAsync) survive
+    // the re-seed — a warm re-run of the bootstrap must never clobber
+    // admin state.
+
+    [Fact]
+    public async Task SeedComponentsAsync_ReRun_LeavesAdminCreatedCommunityUntouched_FlagsIncluded()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        // First-boot seed (the four known defaults).
+        await svc.SeedComponentsAsync();
+
+        // An admin adds a community and explicitly enables standing moderator
+        // access (C5's intentional ON).
+        var adminRow = await svc.CreateCommunityAsync("Admin's Garden", null, "admin");
+        await svc.UpdateCommunityAsync(
+            componentId: adminRow.Id,
+            name: null, description: null, sortOrder: null,
+            moderatorAccess: true, enabled: null, actorId: "admin");
+
+        // Warm re-seed (the rare outer-gate bypass) — the four seeds are
+        // idempotent and the admin row is untouched (including its flag).
+        await svc.SeedComponentsAsync();
+
+        await using var session = store.QuerySession();
+        var adminAfter = await session.LoadAsync<Component>(adminRow.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(adminAfter);
+        Assert.Equal("Admin's Garden", adminAfter!.Name);
+        Assert.True(adminAfter.ModeratorAccess); // the intentional ON survived the re-seed
+        Assert.True(adminAfter.Enabled);
+
+        // The four seeded ids remain (and their ModeratorAccess defaults are
+        // still OFF — only the flag path may flip them, so a re-seed never
+        // resets an intentional ON either).
+        var all = await session.Query<Component>().ToListAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(5, all.Count);
+        Assert.Equal(new[] { "safety", "maintenance", "social", "governance" }.ToHashSet(),
+            all.Where(c => !c.Id.StartsWith("admin")).Select(c => c.Id).ToHashSet());
+    }
+
     // ── Test 11 — profile upsert (plan test 11) ────────────────────────────────
     // Create-when-absent: a fresh SubjectId produces a row built from the `profile`
     // argument's base fields (DisplayName/Email/Verified/Visibility). A subsequent upsert
