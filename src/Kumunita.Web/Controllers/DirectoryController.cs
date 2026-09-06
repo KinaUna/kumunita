@@ -38,6 +38,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 [Authorize]
+[Route("directory")]
 public sealed class DirectoryController(DirectoryService directory) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>

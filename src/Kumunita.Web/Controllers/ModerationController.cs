@@ -114,6 +114,7 @@ namespace Kumunita.Web.Controllers;
 /// </para>
 /// </summary>
 [Authorize]
+[Route("moderation")]
 public sealed class ModerationController(
     IDocumentStore store,
     IUserInfoService userInfo,
