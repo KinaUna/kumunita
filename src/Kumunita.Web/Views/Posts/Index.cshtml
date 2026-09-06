@@ -49,6 +49,10 @@
                                class="text-decoration-none fw-semibold">
                                 @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
                             </a>
+                            @if (!string.IsNullOrEmpty(p.ComponentName))
+                            {
+                                <span class="badge text-bg-light ms-2" title="@p.ComponentName">@p.ComponentName</span>
+                            }
                             <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
                         </div>
                         <div class="text-end text-muted small">

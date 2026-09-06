@@ -53,4 +53,5 @@ public sealed record PostListItem(
     string? Title,
     string BodyPreview,
     DateTimeOffset Created,
-    string AuthorDisplayName);
+    string AuthorDisplayName,
+    string? ComponentName = null);
