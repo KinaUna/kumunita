@@ -189,7 +189,11 @@ public sealed class AccountController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        // SignOutAsync (not a bare SignOutAsync on the auth scheme) clears BOTH
+        // of the app's cookies: AddIdentity registers an auxiliary anonymous
+        // .AspNetCore.Identity.Application cookie alongside the kumunita.auth
+        // cookie, and only this path signs out the ApplicationScheme too.
+        await signInManager.SignOutAsync();
         return RedirectToAction("Index", "Home");
     }
 

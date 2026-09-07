@@ -40,10 +40,22 @@ services:
     container_name: kumunita_app
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      Community__Name: "Maplewood Residents"
-      Community__SupportEmail: "maplewood@example.com"
+      Community__Name: "Kumunita Test Residents"
+      Community__SupportEmail: "test@kumunita.com"
       # kumunita role (created by dev-db-init/01-app-role.sql), not the bootstrap superuser
       ConnectionStrings__Kumunita: "Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=kumunita;Include Error Detail=true"
+      # First-boot seed-admin lane (OPS §2). One-time, weak-by-design dev values (like the
+      # DB password) — presented at /admin/setup on first boot to set the admin password;
+      # the token is consumed and invalidated on that first use. Regenerate with
+      # `openssl rand -hex 24` (or a fresh random hex string) if the DB volume is recreated.
+      SeedAdmin__Email: "admin@example.com"
+      SeedAdmin__Token: "devseedadmintok30"
+      # Mailpit as dev SMTP relay (COOLIFY §5.1A) — the only thing that gets the
+      # first-boot setup email out; without it the outbox handler retries/dead-letters.
+      # Inspect deliveries in the Mailpit web UI on port 8025.
+      SMTP__Host: mailpit
+      SMTP__Port: "1025"
+      SMTP__Secure: "None"
     ports:
       - "5080:8080"
     depends_on:
