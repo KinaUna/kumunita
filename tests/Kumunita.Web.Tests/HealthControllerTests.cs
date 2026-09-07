@@ -39,7 +39,10 @@ public class HealthControllerTests
         deadLetters.GetCountAsync(Arg.Any<CancellationToken>()).Returns(deadLetterRows);
 
         var smtpHealth = Substitute.For<ISmtpHealthCheck>();
-        smtpHealth.IsReachableAsync(Arg.Any<CancellationToken>()).Returns(mailReachable);
+        smtpHealth.CheckAsync(Arg.Any<CancellationToken>())
+            .Returns(mailReachable
+                ? SmtpHealthResult.Ok
+                : SmtpHealthResult.Fail("connect: refused (test)"));
 
         return new HealthController(store, deadLetters, smtpHealth);
     }
@@ -90,6 +93,11 @@ public class HealthControllerTests
         Assert.Equal("degraded", type.GetProperty("status")!.GetValue(payload));
         Assert.Equal("ok", type.GetProperty("database")!.GetValue(payload));
         Assert.Equal("unreachable", type.GetProperty("mail")!.GetValue(payload));
+        // mailDetail must carry the diagnostic (connect/DNS/banner/EHLO/AUTH reason),
+        // so an operator reading /health sees the cause immediately.
+        var detail = type.GetProperty("mailDetail")!.GetValue(payload) as string;
+        Assert.NotNull(detail);
+        Assert.Contains("connect", detail);
         Assert.Equal(0, type.GetProperty("emailDeadLetters")!.GetValue(payload));
     }
 

@@ -17,11 +17,29 @@ namespace Kumunita.Core.Identity;
 public interface ISmtpHealthCheck
 {
     /// <summary>
-    /// True if a minimal SMTP handshake (banner + EHLO/HELO response) completes
-    /// against the configured relay without throwing or timing out.
+    /// Probes the relay and returns a diagnostic result: <see cref="SmtpHealthResult.Reachable"/>
+    /// plus (when false) a <see cref="SmtpHealthResult.Reason"/> naming the exact step that
+    /// failed, so /health can tell the operator <em>why</em> mail is degraded without
+    /// digging through relay logs.
     /// </summary>
     /// <param name="ct">Cancellation / timeout for the round-trip.</param>
-    Task<bool> IsReachableAsync(CancellationToken ct);
+    Task<SmtpHealthResult> CheckAsync(CancellationToken ct);
+}
+
+/// <summary>
+/// Diagnostic outcome of a single SMTP reachability probe (OPS.md §8 — /health).
+/// <paramref name="Reachable"/> is the old boolean signal; <paramref name="Reason"/>
+/// carries the per-step cause when it is <c>false</c> (banner, EHLO, AUTH, DNS/
+/// connect, timeout…), and is <c>null</c> on a passing probe. The reason is
+/// operator-facing text and must never contain credentials.
+/// </summary>
+public sealed record SmtpHealthResult(bool Reachable, string? Reason)
+{
+    /// <summary>Passing probe (greeting + EHLO, + AUTH when configured).</summary>
+    public static SmtpHealthResult Ok { get; } = new(Reachable: true, Reason: null);
+
+    /// <summary>Failure with a human-readable cause for the operator.</summary>
+    public static SmtpHealthResult Fail(string reason) => new(Reachable: false, Reason: reason);
 }
 
 /// <summary>
@@ -39,6 +57,9 @@ public sealed class SmtpHealthCheck(
     private readonly SmtpOptions _cfg = options.Value;
 
     /// <inheritdoc />
-    public async Task<bool> IsReachableAsync(CancellationToken ct)
-        => await SmtpProbe.TryHandshakeAsync(_cfg, ct).ConfigureAwait(false);
+    public async Task<SmtpHealthResult> CheckAsync(CancellationToken ct)
+    {
+        var raw = await SmtpProbe.TryHandshakeAsync(_cfg, ct).ConfigureAwait(false);
+        return raw.Ok ? SmtpHealthResult.Ok : SmtpHealthResult.Fail(raw.Message ?? "unknown error");
+    }
 }

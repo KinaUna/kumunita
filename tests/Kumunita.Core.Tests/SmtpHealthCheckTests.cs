@@ -19,7 +19,7 @@ public class SmtpHealthCheckTests
     {
         var check = new SmtpHealthCheck(Options.Create(new SmtpOptions()));
 
-        return CheckTrue(check.IsReachableAsync(TestContext.Current.CancellationToken), expected: false);
+        return CheckFalse(check.CheckAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public class SmtpHealthCheckTests
                 Port = relay.Port
             }));
 
-            Assert.True(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
         }
     }
 
@@ -50,7 +50,7 @@ public class SmtpHealthCheckTests
             Port = port
         }));
 
-        Assert.False(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+        Assert.False((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
     }
 
     [Fact]
@@ -67,7 +67,7 @@ public class SmtpHealthCheckTests
                 Pass = "relay-secret"
             }));
 
-            Assert.True(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
         }
     }
 
@@ -85,7 +85,13 @@ public class SmtpHealthCheckTests
                 Pass = "wrong-pass"
             }));
 
-            Assert.False(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+            Assert.False(result.Reachable);
+            // Diagnostic must name the step: AUTH rejection, plus the relay's own
+            // 535 reply, so an operator reading /health sees exactly why the
+            // credentials were rejected.
+            Assert.Contains("AUTH", result.Reason);
+            Assert.Contains("535", result.Reason);
         }
     }
 
@@ -103,7 +109,7 @@ public class SmtpHealthCheckTests
                 Pass = "relay-secret"
             }));
 
-            Assert.True(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
         }
     }
 
@@ -124,7 +130,9 @@ public class SmtpHealthCheckTests
                 Pass = "relay-secret"
             }));
 
-            Assert.False(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+            Assert.False(result.Reachable);
+            Assert.Contains("CRAM-MD5", result.Reason);
         }
     }
 
@@ -140,7 +148,12 @@ public class SmtpHealthCheckTests
                 Port = relay.Port
             }));
 
-            Assert.False(await check.IsReachableAsync(TestContext.Current.CancellationToken));
+            var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+            Assert.False(result.Reachable);
+            // Diagnostic must name the step that broke (EHLO) and the relay's
+            // 421 reply, so /health is actionable instead of "unreachable".
+            Assert.Contains("EHLO", result.Reason);
+            Assert.Contains("421", result.Reason);
         }
     }
 
@@ -166,13 +179,20 @@ public class SmtpHealthCheckTests
             Pass = "relay-secret"
         }));
 
-        Assert.False(await onlyUser.IsReachableAsync(TestContext.Current.CancellationToken));
-        Assert.False(await onlyPass.IsReachableAsync(TestContext.Current.CancellationToken));
+        var userOnly = await onlyUser.CheckAsync(TestContext.Current.CancellationToken);
+        var passOnly = await onlyPass.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(userOnly.Reachable);
+        Assert.False(passOnly.Reachable);
+        // Config error must be distinguishable from a live-connection failure —
+        // no I/O happened here, so the message should say "misconfigured".
+        Assert.Contains("misconfigured", userOnly.Reason);
+        Assert.Contains("misconfigured", passOnly.Reason);
     }
 
-    private static async Task CheckTrue(Task<bool> result, bool expected)
+    private static async Task CheckFalse(Task<SmtpHealthResult> result)
     {
-        Assert.Equal(expected, await result);
+        Assert.False((await result).Reachable);
     }
 }
 

@@ -38,21 +38,35 @@ internal static class SmtpProbe
     private static readonly TimeSpan DefaultHandshakeTimeout = TimeSpan.FromSeconds(3);
 
     /// <summary>
+    /// Outcome of a single <see cref="TryHandshakeAsync"/> pass: a passing probe is
+    /// <see cref="Ok"/>; a failing one is <see cref="Fail(string)"/> with
+    /// <see cref="Message"/> naming the exact step that broke (not-configured,
+    /// connect/DNS, greeting, EHLO, AUTH, timeout) so the operator reading /health
+    /// sees the cause instead of guessing.
+    /// </summary>
+    internal sealed record ProbeOutcome(bool Ok, string? Message)
+    {
+        public static ProbeOutcome OkInstance { get; } = new(true, null);
+        public static ProbeOutcome Fail(string message) => new(false, message);
+    }
+
+    /// <summary>
     /// Runs the full delivery preflight (greeting, EHLO, and AUTH when
     /// credentials are configured) against <paramref name="options"/> and
-    /// returns true only if every step succeeds or completes within one
-    /// shared timeout window.
+    /// returns a passing/failed <see cref="ProbeOutcome"/> — on failure the
+    /// outcome names the step that broke.
     /// </summary>
-    public static async Task<bool> TryHandshakeAsync(SmtpOptions options, CancellationToken ct)
+    public static async Task<ProbeOutcome> TryHandshakeAsync(SmtpOptions options, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(options.Host))
-            return false;
+            return ProbeOutcome.Fail("not configured: SMTP__Host is empty — no relay to reach (unconfigured, not a connection failure)");
 
         bool hasUser = !string.IsNullOrWhiteSpace(options.User);
         bool hasPass = !string.IsNullOrWhiteSpace(options.Pass);
         if (hasUser != hasPass)
-            return false;   // exactly-one-or-zero invariant (SmtpSender's, mirrored so the probe and the send can't disagree)
+            return ProbeOutcome.Fail("misconfigured: exactly one of SMTP__User / SMTP__Pass is set — real sends would fail authentication; set both or neither");
 
+        string target = $"{options.Host}:{options.Port}";
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
@@ -74,7 +88,7 @@ internal static class SmtpProbe
             // 220 banner: any 2xx greeting line (RFC 5321 &#167;4.2).
             string banner = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
             if (!banner.StartsWith("2", StringComparison.Ordinal))
-                return false;
+                return ProbeOutcome.Fail($"greeting: relay answered with a non-2xx banner — {FirstLine(banner)}");
 
             // EHLO advertises the capabilities (incl. AUTH, if it does any at
             // all); a 250 here proves the relay is actually speaking SMTP, not
@@ -82,10 +96,10 @@ internal static class SmtpProbe
             writer.WriteLine($"EHLO {ProbeDomain}");
             string ehlo = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
             if (!ehlo.StartsWith("250", StringComparison.Ordinal))
-                return false;
+                return ProbeOutcome.Fail($"EHLO: relay rejected EHLO — {FirstLine(ehlo)}");
 
             if (!hasUser)
-                return true;   // no-auth shape (Mailpit / localhost relay) — greeting + EHLO is everything a real send needs
+                return ProbeOutcome.OkInstance;   // no-auth shape (Mailpit / localhost relay) — greeting + EHLO is everything a real send needs
 
             // AUTH — only PLAIN or LOGIN are in scope: those are the two BCL
             // actually supports, and they're the only shapes SmtpSender's
@@ -95,7 +109,7 @@ internal static class SmtpProbe
             // anything.
             string? mechanism = ParseAdvertisedAuthMechanism(ehlo);
             if (mechanism is null)
-                return false;   // relay doesn't advertise AUTH; credentials would be useless
+                return ProbeOutcome.Fail("AUTH: relay does not advertise any AUTH mechanism");
 
             // RFC 4954: PLAIN carries base64("\0 user \0 pass") inline on the
             // AUTH line — a correct 235 is the whole proof in that one round
@@ -104,7 +118,9 @@ internal static class SmtpProbe
             {
                 writer.WriteLine($"AUTH PLAIN {ComputePlainToken(options.User!, options.Pass!)}");
                 string plainReply = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
-                return plainReply.StartsWith("235", StringComparison.Ordinal);
+                return plainReply.StartsWith("235", StringComparison.Ordinal)
+                    ? ProbeOutcome.OkInstance
+                    : ProbeOutcome.Fail($"AUTH PLAIN: relay rejected the credentials — {FirstLine(plainReply)} (check SMTP__User / SMTP__Pass on this host)");
             }
 
             // RFC 4954: LOGIN is two 334 challenges (user, then password).
@@ -113,33 +129,38 @@ internal static class SmtpProbe
                 writer.WriteLine("AUTH LOGIN");
                 string first = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
                 if (!first.StartsWith("334", StringComparison.Ordinal))
-                    return false;
+                    return ProbeOutcome.Fail($"AUTH LOGIN: relay did not issue the username challenge — {FirstLine(first)}");
 
                 writer.WriteLine(Convert.ToBase64String(Encoding.UTF8.GetBytes(options.User!)));
                 string second = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
                 if (!second.StartsWith("334", StringComparison.Ordinal))
-                    return false;
+                    return ProbeOutcome.Fail($"AUTH LOGIN: relay did not issue the password challenge — {FirstLine(second)}");
 
                 writer.WriteLine(Convert.ToBase64String(Encoding.UTF8.GetBytes(options.Pass!)));
                 string final = await ReadReplyAsync(reader, linked.Token).ConfigureAwait(false);
-                return final.StartsWith("235", StringComparison.Ordinal);
+                return final.StartsWith("235", StringComparison.Ordinal)
+                    ? ProbeOutcome.OkInstance
+                    : ProbeOutcome.Fail($"AUTH LOGIN: relay rejected the credentials — {FirstLine(final)} (check SMTP__User / SMTP__Pass on this host)");
             }
 
-            return false;   // advertised a mechanism BCL can't drive — same dead-letter outcome a real send would have.
+            return ProbeOutcome.Fail($"AUTH: relay advertises only {mechanism}, which the BCL SmtpClient cannot drive (only PLAIN and LOGIN are) — a real send would dead-letter");
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            // Timeout (linked CancelAfter) or caller cancellation — both are "down"
-            // for health-probe purposes.
-            return false;
+            // Timeout (linked CancelAfter) or caller cancellation — name it
+            // explicitly so "slow/firewalled" is distinguishable from "wrong creds".
+            return ProbeOutcome.Fail($"timed out or was cancelled against {target}: {ex.GetType().Name}: {ex.Message}");
         }
-        catch
+        catch (Exception ex)
         {
             // DNS failure, connection refused, a reset mid-handshake — all the
-            // same operator signal: the relay is not delivering.
-            return false;
+            // same operator signal (the relay is not delivering), but with the
+            // concrete cause attached so /health is actionable.
+            return ProbeOutcome.Fail($"failed against {target}: {ex.GetType().Name}: {ex.Message}");
         }
     }
+
+    private static string FirstLine(string reply) => reply.Split('\n').FirstOrDefault() ?? reply;
 
     /// <summary>
     /// RFC 4954 &#167;2: PLAIN's inline initial-response is

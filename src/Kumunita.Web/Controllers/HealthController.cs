@@ -50,17 +50,21 @@ public sealed class HealthController : Controller
         // live (200) when the relay is down — email is still durable via the
         // OutboxEmail retry / dead-letter path — but the operator gets the
         // "degraded" signal plus a "mail" field showing the relay is unreachable.
-        var mailReachable = await _smtpHealth.IsReachableAsync(ct).ConfigureAwait(false);
+        var mail = await _smtpHealth.CheckAsync(ct).ConfigureAwait(false);
 
         sw.Stop();
 
         return Ok(new
         {
-            status = (deadLetterCount > 0 || !mailReachable) ? "degraded" : "ok",
+            status = (deadLetterCount > 0 || !mail.Reachable) ? "degraded" : "ok",
             app = "Kumunita",
             build = Environment.GetEnvironmentVariable("SOURCE_COMMIT") ?? "local",
             database = "ok",
-            mail = mailReachable ? "ok" : "unreachable",
+            mail = mail.Reachable ? "ok" : "unreachable",
+            // Operator diagnostic (OPS §7): the exact step the handshake failed at
+            // (connect/DNS, banner, EHLO, AUTH, timeout) plus the relay's own
+            // reply — null when mail is healthy, or on the 503 path above.
+            mailDetail = mail.Reachable ? null : mail.Reason,
             emailDeadLetters = deadLetterCount,
             elapsedMs = sw.ElapsedMilliseconds
         });
