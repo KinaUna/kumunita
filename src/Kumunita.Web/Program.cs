@@ -198,6 +198,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
         options.Cookie.Name = "kumunita.auth";
+        // Pin the cookie path to site root. Without this the cookie is set
+        // with no `Path` attribute (browser stores as Path=/), but the sign-out
+        // path in CookieAuthenticationHandler emits the clear cookie with
+        // Path=<current request path> — and per RFC 6265 a clear header
+        // only matches the stored cookie when name AND path both agree, so
+        // signing out from /Home, /Community, /Profile/Edit, etc. leaves the
+        // original cookie intact and the resident re-authenticates on the
+        // very next request. (learn.microsoft.com/aspnet/core/security/
+        // cookie-sharing documents this for exactly this auth-cookie case.)
+        options.Cookie.Path = "/";
         // Absolute 14-day ticket span: the handler uses it for any sign-in that
         // omits an explicit ExpiresUtc. Every sign-in lane also sets its own 14-day
         // ExpiresUtc + IsPersistent (AuthenticationProperties), so a login neither

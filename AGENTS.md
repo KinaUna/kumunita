@@ -85,6 +85,29 @@ when you change behavior:
 - A **new capability that settles a design question** gets an ADR under `docs/adr/`
   (numbered after the current highest), not just a prose note in the README.
 
+## Running the tests (test-runner quirk)
+
+Both test projects use **xunit.v3** (`Microsoft.Testing.Platform`), surfaced to VS
+Test Explorer via `Microsoft.Testing.Extensions.VSTestBridge`. On this machine the
+discovery path reliably goes wrong: VS Test Explorer (the `run_tests` tool) shows
+"Discovered: N Tests found … No tests found to run", and `dotnet test` fails with
+`Zero tests ran / Exit code: 5` — even though the same discovery run found all the
+tests moments earlier. This is a runner/discovery bug, **not** a real test failure;
+don't keep retrying those paths or "fix" the tests.
+
+The reliable path is to build, then run each test assembly in-process through
+xunit.v3's own runner (this is what actually reports pass/fail here):
+
+```powershell
+dotnet build Kumunita.slnx -c Debug
+dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+```
+
+`Kumunita.Web.Tests` runs in well under a second; `Kumunita.Core.Tests` takes ~20 s
+because it starts `postgres:18` via Testcontainers (and leaves Docker containers
+behind if the process is killed — clean up with `docker container prune`).
+
 ## Running PowerShell commands safely (Windows agents)
 
 If you run terminal commands on this machine, the shell is PowerShell. PowerShell
