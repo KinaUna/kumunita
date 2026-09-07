@@ -660,6 +660,212 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Null(stored!.Modified);
     }
 
+    // ── Pinned (the site-wide banner lane — the visibility pin) ────────────
+
+    /// <summary>
+    /// The pinned lane is the same two-way split as the normal list, but
+    /// narrowed to <see cref="Announcement.Pinned"/> = true. An anonymous
+    /// visitor sees at most one pinned <see cref="AnnouncementScope.Public"/>
+    /// announcement — pinned <see cref="AnnouncementScope.Community"/> rows
+    /// are invisible to anonymous callers (the split pin, the same reason
+    /// <see cref="ListVisible_Anonymous_OnlySeesPublic"/> above applies).
+    /// </summary>
+    [Fact]
+    public async Task Pinned_Anonymous_ReturnsOnlyPinnedPublic()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-pinned-visit";
+        var c = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "pin-pub", Scope = AnnouncementScope.Public, Pinned = true,
+            Title = "Maintenance", Body = "Sat 02:00 UTC", AuthorId = author,
+            Created = c,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "pin-comm", Scope = AnnouncementScope.Community, Pinned = true,
+            Title = "Resident event", Body = "this weekend", AuthorId = author,
+            Created = c.AddDays(1),
+        });
+        await Plant(store, new Announcement
+        {
+            // Pinned row in the Community scope, but a different scope than an
+            // anonymous viewer is allowed to see: must be invisible.
+            Id = "pin-comm-2", Scope = AnnouncementScope.Community, Pinned = true,
+            Title = "Volunteers", Body = "needed", AuthorId = author,
+            Created = c.AddDays(2),
+        });
+
+        var pinned = await svc.PinnedAsync(isAuthenticated: false);
+
+        Assert.NotNull(pinned);
+        Assert.Equal("pin-pub", pinned!.Id);
+        Assert.Equal(AnnouncementScope.Public, pinned.Scope);
+    }
+
+    /// <summary>
+    /// A signed-in caller sees the most-recently-created pinned announcement
+    /// across both scopes (the "most-recently-created wins" rule, applied to
+    /// the union). A newer Community pin trumps an older Public pin even
+    /// though the Public one is visible more broadly by virtue of its scope.
+    /// </summary>
+    [Fact]
+    public async Task Pinned_Authenticated_MostRecentlyCreatedWinsAcrossScopes()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-pinned-auth";
+        var c = new DateTimeOffset(2026, 2, 2, 0, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "older-pub", Scope = AnnouncementScope.Public, Pinned = true,
+            Title = "Scheduled maintenance", Body = "Sat 02:00 UTC",
+            AuthorId = author, Created = c,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "older-comm", Scope = AnnouncementScope.Community, Pinned = true,
+            Title = "Help us with X", Body = "this weekend",
+            AuthorId = author, Created = c.AddDays(1),
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "newer-comm", Scope = AnnouncementScope.Community, Pinned = true,
+            Title = "New event", Body = "this weekend",
+            AuthorId = author, Created = c.AddDays(2),
+        });
+
+        var pinned = await svc.PinnedAsync(isAuthenticated: true);
+
+        Assert.NotNull(pinned);
+        Assert.Equal("newer-comm", pinned!.Id);
+
+        // Spot-check: had the query returned only the anonymous-visible set,
+        // the anonymous call would have returned "older-pub" (newest Public)
+        // — the Community pin "newer-comm" is the correct answer for a
+        // signed-in caller, proving both scopes are on the table.
+        var anonymousPinned = await svc.PinnedAsync(isAuthenticated: false);
+        Assert.NotNull(anonymousPinned);
+        Assert.Equal("older-pub", anonymousPinned!.Id);
+    }
+
+    /// <summary>
+    /// The empty state: no announcement is pinned. Returns null (the Web
+    /// layer uses null to skip the banner). This is not the same shape as
+    /// <see cref="ListVisible_NoDocuments_ReturnsEmptyList_NotNull"/> — the
+    /// pinned lane is single-result, so its empty sentinel is null.
+    /// </summary>
+    [Fact]
+    public async Task Pinned_NoPinnedAnnouncements_ReturnsNull()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        // Plant two non-pinned (Pinned = false) announcements: the pinned
+        // lane must return null even though other announcements exist.
+        const string author = "u-author-no-pin";
+        var c = new DateTimeOffset(2026, 2, 3, 0, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "unpin-pub", Scope = AnnouncementScope.Public, Pinned = false,
+            Title = "Maintenance", Body = "Sat 02:00 UTC", AuthorId = author,
+            Created = c,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "unpin-comm", Scope = AnnouncementScope.Community, Pinned = false,
+            Title = "Resident call", Body = "help us", AuthorId = author,
+            Created = c.AddDays(1),
+        });
+
+        var pinned = await svc.PinnedAsync(isAuthenticated: true);
+
+        Assert.Null(pinned);
+    }
+
+    /// <summary>
+    /// The split pin on the read gate: an announcement that was pinned but
+    /// later unpinned (Pinned=false) is not returned, regardless of scope or
+    /// auth state. The pinned lane does not remember that it was *ever*
+    /// pinned; only the current <see cref="Announcement.Pinned"/> state
+    /// counts (there's no "re-appear" lane on this bounded context —
+    /// mirroring the "hard delete" pin, no soft-hidden state surface).
+    /// </summary>
+    [Fact]
+    public async Task Pinned_UnpinnedRows_AreNotReturned()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-unpin";
+        var c = new DateTimeOffset(2026, 2, 4, 0, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "unpin-pub-1", Scope = AnnouncementScope.Public, Pinned = false,
+            Title = "Maintenance", Body = "Sat 02:00 UTC", AuthorId = author,
+            Created = c,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "unpin-comm-1", Scope = AnnouncementScope.Community, Pinned = false,
+            Title = "Resident call", Body = "help us", AuthorId = author,
+            Created = c.AddDays(1),
+        });
+
+        Assert.Null(await svc.PinnedAsync(isAuthenticated: false));
+        Assert.Null(await svc.PinnedAsync(isAuthenticated: true));
+    }
+
+    /// <summary>
+    /// The scope split is applied to the pinned result itself (not just
+    /// which rows are returned, but which scope the caller can see). An
+    /// unauthenticated caller sees a pinned Public announcement but the
+    /// pinned Community one is never surfaced — and vice versa, a
+    /// signed-in caller sees the most-recently-created pinned announcement
+    /// in either scope. This test pins the "scope of the returned doc
+    /// matches the caller's auth state" shape.
+    /// </summary>
+    [Fact]
+    public async Task Pinned_Anonymous_ScopeOfReturnedDoc_RespectsAuthGate()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-scope";
+        var c = new DateTimeOffset(2026, 2, 5, 0, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "pin-pub-a", Scope = AnnouncementScope.Public, Pinned = true,
+            Title = "Maintenance", Body = "Sat 02:00 UTC", AuthorId = author,
+            Created = c,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "pin-comm-b", Scope = AnnouncementScope.Community, Pinned = true,
+            Title = "Resident call", Body = "help us", AuthorId = author,
+            Created = c.AddDays(1),
+        });
+
+        // Anonymous: only Public is visible. The most-recently-created
+        // pinned announcement that passes the gate is "pin-pub-a" even
+        // though "pin-comm-b" is newer (it's a Community pin).
+        var anon = await svc.PinnedAsync(isAuthenticated: false);
+        Assert.NotNull(anon);
+        Assert.Equal("pin-pub-a", anon!.Id);
+        Assert.Equal(AnnouncementScope.Public, anon.Scope);
+
+        // Signed-in: union of pinned rows, most-recently-created wins —
+        // "pin-comm-b" even though it's Community scope.
+        var auth = await svc.PinnedAsync(isAuthenticated: true);
+        Assert.NotNull(auth);
+        Assert.Equal("pin-comm-b", auth!.Id);
+        Assert.Equal(AnnouncementScope.Community, auth.Scope);
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

@@ -110,7 +110,7 @@ public sealed class AnnouncementController(
 
         var rows = visible
             .Select(a => new AnnouncementRow(a.Id, a.Scope, a.Title ?? string.Empty, a.Body, a.Created,
-                                             authorNames[a.AuthorId]))
+                                             authorNames[a.AuthorId], a.Pinned))
             .ToList();
 
         return View(new AnnouncementIndexViewModel(rows));
@@ -180,9 +180,10 @@ public sealed class AnnouncementController(
             var created = await announcements.CreateAsync(
                 new Announcement
                 {
-                    Title = string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title.Trim(),
-                    Body  = model.Body!,
-                    Scope = scope,
+                    Title  = string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title.Trim(),
+                    Body   = model.Body!,
+                    Scope  = scope,
+                    Pinned = model.Pinned,
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -239,6 +240,7 @@ public sealed class AnnouncementController(
             Title = existing.Title,
             Body  = existing.Body,
             Scope = existing.Scope.ToString(),
+            Pinned = existing.Pinned,
             AllowedScopes = RoleAllowedScopes(roles),
         });
     }
@@ -274,6 +276,7 @@ public sealed class AnnouncementController(
                 Title = model.Title,
                 Body  = model.Body,
                 Scope = model.Scope,
+                Pinned = model.Pinned,
                 AllowedScopes = RoleAllowedScopes(RoleSet(User)),
             });
         }
@@ -289,7 +292,14 @@ public sealed class AnnouncementController(
         try
         {
             await announcements.UpdateAsync(
-                new Announcement { Id = id, Title = model.Title ?? string.Empty, Body = model.Body!, Scope = scope },
+                new Announcement
+                {
+                    Id     = id,
+                    Title  = model.Title ?? string.Empty,
+                    Body   = model.Body!,
+                    Scope  = scope,
+                    Pinned = model.Pinned,
+                },
                 actorId:    actorId,
                 actorRoles: RoleSet(User),
                 session);

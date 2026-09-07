@@ -1,0 +1,69 @@
+@using Kumunita.Core.Announcements
+@inject Kumunita.Core.Announcements.IAnnouncementService Announcements
+@{
+    // Render the single pinned announcement as a banner at the top of every
+    // page (see the layout, Views/Shared/_Layout.cshtml). The visibility gate
+    // is the service's (public always; community only when signed in), so an
+    // anonymous visitor may see a pinned Public announcement but never a
+    // pinned Community one — the split pin, ADR 0006-D.
+    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
+    Announcement? pinned = await Announcements.PinnedAsync(isAuthenticated);
+
+    if (pinned is not null)
+    {
+        string dismissKey = "kumunita-pinned-announcement-dismissed-" + pinned.Id;
+        string badgeClass = pinned.Scope == AnnouncementScope.Public
+            ? "text-bg-secondary"
+            : "text-bg-primary";
+
+        <div class="kumunita-pinned-announcement alert alert-info alert-dismissible fade show mb-3"
+             role="region" aria-label="Pinned announcement" data-pinned-id="@pinned.Id">
+            <div class="container-fluid py-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge @badgeClass">
+                        @(pinned.Scope == AnnouncementScope.Public ? "everyone" : "residents")
+                    </span>
+                    <span class="me-auto me-2">
+                        @if (!string.IsNullOrWhiteSpace(pinned.Title))
+                        {
+                            <strong class="me-1">@pinned.Title</strong>
+                        }
+                        @pinned.Body
+                    </span>
+                    <a class="btn btn-sm btn-link text-nowrap p-0" href="/announcements"
+                       aria-label="See all announcements">All announcements</a>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert"
+                            data-dismiss-key="@dismissKey"
+                            aria-label="Dismiss this pinned announcement"></button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Persist the per-announcement dismissal in sessionStorage so the
+            // banner stays hidden for the rest of the browser session (across
+            // every page, but not across browser restarts). The key is per
+            // announcement id, so a future admin pinning a different one will
+            // surface for the user again.
+            (function () {
+                var banner = document.querySelector('.kumunita-pinned-announcement');
+                if (!banner) return;
+                var key = banner.querySelector('[data-dismiss-key]')
+                    .getAttribute('data-dismiss-key');
+                var btn = banner.querySelector('.btn-close');
+
+                if (sessionStorage.getItem(key)) {
+                    banner.style.display = 'none';
+                    return;
+                }
+
+                if (btn) {
+                    btn.addEventListener('click', function () {
+                        sessionStorage.setItem(key, '1');
+                    });
+                }
+            })();
+        </script>
+    }
+}

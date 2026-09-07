@@ -72,6 +72,12 @@
                                     <span class="badge @badgeClass">
                                         @(a.Scope == AnnouncementScope.Public ? "everyone" : "residents")
                                     </span>
+                                    @if (a.Pinned)
+                                    {
+                                        <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
+                                            pinned
+                                        </span>
+                                    }
                                     @if (isGlobalAdmin || (isModerator && a.Scope == AnnouncementScope.Community))
                                     {
                                         <a class="btn btn-sm btn-link p-0" href="/announcements/@a.Id/edit">

@@ -46,6 +46,18 @@ public sealed class Announcement
     /// <summary>The fixed visibility audience for the announcement (see <see cref="AnnouncementScope"/>).</summary>
     public AnnouncementScope Scope { get; set; } = AnnouncementScope.Public;
 
+    /// <summary>
+    /// When true, this announcement is "pinned" — the Web layer may render it
+    /// as a site-wide banner at the top of every page (including the home page)
+    /// in addition to its place in the regular <c>/announcements</c> list.
+    /// The visibility pin follows the same gate as <see cref="Scope"/>:
+    /// a pinned <see cref="AnnouncementScope.Public"/> announcement is pinned
+    /// for every visitor; a pinned <see cref="AnnouncementScope.Community"/>
+    /// announcement is pinned only for signed-in users. The most-recently-created
+    /// pinned announcement that passes the caller's auth gate is the one rendered
+    /// (see <see cref="IAnnouncementService.PinnedAsync"/>).</summary>
+    public bool Pinned { get; set; } = false;
+
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }
 }

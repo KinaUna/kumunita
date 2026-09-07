@@ -36,6 +36,20 @@ public interface IAnnouncementService
     Task<IReadOnlyList<Announcement>> ListVisibleAsync(bool isAuthenticated);
 
     /// <summary>
+    /// The single announcement to render as a site-wide banner — the
+    /// most-recently-created announcement with <see cref="Announcement.Pinned"/>
+    /// true that passes the caller's authentication state (the same
+    /// <see cref="ListVisibleAsync"/> visibility gate: <see cref="AnnouncementScope.Public"/>
+    /// always; <see cref="AnnouncementScope.Community"/> only when
+    /// <paramref name="isAuthenticated"/>). Returns null when no pinned
+    /// announcement passes the gate (the Web layer skips the banner in
+    /// that case). No <see cref="Kumunita.Core.Authorization.AccessAudit"/> row.
+    /// See <see cref="AnnouncementService.PinnedAsync"/> for the full
+    /// contract.
+    /// </summary>
+    Task<Announcement?> PinnedAsync(bool isAuthenticated);
+
+    /// <summary>
     /// Creates an <see cref="Announcement"/> in the <b>caller's</b> in-flight
     /// session (invariant C3). Enforces the scope-vs-role split — a
     /// <see cref="Roles.GlobalAdmin"/> may author either scope; a

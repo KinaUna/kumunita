@@ -29,3 +29,19 @@ body {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+/* Pinned announcement banner (Views/Shared/_PinnedAnnouncement.cshtml).
+   The banner is rendered at the top of every page, above the navbar. It is
+   already Bootstrap-styled via alert alert-info, but the body container
+   constrains everything below the navbar, so the banner needs explicit
+   full-bleed + a thin top border so it visually reads as a distinct
+   region rather than a page-level alert. */
+.kumunita-pinned-announcement {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--bs-info-border);
+}
+.kumunita-pinned-announcement .container-fluid {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}

@@ -68,6 +68,32 @@ public sealed class AnnouncementService : IAnnouncementService
     }
 
     /// <summary>
+    /// The single announcement to render as a site-wide banner:
+    /// the most-recently-created <see cref="Announcement"/> with
+    /// <see cref="Announcement.Pinned" /> true that passes the caller's
+    /// authentication state (the same gate as <see cref="ListVisibleAsync"/>:
+    /// <see cref="AnnouncementScope.Public" /> always;
+    /// <see cref="AnnouncementScope.Community" /> only when
+    /// <paramref name="isAuthenticated"/>). Returns null when no pinned
+    /// announcement passes (the Web layer skips the banner in that case).
+    /// No <c>AccessAudit</c> row (same reasoning as
+    /// <see cref="ListVisibleAsync"/> — announcements are not
+    /// audience-restricted; the scope-vs-role split is the whole decision).
+    /// </summary>
+    public async Task<Announcement?> PinnedAsync(bool isAuthenticated)
+    {
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Announcement>()
+            .Where(a => a.Pinned == true &&
+                        (a.Scope == AnnouncementScope.Public ||
+                         (isAuthenticated && a.Scope == AnnouncementScope.Community)))
+            .OrderByDescending(a => a.Created)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Creates an <see cref="Announcement"/> in the <b>caller's</b> in-flight
     /// session (invariant C3 — the same-transaction lane, see
     /// <see cref="Posts.PostService.CreatePostAsync"/> for the shape).
@@ -142,8 +168,8 @@ public sealed class AnnouncementService : IAnnouncementService
     /// <see cref="CreateAsync"/>, which mints a brand-new doc): the author of
     /// record is whoever created it, not whoever last edited it, and
     /// <see cref="Announcement.Modified"/> is stamped — <see cref="DateTimeOffset.UtcNow"/>
-    /// — only when at least one of Title/Body/Scope actually changed, so a
-    /// no-op re-save of an unchanged doc does not bump the stamp.
+    /// — only when at least one of Title/Body/Scope/Pinned actually changed,
+    /// so a no-op re-save of an unchanged doc does not bump the stamp.
     /// </summary>
     public async Task<Announcement> UpdateAsync(
         Announcement updated,
@@ -178,11 +204,13 @@ public sealed class AnnouncementService : IAnnouncementService
 
         var changed = existing.Title != updated.Title
             || existing.Body != updated.Body
-            || existing.Scope != updated.Scope;
+            || existing.Scope != updated.Scope
+            || existing.Pinned != updated.Pinned;
 
         existing.Title = updated.Title;
         existing.Body  = updated.Body;
         existing.Scope = updated.Scope;
+        existing.Pinned = updated.Pinned;
         if (changed)
             existing.Modified = DateTimeOffset.UtcNow;
 

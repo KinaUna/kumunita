@@ -97,6 +97,28 @@
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="pinned" name="Pinned"
+                               value="true" checked="@(Model.Pinned ? "checked" : null)" />
+                        <input type="hidden" name="Pinned" value="false" />
+                        <label class="form-check-label" for="pinned" style="font-weight:600;">
+                            Pin to the top of all pages
+                        </label>
+                        <div class="text-muted small mt-1">
+                            A pinned announcement is shown as a banner at the very top
+                            of every Kumunita page (including Home) in addition to
+                            the usual <b>Announcements</b> list.
+                            The visibility gate still applies: a <b>public</b> pin
+                            shows for every visitor; a <b>resident</b> pin shows
+                            only when a user is signed in.
+                            The most-recently-pinned announcement wins.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">Create announcement</button>
                 <a href="/announcements" class="btn btn-link p-0">Cancel</a>
