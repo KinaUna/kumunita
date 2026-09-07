@@ -16,4 +16,8 @@ public sealed class LoginViewModel
     public bool RememberMe { get; set; }
 
     public string? ReturnUrl { get; set; }
+
+    /// <summary>Pre-populated error to display when arriving at the login page with a
+    /// known reason (e.g. the blocked-account sign-out landing).</summary>
+    public string? Error { get; set; }
 }

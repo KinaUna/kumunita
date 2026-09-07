@@ -298,6 +298,8 @@ app.UseRouting();
 
 app.UseAuthentication();
 
+app.UseMiddleware<BlockedAccountMiddleware>();
+
 app.UseAuthorization();
 
 app.MapStaticAssets();
