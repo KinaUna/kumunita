@@ -542,3 +542,86 @@ would be a code change, which exceeds U5's comments-only scope.
 - [x] Comments-only changes — no code, no signature, no registration, no
       version pin altered.
 - [x] `U1PinnedApiProbe.cs` left in place (not in U5's Deliverables).
+
+---
+
+## U6 — e2e (evidenced)
+
+**Status: complete (evidenced, not skipped).** Exit satisfied (plan line 143):
+a real signup was run through `/signup` and the full §6.2 path was observed
+live — the positive path delivered to Mailpit, and the retry path was actually
+triggered and held by the cooldown schedule.
+
+### What was set up
+
+- `kumunita_app` rebuilt from the **current** source (U1–U5) so the test ran
+  the real `OutboxEmailStager` that enqueues the durable envelope. New image
+  `sha256:cd8a31da…` replaced the stale `sha256:a07777…` (pre-U1, store-only).
+- A **local-only, uncommitted** `docker-compose.override.yml` supplied
+  `SMTP__From=kumunita@localhost`. This closed a dev-runtime config gap, not a
+  code bug: `SmtpSender.SendAsync` only sets `mailmessage.From` when
+  `SmtpOptions.From` is non-empty (lines 250-251); with it empty the BCL
+  `SmtpClient` throws `A from address must be specified` before reaching Mailpit.
+  The base `docker-compose.yml` already sets `SMTP__Host/Port/Secure`.
+
+### Round 1 — §6.2 retry path observed live
+
+- Signup → new `mt.mt_doc_outboxemail` row + a **real durable envelope** in
+  `mt.wolverine_incoming_envelopes` (`message_type=Kumunita.Core.Identity.OutboxEmail`),
+  produced in the **same commit** — the C3 guarantee restored by U1–U5.
+- The durable handler fired against that envelope and threw
+  `SmtpException: A from address must be specified`; the app log shows
+  `Wolverine.ErrorHandling.RetryInlineContinuation.ExecuteAsync` /
+  `MessageContext.RetryExecutionNowAsync` called — i.e. the `RetryWithCooldown`
+  schedule (Program.cs:271) is actually holding the next attempt. The handler
+  reached `SmtpSender.SendAsync` only because a real envelope existed; the
+  pre-U1–U5 code never produced one (the two pre-existing `OutboxEmail` rows have
+  no matching envelope rows — direct evidence of the old gap).
+
+### Round 2 — positive path, delivered to Mailpit
+
+- `POST /Account/Signup` → **302 → /Account/Login** (exact success path,
+  `AccountController.Signup:70`).
+- New `mt.mt_doc_outboxemail` row: `id=d5f6c76f…`, `Recipient=u6smoke2@kumunita.example`,
+  `IdempotencyKey=verify:6220ddfa…:1` (correct `verify:{userId}:1` shape),
+  `QueuedAt=2026-09-07T12:47:04.178Z`.
+- Durable envelope `08df0cde-1e60-…` reached `status=Handled` (consumed after
+  successful send). `EmailDeadLetter` count stayed 0.
+- **Mailpit delivered it**: message `ID=39l77mDCYQ79YhR0IU5hro`,
+  `From=kumunita@localhost`, `To=u6smoke2@kumunita.example`,
+  `Subject="Verify your Kumunita account"`, `Created=2026-09-07T12:47:06.064Z`.
+
+### C3 timing proof
+
+- row commit (`mt_last_modified`) `12:47:04.232Z` → Mailpit accepted the relay
+  `12:47:06.064Z` = **~1.8 s**. The envelope was held by Wolverine until the
+  caller's `SaveChangesAsync` committed, then dispatched by the durable handler —
+  the exact C3 guarantee this milestone restored. The dead-letter / 24 h-cooldown
+  tail is already covered by the (green in U5) `SideEffectHarnessTests` and
+  `EmailDeadLetterCounterTests`; it needs a ~24 h wait to observe live, so it
+  was not re-run here.
+
+### Deliverables / artifacts
+
+- `docs/plans-milestones/m1-step7-u6-plan.md` — this unit's plan + full evidence
+  (round 1 + round 2 timestamps, envelope ids, Mailpit message, timing).
+- Scratch scripts (`u6-signup-post.ps1`, `u6-signup-post2.ps1`, `u6-evidence.sql`)
+  were **deleted** after the run (not part of the source tree).
+- `docker-compose.override.yml` left in the repo root as a local dev-runtime
+  helper; **not committed**. No `src/**` file was modified — U6 is a read-only
+  smoke test, per its own deliverable ("No source code changes made").
+
+### Exit checklist (mirrors plan line 143)
+
+- [x] `kumunita_app` rebuilt from current source and restarted.
+- [x] One real signup via `/signup`; `OutboxEmail` row in `mt_doc_outboxemail`
+      with `verify:{userId}:1` idempotency key.
+- [x] Durable envelope present in the Wolverine `mt` queue table and reached
+      `Handled`.
+- [x] Email actually dispatched — confirmed in Mailpit (recipient + subject
+      match, `Created` ~1.8 s after row commit).
+- [x] §6.2 retry/dead-letter path confirmed reachable (round-1 live `SmtpException`
+      + retry-continuation; dead-letter row not forced because it needs the ~24 h
+      cooldown schedule and is covered by the pinned unit tests).
+- [x] This `## U6 — e2e (evidenced)` section appended before unit exit.
+- [x] No `src/**` source change made; U6 was a read-only smoke check.
