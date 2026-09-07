@@ -48,7 +48,7 @@ services:
       # DB password) — presented at /admin/setup on first boot to set the admin password;
       # the token is consumed and invalidated on that first use. Regenerate with
       # `openssl rand -hex 24` (or a fresh random hex string) if the DB volume is recreated.
-      SeedAdmin__Email: "admin@example.com"
+      SeedAdmin__Email: "admin@kumunita.com"
       SeedAdmin__Token: "devseedadmintok30"
       # Mailpit as dev SMTP relay (COOLIFY §5.1A) — the only thing that gets the
       # first-boot setup email out; without it the outbox handler retries/dead-letters.

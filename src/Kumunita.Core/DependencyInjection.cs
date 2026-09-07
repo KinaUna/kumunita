@@ -88,6 +88,13 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 
+        // The /health mail-reachability seam (OPS §8): a sockets-level SMTP
+        // handshake against the bound SmtpOptions — resolves IOptions<SmtpOptions>
+        // (which the host binds from the "SMTP" section in Program.cs) and
+        // reports false rather than throwing when the relay is unreachable or
+        // unconfigured, so HealthController can always map it to "mail": "unreachable".
+        services.AddTransient<ISmtpHealthCheck, SmtpHealthCheck>();
+
         // Step-7 (M1 plan): the per-attempt SMTP seam. The durable policy (6 attempts
         // / ~24h / dead-letter) is configured by the host's Wolverine handler against
         // this implementation; the harness overrides this registration with a fake
