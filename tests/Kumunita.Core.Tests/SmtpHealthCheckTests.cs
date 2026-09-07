@@ -7,15 +7,22 @@ using Microsoft.Extensions.Options;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="SmtpHealthCheck" /> (OPS §8 — the /health
-/// mail-reachability seam): the unconfigured shape (empty host) must report
-/// unreachable rather than throw, and a live handshake against a fake SMTP
-/// listener must report reachable.
+/// Unit tests for <see cref="SmtpHealthCheck"/> (OPS §8 — the /health
+/// mail-reachability seam):
+/// <list type="bullet">
+/// <item>the unconfigured shape (empty host) must report unreachable rather than throw,</item>
+/// <item>a live handshake against a fake SMTP listener must report reachable,</item>
+/// <item>the plaintext-AUTH path (Secure=None) accepts and rejects PLAIN/LOGIN correctly,</item>
+/// <item>the STARTTLS path (Secure=Tls — the default) names its diagnostic when the
+/// relay does not advertise STARTTLS, or refuses the upgrade,</item>
+/// <item>each failure exposes the step that broke plus the relay's own reply
+/// (e.g. 535, 421, 535), so /health is actionable without digging through logs.</item>
+/// </list>
 /// </summary>
 public class SmtpHealthCheckTests
 {
     [Fact]
-    public Task IsReachableAsync_When_HostUnconfigured_Returns_False()
+    public Task CheckAsync_When_HostUnconfigured_Returns_False()
     {
         var check = new SmtpHealthCheck(Options.Create(new SmtpOptions()));
 
@@ -23,15 +30,16 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_RelayAnswersHandshake_Returns_True()
+    public async Task CheckAsync_When_RelayAnswersHandshake_Plain_Returns_True()
     {
-        var relay = FakeSmtpRelay.Start();
+        var relay = FakeSmtpRelay.Start();   // default: NoAuth mode → banner + EHLO (no STARTTLS)
         using (relay)
         {
             var check = new SmtpHealthCheck(Options.Create(new SmtpOptions
             {
                 Host = "127.0.0.1",
-                Port = relay.Port
+                Port = relay.Port,
+                Secure = SmtpOptions.SecureNone   // plain relay — the Mailpit / localhost shape
             }));
 
             Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
@@ -39,22 +47,42 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_NothingListening_Returns_False()
+    public async Task CheckAsync_When_NothingListening_Returns_False()
     {
-        // FreeTcpPort reserves (and immediately releases) a port, so a connect
-        // to it is refused — the "relay down" shape.
-        int port = FreeTcpPort.ReserveAndRelease();
+        // Reserving (and immediately releasing) a port makes a subsequent
+        // connect to it refused — the "relay down" shape.
+        int port = ReserveFreePort();
         var check = new SmtpHealthCheck(Options.Create(new SmtpOptions
         {
             Host = "127.0.0.1",
             Port = port
         }));
 
-        Assert.False((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
+        var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+
+        Assert.False(result.Reachable);
+        // The diagnostic must name the target host:port and the underlying
+        // socket error so /health is actionable.
+        Assert.Contains($"127.0.0.1:{port}", result.Reason);
+        Assert.Contains("SocketException", result.Reason);
+    }
+
+    /// <summary>
+    /// Reserves an OS-assigned TCP port and releases it immediately — any
+    /// subsequent connect to the same port is refused (the "relay down"
+    /// shape the /health probe is meant to detect).
+    /// </summary>
+    private static int ReserveFreePort()
+    {
+        var probe = new TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int assigned = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return assigned;
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_RelayAdvertisesAuthPlain_Accepts_Returns_True()
+    public async Task CheckAsync_When_RelayAdvertisesAuthPlain_Accepts_Returns_True()
     {
         var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.AuthPlainAccept);
         using (relay)
@@ -64,7 +92,8 @@ public class SmtpHealthCheckTests
                 Host = "127.0.0.1",
                 Port = relay.Port,
                 User = "kumunita@kumunita",
-                Pass = "relay-secret"
+                Pass = "relay-secret",
+                Secure = SmtpOptions.SecureNone   // plaintext AUTH path
             }));
 
             Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
@@ -72,7 +101,7 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_RelayAdvertisesAuthPlain_Rejects_Returns_False()
+    public async Task CheckAsync_When_RelayAdvertisesAuthPlain_Rejects_Returns_False()
     {
         var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.AuthPlainReject);
         using (relay)
@@ -82,21 +111,22 @@ public class SmtpHealthCheckTests
                 Host = "127.0.0.1",
                 Port = relay.Port,
                 User = "wrong-user",
-                Pass = "wrong-pass"
+                Pass = "wrong-pass",
+                Secure = SmtpOptions.SecureNone
             }));
 
             var result = await check.CheckAsync(TestContext.Current.CancellationToken);
             Assert.False(result.Reachable);
-            // Diagnostic must name the step: AUTH rejection, plus the relay's own
-            // 535 reply, so an operator reading /health sees exactly why the
-            // credentials were rejected.
+            // Diagnostic must name the step: AUTH rejection, plus the relay's
+            // own 535 reply, so an operator reading /health sees exactly why
+            // the credentials were rejected.
             Assert.Contains("AUTH", result.Reason);
             Assert.Contains("535", result.Reason);
         }
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_RelayAdvertisesAuthLogin_Accepts_Returns_True()
+    public async Task CheckAsync_When_RelayAdvertisesAuthLogin_Accepts_Returns_True()
     {
         var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.AuthLoginAccept);
         using (relay)
@@ -106,7 +136,8 @@ public class SmtpHealthCheckTests
                 Host = "127.0.0.1",
                 Port = relay.Port,
                 User = "kumunita@kumunita",
-                Pass = "relay-secret"
+                Pass = "relay-secret",
+                Secure = SmtpOptions.SecureNone
             }));
 
             Assert.True((await check.CheckAsync(TestContext.Current.CancellationToken)).Reachable);
@@ -114,7 +145,7 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_RelayAdvertisesOnlyUnsupportedMechanism_Returns_False()
+    public async Task CheckAsync_When_RelayAdvertisesOnlyUnsupportedMechanism_Returns_False()
     {
         // The relay advertises AUTH CRAM-MD5 — the BCL (and therefore SmtpSender)
         // can't drive it, so the probe must not pass the credentials through
@@ -127,7 +158,8 @@ public class SmtpHealthCheckTests
                 Host = "127.0.0.1",
                 Port = relay.Port,
                 User = "kumunita@kumunita",
-                Pass = "relay-secret"
+                Pass = "relay-secret",
+                Secure = SmtpOptions.SecureNone
             }));
 
             var result = await check.CheckAsync(TestContext.Current.CancellationToken);
@@ -137,7 +169,7 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_EhloFailsAfterBanner_Returns_False()
+    public async Task CheckAsync_When_EhloFailsAfterBanner_Returns_False()
     {
         var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.BadEhlo);
         using (relay)
@@ -145,7 +177,8 @@ public class SmtpHealthCheckTests
             var check = new SmtpHealthCheck(Options.Create(new SmtpOptions
             {
                 Host = "127.0.0.1",
-                Port = relay.Port
+                Port = relay.Port,
+                Secure = SmtpOptions.SecureNone
             }));
 
             var result = await check.CheckAsync(TestContext.Current.CancellationToken);
@@ -158,7 +191,7 @@ public class SmtpHealthCheckTests
     }
 
     [Fact]
-    public async Task IsReachableAsync_When_OnlyOneCredentialSet_Returns_False()
+    public async Task CheckAsync_When_OnlyOneCredentialSet_Returns_False()
     {
         // The exactly-one-or-zero invariant (SmtpSender's, mirrored here): a
         // half-configured credential pair is a configuration error, and the
@@ -190,6 +223,60 @@ public class SmtpHealthCheckTests
         Assert.Contains("misconfigured", passOnly.Reason);
     }
 
+    [Fact]
+    public async Task CheckAsync_When_SecureTls_And_RelayDoesNotAdvertiseStarttls_Fails_With_Diagnostic()
+    {
+        // The default SmtpOptions.Secure is "Tls". A real-world relay that is
+        // plain-only (e.g. a local Mailpit-style relay) would advertise EHLO
+        // capabilities without STARTTLS, and the BCL SmtpClient would refuse
+        // to connect with EnableSsl=true against it. The probe must fail at
+        // the STARTTLS check and say so explicitly — this is the exact
+        // diagnostic the "AUTH: relay does not advertise any AUTH mechanism"
+        // bug on the Coolify test server was masking.
+        var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.PlainNoStarttls);
+        using (relay)
+        {
+            var check = new SmtpHealthCheck(Options.Create(new SmtpOptions
+            {
+                Host = "127.0.0.1",
+                Port = relay.Port,
+                User = "kumunita@kumunita",
+                Pass = "relay-secret",
+                Secure = SmtpOptions.SecureTls   // default
+            }));
+
+            var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+            Assert.False(result.Reachable);
+            Assert.Contains("STARTTLS", result.Reason);
+        }
+    }
+
+    [Fact]
+    public async Task CheckAsync_When_SecureTls_And_RelayAdvertisesStarttls_ButRefusesUpgrade_Fails()
+    {
+        // The relay advertises STARTTLS in EHLO but replies 454 to the
+        // upgrade command — e.g. a relay with a transient TLS subsystem
+        // outage. The probe must name the refusal and the relay's own
+        // 454 reply so /health is actionable.
+        var relay = FakeSmtpRelay.Start(FakeSmtpRelay.Mode.StarttlsRefused);
+        using (relay)
+        {
+            var check = new SmtpHealthCheck(Options.Create(new SmtpOptions
+            {
+                Host = "127.0.0.1",
+                Port = relay.Port,
+                User = "kumunita@kumunita",
+                Pass = "relay-secret",
+                Secure = SmtpOptions.SecureTls
+            }));
+
+            var result = await check.CheckAsync(TestContext.Current.CancellationToken);
+            Assert.False(result.Reachable);
+            Assert.Contains("STARTTLS", result.Reason);
+            Assert.Contains("454", result.Reason);
+        }
+    }
+
     private static async Task CheckFalse(Task<SmtpHealthResult> result)
     {
         Assert.False((await result).Reachable);
@@ -198,8 +285,8 @@ public class SmtpHealthCheckTests
 
 /// <summary>
 /// Minimal loopback SMTP responder: a <c>220</c> banner, and for each
-/// subsequent command (EHLO / AUTH PLAIN / AUTH LOGIN) whatever the
-/// <see cref="Mode"/> requires — exactly the shape the probe walks.
+/// subsequent command (EHLO / AUTH PLAIN / AUTH LOGIN / STARTTLS) whatever
+/// the <see cref="Mode"/> requires — exactly the shape the probe walks.
 /// </summary>
 internal sealed class FakeSmtpRelay : IDisposable
 {
@@ -215,21 +302,22 @@ internal sealed class FakeSmtpRelay : IDisposable
 
     /// <summary>
     /// Behaviors the fake relay can exhibit — each corresponds to one test of
-    /// the probe's AUTH path (or a deliberately-broken relay).
+    /// the probe's STARTTLS or AUTH path (or a deliberately-broken relay).
     /// </summary>
     public enum Mode
     {
-        NoAuth,                 // banner + EHLO (no AUTH advertised) — the Mailpit shape
-        AuthPlainAccept,        // EHLO advertises AUTH PLAIN; AUTH returns 235
-        AuthPlainReject,        // EHLO advertises AUTH PLAIN; AUTH returns 535
-        AuthLoginAccept,        // EHLO advertises AUTH LOGIN; two 334s then 235
-        AuthAdsNoUsableMech,    // EHLO advertises AUTH CRAM-MD5 (BCL doesn't support) → probe returns false
-        BadEhlo                 // EHLO returns 421 (non-2xx) — the "down after banner" shape
+        PlainNoStarttls = 0,   // banner + EHLO (no STARTTLS, no AUTH advertised) — the Mailpit plain shape
+        AuthPlainAccept,       // EHLO advertises AUTH PLAIN; AUTH returns 235
+        AuthPlainReject,       // EHLO advertises AUTH PLAIN; AUTH returns 535
+        AuthLoginAccept,       // EHLO advertises AUTH LOGIN; two 334s then 235
+        AuthAdsNoUsableMech,   // EHLO advertises AUTH CRAM-MD5 (BCL doesn't support) → probe returns false
+        BadEhlo,               // EHLO returns 421 (non-2xx) — the "down after banner" shape
+        StarttlsRefused        // EHLO advertises STARTTLS; STARTTLS is answered 454 (refused)
     }
 
     public int Port => ((IPEndPoint)_listener.LocalEndpoint).Port;
 
-    public static FakeSmtpRelay Start()                 => Start(Mode.NoAuth);
+    public static FakeSmtpRelay Start() => Start(Mode.PlainNoStarttls);
     public static FakeSmtpRelay Start(Mode mode)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);   // port 0 = OS-assigned free port
@@ -266,15 +354,17 @@ internal sealed class FakeSmtpRelay : IDisposable
 
                 await WriteAsync(stream, "220 fake.kumunita ESMTP\r\n").ConfigureAwait(false);
 
+                bool starttlsRefusalSent = false;
                 string? request;
                 while ((request = await ReadLineAsync(stream).ConfigureAwait(false)) is not null)
                 {
                     if (string.IsNullOrWhiteSpace(request))
                         continue;
 
+                    request = request.Trim();   // ReadLineAsync appends a trailing '\n'
+
                     if (request.StartsWith("EHLO", StringComparison.OrdinalIgnoreCase) || request.StartsWith("HELO", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Mode determines which capability lines the relay "offers".
                         string ehlo = _mode switch
                         {
                             Mode.AuthPlainAccept => "250-fake.kumunita\r\n250-AUTH PLAIN\r\n250 HELP\r\n",
@@ -282,22 +372,34 @@ internal sealed class FakeSmtpRelay : IDisposable
                             Mode.AuthAdsNoUsableMech => "250-fake.kumunita\r\n250-AUTH CRAM-MD5\r\n250 HELP\r\n",
                             Mode.AuthLoginAccept => "250-fake.kumunita\r\n250-AUTH LOGIN\r\n250 HELP\r\n",
                             Mode.BadEhlo => "421 service not available\r\n",
-                            _ => "250-fake.kumunita\r\n250 HELP\r\n"   // mode-independent baseline (NoAuth)
+                            Mode.StarttlsRefused => "250-fake.kumunita\r\n250-STARTTLS\r\n250-AUTH PLAIN\r\n250 HELP\r\n",
+                            _ => "250-fake.kumunita\r\n250 HELP\r\n"   // plain baseline (no STARTTLS advertised)
                         };
                         await WriteAsync(stream, ehlo).ConfigureAwait(false);
                         continue;
                     }
 
                     int space = request.IndexOf(' ', StringComparison.Ordinal);
-                    // cmd is the first whitespace-delimited token on the line (no
-                    // trailing space — it's a pure prefix).
                     string cmd = (space < 0 ? request : request[..space]).ToUpperInvariant();
 
-                    // AUTH ... — the shape the probe actually sends in each mode.
-                    // The relay-side dispatch only cares about the first word of
-                    // the mechanism (e.g. "AUTH PLAIN <token>" → "PLAIN"); any
-                    // trailing argument is the mechanism's own initial-response
-                    // payload and is meaningless to this dispatch.
+                    if (cmd == "STARTTLS")
+                    {
+                        // Only the StarttlsRefused mode advertises it; all other
+                        // modes would treat this as an unknown command — but the
+                        // probe does not send STARTTLS to them (Secure=None), so
+                        // this branch is only reached by the refused-upgrade test.
+                        if (_mode == Mode.StarttlsRefused && !starttlsRefusalSent)
+                        {
+                            await WriteAsync(stream, "454 4.7.0 TLS not available\r\n").ConfigureAwait(false);
+                            starttlsRefusalSent = true;
+                        }
+                        else
+                        {
+                            await WriteAsync(stream, "502 unknown command " + cmd + "\r\n").ConfigureAwait(false);
+                        }
+                        continue;
+                    }
+
                     if (cmd == "AUTH")
                     {
                         string rest = (space < 0 ? "" : request[(space + 1)..].Trim()).ToUpperInvariant();
@@ -325,49 +427,46 @@ internal sealed class FakeSmtpRelay : IDisposable
                         continue;
                     }
 
-                    // Anything else (bare EHLO already handled; QUIT, etc.) — accept.
-                    await WriteAsync(stream, "250 OK\r\n").ConfigureAwait(false);
+                    // Fallback — the probe never sends anything else on these
+                    // shapes, but a malformed relay response here is better
+                    // than hanging the loop.
+                    await WriteAsync(stream, "502 unknown command " + cmd + "\r\n").ConfigureAwait(false);
                 }
             }
         }
-        catch
+        catch (Exception)
         {
-            // Client went away (normal when the probe's socket closes first).
+            // SocketException/IOException when the client closes early or the
+            // listener is stopped at disposal — the expected shutdown path.
         }
     }
 
-    private static async Task<string> ReadLineAsync(NetworkStream stream)
+    private static async Task<string?> ReadLineAsync(Stream stream)
     {
-        var sb = new StringBuilder(64);
-        var buffer = new byte[1];
-        while (await stream.ReadAsync(buffer.AsMemory(0, 1)).ConfigureAwait(false) == 1)
+        var sb = new StringBuilder();
+        var buf = new byte[1];
+        int b;
+        while ((b = await stream.ReadAsync(buf, 0, 1).ConfigureAwait(false)) > 0)
         {
-            if (buffer[0] == (byte)'\n')
+            char c = (char)buf[0];
+            if (c == '\r' || c == '\n')
+            {
+                sb.Append('\n');
                 break;
-            sb.Append((char)buffer[0]);
+            }
+            sb.Append(c);
         }
+        // b == 0 means "stream still open, retry" per ReadAsync contract — loop.
+        if (sb.Length == 0) return null;
         return sb.ToString();
     }
 
-    private static async Task WriteAsync(NetworkStream stream, string text)
-        => await stream.WriteAsync(Encoding.ASCII.GetBytes(text)).ConfigureAwait(false);
+    private static Task WriteAsync(Stream stream, string s) =>
+        Task.Run(() => { var bytes = Encoding.ASCII.GetBytes(s); stream.Write(bytes, 0, bytes.Length); stream.Flush(); });
 
     public void Dispose()
     {
         _disposed = true;
-        _listener.Stop();
-    }
-}
-
-/// <summary>Reserves a TCP port on loopback and releases it immediately, yielding a guaranteed-refused port.</summary>
-internal static class FreeTcpPort
-{
-    public static int ReserveAndRelease()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
+        try { _listener.Stop(); } catch { /* already stopped */ }
     }
 }
