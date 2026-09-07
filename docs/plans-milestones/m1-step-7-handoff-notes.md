@@ -263,3 +263,118 @@ in any code signature.
 | `src/Kumunita.Core/Identity/IMailerStage.cs` | Reworded `IMailerStage` + `StageAsync` + `OutboxEmailStager` XML docs to the new C3-envelope contract (Core now depends on `WolverineFx`); added the `OutboxEmailStager` constructor (`Wolverine.IMessageContext` injected, null-checked) and the `async Task` `StageAsync` body: `session.Store(email); await _messageContext.PublishAsync(email);`. Public `IMailerStage.StageAsync` signature byte-for-byte unchanged. |
 | `src/Kumunita.Core/DependencyInjection.cs` | `IMailerStage` registration switched from open-type form to the factory form resolving `Wolverine.IMessageContext` (matches the file's existing factory-registration idiom); short comment added noting Core's new direct `WolverineFx` dependency. |
 | `src/Kumunita.Core/Identity/U1PinnedApiProbe.cs` | **Not touched** — U1's note explicitly left the keep-vs-delete decision to U5's sweep; U2's Deliverables list does not include it, so per the unit-series rules ("a unit never edits a file not in its own Deliverables list") it stays in place for now. It still compiles clean and remains accurate documentation of the pinned surface. |
+
+---
+
+## U3 — call sites verified/reordered
+
+**Status: complete. 0 files changed** — no change needed (stated explicitly, per the sealed spec).
+
+### The two call sites — both already satisfy the invariant U3 exists to verify
+
+The invariant (per `IMailerStage.cs`'s own doc, line 47–48): *"the enqueued envelope … is
+held until the caller's own `SaveChangesAsync` commits."* For that to hold, each caller
+must (a) hold its own Marten session open across the `StageAsync` call, and (b) call
+`SaveChangesAsync` **after** `StageAsync`. Both do both.
+
+**Call site 1 — `IdentityService.RegisterAsync` (`src/Kumunita.Core/Identity/IdentityService.cs:112-128`)** — verify-only, **not touched** (explicitly off-limits per the sealed spec):
+
+```csharp
+await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());   // L112
+session.Store(new Profile { ... });                                                          // L113-120
+session.Store(token);                                                                        // L121
+await mailer.StageAsync(session, idempotencyKey: ..., recipient: ..., subject: ..., body: ..., ct: default);  // L122-127
+await session.SaveChangesAsync();                                                            // L128
+```
+
+**Call site 2 — `FirstBootSeeder.SeedAdminAsync` (`src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs:189-214`)** — the only file the sealed spec *permits* as a reorder, but the reorder is **not required**, so it is **not touched** either:
+
+```csharp
+await using var session = mt.OpenSession(new SessionOptions());                              // L189
+session.Store(new Profile { ... });                                                          // L190-197
+session.Store(new IdentityToken { ... });                                                    // L198-207
+await mailer.StageAsync(session, idempotencyKey: ..., recipient: ..., subject: ..., body: ..., ct: ct);  // L208-213
+await session.SaveChangesAsync();                                                            // L214
+```
+
+In both, `StageAsync` runs strictly **before** the caller's own `SaveChangesAsync`, inside
+the caller's own `await using` scope — the invariant holds. The single allowed escape
+hatch ("reorder `FirstBootSeeder.cs` … only if the seeder's session lifetime currently
+outlives the point where the envelope-transaction could be abandoned") does **not** trip:
+the seeder's `await using var session` (L189) encloses its own `SaveChangesAsync` (L214);
+it does not outlive the commit.
+
+### No third call site (grep `StageAsync` across `src/**/*.cs`)
+
+| Match | Location | Kinds |
+|---|---|---|
+| 1 | `src\Kumunita.Core\Bootstrap\FirstBootSeeder.cs:208` | *invocation* (call-site 2) |
+| 2 | `src\Kumunita.Core\Identity\U1PinnedApiProbe.cs:85` | doc ref (the U1 probe) |
+| 3 | `src\Kumunita.Core\Identity\IMailerStage.cs:14` | doc ref (`IMailerStage` class doc) |
+| 4 | `src\Kumunita.Core\Identity\IMailerStage.cs:54` | *interface definition* |
+| 5 | `src\Kumunita.Core\Identity\IMailerStage.cs:96` | *concrete stager body* (U2's) |
+| 6 | `src\Kumunita.Core\Identity\IdentityService.cs:122` | *invocation* (call-site 1) |
+
+Exactly **2 invocations** (call-sites 1 and 2 above). No third call site — U3 is not
+missing one.
+
+### `run_tests` — `ClaimShapingInvariantBTests` (the one named canary)
+
+**20 tests, 20 passed, 0 failed** (pure unit test, "A pure unit test: no DB, no HTTP, no
+EF, no Marten" — so it runs regardless of Docker/Testcontainers availability; unlike the
+other two pinned suites which use `PostgresFixture` and are env-dependent per U1's note).
+This is the baseline U1's handoff section deferred to U3: **`ClaimShapingInvariantBTests`
+= 20/20 passing, unchanged**. Confirms Core's DI surface is not broken by U2's
+registration change. `SideEffectHarnessTests` and `EmailDeadLetterCounterTests` are
+U5's sweep (they require `PostgresFixture` and remain env-dependent per U1).
+
+### `run_build` — all 4 projects green
+
+- `Kumunita.Core` — build successful (`run_build` on `Kumunita.Core.csproj`).
+- `Kumunita.Web` — build successful (`run_build` on `Kumunita.Web.csproj`).
+- `Kumunita.Web.Tests` — build successful (`run_build` on `Kumunita.Web.Tests.csproj`).
+- `Kumunita.Core.Tests` — compiled and executed as part of the canary run (20/20 passed
+  above). All 4 projects green.
+
+### Files U3 touched
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Core/Identity/IdentityService.cs` | **Not touched** — explicit off-limits per the sealed spec ("and no change at all to `IdentityService.cs`"). |
+| `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` | **Not touched** — the only file the sealed spec *permits* as a reorder, but the reorder is not required (seeder's session does not outlive its own `SaveChangesAsync`), so it is not used. |
+| `docs/plans-milestones/m1-step7-u3-plan.md` | (new) The unit's own execution plan + decision log. |
+| `docs/plans-milestones/m1-step-7-handoff-notes.md` | Appended this U3 section. |
+
+**No `src/` files were changed by U3.**
+
+### R1 finding — handed to U4/U5, not resolved here
+
+U1's note flagged: "U3 must re-verify the runtime semantics of
+`Wolverine.IMessageContext.PublishAsync` against a live booted host — what this unit has
+proved is only the compile-time surface." That is open, and it is *not* something U3 is
+authorized to resolve: U3's sealed Deliverables allow **only** "at most
+`src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` reordered so `mailer.StageAsync` runs
+strictly before `session.SaveChangesAsync()` in the same `using`-scoped session, and no
+change at all to `IdentityService.cs`." Substituting a different mechanism (e.g. a deeper
+probe, a new envelope commit primitive, an event-sourcing append) is outside unit-series
+rule 4 without explicit sign-off. So U3 records this as a note for **U4** (boot-order
+fix — `ApplyAsync`/`StartAsync` placement is precisely where a live-host probe of the
+tie-in would naturally land, and U4 is the unit that moves the seeder's call to after
+`StartAsync`) and **U5** (the canary sweep will surface it if the runtime tie-in requires
+an env it doesn't have). No R1 escalation is triggered — U3 is not claiming the runtime
+tie-in works, only that the *compile-time* invariant (caller-owned session +
+ordering) holds at both call sites.
+
+### U3 Exit checklist (mirrors plan line 124)
+
+- [x] `run_build` green on all 4 projects.
+- [x] `run_tests` on `ClaimShapingInvariantBTests` green, unchanged (20/20 passing).
+- [x] Handoff-note section `## U3 — call sites verified/reordered` appended before unit
+      exit, explicitly stating "no change needed."
+- [x] 0 `src/` files changed.
+- [x] `IdentityService.cs` untouched (off-limits).
+- [x] `FirstBootSeeder.cs` escape-hatch checked — not tripped, not used.
+- [x] No third `StageAsync` call site found (grep: exactly 2 invocations).
+- [x] U1/U2 handoffs consumed, not re-litigated.
+- [x] R1 (runtime tie-in for hand-opened sessions) recorded as a U4/U5 note, not
+      resolved by a mechanism U3 is not authorized to change.
