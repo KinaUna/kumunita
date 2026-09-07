@@ -471,3 +471,74 @@ suites).
 - [x] `SchemaBootstrap.cs`, `FirstBootSeeder.cs`, `IMailerStage.cs`,
       `DependencyInjection.cs`, the pinned test files, and
       `OutboxEmailHandler.cs` all untouched (not in U4's Deliverables).
+
+---
+
+## U5 — verified + comments reconciled
+
+**Status: complete.** Exit satisfied (plan line 139).
+
+### Verification — all three pinned test suites
+
+| Suite | Result | Baseline (U3) |
+|---|---|---|
+| `ClaimShapingInvariantBTests` | **20/20 passing** | 20/20 (U3, pre-U4) — unchanged |
+| `EmailDeadLetterCounterTests` | **1/1 passing** | (U1/U3 noted env-dependent; ran green here — Docker was available) |
+| `SideEffectHarnessTests` | **7/7 passing** | (U1/U3 noted env-dependent; ran green here — Docker was available) |
+
+**Total: 28/28 passing**, no test modified in U1–U5.
+
+### `run_build`
+
+- Full solution (`Kumunita.slnx`, all 4 projects) — **Build successful**, 0
+  errors, 0 warnings.
+- `Kumunita.Web` alone (after the `Kumunita.Web.csproj` comment edit) —
+  **Build successful**.
+
+### Comment reconciliation — the 4 "Wolverine is a Web package" sites
+
+U1's handoff (this file, lines 82-116) identified all four:
+
+| # | File | Status after U1-U4 | U5 action |
+|---|---|---|
+| 1 | `src/Kumunita.Core/Kumunita.Core.csproj` (lines 28-55) | **Already reconciled** — U1's own comment says "intentionally broken here" and lists all 4 sites | No edit needed; confirmed stays accurate |
+| 2 | `src/Kumunita.Core/Identity/IMailerStage.cs` (lines 22-33) | **Already reconciled** — U2 reworded the class doc to "deliberately broken here … Core now carries a direct reference to WolverineFx … same 6.33.0 pin as Kumunita.Web" | No edit needed; confirmed stays accurate |
+| 3 | `src/Kumunita.Core/DependencyInjection.cs` (lines 47-53, the `IMailerStage` factory registration comment) | **Already reconciled** — U2's comment says "OutboxEmailStager now also enqueues the durable message envelope via Wolverine IMessageContext (Core's new direct WolverineFx dependency — see Kumunita.Core.csproj + IMailerStage.cs)" | No edit needed; confirmed stays accurate |
+| 4 | `src/Kumunita.Web/Kumunita.Web.csproj` (lines 18-21) | **Still false** — said "These are the only two Wolverine-related assemblies the whole repo references (per the repo's own convention — IMailerStage.cs and DependencyInjection.cs both call out 'Wolverine is a *Web* package')" | **Edited by U5**: replaced with accurate statement that `Kumunita.Core` also references WolverineFx 6.33.0 directly (for the `IMessageContext` enqueue), both projects pinned to the same version (R4), with pointer back to `plan-m1-step-7-outbox-email-c3.md` |
+
+### Files U5 touched
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Web/Kumunita.Web.csproj` | Reworded the comment block (lines 18-21) above the `WolverineFx`/`WolverineFx.Marten` references: removed the now-false "only two Wolverine-related assemblies the whole repo references" + the outdated "Wolverine is a *Web* package" convention call-out; replaced with a note that Core also references WolverineFx 6.33.0 (for `IMessageContext`), both pinned to the same version (R4), pointing back to the plan file. Comments only — no code, no PackageReference attributes, no version changes. |
+| `docs/plans-milestones/m1-step7-u5-plan.md` | (new) This unit's own plan file. |
+| `docs/plans-milestones/m1-step-7-handoff-notes.md` | Appended this `## U5 — verified + comments reconciled` section. |
+
+### `U1PinnedApiProbe.cs` disposition
+
+U2's handoff (line 265) stated: "U1's note explicitly left the keep-vs-delete
+decision to U5's sweep; U2's Deliverables list does not include it, so per the
+unit-series rules ('a unit never edits a file not in its own Deliverables
+list') it stays in place for now."
+
+U5's sealed Deliverables list does **not** include `U1PinnedApiProbe.cs`, so
+the same rule applies: the file **stays in place**. It continues to compile
+clean and serves as a useful inline record of the pinned `IMessageContext
+PublishAsync<T>(T) -> ValueTask` surface for any future reader. Deleting it
+would be a code change, which exceeds U5's comments-only scope.
+
+### U5 Exit checklist (mirrors plan line 139)
+
+- [x] `run_build` green on all 4 projects (full solution + `Kumunita.Web`
+      individually).
+- [x] `run_tests` on all three pinned suites: `SideEffectHarnessTests` 7/7,
+      `EmailDeadLetterCounterTests` 1/1, `ClaimShapingInvariantBTests` 20/20 —
+      all passing, no test modified (28/28 total).
+- [x] Handoff-note section `## U5 — verified + comments reconciled` appended
+      before unit exit (this section).
+- [x] The 4 "Wolverine is a Web package" comment sites reconciled:
+      sites 1-3 confirmed already reconciled by U1/U2 (no edit);
+      site 4 (`Kumunita.Web.csproj`) edited by U5.
+- [x] Comments-only changes — no code, no signature, no registration, no
+      version pin altered.
+- [x] `U1PinnedApiProbe.cs` left in place (not in U5's Deliverables).
