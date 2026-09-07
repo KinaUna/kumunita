@@ -43,7 +43,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
         services.AddTransient<IIdentityService, IdentityService>();
-        services.AddTransient<IMailerStage, OutboxEmailStager>();
+
+        // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
+        // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
+        // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
+        // per-scope context injected (factory form, same idiom as DirectoryService /
+        // Posts.PostService / Moderation.ModerationService below).
+        services.AddTransient<IMailerStage>(sp =>
+            new OutboxEmailStager(sp.GetRequiredService<Wolverine.IMessageContext>()));
 
         // M2 (plan U5): the directory-side composition root — a concrete class (it
         // composes two *seams*, not itself a seam: no interface, ADR 0006-D's

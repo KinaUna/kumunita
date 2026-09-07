@@ -184,3 +184,82 @@ plan's U6 skip-allowed fallback convention (applied here by analogy).
 |---|---|
 | `src/Kumunita.Core/Kumunita.Core.csproj` | + `<PackageReference Include="WolverineFx" Version="6.33.0" />` and the block comment above it (14 lines). No other references changed; `WolverineFx.Marten` is *not* referenced in Core — only `WolverineFx` is, because Core only needs the `IMessageContext` type (in `WolverineFx.dll`); the `.IntegrateWithWolverine()` extension lives in `WolverineFx.Marten`, referenced only by `Kumunita.Web.csproj` where the host wires it up. |
 | `src/Kumunita.Core/Identity/U1PinnedApiProbe.cs` | (new) 92-line `internal static class`, single public static method `ProbePublish(IMessageContext, OutboxEmail) -> ValueTask`. Compiles clean. Deletable at U2's convenience — or leave in place; it is `internal` and the plan's U2 Deliverables do not list it as a removal target, so U5's sweep can decide. |
+
+---
+
+## U2 — stager reworked
+
+**Status: complete.** Exit satisfied (plan line 121).
+
+### Deliverable files (exactly 2, per the plan's U2 Deliverables closed set)
+
+1. **`src/Kumunita.Core/Identity/IMailerStage.cs`**
+   - Reworded the `IMailerStage` class doc and the `StageAsync` doc to the new
+     contract: `StageAsync` now **both** stores the `OutboxEmail` row on the
+     caller's session **and** enqueues the matching durable-message envelope in the
+     same ambient Marten transaction (held until the caller's own
+     `SaveChangesAsync` commits — the C3-envelope guarantee), replacing the old
+     "Core has no Wolverine dependency (ADR 0006-D; the repo convention is
+     'Wolverine is a *Web* package')" prose — this was one of the four now-false
+     comment sites U1 flagged for U5's sweep (here, `IMailerStage.cs:11-22`).
+     U5 still owns the remaining sites (`DependencyInjection.cs` surrounding doc
+     block, `Kumunita.Web.csproj:19-21`) — U2 did not touch those, staying in
+     scope.
+   - Reworded the `OutboxEmailStager` class doc to match.
+   - Added a constructor-injected `Wolverine.IMessageContext` (private readonly
+     field + `public OutboxEmailStager(Wolverine.IMessageContext messageContext)`
+     — null-checked via `ArgumentNullException`) and changed `StageAsync` to:
+     ```csharp
+     var email = new OutboxEmail { ... };
+     session.Store(email);
+     await _messageContext.PublishAsync(email);   // U1-pinned call
+     ```
+     using `async Task` instead of the old synchronous `Task.CompletedTask` body.
+
+2. **`src/Kumunita.Core/DependencyInjection.cs`**
+   - Replaced `services.AddTransient<IMailerStage, OutboxEmailStager>();` with the
+     plan-specified factory form:
+     ```csharp
+     services.AddTransient<IMailerStage>(sp =>
+         new OutboxEmailStager(sp.GetRequiredService<Wolverine.IMessageContext>()));
+     ```
+     matching the existing `DirectoryService` / `Posts.PostService` /
+     `Moderation.ModerationService` factory-registration idiom already in the
+     method (no new registration style invented). Added a short comment noting
+     Core's new direct `WolverineFx` dependency (the `.IntegrateWithWolverine()`
+     wiring that produces the `IMessageContext` still lives in the host's
+     `Kumunita.Web/Program.cs`).
+
+### The exact call used (verbatim, per U1's pin)
+
+`await _messageContext.PublishAsync(email)` — `Wolverine.IMessageContext
+PublishAsync<T>(T) -> ValueTask`, confirmed by U1's compile-verified probe
+(`U1PinnedApiProbe.cs`) and the `## U1 — pinned API` section above. Not
+`IMessageBus.PublishAsync` (host-started assertion risk R1), not
+`EnqueueAsync` (does not exist in 6.33.0 per U1's CS1061 finding).
+
+### `IMailerStage.StageAsync` signature — unchanged (U2 Exit's one-line confirmation)
+
+Confirmed byte-for-byte: still `Task StageAsync(Marten.IDocumentSession session,
+string idempotencyKey, string recipient, string subject, string body,
+CancellationToken ct = default)` — same parameter list, names, order, types,
+and default value, same return type (`Task`). Only the *body* and the
+`OutboxEmailStager` *implementation* (now constructor-injected) changed; the
+interface contract text changed only in the `<summary>`/`<param>` doc prose, not
+in any code signature.
+
+### `run_build` (U2 Exit requirement)
+
+- `Kumunita.Core` — build successful, 0 errors.
+- `Kumunita.Web` — build successful, 0 errors.
+- Also ran a full-solution `run_build` (whole `Kumunita.slnx`) — build
+  successful, 0 errors. No new warnings surfaced. (Test runs are U3's Exit,
+  not U2's — see plan line 121.)
+
+### Files U2 touched
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Core/Identity/IMailerStage.cs` | Reworded `IMailerStage` + `StageAsync` + `OutboxEmailStager` XML docs to the new C3-envelope contract (Core now depends on `WolverineFx`); added the `OutboxEmailStager` constructor (`Wolverine.IMessageContext` injected, null-checked) and the `async Task` `StageAsync` body: `session.Store(email); await _messageContext.PublishAsync(email);`. Public `IMailerStage.StageAsync` signature byte-for-byte unchanged. |
+| `src/Kumunita.Core/DependencyInjection.cs` | `IMailerStage` registration switched from open-type form to the factory form resolving `Wolverine.IMessageContext` (matches the file's existing factory-registration idiom); short comment added noting Core's new direct `WolverineFx` dependency. |
+| `src/Kumunita.Core/Identity/U1PinnedApiProbe.cs` | **Not touched** — U1's note explicitly left the keep-vs-delete decision to U5's sweep; U2's Deliverables list does not include it, so per the unit-series rules ("a unit never edits a file not in its own Deliverables list") it stays in place for now. It still compiles clean and remains accurate documentation of the pinned surface. |
