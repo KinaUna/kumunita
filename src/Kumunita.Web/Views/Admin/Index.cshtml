@@ -111,7 +111,7 @@
                                        style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
                                     @* checked="" is the null-conditional attribute idiom: renders the
                                        checked keyword when true, emits nothing when false *@
-                                    <input type="checkbox" name="componentIds" value="@c.Id" class="d-none"
+                                    <input type="checkbox" name="componentIds" value="@c.Id"
                                            checked="@(a.ComponentIds.Contains(c.Id) ? "checked" : null)" />
                                     <span class="badge text-bg-light border">@c.Name</span>
                                 </label>
