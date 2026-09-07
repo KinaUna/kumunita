@@ -43,7 +43,7 @@ public sealed class AccountController(
     public IActionResult Signup() =>
         User.Identity?.IsAuthenticated == true
             ? Redirect("/profile/edit")
-            : View();
+            : View(new SignupViewModel());
 
     [AllowAnonymous]
     [HttpPost]
@@ -62,12 +62,42 @@ public sealed class AccountController(
         }
         catch (InvalidOperationException ex)
         {
+            if (ex.Message.StartsWith("An account with email", StringComparison.OrdinalIgnoreCase))
+                model.EmailAlreadyExists = true;
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(model);
         }
 
         TempData["info"] = "Account created. Check your inbox for the verification link.";
         return RedirectToAction(nameof(Login));
+    }
+
+    // ── Resend confirmation email (an unactivated account already exists for the email) ──
+
+    [AllowAnonymous]
+    [HttpGet]
+    public IActionResult ResendVerification([FromQuery] string? email) =>
+        View(new ResendVerificationViewModel { Email = email ?? string.Empty });
+
+    [AllowAnonymous]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return View(model);
+
+        var result = await identity.ResendVerificationEmailAsync(model.Email);
+        if (result.Success)
+        {
+            TempData["info"] =
+                $"If there is an unverified account with email '{model.Email}', a new " +
+                "verification link is on its way. Check your inbox (and your spam folder).";
+            return RedirectToAction(nameof(Login));
+        }
+
+        ModelState.AddModelError(string.Empty, result.Reason ?? "Could not resend the verification email.");
+        return View(model);
     }
 
     // ── Verify (the one designed handoff) ───────────────────────────────────────────────

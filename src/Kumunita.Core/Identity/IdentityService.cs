@@ -132,6 +132,53 @@ public sealed class IdentityService(
     }
 
     /// <inheritdoc />
+    public async Task<ResendVerificationResult> ResendVerificationEmailAsync(string email)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+            return new ResendVerificationResult(false,
+                $"No account found with email '{email}'. Sign up again to create one.");
+
+        var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
+        if (profile?.Verified == true)
+            return new ResendVerificationResult(false,
+                "This account is already verified — sign in instead.");
+
+        await using (var session = documentStore.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var attempts = await session
+                .Query<IdentityToken>()
+                .Where(t => t.Kind == IdentityToken.KindVerify && t.UserId == user.Id)
+                .Select(t => t.Attempt)
+                .ToListAsync();
+
+            var nextAttempt = attempts.Count == 0 ? 1 : attempts.Max() + 1;
+            if (nextAttempt > verificationOptions.Value.MaxVerifyAttempts)
+                return new ResendVerificationResult(false,
+                    "Automatic verification-email resends for this account are exhausted. " +
+                    "Ask an admin to verify your account.");
+
+            var now = DateTimeOffset.UtcNow;
+            var token = NewVerifyToken(user.Id, now, attempt: nextAttempt);
+            await mailer.StageAsync(session,
+                idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
+                recipient: email,
+                subject: "Verify your Kumunita account",
+                body: VerificationBody(
+                    profile?.DisplayName ?? user.Email ?? "there",
+                    VerificationLink(token.Id)),
+                ct: default);
+            await session.SaveChangesAsync();
+
+            logger.LogInformation(
+                "Re-issued verification (attempt {Attempt}) for resident {UserId} (email {Email}).",
+                nextAttempt, user.Id, email);
+        }
+
+        return new ResendVerificationResult(Success: true);
+    }
+
+    /// <inheritdoc />
     public async Task<Profile> VerifyWithTokenAsync(string tokenValue)
     {
         var token = await FindTokenAsync(
@@ -469,13 +516,13 @@ public sealed class IdentityService(
         return await query.FirstOrDefaultAsync().ConfigureAwait(false);
     }
 
-    private IdentityToken NewVerifyToken(string userId, DateTimeOffset now) => new()
-    {
+    private IdentityToken NewVerifyToken(string userId, DateTimeOffset now, int attempt = 1) => new()
+{
         Id = Guid.NewGuid().ToString("N"),
         Kind = IdentityToken.KindVerify,
         UserId = userId,
         Token = NewSecret(),   // high-entropy; never in a URL (the URL carries the row Id)
-        Attempt = 1,
+        Attempt = attempt,
         CreatedAt = now,
         // The bound option (Verification__TtlDays in appsettings, default 14) — see the
         // VerificationOptions class doc for the re-verify semantics (each attempt gets its
@@ -515,7 +562,7 @@ public sealed class IdentityService(
     // path, which a human reading the mail can still copy into the browser's bar.
     private string VerificationLink(string tokenRowId) =>
         (verificationOptions.Value.BaseUrl is string root and not ""
-            ? root.TrimEnd('/') + "/"
+            ? root.TrimEnd('/')
             : string.Empty) + $"/account/verify?id={tokenRowId}";
 
     private static string VerificationBody(string displayName, string verifyLink) =>
