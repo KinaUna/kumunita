@@ -482,6 +482,184 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             svc.DeleteAsync("no-such-id", session));
     }
 
+    // ── Update (edit lane — the same scope-vs-role split, applied to the edited scope) ──
+
+    /// <summary>
+    /// The happy pin: a GlobalAdmin editing a public-scope announcement
+    /// persists the new Title/Body/Scope. <see cref="Announcement.AuthorId"/>
+    /// and <see cref="Announcement.Created"/> are preserved untouched (the
+    /// author of record is whoever created it, not whoever edited it), and
+    /// <see cref="Announcement.Modified"/> is stamped (the observable "this
+    /// was edited after creation" state).
+    /// </summary>
+    [Fact]
+    public async Task Update_Public_AsGlobalAdmin_Persists_KeepsAuthorAndCreated_StampedModified()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string originalAuthor = "u-author-original";
+        var created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero);
+        await Plant(store, new Announcement
+        {
+            Id = "edit-pub", Scope = AnnouncementScope.Public,
+            Title = "Old title", Body = "Old body", AuthorId = originalAuthor,
+            Created = created,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-pub", Scope = AnnouncementScope.Public, Title = "New title", Body = "New body" },
+            actorId: "u-admin-editor",
+            actorRoles: new HashSet<string> { Roles.GlobalAdmin },
+            session);
+
+        Assert.Equal(originalAuthor, updated.AuthorId);
+        Assert.Equal(created, updated.Created);
+        Assert.Equal("New title", updated.Title);
+        Assert.Equal("New body", updated.Body);
+        Assert.NotNull(updated.Modified);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-pub", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal("New title", stored!.Title);
+        Assert.Equal(originalAuthor, stored.AuthorId);
+        Assert.Equal(created, stored.Created);
+        Assert.NotNull(stored.Modified);
+    }
+
+    /// <summary>
+    /// The split pin, moderator case: a Moderator editing a
+    /// <see cref="AnnouncementScope.Public"/> announcement throws
+    /// <see cref="UnauthorizedAccessException"/> and NOTHING is written: the
+    /// split check runs before the write, so the store's version still reads
+    /// back untouched (the "not persisted" observable, same shape as the
+    /// <see cref="CreateAsync"/> moderator-denied pin).
+    /// </summary>
+    [Fact]
+    public async Task Update_ToPublic_AsModerator_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-public-denied";
+        await Plant(store, new Announcement
+        {
+            Id = "edit-denied", Scope = AnnouncementScope.Community,
+            Title = "Still community", Body = "body", AuthorId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateAsync(
+                new Announcement { Id = "edit-denied", Scope = AnnouncementScope.Public, Title = "Escalated?", Body = "x" },
+                actorId: "u-moderator-editor",
+                actorRoles: new HashSet<string> { Roles.Moderator },
+                session));
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-denied", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(AnnouncementScope.Community, stored!.Scope);
+        Assert.Equal("Still community", stored.Title);
+    }
+
+    /// <summary>
+    /// The happy pin, community scope: a Moderator may edit a
+    /// <see cref="AnnouncementScope.Community"/> announcement (the split's
+    /// community-side lane — the same split <see cref="CreateAsync"/>
+    /// enforces for a community-scope create).
+    /// </summary>
+    [Fact]
+    public async Task Update_Community_AsModerator_Persists()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-community";
+        await Plant(store, new Announcement
+        {
+            Id = "edit-comm", Scope = AnnouncementScope.Community,
+            Title = "Old", Body = "Old body", AuthorId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-comm", Scope = AnnouncementScope.Community, Title = "Updated", Body = "New body" },
+            actorId: "u-moderator-editor-community",
+            actorRoles: new HashSet<string> { Roles.Moderator },
+            session);
+
+        Assert.Equal("Updated", updated.Title);
+        Assert.Equal("New body", updated.Body);
+        Assert.Equal(AnnouncementScope.Community, updated.Scope);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-comm", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal("Updated", stored!.Title);
+        Assert.Equal(AnnouncementScope.Community, stored.Scope);
+    }
+
+    /// <summary>
+    /// Editing a missing id is a <see cref="KeyNotFoundException"/> (the
+    /// Web layer maps that to a 404) — the same contract
+    /// <see cref="DeleteAsync"/> pins for a missing id, on the write lane.
+    /// </summary>
+    [Fact]
+    public async Task Update_MissingId_ThrowsKeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.UpdateAsync(
+                new Announcement { Id = "no-such-id", Scope = AnnouncementScope.Public, Title = "x", Body = "x" },
+                actorId: "u-admin-missing",
+                actorRoles: new HashSet<string> { Roles.GlobalAdmin },
+                session));
+    }
+
+    /// <summary>
+    /// No-op re-save (Title/Body/Scope all unchanged) must NOT stamp
+    /// <see cref="Announcement.Modified"/> — the "edited after creation"
+    /// state is meaningful only when a value actually changed, so a
+    /// resubmit without change leaves the row's stamp exactly where the
+    /// last real edit put it (null, if none yet).
+    /// </summary>
+    [Fact]
+    public async Task Update_NoOp_DoesNotStampModified()
+    {
+        var store = await BootStoreAsync();
+        var svc = new AnnouncementService(store);
+
+        const string author = "u-author-noop";
+        await Plant(store, new Announcement
+        {
+            Id = "edit-noop", Scope = AnnouncementScope.Public,
+            Title = "Same", Body = "same body", AuthorId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-noop", Scope = AnnouncementScope.Public, Title = "Same", Body = "same body" },
+            actorId: "u-admin-noop",
+            actorRoles: new HashSet<string> { Roles.GlobalAdmin },
+            session);
+
+        Assert.Null(updated.Modified);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-noop", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Null(stored!.Modified);
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

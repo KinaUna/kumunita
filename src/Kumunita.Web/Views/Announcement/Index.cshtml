@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
+    bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
 }
 
 <div class="row justify-content-center">
@@ -71,6 +72,12 @@
                                     <span class="badge @badgeClass">
                                         @(a.Scope == AnnouncementScope.Public ? "everyone" : "residents")
                                     </span>
+                                    @if (isGlobalAdmin || (isModerator && a.Scope == AnnouncementScope.Community))
+                                    {
+                                        <a class="btn btn-sm btn-link p-0" href="/announcements/@a.Id/edit">
+                                            Edit
+                                        </a>
+                                    }
                                     @if (isGlobalAdmin)
                                     {
                                         <form method="post" action="/announcements/@a.Id/delete"

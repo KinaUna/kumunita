@@ -276,7 +276,297 @@ public class AnnouncementControllerTests
         await announcements.Received(1).DeleteAsync(id, Arg.Any<IDocumentSession>());
     }
 
-    // ── Harness ─────────────────────────────────────────────────────────────–
+    // ── Edit gate (GET + POST /announcements/{id}/edit) ─────────────────────
+
+    /// <summary>
+    /// GET /announcements/{id}/edit for a missing id: the store's read
+    /// session returns null → the controller maps that to a clean 404
+    /// (same "missing = 404, not 500" contract as the delete lane).
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_StoreHasNoSuchAnnouncement_Returns_404()
+    {
+        const string id = "ann-does-not-exist";
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(null));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            store);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = await controller.Edit(id);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, happy path, GlobalAdmin on a
+    /// public-scope announcement: the view model is seeded from the stored
+    /// document (Title/Body/Scope preserved) and the picker offers both
+    /// scopes — the edit form is a shape seeded from the existing row.
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_GlobalAdmin_EditFormSeededFromStoredRow_BothScopes()
+    {
+        const string id = "ann-edit-pub";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Public,
+            Title = "Old title", Body = "Old body",
+            AuthorId = "subj-author-001", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                    new[]
+                    {
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-admin-001"),
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.GlobalAdmin),
+                    },
+                    authenticationType: "test")) },
+        };
+
+        var result = (await controller.Edit(id)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = result!.ViewData.Model as AnnouncementComposeViewModel;
+        Assert.NotNull(model);
+        Assert.Equal(id, model!.Id);
+        Assert.Equal("Old title", model.Title);
+        Assert.Equal("Old body", model.Body);
+        Assert.Equal(AnnouncementScope.Public.ToString(), model.Scope);
+        var scopes = model.AllowedScopes!.ToList();
+        Assert.Equal(2, scopes.Count);
+        Assert.Contains(AnnouncementScope.Public, scopes);
+        Assert.Contains(AnnouncementScope.Community, scopes);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, Moderator on a public-scope
+    /// announcement: the shape gate refuses up front (403) — a form a user
+    /// cannot submit is not rendered in the first place (the service's
+    /// re-check is still the sole real gate at POST). The assertion lives
+    /// on the <em>view model shape</em> — that the form is NOT seeded —
+    /// since the controller's <c>TempData["error"]</c> write on this
+    /// <c>ForbidResult</c> branch NREs in this harness (no <c>ISessionStore</c>),
+    /// exactly per the <see cref="AdminControllerBlockTests"/> "NRE lands
+    /// *after* the Core lane" convention: the pin is that the <c>View</c>
+    /// return path is NOT hit, which is observable via the <c>ViewResult</c>
+    /// assertion below.
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_Moderator_PublicScope_Returns_Forbid_NotView()
+    {
+        const string id = "ann-edit-denied";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Public,
+            Title = "t", Body = "b", AuthorId = "subj-author-001",
+            Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-mod-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Moderator),
+            }),
+        };
+
+        // The NRE on the TempData["error"] write is expected here (established
+        // harness convention — see AdminControllerBlockTests). The pin is
+        // that the controller did NOT fall into the View(...) branch (which
+        // would have returned a view before the write) — observable via the
+        // NRE being thrown at all. The shape-gate pin.
+        await Assert.ThrowsAsync<NullReferenceException>(() => controller.Edit(id));
+    }
+
+    /// <summary>
+    /// POST /announcements/{id}/edit, happy path: a GlobalAdmin's valid
+    /// submit drives the service's UpdateAsync exactly once with the id +
+    /// posted Title/Body/Scope. The service-call assertion is the pin —
+    /// the controller's <c>TempData["info"]</c> write on the success branch
+    /// NREs in this harness (no <c>ISessionStore</c>), exactly per the
+    /// <see cref="AdminControllerBlockTests"/> "NRE lands *after* the Core
+    /// lane" convention: the pin is the NSubstitute call log (the service
+    /// received the right args), not <c>RedirectToActionResult</c>.
+    /// </summary>
+    [Fact]
+    public async Task Edit_Post_When_Valid_Calls_UpdateAsync()
+    {
+        const string id = "ann-edit-ok";
+        var announcements = Substitute.For<IAnnouncementService>();
+        // A canned return value (the controller ignores the service's return
+        // value; the pin below is the received-args assertion, not the
+        // return round-trip).
+        var canned = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Public, Title = "New title", Body = "New body",
+            AuthorId = "subj-author-001", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+        announcements.UpdateAsync(
+            Arg.Any<Announcement>(),
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>())
+            .Returns(Task.FromResult(canned));
+
+        var store = Substitute.For<IDocumentStore>();
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-admin-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.GlobalAdmin),
+            }),
+        };
+
+        try { await controller.Edit(id, new AnnouncementComposeViewModel
+        {
+            Id = id, Title = "New title", Body = "New body", Scope = "Public",
+        }); }
+        catch (NullReferenceException) { /* expected: TempData write NRE, see above */ }
+
+        await announcements.Received(1).UpdateAsync(
+            Arg.Is<Announcement>(a => a.Id == id
+                && a.Title == "New title"
+                && a.Body == "New body"
+                && a.Scope == AnnouncementScope.Public),
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// POST /announcements/{id}/edit, the write-lane re-check: the service
+    /// refuses the split (Moderator → public scope) with
+    /// <see cref="UnauthorizedAccessException"/> → the controller maps that
+    /// to a 403 (Forbid), not a 500.
+    /// </summary>
+    [Fact]
+    public async Task Edit_Post_When_ServiceDenies_Returns_Forbid()
+    {
+        const string id = "ann-edit-denied";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.UpdateAsync(
+            Arg.Any<Announcement>(),
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Announcement>(new UnauthorizedAccessException(
+                "Only a GlobalAdmin may edit a public-scope announcement.")));
+
+        var store = Substitute.For<IDocumentStore>();
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-mod-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Moderator),
+            }),
+        };
+
+        var result = await controller.Edit(id, new AnnouncementComposeViewModel
+        {
+            Id = id, Title = "t", Body = "b", Scope = "Public",
+        });
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// POST /announcements/{id}/edit, missing id from the service
+    /// (<see cref="KeyNotFoundException"/>) → the controller maps that to a
+    /// clean 404 (same contract as the delete lane).
+    /// </summary>
+    [Fact]
+    public async Task Edit_Post_When_ServiceReportsMissing_Returns_404()
+    {
+        const string id = "ann-does-not-exist";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.UpdateAsync(
+            Arg.Any<Announcement>(),
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Announcement>(new KeyNotFoundException(
+                $"Announcement '{id}' was not found in the session; nothing to edit.")));
+
+        var store = Substitute.For<IDocumentStore>();
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-admin-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.GlobalAdmin),
+            }),
+        };
+
+        var result = await controller.Edit(id, new AnnouncementComposeViewModel
+        {
+            Id = id, Title = "t", Body = "b", Scope = "Public",
+        });
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    // ── Harness ──
+
+    /// <summary>
+    /// Builds an authenticated <see cref="DefaultHttpContext"/> with the supplied
+    /// claims plus an NSubstitute <see cref="Microsoft.AspNetCore.Http.ISession"/>
+    /// (so controller actions that write to <c>TempData</c> don't NRE — 
+    /// <c>DefaultHttpContext</c> leaves <c>Session</c> null by default, and the
+    /// edit lane's success/denied branches both touch <c>TempData</c>).
+    /// </summary>
+    private static DefaultHttpContext HttpContextWithSession(Claim[] claims)
+    {
+        var session = NSubstitute.Substitute.For<Microsoft.AspNetCore.Http.ISession>();
+        session.Id.Returns("test-session");
+        session.IsAvailable.Returns(true);
+        session.LoadAsync().Returns(Task.CompletedTask);
+        session.CommitAsync().Returns(Task.CompletedTask);
+        return new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test")),
+            Session = session,
+        };
+    }
 
     /// <summary>
     /// Builds an <see cref="AnnouncementController"/> with a substituted

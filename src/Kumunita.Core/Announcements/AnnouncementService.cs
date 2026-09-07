@@ -122,6 +122,76 @@ public sealed class AnnouncementService : IAnnouncementService
     }
 
     /// <summary>
+    /// Edits an existing <see cref="Announcement"/> in the <b>caller's</b>
+    /// in-flight session (invariant C3, mirroring <see cref="CreateAsync"/>
+    /// and <see cref="DeleteAsync"/>'s write lane). Applies the same
+    /// scope-vs-role split as <see cref="CreateAsync"/>, but against the
+    /// <see cref="Announcement.Scope"/> of the edited document (the new
+    /// scope, if the caller is changing it — not the previously stored one,
+    /// since a scope change is itself the edit in question):
+    /// <list type="bullet">
+    /// <item><see cref="AnnouncementScope.Public"/> — the actor must hold <see cref="Roles.GlobalAdmin"/>;</item>
+    /// <item><see cref="AnnouncementScope.Community"/> — the actor must hold <see cref="Roles.GlobalAdmin"/>
+    /// <b>or</b> <see cref="Roles.Moderator"/>.</item>
+    /// </list>
+    /// A denied split is a hard <see cref="UnauthorizedAccessException"/>
+    /// (the Web layer maps that to a 403); a missing id is a
+    /// <see cref="KeyNotFoundException"/> (the Web layer maps that to a 404).
+    /// <see cref="Announcement.AuthorId"/> and <see cref="Announcement.Created"/>
+    /// are deliberately <b>not</b> reassigned here (unlike
+    /// <see cref="CreateAsync"/>, which mints a brand-new doc): the author of
+    /// record is whoever created it, not whoever last edited it, and
+    /// <see cref="Announcement.Modified"/> is stamped — <see cref="DateTimeOffset.UtcNow"/>
+    /// — only when at least one of Title/Body/Scope actually changed, so a
+    /// no-op re-save of an unchanged doc does not bump the stamp.
+    /// </summary>
+    public async Task<Announcement> UpdateAsync(
+        Announcement updated,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(updated);
+        if (string.IsNullOrEmpty(updated.Id)) throw new ArgumentException("An announcement id is required.", nameof(updated.Id));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var hasGlobalAdmin = actorRoles.Contains(Roles.GlobalAdmin);
+        var hasModerator   = actorRoles.Contains(Roles.Moderator);
+
+        switch (updated.Scope)
+        {
+            case AnnouncementScope.Public when !hasGlobalAdmin:
+                throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a public-scope announcement.");
+
+            case AnnouncementScope.Community when !hasGlobalAdmin && !hasModerator:
+                throw new UnauthorizedAccessException("Only a GlobalAdmin or Moderator may edit a community-scope announcement.");
+
+            default:
+                break;
+        }
+
+        var existing = await session.LoadAsync<Announcement>(updated.Id).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Announcement '{updated.Id}' was not found in the session; nothing to edit.");
+
+        var changed = existing.Title != updated.Title
+            || existing.Body != updated.Body
+            || existing.Scope != updated.Scope;
+
+        existing.Title = updated.Title;
+        existing.Body  = updated.Body;
+        existing.Scope = updated.Scope;
+        if (changed)
+            existing.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(existing);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <summary>
     /// Deletes an <see cref="Announcement"/> in the <b>caller's</b> in-flight
     /// session (invariant C3). A hard delete (no soft-hidden state —
     /// announcements are a flat public surface, not audience-restricted

@@ -20,14 +20,15 @@ public sealed record AnnouncementRow(
 /// a display-name lookup, never an access decision).</summary>
 public sealed record AnnouncementIndexViewModel(IReadOnlyList<AnnouncementRow> Announcements);
 
-/// <summary>The /announcements/new create form (the write lane). <see cref="AllowedScopes"/>
-/// is the caller's role-dependent scope picker (a GlobalAdmin sees both
-/// <see cref="AnnouncementScope.Public"/> and <see cref="AnnouncementScope.Community"/>;
-/// a Moderator sees only <see cref="AnnouncementScope.Community"/> — the
-/// <see cref="AnnouncementService"/> re-checks the same split server-side at
-/// POST, so the picker is a shape convenience, not the sole gate).</summary>
+/// <summary>The /announcements/new create form (the write lane) — also reused for the
+/// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share
+/// the same Title/Body/Scope shape and both enforce the scope-vs-role split server-side
+/// (<see cref="Kumunita.Core.Announcements.AnnouncementService"/>).</summary>
 public sealed class AnnouncementComposeViewModel
 {
+    /// <summary>The announcement id (set only for the edit lane; null/empty for create).
+    /// The edit form posts to <c>/announcements/</c> + this value + <c>/edit</c>.</summary>
+    public string? Id { get; set; }
     public string? Title { get; set; }
     public string Body { get; set; } = string.Empty;
     public string? Scope { get; set; }

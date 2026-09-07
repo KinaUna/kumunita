@@ -7,7 +7,7 @@ namespace Kumunita.Core.Announcements;
 /// The <c>/announcements</c> bounded-context's service seam (M4, the "platform
 /// announcements" lane). The public surface of <see cref="AnnouncementService"/>:
 /// the <see cref="ListVisibleAsync"/> / <see cref="CreateAsync"/> /
-/// <see cref="DeleteAsync"/> triad.
+/// <see cref="UpdateAsync"/> / <see cref="DeleteAsync"/> quartet.
 /// <para>
 /// Kept behind an interface so the Web-side consumer (the
 /// <see cref="Kumunita.Web.Controllers.AnnouncementController"/>) can be tested
@@ -49,6 +49,27 @@ public interface IAnnouncementService
         Announcement announcement,
         string actorId,
         IReadOnlySet<string> authorRoles,
+        IDocumentSession session);
+
+    /// <summary>
+    /// Edits an existing <see cref="Announcement"/> in the <b>caller's</b>
+    /// in-flight session (invariant C3). Applies the same scope-vs-role split
+    /// as <see cref="CreateAsync"/>, but against the edited (new) scope — a
+    /// <see cref="Roles.GlobalAdmin"/> may edit either scope; a
+    /// <see cref="Roles.Moderator"/> may edit
+    /// <see cref="AnnouncementScope.Community"/> only. A denied split is a hard
+    /// <see cref="UnauthorizedAccessException"/> (the Web layer maps that to a
+    /// 403); a missing id is a <see cref="KeyNotFoundException"/> (the Web
+    /// layer maps that to a 404). <c>AuthorId</c>/<c>Created</c> are preserved
+    /// untouched (the author of record is who created it, not who last edited
+    /// it); <see cref="Announcement.Modified"/> is stamped when the edit
+    /// actually changes Title/Body/Scope. See
+    /// <see cref="AnnouncementService.UpdateAsync"/> for the full contract.
+    /// </summary>
+    Task<Announcement> UpdateAsync(
+        Announcement updated,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
         IDocumentSession session);
 
     /// <summary>

@@ -29,6 +29,16 @@ namespace Kumunita.Web.Controllers;
 /// <see cref="AnnouncementService.CreateAsync"/> re-checks server-side at
 /// POST (defense-in-depth: the ASP.NET gate narrows the author, the service
 /// narrows the scope, together they pin the two-way split).</item>
+/// <item><c>GET /announcements/{id}/edit</c> + <c>POST
+/// /announcements/{id}/edit</c> — the edit write lane,
+/// <b>[Authorize(Roles = GlobalAdmin, Moderator)]</b>. A GlobalAdmin may edit
+/// either scope; a Moderator may edit
+/// <see cref="AnnouncementScope.Community"/> only — the same split
+/// <see cref="AnnouncementService.CreateAsync"/> /
+/// <see cref="AnnouncementService.UpdateAsync"/> re-check server-side at
+/// POST, against the <em>edited</em> scope (defense-in-depth: a Moderator
+/// could GET any seeded form regardless of the row's actual scope, so the
+/// service is what guarantees the split is real on the write).</item>
 /// <item><c>POST /announcements/{id}/delete</c> — <b>[Authorize(Roles =
 /// GlobalAdmin)]</b> (delete the lane is GlobalAdmin-only by design; the
 /// <see cref="AnnouncementService"/> delete lane is the single write surface).</item>
@@ -59,7 +69,17 @@ public sealed class AnnouncementController(
             .ToHashSet()
             ?? new HashSet<string>();
 
-    // ── Read (GET /announcements) ──────────────────────────────────────────
+    /// <summary>The caller's role-dependent scope options (GlobalAdmin: both
+    /// scopes; Moderator: community only) — a shape convenience, never the gate.</summary>
+    private static IReadOnlyCollection<AnnouncementScope> RoleAllowedScopes(IReadOnlySet<string> roles)
+    {
+        var allowed = new List<AnnouncementScope> { AnnouncementScope.Community };
+        if (roles.Contains(Roles.GlobalAdmin))
+            allowed.Insert(0, AnnouncementScope.Public);
+        return allowed;
+    }
+
+    // ── Read (GET /announcements) ─
 
     /// <summary>
     /// The read surface: the caller-visible announcements (public scope always,
@@ -179,6 +199,110 @@ public sealed class AnnouncementController(
                 allowed.Insert(0, AnnouncementScope.Public);
             model.AllowedScopes = allowed;
             return View(model);
+        }
+    }
+
+    // ── Edit (GET + POST /announcements/{id}/edit) ─────────────────────────
+
+    /// <summary>
+    /// <c>GET /announcements/{id}/edit</c> — the edit write lane's shape,
+    /// seeded from the existing announcement (Title/Body/Scope preserved).
+    /// The scope picker options are the caller's role-dependent set (a
+    /// GlobalAdmin: both scopes; a Moderator: community only); a Moderator
+    /// viewing a public-scope announcement gets a 403 here already (the GET
+    /// is a shape convenience, the service's <see cref="IAnnouncementService.UpdateAsync"/>
+    /// split re-check is the real gate — but a form a user can't submit
+    /// shouldn't be rendered in the first place).
+    /// </summary>
+    [HttpGet("/announcements/{id}/edit")]
+    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    public async Task<IActionResult> Edit(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return NotFound();
+
+        await using var session = store.QuerySession();
+        var existing = await session.LoadAsync<Announcement>(id);
+        if (existing is null)
+            return NotFound();
+
+        var roles = RoleSet(User);
+        if (existing.Scope == AnnouncementScope.Public && !roles.Contains(Roles.GlobalAdmin))
+        {
+            TempData["error"] = "Only a GlobalAdmin may edit a public-scope announcement.";
+            return new ForbidResult();
+        }
+
+        return View(new AnnouncementComposeViewModel
+        {
+            Id = id,
+            Title = existing.Title,
+            Body  = existing.Body,
+            Scope = existing.Scope.ToString(),
+            AllowedScopes = RoleAllowedScopes(roles),
+        });
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/edit</c> — the edit write lane. On
+    /// success, redirects to the read page (the edit is visible to the
+    /// visitor immediately — the split is the gate, not a re-render). A
+    /// denied scope-vs-role split (e.g. a Moderator editing a public-scope
+    /// announcement) is a 403; a missing id is a 404.
+    /// </summary>
+    [HttpPost("/announcements/{id}/edit")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    public async Task<IActionResult> Edit(string id, AnnouncementComposeViewModel model)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return NotFound();
+        if (string.IsNullOrWhiteSpace(model.Body))
+            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+        if (!Enum.TryParse<AnnouncementScope>(model.Scope, out var scope))
+            ModelState.AddModelError(nameof(model.Scope), "Scope is required.");
+
+        if (!ModelState.IsValid)
+        {
+            // Re-seed the picker (the invalid-POST path has no existing doc to
+            // seed from — the edit target isn't loadable without a write
+            // session; fall back to the role-dependent shape, the same way the
+            // create lane does).
+            return View(new AnnouncementComposeViewModel
+            {
+                Id = id,
+                Title = model.Title,
+                Body  = model.Body,
+                Scope = model.Scope,
+                AllowedScopes = RoleAllowedScopes(RoleSet(User)),
+            });
+        }
+
+        await using var session = store.LightweightSession();
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+        {
+            TempData["error"] = "Not signed in.";
+            return new UnauthorizedResult();
+        }
+
+        try
+        {
+            await announcements.UpdateAsync(
+                new Announcement { Id = id, Title = model.Title ?? string.Empty, Body = model.Body!, Scope = scope },
+                actorId:    actorId,
+                actorRoles: RoleSet(User),
+                session);
+            TempData["info"] = "Announcement updated.";
+            return RedirectToAction("Index");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
     }
 
