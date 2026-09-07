@@ -6,8 +6,11 @@ namespace Kumunita.Core.Tests;
 
 /// <summary>
 /// Pinned behavior of <see cref="DbBootstrap.IsPristineAsync"/> (M0 first-boot gate, OPS.md §2):
-/// it must report a brand-new database as pristine, and stop doing so the moment *either*
-/// domain schema (<c>mt</c>) or the Identity schema (<c>identity</c>) exists.
+/// it must report a brand-new database as pristine, and stop doing so the moment the
+/// Identity schema (<c>identity</c>) exists. The <c>mt</c> schema is deliberately NOT a
+/// disqualifier — Wolverine/Marten create it during <c>app.StartAsync()</c> (before the
+/// gate runs), so a <c>mt</c>-only DB is still a valid "first boot" and must be reported
+/// as pristine (see the method docs on <see cref="DbBootstrap.IsPristineAsync"/>).
 /// </summary>
 public class DbBootstrapIsPristineTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
@@ -26,12 +29,15 @@ public class DbBootstrapIsPristineTests(PostgresFixture fixture) : IClassFixture
     }
 
     [Fact]
-    public async Task Is_Not_Pristine_When_Mt_Schema_Exists()
+    public async Task Is_Still_Pristine_When_Only_Mt_Schema_Exists()
     {
+        // Wolverine/Marten create mt during app.StartAsync(), before the first-boot gate
+        // runs, so a DB that has mt but not identity is still a genuine first boot and
+        // the seeder must run. mt is not part of the pristine signal.
         await CreateSchemaAsync("mt");
         var db = CreateContext();
 
-        Assert.False(await DbBootstrap.IsPristineAsync(db, TestContext.Current.CancellationToken));
+        Assert.True(await DbBootstrap.IsPristineAsync(db, TestContext.Current.CancellationToken));
     }
 
     [Fact]
