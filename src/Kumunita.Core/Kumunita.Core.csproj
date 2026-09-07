@@ -25,17 +25,37 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
-    <!-- M1 step 7: Core carries the *business logic* of the durable side effects
-         (ISmtpSender, OutboxEmailSender, EmailDeadLetterWriter, AuditPurgeService —
-         all Wolverine-free). Per the repo's own convention (IMailerStage.cs and
-         DependencyInjection.cs: "Wolverine is a *Web* package"; "the step-7 Wolverine
-         handler replaces ... in the host"), the thin Wolverine 8.2.1 handler +
-         scheduled-job wrappers live in Kumunita.Web (see SideEffects/ in Kumunita.Web);
-         Core's ADR 0006-D "no HTTP types / testable" boundary is fully preserved —
-         the two stores share one Postgres through `IDocumentStore` injection, not
-         through any Wolverine-specific type in Core. -->
+    <!-- M1 step 7 (C3 fix, plan-m1-step-7-outbox-email-c3.md):
+          Core now carries the *enqueue* half of the durable OutboxEmail
+          pipeline. The prior convention — "Wolverine is a Web package" — is
+          intentionally broken here: the transactional-outbox guarantee
+          (docs/wolverine/marten-integration-outbox.md) requires the enqueue
+          to happen inside the caller's own Marten transaction, and the only
+          API that does that is the per-scope, handler-context primitive
+          `Wolverine.IMessageContext` (NOT the host-level `IMessageBus`, which
+          asserts the host has started — see the AuditPurgeTick comment at
+          Program.cs:324). U2 rewires `OutboxEmailStager` to resolve
+          `IMessageContext` and call its `PublishAsync<T>(T) -> ValueTask`
+          (see src/Kumunita.Core/Identity/U1PinnedApiProbe.cs for the exact
+          compile-pinned surface; the `EnqueueAsync` name hinted in the plan
+          text does NOT exist on IMessageContext in 6.33.0, verified by the
+          compiler's CS1061 verdict during U1).
+
+          The four "Wolverine is a Web package" comment sites U5 will
+          reconcile are:
+            1. this file (the block above the WolverineFx reference)
+            2. src/Kumunita.Core/Identity/IMailerStage.cs (lines 12-21)
+            3. src/Kumunita.Core/DependencyInjection.cs (the IMailerStage
+               registration block)
+            4. src/Kumunita.Web/Kumunita.Web.csproj (lines 19-21)
+
+          Version pin: 6.33.0, byte-for-byte identical to the reference in
+          Kumunita.Web.csproj (R4 — do not let a transitive bump drift one
+          of them; WolverineFx.Marten 6.33 pulls WolverineFx >= 6.33 so the
+          two stay locked together as they already are in Web). -->
+    <PackageReference Include="WolverineFx" Version="6.33.0" />
     <!-- EF Core design-time: lets `dotnet ef migrations add ...` discover AppDbContext
-         without booting the Web host (the DesignTimeDbContextFactory seam). -->
+          without booting the Web host (the DesignTimeDbContextFactory seam). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
