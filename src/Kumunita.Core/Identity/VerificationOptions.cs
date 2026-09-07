@@ -28,4 +28,16 @@ public sealed class VerificationOptions
     public int TtlDays { get; set; } = 14;
 
     public int MaxVerifyAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// The public base URL of this platform instance (no trailing slash, e.g.
+    /// <c>https://maplewood.kumunita.example</c>), used to build the absolute
+    /// verification link in the confirmation email — an email reader cannot
+    /// resolve a relative <c>/account/verify</c> path on its own. Empty/unset =
+    /// the email carries the relative path (dev convenience only — the dev
+    /// shapes set it in <c>appsettings.Development.json</c> /
+    /// <c>docker-compose.yml</c>; production sets it to the instance's public
+    /// domain per <c>docs/COOLIFY.md</c> §5/§5.3).
+    /// </summary>
+    public string? BaseUrl { get; set; }
 }

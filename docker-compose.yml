@@ -56,6 +56,10 @@ services:
       SMTP__Host: mailpit
       SMTP__Port: "1025"
       SMTP__Secure: "None"
+      # Absolute base URL for links in outbound emails (verification link, etc.).
+      # Must be the host-browser-reachable URL (this service's published port),
+      # not the in-docker 8080 — the recipient opens the link in their own browser.
+      Verification__BaseUrl: "http://localhost:5080"
     ports:
       - "5080:8080"
     depends_on:

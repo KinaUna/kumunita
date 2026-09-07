@@ -123,7 +123,7 @@ public sealed class IdentityService(
                     idempotencyKey: $"verify:{user.Id}:1",
                     recipient: email,
                     subject: "Verify your Kumunita account",
-                    body: VerificationBody(displayName, token.Id),
+                    body: VerificationBody(displayName, VerificationLink(token.Id)),
                     ct: default);
         await session.SaveChangesAsync();
 
@@ -506,9 +506,21 @@ public sealed class IdentityService(
         return Convert.ToBase64String(bytes);
     }
 
-    private static string VerificationBody(string displayName, string tokenRowId) =>
+    // The link target is the Web host's AccountController.Verify action, reached
+    // through the conventional "default" route ({controller=Home}/{action=Index}/
+    // {id?}) — /account/verify?id={token row id}. The row id is what travels in the
+    // URL (§6.2: the high-entropy secret is never in a link); if the operator set
+    // Verification__BaseUrl, prefix it to make the path absolute — an email client
+    // can't resolve a relative path. Unset (a dev-only shape) keeps the relative
+    // path, which a human reading the mail can still copy into the browser's bar.
+    private string VerificationLink(string tokenRowId) =>
+        (verificationOptions.Value.BaseUrl is string root and not ""
+            ? root.TrimEnd('/') + "/"
+            : string.Empty) + $"/account/verify?id={tokenRowId}";
+
+    private static string VerificationBody(string displayName, string verifyLink) =>
         $"Hi {displayName},\n\nYour Kumunita account is set to verify on its first sign-in. " +
-        $"This one-time link (row id {tokenRowId}) returns you to the platform to confirm the account.\n\n" +
+        $"Open this one-time link to confirm the account (it also signs you in):\n\n{verifyLink}\n\n" +
         "If you didn't create this account, you can ignore this message.";
 }
 
