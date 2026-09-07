@@ -378,3 +378,96 @@ ordering) holds at both call sites.
 - [x] U1/U2 handoffs consumed, not re-litigated.
 - [x] R1 (runtime tie-in for hand-opened sessions) recorded as a U4/U5 note, not
       resolved by a mechanism U3 is not authorized to change.
+
+---
+
+## U4 — boot order fixed
+
+**Status: complete.** Exit satisfied (plan line 133).
+
+### Deliverable (1 file, 1 moved line + rationale comment)
+
+**`src/Kumunita.Web/Program.cs`** — `await SchemaBootstrap.ApplyAsync(app
+.Services);` and its 2-line rationale comment moved from **before** the HTTP
+pipeline (`var app = builder.Build();` → `ApplyAsync` (was line 279) → pipeline
+setup → `app.StartAsync()`) to **immediately after** `await
+app.StartAsync();` and **before** the `AuditPurgeTick` block.
+
+- **Before (pre-change line numbers, `Program.cs` at commit 9f2de7d):**
+  `var app = builder.Build();` L275, `await SchemaBootstrap.ApplyAsync(app
+  .Services);` L279, pipeline L282–312, `await app.StartAsync();` L315,
+  `AuditPurgeTick` block L317–331.
+- **After (post-change, current file):** `var app = builder.Build();` L275,
+  pipeline L278–308, `await app.StartAsync();` L311, `await
+  SchemaBootstrap.ApplyAsync(app.Services);` L321, `AuditPurgeTick` block
+  L323–337. (The file is 346 lines now vs 340 before — the original 2 lines of
+  rationale comment moved with the call, and a 7-line rationale block was
+  added in the new position explaining *why* it moved here.)
+- Everything else in the file — pipeline middleware order, the `AuditPurgeTick`
+  block itself, the `WaitForShutdownAsync`/`StopAsync` tail — is byte-for-byte
+  untouched in content; only the `ApplyAsync` block's position changed.
+
+### One-line confirmation (U4 Exit requirement)
+
+The `AuditPurgeTick` block's relative position to `StartAsync` did **not**
+change: it still runs strictly after `await app.StartAsync();` — and it now
+also runs strictly after `SchemaBootstrap.ApplyAsync` (order: `StartAsync` →
+`ApplyAsync` → `AuditPurgeTick`), consistent with the comment at that block
+documenting the same `AssertHasStarted` constraint this move exists to satisfy
+for the seeder's new `IMessageContext.PublishAsync` call (U2's reworked
+stager). Its own comment block now sits at `Program.cs:330-334` (it was at
+`Program.cs:317-328` pre-change); the block itself is unmodified.
+
+### Why this closes the R2 trap (plan line 87–88)
+
+With U2 in place, `FirstBootSeeder.SeedAdminAsync`'s
+`mailer.StageAsync(...)` resolves an `IMailerStage` whose `OutboxEmailStager`
+(U2's deliverable) now calls `_messageContext.PublishAsync(email)` on a scoped
+`Wolverine.IMessageContext` — the same started-host-assert machinery the
+`AuditPurgeTick` block's own comment (`Program.cs:320-324`) warns about
+(`WolverineRuntime.AssertHasStarted`). Running `ApplyAsync` — and therefore
+the seeder, on a pristine first boot — *before* `StartAsync` would succeed at
+storing the `OutboxEmail` row but crash (or worse, silently drop) the envelope
+commit. Moving it to after `StartAsync` makes first boot's envelope publish
+subject to the same, already-known-and-documented host-start constraint as
+the existing `AuditPurgeTick` publish, rather than being one the repo had no
+comment warning about at all before this unit. Nothing in
+`SchemaBootstrap.ApplyAsync` itself required the host to be unstarted (verified
+against the full 118-line file — it just resolves scoped services from the
+root-provided scope, applies migrations, and conditionally runs the seeder),
+so the move is safe in both directions and strictly necessary in the
+post-U2 world.
+
+### `run_build` (U4 Exit gate)
+
+- `Kumunita.Web` alone — Build successful (0 errors, 0 warnings).
+- Whole-solution `run_build` (`Kumunita.slnx`) after the edit — Build
+  successful (all 4 projects: `Kumunita.Core`, `Kumunita.Web`,
+  `Kumunita.Core.Tests`, `Kumunita.Web.Tests`).
+
+Test execution was not run this unit (U4's Exit is `run_build` green, per the
+plan; the three pinned suites are U5's sweep, and U1/U3 already documented
+that this environment has no live Postgres for the `PostgresFixture`-based
+suites).
+
+### Files U4 touched
+
+| File | Change |
+|---|---|
+| `src/Kumunita.Web/Program.cs` | Moved `await SchemaBootstrap.ApplyAsync(app.Services);` (+ its 2-line existing comment) from before the HTTP pipeline (old line 277–279) to immediately after `await app.StartAsync();` (new position, old line 315's neighborhood), ahead of the `AuditPurgeTick` block; added a short rationale comment at the new site pointing at this plan/section. No other line in the file changed. |
+| `docs/plans-milestones/m1-step7-u4-plan.md` | (new) This unit's own plan file, as instructed by the unit task text ("Create a plan for the U4 work and save it to …"). |
+| `docs/plans-milestones/m1-step-7-handoff-notes.md` | Appended this `## U4 — boot order fixed` section (before unit exit, per the unit-series rule). |
+
+### U4 Exit checklist (mirrors plan line 133)
+
+- [x] `run_build` green on `Kumunita.Web` (and, for good measure, the whole
+      `Kumunita.slnx`) after the move.
+- [x] Handoff-note section `## U4 — boot order fixed` appended to this file
+      *before* unit exit (this section is that artifact).
+- [x] Exact before/after line numbers of the moved block recorded above.
+- [x] One-line confirmation that the `AuditPurgeTick` block's relative
+      position to `StartAsync` did not change (and now also sits after
+      `ApplyAsync`).
+- [x] `SchemaBootstrap.cs`, `FirstBootSeeder.cs`, `IMailerStage.cs`,
+      `DependencyInjection.cs`, the pinned test files, and
+      `OutboxEmailHandler.cs` all untouched (not in U4's Deliverables).

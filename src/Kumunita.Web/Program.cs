@@ -274,10 +274,6 @@ builder.UseWolverine(opts =>
 
 var app = builder.Build();
 
-// Versioned schema steps apply on boot in ALL environments (ADR 0004 B, OPS.md §2/§3);
-// see SchemaBootstrap for the full rationale.
-await SchemaBootstrap.ApplyAsync(app.Services);
-
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -313,6 +309,16 @@ app.MapControllerRoute(
 
 
 await app.StartAsync();
+
+// Versioned schema steps apply on boot in ALL environments (ADR 0004 B, OPS.md §2/§3);
+// see SchemaBootstrap for the full rationale.
+//
+// This must run AFTER StartAsync (moved here by M1 step 7, U4, plan:
+// plan-m1-step-7-outbox-email-c3.md): on first boot the seeder stages an
+// OutboxEmail envelope via Wolverine IMessageContext, which — like the
+// AuditPurgeTick publish below — requires the host to be started
+// (WolverineRuntime.AssertHasStarted), so any earlier placement breaks first boot.
+await SchemaBootstrap.ApplyAsync(app.Services);
 
 // Kick off the AuditPurge recurring job (SideEffects/AuditPurgeHandler) on boot.
 // The TimeoutMessage type bakes in a 1-day delay, so publishing one fresh tick
