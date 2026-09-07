@@ -160,6 +160,7 @@ public sealed class IdentityService(
 
             var now = DateTimeOffset.UtcNow;
             var token = NewVerifyToken(user.Id, now, attempt: nextAttempt);
+            session.Store(token);
             await mailer.StageAsync(session,
                 idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
                 recipient: email,
