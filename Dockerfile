@@ -22,9 +22,11 @@ RUN dotnet publish src/Kumunita.Web -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 # curl is the healthcheck client: Coolify pings the /health endpoint with it
-# (the slim image ships neither curl nor wget).
+# (the slim image ships neither curl nor wget). wget is installed too so
+# Coolify's default `wget`-based healthcheck works out of the box without
+# any operator configuring a custom probe.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl wget \
     && rm -rf /var/lib/apt/lists
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:8080
