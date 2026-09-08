@@ -28,24 +28,37 @@ namespace Kumunita.Web.Security;
 /// </para>
 /// <para>
 /// Dependency scoping: both <see cref="IUserInfoService"/> and
-/// <see cref="SignInManager{User}"/> resolve to <em>scoped</em> services, but this
-/// middleware is registered via <c>UseMiddleware&lt;T&gt;()</c>, which resolves its
-/// constructor dependencies from the <em>root</em> provider (at application boot), not
-/// per-request — holding root-scoped instances across the request pipeline risks
-/// cross-request leakage (the "captive" dependency pitfall). So instead of
-/// constructor-injecting them, <see cref="InvokeAsync"/> resolves them from
-/// <see cref="HttpContext.RequestServices"/> (the request's scoped provider) on demand.
-/// <see cref="InvokeAsync"/> receives the <see cref="HttpContext"/> directly from the
-/// middleware pipeline, so no <see cref="IHttpContextAccessor"/> is involved.
+/// <see cref="SignInManager{User}"/> resolve to <em>scoped</em> services, and
+/// <c>UseMiddleware&lt;T&gt;()</c> constructs the middleware <em>once at app startup</em>
+/// from the root provider. Injecting scoped services into that root-lifetime
+/// instance would hold them across requests (the "captive dependency" pitfall), so
+/// <see cref="InvokeAsync"/> resolves them from
+/// <see cref="HttpContext.RequestServices"/> (the per-request scoped provider)
+/// instead; the only thing constructor-injected is the <see cref="RequestDelegate"/>,
+/// which is exactly the shape the ASP.NET Core middleware-class contract requires
+/// (<see href="https://learn.microsoft.com/aspnet/core/fundamentals/middleware/write#middleware-class">
+/// middleware/write</see>): a public constructor taking a single
+/// <see cref="RequestDelegate"/> parameter.
 /// </para>
 /// </summary>
 public sealed class BlockedAccountMiddleware
 {
-    public async Task InvokeAsync(HttpContext context, RequestDelegate next)
+    private readonly RequestDelegate _next;
+
+    // Conforms to the documented middleware-class shape (learn.microsoft.com/aspnet/core/fundamentals/
+    // middleware/write#middleware-class): "a public constructor with a parameter of type RequestDelegate."
+    // Without this the app fails to start with
+    // "A suitable constructor for type 'BlockedAccountMiddleware' could not be located."
+    public BlockedAccountMiddleware(RequestDelegate next)
+    {
+        _next = next ?? throw new ArgumentNullException(nameof(next));
+    }
+
+    public async Task InvokeAsync(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated != true)
         {
-            await next(context);
+            await _next(context);
             return;
         }
 
@@ -54,7 +67,7 @@ public sealed class BlockedAccountMiddleware
         var subject = context.User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
         if (string.IsNullOrEmpty(subject))
         {
-            await next(context);
+            await _next(context);
             return;
         }
 
@@ -67,7 +80,7 @@ public sealed class BlockedAccountMiddleware
         var profile = await userInfo.GetProfileAsync(subject);
         if (profile is null || !profile.Blocked)
         {
-            await next(context);
+            await _next(context);
             return;
         }
 
