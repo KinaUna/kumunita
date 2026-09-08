@@ -1,3 +1,4 @@
+using Kumunita.Core.Identity;
 using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
@@ -321,24 +322,71 @@ public sealed class PostsController(
     /// A missing/unreadable component list is fail-safe: the form seeds
     /// an empty shape (the M2
     /// <see cref="Kumunita.Web.Controllers.ProfileController">Edit</see>
-    /// GET's "missing <c>Profile</c> row ⇒ empty editor" precedent).
+    /// GET's "missing <c>Profile</c> row ⇒ empty editor" precedent). The
+    /// picker itself is the <b>poster-reachable</b> enabled set (the
+    /// <see cref="AccessibleComponentsAsync"/> rule mirrors the POST gate
+    /// in <see cref="PostService.CreatePostAsync"/>), not the full enabled
+    /// set.
     /// </summary>
+    /// <summary>
+    /// The enabled components <paramref name="user"/> can post to — the
+    /// picker's candidate set, filtered by the **same** posting-right rule the
+    /// <see cref="PostService.CreatePostAsync"/> gate applies at POST time:
+    /// a <c>GlobalAdmin</c> sees every enabled component; a per-component
+    /// Moderator (<see cref="Kumunita.Core.Identity.Roles.ModeratorComponent(string)"/>
+    /// claim) sees their scoped components **plus** any explicit memberships;
+    /// everyone else sees only the components they hold a
+    /// <c>ComponentMembership</c> row for. Keeping the picker and the POST
+    /// gate on one rule is what stops a plain member from selecting a
+    /// community they can never post to (the POST gate remains the
+    /// authoritative deny and is unchanged).
+    /// </summary>
+    private async Task<IReadOnlyList<Component>> AccessibleComponentsAsync(
+        System.Security.Claims.ClaimsPrincipal user)
+    {
+        var all = await userInfo.GetComponentsAsync(enabledOnly: true);
+
+        if (KumunitaPrincipal.IsGlobalAdmin(user))
+            return all; // GlobalAdmin bypasses the membership check
+
+        var accessible = new HashSet<string>();
+        var subject = SubjectId(user);
+        if (!string.IsNullOrEmpty(subject))
+            accessible.UnionWith(await userInfo.GetCommunityIdsAsync(subject));
+
+        // Per-component Moderator scope grants a posting right on top of
+        // explicit membership rows (the same claim set the POST gate reads).
+        var prefix = Kumunita.Core.Identity.Roles.ModeratorComponent(string.Empty); // "moderator:"
+        foreach (var role in KumunitaPrincipal.RoleSet(user))
+        {
+            if (role.StartsWith(prefix, StringComparison.Ordinal) && role.Length > prefix.Length)
+                accessible.Add(role[prefix.Length..]);
+        }
+
+        return all.Where(c => accessible.Contains(c.Id)).ToList();
+    }
+
     [HttpGet("/posts/new")]
     public async Task<IActionResult> New()
     {
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        // The picker is seeded with the poster-reachable set only: a plain
+        // member no longer sees communities they cannot post to; the POST
+        // gate in <see cref="PostService.CreatePostAsync"/> remains the
+        // authoritative deny (mapped to a form error).
+        var components = await AccessibleComponentsAsync(User);
 
-        // The composer's default selection is the *first* enabled
+        // The composer's default selection is the *first* enabled, reachable
         // component (a "which community?" — not a "which is my
-        // default?"). A "no enabled components" shape is a
+        // default?"). A "no reachable components" shape is a
         // fail-closed empty form (the §2.3 404 shape, not on the
         // composer — the user can still sign-in / create a component
         // via M1's seeder; the "no enabled components" edge is a
         // bootstrap edge, not a runtime error).
+        var first = components.FirstOrDefault();
         var model = new PostComposeViewModel
         {
             Components = components.Select(c => (c.Id, c.Name)).ToList(),
-            ComponentId = components.FirstOrDefault()!.Id, // empty string when zero components
+            ComponentId = first is null ? string.Empty : first.Id, // empty when zero reachable components
             // ADR 0001-B — the composer's choice is absolute: the
             // editor's <b>default</b> shape is the *bootstrap* self-only
             // audience (invariant C1: an empty audience is the
@@ -407,16 +455,14 @@ public sealed class PostsController(
             return View(model);
         }
 
-        // Re-load the enabled component set (same shape as the
-        // <c>GET</c>'s picker) — the <c>Model.IsValid</c> guard is a
-        // *shape* guard (the component, the body, the audience
-        // editor's <c>IsValid</c>); the "is that component present-
-        // enabled" check is the <b>Web-layer precondition</b> that
-        // the <c>Post.Draft</c> write targets a real component (the
-        // §2.3 row 2 shape; a write to a disabled component is the
-        // same class of bug as a write to a missing component — the
-        // Web-layer pin).
-        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        // Re-load the *reachable* component set with the same rule as the
+        // <c>GET</c>'s picker (single source: <see cref="AccessibleComponentsAsync"/>)
+        // — the <c>Model.IsValid</c> guard is a *shape* guard (the component,
+        // the body, the audience editor's <c>IsValid</c>); the "is that
+        // component enabled and reachable" check is the <b>Web-layer
+        // precondition</b> that the <c>Post.Draft</c> write targets a real,
+        // admissible component (the §2.3 row 2 shape).
+        var components = await AccessibleComponentsAsync(User);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
 
         if (!model.IsValid)
@@ -432,14 +478,13 @@ public sealed class PostsController(
 
         if (components.All(c => c.Id != model.ComponentId))
         {
-            // §2.3 row 2 — the "disabled component" write path (the
-            // "present" case was covered above; this is the "no
-            // match" branch). The shape is a form error, not a
-            // 404 (a 404 on POST is a non-standard shape; the M2
-            // <see cref="GroupsController"/> "a form is a shape"
-            // precedent applies).
+            // §2.3 row 2 — the "not in the reachable set" write path (disabled
+            // component, or one the actor is not a member of / has no
+            // moderator scope on). The shape is a form error, not a 404 (a 404
+            // on POST is a non-standard shape; the M2 <see
+            // cref="GroupsController"/> "a form is a shape" precedent applies).
             ModelState.AddModelError(nameof(model.ComponentId),
-                "That community is not enabled.");
+                "That community is not enabled, or you do not have a posting right on it.");
             return View(model);
         }
 
