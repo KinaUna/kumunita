@@ -13,19 +13,38 @@
         ? Model.Visibility
         : (optIn ? Model.ContactVisibility : null);
 
+    // Render a "well-formed but unchecked" editor when the saved shape is
+    // absent (the bootstrap self-only shape for Visibility, the off shape for
+    // an author who hasn't opted into a contact block). The *inputs* are
+    // ALWAYS rendered enabled (no HTML `disabled` attribute) — a disabled
+    // input is not submitted with the form, so a checkbox-flipped post would
+    // lose the mode/grants and `ProfileEditViewModel.IsValid` would reject it
+    // (the "checked the opt-in but the editor is still disabled" bug that
+    // made the contact-block toggle not stick across edits).
+    //
+    // The gate's *off* shape — the §2.4 "null ⇒ short-circuit" row — is
+    // enforced server-side: when the parent's `OptIn` flag is false, the
+    // `ToProfileUpdate` builder emits a null `ContactVisibility` patch field,
+    // so a non-null editor shape on this form never becomes a non-null patch.
+    // The shape-level `Visibility` gate (non-nullable on the document, ADR
+    // 0001-B bootstrap default) always posts a valid shape either way.
+    var activeEditor = editor 
+        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty };
+
     var modePrefix = editorName + ".Mode";
     var grantsPrefix = editorName + ".Grants";
     string[] modes = { "Any", "All" };
 
-    // When opt-in is off, the editor is disabled (the "null ⇒ short-circuit"
-    // §2.4 shape — not "an empty audience"; a null gate is the "not
-    // evaluated at all" shape, which is different from an empty audience's
-    // "deny everyone" shape).
-    bool disabled = !(editor is not null);
-    var disabledAttr = disabled ? "disabled" : null;
+    // Whether the editor *block* should visually dim (the off shape is
+    // visually de-emphasised but still editable so the author can opt in from
+    // the UI without needing to flip the checkbox first) — this is a CSS
+    // class, NOT the HTML `disabled` attribute (a `disabled` attribute would
+    // stop the form from posting the inputs and break the round-trip described
+    // in the above comment).
+    bool visuallyOff = !(editor is not null);
 }
 
-<div class="audience-editor card mb-4 @(disabled ? "opacity-75" : "")">
+<div class="audience-editor card mb-4">
     <div class="card-body">
         <h6 class="card-title" style="font-weight:600;">
             @if (string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase))
@@ -34,31 +53,30 @@
             }
             else
             {
-                <text>Contact visibility — who can see email/phone (opt-in)</text>
+                <text>Contact visibility — who can see address/email/phone (opt-in)</text>
             }
         </h6>
 
-        @if (disabled)
+        @if (visuallyOff && string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
         {
             <p class="text-muted" style="margin-bottom:0;">
                 Contact info is hidden for every viewer (the "null ⇒
                 short-circuit" shape of §2.4). To change this, check
-                "Opt in the contact block" below this box.
+                "Opt in contact info" above this box.
             </p>
         }
-        else
-        {
+
+        <div class="@(visuallyOff ? "opacity-75" : null)">
             <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
             @foreach (var m in modes)
             {
-                var checkedMark = (editor is not null &&
-                                   string.Equals(editor.Mode, m, StringComparison.OrdinalIgnoreCase))
+                var checkedMark = string.Equals(activeEditor.Mode, m, StringComparison.OrdinalIgnoreCase)
                     ? "checked"
                     : null;
             <div class="form-check" style="margin-left:0.5rem;">
                 <input class="form-check-input" type="radio"
                        name="@modePrefix" id="@($"{modePrefix}-{m}")"
-                       value="@m" @checkedMark @disabledAttr />
+                       value="@m" @checkedMark />
                 <label class="form-check-label" for="@($"{modePrefix}-{m}")">
                     @m @(" — " + (m == "Any"
                         ? "any matching grant is enough"
@@ -82,28 +100,34 @@
             <textarea class="form-control font-monospace"
                       name="@grantsPrefix" id="@grantsPrefix" rows="3"
                       placeholder='[{"Kind":"User","Id":"&lt;subject-id&gt;"}] — or leave empty for "no one"'
-                      @disabledAttr>@(editor is not null ? (editor.Grants ?? string.Empty) : string.Empty)</textarea>
+                      >@(activeEditor.Grants ?? string.Empty)</textarea>
 
-            @if (editor is not null && editor.IsEmpty)
+            @if (string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
             {
-                <div class="alert alert-warning mt-2 mb-0">
-                    <b>Empty audience.</b>
-                    @if (editor.Mode is "All")
-                    {
-                        <text>With <b>All</b> mode + an empty grant list, <b>zero
-                        grants must all apply</b> — vacuously <b>no one
-                        matches</b>, so this denies everyone (C1's "empty
-                        audience denies" invariant).</text>
-                    }
-                    else
-                    {
-                        <text>With <b>Any</b> mode + an empty grant list, <b>no
-                        grant matches</b>, so this denies everyone (C1's "empty
-                        audience denies" invariant).</text>
-                    }
-                </div>
+                @* The empty-audience warning is meaningful only when the author has
+                   actually opted in AND the grant list is empty — an opt-out with
+                   an empty editor is the §2.4 short-circuit row, not a mis-set gate. *@
+                @if (optIn && activeEditor.IsEmpty)
+                {
+                    <div class="alert alert-warning mt-2 mb-0">
+                        <b>Empty audience.</b>
+                        @if (activeEditor.Mode is "All")
+                        {
+                            <text>With <b>All</b> mode + an empty grant list, <b>zero
+                            grants must all apply</b> — vacuously <b>no one
+                            matches</b>, so this denies everyone (C1's "empty
+                            audience denies" invariant).</text>
+                        }
+                        else
+                        {
+                            <text>With <b>Any</b> mode + an empty grant list, <b>no
+                            grant matches</b>, so this denies everyone (C1's "empty
+                            audience denies" invariant).</text>
+                        }
+                    </div>
+                }
             }
-        }
+        </div>
 
         <small class="text-muted d-block mt-2">
             The grants are bound as a JSON array of

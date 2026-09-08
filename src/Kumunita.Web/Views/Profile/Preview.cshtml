@@ -35,6 +35,11 @@
                 see this contact block on the directory detail.
             </div>
             <dl class="row mt-3">
+                @if (!string.IsNullOrEmpty(Model.Address))
+                {
+                    <dt class="col-sm-3">Address</dt>
+                    <dd class="col-sm-9">@Model.Address</dd>
+                }
                 @if (!string.IsNullOrEmpty(Model.Email))
                 {
                     <dt class="col-sm-3">Email</dt>

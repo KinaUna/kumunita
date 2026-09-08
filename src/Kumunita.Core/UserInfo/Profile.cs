@@ -69,7 +69,7 @@ public sealed class Profile
 
     /// <summary>
     /// The <b>single</b> audience gate on the directory/detail surface (M2 §2.4, invariant
-    /// C-M2·1): who may see the contact block (<see cref="Email"/>/<see cref="Phone"/>).
+    /// C-M2·1): who may see the contact block (<see cref="Address"/>/<see cref="Email"/>/<see cref="Phone"/>).
     /// Evaluated by <see cref="Kumunita.Core.UserInfo.DirectoryService"/> through the
     /// frozen <c>IAuthorizationService.CanAsync</c>: <c>null</c> short-circuits to "no
     /// contact block" with no decision and no audit row (the author opted out); a
@@ -81,6 +81,15 @@ public sealed class Profile
     public string? Email { get; set; }
 
     public string? Phone { get; set; }
+
+    /// <summary>
+    /// The resident's street address, shown to neighbors in the directory. Like
+    /// <see cref="Email"/>/<see cref="Phone"/>, it is an opt-in field: gated by the same
+    /// <see cref="ContactVisibility"/> audience so it only renders on the directory
+    /// list/detail when the author has opted in <i>and</i> the viewer's decision allows.
+    /// Free-text (a single street line) — the repo has no structured address sub-model.
+    /// </summary>
+    public string? Address { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
@@ -91,4 +100,9 @@ public sealed record ProfileUpdate(
     string? Email,
     string? Phone,
     Audience? Visibility,
-    Audience? ContactVisibility);
+    Audience? ContactVisibility,
+    /// <summary>The resident's address (see <see cref="Profile.Address"/>). Appended with a
+    /// default after the frozen M1/M2 five-field shape so existing positional call sites
+    /// compile unchanged; null leaves the current value untouched (the "null ⇒ don't touch"
+    /// patch rule every other field follows).</summary>
+    string? Address = null);

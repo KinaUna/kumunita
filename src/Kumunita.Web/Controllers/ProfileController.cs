@@ -94,6 +94,7 @@ public sealed class ProfileController(
         {
             DisplayName = savedProfile?.DisplayName ?? string.Empty,
             Email = savedProfile?.Email ?? string.Empty,
+            Address = savedProfile?.Address ?? string.Empty,
         };
 
         // The profile-level gate is non-nullable on the Profile document —
@@ -205,7 +206,8 @@ public sealed class ProfileController(
                 AsDisplayName: "(none)",
                 ShowContactBlock: false,
                 Email: null,
-                Phone: null));
+                Phone: null,
+                Address: null));
 
         // The preview's "as" — default to the author's own subject
         // (the "how I appear" self-view; the M2 scope pin).
@@ -214,14 +216,14 @@ public sealed class ProfileController(
         var row = await directory.PreviewAsAsync(authorSubjectId: subject, asSubjectId: asId);
 
         // Map the frozen PreviewRow to the Web-layer projection. The
-        // contact fields (Email / Phone) are surfaced <b>only</b> when
-        // the single ContactVisibility decision allowed them (the C-M2·1
-        // view-level pin — "no contact block without an opt-in audience
-        // that allowed the viewer"): a <c>null</c> contact audience or a
-        // denied audience both mean no contact field on this view.
-        string? email = null, phone = null;
+        // contact fields (Address / Email / Phone) are surfaced <b>only</b> when the single
+        // ContactVisibility decision allowed them (the C-M2·1 view-level pin — "no contact
+        // block without an opt-in audience that allowed the viewer"): a null contact
+        // audience or a denied audience both mean no contact field on this view.
+        string? address = null, email = null, phone = null;
         if (row.ShowContactBlock && row.Profile is { } p)
         {
+            address = p.Address;
             email = p.Email;
             phone = p.Phone;
         }
@@ -234,7 +236,8 @@ public sealed class ProfileController(
             AsDisplayName: asDisplay,
             ShowContactBlock: row.ShowContactBlock,
             Email: email,
-            Phone: phone));
+            Phone: phone,
+            Address: address));
     }
 
     // ── Private helpers ────────────────────────────────────────────────────

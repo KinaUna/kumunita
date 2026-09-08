@@ -14,7 +14,7 @@ namespace Kumunita.Web.Tests;
 public sealed class ProfileEditViewModelTests
 {
     [Fact]
-    public void ProfileEditViewModel_Has_Exactly_Five_FormFields()
+    public void ProfileEditViewModel_Has_Exactly_Six_FormFields()
     {
         var fields = typeof(ProfileEditViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -25,6 +25,7 @@ public sealed class ProfileEditViewModelTests
 
         Assert.Equal(new[]
         {
+            "Address",
             "ContactVisibility",
             "DisplayName",
             "Email",
@@ -34,12 +35,12 @@ public sealed class ProfileEditViewModelTests
     }
 
     [Fact]
-    public void ProfilePreviewViewModel_Has_Exactly_Four_Fields()
+    public void ProfilePreviewViewModel_Has_Exactly_Five_Fields()
     {
         // The preview answers one question: "would this viewer see my contact block?" —
         // the show-everyone rule removes the "hidden profile" shape, so the old
         // `IsVisible` field is gone. Only AsDisplayName + the ShowContactBlock opt-in
-        // gate + the contact fields remain.
+        // gate + the contact fields (address/email/phone) remain.
         var fields = typeof(ProfilePreviewViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(p => p.Name)
@@ -48,6 +49,7 @@ public sealed class ProfileEditViewModelTests
 
         Assert.Equal(new[]
         {
+            "Address",
             "AsDisplayName",
             "Email",
             "Phone",

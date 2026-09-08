@@ -41,7 +41,7 @@ public sealed class DirectoryViewModel
     /// basic info (<c>DisplayName</c>, <c>Verified</c>) renders regardless — the directory
     /// no longer has a "hidden profile" shape; a missing or <see cref="Kumunita.Core.UserInfo.Profile.Blocked"/>
     /// row is handled by the controller redirecting to <c>NotFound()</c>, not projected here.
-    /// <c>Email</c>/<c>Phone</c> are a *subset* of <see cref="Kumunita.Core.UserInfo.Profile"/> —
+    /// <c>Email</c>/<c>Phone</c>/<c>Address</c> are a *subset* of <see cref="Kumunita.Core.UserInfo.Profile"/> —
     /// never <c>Visibility</c>/<c>ContactVisibility</c>/<c>HouseholdId</c>/<c>ExternalId</c>.
     /// </remarks>
     public sealed record Detail(
@@ -49,15 +49,24 @@ public sealed class DirectoryViewModel
         bool Verified,
         bool ShowContactBlock,
         string? Email,
-        string? Phone);
+        string? Phone,
+        /// <summary>The resident's address — carried alongside the gated contact block; null
+        /// unless <see cref="ShowContactBlock"/> is true (same gate as <see cref="Email"/>/<see cref="Phone"/>).</summary>
+        string? Address = null);
 }
 
 /// <summary>
-/// One directory row. Exactly three fields — the low-entropy shape the list model
-/// exposes. <c>SubjectId</c> (string, mirrors
-/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>), <c>DisplayName</c>, and the
-/// <c>Verified</c> badge. No email, no phone, no contact/audience fields — those only
-/// surface on the detail row, and only behind the <see cref="Profile.ContactVisibility"/>
-/// opt-in (see <see cref="DirectoryViewModel.Detail"/>).
+/// One directory row. Four fields — the low-entropy shape the list model exposes.
+/// <c>SubjectId</c> (string, mirrors
+/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>), <c>DisplayName</c>, the
+/// <c>Verified</c> badge, and the <c>Address</c> — the one privacy-aware row field
+/// added (the directory is a *neighbor* surface, so the address is part of "who is here").
+/// <c>Address</c> is projected only when the profile's <c>ContactVisibility</c> is non-null
+/// (the author opted in); it is otherwise <c>null</c>. No email, no phone, no
+/// contact/audience fields other than this — those only surface on the detail row,
+/// behind the <see cref="Profile.ContactVisibility"/> opt-in + one <c>CanAsync</c> decision
+/// (the detail is the enforce-gate surface; the list approximation is "the author opted in,"
+/// since the list is a pure catalog read by pin and does not run a per-viewer decision). See
+/// <see cref="DirectoryViewModel.Detail"/> for the enforce-gate shape.
 /// </summary>
-public sealed record VisibleProfile(string SubjectId, string DisplayName, bool Verified);
+public sealed record VisibleProfile(string SubjectId, string DisplayName, bool Verified, string? Address = null);

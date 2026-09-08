@@ -9,14 +9,15 @@ namespace Kumunita.Web.Models;
 /// field").
 /// <para>
 /// The preview shows <b>only</b> whether <paramref name="AsDisplayName"/> would see the
-/// <b>contact block</b> (email/phone). Basic profile info (name + verified badge) always
-/// renders — the platform is invitation-only and limited to residents, so the directory
-/// detail has no "hidden profile" shape anymore. The contact block is gated by the <b>single</b>
-/// <see cref="Kumunita.Core.UserInfo.Profile.ContactVisibility"/> audience: <see cref="Email"/>
-/// and <see cref="Phone"/> are a *subset* of <see cref="Kumunita.Core.UserInfo.Profile"/>
-/// and are surfaced <b>only</b> when <see cref="ShowContactBlock"/> is true; otherwise both
-/// are null and the view has no channel to render a contact method (the §2.4 "null ⇒ not opted
-/// in" pin: a non-allowed / <c>null</c> contact audience carries no value to the preview).
+/// <b>contact block</b> (address/email/phone). Basic profile info (name + verified badge)
+/// always renders — the platform is invitation-only and limited to residents, so the
+/// directory detail has no "hidden profile" shape anymore. The contact block is gated by the
+/// <b>single</b> <see cref="Kumunita.Core.UserInfo.Profile.ContactVisibility"/> audience:
+/// <see cref="Address"/>, <see cref="Email"/> and <see cref="Phone"/> are a *subset* of
+/// <see cref="Kumunita.Core.UserInfo.Profile"/> and are surfaced <b>only</b> when
+/// <see cref="ShowContactBlock"/> is true; otherwise all are null and the view has no channel
+/// to render a contact value (the §2.4 "null ⇒ not opted in" pin: a non-allowed /
+/// <c>null</c> contact audience carries no value to the preview).
 /// </para>
 /// <para>
 /// The row carries <b>no</b> <c>PredictedAudience</c>/<c>PredictedGrants</c> and no raw
@@ -31,7 +32,10 @@ public sealed record ProfilePreviewViewModel(
     string AsDisplayName,
     bool ShowContactBlock,
     string? Email,
-    string? Phone);
+    string? Phone,
+    /// <summary>The resident's address — surfaced only when <see cref="ShowContactBlock"/>
+    /// is true (same gate as <see cref="Email"/>/<see cref="Phone"/>).</summary>
+    string? Address);
 
 /// <summary>
 /// One selectable "view as" resident for the profile editor's preview selector (F6).

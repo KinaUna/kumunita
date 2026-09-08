@@ -20,7 +20,13 @@
                 @foreach (var p in Model.Profiles)
                 {
                     <li class="list-group-item d-flex align-items-center justify-content-between">
-                        <span>@p.DisplayName</span>
+                        <span>
+                            @p.DisplayName
+                            @if (!string.IsNullOrEmpty(p.Address))
+                            {
+                                <span class="text-muted small"> · @p.Address</span>
+                            }
+                        </span>
                         <span>
                             @if (p.Verified)
                             {

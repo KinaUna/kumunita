@@ -62,11 +62,20 @@ public sealed class DirectoryController(DirectoryService directory) : Controller
 
         var model = new DirectoryViewModel
         {
-            // Project every Profile to the three-field VisibleProfile shape — never
-            // contact/audience fields (they only surface on the detail row, behind the
-            // ContactVisibility opt-in).
+            // Project every Profile to the VisibleProfile row shape. The address is the
+            // one privacy-aware field on the list row: it is projected only when the
+            // author has opted in (a non-null ContactVisibility audience) — the list is
+            // a pure catalog read (no per-viewer CanAsync here, by pin), so the closest
+            // honest surface is "the author chose to share it" (a null gate means "never
+            // shown," matching the detail row's short-circuit). No email/phone/audience
+            // fields — those surface only on the detail row, behind the ContactVisibility
+            // opt-in + one CanAsync decision.
             Profiles = list.Visible
-                .Select(p => new VisibleProfile(p.SubjectId, p.DisplayName, p.Verified))
+                .Select(p => new VisibleProfile(
+                    p.SubjectId,
+                    p.DisplayName,
+                    p.Verified,
+                    p.ContactVisibility is not null ? p.Address : null))
                 .ToList(),
         };
 
@@ -139,9 +148,12 @@ public sealed class DirectoryController(DirectoryService directory) : Controller
             DisplayName: p.DisplayName,
             Verified: p.Verified,
             ShowContactBlock: detail.ShowContactBlock,
-            // Contact fields only projected when the service's ShowContactBlock gate
-            // allowed them — never a field the service decided to hide.
+            // Contact fields (email/phone/address) only projected when the service's
+            // ShowContactBlock gate allowed them — never a field the service decided to
+            // hide. The address shares the same opt-in gate (C-M2·1's single-gate "contact
+            // block" surface).
             Email: detail.ShowContactBlock ? p.Email : null,
-            Phone: detail.ShowContactBlock ? p.Phone : null);
+            Phone: detail.ShowContactBlock ? p.Phone : null,
+            Address: detail.ShowContactBlock ? p.Address : null);
     }
 }

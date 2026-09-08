@@ -19,7 +19,7 @@ namespace Kumunita.Web.Tests;
 public sealed class DirectoryIndexViewModelTests
 {
     [Fact]
-    public void VisibleProfile_Has_Exactly_Three_Projected_Fields()
+    public void VisibleProfile_Has_Exactly_Four_Projected_Fields()
     {
         var fields = typeof(VisibleProfile)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -27,9 +27,11 @@ public sealed class DirectoryIndexViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // The privacy pin: SubjectId + DisplayName + Verified — and *nothing else*.
-        // No Email, No Phone, No ContactVisibility, No HouseholdId.
-        Assert.Equal(new[] { "DisplayName", "SubjectId", "Verified" }, fields.ToArray());
+        // The pin: SubjectId + DisplayName + Verified + Address — and *nothing else*.
+        // Address is the one privacy-aware field on the list, deliberately added for the
+        // neighbor-surface "who lives where" shape. No Email, No Phone, No ContactVisibility,
+        // No HouseholdId.
+        Assert.Equal(new[] { "Address", "DisplayName", "SubjectId", "Verified" }, fields.ToArray());
     }
 
     [Fact]
@@ -54,7 +56,10 @@ public sealed class DirectoryIndexViewModelTests
     {
         // A hidden row's Privacy-critical fields must have *no* corresponding member
         // on the visible row type — even if someone later sets them on the Profile,
-        // they have nowhere to land in the view model.
+        // they have nowhere to land in the view model. Address is deliberately *not* in
+        // this exclusion set: it is the neighbor-surface field, surfaced on the list when
+        // the author has opted in (see VisibleProfile_Has_Exactly_Four_Projected_Fields
+        // above).
         var profileContactFields = new[] { "Email", "Phone", "ContactVisibility", "Visibility" };
         var visibleProfileProps = typeof(VisibleProfile)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

@@ -22,14 +22,15 @@ namespace Kumunita.Web.Tests;
 public sealed class DirectoryDetailViewModelTests
 {
     /// <summary>
-    /// Plan U8 pin — the <see cref="DirectoryViewModel.Detail"/> record has exactly five fields,
+    /// Plan U8 pin — the <see cref="DirectoryViewModel.Detail"/> record has exactly six fields,
     /// and <b>nothing else</b>. No <c>Visibility</c>, no <c>ContactVisibility</c>, no
     /// <c>HouseholdId</c>, no <c>ExternalId</c>, no <c>SubjectId</c> (the row is already
     /// addressed by its route). The contact surface is a *subset* of
-    /// <c>Kumunita.Core.UserInfo.Profile</c> (<c>Email</c>/<c>Phone</c>) — nothing more.
+    /// <c>Kumunita.Core.UserInfo.Profile</c> (<c>Address</c>/<c>Email</c>/<c>Phone</c>) —
+    /// nothing more.
     /// </summary>
     [Fact]
-    public void Detail_Has_Exactly_Five_Fields()
+    public void Detail_Has_Exactly_Six_Fields()
     {
         var fields = typeof(DirectoryViewModel.Detail)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -37,9 +38,11 @@ public sealed class DirectoryDetailViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // DisplayName, Verified, ShowContactBlock, Email, Phone — the plan's U8 freeze.
+        // DisplayName, Verified, ShowContactBlock, Address, Email, Phone — the U8 freeze
+        // extended for the neighbor-surface address (the contact block's address/email/phone
+        // are all behind the same ShowContactBlock gate).
         Assert.Equal(
-            new[] { "DisplayName", "Email", "Phone", "ShowContactBlock", "Verified" },
+            new[] { "Address", "DisplayName", "Email", "Phone", "ShowContactBlock", "Verified" },
             fields);
     }
 
@@ -84,19 +87,21 @@ public sealed class DirectoryDetailViewModelTests
 
         // Case 2 — a profile whose <c>ContactVisibility</c> allowed the viewer (the
         // §2.4 Any+non-empty grant row): the gate is on, so the projected contact values
-        // are carried alongside the name + badge.
+        // (address/email/phone) are carried alongside the name + badge.
         var contactAllowed = new DirectoryViewModel.Detail(
             DisplayName: "B. Resident",
             Verified: true,
             ShowContactBlock: true,
             Email: "b@example.kumunita",
-            Phone: "+1 555 0100");
+            Phone: "+1 555 0100",
+            Address: "12 Maple Lane");
 
         Assert.True(contactAllowed.ShowContactBlock);
         Assert.Equal("B. Resident", contactAllowed.DisplayName);
         Assert.True(contactAllowed.Verified);
         Assert.Equal("b@example.kumunita", contactAllowed.Email);
         Assert.Equal("+1 555 0100", contactAllowed.Phone);
+        Assert.Equal("12 Maple Lane", contactAllowed.Address);
     }
 
     /// <summary>

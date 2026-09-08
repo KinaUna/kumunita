@@ -430,7 +430,8 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             Visibility = profile.Visibility,
             ContactVisibility = profile.ContactVisibility,
             Email = profile.Email,
-            Phone = profile.Phone
+            Phone = profile.Phone,
+            Address = profile.Address
         };
 
         // Patch wins on every non-null field; a null field leaves the current value untouched.
@@ -439,6 +440,7 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         if (patch.Phone is not null) doc.Phone = patch.Phone;
         if (patch.Visibility is not null) doc.Visibility = patch.Visibility;
         if (patch.ContactVisibility is not null) doc.ContactVisibility = patch.ContactVisibility;
+        if (patch.Address is not null) doc.Address = patch.Address;
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
