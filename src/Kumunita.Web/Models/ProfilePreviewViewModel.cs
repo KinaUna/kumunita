@@ -8,26 +8,27 @@ namespace Kumunita.Web.Models;
 /// never a write path (the M2 scope pin: "the preview is a composition read, not an editor
 /// field").
 /// <para>
-/// Privacy pin (parallel to U8's <see cref="DirectoryViewModel.Detail"/>): <see
-/// cref="Email"/>/<see cref="Phone"/> are a *subset* of <see
-/// cref="Kumunita.Core.UserInfo.Profile"/> and are surfaced <b>only</b> when
-/// <see cref="ShowContactBlock"/> is true — otherwise they are null, so the view has no
-/// channel to render a contact method the author's two-gate evaluation did not allow
-/// (C-M2·1 / §2.4: the contact decision is *never* evaluated on a profile
-/// <see cref="Kumunita.Core.UserInfo.Profile.Visibility"/> denied).
+/// The preview shows <b>only</b> whether <paramref name="AsDisplayName"/> would see the
+/// <b>contact block</b> (email/phone). Basic profile info (name + verified badge) always
+/// renders — the platform is invitation-only and limited to residents, so the directory
+/// detail has no "hidden profile" shape anymore. The contact block is gated by the <b>single</b>
+/// <see cref="Kumunita.Core.UserInfo.Profile.ContactVisibility"/> audience: <see cref="Email"/>
+/// and <see cref="Phone"/> are a *subset* of <see cref="Kumunita.Core.UserInfo.Profile"/>
+/// and are surfaced <b>only</b> when <see cref="ShowContactBlock"/> is true; otherwise both
+/// are null and the view has no channel to render a contact method (the §2.4 "null ⇒ not opted
+/// in" pin: a non-allowed / <c>null</c> contact audience carries no value to the preview).
 /// </para>
 /// <para>
 /// The row carries <b>no</b> <c>PredictedAudience</c>/<c>PredictedGrants</c> and no raw
 /// subject id — the §2.x decision the author cares about ("who could see my contact block?")
-/// is <b>never</b> computed: the §2.4/§9 pin is that contact visibility is only *evaluated*,
-/// not *predicted*, and a "who-else-could-see-my-contacts" oracle is a Web-layer peek surface
+/// is <b>never</b> computed: contact visibility is only *evaluated*, not *predicted*, and a
+/// "who-else-could-see-my-contacts" oracle is a Web-layer peek surface
 /// (F12's "a resident cannot use the profile editor to peek contact visibility" line) the
 /// preview must not open.
 /// </para>
 /// </summary>
 public sealed record ProfilePreviewViewModel(
     string AsDisplayName,
-    bool IsVisible,
     bool ShowContactBlock,
     string? Email,
     string? Phone);

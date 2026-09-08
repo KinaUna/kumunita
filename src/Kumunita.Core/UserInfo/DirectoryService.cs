@@ -3,37 +3,48 @@ using Kumunita.Core.Authorization;
 namespace Kumunita.Core.UserInfo;
 
 /// <summary>
-/// <see cref="DirectoryService.ListAsync"/>'s result: the profiles the viewer may see
-/// (their source <see cref="Profile"/> documents, projected 1:1 from the
-/// <c>CanSeeAsync</c> visible set — never re-read, no field invented) plus how many of
-/// the *candidate set* were hidden. Invariant C-M2·2: <see cref="HiddenCount"/> counts
-/// only the candidates <c>CanSeeAsync</c> actually evaluated; a profile dropped by the
-/// §2.3 candidate filter (e.g. a verified resident, seen by an unverified viewer) is not
-/// "hidden" here — it was excluded before any decision ran, and no <see cref="AccessAudit"/>
-/// row names it.
+/// <see cref="DirectoryService.ListAsync"/>'s result: the residents the viewer may see
+/// (their source <see cref="Profile"/> documents, projected 1:1 — never re-read, no field
+/// invented). The directory lists *every* non-blocked resident to any signed-in viewer —
+/// the platform is invitation-only and limited to residents, so "who is here" is not a
+/// gated surface; the <c>CanSeeAsync</c> pass is not run on the list (there is no
+/// hidden-count to count). Blocked residents (a GlobalAdmin's suspension) are still
+/// excluded, since a suspended account has no public presence. No <see cref="AccessAudit"/>
+/// row is written for the list render (an anonymised "directory.list-viewed" row is a
+/// separate concern, deferred to a future privacy-abuse lane).
 /// </summary>
-public sealed record DirectoryList(IReadOnlyList<Profile> Visible, int HiddenCount);
+public sealed record DirectoryList(IReadOnlyList<Profile> Visible);
 
 /// <summary>
-/// <see cref="DirectoryService.DetailAsync"/>'s result: <see cref="IsVisible"/> is the
-/// first gate (<see cref="Profile.Visibility"/>, via <c>IAuthorizationService.CanAsync</c>);
-/// <see cref="ShowContactBlock"/> is the second gate (<see cref="Profile.ContactVisibility"/>,
-/// §2.4, invariant C-M2·1 — evaluated *only* after <see cref="IsVisible"/> is true, so a
-/// hidden profile never produces a contact-block audit row: the §9 pin).
-/// <see cref="Profile"/> is null only in the fail-closed "target profile does not exist"
-/// case (no decision ran, no audit row).
+/// <see cref="DirectoryService.DetailAsync"/>'s result: <see cref="ShowContactBlock"/> is
+/// the single gate evaluated through <c>IAuthorizationService.CanAsync</c> — the
+/// <see cref="Profile.ContactVisibility"/> audience (the §2.4 rule, now a *single*
+/// decision): a null / absent audience short-circuits to <c>false</c> with no contact
+/// decision (no audit row); a non-null audience runs the one <c>CanAsync</c>, one
+/// <see cref="AccessAudit"/> row. <see cref="Profile"/> is <c>null</c> only for the
+/// fail-closed empty shape — the target profile does not exist, or the resident is
+/// <see cref="Profile.Blocked"/> (a suspended account whose profile has no public
+/// presence at all) — in which case no decision ran, no audit row.
+/// <para>
+/// The profile-level <see cref="Profile.Visibility"/> audience no longer hides the whole
+/// profile from the directory (see <see cref="DirectoryService"/> doc comment — the
+/// directory shows every non-blocked resident). It remains on the data model + editor for
+/// the audience that would gate *detailed* non-contact fields once such fields exist;
+/// the contact block (Email/Phone) is the only profile field currently gated by an
+/// audience, and that gate is <see cref="Profile.ContactVisibility"/>.
+/// </para>
 /// </summary>
-public sealed record DirectoryDetail(bool IsVisible, bool ShowContactBlock, Profile? Profile);
+public sealed record DirectoryDetail(bool ShowContactBlock, Profile? Profile);
 
 /// <summary>
 /// <see cref="DirectoryService.PreviewAsAsync"/>'s result (F6 — the read-only "view as"
-/// preview): the same two-gate shape as <see cref="DirectoryDetail"/>, applied to the
+/// preview): the same single-gate shape as <see cref="DirectoryDetail"/>, applied to the
 /// *author's* saved profile as if a chosen resident (<c>asSubjectId</c>) were the viewer.
 /// No write path (M2's scope pin: preview is a composition read, never an editor field);
-/// the two decisions still commit their own <see cref="AccessAudit"/> rows (C3 — a
-/// preview is an evaluation, not an exemption from the audit lane).
+/// the contact-block decision still commits its own <see cref="AccessAudit"/> row (C3 —
+/// a preview is an evaluation, not an exemption from the audit lane).
 /// </summary>
-public sealed record PreviewRow(bool IsVisible, bool ShowContactBlock, Profile? Profile);
+public sealed record PreviewRow(bool ShowContactBlock, Profile? Profile);
 
 /// <summary>
 /// The directory-side composition root (M2, plan U5). A pure caller of the two frozen
@@ -41,12 +52,37 @@ public sealed record PreviewRow(bool IsVisible, bool ShowContactBlock, Profile? 
 /// <see cref="IAuthorizationService"/> (the single decision path, ADR 0006-D) — never
 /// reading <c>GroupMembership</c>/<c>DelegationGrant</c> for its own access decisions
 /// (the same "feature modules never re-derive access" ADR 0006-D boundary that pins M1's
-/// modules). Owns M2's two product rules: the §4.3 candidate filter (invariant C-M2·2 —
-/// a *product rule*, applied *before* any <see cref="IAuthorizationService"/> call, never
-/// an <see cref="AccessAction"/> subject or an <see cref="AccessAudit"/> row) and the §2.4
-/// <c>ContactVisibility</c> gating (invariant C-M2·1 — a *composition* rule over the same
-/// two frozen methods: Visibility first, then ContactVisibility, as two separate
-/// decisions through the same shared matching pass, C6).
+/// modules).
+/// <para>
+/// **Product rule (invocation-only, invitation-only platform):** the directory lists
+/// every non-blocked resident to every signed-in viewer — "who is here" is not a gated
+/// surface. <see cref="Profile.Blocked"/> is the only account-level exclusion (a
+/// suspended account has no public presence). <see cref="ListAsync"/> therefore no longer
+/// runs <c>CanSeeAsync</c> at all: it is a pure catalog read; no <see cref="AccessAudit"/>
+/// row is written for the list render. (If a "directory.list-viewed" privacy-abuse audit
+/// row is needed later, it is a separate addition — not part of this rule.)
+/// </para>
+/// <para>
+/// **Contact-block opt-in (M2 §2.4, invariant C-M2·1):** the email/phone block on the
+/// <b>detail</b> (<see cref="DetailAsync"/>) and the read-only <b>preview</b>
+/// (<see cref="PreviewAsAsync"/>) is gated by <b>one</b> audience decision —
+/// <see cref="Profile.ContactVisibility"/> — through the frozen
+/// <see cref="IAuthorizationService"/>'s <c>CanAsync</c>. A null audience short-circuits
+/// to "no contact block" with no decision and no audit row (the C-M2·1/C3 pin that is
+/// preserved from the two-gate M2 design: the second decision is *not evaluated*, not
+/// a Deny). <c>CanAsync</c> is the single shared decision path (C6) — the two public
+/// read methods behind this rule (<c>DetailAsync</c> and <c>PreviewAsAsync</c>) share
+/// the same <see cref="EvaluateContactGateAsync"/> call so they cannot drift.
+/// </para>
+/// <para>
+/// The profile-level <see cref="Profile.Visibility"/> audience remains on the data model
+/// and the editor (an author-controlled, opt-in audience), but the directory and detail
+/// surfaces no longer use it to hide a whole profile — the "show everyone, filter the
+/// contact block" rule above supersedes it at the presentation layer. It takes effect
+/// once *detailed* non-contact profile fields exist and the product wires them through
+/// a <c>Visibility</c> gate (M2 scope pin: the visibility gate stays frozen in the data
+/// model and editor so later fields can adopt it without a migration).
+/// </para>
 /// </summary>
 public sealed class DirectoryService
 {
@@ -60,131 +96,105 @@ public sealed class DirectoryService
     }
 
     /// <summary>
-    /// The directory listing (F1/F8/F11/F15): the §2.3 candidate filter, then one
-    /// <c>IAuthorizationService</c> <c>CanSeeAsync</c> call over the survivor set.
-    /// <paramref name="viewerSubjectId"/>/<paramref name="viewerVerified"/> is the
-    /// caller-state pair the Web layer already knows (from the principal); this service —
-    /// not the Web controller — applies the §2.3 table to it (C-M2·2 names this service
-    /// as the filter's owner): <c>null</c>/empty <paramref name="viewerSubjectId"/>
-    /// (unauthenticated) short-circuits to an empty <see cref="DirectoryList"/> with no
-    /// <c>CanSeeAsync</c> call and no aggregate audit row (F8's boundary row);
-    /// <paramref name="viewerVerified"/> true — the <c>verifiedOnly:true</c> profile set;
-    /// false — exactly the viewer's own <see cref="Profile"/>, if any ("missing profile
-    /// ⇒ empty, fail closed" — §2.3's last row, shared with the no-principal case).
+    /// The directory listing (F1/F8/F11/F15): every non-blocked resident, for any
+    /// signed-in viewer. The platform is invitation-only and limited to residents, so
+    /// "who is here" is not a gated surface — <see cref="Profile.Visibility"/> no longer
+    /// hides a profile from the directory. <see cref="Profile.Blocked"/> remains the only
+    /// account-level exclusion (a suspended account has no public presence).
+    /// <para>
+    /// F8 boundary: a <c>null</c>/empty <paramref name="viewerSubjectId"/> (unauthenticated)
+    /// short-circuits to an empty <see cref="DirectoryList"/> — the list is
+    /// sign-in-gated at the Web layer ([Authorize] on the DirectoryController); this
+    /// method is the Core-side pin that the list is never exposed to a no-principal caller
+    /// even if a caller bypasses the Web gate.
+    /// </para>
+    /// <para>
+    /// <see cref="ListAsync"/> does not run <see cref="IAuthorizationService"/> at all:
+    /// it is a pure catalog read, no <see cref="AccessAudit"/> row. (A future
+    /// anonymised "directory.list-viewed" privacy-abuse lane is a separate addition,
+    /// not part of this pin.)
+    /// </para>
     /// </summary>
-    public async Task<DirectoryList> ListAsync(string viewerSubjectId, bool viewerVerified)
+    public async Task<DirectoryList> ListAsync(string viewerSubjectId)
     {
         if (string.IsNullOrEmpty(viewerSubjectId))
-            return new DirectoryList(Visible: Array.Empty<Profile>(), HiddenCount: 0);
+            return new DirectoryList(Visible: Array.Empty<Profile>());
 
-        IReadOnlyList<Profile> candidates;
-        if (viewerVerified)
-        {
-            candidates = await _userInfo.GetProfilesAsync(verifiedOnly: true).ConfigureAwait(false);
-        }
-        else
-        {
-            // Unverified-resident self-only (F8): exactly one candidate — the viewer
-            // themself — or none (their profile row missing: fail closed, no decision).
-            var all = await _userInfo.GetProfilesAsync(verifiedOnly: false).ConfigureAwait(false);
-            var self = all.FirstOrDefault(p => p.SubjectId == viewerSubjectId);
-            candidates = self is null ? Array.Empty<Profile>() : new[] { self };
-        }
-
-        if (candidates.Count == 0)
-            return new DirectoryList(Visible: candidates, HiddenCount: 0);
-
-        // C6 — one shared matching pass over the whole candidate set; C3 — one aggregate
-        // audit row (VisibleCount/HiddenCount) from that single call. Standalone form
-        // (no IDocumentSession overload): this service has no in-flight caller transaction
-        // (a plain read, not a command handler's write path), so the standalone method's
-        // own commit is the correct C3 lane here.
-        var visibleSet = await _authz.CanSeeAsync(
-                viewerSubjectId, AccessAction.Read,
-                candidates.Select(p => new ProfileToAuditableResource(p)))
-            .ConfigureAwait(false);
-
-        // F1 / the "Profile enumeration vs privacy" risk line: return only the source
-        // documents whose id the visible set surfaced — never a hidden row's fields.
-        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        var visible = candidates
-            .Where(p => visibleIds.Contains(p.SubjectId))
-            .ToList();
-
-        return new DirectoryList(Visible: visible, HiddenCount: visibleSet.HiddenCount);
+        var all = await _userInfo.GetProfilesAsync(verifiedOnly: false).ConfigureAwait(false);
+        var visible = all.Where(p => !p.Blocked).ToList();
+        return new DirectoryList(Visible: visible);
     }
 
     /// <summary>
-    /// The directory detail (F3/F4): the <see cref="Profile.Visibility"/> decision for
-    /// <paramref name="viewerSubjectId"/> → <paramref name="targetSubjectId"/>, and —
-    /// *only if that allowed* (C-M2·1, §2.4) — the <see cref="Profile.ContactVisibility"/>
-    /// decision for the same pair. A missing target profile is fail-closed (no decision,
-    /// no audit row — the §2.3 "missing profile ⇒ empty" row, extended to the single-row
-    /// case). <see cref="PreviewAsAsync"/> shares this exact two-gate shape (F6).
+    /// The directory detail (F3/F4): the <see cref="Profile.ContactVisibility"/> decision
+    /// for <paramref name="viewerSubjectId"/> → <paramref name="targetSubjectId"/>, the
+    /// <b>single</b> audience gate on the detail surface (§2.4, invariant C-M2·1 — now a
+    /// one-decision rule): <c>null</c> <see cref="Profile.ContactVisibility"/> short-circuits
+    /// to <c>ShowContactBlock = false</c> with no <c>CanAsync</c> call and no
+    /// <see cref="AccessAudit"/> row; a non-null audience runs one <c>CanAsync</c> and one
+    /// audit row. The profile's <b>basic</b> info (<c>DisplayName</c>/<c>Verified</c>) is
+    /// the only thing the detail renders *always* — <see cref="Profile.Visibility"/> no
+    /// longer hides the whole profile (the platform is invitation-only and limited to
+    /// residents, so "who is here" is not gated). A missing target profile, or a
+    /// <see cref="Profile.Blocked"/> resident (suspended, no public presence), is
+    /// fail-closed: <c>Profile = null</c>, no decision, no audit row.
+    /// <see cref="PreviewAsAsync"/> shares this exact single-gate shape (F6) via
+    /// <see cref="EvaluateContactGateAsync"/> — C6's no-drift property.
     /// </summary>
     public Task<DirectoryDetail> DetailAsync(string viewerSubjectId, string targetSubjectId)
-        => EvaluateTwoGatesAsync(viewerSubjectId, targetSubjectId);
+        => EvaluateContactGateAsync(viewerSubjectId, targetSubjectId);
 
     /// <summary>
     /// The read-only "view-as" preview (F6): evaluates <paramref name="authorSubjectId"/>'s
-    /// saved <see cref="Profile"/> through exactly the same two gates as
+    /// saved <see cref="Profile"/> through exactly the same single gate as
     /// <see cref="DetailAsync"/>, with <paramref name="asSubjectId"/> standing in as the
     /// viewer. Read-only — no write path, no state change (M2's scope pin: the preview is
-    /// a composition read, not an editor field). The two decisions still commit their own
-    /// <see cref="AccessAudit"/> rows (C3) — a preview is an evaluation, not an exemption.
+    /// a composition read, not an editor field). The contact-block decision still commits
+    /// its own <see cref="AccessAudit"/> row (C3) — a preview is an evaluation, not an
+    /// exemption.
     /// </summary>
     public async Task<PreviewRow> PreviewAsAsync(string authorSubjectId, string asSubjectId)
     {
         if (string.IsNullOrEmpty(authorSubjectId) || string.IsNullOrEmpty(asSubjectId))
-            return new PreviewRow(IsVisible: false, ShowContactBlock: false, Profile: null);
+            return new PreviewRow(ShowContactBlock: false, Profile: null);
 
-        var detail = await EvaluateTwoGatesAsync(
+        var detail = await EvaluateContactGateAsync(
                 viewerSubjectId: asSubjectId, profileSubjectId: authorSubjectId)
             .ConfigureAwait(false);
-        return new PreviewRow(detail.IsVisible, detail.ShowContactBlock, detail.Profile);
+        return new PreviewRow(detail.ShowContactBlock, detail.Profile);
     }
 
     /// <summary>
-    /// The shared Visibility → ContactVisibility two-gate evaluation — the one code path
-    /// behind <see cref="DetailAsync"/> and <see cref="PreviewAsAsync"/> (C6's no-drift
-    /// property applied to this service's own two public read methods: they *cannot*
-    /// disagree on the order or the shape of the two decisions, since they are the same
-    /// calls in the same order).
+    /// The shared <see cref="Profile.ContactVisibility"/> gate evaluation — the one code
+    /// path behind <see cref="DetailAsync"/> and <see cref="PreviewAsAsync"/> (C6's
+    /// no-drift property applied to this service's two public read methods: they *cannot*
+    /// disagree on the gate or the audit-row shape, since they are the same call).
     /// </summary>
-    private async Task<DirectoryDetail> EvaluateTwoGatesAsync(
+    private async Task<DirectoryDetail> EvaluateContactGateAsync(
         string viewerSubjectId, string profileSubjectId)
     {
         var profile = await _userInfo.GetProfileAsync(profileSubjectId).ConfigureAwait(false);
-        if (profile is null)
-            return new DirectoryDetail(IsVisible: false, ShowContactBlock: false, Profile: null);
 
-        var visibilityDecision = await _authz.CanAsync(
-                viewerSubjectId, AccessAction.Read, new ProfileToAuditableResource(profile))
-            .ConfigureAwait(false);
+        // Fail-closed shape: no row, or a suspended resident (a <see cref="Profile.Blocked"/>
+        // account has no public presence — the profile never surfaces, no decision runs,
+        // no audit row).
+        if (profile is null || profile.Blocked)
+            return new DirectoryDetail(ShowContactBlock: false, Profile: null);
 
-        if (!visibilityDecision.Allowed)
-            // C-M2·1 / F4 — a Visibility Deny never reaches the contact decision: no second
-            // CanAsync call, no second audit row, no contact field render. This is the §9
-            // pin ("contact block never on a hidden profile"), made concrete by this early
-            // return.
-            return new DirectoryDetail(IsVisible: false, ShowContactBlock: false, Profile: profile);
-
+        // §2.4 / C-M2·1 short-circuit: `null` ContactVisibility ⇒ no contact decision, no
+        // <see cref="AccessAudit"/> row. Basic info still renders; only the contact block
+        // is gated, and a `null` gate is the "not opted in" shape (not a Deny, not an
+        // evaluation).
         if (profile.ContactVisibility is null)
-            // §2.4, row 1 — `null` short-circuits: the contact decision is *not evaluated*
-            // (no call, no audit row), exactly as the design doc's literal "not evaluated"
-            // wording reads.
-            return new DirectoryDetail(IsVisible: true, ShowContactBlock: false, Profile: profile);
+            return new DirectoryDetail(ShowContactBlock: false, Profile: profile);
 
-        // §2.4, rows 2–4 (+ Any/All with non-empty grants): a *separate* second decision,
-        // on the same profile, through the same shared matching pass (C6) — deliberately
-        // not folded into one merged compound audience, so the two decisions can never
-        // drift and each audits its own row (C3).
+        // One audience decision (C6 shared matching pass; C3 one audit row) on the
+        // profile's contact audience.
         var contactDecision = await _authz.CanAsync(
                 viewerSubjectId, AccessAction.Read, new ContactVisibilityResource(profile))
             .ConfigureAwait(false);
 
         return new DirectoryDetail(
-            IsVisible: true,
             ShowContactBlock: contactDecision.Allowed,
             Profile: profile);
     }

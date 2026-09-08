@@ -174,21 +174,26 @@ public sealed class ProfileController(
     /// id) — the read-only "view as" preview (F6). Delegates to
     /// <see cref="DirectoryService.PreviewAsAsync"/> (U5): a composition
     /// read, never a write path (the M2 scope pin). When <c>?as=</c> is
-    /// omitted, the actor views their own profile (the "how I appear"
-    /// self-view — the trivial <c>Allow</c> branch through the
-    /// <c>IAuthorizationService</c>'s owner-branch, ADR 0001-B).
+    /// omitted, the actor previews their own profile (the "how I appear"
+    /// self-view).
     /// <para>
-    /// **Fail-safe:** <see cref="DirectoryService.PreviewAsAsync"/>
-    /// returns <c>PreviewRow(IsVisible=false, ShowContactBlock=false,
-    /// Profile=null)</c> when either subject is null/empty or the target
-    /// profile doesn't exist (the §2.3 "missing profile ⇒ empty, fail
-    /// closed" row). The view model maps that to an empty
-    /// <see cref="ProfilePreviewViewModel"/> (the "hidden" shape) — not a
-    /// 500, not a 404. The preview's audit lane (the C3
-    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> rows) is
-    /// committed by <c>DirectoryService</c> in its own commit — the
-    /// preview is not exempt from the audit lane, only from the write
-    /// lane.
+    /// The preview answers exactly one question: "would <c>?as=</c> see my
+    /// <b>contact block</b> (email/phone) on the directory detail?" The
+    /// single decision is the <see cref="Kumunita.Core.UserInfo.Profile.ContactVisibility"/>
+    /// audience (C-M2·1, §2.4): <c>null</c> ⇒ not opted in ⇒ no contact block, no
+    /// decision, no audit row; non-null ⇒ one <c>CanAsync</c>, one
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row. The basic profile info
+    /// (name + verified badge) always renders in the preview — the directory no longer
+    /// has a "hidden profile" shape (the platform is invitation-only and limited to
+    /// residents).
+    /// <para>
+    /// **Fail-safe:** <see cref="DirectoryService.PreviewAsAsync"/> returns
+    /// <c>PreviewRow(ShowContactBlock=false, Profile=null)</c> when either subject is
+    /// null/empty or the target profile is missing/suspended. The view model maps that
+    /// to a contact-hidden shape (no 500, no 404). The preview's audit lane (the C3
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row, when a contact decision
+    /// ran) is committed by <c>DirectoryService</c> in its own commit — the preview is
+    /// not exempt from the audit lane, only from the write lane.
     /// </para>
     /// </summary>
     [HttpGet]
@@ -198,7 +203,6 @@ public sealed class ProfileController(
         if (string.IsNullOrEmpty(subject))
             return View(new ProfilePreviewViewModel(
                 AsDisplayName: "(none)",
-                IsVisible: false,
                 ShowContactBlock: false,
                 Email: null,
                 Phone: null));
@@ -211,10 +215,10 @@ public sealed class ProfileController(
 
         // Map the frozen PreviewRow to the Web-layer projection. The
         // contact fields (Email / Phone) are surfaced <b>only</b> when
-        // two-gate evaluation allowed them (the C-M2·1 view-level pin:
-        // the contact block is never on a hidden profile; a hidden
-        // profile's contact fields must NOT render even if the
-        // underlying <c>Profile</c> row carries them).
+        // the single ContactVisibility decision allowed them (the C-M2·1
+        // view-level pin — "no contact block without an opt-in audience
+        // that allowed the viewer"): a <c>null</c> contact audience or a
+        // denied audience both mean no contact field on this view.
         string? email = null, phone = null;
         if (row.ShowContactBlock && row.Profile is { } p)
         {
@@ -228,7 +232,6 @@ public sealed class ProfileController(
 
         return View(new ProfilePreviewViewModel(
             AsDisplayName: asDisplay,
-            IsVisible: row.IsVisible,
             ShowContactBlock: row.ShowContactBlock,
             Email: email,
             Phone: phone));

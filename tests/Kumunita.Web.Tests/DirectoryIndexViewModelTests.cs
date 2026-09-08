@@ -33,7 +33,7 @@ public sealed class DirectoryIndexViewModelTests
     }
 
     [Fact]
-    public void DirectoryViewModel_Only_Exposes_Profiles_And_HiddenCount()
+    public void DirectoryViewModel_Only_Exposes_Profiles()
     {
         var fields = typeof(DirectoryViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -41,9 +41,12 @@ public sealed class DirectoryIndexViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // The list model exposes the projected rows + the hidden count, and nothing
-        // more — the view has no channel to a Profile's own contact fields.
-        Assert.Equal(new[] { "HiddenCount", "Profiles" }, fields.ToArray());
+        // The list model exposes exactly the projected rows — and nothing more. There
+        // is no "hidden count" (the directory lists every non-blocked resident to
+        // every signed-in viewer: the platform is invitation-only and limited to
+        // residents) and no channel to a Profile's own contact/audience fields (those
+        // only surface on the detail row, behind the ContactVisibility opt-in).
+        Assert.Equal(new[] { "Profiles" }, fields.ToArray());
     }
 
     [Fact]

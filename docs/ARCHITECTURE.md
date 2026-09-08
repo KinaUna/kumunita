@@ -22,7 +22,7 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   |---|---|
   | **M0** scaffold | the substrate — no value yet, just a place the rest can link into |
   | **M1** identity, groups, delegation, authorization | the **access model** — the linkage that turns *signals* into *shared awareness* for the right audience |
-  | **M2** directory & profiles | **shared awareness** — who is here, and who you can trust with what |
+  | **M2** directory & profiles | **shared awareness** — every resident is listed; each opt-in contact block is audience-gated |
   | **M3** posts, components, moderation | **understanding → decision** — a signal reaches its audience; a report links to a moderator |
   | **M4** events, RSVP, reminders | **coordination** — a decision becomes an owned, scheduled, reminded action |
   | **M5** projects (goals, tasks, contributors) | **coordination → outcome** — many signals re-linked into one goal with owners |
@@ -187,9 +187,14 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
   visibility per scope.
 - **Audit** of access decisions = always on.
 - **Candidate filters are not authorization** (§4.4). A rule about *who is in the
-  candidate set* (e.g. the directory lists only verified residents; an unverified user
-  sees themselves) is a product query, applied before `CanSeeAsync`, and is never
+  candidate set* (e.g. a post feed only includes published posts; a list only includes
+  non-archived items) is a product query, applied before `CanSeeAsync`, and is never
   audited as an access decision.
+- **Show-everyone directory.** The platform is invitation-only and limited to one
+  neighborhood's residents: the directory lists every non-blocked resident to every
+  signed-in viewer (no verified/unverified filter, no `Profile.Visibility` gate), and
+  is a pure catalog read — no `CanSeeAsync`, no `AccessAudit` row. Only the detail
+  (and preview) surfaces run the single `ContactVisibility` audience decision.
 
 ### 4.4 Decision algorithm
 
@@ -283,10 +288,14 @@ Authorization
   AdminOverride { id, userId, token, grantedAt, expiresAt, consumedAt? }
 
 UserInfoModule
-  // visibility is an Audience (same embedded structure as content). contactVisibility
-  // gates the opt-in contact block (email/phone) and is evaluated only after
-  // `visibility` allows the profile — never on a hidden profile.
-  Profile          { subjectId, externalId?, householdId?, displayName, verified,
+  // The directory lists every non-blocked resident's basic info (displayName/verified) to every
+  // signed-in viewer — the show-everyone rule: `visibility` no longer hides a profile, and the
+  // list runs no audience decision. `contactVisibility` is the *single* audience gate (the
+  // detail/preview surface's opt-in contact block, email/phone): `null` ⇒ not opted in ⇒ no
+  // decision / no audit row; non-null ⇒ one `CanAsync` decision + one AccessAudit row.
+  // `visibility` stays on the document + editor (author-controlled, ADR 0003) as the audience
+  // for detailed non-contact fields once they exist — it takes no effect at the directory layer.
+  Profile          { subjectId, externalId?, householdId?, displayName, verified, blocked,
                      visibility: Audience, contactVisibility?: Audience, email, phone? }
   Group            { id, name, description, ownerId, created }
   GroupMembership  { groupId, userId, addedBy, at }

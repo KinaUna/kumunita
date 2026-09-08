@@ -34,8 +34,12 @@ public sealed class ProfileEditViewModelTests
     }
 
     [Fact]
-    public void ProfilePreviewViewModel_Has_Exactly_Five_Fields()
+    public void ProfilePreviewViewModel_Has_Exactly_Four_Fields()
     {
+        // The preview answers one question: "would this viewer see my contact block?" —
+        // the show-everyone rule removes the "hidden profile" shape, so the old
+        // `IsVisible` field is gone. Only AsDisplayName + the ShowContactBlock opt-in
+        // gate + the contact fields remain.
         var fields = typeof(ProfilePreviewViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(p => p.Name)
@@ -46,7 +50,6 @@ public sealed class ProfileEditViewModelTests
         {
             "AsDisplayName",
             "Email",
-            "IsVisible",
             "Phone",
             "ShowContactBlock",
         }, fields);
