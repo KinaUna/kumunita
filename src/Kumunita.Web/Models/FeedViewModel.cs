@@ -34,6 +34,18 @@ public sealed class FeedViewModel
     public string ComponentName { get; set; } = string.Empty;
     public IReadOnlyList<PostListItem> Items { get; set; } = [];
     public int Total { get; set; }
+
+    /// <summary>
+    /// Whether the current viewer holds a posting right on the community
+    /// this feed belongs to (or, for the all-sections feed, on *any*
+    /// enabled community) — the same rule the POST gate in
+    /// <see cref="Kumunita.Core.Posts.PostService.CreatePostAsync"/> enforces
+    /// (GlobalAdmin bypass; a <see cref="Kumunita.Core.Identity.Roles.ModeratorComponent(string)"/>
+    /// claim for this component; or a <c>ComponentMembership</c> row). The
+    /// view hides the "Write a post" button when this is false rather than
+    /// sending the user to a composer they'd only bounce back from.
+    /// </summary>
+    public bool CanPost { get; set; }
 }
 
 /// <summary>

@@ -121,6 +121,14 @@ public sealed class PostsController(
 
         var feed = await posts.ListFeedAsync(componentId, actor, page: 1);
 
+        // Whether the current viewer holds a posting right on *this* community —
+        // the exact rule the composer's POST gate enforces (AccessibleComponentsAsync
+        // mirrors PostService.CreatePostAsync's gate). Drives the "Write a post"
+        // button's visibility in the view: if the viewer can't post to this
+        // component, the button would just dead-end on the composer, so we hide it.
+        var accessible = await AccessibleComponentsAsync(User);
+        var canPost = accessible.Any(c => c.Id == componentId);
+
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -152,6 +160,7 @@ public sealed class PostsController(
             ComponentName = component.Name,
             Items = items,
             Total = feed.Total,
+            CanPost = canPost,
         });
     }
 
@@ -183,6 +192,14 @@ public sealed class PostsController(
         var actor = SubjectId(User) ?? string.Empty;
 
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        // The viewer's posting reach is the same rule the composer's POST gate uses
+        // (AccessibleComponentsAsync mirrors PostService.CreatePostAsync's gate). On
+        // the all-sections feed, "Write a post" is offered only when the viewer can
+        // actually post to *at least one* enabled community — otherwise the button
+        // would just dead-end on an empty composer.
+        var accessible = await AccessibleComponentsAsync(User);
+        var canPost = accessible.Count > 0;
+
         if (components.Count == 0)
         {
             return View("Index", new FeedViewModel
@@ -190,6 +207,7 @@ public sealed class PostsController(
                 ComponentName = "Community",
                 Items = [],
                 Total = 0,
+                CanPost = false, // no communities at all, so no posting right to offer
             });
         }
 
@@ -220,6 +238,7 @@ public sealed class PostsController(
             ComponentName = "Community",
             Items = items,
             Total = feed.Total,
+            CanPost = canPost,
         });
     }
 

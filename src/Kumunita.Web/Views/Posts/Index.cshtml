@@ -10,10 +10,13 @@
                 <h1 style="display:inline;">@Model.ComponentName</h1>
                 <span class="text-muted ms-3">(feed)</span>
             </div>
-            <a class="btn btn-primary"
-               href="@Url.Action("New","Posts")">
-                Write a post
-            </a>
+            @if (Model.CanPost)
+            {
+                <a class="btn btn-primary"
+                   href="@Url.Action("New","Posts")">
+                    Write a post
+                </a>
+            }
         </div>
 
         @if (TempData["info"] is string info)
@@ -34,8 +37,15 @@
         @if (Model.Items.Count == 0)
         {
             <div class="alert alert-info">
-                No posts yet here. Write the first one — it will be visible only to
-                the audience you choose in the composer below the title.
+                @if (Model.CanPost)
+                {
+                    <text>No posts yet here. Write the first one — it will be visible only to
+                    the audience you choose in the composer below the title.</text>
+                }
+                else
+                {
+                    <text>No posts here yet.</text>
+                }
             </div>
         }
         else
