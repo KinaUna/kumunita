@@ -12,7 +12,20 @@ public sealed class AdminIndexViewModel
         public bool Verified { get; init; }
         public bool Blocked { get; init; }
         public IReadOnlyList<string> Roles { get; init; } = [];
+        /// <summary>The component *scopes* this account governs (moderator
+        /// standing — ADR 0003). Distinct from <see cref="CommunityIds"/>
+        /// (the communities this account may **post to**): a moderator can
+        /// govern a community they cannot post to, and a member can post to a
+        /// community they do not moderate; the two overlap by coincidence,
+        /// not by definition.</summary>
         public IReadOnlyList<string> ComponentIds { get; init; } = [];
+        /// <summary>The communities this account may **post to** (the new
+        /// <c>ComponentMembership</c> posting right, distinct from the
+        /// moderator scope above; <see cref="Kumunita.Core.Identity
+        /// .Roles.GlobalAdmin"/> bypass this gate at post-time so an admin's
+        /// own rows here are not strictly meaningful, but the UI renders
+        /// them for consistency).</summary>
+        public IReadOnlyList<string> CommunityIds { get; init; } = [];
     }
 
     public IReadOnlyList<AccountRow> Accounts { get; init; } = [];

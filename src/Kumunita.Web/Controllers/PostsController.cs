@@ -468,7 +468,28 @@ public sealed class PostsController(
         // row, the C3 "audit always on" shape) commit or roll back
         // atomically.
         await using var session = store.LightweightSession();
-        var post = await posts.CreatePostAsync(draft, actor, session);
+
+        // Posting-right gate (Core <see cref="PostService.CreatePostAsync"/>):
+        // the actor's admissible role set — the same claim-set-as-principal
+        // shape the <c>AnnouncementController</c>'s private <c>RoleSet</c>
+        // helper hands Core; we share it via <see cref="KumunitaPrincipal
+        // .RoleSet"/>. The Core call throws
+        // <see cref="UnauthorizedAccessException"/> when the actor is not a
+        // GlobalAdmin and has no <c>ComponentMembership</c> row on
+        // <c>draft.ComponentId</c> — mapped to a form error here (matching the
+        // composer's "a form is a shape" precedent; no 403 on a POST).
+        var roles = KumunitaPrincipal.RoleSet(User);
+        Post post;
+        try
+        {
+            post = await posts.CreatePostAsync(draft, actor, roles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ModelState.AddModelError(nameof(model.ComponentId),
+                "You are not a member of this community yet. An admin can add you under /admin → Accounts.");
+            return View(model);
+        }
 
         var component = components.First(c => c.Id == model.ComponentId);
         TempData["info"] = $"Post added to “{component.Name}”.";

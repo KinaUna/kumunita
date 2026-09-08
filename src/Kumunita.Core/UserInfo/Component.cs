@@ -39,6 +39,18 @@ public sealed class Component
 /// cleared (the row is kept for history, but the user no longer moderates that
 /// component).
 /// </para>
+/// <para>
+/// **Do not confuse with <see cref="ComponentMembership"/>**: a
+/// <see cref="ModeratorAssignment"/> is a moderator's *governing scope* (which
+/// components they moderate — ADR 0003), whereas a
+/// <see cref="ComponentMembership"/> is a *posting right* (which communities a
+/// user may post to). The two rows can overlap, but they authorize different
+/// things; a Moderator who is not also a member of the component does not get
+/// posting rights (and vice versa — a member is not a moderator by default).
+/// The single exception to that independence is <see cref="Identity.Roles.GlobalAdmin"/>,
+/// who bypasses the <see cref="ComponentMembership"/> gate entirely (see
+/// <see cref="Posts.PostService"/> for the gate itself).
+/// </para>
 /// </summary>
 public sealed class ModeratorAssignment
 {
@@ -52,6 +64,47 @@ public sealed class ModeratorAssignment
     /// state is not a valid shape — a cleared row is written with <see cref="GrantedBy"/>
     /// being the clearing admin.</summary>
     public string? GrantedBy { get; set; }
+
+    public DateTimeOffset At { get; set; }
+}
+
+/// <summary>
+/// A user's **membership** of a community (a <see cref="Component"/> row) — the
+/// posting right. One row per <c>(componentId, userId)</c> pair, enforced by a
+/// unique index on the pair (mirrors <see cref="GroupMembership"/>'s business-key
+/// convention).
+/// <para>
+/// **Scope:** <see cref="ComponentMembership"/> gates *posting* — a user may
+/// only <c>PostService.CreatePostAsync</c> into a component they are a member of.
+/// It is not a visibility decision (read access is still the post's
+/// <c>Audience</c>); it is not a moderation decision (moderation is
+/// <see cref="ModeratorAssignment"/> + the <see cref="Identity.Roles.Moderator"/>
+/// claim). <see cref="Identity.Roles.GlobalAdmin"/> bypasses the gate entirely
+/// (see <see cref="Posts.PostService.CreatePostAsync"/>).
+/// </para>
+/// <para>
+/// **Strong consistency (invariant C4)**: a change to this row is live on the very
+/// next read — no projection, no cache. The <c>Read</c> surface
+/// (<c>IsCommunityMemberAsync</c>) does not append an
+/// <see cref="Authorization.AccessAudit"/> row — the audit pin matches the
+/// <see cref="GroupMembership"/> analog: the write lanes
+/// (<see cref="UserInfoService.SetCommunityMembershipAsync"/> /
+/// <see cref="UserInfoService.ClearCommunityMembershipAsync"/>) are the audited
+/// admin actions.
+/// </para>
+/// </summary>
+public sealed class ComponentMembership
+{
+    /// <summary>Surrogate PK; (ComponentId, UserId) is the business key.</summary>
+    public string Id { get; set; } = string.Empty;
+
+    public string ComponentId { get; set; } = string.Empty;
+
+    public string UserId { get; set; } = string.Empty;
+
+    /// <summary>The account that added the membership (always a GlobalAdmin — see
+    /// <see cref="IUserInfoService.SetCommunityMembershipAsync"/>).</summary>
+    public string AddedBy { get; set; } = string.Empty;
 
     public DateTimeOffset At { get; set; }
 }

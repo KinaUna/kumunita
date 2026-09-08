@@ -208,12 +208,59 @@ public sealed class PostService
     /// composer's choice is absolute; <c>PostDraft.Audience</c> is non-null, C1);
     /// <c>AuthorId = actorId</c>, <c>ComponentId = draft.ComponentId</c>. One
     /// <c>SaveChangesAsync</c>.
+    /// <para>
+    /// <b>Community-membership gate (posting right, see
+    /// <see cref="UserInfo.ComponentMembership"/>):</b> <paramref name="actorRoles"/>
+    /// is the caller's admissible role set (the same <c>IReadOnlySet&lt;string&gt;</c>
+    /// author-roles seam <see cref="Announcements.AnnouncementService.CreateAsync"/>
+    /// takes — the claim-set-as-principal, not a DB read). A post is
+    /// **permitted** iff the actor is a <see cref="Identity.Roles.GlobalAdmin"/>
+    /// (bypass) <b>OR</b> a <c>ComponentMembership</c> row exists for
+    /// <c>(draft.ComponentId, actorId)</c>. Otherwise a
+    /// <see cref="UnauthorizedAccessException"/> is thrown <b>before</b> anything
+    /// is stored — the audit row is the caller's job; the service does not open a
+    /// second session and does not append an audit row in the denial path
+    /// (<see cref="AccessVia"/> does not model "posting membership" — the Web
+    /// layer maps the exception to a form error, matching the existing
+    /// <see cref="Announcements.AnnouncementService.CreateAsync"/> lane's contract).
+    /// Strong consistency (invariant C4): the gate re-evaluates on the live
+    /// membership row at the moment of the call — an admin's remove is visible on
+    /// the very next create attempt.
+    /// </para>
     /// </summary>
-    public async Task<Post> CreatePostAsync(PostDraft draft, string actorId, IDocumentSession session)
+    /// <exception cref="UnauthorizedAccessException">The actor is not a
+    /// <see cref="Identity.Roles.GlobalAdmin"/> and has no
+    /// <c>ComponentMembership</c> row for <c>draft.ComponentId</c>.</exception>
+    public async Task<Post> CreatePostAsync(PostDraft draft, string actorId,
+        IReadOnlySet<string> actorRoles, IDocumentSession session)
     {
         ArgumentNullException.ThrowIfNull(draft);
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
+
+        // Posting-right gate — GlobalAdmin bypass; a Moderator with an
+        // assignment on the target component (the admin-set "scope" row,
+        // ADR 0003) also posts; everyone else needs a
+        // <c>ComponentMembership</c> row on the target. Strong consistency:
+        // all three checks read live rows now, no projection lag
+        // (invariant C4).
+        var hasGlobalAdmin = actorRoles.Contains(Identity.Roles.GlobalAdmin);
+        var moderatorComponentClaim = Identity.Roles.ModeratorComponent(draft.ComponentId);
+        var hasComponentModerator = actorRoles.Contains(moderatorComponentClaim);
+
+        if (!hasGlobalAdmin && !hasComponentModerator)
+        {
+            var communities = await _userInfo
+                .GetCommunityIdsAsync(actorId)
+                .ConfigureAwait(false);
+            if (communities is null || !communities.Contains(draft.ComponentId))
+            {
+                throw new UnauthorizedAccessException(
+                    $"You are not a member of the community this post targets; " +
+                    "an admin must add you to the Community Membership in /admin.");
+            }
+        }
 
         var post = new Post
         {

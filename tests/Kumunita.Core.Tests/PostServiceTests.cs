@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -753,8 +754,13 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             ]);
 
         var draft = new PostDraft(ComponentId, "F15", "body f15", authorAudience);
+        // The posting gate consults <c>ComponentMembership</c> rows (see
+        // ComponentMembership doc); the "verbatim audience" assertion is
+        // orthogonal, so the test grants the author as a GlobalAdmin to
+        // bypass the gate (the bypass pin is covered separately in the
+        // membership-gate tests below).
         var post = await RunInSession(store, async session =>
-            await svc.CreatePostAsync(draft, author, session));
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.GlobalAdmin }, session));
 
         // The returned entity carries the shape verbatim.
         Assert.Equal(author, post.AuthorId);
@@ -1265,5 +1271,149 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
         return await s.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    // ── Posting-right gate (the new ComponentMembership gate; see the
+    // doc-comment on PostService.CreatePostAsync / UserInfoService
+    // (Set/Clear/Get CommunityMembershipAsync)). Distinct from the
+    // read-side audience tests above (which already pin ADR 0001-B):
+    // here, the *author* needs either a ComponentMembership row for the
+    // target component or a GlobalAdmin role claim to create a post.
+
+    [Fact]
+    public async Task CreatePost_MemberOfCommunity_Allows()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gate-member";
+        const string comp   = "c-gate-a";
+
+        await Plant(store, new Component { Id = comp, Name = "X", Enabled = true });
+        await userInfo.SetCommunityMembershipAsync(comp, author, actorId: "u-gate-admin");
+
+        var draft = new PostDraft(comp, "T1", "body 1", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s));
+
+        Assert.NotNull(post);
+        Assert.Equal(author, post.AuthorId);
+    }
+
+    [Fact]
+    public async Task CreatePost_NotMemberOfCommunity_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-stranger";
+        const string comp   = "c-gate-b";
+
+        await Plant(store, new Component { Id = comp, Name = "Y", Enabled = true });
+        // No membership row planted; the gate is the only thing to catch this.
+
+        var draft = new PostDraft(comp, "T2", "body 2", Audience(GrantKind.User, author));
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s)));
+
+        Assert.Contains("not a member", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreatePost_ModeratorAssignedToComponent_BypassesMembershipGate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-moderator";
+        const string comp   = "c-gate-e";
+
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+        // No membership row planted; the admin-set ModeratorAssignment on the
+        // component (Roles.ModeratorComponent(comp) claim) is the bypass.
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-gate",
+            UserId = author,
+            ComponentId = comp,
+            GrantedBy = "u-gate-admin",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var draft = new PostDraft(comp, "T4", "body 4", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(
+                draft, author,
+                new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent(comp) },
+                s));
+
+        Assert.NotNull(post);
+    }
+
+    [Fact]
+    public async Task CreatePost_ModeratorAssignedElsewhere_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-moderator-2";
+        const string comp   = "c-gate-f";
+
+        await Plant(store, new Component { Id = comp, Name = "N", Enabled = true });
+        // A Moderator assigned to a *different* component — the assignment
+        // does not extend posting rights to this one.
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-gate-2",
+            UserId = author,
+            ComponentId = "c-other",
+            GrantedBy = "u-gate-admin",
+            At = DateTimeOffset.UtcNow
+        });
+
+        var draft = new PostDraft(comp, "T5", "body 5", Audience(GrantKind.User, author));
+        // The role claim set only contains moderator:{c-other}, so the gate
+        // falls through to the membership row lookup — which is empty — and
+        // denies.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(
+                    draft, author,
+                    new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("c-other") },
+                    s)));
+    }
+
+    [Fact]
+    public async Task CreatePost_GlobalAdmin_BypassesMembershipGate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-global-admin";
+        const string comp   = "c-gate-c";
+
+        await Plant(store, new Component { Id = comp, Name = "Z", Enabled = true });
+        // No membership row; the role grant (GlobalAdmin) is the bypass.
+
+        var draft = new PostDraft(comp, "T3", "body 3", Audience(GrantKind.User, author));
+        var post  = await RunInSession(store, async s =>
+            await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.GlobalAdmin }, s));
+
+        Assert.NotNull(post);
+    }
+
+    [Fact]
+    public async Task CreatePost_StrangerWithMemberRoleOnly_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gate-nobody";
+        const string comp   = "c-gate-d";
+
+        await Plant(store, new Component { Id = comp, Name = "W", Enabled = true });
+        // A member with no membership row on this component — must deny
+        // (this is the "the role is Member, not GlobalAdmin, so the
+        // membership row decides" path).
+
+        var draft = new PostDraft(comp, null, "body x", Audience(GrantKind.User, author));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s)));
     }
 }
