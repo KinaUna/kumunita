@@ -140,6 +140,7 @@ port (OPS §10).
 | `SMTP__User` / `SMTP__Pass` | required by most real relays — see **§5.1** |
 | `SMTP__Secure` | optional; `Tls` (STARTTLS, default) or `None` (plain, local-only) — **see BCL constraint in §5.1** |
 | `SeedAdmin__Email` / `SeedAdmin__Token` | one-time setup token — **created per OPS Procedure 2, removed from env after first login** |
+| `Verification__BaseUrl` | this instance's public base URL — the §2 domain, scheme included, **no trailing slash** (e.g. `https://maplewood.kumunita.example`). The verification email's link is built from it; a recipient's mail client cannot resolve a bare `/account/verify` path, so an unset value degrades the email to a relative path. See **§5.3**. |
 | `DataProtection__KeysDirectory` | **recommended** — a persistent directory (Coolify's `/data` volume, e.g. `/data/keys`) holding the data-protection keyring. See **§5.2** below. Omit to keep the in-memory default. |
 
 The `Host` value is the addon's internal service name (visible on the
@@ -325,6 +326,11 @@ the app used on boot #1 and boot #2 are different. Check, in order:
 Attach the neighborhood's domain (§2). Coolify + Let's Encrypt issue it —
 see OPS §6.
 
+The domain is also the value of `Verification__BaseUrl` (§5 table) — set
+both together, from the same value, so the confirmation email's link resolves
+at the same host Caddy routes and signs for. If the domain changes later,
+update `Verification__BaseUrl` in the same change.
+
 ### 5.4 Health check
 
 Path `GET /health`, expected `200`.
@@ -345,9 +351,18 @@ the token invalidates on use. Then **remove `SeedAdmin__*` from env**
 (nothing reusable remains to leak — OPS Procedure 2, step 4).
 5. `/health` reports `ok` (email dead-letter count 0); a test email arrives
 at the destination inbox (OPS Procedure 2 step 5).
-6. Record the instance in the **OPS inventory** (domain, VPS, DB name, commit
+6. **Confirm the verification link is absolute** (requires `Verification__BaseUrl`,
+§5/§5.3): the first-boot *setup* email carries no link — its proof is the
+setup token + a `/admin/setup` path. The resident *verification* link only
+appears in a **signup** email (`RegisterAsync`, `VerificationBody`). So to
+check it: create a throwaway resident account, read the email's link, and
+confirm it is `https://<domain>/account/verify?id=…` — an absolute URL to
+**this** instance's domain. A bare `/account/verify?id=…` (relative) means
+`Verification__BaseUrl` is unset or wrong. Delete the throwaway account
+after the check.
+7. Record the instance in the **OPS inventory** (domain, VPS, DB name, commit
 SHA, admin contact, dates).
-7. Backups enabled / scheduled per OPS Procedure 4.
+8. Backups enabled / scheduled per OPS Procedure 4.
 
 ## Troubleshooting (quick)
 

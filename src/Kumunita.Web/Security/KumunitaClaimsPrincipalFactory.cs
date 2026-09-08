@@ -71,7 +71,7 @@ public sealed class KumunitaClaimsPrincipalFactory(
     /// </summary>
     private async Task<IReadOnlyList<string>> BuildRoleListAsync(User user, bool verified)
     {
-        var userRoleNames = (await userManager.GetRolesAsync(user)).ToList();
+        var userRoleNames = (await UserManager.GetRolesAsync(user)).ToList();
 
         var roles = new List<string>();
         if (verified)

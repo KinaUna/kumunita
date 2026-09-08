@@ -895,4 +895,171 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Equal("Second Name", read!.DisplayName);
         Assert.Equal(bootstrap.Email, read!.Email);
     }
+
+    // ── Community membership — the posting-right write/read lanes ───
+    // The ComponentMembership row is a *posting right* (distinct from
+    // the moderator-scope ModeratorAssignment — see the doc comment on
+    // the ComponentMembership type in Component.cs, and the
+    // SetCommunityMembershipAsync / ClearCommunityMembershipAsync /
+    // GetCommunityIdsAsync trio on IUserInfoService). The write lanes
+    // are admin-action audited (via:Admin, C3); the read lane is a
+    // candidate read (no audit row — same pin as GetGroupIdsAsync).
+
+    [Fact]
+    public async Task SetCommunityMembership_SetsRow_And_AuditsCommunityAddMember()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string admin  = "u-mem-admin";
+        const string target = "u-mem-target";
+        const string comp   = "c-mem-a";
+
+        await Plant(store, new Component { Id = comp, Name = "X", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+
+        var ids = await svc.GetCommunityIdsAsync(target);
+        Assert.Contains(comp, ids);
+
+        var mem = await LoadMembership(store, comp, target);
+        Assert.NotNull(mem);
+        Assert.Equal(admin, mem.AddedBy);
+        Assert.Equal(comp, mem.ComponentId);
+        Assert.Equal(target, mem.UserId);
+        Assert.NotNull(mem.At);
+
+        var audits = await AuditsFor(store, actor: admin, action: "community.add-member");
+        Assert.Single(audits, a => a.TargetKind == "component" && a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task SetCommunityMembership_ReAddIsIdempotent_OneRow_AuditsTwice()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string admin  = "u-mem-admin2";
+        const string target = "u-mem-target2";
+        const string comp   = "c-mem-b";
+
+        await Plant(store, new Component { Id = comp, Name = "Y", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+        await svc.SetCommunityMembershipAsync(comp, target, admin); // re-add — no duplicate
+
+        // Business-key invariant: the DB unique index would reject a second row;
+        // we verify our Upsert logic doesn't try to insert twice.
+        await using var session = store.QuerySession();
+        var count = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == comp && m.UserId == target)
+            .CountAsync();
+        Assert.Equal(1, count);
+
+        // Two add audit rows (one per admin action).
+        var audits = await AuditsFor(store, actor: admin, action: "community.add-member");
+        Assert.Equal(2, audits.Count(a => a.TargetKind == "component" && a.TargetId == comp));
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_RemovesRow_LiveOnNextRead_And_AuditsCommunityRemoveMember()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string admin  = "u-mem-admin3";
+        const string target = "u-mem-target3";
+        const string comp   = "c-mem-c";
+
+        await Plant(store, new Component { Id = comp, Name = "Z", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(comp, target, admin);
+        var before = await svc.GetCommunityIdsAsync(target);
+        Assert.Contains(comp, before);
+
+        await svc.ClearCommunityMembershipAsync(comp, target, admin);
+
+        // Strong consistency — live on the very next call (invariant C4).
+        var after = await svc.GetCommunityIdsAsync(target);
+        Assert.DoesNotContain(comp, after);
+
+        var audits = await AuditsFor(store, actor: admin, action: "community.remove-member");
+        Assert.Single(audits, a => a.TargetKind == "component" && a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_NoOp_NoThrow_WhenAbsent()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string admin  = "u-mem-admin4";
+        const string target = "u-mem-target4";
+        const string comp   = "c-mem-d";
+
+        await Plant(store, new Component { Id = comp, Name = "W", Enabled = true });
+
+        // No membership row exists — Clear must not throw (an admin "unchecking"
+        // a row that was never there is a no-op).
+        await svc.ClearCommunityMembershipAsync(comp, target, admin);
+
+        // Even a no-op still leaves an audit row (the admin action happened —
+        // an intent to remove; the row may have been absent, but the action
+        // itself is still audited).
+        await using var s = store.QuerySession();
+        var rows = await s.Query<AccessAudit>()
+            .Where(a => a.ActorId == admin && a.Action == "community.remove-member" && a.TargetId == comp)
+            .ToListAsync();
+        Assert.Single(rows);
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_ReturnsMultipleMembershipsInIsolation()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string admin  = "u-mem-admin5";
+        const string target = "u-mem-target5";
+        const string c1 = "c-mem-e";
+        const string c2 = "c-mem-f";
+        const string c3 = "c-mem-g";
+
+        await Plant(store, new Component { Id = c1, Name = "1", Enabled = true });
+        await Plant(store, new Component { Id = c2, Name = "2", Enabled = true });
+        await Plant(store, new Component { Id = c3, Name = "3", Enabled = true });
+
+        await svc.SetCommunityMembershipAsync(c1, target, admin);
+        await svc.SetCommunityMembershipAsync(c2, target, admin);
+
+        var ids = await svc.GetCommunityIdsAsync(target);
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(c1, ids);
+        Assert.Contains(c2, ids);
+        Assert.DoesNotContain(c3, ids);
+    }
+
+    // ── Shared helpers for the membership tests ──────────────────
+
+    private static async Task Plant(IDocumentStore store, object document)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new SessionOptions());
+        w.Store(document);
+        await w.SaveChangesAsync(ct);
+    }
+
+    private static async Task<ComponentMembership> LoadMembership(IDocumentStore store, string componentId, string userId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("Membership row missing (should be set by the test).");
+    }
+
+    private static async Task<IReadOnlyList<AccessAudit>> AuditsFor(IDocumentStore store, string actor, string action)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<AccessAudit>()
+            .Where(a => a.ActorId == actor && a.Action == action)
+            .ToListAsync(ct);
+    }
 }

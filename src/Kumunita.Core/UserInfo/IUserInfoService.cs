@@ -206,4 +206,57 @@ public interface IUserInfoService
     /// <exception cref="ArgumentException"><paramref name="componentId"/> is null/whitespace.</exception>
     /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
     Task SetCommunityEnabledAsync(string componentId, bool enabled, string actorId);
+
+    // ── Community membership (the **posting right** — separate from
+    // ModeratorAssignment, which is a moderator's *governing scope*.
+    // ADR 0006-E compatible lane: appended to the owning module's public
+    // surface; not a break on the ADR 0006-A frozen surface) ────────
+
+    /// <summary>
+    /// Strong-consistency membership resolution for the posting gate
+    /// (invariant C4): returns the set of <c>componentId</c> values the
+    /// account is a member of *at this instant* — from the live
+    /// <see cref="ComponentMembership"/> rows (no projection lag, no cache).
+    /// Mirrors <see cref="GetGroupIdsAsync"/> in shape and audit
+    /// behavior: the **write** lanes
+    /// (<see cref="SetCommunityMembershipAsync"/> /
+    /// <see cref="ClearCommunityMembershipAsync"/>) are the audited admin
+    /// actions; this **read** lane is a candidate read and appends no
+    /// <see cref="Authorization.AccessAudit"/> row itself (the caller —
+    /// <see cref="Posts.PostService"/> / the Web surface — consults it and is
+    /// the gate point).
+    /// </summary>
+    Task<IReadOnlyCollection<string>> GetCommunityIdsAsync(string userId);
+
+    /// <summary>
+    /// Add a membership row (or refresh an existing one) so that
+    /// <paramref name="userId"/> may post to <paramref name="componentId"/>.
+    /// Idempotent on the <c>(componentId, userId)</c> pair: an existing row is
+    /// re-stamped with <paramref name="actorId"/> and the new timestamp rather
+    /// than duplicated (the business key is unique — the index in
+    /// <see cref="M1DocTypes"/> enforces it). Appends an
+    /// <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.add-member", targetKind "component", via Admin, outcome
+    /// Allow) in the same transaction as the row (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> or
+    /// <paramref name="userId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task SetCommunityMembershipAsync(string componentId, string userId, string actorId);
+
+    /// <summary>
+    /// Remove a membership row (the <paramref name="userId"/> loses posting
+    /// rights on <paramref name="componentId"/>). Strong consistency
+    /// (invariant C4): the gate re-evaluates on the very next
+    /// <see cref="GetCommunityIdsAsync"/> or
+    /// <see cref="Posts.PostService.CreatePostAsync"/> call. A **no-op** when
+    /// the pair has no row (does not throw) — admins editing a "set" of
+    /// components per user are free to uncheck rows that were never there.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.remove-member", targetKind "component", via Admin, outcome
+    /// Allow).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> or
+    /// <paramref name="userId"/> is null/whitespace.</exception>
+    Task ClearCommunityMembershipAsync(string componentId, string userId, string actorId);
 }

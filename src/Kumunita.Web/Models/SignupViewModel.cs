@@ -19,4 +19,17 @@ public sealed class SignupViewModel
     [DataType(DataType.Password), Compare(nameof(Password))]
     [Display(Name = "Confirm password")]
     public string ConfirmPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True when signup failed because an account with this email already exists
+    /// (unactivated) — the view shows the "resend confirmation email" affordance.
+    /// </summary>
+    public bool EmailAlreadyExists { get; set; }
+}
+
+public sealed class ResendVerificationViewModel
+{
+    [Required, EmailAddress]
+    [Display(Name = "Email")]
+    public string Email { get; set; } = string.Empty;
 }

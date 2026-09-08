@@ -43,7 +43,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
         services.AddTransient<IIdentityService, IdentityService>();
-        services.AddTransient<IMailerStage, OutboxEmailStager>();
+
+        // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable
+        // message envelope via Wolverine IMessageContext (Core's new direct WolverineFx
+        // dependency — see Kumunita.Core.csproj + IMailerStage.cs), so it needs the
+        // per-scope context injected (factory form, same idiom as DirectoryService /
+        // Posts.PostService / Moderation.ModerationService below).
+        services.AddTransient<IMailerStage>(sp =>
+            new OutboxEmailStager(sp.GetRequiredService<Wolverine.IMessageContext>()));
 
         // M2 (plan U5): the directory-side composition root — a concrete class (it
         // composes two *seams*, not itself a seam: no interface, ADR 0006-D's
@@ -65,7 +72,16 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
-        // M3b (plan U7): the moderation-side composition root — a concrete class
+        // M3b (the "platform announcements" lane, bounded context
+        // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
+        // service kept behind an interface so the Web-side consumer (the
+        // AnnouncementController) can be tested without a live Postgres
+        // (mirrors IEmailDeadLetterCounter's registration pattern; the
+        // scope-vs-role split lives inside CreateAsync, not in a
+        // separate IUserInfoService / IAuthorizationService pairing).
+        services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
+
+        // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
         // seams with the host-registered Marten IDocumentStore (the same
         // "concrete service in the Core composition root" shape as M2 U5's
@@ -78,6 +94,13 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
+
+        // The /health mail-reachability seam (OPS §8): a sockets-level SMTP
+        // handshake against the bound SmtpOptions — resolves IOptions<SmtpOptions>
+        // (which the host binds from the "SMTP" section in Program.cs) and
+        // reports false rather than throwing when the relay is unreachable or
+        // unconfigured, so HealthController can always map it to "mail": "unreachable".
+        services.AddTransient<ISmtpHealthCheck, SmtpHealthCheck>();
 
         // Step-7 (M1 plan): the per-attempt SMTP seam. The durable policy (6 attempts
         // / ~24h / dead-letter) is configured by the host's Wolverine handler against

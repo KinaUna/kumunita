@@ -45,6 +45,7 @@
                 <th>Account</th>
                 <th>Roles</th>
                 <th>Scope</th>
+                <th>Posting</th>
                 <th></th>
             </tr>
         </thead>
@@ -89,6 +90,29 @@
                             @string.Join(", ", names)
                         }
                     </td>
+                    <td>
+                        @{
+                            var posting = Model.Components
+                                .Where(c => a.CommunityIds.Contains(c.Id))
+                                .Select(c => c.Name)
+                                .ToList();
+                            // Also surface disabled communities the account is still a member
+                            // of (their memberships stay valid; the community feed just 404s).
+                            var extra = a.CommunityIds
+                                .Where(id => !Model.Components.Any(c => c.Id == id))
+                                .Select(id => Model.Communities.FirstOrDefault(c => c.Id == id)?.Name ?? id)
+                                .ToList();
+                            posting.AddRange(extra);
+                        }
+                        @if (posting.Count == 0)
+                        {
+                            <span class="text-muted small">(none)</span>
+                        }
+                        else
+                        {
+                            @string.Join(", ", posting)
+                        }
+                    </td>
                     <td class="text-end">
                         <form method="post" asp-action="SetRole" class="d-inline-flex">
                             @Html.AntiForgeryToken()
@@ -111,7 +135,7 @@
                                        style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
                                     @* checked="" is the null-conditional attribute idiom: renders the
                                        checked keyword when true, emits nothing when false *@
-                                    <input type="checkbox" name="componentIds" value="@c.Id" class="d-none"
+                                    <input type="checkbox" name="componentIds" value="@c.Id"
                                            checked="@(a.ComponentIds.Contains(c.Id) ? "checked" : null)" />
                                     <span class="badge text-bg-light border">@c.Name</span>
                                 </label>
@@ -119,6 +143,29 @@
 
                             <button class="btn btn-sm btn-primary" type="submit">Set</button>
                         </form>
+
+                        @* Posting membership (the distinct data row from the moderator
+                           scope above): a GlobalAdmin grants/removes which communities
+                           a given account may POST to. GlobalAdmins bypass this at
+                           post time, but admins still see the UI for consistency. *@
+                        @if (Model.Components.Any())
+                        {
+                            <form method="post" asp-action="SetCommunityMembership" class="d-inline-flex ms-2">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
+                                <span class="text-muted small me-1">post:</span>
+                                @foreach (var c in Model.Components)
+                                {
+                                    <label title="@c.Name" aria-label="@c.Name"
+                                           style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                        <input type="checkbox" name="communityIds" value="@c.Id"
+                                               checked="@(a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
+                                        <span class="badge text-bg-light border">@c.Name</span>
+                                    </label>
+                                }
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Set</button>
+                            </form>
+                        }
 
                         @* Block / Unblock — suspend/restore the account's standing (audited
                            in the Core admin lane). A plain client confirm() guard mirrors the

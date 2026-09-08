@@ -67,9 +67,10 @@ var marten = builder.Services.AddMarten(opts =>
     // GroupMembership business-key index). ADR 0004 §B.1.
     M1DocTypes.Configure(opts);
 
-    // M3's Marten-native documents (Post, PostReply, Report — report table-in-M3 /
-    // flow-in-M3b). Conventional string Id, so no non-default convention needed.
-    // ADR 0004 §B.1.
+    // M3's + M3b's Marten-native documents (Post, PostReply, Report — report
+    // table-in-M3 / flow-in-M3b; and Announcement — the M3b "platform
+    // announcements" lane). All use the conventional string Id, so no non-default
+    // convention needed. ADR 0004 §B.1.
     M3DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
@@ -193,6 +194,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.LoginPath = "/Account/Login";
         options.AccessDeniedPath = "/Account/AccessDenied";
         options.Cookie.Name = "kumunita.auth";
+        // Pin the cookie path to site root. Without this the cookie is set
+        // with no `Path` attribute (browser stores as Path=/), but the sign-out
+        // path in CookieAuthenticationHandler emits the clear cookie with
+        // Path=<current request path> — and per RFC 6265 a clear header
+        // only matches the stored cookie when name AND path both agree, so
+        // signing out from /Home, /Community, /Profile/Edit, etc. leaves the
+        // original cookie intact and the resident re-authenticates on the
+        // very next request. (learn.microsoft.com/aspnet/core/security/
+        // cookie-sharing documents this for exactly this auth-cookie case.)
+        options.Cookie.Path = "/";
         // Absolute 14-day ticket span: the handler uses it for any sign-in that
         // omits an explicit ExpiresUtc. Every sign-in lane also sets its own 14-day
         // ExpiresUtc + IsPersistent (AuthenticationProperties), so a login neither
@@ -259,10 +270,6 @@ builder.UseWolverine(opts =>
 
 var app = builder.Build();
 
-// Versioned schema steps apply on boot in ALL environments (ADR 0004 B, OPS.md §2/§3);
-// see SchemaBootstrap for the full rationale.
-await SchemaBootstrap.ApplyAsync(app.Services);
-
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -287,6 +294,8 @@ app.UseRouting();
 
 app.UseAuthentication();
 
+app.UseMiddleware<BlockedAccountMiddleware>();
+
 app.UseAuthorization();
 
 app.MapStaticAssets();
@@ -298,6 +307,16 @@ app.MapControllerRoute(
 
 
 await app.StartAsync();
+
+// Versioned schema steps apply on boot in ALL environments (ADR 0004 B, OPS.md §2/§3);
+// see SchemaBootstrap for the full rationale.
+//
+// This must run AFTER StartAsync (moved here by M1 step 7, U4, plan:
+// plan-m1-step-7-outbox-email-c3.md): on first boot the seeder stages an
+// OutboxEmail envelope via Wolverine IMessageContext, which — like the
+// AuditPurgeTick publish below — requires the host to be started
+// (WolverineRuntime.AssertHasStarted), so any earlier placement breaks first boot.
+await SchemaBootstrap.ApplyAsync(app.Services);
 
 // Kick off the AuditPurge recurring job (SideEffects/AuditPurgeHandler) on boot.
 // The TimeoutMessage type bakes in a 1-day delay, so publishing one fresh tick

@@ -55,6 +55,11 @@ public static class M1DocTypes
         opts.Schema.For<DelegationGrant>();
         opts.Schema.For<Component>();
         opts.Schema.For<ModeratorAssignment>();
+        // Posting right: one row per (component, user) pair, the same business-key
+        // convention as GroupMembership. The unique index enforces the pair at the
+        // DB layer (the surrogate Id is the Marten document identity).
+        opts.Schema.For<ComponentMembership>()
+               .UniqueIndex(m => m.ComponentId, m => m.UserId);
 
         // Identity
         opts.Schema.For<IdentityToken>();

@@ -26,26 +26,24 @@ namespace Kumunita.Core.Tests;
 /// </summary>
 public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
-    // ── Test 1 — ContactVisibility_FourShape_TrightTable (§2.4, C-M2·1, §9 pin) ─
+    // ── Test 1 — ContactVisibility_FourShape_TrightTable (§2.4, C-M2·1) ──────
     //
-    // The design doc §2.4's four-shape truth table, each cell with a `Visibility`
-    // that *already allowed* the target (the gating precondition — otherwise the
-    // whole table never runs, F4). For each shape we assert the returned
-    // `ShowContactBlock` AND the exact audit-row count for that profile:
-    //   • row 1 (`null`) — the contact decision is *not evaluated* (C-M2·1 / §2.4
-    //     literal "not evaluated"): exactly ONE audit row exists (visibility only);
-    //     a null contact audience must not be mis-modeled as a Deny (the §9 pin in
-    //     its "short-circuit, not a denial, not an evaluation" form).
-    //   • row 2 (`Any` + empty grants) — C1 empty-audience guard: exactly TWO audit
-    //     rows (the §2.4 "separate-call" pin — it *was* a distinct second decision,
-    //     a C6-compliant shared-matching-pass call), and the contact one is a Deny.
-    //     `ShowContactBlock == false`.
+    // The design doc §2.4's four-shape truth table for the *contact-block* gate —
+    // the single audience decision on the detail surface (C-M2·1, now a one-decision
+    // rule: the profile's basic info renders always; only the contact block is
+    // audience-gated). For each shape we assert the returned `ShowContactBlock` AND
+    // the exact audit-row count for that profile:
+    //   • row 1 (`null`) — "null ⇒ not opted in" short-circuit: basic info renders
+    //     (Profile non-null), contact NOT evaluated, so ZERO audit rows (a null
+    //     contact audience is not a Deny and not an evaluation).
+    //   • row 2 (`Any` + empty grants) — C1 empty-audience guard: one decision
+    //     (a C6-compliant shared-matching-pass call) that Denies; exactly ONE audit
+    //     row, `ShowContactBlock == false`.
     //   • row 3 (`Any` + grant, viewer in-grant) — evaluates through
-    //     `<c>MatchGroups</c>`; exactly two rows, the contact one is an Allow.
-    //     `ShowContactBlock == true`.
+    //     <c>MatchGroups</c>; exactly one row, an Allow. `ShowContactBlock == true`.
     //   • row 4 (`All` + empty grants) — C1 `All` + empty denies (the vacuous-truth
-    //     guard this invariant exists for): exactly two rows, the contact one is a
-    //     Deny. `ShowContactBlock == false`.
+    //     guard this invariant exists for): exactly one row, a Deny.
+    //     `ShowContactBlock == false`.
     //
     // Each variant gets a *distinct* target profile (a fresh scratch DB per test
     // method does not isolate within-method steps) so the per-target audit-row
@@ -108,56 +106,50 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         await userInfo.UpsertProfileAsync(rowAnyGrant, new ProfileUpdate(null, null, null, null, null));
         await userInfo.UpsertProfileAsync(rowAllEmpty, new ProfileUpdate(null, null, null, null, null));
 
-        // Row 1 — `null` short-circuit: visible; contact NOT evaluated, no contact
-        // audit row (the §9 pin — a null contact audience is not a Deny and not an
-        // evaluation; it is an early return before the second `CanAsync` call).
+        // Row 1 — `null` ContactVisibility: the §2.4 "null ⇒ not opted in" short-circuit —
+        // basic info still renders (Profile is non-null), contact NOT evaluated, so NO
+        // audit row (not a Deny, not an evaluation — an early return before any CanAsync).
         var d1 = await svc.DetailAsync(viewer, rowNull.SubjectId);
-        Assert.True(d1!.IsVisible);
+        Assert.NotNull(d1!.Profile);
         Assert.False(d1.ShowContactBlock);
-        // Row 1 short-circuit pin: exactly one audit row (visibility only) — the
-        // `null` ContactVisibility produced no second decision / audit row (§9).
-        Assert.Equal(1, await RowCount(store, rowNull.SubjectId));
+        Assert.Equal(0, await RowCount(store, rowNull.SubjectId));
 
-        // Row 2 — `Any` + empty: evaluates (a separate decision — the §2.4 pin),
-        // Deny (C1 empty-audience guard), no contact rendered.
+        // Row 2 — `Any` + empty: evaluates (a single decision — the §2.4 pin),
+        // Deny (C1 empty-audience guard), no contact rendered. Exactly one audit row.
         var d2 = await svc.DetailAsync(viewer, rowAnyEmpty.SubjectId);
-        Assert.True(d2!.IsVisible);
+        Assert.NotNull(d2!.Profile);
         Assert.False(d2.ShowContactBlock);
-        // Two rows: the contact decision was a distinct 2nd decision (the §2.4
-        // separate-call / C6 pin) even though it denied.
-        Assert.Equal(2, await RowCount(store, rowAnyEmpty.SubjectId));
+        Assert.Equal(1, await RowCount(store, rowAnyEmpty.SubjectId));
         Assert.Single(await OutcomeRowCount(store, rowAnyEmpty.SubjectId, AccessOutcome.Deny));
 
         // Row 3 — `Any` + grant the viewer is in: evaluates through MatchGroups,
-        // Allow, contact rendered.
+        // Allow, contact rendered. Exactly one audit row.
         var d3 = await svc.DetailAsync(viewer, rowAnyGrant.SubjectId);
-        Assert.True(d3!.IsVisible);
+        Assert.NotNull(d3!.Profile);
         Assert.True(d3.ShowContactBlock);
-        Assert.Equal(2, await RowCount(store, rowAnyGrant.SubjectId));
+        Assert.Equal(1, await RowCount(store, rowAnyGrant.SubjectId));
+        Assert.Single(await OutcomeRowCount(store, rowAnyGrant.SubjectId, AccessOutcome.Allow));
 
         // Row 4 — `All` + empty: evaluates, Deny (the vacuous-truth guard, C1).
         var d4 = await svc.DetailAsync(viewer, rowAllEmpty.SubjectId);
-        Assert.True(d4!.IsVisible);
+        Assert.NotNull(d4!.Profile);
         Assert.False(d4.ShowContactBlock);
-        Assert.Equal(2, await RowCount(store, rowAllEmpty.SubjectId));
+        Assert.Equal(1, await RowCount(store, rowAllEmpty.SubjectId));
         Assert.Single(await OutcomeRowCount(store, rowAllEmpty.SubjectId, AccessOutcome.Deny));
     }
 
-    // ── Test 2 — Unverified_SelfCandidate_NotAudited (C-M2·2, §4.3/§2.3) ───
+    // ── Test 2 — UnverifiedViewer_Lists_All_NonBlock_Residents (show-everyone) ─
     //
-    // U5's own self-check (`ListAsync_Hides_Unverified`, same-assembly
-    // `DirectoryServiceTests`) pins the *visible-set shape* (exact viewer-own row,
-    // `HiddenCount = 0`, no other resident named anywhere in any row). U6's
-    // addition — the plan's exact wording, "the audit row is a *single*
-    // Owner-branch `Read` on the viewer's *own* profile (not a `Visibility`/
-    // `ContactVisibility` audit)" — pins the *audit-row shape itself* at the
-    // aggregate-row and per-item-row level: Action/TargetKind/Via/Outcome/
-    // EffectivePrincipalId asserted explicitly on both (the C-M2·2 §2.3 pin — the
-    // candidate filter produced exactly this one, owner-branch decision, and never
-    // a `ContactVisibility`/visibility decision *row* naming the excluded other).
+    // The directory's product rule (invitation-only, resident-limited): the list is
+    // NOT narrowed by verification or by audience. U6's pin — the plan's intent,
+    // restated — is that an *unverified* resident's `ListAsync` result includes
+    // OTHER residents (a verified one whose audience granted them is in `Visible`,
+    // their own row is in `Visible`, the blocked one is not), and that the list ran
+    // NO `IAuthorizationService` decision at all: the list renders zero
+    // `AccessAudit` rows (nothing to name any resident as actor/principal/target).
 
     [Fact]
-    public async Task Unverified_SelfCandidate_NotAudited()
+    public async Task UnverifiedViewer_Lists_All_NonBlock_Residents()
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
@@ -166,13 +158,12 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
 
         const string verifiedOther = "u-u6-t2-verified-other";
         const string unverifiedViewer = "u-u6-t2-unverified-viewer";
+        const string blockedResident = "u-u6-t2-blocked-resident";
 
-        // A verified resident whose *own* audience would allow the viewer — so the
-        // test proves the result is driven by the §2.3 *filter*, not by audience
-        // evaluation: if the viewer had reached `CanSeeAsync` with both candidates
-        // (the filter's job is to have excluded this one), this profile would have
-        // surfaced in `Visible` and its subject id would have appeared in at least
-        // one audit row.
+        // A verified resident whose *own* audience would have allowed the viewer —
+        // so the test proves the result is driven by the show-everyone rule, *not*
+        // by audience evaluation: under the old two-gate design, audience evaluation
+        // would have excluded this one from the unverified viewer's list.
         await userInfo.UpsertProfileAsync(
             new Profile
             {
@@ -195,57 +186,36 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
             },
             new ProfileUpdate(null, null, null, null, null));
 
-        var result = await svc.ListAsync(unverifiedViewer, viewerVerified: false);
+        // A suspended resident: excluded by Profile.Blocked, the only account-level
+        // exclusion that survives on the list. (BlockAsync is the real admin lane —
+        // it needs UserManager; we set the flag via the same single-Store the
+        // admin lane's core line does.)
+        await using (var blockedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            blockedSession.Store(new Profile
+            {
+                SubjectId = blockedResident,
+                DisplayName = "Blocked Resident",
+                Verified = true,
+                Blocked = true,
+            });
+            await blockedSession.SaveChangesAsync();
+        }
 
-        // Same shape pin U5 owns (single self row, zero hidden, other never appears).
-        Assert.Single(result.Visible);
-        Assert.Equal(unverifiedViewer, result.Visible[0].SubjectId);
-        Assert.Equal(0, result.HiddenCount);
+        var result = await svc.ListAsync(unverifiedViewer);
 
-        // The §2.3 / C-M2·2 audit pin, at the row level: exactly the two rows of a
-        // *single* 1-candidate bulk Read by the viewer on their own profile — one
-        // aggregate row (C3: one per bulk decision) + one per-item row (C3: one per
-        // audience-restricted visible candidate). Both Owner-via (the owner branch
-        // is branch 1 of the §4.4 algorithm and fires before `MatchGroups`), both
-        // Allow, both with the viewer as their effective principal (no delegation,
-        // no moderator standing planted here), and the action/target kind pinned to
-        // `read` / `directory` — never a `ContactVisibility` or other resource shape.
-        await using var session = store.QuerySession();
-        var audited = await session.Query<AccessAudit>()
-            .Where(a => a.Action == AccessAction.Read.Id
-                        && a.TargetKind == "directory"
-                        && a.ActorId == unverifiedViewer)
-            .ToListAsync(TestContext.Current.CancellationToken);
+        var ids = result.Visible.Select(p => p.SubjectId).ToHashSet();
+        Assert.Contains(verifiedOther, ids);
+        Assert.Contains(unverifiedViewer, ids);
+        Assert.DoesNotContain(blockedResident, ids);
+        Assert.Equal(2, result.Visible.Count);
 
-        Assert.Equal(2, audited.Count);
-
-        var aggregate = audited.Single(a => a.TargetId is null);
-        Assert.Equal(AccessVia.Owner, aggregate.Via);
-        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
-        Assert.Equal(1, aggregate.VisibleCount);
-        Assert.Equal(0, aggregate.HiddenCount);
-        Assert.Equal(unverifiedViewer, aggregate.EffectivePrincipalId);
-
-        var perItem = audited.Single(a => a.TargetId is not null);
-        Assert.Equal(unverifiedViewer, perItem.TargetId);
-        Assert.Equal(AccessVia.Owner, perItem.Via);
-        Assert.Equal(AccessOutcome.Allow, perItem.Outcome);
-        Assert.Equal(unverifiedViewer, perItem.EffectivePrincipalId);
-
-        // C-M2·2's DB-level pin: the excluded verified resident appears NOWHERE
-        // (not as actor, not as effective principal, not as target) in *any* audit
-        // row — evidence the §2.3 filter excluded them before `CanSeeAsync` could
-        // name them in any row, and no `ContactVisibility`-or-other decision ran
-        // on their row.
+        // The list rendered zero AccessAudit rows (a pure catalog read — nothing
+        // naming any resident as actor, principal, or target).
         await using var auditSession = store.QuerySession();
         var allRows = await auditSession.Query<AccessAudit>()
             .ToListAsync(TestContext.Current.CancellationToken);
-        Assert.All(allRows, a =>
-        {
-            Assert.NotEqual(verifiedOther, a.ActorId);
-            Assert.NotEqual(verifiedOther, a.EffectivePrincipalId);
-            Assert.NotEqual(verifiedOther, a.TargetId);
-        });
+        Assert.Empty(allRows);
     }
 
     // ── Test 3 — DelegationOnProfile_OwnerBranch (F9, ADR 0006-C2) ─────────
@@ -458,28 +428,27 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
     // ── Test 5 — GroupAddRemoveMember_ReflectedOnNext_Call_Profile (F2, F7, C4,
     //    C-M2·3) ─────────────────────────────────────────────────────────────
     //
-    // The plan's exact wording — "C4 for *profiles' own audiences*: a member add
-    // in the same commit is visible to `ListAsync` on the next call (M1's
-    // `MembershipTests` pattern, now applied to the `Profile` audience shape)" —
-    // exercised on the *directory* surface (`DirectoryService.ListAsync`, U5's
-    // composition), over a `Profile` whose `Visibility` is a `Group`-grant (the
-    // "reuse unit" F1 named), and with the `AddGroupMemberAsync` /
-    // `RemoveGroupMemberAsync` audit rows' own shape (C3, and C-M2·3's SoD pin —
-    // the `ActorId` is the *owner*, the only standing that reaches those methods,
-    // per the interface's own docs):
-    //   (a) pre-add: the member's `ListAsync` is exactly 1 visible (themselves,
-    //       via the owner branch) + 1 hidden (the owner's group-scoped profile);
-    //       the owner's profile is *not* in `Visible`.
+    // The plan's intent — "C4 for *profiles' own audiences*: a member add in the
+    // same commit is reflected on the *directory decision* that reads the group" —
+    // exercised on the *directory* surface, now over a `Profile` whose
+    // <b>ContactVisibility</b> is a `Group`-grant (the "reuse unit" F1 named),
+    // because the contact block is the audience the directory surfaces gate on
+    // (the show-everyone rule removes the list-level audience gate). The
+    // `AddGroupMemberAsync` / `RemoveGroupMemberAsync` audit rows keep their own
+    // shape (C3, and C-M2·3's SoD pin — the `ActorId` is the *owner*, the only
+    // standing that reaches those methods, per the interface's own docs):
+    //   (a) pre-add: the member's directory *list* already includes the owner
+    //       (show-everyone), but the *detail*'s contact block is denied (the
+    //       group-scoped ContactVisibility is not in the member's groups).
     //   (b) `AddGroupMemberAsync`'s own `AccessAudit` row: `Allow`/`Via = Owner`/
-    //       `TargetKind = "group"`/`ActorId = owner` (C3 same-transaction shape;
-    //       C-M2·3 SoD — the owner is the grantor, per the signature).
-    //   (c) post-add: the *very next* `ListAsync` is 2 visible + 0 hidden (C4 /
+    //       `TargetKind = "group"`/`ActorId = owner`.
+    //   (c) post-add: the *very next* `DetailAsync` shows the contact block (C4 /
     //       F2 live-on-next-call — the interface doc's own "live on the next
-    //       GetGroupIdsAsync call" wording, here as the next *list* decision),
-    //       and the owner's profile is now in `Visible`.
+    //       GetGroupIdsAsync call" wording, here as the next *contact* decision);
+    //       the owner's basic info was already visible the whole time.
     //   (d) `RemoveGroupMemberAsync`'s own `AccessAudit` row, same shape pin; then
-    //       the very next `ListAsync` is back to 1 visible + 1 hidden — "the loss
-    //       of access is live on the next ... call", per the interface doc.
+    //       the very next `DetailAsync` is back to contact-hidden — "the loss of
+    //       access is live on the next ... call", per the interface doc.
 
     [Fact]
     public async Task GroupAddRemoveMember_ReflectedOnNext_Call_Profile()
@@ -492,8 +461,10 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         const string owner = "u-u6-t5-owner";
         const string member = "u-u6-t5-member";
 
-        // Owner's profile: group-scoped audience (a `Group` grant — the "reuse
-        // unit" F1 named) — only group members can see it.
+        // Owner's profile: group-scoped *contact* block (a `Group` grant — the
+        // "reuse unit" F1 named) — only group members can see the contact block.
+        // Basic info (name + verified) renders for everyone, per the show-everyone
+        // rule, regardless of this audience.
         var group = await userInfo.CreateGroupAsync(owner, "U6 T5 group", null);
         await userInfo.UpsertProfileAsync(
             new Profile
@@ -501,33 +472,32 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
                 SubjectId = owner,
                 DisplayName = "Owner",
                 Verified = true,
-                Visibility = new Audience(AudienceMode.Any,
+                ContactVisibility = new Audience(AudienceMode.Any,
                     [new AudienceGrant(GrantKind.Group, group.Id)]),
             },
             new ProfileUpdate(null, null, null, null, null));
 
-        // The member's own profile: a self-grant (their own `ListAsync` always
-        // includes themselves via the owner branch — the "1 visible" baseline for
-        // the pre-add and post-remove states below).
+        // The member's own profile (a minimal row so the directory can list them;
+        // the show-everyone rule means their own presence isn't a baseline — it's
+        // just one of N non-blocked residents).
         await userInfo.UpsertProfileAsync(
             new Profile
             {
                 SubjectId = member,
                 DisplayName = "Member",
                 Verified = true,
-                Visibility = new Audience(AudienceMode.Any,
-                    [new AudienceGrant(GrantKind.User, member)]),
             },
             new ProfileUpdate(null, null, null, null, null));
 
-        // (a) Pre-add: the member's `ListAsync` includes themselves + exactly one
-        // hidden profile (the owner's group-scoped one, denied by the group-scoped
-        // audience).
-        var before = await svc.ListAsync(member, viewerVerified: true);
-        Assert.Single(before.Visible);
-        Assert.Equal(1, before.HiddenCount);
-        Assert.Contains(before.Visible, p => p.SubjectId == member);
-        Assert.DoesNotContain(before.Visible, p => p.SubjectId == owner);
+        // (a) Pre-add: the member's list already includes the owner (show-everyone;
+        // no hidden-count concept), but the detail's contact block is denied (the
+        // group-scoped ContactVisibility is not in the member's groups).
+        var beforeList = await svc.ListAsync(member);
+        Assert.Contains(beforeList.Visible, p => p.SubjectId == owner);
+        Assert.Contains(beforeList.Visible, p => p.SubjectId == member);
+        var beforeDetail = await svc.DetailAsync(member, owner);
+        Assert.NotNull(beforeDetail.Profile);
+        Assert.False(beforeDetail.ShowContactBlock);
 
         // (b) `AddGroupMemberAsync`'s own `AccessAudit` row (C3; C-M2·3 SoD — the
         // `ActorId` is the owner, the only standing that reaches it, per the
@@ -546,13 +516,15 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
             Assert.Equal(owner, addAudit.ActorId);
         }
 
-        // (c) Post-add: live on the very next `ListAsync` (C4/F2). 2 visible
-        // (self + owner), 0 hidden.
-        var afterAdd = await svc.ListAsync(member, viewerVerified: true);
-        Assert.Equal(2, afterAdd.Visible.Count);
-        Assert.Equal(0, afterAdd.HiddenCount);
-        Assert.Contains(afterAdd.Visible, p => p.SubjectId == member);
-        Assert.Contains(afterAdd.Visible, p => p.SubjectId == owner);
+        // (c) Post-add: the *very next* `DetailAsync` shows the contact block
+        // (C4/F2 live-on-next-call); the owner's basic info was visible the whole
+        // time (unchanged), and the list still includes both residents.
+        var afterAddList = await svc.ListAsync(member);
+        Assert.Contains(afterAddList.Visible, p => p.SubjectId == owner);
+        Assert.Contains(afterAddList.Visible, p => p.SubjectId == member);
+        var afterAddDetail = await svc.DetailAsync(member, owner);
+        Assert.NotNull(afterAddDetail.Profile);
+        Assert.True(afterAddDetail.ShowContactBlock);
 
         // (d) `RemoveGroupMemberAsync`'s own `AccessAudit` row, same shape pin.
         await userInfo.RemoveGroupMemberAsync(group.Id, member, removedBy: owner);
@@ -569,13 +541,16 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
             Assert.Equal(owner, removeAudit.ActorId);
         }
 
-        // (e) The loss of access is live on the very next `ListAsync` (C4/F2, the
-        // `RemoveGroupMemberAsync` interface doc's own wording).
-        var afterRemove = await svc.ListAsync(member, viewerVerified: true);
-        Assert.Single(afterRemove.Visible);
-        Assert.Equal(1, afterRemove.HiddenCount);
-        Assert.Contains(afterRemove.Visible, p => p.SubjectId == member);
-        Assert.DoesNotContain(afterRemove.Visible, p => p.SubjectId == owner);
+        // (e) The loss of the *contact* access is live on the very next
+        // `DetailAsync` (C4/F2, the `RemoveGroupMemberAsync` interface doc's own
+        // wording). The list is unchanged (show-everyone); only the contact block
+        // flips back to hidden.
+        var afterRemoveList = await svc.ListAsync(member);
+        Assert.Contains(afterRemoveList.Visible, p => p.SubjectId == member);
+        Assert.Contains(afterRemoveList.Visible, p => p.SubjectId == owner);
+        var afterRemoveDetail = await svc.DetailAsync(member, owner);
+        Assert.NotNull(afterRemoveDetail.Profile);
+        Assert.False(afterRemoveDetail.ShowContactBlock);
     }
 
     // ── Shared helpers (mirror `DirectoryServiceTests`'s `BootStoreAsync` shape) ──

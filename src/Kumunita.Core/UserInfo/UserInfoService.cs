@@ -430,7 +430,8 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             Visibility = profile.Visibility,
             ContactVisibility = profile.ContactVisibility,
             Email = profile.Email,
-            Phone = profile.Phone
+            Phone = profile.Phone,
+            Address = profile.Address
         };
 
         // Patch wins on every non-null field; a null field leaves the current value untouched.
@@ -439,6 +440,7 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         if (patch.Phone is not null) doc.Phone = patch.Phone;
         if (patch.Visibility is not null) doc.Visibility = patch.Visibility;
         if (patch.ContactVisibility is not null) doc.ContactVisibility = patch.ContactVisibility;
+        if (patch.Address is not null) doc.Address = patch.Address;
 
         session.Store(doc);
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -665,6 +667,137 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             ActorId = actorId,
             EffectivePrincipalId = actorId,
             Action = enabled ? "community.enable" : "community.disable",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ── Community membership (posting right) — the write / read lanes
+    // for the ComponentMembership row. Admin-action lane (via:Admin) on the
+    // writes; the read is a candidate read (no audit row — same audit pin as
+    // GetGroupIdsAsync), matching the ADR 0006-A/D pattern used for Group
+    // membership.
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyCollection<string>> GetCommunityIdsAsync(string userId)
+    {
+        // Strong consistency (invariant C4): live rows, no projection, no cache.
+        // No AccessAudit row is appended here — this is a candidate read, mirroring
+        // GetGroupIdsAsync's audit pin (the write lanes SetCommunityMembershipAsync /
+        // ClearCommunityMembershipAsync are the admin audited actions).
+        if (string.IsNullOrWhiteSpace(userId))
+            return System.Array.Empty<string>();
+
+        await using var session = store.QuerySession();
+        return (await session
+            .Query<ComponentMembership>()
+            .Where(m => m.UserId == userId)
+            .Select(m => m.ComponentId)
+            .ToListAsync()
+            .ConfigureAwait(false)) as IReadOnlyCollection<string>;
+    }
+
+    /// <inheritdoc />
+    public async Task SetCommunityMembershipAsync(string componentId, string userId, string actorId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // The component must exist (a membership on a missing component is a data
+        // bug, not a no-op).
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // Upsert by business key (component, user); the DB unique index
+        // guarantees at most one row per pair, so this is idempotent.
+        var existing = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            existing = new ComponentMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = componentId,
+                UserId = userId,
+                AddedBy = actorId,
+                At = now
+            };
+        }
+        else
+        {
+            // Refresh the idempotency metadata on a re-add (no new row).
+            existing.AddedBy = actorId;
+            existing.At = now;
+        }
+
+        session.Store(existing);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.add-member",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ClearCommunityMembershipAsync(string componentId, string userId, string actorId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Delete (if any) — strong consistency (invariant C4): the next
+        // GetCommunityIdsAsync is live; an absent row is a no-op (not an error).
+        var membership = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is not null)
+            session.Delete(membership);
+
+        // Always audit the admin action (allow or no-op): the same audit lane
+        // as the "add" lane, with a distinct action string so /admin/audit can
+        // distinguish add from remove.
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.remove-member",
             TargetKind = "component",
             TargetId = componentId,
             Via = Authorization.AccessVia.Admin,

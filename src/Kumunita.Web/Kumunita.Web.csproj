@@ -15,10 +15,12 @@
          Version pin: 6.33.0 is the current pairing (WolverineFx.Marten 6.33 pulls
          WolverineFx >= 6.33 via WolverineFx.RDBMS, so the two are locked together;
          6.32/6.33 was the pairing in the Critter-Stack `versions.md` snapshot, but
-         the transitive graph forces both to 6.33 as of 2026-09). These are the only
-         two Wolverine-related assemblies the whole repo references (per the repo's
-         own convention — `IMailerStage.cs` and `DependencyInjection.cs` both call
-         out "Wolverine is a *Web* package"). -->
+         the transitive graph forces both to 6.33 as of 2026-09).
+         Note: the prior convention ("Wolverine is a *Web* package") was intentionally
+         broken by M1 step 7 (plan U1/U2) — `Kumunita.Core` now also references
+         WolverineFx 6.33.0 directly for the transactional-outbox `IMessageContext`
+         enqueue. Both projects pin the same version (R4: no skew). See
+         docs/plans-milestones/plan-m1-step-7-outbox-email-c3.md. -->
     <PackageReference Include="WolverineFx" Version="6.33.0" />
     <PackageReference Include="WolverineFx.Marten" Version="6.33.0" />
     <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)

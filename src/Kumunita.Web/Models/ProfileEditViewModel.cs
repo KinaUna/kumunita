@@ -51,6 +51,17 @@ public sealed class ProfileEditViewModel
     [Display(Name = "Email")]
     public string? Email { get; set; }
 
+    /// <summary>The resident's address. Optional (unlike name/email, a resident who doesn't
+    /// want to share a street line simply leaves it empty). When non-empty and
+    /// <see cref="OptInContactVisibility"/> is true, it appears with the gated contact block
+    /// on the directory list + detail (same gate as email/phone); when <see
+    /// cref="OptInContactVisibility"/> is false it is still saved on the document (the
+    /// author's own field) but no directory surface renders it, since the contact-block
+    /// gate — which the address shares — is off. Free-text, up to a street line's worth.</summary>
+    [MaxLength(200)]
+    [Display(Name = "Address (the street you live at)")]
+    public string? Address { get; set; }
+
     // ── The two audience editors (U11, plan line 158) ─────────────────────
 
     /// <summary>The <c>Profile.Visibility</c> editor (the profile-level gate).
@@ -83,7 +94,7 @@ public sealed class ProfileEditViewModel
     /// <c>DirectoryViewModel.Detail</c>'s <c>ShowContactBlock</c> (a
     /// gate, not a field).
     /// </summary>
-    [Display(Name = "Opt in the contact block (email/phone)")]
+    [Display(Name = "Opt in contact info (address/email/phone)")]
     public bool OptInContactVisibility { get; set; }
 
     /// <summary>The <c>Profile.ContactVisibility</c> editor (the
@@ -185,10 +196,14 @@ public sealed class ProfileEditViewModel
             Visibility.BuildAudience(),            // the non-null gate (always built)
             OptInContactVisibility
                 ? (ContactVisibility?.BuildAudience()
-                   ?? new Kumunita.Core.Authorization.Audience(
-                       Kumunita.Core.Authorization.AudienceMode.Any,
-                       Array.Empty<Kumunita.Core.Authorization.AudienceGrant>()))
-                : null                              // §2.4 "null => short-circuit" shape
+                    ?? new Kumunita.Core.Authorization.Audience(
+                        Kumunita.Core.Authorization.AudienceMode.Any,
+                        Array.Empty<Kumunita.Core.Authorization.AudienceGrant>()))
+                : null,                             // §2.4 "null => short-circuit" shape
+            Address?.Trim() ?? string.Empty        // optional + clearable: a blank edit clears it;
+                                                   // never null here, so the patch's "null => don't
+                                                   // touch" rule stays consistent (a resident who
+                                                   // wants no address saves it empty, not deleted)
         );
         return (profile, patch);
     }

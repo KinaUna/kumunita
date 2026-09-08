@@ -8,11 +8,14 @@ namespace Kumunita.Core.UserInfo;
 /// "emergent impact"). Document identity is <see cref="SubjectId"/> (the thin principal's
 /// subject).
 /// <para>
-/// <see cref="Visibility"/> defaults per ADR 0001-B — the author's choice, absolute by
-/// default: a bootstrapped profile starts visible to the author alone (an empty audience
-/// denies everyone, including the author, per invariant C1). <see cref="ContactVisibility"/>
-/// gates the *opt-in* contact block (email/phone) and is evaluated only after
-/// <see cref="Visibility"/> allows the profile — never on a hidden profile (§9 testing).
+/// The directory lists every non-blocked resident's *basic* info (name + verified badge)
+/// to every signed-in viewer — the platform is invitation-only and limited to residents,
+/// so "who is here" is not a gated surface. <see cref="ContactVisibility"/> is the <b>single</b>
+/// audience that gates a profile's *opt-in* contact block (email/phone) on the directory
+/// detail and preview: <c>null</c> means the author opted out (never shown), a non-null
+/// audience runs one <c>CanAsync</c> decision. <see cref="Visibility"/> is kept (document +
+/// editor, author-controlled, ADR 0003) as the audience for the *detailed* non-contact
+/// fields that will take it over once they exist — it does not hide a profile today.
 /// </para>
 /// <para>
 /// <see cref="ExternalId"/> is reserved for federation (ADR 0001): IdentityModule is the only
@@ -51,16 +54,42 @@ public sealed class Profile
     /// "no roles", read from <c>mt</c> at sign-in).</summary>
     public bool Blocked { get; set; }
 
-    /// <summary>Who may see this profile. The author-controlled audience (ADR 0003: the author
-    /// always controls their own content's audience). Bootstrap default: self-only.</summary>
+    /// <summary>
+    /// The author-controlled audience (ADR 0003: the author always controls their own
+    /// content's audience), kept on the document + editor for the *detailed* non-contact
+    /// profile fields (the audience that would gate them once such fields ship). At the
+    /// directory/detail presentation layer the profile's <b>basic</b> info
+    /// (<see cref="DisplayName"/> + <see cref="Verified"/>) is <b>not</b> gated: the
+    /// platform is invitation-only and limited to residents, so "who is here" is not a
+    /// gated surface — <see cref="Kumunita.Core.UserInfo.DirectoryService"/> lists every
+    /// non-blocked resident to every signed-in viewer. Bootstrap default: <c>new
+    /// Audience()</c> (an empty audience; see <see cref="ContactVisibility"/> for the
+    /// short-circuit rule that applies to the actually-gated contact block).</summary>
     public Audience Visibility { get; set; } = new();
 
-    /// <summary>Gates the contact block only; evaluated after <see cref="Visibility"/> allows.</summary>
+    /// <summary>
+    /// The <b>single</b> audience gate on the directory/detail surface (M2 §2.4, invariant
+    /// C-M2·1): who may see the contact block (<see cref="Address"/>/<see cref="Email"/>/<see cref="Phone"/>).
+    /// Evaluated by <see cref="Kumunita.Core.UserInfo.DirectoryService"/> through the
+    /// frozen <c>IAuthorizationService.CanAsync</c>: <c>null</c> short-circuits to "no
+    /// contact block" with no decision and no audit row (the author opted out); a
+    /// non-null audience runs one decision and one <c>AccessAudit</c> row. The profile's
+    /// basic info renders regardless of this gate — only the contact block is gated.
+    /// </summary>
     public Audience? ContactVisibility { get; set; }
 
     public string? Email { get; set; }
 
     public string? Phone { get; set; }
+
+    /// <summary>
+    /// The resident's street address, shown to neighbors in the directory. Like
+    /// <see cref="Email"/>/<see cref="Phone"/>, it is an opt-in field: gated by the same
+    /// <see cref="ContactVisibility"/> audience so it only renders on the directory
+    /// list/detail when the author has opted in <i>and</i> the viewer's decision allows.
+    /// Free-text (a single street line) — the repo has no structured address sub-model.
+    /// </summary>
+    public string? Address { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
@@ -71,4 +100,9 @@ public sealed record ProfileUpdate(
     string? Email,
     string? Phone,
     Audience? Visibility,
-    Audience? ContactVisibility);
+    Audience? ContactVisibility,
+    /// <summary>The resident's address (see <see cref="Profile.Address"/>). Appended with a
+    /// default after the frozen M1/M2 five-field shape so existing positional call sites
+    /// compile unchanged; null leaves the current value untouched (the "null ⇒ don't touch"
+    /// patch rule every other field follows).</summary>
+    string? Address = null);

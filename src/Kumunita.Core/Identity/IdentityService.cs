@@ -123,12 +123,60 @@ public sealed class IdentityService(
                     idempotencyKey: $"verify:{user.Id}:1",
                     recipient: email,
                     subject: "Verify your Kumunita account",
-                    body: VerificationBody(displayName, token.Id),
+                    body: VerificationBody(displayName, VerificationLink(token.Id)),
                     ct: default);
         await session.SaveChangesAsync();
 
         logger.LogInformation("Registered unverified resident {UserId} (email {Email}).", user.Id, email);
         return new ThinPrincipal(user.Id, user.ExternalId, IsVerifiedResident: false, ThinPrincipal.NoRoles);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResendVerificationResult> ResendVerificationEmailAsync(string email)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+            return new ResendVerificationResult(false,
+                $"No account found with email '{email}'. Sign up again to create one.");
+
+        var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
+        if (profile?.Verified == true)
+            return new ResendVerificationResult(false,
+                "This account is already verified — sign in instead.");
+
+        await using (var session = documentStore.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            var attempts = await session
+                .Query<IdentityToken>()
+                .Where(t => t.Kind == IdentityToken.KindVerify && t.UserId == user.Id)
+                .Select(t => t.Attempt)
+                .ToListAsync();
+
+            var nextAttempt = attempts.Count == 0 ? 1 : attempts.Max() + 1;
+            if (nextAttempt > verificationOptions.Value.MaxVerifyAttempts)
+                return new ResendVerificationResult(false,
+                    "Automatic verification-email resends for this account are exhausted. " +
+                    "Ask an admin to verify your account.");
+
+            var now = DateTimeOffset.UtcNow;
+            var token = NewVerifyToken(user.Id ?? string.Empty, now, attempt: nextAttempt);
+            session.Store(token);
+            await mailer.StageAsync(session,
+                idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
+                recipient: email,
+                subject: "Verify your Kumunita account",
+                body: VerificationBody(
+                    profile?.DisplayName ?? user.Email ?? "there",
+                    VerificationLink(token.Id)),
+                ct: default);
+            await session.SaveChangesAsync();
+
+            logger.LogInformation(
+                "Re-issued verification (attempt {Attempt}) for resident {UserId} (email {Email}).",
+                nextAttempt, user.Id, email);
+        }
+
+        return new ResendVerificationResult(Success: true);
     }
 
     /// <inheritdoc />
@@ -282,6 +330,26 @@ public sealed class IdentityService(
 
         var identityRoles = (await userManager.GetRolesAsync(user)).ToList();
         return new ThinPrincipal(user.Id, user.ExternalId, IsVerifiedResident: true, identityRoles);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsFirstBootSetupCompleteAsync()
+    {
+        // The first-boot setup lane is "still open" exactly while an unconsumed,
+        // unexpired KindSetup token exists. ConsumedAt is set by
+        // CompleteSeedAdminSetupAsync in its single commit, so its presence is the
+        // completion signal; an unconsumed-but-expired token is dead setup material
+        // too — the link must not linger advertising an unusable token either.
+        await using var session = documentStore.OpenSession(new SessionOptions());
+        var now = DateTimeOffset.UtcNow;
+        var liveSetupToken = await session
+            .Query<IdentityToken>()
+            .Where(t => t.Kind == IdentityToken.KindSetup
+                && t.ConsumedAt == null
+                && t.ExpiresAt > now)
+            .FirstOrDefaultAsync();
+
+        return liveSetupToken is null;
     }
 
     /// <inheritdoc />
@@ -469,13 +537,13 @@ public sealed class IdentityService(
         return await query.FirstOrDefaultAsync().ConfigureAwait(false);
     }
 
-    private IdentityToken NewVerifyToken(string userId, DateTimeOffset now) => new()
-    {
+    private IdentityToken NewVerifyToken(string userId, DateTimeOffset now, int attempt = 1) => new()
+{
         Id = Guid.NewGuid().ToString("N"),
         Kind = IdentityToken.KindVerify,
         UserId = userId,
         Token = NewSecret(),   // high-entropy; never in a URL (the URL carries the row Id)
-        Attempt = 1,
+        Attempt = attempt,
         CreatedAt = now,
         // The bound option (Verification__TtlDays in appsettings, default 14) — see the
         // VerificationOptions class doc for the re-verify semantics (each attempt gets its
@@ -506,9 +574,21 @@ public sealed class IdentityService(
         return Convert.ToBase64String(bytes);
     }
 
-    private static string VerificationBody(string displayName, string tokenRowId) =>
+    // The link target is the Web host's AccountController.Verify action, reached
+    // through the conventional "default" route ({controller=Home}/{action=Index}/
+    // {id?}) — /account/verify?id={token row id}. The row id is what travels in the
+    // URL (§6.2: the high-entropy secret is never in a link); if the operator set
+    // Verification__BaseUrl, prefix it to make the path absolute — an email client
+    // can't resolve a relative path. Unset (a dev-only shape) keeps the relative
+    // path, which a human reading the mail can still copy into the browser's bar.
+    private string VerificationLink(string tokenRowId) =>
+        (verificationOptions.Value.BaseUrl is string root and not ""
+            ? root.TrimEnd('/')
+            : string.Empty) + $"/account/verify?id={tokenRowId}";
+
+    private static string VerificationBody(string displayName, string verifyLink) =>
         $"Hi {displayName},\n\nYour Kumunita account is set to verify on its first sign-in. " +
-        $"This one-time link (row id {tokenRowId}) returns you to the platform to confirm the account.\n\n" +
+        $"Open this one-time link to confirm the account (it also signs you in):\n\n{verifyLink}\n\n" +
         "If you didn't create this account, you can ignore this message.";
 }
 

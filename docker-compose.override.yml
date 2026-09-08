@@ -1,0 +1,23 @@
+# U6 smoke-test override (local-only, not committed).
+#
+# The base compose file (docker-compose.yml) already sets SMTP__Host / SMTP__Port
+# / SMTP__Secure for Mailpit (plain SMTP on the docker network), but does not
+# set SMTP__From. Kumunita.Core.Identity.SmtpSender.SendAsync (lines 250-251)
+# only sets msg.From when SmtpOptions.From is non-empty; when it's empty the
+# BCL SmtpClient throws "A from address must be specified" before talking to
+# the relay, which is exactly the exception shape the durable handler's retry
+# schedule is configured to catch (Program.cs:271-272) and hold for the
+# 6-cooldown / ~24h schedule (ARCHITECTURE §6.2).
+#
+# This override supplies a syntactically valid sender identity for Mailpit's
+# permissive local sink. It does NOT modify any source code, and its only
+# purpose is to let the U6 end-to-end smoke check observe the positive
+# (Mailpit-delivered) branch of the deliverable.
+#
+# Compose automatically merges docker-compose.override.yml onto
+# docker-compose.yml for every `docker compose up` in this directory, so this
+# file is picked up without touching the base file.
+services:
+  app:
+    environment:
+      SMTP__From: "kumunita@localhost"

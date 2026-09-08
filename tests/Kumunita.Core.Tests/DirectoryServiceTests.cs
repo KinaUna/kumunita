@@ -7,39 +7,47 @@ using Xunit;
 namespace Kumunita.Core.Tests;
 
 /// <summary>
-/// M2, plan U5 — <see cref="DirectoryService"/> self-check (the *one* test U5 owns; the
-/// full 5-test seam list §2.5 is U6's).
+/// M2 — <see cref="DirectoryService"/> self-check (the "list" side; the detail/preview
+/// gates are <c>DirectoryServiceTests_U6</c>).
 /// <para>
-/// <see cref="ListAsync_Hides_Unverified"/> pins invariant C-M2·2 (candidate filter ≠
-/// access decision, §4.3/§2.3) at the unit level: an unverified viewer's
-/// <see cref="DirectoryService.ListAsync"/> result must be exactly their own
-/// <see cref="Profile"/> (via the Owner branch, the sole Allow) and nothing else — a
-/// verified resident's profile, even if planted in the same store, never appears in the
-/// result's <c>Visible</c> *or* <c>HiddenCount</c> (it was excluded by the §2.3 filter
-/// before any <see cref="IAuthorizationService"/> call ran), and no <see cref="AccessAudit"/>
-/// row anywhere names that other resident (their <c>SubjectId</c>, as actor, as
-/// effective principal, or as target).
+/// <see cref="ListAsync_Shows_All_NonBlock_Residents_to_Any_SignedIn_Viewer"/> pins the
+/// directory's <b>show-everyone</b> product rule at the unit level: the platform is
+/// invitation-only and limited to residents, so <c>ListAsync</c> returns <b>every</b>
+/// non-blocked <see cref="Profile"/> for <b>any</b> signed-in viewer — an unverified
+/// viewer's result is not narrowed to their own row (the old §2.3 candidate filter is
+/// gone), and a verified resident's profile appears for them too. <c>Profile.Blocked</c>
+/// remains the only account-level exclusion (a suspended resident is not listed). The
+/// list is a <b>pure catalog read</b>: <c>ListAsync</c> runs no
+/// <see cref="IAuthorizationService"/> decision, so <b>no</b> <see cref="AccessAudit"/>
+/// row is written at all. An unauthenticated (empty) subject short-circuits to an empty
+/// list (F8 boundary).
 /// </para>
 /// </summary>
 public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     [Fact]
-    public async Task ListAsync_Hides_Unverified()
+    public async Task ListAsync_Shows_All_NonBlock_Residents_to_Any_SignedIn_Viewer()
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
         var authz = new AuthorizationService(store, userInfo);
         var svc = new DirectoryService(userInfo, authz);
 
-        // Two residents in the same store: one verified, one unverified (the viewer).
-        const string verifiedOther = "u-dir-verified-other";
-        const string unverifiedViewer = "u-dir-unverified-viewer";
+        var verifiedOther = "u-dir-verified-other";
+        var unverifiedViewer = "u-dir-unverified-viewer";
+        var blockedResident = "u-dir-blocked-resident";
 
+        // Three residents in the same store: two listed, one suspended. Note the listed
+        // profiles use a Visibility that would have *denied* the other viewer under the
+        // old two-gate design — the point of the test is that the listing no longer
+        // consults that audience at all.
         var verifiedProfile = new Profile
         {
             SubjectId = verifiedOther,
             DisplayName = "Verified Other",
             Verified = true,
+            // A self-only audience would have hidden this row from the unverified viewer
+            // before the change; the new rule ignores it for the listing.
             Visibility = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, verifiedOther)]),
         };
         var unverifiedProfile = new Profile
@@ -47,66 +55,61 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
             SubjectId = unverifiedViewer,
             DisplayName = "Unverified Viewer",
             Verified = false,
-            // Deliberately self-granted (an audience *that* would Allow the owner):
-            // if the test asserted on Visibility evaluation alone (not the §2.3 filter),
-            // this shape still lands on the Owner branch (which wins first, §4.4
-            // branch 1) — the test's assertion is about *which* profile is even
-            // *present* to be evaluated, not about this audience's shape.
             Visibility = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, unverifiedViewer)]),
         };
+        var blockedProfile = new Profile
+        {
+            SubjectId = blockedResident,
+            DisplayName = "Blocked Resident",
+            Verified = true,
+            Blocked = true, // suspended — never listed
+        };
 
-        // Bootstrap both through the service's own single write seam (C3's write lane),
-        // then reset to zero rows for the audit assertion below (UpsertProfileAsync
-        // itself appends no Audit row — M1's bootstrap surface — so this is a
-        // well-defined starting count of 0 for the DirectoryService decision rows).
+        // Bootstrap the two listed residents through the service's own single write
+        // seam (UpsertProfileAsync appends no Audit row — M1's bootstrap surface — so
+        // the audit count below starts well-defined at 0 for any DirectoryService
+        // decision rows).
         await userInfo.UpsertProfileAsync(verifiedProfile, new ProfileUpdate(null, null, null, null, null));
         await userInfo.UpsertProfileAsync(unverifiedProfile, new ProfileUpdate(null, null, null, null, null));
 
-        // The §2.3 unverified row: exactly one candidate — the viewer themself —
-        // survives the filter in DirectoryService.ListAsync before CanSeeAsync runs.
-        var result = await svc.ListAsync(unverifiedViewer, viewerVerified: false);
+        // The suspended resident: BlockAsync is the real admin lane (it needs
+        // UserManager; pulling Identity infra into this test would obscure the pin).
+        // Persist Profile.Blocked via a raw document-session set — the same
+        // single-Store the admin lane itself does (SetBlockedAsync's core line:
+        // profile.Blocked = true; session.Store(profile)).
+        await using (var blockedSession = store.OpenSession(new Marten.Services.SessionOptions()))
+        {
+            blockedSession.Store(blockedProfile);
+            await blockedSession.SaveChangesAsync();
+        }
 
-        // Exactly the viewer's own profile; the verified resident never appears — not
-        // in Visible, not in HiddenCount (excluded *before* any decision ran, C-M2·2).
-        Assert.Single(result.Visible);
-        Assert.Equal(unverifiedViewer, result.Visible[0].SubjectId);
-        Assert.Equal(0, result.HiddenCount);
+        // (a) Unverified viewer: sees BOTH non-blocked residents (not just themselves),
+        // never the blocked one.
+        var unverifiedList = await svc.ListAsync(unverifiedViewer);
+        var unverifiedIds = unverifiedList.Visible.Select(p => p.SubjectId).ToHashSet();
+        Assert.Contains(verifiedOther, unverifiedIds);
+        Assert.Contains(unverifiedViewer, unverifiedIds);
+        Assert.DoesNotContain(blockedResident, unverifiedIds);
+        Assert.Equal(2, unverifiedList.Visible.Count);
 
-        // The single decision (Owner branch, Read on the viewer's own profile) is
-        // audited: one aggregate row + one per-item (audience-restricted) row for that
-        // same profile — C3's two-row shape applied to a 1-candidate set — and *nothing
-        // else* anywhere names the verified resident (C-M2·2's "never logged as an
-        // access decision" pin, at the DB level, not just the return shape).
+        // (b) Verified viewer: the same full non-blocked set (no narrowing either way).
+        var verifiedList = await svc.ListAsync(verifiedOther);
+        var verifiedIds = verifiedList.Visible.Select(p => p.SubjectId).ToHashSet();
+        Assert.Contains(verifiedOther, verifiedIds);
+        Assert.Contains(unverifiedViewer, verifiedIds);
+        Assert.DoesNotContain(blockedResident, verifiedIds);
+        Assert.Equal(2, verifiedList.Visible.Count);
+
+        // (c) Unauthenticated (empty subject): F8 boundary — empty list, fail closed.
+        var anonymousList = await svc.ListAsync(string.Empty);
+        Assert.Empty(anonymousList.Visible);
+
+        // (d) The list ran NO IAuthorizationService decision: zero AccessAudit rows
+        // anywhere (nothing to name any resident as actor/principal/target).
         await using var session = store.QuerySession();
         var allAudits = await session.Query<AccessAudit>()
             .ToListAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, allAudits.Count);
-
-        var aggregate = allAudits.Single(a => a.TargetId is null);
-        Assert.Equal("directory", aggregate.TargetKind);
-        Assert.Equal(AccessAction.Read.Id, aggregate.Action);
-        Assert.Equal(unverifiedViewer, aggregate.ActorId);
-        Assert.Equal(1, aggregate.VisibleCount);
-        Assert.Equal(0, aggregate.HiddenCount);
-        Assert.Equal(AccessVia.Owner, aggregate.Via);
-        Assert.Equal(AccessOutcome.Allow, aggregate.Outcome);
-
-        var perItem = allAudits.Single(a => a.TargetId is not null);
-        Assert.Equal(unverifiedViewer, perItem.TargetId);
-        Assert.Equal(unverifiedViewer, perItem.ActorId);
-        Assert.Equal(AccessVia.Owner, perItem.Via);
-        Assert.Equal(AccessOutcome.Allow, perItem.Outcome);
-
-        // C-M2·2 — the verified resident's SubjectId appears nowhere: not as actor,
-        // not as effective principal, not as target — evidence the §2.3 filter excluded
-        // them before CanSeeAsync could name them in any row.
-        Assert.All(allAudits, a =>
-        {
-            Assert.NotEqual(verifiedOther, a.ActorId);
-            Assert.NotEqual(verifiedOther, a.EffectivePrincipalId);
-            Assert.NotEqual(verifiedOther, a.TargetId);
-        });
+        Assert.Empty(allAudits);
     }
 
     // ── Shared bootstrap: store + connection string + services ──────────

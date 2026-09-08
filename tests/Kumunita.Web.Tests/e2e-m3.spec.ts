@@ -165,10 +165,9 @@ const extended = baseTest.extend<{ kumunita: Kumunita }>({
       'ADDs. See docs/plans-milestones/m3b-handoff-notes.md § U10.',
     );
     // `use` is required by the Playwright fixture API. The throw
-    // above fires first (before `use` is ever called), so we simply
-    // `return` to satisfy TS exhaustiveness — same comment as
-    // e2e-m2.spec.ts.
-    return;
+    // above fires first (before `use` is ever called), so there is
+    // nothing left to return. No explicit `return;` here - that would be
+    // unreachable (TS7027) and adds no semantics. Same precedent as e2e-m2.spec.ts.
   },
 });
 const test = extended;

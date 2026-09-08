@@ -20,17 +20,24 @@
         </h1>
 
         @*
-          §9 pin (M2 design doc §2.4, invariant C-M2·1, ARCHITECTURE.md §9):
-          the contact block is rendered ONLY when the service's two-gate evaluation
-          allowed both Visibility AND ContactVisibility for *this* viewer. A hidden
-          or contact-unauthorized row gets ShowContactBlock=false and null
-          Email/Phone — see DirectoryController.ProjectDetail — so even a hand-edited
-          model has nowhere to put a contact value (the Razor view cannot render
-          Email/Phone independently of ShowContactBlock).
+          Contact-block opt-in pin (M2 design doc §2.4, invariant C-M2·1,
+          ARCHITECTURE.md §9): the contact block is rendered ONLY when the
+          service's ContactVisibility decision allowed *this* viewer — a
+          not-opted-in (null) or denied audience yields ShowContactBlock=false
+          and null Email/Phone/Address — see DirectoryController.ProjectDetail —
+          so even a hand-edited model has nowhere to put a contact value (the
+          Razor view cannot render Email/Phone/Address independently of
+          ShowContactBlock). Basic info (name + verified badge) above always
+          renders: the directory has no "hidden profile" shape anymore.
         *@
         @if (Model.ShowContactBlock)
         {
             <dl class="row mt-4">
+                @if (!string.IsNullOrEmpty(Model.Address))
+                {
+                    <dt class="col-sm-3">Address</dt>
+                    <dd class="col-sm-9">@Model.Address</dd>
+                }
                 @if (!string.IsNullOrEmpty(Model.Email))
                 {
                     <dt class="col-sm-3">Email</dt>
@@ -45,7 +52,7 @@
                 }
             </dl>
         }
-        else if (string.IsNullOrEmpty(Model.Email) && string.IsNullOrEmpty(Model.Phone))
+        else
         {
             <p class="text-muted mt-3">
                 This resident hasn't shared a contact method with you (yet). You can

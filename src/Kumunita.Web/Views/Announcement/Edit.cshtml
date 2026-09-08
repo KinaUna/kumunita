@@ -1,0 +1,125 @@
+@model Kumunita.Web.Models.AnnouncementComposeViewModel
+@using Kumunita.Core.Announcements
+@{
+    ViewData["Title"] = "Edit announcement";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1>Edit announcement</h1>
+        <p class="text-muted">
+            Update this announcement's title, body, and visibility. A
+            <b>public</b> announcement is visible to everyone
+            (e.g. scheduled maintenance); a <b>resident</b> announcement
+            is visible to all signed-in users (e.g. "help us with X"
+            calls).
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form id="edit-announcement-form" method="post" action="/announcements/@Model.Id/edit">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="scope" style="font-weight:600;">
+                        Who sees this?
+                    </label>
+                    <select class="form-control" id="scope" name="Scope" required>
+                        @foreach (var s in Model.AllowedScopes)
+                        {
+                            string scopeValue = s.ToString();
+                            bool isSelected = scopeValue == (Model.Scope ?? "Community");
+                            <option value="@scopeValue" selected="@(isSelected ? "selected" : null)">
+                                @(s == AnnouncementScope.Public
+                                    ? "Everyone (public — visible to visitors and residents)"
+                                    : "Residents (community — visible only when signed in)")
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        Changing who sees this applies immediately for the next reader.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="title" style="font-weight:600;">
+                        Title
+                    </label>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="120" placeholder="optional"
+                           value="@Model.Title" />
+                    <div class="text-muted small mt-1">
+                        A short headline (≤ 120 chars).
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="body" style="font-weight:600;">
+                        Body
+                    </label>
+                    <textarea class="form-control" id="body" name="Body"
+                              rows="6" required>@Model.Body</textarea>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="pinned" name="Pinned"
+                               value="true" checked="@(Model.Pinned ? "checked" : null)" />
+                        <input type="hidden" name="Pinned" value="false" />
+                        <label class="form-check-label" for="pinned" style="font-weight:600;">
+                            Pin to the top of all pages
+                        </label>
+                        <div class="text-muted small mt-1">
+                            A pinned announcement is shown as a banner at the very top
+                            of every Kumunita page (including Home) in addition to
+                            the usual <b>Announcements</b> list.
+                            The visibility gate still applies: a <b>public</b> pin
+                            shows for every visitor; a <b>resident</b> pin shows
+                            only when a user is signed in.
+                            The most-recently-pinned announcement wins.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save changes</button>
+                <a href="/announcements" class="btn btn-link p-0">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

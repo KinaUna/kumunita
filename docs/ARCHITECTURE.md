@@ -22,7 +22,7 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   |---|---|
   | **M0** scaffold | the substrate — no value yet, just a place the rest can link into |
   | **M1** identity, groups, delegation, authorization | the **access model** — the linkage that turns *signals* into *shared awareness* for the right audience |
-  | **M2** directory & profiles | **shared awareness** — who is here, and who you can trust with what |
+  | **M2** directory & profiles | **shared awareness** — every resident is listed; each opt-in contact block is audience-gated |
   | **M3** posts, components, moderation | **understanding → decision** — a signal reaches its audience; a report links to a moderator |
   | **M4** events, RSVP, reminders | **coordination** — a decision becomes an owned, scheduled, reminded action |
   | **M5** projects (goals, tasks, contributors) | **coordination → outcome** — many signals re-linked into one goal with owners |
@@ -75,35 +75,44 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── Kumunita.Core/          # domain, services, Marten, the Wolverine-free side-effect business logic
     │   │   ├── CommunityOptions.cs # per-instance config (ADR 0002)
     │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
-    │   │   ├── Bootstrap/          # DbBootstrap, FirstBootSeeder
-    │   │   ├── Identity/           # IdentityModule (M1) — also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter
-    │   │   ├── UserInfo/           # UserInfoModule     (M1)
-    │   │   ├── Authorization/      # AuthorizationModule (M1) — also AuditPurgeService (Wolverine-free tiering)
-    │   │   ├── Directory/          # M2 ✓ — DirectoryService (list/detail/preview) + profile editor + groups — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 115 unit specs 0-failed; see design/m2-directory-profiles-groups.md § Acceptance Gate (2026-09-04)
-    │   │   ├── Posts/              # M3 ✓ — post/reply documents (M3DocTypes) + PostService (feed/detail/create/reply) + component-organized feeds — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 18 M3-pinned unit specs 0-failed; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
+    │   │   ├── M1DocTypes.cs       # M1 Marten-native doc registration (ADR 0004 §B.1)
+    │   │   ├── M3DocTypes.cs       # M3 + M3b Marten-native doc registration (Post, PostReply, Report, Announcement)
+    │   │   ├── Bootstrap/          # DbBootstrap, SchemaBootstrap, FirstBootSeeder
+    │   │   ├── Identity/           # IdentityModule (M1) — also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
+    │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService
+    │   │   ├── Authorization/      # AuthorizationModule (M1) — audiences, policy, audit; AuditPurgeService (Wolverine-free tiering); AdminOverride (break-glass read path)
+    │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
+    │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
+    │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-12)
+    │   │   ├── Localization/       # ADR 0005 — LanguageCatalog, LocaleSettings (shipped in M1's surface); TranslationResource / LocalizedPage land with M6's admin UI
+    │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
-    │   │   ├── Projects/           # M5 — not yet created
-    │   │   └── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve + the `Via = Report` read branch) + `PostStatus` (Active/Hidden/Removed) + the hide/remove lanes + the `/moderation` queue/resolve UI — live; 3 gate tests (closed-loop/handoff/part-vs-whole) + 13 M3b-pinned unit specs 0-failed; see design/m3b-moderation.md § Run result (M3b acceptance gate — 2026-09-12) + § M3b — Closed (recorded)
+    │   │   └── Projects/           # M5 — not yet created
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
+    │       ├── Milestones.cs       # home-page roadmap (kept in sync with README's "Roadmap" — AGENTS.md)
+    │       ├── RepositoryInfo.cs   # build sha/branch for `/health`
     │       ├── appsettings*.json
+    │       ├── Models/             # Razor view-models per controller (Audit, BreakGlass, Directory, Feed, Group, Post, Profile, Moderation, ...)
+    │       ├── Security/           # ClaimsSource, KumunitaPrincipal/KumunitaClaimsPrincipalFactory, BlockedAccountMiddleware
     │       ├── SideEffects/        # M1 step 7: OutboxEmailHandler (durable send + Fault<OutboxEmail> dead-letter hook), AuditPurgeHandler/Tick
-    │       ├── Controllers/        # Home today; `/admin` M1
-    │       ├── Views/              # Razor views + Layout
+    │       ├── Controllers/        # Home, Account, Admin, AdminSetup, Announcement, Directory, Groups, Moderation, Posts, Profile, Health
+    │       ├── Views/              # Razor views + Layout; per-feature folders (Account, Admin, AdminSetup, Announcement, Directory, Groups, Home, Moderation, Posts, Profile, Shared)
     │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
-    │       ├── client/             # plain TS sources; per-page modules
+    │       ├── client/             # plain TS sources
     │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash
-    │       └── wwwroot/js/         # tsc output (compiled, not committed)
+    │       └── wwwroot/            # js/ (tsc output, compiled — not source), css/, lib/ (bootstrap + jQuery validation)
     └── tests/
         ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
         │                           #   fresh scratch DB per test (matches prod db image)
-        └── Kumunita.Web.Tests/     # XUnit; today: config binding + HomeController;
-                                     # Playwright e2e arrives later (§7)
+        └── Kumunita.Web.Tests/     # XUnit; controller + view-model + config-binding tests, plus
+                                      # Playwright e2e (e2e-m2.spec.ts, e2e-m3.spec.ts, §7)
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
-layer. `Web` is a thin HTTP/Razor/TS shell. Directories marked *not yet created* are
-the M1+ plan from §3.
+layer. `Web` is a thin HTTP/Razor/TS shell. `Events/` and `Projects/` (M4 and M5
+respectively) are marked *not yet created* — the next milestone additions per the §3
+feature module list.
 
 ## 3. Modular monolith & bounded contexts
 
@@ -178,9 +187,14 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
   visibility per scope.
 - **Audit** of access decisions = always on.
 - **Candidate filters are not authorization** (§4.4). A rule about *who is in the
-  candidate set* (e.g. the directory lists only verified residents; an unverified user
-  sees themselves) is a product query, applied before `CanSeeAsync`, and is never
+  candidate set* (e.g. a post feed only includes published posts; a list only includes
+  non-archived items) is a product query, applied before `CanSeeAsync`, and is never
   audited as an access decision.
+- **Show-everyone directory.** The platform is invitation-only and limited to one
+  neighborhood's residents: the directory lists every non-blocked resident to every
+  signed-in viewer (no verified/unverified filter, no `Profile.Visibility` gate), and
+  is a pure catalog read — no `CanSeeAsync`, no `AccessAudit` row. Only the detail
+  (and preview) surfaces run the single `ContactVisibility` audience decision.
 
 ### 4.4 Decision algorithm
 
@@ -274,10 +288,14 @@ Authorization
   AdminOverride { id, userId, token, grantedAt, expiresAt, consumedAt? }
 
 UserInfoModule
-  // visibility is an Audience (same embedded structure as content). contactVisibility
-  // gates the opt-in contact block (email/phone) and is evaluated only after
-  // `visibility` allows the profile — never on a hidden profile.
-  Profile          { subjectId, externalId?, householdId?, displayName, verified,
+  // The directory lists every non-blocked resident's basic info (displayName/verified) to every
+  // signed-in viewer — the show-everyone rule: `visibility` no longer hides a profile, and the
+  // list runs no audience decision. `contactVisibility` is the *single* audience gate (the
+  // detail/preview surface's opt-in contact block, email/phone): `null` ⇒ not opted in ⇒ no
+  // decision / no audit row; non-null ⇒ one `CanAsync` decision + one AccessAudit row.
+  // `visibility` stays on the document + editor (author-controlled, ADR 0003) as the audience
+  // for detailed non-contact fields once they exist — it takes no effect at the directory layer.
+  Profile          { subjectId, externalId?, householdId?, displayName, verified, blocked,
                      visibility: Audience, contactVisibility?: Audience, email, phone? }
   Group            { id, name, description, ownerId, created }
   GroupMembership  { groupId, userId, addedBy, at }
@@ -443,7 +461,7 @@ Explicitly not used: event sourcing, distributed workflows.
 
 One instance per neighborhood on a VPS via Coolify.
 
-  compose (dev/local): app (multi-stage) + postgres:16 + mailpit
+  compose (dev/local): app (multi-stage) + postgres:18 + mailpit
 
 Env contract:
   Community__Name            # per-instance display name (NOT "Kumunita")

@@ -16,7 +16,7 @@ namespace Kumunita.Web.Tests;
 /// </summary>
 public class HealthControllerTests
 {
-    private static HealthController CreateController(bool databaseReachable, int deadLetterRows)
+    private static HealthController CreateController(bool databaseReachable, int deadLetterRows, bool mailReachable = true)
     {
         // IDocumentStore stub for the connectivity check (per ADR 0004 + Marten 9:
         // store.Storage.Database.AssertConnectivityAsync).
@@ -38,7 +38,13 @@ public class HealthControllerTests
         var deadLetters = Substitute.For<IEmailDeadLetterCounter>();
         deadLetters.GetCountAsync(Arg.Any<CancellationToken>()).Returns(deadLetterRows);
 
-        return new HealthController(store, deadLetters);
+        var smtpHealth = Substitute.For<ISmtpHealthCheck>();
+        smtpHealth.CheckAsync(Arg.Any<CancellationToken>())
+            .Returns(mailReachable
+                ? SmtpHealthResult.Ok
+                : SmtpHealthResult.Fail("connect: refused (test)"));
+
+        return new HealthController(store, deadLetters, smtpHealth);
     }
 
     [Fact]
@@ -57,12 +63,41 @@ public class HealthControllerTests
         Assert.Contains("status", names);
         Assert.Contains("app", names);
         Assert.Contains("database", names);
+        Assert.Contains("mail", names);
         Assert.Contains("emailDeadLetters", names);
         Assert.Contains("elapsedMs", names);
 
         Assert.Equal("ok", type.GetProperty("status")!.GetValue(payload));
         Assert.Equal("Kumunita", type.GetProperty("app")!.GetValue(payload));
         Assert.Equal("ok", type.GetProperty("database")!.GetValue(payload));
+        Assert.Equal(0, type.GetProperty("emailDeadLetters")!.GetValue(payload));
+        Assert.Equal("ok", type.GetProperty("mail")!.GetValue(payload));
+    }
+
+    [Fact]
+    public async Task Get_When_MailUnreachable_Returns_200_And_DegradedShape_WithMailField()
+    {
+        // OPS §8: a down SMTP relay does not take the app off-line (email stays
+        // durable via the OutboxEmail retry / dead-letter path) — but the probe
+        // still flips to "degraded" and surfaces "mail": "unreachable" so the
+        // operator (OPS §7) sees the cause.
+        var controller = CreateController(databaseReachable: true, deadLetterRows: 0, mailReachable: false);
+
+        var result = await controller.Get(TestContext.Current.CancellationToken) as OkObjectResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(200, (int)result.StatusCode!);
+
+        var payload = result.Value!;
+        var type = payload.GetType();
+        Assert.Equal("degraded", type.GetProperty("status")!.GetValue(payload));
+        Assert.Equal("ok", type.GetProperty("database")!.GetValue(payload));
+        Assert.Equal("unreachable", type.GetProperty("mail")!.GetValue(payload));
+        // mailDetail must carry the diagnostic (connect/DNS/banner/EHLO/AUTH reason),
+        // so an operator reading /health sees the cause immediately.
+        var detail = type.GetProperty("mailDetail")!.GetValue(payload) as string;
+        Assert.NotNull(detail);
+        Assert.Contains("connect", detail);
         Assert.Equal(0, type.GetProperty("emailDeadLetters")!.GetValue(payload));
     }
 

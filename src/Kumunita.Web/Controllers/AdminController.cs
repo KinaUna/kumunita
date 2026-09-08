@@ -64,6 +64,12 @@ public sealed class AdminController(
                 ? (await userInfo.GetAssignmentsAsync(subject)).Select(a => a.ComponentId).ToList()
                 : new List<string>();
 
+            // Community membership (the **posting right** — a distinct data row
+            // from the moderator scope above; see ComponentMembership doc-comment
+            // in Kumunita.Core.UserInfo for the "posting right vs moderator scope"
+            // distinction).
+            var communityIds = (await userInfo.GetCommunityIdsAsync(subject)).ToList();
+
             var profile = await userInfo.GetProfileAsync(subject);
             var verified = profile?.Verified ?? false;
             var blocked  = profile?.Blocked ?? false;
@@ -76,7 +82,8 @@ public sealed class AdminController(
                 Verified     = verified,
                 Blocked      = blocked,
                 Roles        = roleNames,
-                ComponentIds = componentIds
+                ComponentIds = componentIds,
+                CommunityIds = communityIds
             });
         }
 
@@ -259,6 +266,91 @@ public sealed class AdminController(
         }
 
         TempData["info"] = "Role updated.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── /admin — Community membership (the **posting right**; the distinct data
+    // from SetRole's moderator scope). A GlobalAdmin grants/removes which
+    // communities a given account may post to. The Core write lanes
+    // (SetCommunityMembershipAsync / ClearCommunityMembershipAsync) are
+    // audited (via:Admin); this controller is the thin web wrapper.
+    // The diff of the new set against the current row decides add-vs-remove
+    // per community so an admin can "uncheck one" without unchecking every
+    // other.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetCommunityMembership([FromForm] CommunityMembershipSetViewModel model)
+    {
+        if (string.IsNullOrEmpty(model.TargetSubjectId))
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // All component ids (enabled + disabled — the current rows are keyed
+        // on them regardless of Enabled state).
+        var allComponents = (await userInfo.GetComponentsAsync(enabledOnly: false)).Select(c => c.Id).ToHashSet();
+
+        var newSet = model.CommunityIds
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .ToHashSet();
+
+        // Only target ids that exist on this instance (defensive: an admin
+        // shouldn't be able to create orphans via an old form state, but it
+        // is a data-hygiene guard worth keeping — the Core write lane
+        // throws on a missing component, so this filter keeps the error
+        // surface at the controller level and keeps the per-community
+        // loop tight).
+        newSet.IntersectWith(allComponents);
+
+        var currentSet = (await userInfo.GetCommunityIdsAsync(model.TargetSubjectId)).ToHashSet();
+
+        var toAdd    = newSet.Except(currentSet).ToList();
+        var toRemove = currentSet.Except(newSet).ToList();
+
+        var errors = new List<string>();
+
+        foreach (var componentId in toAdd)
+        {
+            try
+            {
+                await userInfo.SetCommunityMembershipAsync(
+                    componentId: componentId,
+                    userId: model.TargetSubjectId,
+                    actorId: admin);
+            }
+            catch (InvalidOperationException ex) { errors.Add(ex.Message); }
+        }
+
+        foreach (var componentId in toRemove)
+        {
+            try
+            {
+                await userInfo.ClearCommunityMembershipAsync(
+                    componentId: componentId,
+                    userId: model.TargetSubjectId,
+                    actorId: admin);
+            }
+            catch (InvalidOperationException ex) { errors.Add(ex.Message); }
+        }
+
+        if (errors.Count > 0)
+        {
+            TempData["error"] = string.Join(" ", errors);
+            return RedirectToAction(nameof(Index));
+        }
+
+        var addedCount    = toAdd.Count;
+        var removedCount  = toRemove.Count;
+        var summary = (addedCount, removedCount) switch
+        {
+            (0, 0) => "No membership change.",
+            (_, 0) => $"Granted membership: {addedCount} community(ies).",
+            (0, _) => $"Revoked membership: {removedCount} community(ies).",
+            _      => $"Membership updated: {addedCount} added, {removedCount} removed.",
+        };
+
+        TempData["info"] = summary;
         return RedirectToAction(nameof(Index));
     }
 

@@ -31,6 +31,7 @@ public sealed class AccountController(
     SignInManager<User> signInManager,
     UserManager<User> userManager,
     IIdentityService identity,
+    IUserInfoService userInfo,
     IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -43,7 +44,7 @@ public sealed class AccountController(
     public IActionResult Signup() =>
         User.Identity?.IsAuthenticated == true
             ? Redirect("/profile/edit")
-            : View();
+            : View(new SignupViewModel());
 
     [AllowAnonymous]
     [HttpPost]
@@ -62,12 +63,42 @@ public sealed class AccountController(
         }
         catch (InvalidOperationException ex)
         {
+            if (ex.Message.StartsWith("An account with email", StringComparison.OrdinalIgnoreCase))
+                model.EmailAlreadyExists = true;
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(model);
         }
 
         TempData["info"] = "Account created. Check your inbox for the verification link.";
         return RedirectToAction(nameof(Login));
+    }
+
+    // ── Resend confirmation email (an unactivated account already exists for the email) ──
+
+    [AllowAnonymous]
+    [HttpGet]
+    public IActionResult ResendVerification([FromQuery] string? email) =>
+        View(new ResendVerificationViewModel { Email = email ?? string.Empty });
+
+    [AllowAnonymous]
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return View(model);
+
+        var result = await identity.ResendVerificationEmailAsync(model.Email);
+        if (result.Success)
+        {
+            TempData["info"] =
+                $"If there is an unverified account with email '{model.Email}', a new " +
+                "verification link is on its way. Check your inbox (and your spam folder).";
+            return RedirectToAction(nameof(Login));
+        }
+
+        ModelState.AddModelError(string.Empty, result.Reason ?? "Could not resend the verification email.");
+        return View(model);
     }
 
     // ── Verify (the one designed handoff) ───────────────────────────────────────────────
@@ -136,10 +167,33 @@ public sealed class AccountController(
 
     [AllowAnonymous]
     [HttpGet]
-    public IActionResult Login([FromQuery] string? returnUrl = null) =>
-        User.Identity?.IsAuthenticated == true
-            ? Redirect("/profile/edit")
-            : View(new LoginViewModel { ReturnUrl = returnUrl });
+    public async Task<IActionResult> Login([FromQuery] string? returnUrl = null, [FromQuery] string? error = null)
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return Redirect("/profile/edit");
+
+        // `error` arrives as a short code (not the message text) — the query string is
+        // user-visible and may be bookmarked/shared, so keep it token-like. "blocked"
+        // is set by BlockedAccountMiddleware when it forces a sign-out of an account
+        // suspended mid-session, and by the POST-Login guard when a login attempt
+        // succeeds against a blocked account (the two land on this page the same way).
+        const string blockedMessage =
+            "Your account has been blocked by an administrator. " +
+            "Contact them if you believe this is a mistake.";
+        var errorText = error switch
+        {
+            "blocked" => blockedMessage,
+            _ => null
+        };
+
+        // Hide the "Received a first-boot setup token?" hint once the seed-admin
+        // setup has already been completed (or its token has since expired) — after
+        // that there is no live setup lane left to complete, and the account signs in
+        // with a real password.
+        var showSetupLink = !await identity.IsFirstBootSetupCompleteAsync();
+
+        return View(new LoginViewModel { ReturnUrl = returnUrl, Error = errorText, ShowSetupLink = showSetupLink });
+    }
 
     [AllowAnonymous]
     [HttpPost]
@@ -171,6 +225,24 @@ public sealed class AccountController(
 
         if (result.Succeeded)
         {
+            // Block enforcement at the login seam: a GlobalAdmin's suspension (Profile.Blocked)
+            // must not end in a signed-in resident, even if the cookie minted below somehow
+            // carried standing (it does not — the ClaimsPrincipalFactory strips it at mint,
+            // but the explicit sign-out + message here is what the feature promises the
+            // resident: a login attempt that ends in rejection, not a silent bounce to a
+            // page they then cannot open). Kept here (not in the factory) because the
+            // factory cannot fail sign-in; the controller is the one place that can
+            // inspect the account after credentials are verified.
+            var profile = await userInfo.GetProfileAsync(user.Id ?? string.Empty);
+            if (profile is not null && profile.Blocked)
+            {
+                await signInManager.SignOutAsync();
+                // The GET-Login action maps the "blocked" code to the resident-facing
+                // message (see Login GET) — keep it as a code here too, consistent with
+                // the BlockedAccountMiddleware path and non-informative in URLs.
+                return RedirectToAction(nameof(Login), new { error = "blocked" });
+            }
+
             return Url.IsLocalUrl(model.ReturnUrl)
                 ? Redirect(model.ReturnUrl)
                 : Redirect("/profile/edit");
@@ -189,7 +261,11 @@ public sealed class AccountController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Logout()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        // SignOutAsync (not a bare SignOutAsync on the auth scheme) clears BOTH
+        // of the app's cookies: AddIdentity registers an auxiliary anonymous
+        // .AspNetCore.Identity.Application cookie alongside the kumunita.auth
+        // cookie, and only this path signs out the ApplicationScheme too.
+        await signInManager.SignOutAsync();
         return RedirectToAction("Index", "Home");
     }
 

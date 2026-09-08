@@ -33,4 +33,22 @@ public static class KumunitaPrincipal
 
     public static string? SubjectId(ClaimsPrincipal user) =>
         user?.Claims.FirstOrDefault(c => c.Type == "Kumunita.Sub")?.Value;
+
+    /// <summary>
+    /// The admissible role set of the principal (the <c>Kumunita.Role</c> claim
+    /// values). Empty (not null) when the principal is null, matching the
+    /// fail-closed pin in <see cref="HasRole(System.Security.Claims.ClaimsPrincipal, string)"/>.
+    /// Mirrors the AnnouncementController's private <c>RoleSet</c> helper so a
+    /// single source in this file serves all callers that need to hand Core
+    /// services the <c>IReadOnlySet&lt;string&gt;</c> authorRoles seam.
+    /// </summary>
+    public static IReadOnlySet<string> RoleSet(ClaimsPrincipal user)
+    {
+        if (user is null)
+            return new HashSet<string>();
+        return user.Claims
+            .Where(c => c.Type == "Kumunita.Role")
+            .Select(c => c.Value)
+            .ToHashSet();
+    }
 }

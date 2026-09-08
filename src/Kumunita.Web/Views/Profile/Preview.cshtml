@@ -12,35 +12,34 @@
         <h1>Preview — how I appear</h1>
 
         <p class="text-muted">
-            Read-only "view as" (the F6 preview pin): the same two-gate
-            evaluation the directory uses, with <b>@Model.AsDisplayName</b>
-            standing in as the viewer. This
-            <b>does not</b> change anything in the saved profile — the
-            preview is a composition read, never a write (M2's scope pin;
-            the only write lane is
+            Read-only "view as" (the F6 preview pin): the same
+            <c>ContactVisibility</c> opt-in decision the directory detail
+            uses, with <b>@Model.AsDisplayName</b> standing in as the viewer.
+            This <b>does not</b> change anything in the saved profile — the
+            preview is a composition read, never a write (M2's scope pin; the
+            only write lane is
             <a asp-controller="Profile" asp-action="Edit">the editor</a>).
             <br/>
             <br/>
-            The two decisions still commit their own
-            <c>AccessAudit</c> rows (C3, F6's preview pin: "a preview is an
-            evaluation, not an exemption") — that's the
+            The contact-block decision (when an opt-in audience exists) still
+            commits its own <c>AccessAudit</c> row (C3, F6's preview pin:
+            "a preview is an evaluation, not an exemption") — that's the
             <c>DirectoryService.PreviewAsAsync</c>'s job, not this view
             model's.
         </p>
 
-        @if (!Model.IsVisible)
+        @if (Model.ShowContactBlock)
         {
-            <div class="alert alert-info">
-                <b>Hidden.</b> As <b>@Model.AsDisplayName</b>, you would
-                not see this profile at all — so there is no contact
-                block to evaluate (the §2.4 / §9 "contact block never on
-                a hidden profile" pin: the second decision does not
-                run when the first denies).
+            <div class="alert alert-success">
+                <b>Visible.</b> As <b>@Model.AsDisplayName</b>, you would
+                see this contact block on the directory detail.
             </div>
-        }
-        else if (Model.ShowContactBlock)
-        {
             <dl class="row mt-3">
+                @if (!string.IsNullOrEmpty(Model.Address))
+                {
+                    <dt class="col-sm-3">Address</dt>
+                    <dd class="col-sm-9">@Model.Address</dd>
+                }
                 @if (!string.IsNullOrEmpty(Model.Email))
                 {
                     <dt class="col-sm-3">Email</dt>
@@ -56,10 +55,12 @@
         else
         {
             <div class="alert alert-secondary">
-                <b>Visible, contact hidden.</b> As <b>@Model.AsDisplayName</b>,
-                you would see the profile but not its email/phone — the
-                contact decision (the §2.4 row "non-null gate, mode Any +
-                empty grants denies in either mode") did not allow it.
+                <b>Contact hidden.</b> As <b>@Model.AsDisplayName</b>, you
+                would <b>not</b> see a contact block — either the contact
+                opt-in is off (no audience, the §2.4 "null ⇒ not opted in"
+                pin) or an existing audience did not allow it. The profile
+                itself (name + verified badge) still renders in the
+                directory; only the contact block is gated.
             </div>
         }
 
