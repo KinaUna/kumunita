@@ -72,8 +72,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
-        // M4 (the "platform announcements" lane, bounded context
-        // Kumunita.Core.Announcements): the service seam — a store-composing
+        // M3b (the "platform announcements" lane, bounded context
+        // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
         // service kept behind an interface so the Web-side consumer (the
         // AnnouncementController) can be tested without a live Postgres
         // (mirrors IEmailDeadLetterCounter's registration pattern; the

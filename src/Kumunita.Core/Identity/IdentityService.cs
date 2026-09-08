@@ -159,7 +159,7 @@ public sealed class IdentityService(
                     "Ask an admin to verify your account.");
 
             var now = DateTimeOffset.UtcNow;
-            var token = NewVerifyToken(user.Id, now, attempt: nextAttempt);
+            var token = NewVerifyToken(user.Id ?? string.Empty, now, attempt: nextAttempt);
             session.Store(token);
             await mailer.StageAsync(session,
                 idempotencyKey: $"verify:{user.Id}:{nextAttempt}",

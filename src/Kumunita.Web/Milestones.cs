@@ -23,8 +23,8 @@ public static class Milestones
         new("M0", "Deployable scaffold — solution, Docker, Coolify, live DB", StatusDone),
         new("M1", "Identity, groups, delegation & the authorization model", StatusDone),
         new("M2", "Directory of residents, profile visibility & group management", StatusDone),
-        new("M3", "Posts & announcements in components; moderation + reports", StatusNext),
-        new("M4", "Events, RSVPs & reminders", StatusPlanned),
+        new("M3", "Posts & announcements in components; moderation + reports", StatusDone),
+        new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search, multilingual support", StatusPlanned),
     };

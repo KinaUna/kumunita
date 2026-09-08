@@ -4,8 +4,8 @@ using Marten;
 namespace Kumunita.Core.Announcements;
 
 /// <summary>
-/// The <c>/announcements</c> bounded-context's service seam (M4, the "platform
-/// announcements" lane). The public surface of <see cref="AnnouncementService"/>:
+/// The <c>/announcements</c> bounded-context's service seam (M3b — the "platform
+/// announcements" lane, part of M3's roadmap scope). The public surface of <see cref="AnnouncementService"/>:
 /// the <see cref="ListVisibleAsync"/> / <see cref="CreateAsync"/> /
 /// <see cref="UpdateAsync"/> / <see cref="DeleteAsync"/> quartet.
 /// <para>

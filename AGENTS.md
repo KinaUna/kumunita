@@ -25,12 +25,16 @@ no multi-tenant data model.
 ## The shape of the code
 
 - **`Kumunita.Core`** — domain + services. Bounded contexts live in
-  `Identity/`, `UserInfo/`, `Authorization/`, `Posts/`, `Announcements/`,
-  `Moderation/`, `Bootstrap/`. `DependencyInjection.cs` registers each feature.
+  `Identity/`, `UserInfo/`, `Authorization/`, `Posts/`, `Moderation/`,
+  `Localization/`, `Bootstrap/`. The M3b "platform announcements" lane
+  (`Announcements/`, registered in `M3DocTypes` alongside `M1DocTypes`) is a
+  feature module within that surface, not a top-level bounded context.
+  `DependencyInjection.cs` registers each feature.
 - **`Kumunita.Web`** — Razor Pages / MVC (server-rendered), `Program.cs`
-  bootstrap, `Milestones.cs` (home-page roadmap — keep in sync with `README.md`).
+  bootstrap, `Milestones.cs` (home-page roadmap — keep in sync with `README.md`),
+  `Models/` + `Security/` (view-models and claim shaping, both server-rendered).
 - **Persistence** (ADR 0004 §B): **Marten** owns the domain documents and
-  versioned schema (the `M1DocTypes` / `M3DocTypes` / `M4DocTypes` registration
+  versioned schema (the `M1DocTypes` / `M3DocTypes` registration
   surfaces). **EF Core is used only for ASP.NET Identity tables** — do not put
   domain data in EF.
 

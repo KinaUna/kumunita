@@ -880,9 +880,10 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             // M1DocTypes registers AccessAudit (the read lane's "no audit
             // row" pin needs it in the schema to query).
             M1DocTypes.Configure(opts);
-            // M4DocTypes registers the Announcements bounded context's
-            // document (the whole point of these tests).
-            M4DocTypes.Configure(opts);
+            // M3DocTypes registers Announcement (the M3b "platform announcements"
+            // lane's bounded context — the whole point of these tests) alongside
+            // Post / PostReply / Report.
+            M3DocTypes.Configure(opts);
         });
         await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
             null, null, TestContext.Current.CancellationToken);
