@@ -12,7 +12,15 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
         </li>
-        @* M3 (U8): the single-entry Community nav link. Originally pinned to
+        @* M2 (U8): the resident-facing directory — the visible-profile list
+           + the two-gate detail (§9 pin at DirectoryController.ProjectDetail).
+           The DirectoryController is [Authorize]-gated, so the link belongs
+           in the signed-in branch here rather than the layout's anonymous
+           nav. *@
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
+        </li>
+        @* M3 (U8): the single-entry Community nav link.
            one component (id "safety", per FirstBootSeeder's seed order) —
            the "default community". Now repointed to the all-sections feed
            (GET /community) so the link shows the union of every enabled
