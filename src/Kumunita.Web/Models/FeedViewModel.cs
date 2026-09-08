@@ -46,7 +46,30 @@ public sealed class FeedViewModel
     /// sending the user to a composer they'd only bounce back from.
     /// </summary>
     public bool CanPost { get; set; }
+
+    /// <summary>
+    /// The enabled communities, as a navigable list of links to their
+    /// individual feeds (<c>/community/{Id}</c>). Same candidate set the feed
+    /// itself is organized by (C-M3·2: a feed organizer, never an access
+    /// decision) — listing it here is a *display* convenience so a viewer on
+    /// either the single-community or the all-sections feed can hop between
+    /// communities. On the single-community feed the entry for the current
+    /// community is present in the list (rendered highlighted in the view);
+    /// on the all-sections feed it is the full directory.
+    /// </summary>
+    public IReadOnlyList<CommunityLink> Communities { get; set; } = [];
 }
+
+/// <summary>
+/// One community entry in a <see cref="FeedViewModel.Communities"/> list —
+/// the minimum pair needed to render a link: the component's
+/// <c>Id</c> (the <c>/community/{id}</c> route value) and its
+/// <c>Name</c> (the visible label). No <c>Enabled</c> /
+/// <c>SortOrder</c> / other <see cref="Kumunita.Core.UserInfo.Component"/>
+/// fields — the view only needs to draw an anchor, and the controller
+/// already filtered to the enabled candidate set before projecting here.
+/// </summary>
+public sealed record CommunityLink(string Id, string Name);
 
 /// <summary>
 /// One visible feed row. The low-entropy projection: the <see cref="Post"/>'s
@@ -66,4 +89,5 @@ public sealed record PostListItem(
     string BodyPreview,
     DateTimeOffset Created,
     string AuthorDisplayName,
-    string? ComponentName = null);
+    string? ComponentName = null,
+    string? ComponentId = null);

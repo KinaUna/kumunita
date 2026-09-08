@@ -34,6 +34,32 @@
             </div>
         }
 
+        @* Individual-community links — the community directory for this feed.
+           On the single-community feed (Model.ComponentId set) the current one
+           is highlighted and the others are one click away; on the all-sections
+           feed every entry is a link. Hidden when there are no communities
+           (the bootstrap edge — the empty-feed branch below already covers it). *@
+        @if (Model.Communities.Count > 0)
+        {
+            <div class="mb-3">
+                <div class="small text-muted mb-1">
+                    @(Model.ComponentId != null ? "Communities" : "Browse communities")
+                </div>
+                <ul class="nav nav-pills flex-wrap">
+                    @foreach (var c in Model.Communities)
+                    {
+                        var isCurrent = Model.ComponentId == c.Id;
+                        <li class="nav-item">
+                            <a class="nav-link @(isCurrent ? "active" : "text-dark text-decoration-none")"
+                               href="@Url.Action("Index", "Posts", new { componentId = c.Id })">
+                                @c.Name
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
         @if (Model.Items.Count == 0)
         {
             <div class="alert alert-info">
@@ -61,7 +87,16 @@
                             </a>
                             @if (!string.IsNullOrEmpty(p.ComponentName))
                             {
-                                <span class="badge text-bg-light ms-2" title="@p.ComponentName">@p.ComponentName</span>
+                                @if (!string.IsNullOrEmpty(p.ComponentId))
+                                {
+                                    <a class="badge text-bg-light ms-2 text-decoration-none"
+                                       href="@Url.Action("Index","Posts", new { componentId = p.ComponentId })"
+                                       title="@p.ComponentName">@p.ComponentName</a>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-light ms-2" title="@p.ComponentName">@p.ComponentName</span>
+                                }
                             }
                             <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
                         </div>

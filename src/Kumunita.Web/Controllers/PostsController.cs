@@ -161,6 +161,10 @@ public sealed class PostsController(
             Items = items,
             Total = feed.Total,
             CanPost = canPost,
+            // The full enabled-community directory (the same candidate set used
+            // above for the 404 check) so the view can render links to the
+            // other individual community feeds.
+            Communities = components.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
         });
     }
 
@@ -230,7 +234,8 @@ public sealed class PostsController(
                 preview,
                 post.Created,
                 profile?.DisplayName ?? post.AuthorId,
-                nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null));
+                nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null,
+                post.ComponentId));
         }
 
         return View("Index", new FeedViewModel
@@ -239,6 +244,10 @@ public sealed class PostsController(
             Items = items,
             Total = feed.Total,
             CanPost = canPost,
+            // The full enabled-community directory — on the all-sections feed
+            // this is what links each badge row back to its own feed, and the
+            // view's "Communities" list is the same set.
+            Communities = components.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
         });
     }
 
