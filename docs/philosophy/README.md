@@ -69,6 +69,10 @@ neighborhood and the lives inside it.
 - **In plain language:** [`everyday-life.md`](everyday-life.md) — the same
   idea told with everyday examples, for readers who don't live in the
   codebase.
+- **More to choose from:** [`examples/`](examples/README.md) — the same
+  three-shape examples, one per doc, matched to different backgrounds and
+  not just a neighborhood (a calendar, a garden, a road trip, a meeting, and
+  more). Pick the one that already lives in your head.
 - **How it fails:** [`anti-patterns.md`](anti-patterns.md) — the catalog of
   integration failures, and what to do instead.
 - **The human system:** [`the-human-system.md`](the-human-system.md) is the
@@ -86,8 +90,10 @@ neighborhood and the lives inside it.
 **A lens for diagnosing failures**
 
 - [`domains-of-integration.md`](domains-of-integration.md) maps the kinds of
-  linkage a working system needs. When a design feels wrong but nothing is
-  "broken," name the domain it is failing at.
+  linkage a working system needs — nine the mind already knows, six native
+  to software, six native to the product that reaches into a life. When a
+  design feels wrong but nothing is "broken," name the domain it is failing
+  at.
 
 **Using it in the work**
 
@@ -101,6 +107,22 @@ neighborhood and the lives inside it.
 
 This doc is itself a living system. We review it as the project grows: what
 does our practice show to be true, false, or missing?
+
+## Where this comes from, and how we keep it honest
+
+These docs are Kumunita's local adoption of a small set of public guidelines
+(Fractal Integration). The link back to the source is itself a seam we
+integrate on purpose — a designed one, not an accidental fork:
+
+- **Provenance:** [`SOURCE.md`](SOURCE.md) records the source repo, the
+  commit and date we synced from, our deliberate local deviations, and the
+  re-sync cadence.
+- **Adopting it yourself:** [`adopting-fig.md`](adopting-fig.md) — how to
+  bring the same guidelines into your own project (or hand them to an AI
+  agent) without losing the link back to the source.
+- **The traditions behind it:** [`further-reading.md`](further-reading.md)
+  — one solid entry point into each tradition these guidelines draw from
+  (systems theory, cybernetics, modularity, interpersonal neurobiology).
 
 ## Relationship to the other docs
 

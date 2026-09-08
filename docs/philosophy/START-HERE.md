@@ -99,17 +99,42 @@ can name what it trades away before it's built.
 | 3 | `in-code.md`                               | 10 min| how we build code              |
 | 4 | `in-product.md`                            | 5 min | how we run the platform & community |
 | 5 | `the-human-system.md`                      | 10 min| the outermost scale: the person |
-| 6 | `domains-of-integration.md`                | 5 min | the lenses of linkage          |
+| 6 | `domains-of-integration.md`                | 5 min | the lenses of linkage, in three sets (mind, software, community) |
 | 7 | `anti-patterns.md`                         | 5 min | how integration fails          |
 | 8 | `templates/` (skim)                        | 5 min | the tools for the rituals      |
+| 9 | `adopting-fig.md`                          | 5 min | bringing this into your own project — and the `SOURCE.md` that keeps it honest |
 
 The order is deliberate: idea → why the platform exists → how we build → how
 we run it → the lives it all lives in → the lenses that connect it all → how
-it fails → the tools.
+it fails → the tools → how to make it yours.
 
 **Short on time?** Read the six principles, run the three tests on something
 you touched today, and stop. Come back to the full pass when you have the
 hour — and to `anti-patterns.md` the next time something goes wrong.
+
+**Enter where you stand:**
+
+- Not a technical reader → [`everyday-life.md`](everyday-life.md) — the same
+  idea in plain language, no jargon. If none of its examples fit you,
+  [`examples/`](examples/README.md) has more to pick from.
+- New to Kumunita → read top to bottom; that *is* the onboarding.
+- About to design something → the domain guide for your field
+  (`in-code.md`), then [`templates/design-doc.md`](templates/design-doc.md).
+- Running the platform or reviewing work → the six principles above, then
+  [`templates/retrospective.md`](templates/retrospective.md).
+
+## Applying it to your own domain
+
+The pattern in this folder isn't specific to a community platform — it works
+on any differentiated domain. Kumunita's own domain guides are
+`the-platform-as-integrator.md` (why the platform exists, in our terms),
+`in-code.md`, and `in-product.md`. If you work in a different field — HR,
+accounting, a clinic, a craft — you can write one in the same shape: pick a
+domain, fill in one row of the "same idea, at every scale" table above, and
+turn the six principles into its practices. The row becomes the guide's table
+of contents. See [`adopting-fig.md`](adopting-fig.md) for how to do that
+without forking the core — and for what to do when an AI agent does it for
+you.
 
 ## Do this first (20 minutes, so it sticks)
 

@@ -131,6 +131,14 @@ two minutes:
    is doing all the thinking, all the remembering, all the holding
    together? If they leave the room, what's left?
 
+## More examples
+
+The three examples above are a fixed set, meant to be read start to finish
+in about ten minutes. If none of them quite landed — or you want one that
+matches your own background — [`examples/`](examples/README.md) is a shelf
+of more, one per doc (a calendar, digesting food, a meeting, a household,
+a garden, and more), so you can pick whichever already lives in your head.
+
 ## If you want to go deeper
 
 If you're a resident — not a builder — and want to know what the platform
@@ -141,4 +149,5 @@ actually *does* and how to give feedback on it, start with
 same argument in the platform's working vocabulary, in about an hour.
 [`README.md`](README.md) has the six principles in full. The everyday
 examples above are the same rows as the work scales — that's the whole
-trick.
+trick. If you want to see *where the vocabulary* comes from,
+[`further-reading.md`](further-reading.md) names the traditions behind it.
