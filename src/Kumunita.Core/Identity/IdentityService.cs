@@ -333,6 +333,26 @@ public sealed class IdentityService(
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsFirstBootSetupCompleteAsync()
+    {
+        // The first-boot setup lane is "still open" exactly while an unconsumed,
+        // unexpired KindSetup token exists. ConsumedAt is set by
+        // CompleteSeedAdminSetupAsync in its single commit, so its presence is the
+        // completion signal; an unconsumed-but-expired token is dead setup material
+        // too — the link must not linger advertising an unusable token either.
+        await using var session = documentStore.OpenSession(new SessionOptions());
+        var now = DateTimeOffset.UtcNow;
+        var liveSetupToken = await session
+            .Query<IdentityToken>()
+            .Where(t => t.Kind == IdentityToken.KindSetup
+                && t.ConsumedAt == null
+                && t.ExpiresAt > now)
+            .FirstOrDefaultAsync();
+
+        return liveSetupToken is null;
+    }
+
+    /// <inheritdoc />
     public async Task ConsumeBreakGlassAsync(string subjectId, string token)
     {
         // AdminOverride is the hand-rolled operator-written row (ADR 0004 §B.1): the app

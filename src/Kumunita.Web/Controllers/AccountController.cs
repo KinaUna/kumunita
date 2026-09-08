@@ -167,7 +167,7 @@ public sealed class AccountController(
 
     [AllowAnonymous]
     [HttpGet]
-    public IActionResult Login([FromQuery] string? returnUrl = null, [FromQuery] string? error = null)
+    public async Task<IActionResult> Login([FromQuery] string? returnUrl = null, [FromQuery] string? error = null)
     {
         if (User.Identity?.IsAuthenticated == true)
             return Redirect("/profile/edit");
@@ -186,7 +186,13 @@ public sealed class AccountController(
             _ => null
         };
 
-        return View(new LoginViewModel { ReturnUrl = returnUrl, Error = errorText });
+        // Hide the "Received a first-boot setup token?" hint once the seed-admin
+        // setup has already been completed (or its token has since expired) — after
+        // that there is no live setup lane left to complete, and the account signs in
+        // with a real password.
+        var showSetupLink = !await identity.IsFirstBootSetupCompleteAsync();
+
+        return View(new LoginViewModel { ReturnUrl = returnUrl, Error = errorText, ShowSetupLink = showSetupLink });
     }
 
     [AllowAnonymous]

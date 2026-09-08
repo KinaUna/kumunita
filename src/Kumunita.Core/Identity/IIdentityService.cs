@@ -99,6 +99,17 @@ public interface IIdentityService
     Task<ThinPrincipal> CompleteSeedAdminSetupAsync(string email, string setupTokenValue, string newPassword);
 
     /// <summary>
+    /// Whether the first-boot seed-admin setup (OPS §2) has been completed: <c>true</c>
+    /// once the one-time setup <see cref="IdentityToken"/> (kind
+    /// <see cref="IdentityToken.KindSetup"/>) has been consumed by
+    /// <see cref="CompleteSeedAdminSetupAsync"/> (or has since expired). The Web's
+    /// login page uses this to hide the "Received a first-boot setup token?" hint once
+    /// there is no longer a live setup lane to complete — the account already signs in
+    /// with a real password.
+    /// </summary>
+    Task<bool> IsFirstBootSetupCompleteAsync();
+
+    /// <summary>
     /// Consume a break-glass <see cref="Authorization.AdminOverride"/> token (§4.5, OPS §9):
     /// the target account, in-app at <c>/admin/break-glass</c>, presents the token exactly
     /// once; the row's <see cref="Authorization.AdminOverride.ConsumedAt"/> is set (single-use);
