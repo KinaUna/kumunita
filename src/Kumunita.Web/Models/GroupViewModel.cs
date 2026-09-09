@@ -29,16 +29,45 @@ namespace Kumunita.Web.Models;
 public sealed record GroupViewModel(string Id, string Name, int MemberCount);
 
 /// <summary>
-/// The <b>group list</b> view model (M2 plan U9). Holds the
+/// One <b>invitation the actor received</b> on the <c>/groups</c> list
+/// (m2b — the "Your invitations" card; the accept/decline self-lane's UI
+/// shape). <see cref="GroupId"/> is the route's <c>{id}</c> the two action
+/// forms post to; <see cref="GroupName"/> is the display label (resolved at
+/// projection through the m2b <c>GetGroupAsync</c> read — the invitee cannot
+/// reach the group detail, owner ∪ member gate, until they accept; the name
+/// must not depend on it). The <see cref="Kumunita.Core.UserInfo.GroupInvitation"/>
+/// source row's <c>Status</c> / <c>InvitedAt</c> / resolution stamps never
+/// reach the model — the card only ever carries <em>pending</em> rows, and
+/// "who resolved it" is an <c>AccessAudit</c> lane fact, not a UI fact
+/// (docs/design/m2b-group-invitations.md).
+/// </summary>
+public sealed record InvitationViewModel(
+    string GroupId,
+    string GroupName,
+    string InvitedByDisplayName);
+
+/// <summary>
+/// The <b>group list</b> view model (M2 plan U9 + m2b). Holds the
 /// <see cref="IReadOnlyList{GroupViewModel}"/> projection the
-/// <c>/groups</c> <c>Index</c> action renders. Exactly one member (the
-/// <see cref="Groups"/> collection) — nothing else; the view has no channel to a
+/// <c>/groups</c> <c>Index</c> action renders plus — since m2b — the actor's
+/// own pending invitations (<see cref="Invitations"/>; empty for an actor
+/// without any). The view has no channel to a
 /// <see cref="Kumunita.Core.UserInfo.Group"/>'s raw fields.
 /// </summary>
 public sealed class GroupListViewModel
 {
     /// <summary>The groups the actor owns or is a member of (F14's projection).</summary>
     public IReadOnlyList<GroupViewModel> Groups { get; init; } = Array.Empty<GroupViewModel>();
+
+    /// <summary>
+    /// The actor's <b>own</b> pending group invitations (m2b read lane #2 —
+    /// the <c>GetPendingInvitationsForUserAsync</c> projection, each row's
+    /// group name resolved through the single-group read). Empty when the
+    /// actor holds none; the card is then absent from the view (not an
+    /// "no invitations" placeholder — an empty pending list is the absence of
+    /// a feature, not a state).
+    /// </summary>
+    public IReadOnlyList<InvitationViewModel> Invitations { get; init; } = Array.Empty<InvitationViewModel>();
 }
 
 /// <summary>
@@ -62,6 +91,22 @@ public sealed class GroupCreateModel
     [Display(Name = "Description (optional)")]
     public string? Description { get; set; }
 }
+
+/// <summary>
+/// One <b>pending invitation row</b> on the <c>/groups/{id}</c> invite lane
+/// (m2b — the owner's "Pending invitations" list with its cancel links).
+/// Strict projection, the <see cref="GroupMemberViewModel"/> 2-tuple pin
+/// carried to the invitation axis: <see cref="SubjectId"/> (the invitee's
+/// opaque <see cref="Kumunita.Core.UserInfo.GroupInvitation.UserId"/> — the
+/// cancel route's <c>{subjectId}</c>) + <see cref="DisplayName"/> (a single
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/>
+/// read; the raw subject id when the profile is absent — fail-safe, not a
+/// silent blank row). The source row's <c>InvitedBy</c> / <c>InvitedAt</c>
+/// / <c>Status</c> never reach the model: the list shows only <em>pending</em>
+/// rows, and "who invited, when" is an <c>AccessAudit</c> lane fact, not a
+/// member-list-shaped UI fact (docs/design/m2b-group-invitations.md).
+/// </summary>
+public sealed record PendingInvitationViewModel(string SubjectId, string DisplayName);
 
 /// <summary>
 /// One <b>member row</b> on the <c>/groups/{id}</c> member list (M2 plan U10).
@@ -142,13 +187,23 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// through <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupMembersAsync"/>
 /// (the U9 second M2 read — one read lane serves both U9's <c>MemberCount</c>
 /// and U10's <c>Members</c>; never a third seam, design doc §2.7).</param>
+/// <param name="PendingInvitations">The group's pending invitations
+/// (m2b read lane #3 — the <c>GetPendingInvitationsForGroupAsync</c>
+/// projection, each row's display name resolved through
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/>).
+/// Empty when the group holds none; the invite lane then renders its
+/// invite form only. The detail's <see cref="IsOwner"/> badge is the
+/// *presentation* hint for it — the real SoD gate (C-M2b·1: owner ∪
+/// GlobalAdmin) is in the controller's invite/cancel actions, not on this
+/// carrier.</param>
 public sealed record GroupDetailViewModel(
     string GroupId,
     string Name,
     string OwnerSubjectId,
     string OwnerDisplayName,
     bool IsOwner,
-    IReadOnlyList<GroupMemberViewModel> Members);
+    IReadOnlyList<GroupMemberViewModel> Members,
+    IReadOnlyList<PendingInvitationViewModel> PendingInvitations);
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching

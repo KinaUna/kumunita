@@ -273,4 +273,106 @@ public interface IUserInfoService
     /// <exception cref="ArgumentException"><paramref name="componentId"/> or
     /// <paramref name="userId"/> is null/whitespace.</exception>
     Task ClearCommunityMembershipAsync(string componentId, string userId, string actorId);
+
+    // ── M2b additions (ADR 0006-E compatible lane — owner-invited group
+    // membership: invite → accept/decline, plus the owner's cancel lane.
+    // docs/design/m2b-group-invitations.md; invariants C-M2b·1..3) ──────
+
+    /// <summary>
+    /// The <b>single-group lookup</b> (m2b read lane #1; one document read, the
+    /// <see cref="GetProfileAsync"/> shape on the <see cref="Group"/> axis). A
+    /// candidate read, not an access decision (C-M2·2 carried): produces no
+    /// <see cref="Authorization.AccessAudit"/> row. Null when no group with that
+    /// id exists. Live row (invariant C4).
+    /// </summary>
+    Task<Group?> GetGroupAsync(string groupId);
+
+    /// <summary>
+    /// Invite <paramref name="userId"/> into <paramref name="groupId"/> (m2b
+    /// lane C-M2b·1 — the SoD write is <b>owner ∪ GlobalAdmin only</b>; the Web
+    /// surfaces that standing and passes the actor as
+    /// <paramref name="invitedBy"/>). The row is an upsert on the
+    /// (<c>GroupId</c>, <c>UserId</c>) business key: an absent or resolved
+    /// (Accepted / Declined / Cancelled) row resets to
+    /// <see cref="InvitationStatus.Pending"/> (re-invite, C-M2b·3 — a
+    /// pre-existing Pending row is simply re-stamped). The
+    /// <see cref="Group"/>'s membership is <b>not</b> touched here — the
+    /// membership lands only on <see cref="AcceptGroupInvitationAsync"/>.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>group.invite</c>, <c>TargetKind</c> "group",
+    /// <c>TargetId</c> = group, <see cref="Authorization.AccessVia"/> derived
+    /// exactly like <see cref="AddGroupMemberAsync"/>'s lane:
+    /// <c>invitedBy == Group.OwnerId ⇒ Owner</c>, else <c>Admin</c>) in the same
+    /// session/transaction as the row (invariant C3).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id exists, or the invitation state transition is invalid (C-M2b·3).</exception>
+    Task<GroupInvitation> InviteGroupMemberAsync(string groupId, string userId, string invitedBy);
+
+    /// <summary>
+    /// Resolve a pending invitation as <b>Accepted</b> — the invitee's self-lane
+    /// (C-M2b·2: the actor resolves their <b>own</b> row; the service verifies
+    /// <paramref name="actorId"/> equals the row's <c>UserId</c>). In the same
+    /// session (invariant C3), the row moves
+    /// <see cref="InvitationStatus.Pending"/> → <see cref="InvitationStatus.Accepted"/>
+    /// (<c>ResolvedAt</c>/<c>ResolvedBy</c> stamped) and the
+    /// <see cref="GroupMembership"/> row is upserted with
+    /// <c>AddedBy = actorId</c> — the live-membership lane is exactly
+    /// <see cref="AddGroupMemberAsync"/>'s: the membership is live on the very
+    /// next <see cref="GetGroupIdsAsync"/> / <see cref="GetGroupsForUserAsync"/>
+    /// call (C4 carried). Appends an audit row (action <c>group.invite.accept</c>,
+    /// <c>TargetKind</c> "group", <see cref="Authorization.AccessVia.Owner"/> —
+    /// the invitee's own standing; effective principal = the invitee).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    Task AcceptGroupInvitationAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// Resolve a pending invitation as <b>Declined</b> — the same self-lane and
+    /// audit shape as <see cref="AcceptGroupInvitationAsync"/> (action
+    /// <c>group.invite.decline</c>, <see cref="Authorization.AccessVia.Owner"/>),
+    /// but <b>no</b> <see cref="GroupMembership"/> row is written — the invitee
+    /// simply never becomes a member.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    Task DeclineGroupInvitationAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// Cancel a pending invitation the owner/admin created (m2b lane C-M2b·1;
+    /// <paramref name="cancelledBy"/> is the actor — <c>Owner</c> derivation
+    /// when it equals <see cref="Group.OwnerId"/>, else <c>Admin</c>, exactly
+    /// like <see cref="RemoveGroupMemberAsync"/>'s lane). The row moves
+    /// <see cref="InvitationStatus.Pending"/> →
+    /// <see cref="InvitationStatus.Cancelled"/> (stamped); no
+    /// <see cref="GroupMembership"/> row is touched. A resolved-or-absent row is
+    /// an invalid transition and throws (C-M2b·3) — after a cancel the
+    /// owner/admin may re-invite (reset to <c>Pending</c> via
+    /// <see cref="InviteGroupMemberAsync"/>). Appends an audit row (action
+    /// <c>group.invite.cancel</c>, <c>TargetKind</c> "group") in the same
+    /// transaction (invariant C3).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id, no invitation for this (group, user) pair, or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    Task CancelGroupInvitationAsync(string groupId, string userId, string cancelledBy);
+
+    /// <summary>
+    /// The actor's <b>own</b> pending invitations across all groups (m2b read
+    /// lane #2 — the <c>/groups</c> list's "Your invitations" card + the
+    /// accept/decline self-lane's Web gate "in my pending list, else 404").
+    /// <c>Pending</c> rows only, sorted by
+    /// <see cref="GroupInvitation.InvitedAt"/> descending (newest first — the
+    /// natural "what just arrived" order). A candidate read (C-M2·2 carried): no
+    /// <see cref="Authorization.AccessAudit"/> row. Live rows (invariant C4): a
+    /// cancel on the other lane in the same commit is live on the very next call.
+    /// </summary>
+    Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForUserAsync(string userId);
+
+    /// <summary>
+    /// A group's pending invitations (m2b read lane #3 — the
+    /// <c>/groups/{id}</c> detail's invite lane: the pending list + cancel
+    /// links). <c>Pending</c> rows only, sorted by
+    /// <see cref="GroupInvitation.InvitedAt"/> ascending (oldest first — the
+    /// natural "who is still holding" order). A candidate read (C-M2·2 carried):
+    /// no audit row. Live rows (invariant C4): a resolve on the self-lane is
+    /// live on the very next call.
+    /// </summary>
+    Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForGroupAsync(string groupId);
 }

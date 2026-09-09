@@ -64,4 +64,71 @@ public sealed class GroupsViewModelTests
         // by structural identity, never a form-bound owner id).
         Assert.Equal(new[] { "Description", "Name" }, fields.ToArray());
     }
+
+    // ── m2b drift lane: the two invitation-projection records ────────────
+
+    /// <summary>
+    /// m2b shape pin: <see cref="InvitationViewModel"/> (the "/groups"
+    /// list's "Your invitations" card row) is the strict 3-tuple
+    /// <c>{ GroupId, GroupName, InvitedByDisplayName }</c> — the
+    /// <see cref="Kumunita.Core.UserInfo.GroupInvitation"/> source row's
+    /// <c>Id</c>/<c>UserId</c>/<c>InvitedBy</c> (raw subjects),
+    /// <c>Status</c>, and timestamp/resolution fields never reach the UI:
+    /// a pending row is always <c>Pending</c> (the read lane filters it),
+    /// the invitee has no subject channel (they are the actor), and
+    /// "who resolved it, when" is an <c>AccessAudit</c> lane fact.
+    /// </summary>
+    [Fact]
+    public void InvitationViewModel_Has_Exactly_Three_Projected_Fields()
+    {
+        var fields = typeof(InvitationViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.Equal(
+            new[] { "GroupId", "GroupName", "InvitedByDisplayName" },
+            fields.ToArray());
+
+        var props = typeof(InvitationViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .ToHashSet();
+
+        foreach (var field in new[]
+                 { "Id", "UserId", "InvitedBy", "Status", "InvitedAt", "ResolvedAt", "ResolvedBy" })
+            Assert.DoesNotContain(field, props);
+    }
+
+    /// <summary>
+    /// m2b shape pin: <see cref="PendingInvitationViewModel"/> (the
+    /// "/groups/{id}" invite lane's pending row) is the strict 2-tuple
+    /// <c>{ SubjectId, DisplayName }</c> — the <see
+    /// cref="Kumunita.Core.UserInfo.GroupMemberViewModel"/> pin carried to
+    /// the invitation axis. <c>SubjectId</c> is the invitee's opaque subject
+    /// (the cancel route's <c>{subjectId}</c> segment); the source row's
+    /// <c>InvitedBy</c>/<c>InvitedAt</c>/<c>Status</c> never reach the model
+    /// (audit-lane and read-lane facts, not a member-list-shaped UI).
+    /// </summary>
+    [Fact]
+    public void PendingInvitationViewModel_Has_Exactly_Two_Projected_Fields()
+    {
+        var fields = typeof(PendingInvitationViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .OrderBy(n => n)
+            .ToList();
+
+        Assert.Equal(new[] { "DisplayName", "SubjectId" }, fields.ToArray());
+
+        var props = typeof(PendingInvitationViewModel)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(p => p.Name)
+            .ToHashSet();
+
+        foreach (var field in new[]
+                 { "GroupId", "InvitedBy", "Status", "InvitedAt", "ResolvedAt", "ResolvedBy", "Email", "Phone" })
+            Assert.DoesNotContain(field, props);
+    }
 }

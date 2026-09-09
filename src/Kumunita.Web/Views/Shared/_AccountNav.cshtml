@@ -20,6 +20,13 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
         </li>
+        @* M2 (U9/U10): the resident-facing group surface — list, create,
+           detail (owner ∪ member, F14) + owner/admin member management.
+           GroupsController is [Authorize]-gated too, so this link lives in
+           the signed-in branch like the Directory one above. *@
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">Groups</a>
+        </li>
         @* M3 (U8): the single-entry Community nav link.
            one component (id "safety", per FirstBootSeeder's seed order) —
            the "default community". Now repointed to the all-sections feed

@@ -61,6 +61,57 @@
         }
 
         @*
+            m2b — the owner's invite lane (C-M2b·1: owner ∪ GlobalAdmin).
+            Pending invitations (with cancel links) render whenever the group
+            holds any; both blocks are owner-visible (the route gate is the
+            real SoD wall — a plain member's POST 404s, the form just isn't
+            offered to them here). The invite form carries only the target
+            subject — exactly U10's add-member pin (the actor's subject is
+            minted from the signed-in principal as invitedBy, never a field).
+        *@
+        @if (Model.IsOwner && Model.PendingInvitations.Count > 0)
+        {
+            <h2 class="mt-4">Pending invitations</h2>
+            <ul class="list-group mb-3">
+                @foreach (var p in Model.PendingInvitations)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between">
+                        <span>@p.DisplayName</span>
+                        <form method="post"
+                              action="@Url.Action("CancelInvitation", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
+                            <input type="hidden" name="RequestVerificationToken"
+                                   value="@Html.AntiForgeryToken()" />
+                            <button type="submit" class="btn btn-sm btn-outline-warning">Cancel invite</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Model.IsOwner)
+        {
+            <h2 class="mt-4">Invite a resident</h2>
+            <form method="post" action="@Url.Action("InviteMember", "Groups", new { id = Model.GroupId })" class="row g-2">
+                <input type="hidden" name="RequestVerificationToken"
+                       value="@Html.AntiForgeryToken()" />
+                <div class="col-sm-8">
+                    <label class="visually-hidden" for="invite-subjectId">Subject id</label>
+                    <input type="text" class="form-control" id="invite-subjectId"
+                           name="subjectId"
+                           placeholder="resident subject id" required />
+                    <div class="text-muted small">
+                        They get an invitation on their
+                        <a asp-controller="Groups" asp-action="Index">Groups</a>
+                        page to accept or decline.
+                    </div>
+                </div>
+                <div class="col-sm-auto">
+                    <button type="submit" class="btn btn-primary">Invite</button>
+                </div>
+            </form>
+        }
+
+        @*
             The add-member form. It carries only the target subject (the route
             already encodes "add"; the owner id the seam takes is the actor's
             subject, minted from the signed-in principal in the controller —

@@ -9,9 +9,12 @@ namespace Kumunita.Web.Tests;
 /// <para>
 /// **Shape pin** (mirrors U8's <c>DirectoryDetailViewModelTests</c> + U9's
 /// <c>GroupsViewModelTests</c>): the <see cref="GroupDetailViewModel"/> record
-/// carries exactly the six projected fields named in plan U10 —
+/// carries the six projected fields named in plan U10 —
 /// <c>GroupId</c>, <c>Name</c>, <c>OwnerSubjectId</c>, <c>OwnerDisplayName</c>,
-/// <c>IsOwner</c>, <c>Members</c> — and the <see cref="GroupMemberViewModel"/>
+/// <c>IsOwner</c>, <c>Members</c> — plus, since m2b, <c>PendingInvitations</c>
+/// (the invite lane's projection; seven fields total — this pin grows ONLY
+/// through a plan-level handoff note, per the M2 §2.7 drift-guard) — and the
+/// <see cref="GroupMemberViewModel"/>
 /// record is the strict two-field projection <c>{SubjectId, DisplayName}</c>
 /// (the <see cref="Kumunita.Core.UserInfo.GroupMembership"/> source row — with
 /// its <c>GroupId</c>, <c>AddedBy</c>, <c>At</c> — and any
@@ -49,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Six_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Seven_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -57,6 +60,10 @@ public sealed class GroupsDetailViewModelTests
             .OrderBy(n => n)
             .ToList();
 
+        // U10's six + m2b's PendingInvitations (the invite lane — the
+        // detail's pending list + cancel links projection). No Status /
+        // InvitedBy / InvitedAt: "who invited, when" lives on the
+        // GroupInvitation row's audit lane, not the UI.
         Assert.Equal(
             new[]
             {
@@ -66,6 +73,7 @@ public sealed class GroupsDetailViewModelTests
                 "Name",
                 "OwnerDisplayName",
                 "OwnerSubjectId",
+                "PendingInvitations",
             },
             fields.ToArray());
     }
@@ -171,7 +179,8 @@ public sealed class GroupsDetailViewModelTests
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: true,
-            Members: []);
+            Members: [],
+            PendingInvitations: []);
 
         var adminShape = new GroupDetailViewModel(
             GroupId: "g1",
@@ -182,7 +191,8 @@ public sealed class GroupsDetailViewModelTests
                                            // admin, or a member) reaching the same
                                            // surface — the badge flips, the shape
                                            // does not.
-            Members: []);
+            Members: [],
+            PendingInvitations: []);
 
         Assert.True(ownerShape.IsOwner);
         Assert.False(adminShape.IsOwner);
@@ -270,7 +280,8 @@ public sealed class GroupsDetailViewModelTests
             OwnerDisplayName: "A. Resident",
             IsOwner: true,                 // the owner (alice) is viewing their
                                            // own group.
-            Members: new[] { ownerRow, memberRow });
+            Members: new[] { ownerRow, memberRow },
+            PendingInvitations: []);
 
         // The owner is in the member list (M1's owner-membership pin — the
         // owner's row is not special):
@@ -307,7 +318,8 @@ public sealed class GroupsDetailViewModelTests
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: false,
-            Members: new[] { ownerRow2, carolRow });
+            Members: new[] { ownerRow2, carolRow },
+            PendingInvitations: []);
 
         Assert.False(model2.IsOwner);
         Assert.Contains(model2.Members,   m => m.SubjectId == "alice");
