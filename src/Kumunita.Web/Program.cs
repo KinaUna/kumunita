@@ -115,6 +115,31 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
     .AddEntityFrameworkStores<AppDbContext>()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
 
+// ASP.NET Core Identity automatically wires a SecurityStampValidator into the
+// .AspNetCore.Identity.Application cookie, with a default ValidationInterval of
+// 30 minutes. Every 30 min of a signed-in session, the validator fires and
+// re-reads the user from the store by the NameIdentifier claim
+// (ClaimsIdentityOptions.UserIdClaimType). The custom KumunitaClaimsPrincipalFactory
+// / ClaimShaping.Build mints the identity with a name-type of null (not
+// NameIdentifier, by design — ADR 0006-B no-relational-data invariant), so
+// userManager.FindByIdAsync(...) returns null on every validation pass, and
+// the validator then calls context.RejectPrincipal() + SignInManager.SignOutAsync()
+// — which clears BOTH the .AspNetCore.Identity.Application cookie and, on the
+// next request, the kumunita.auth cookie — forcing a bare redirect to
+// /Account/Login. That is the "I keep getting logged out after a while" bug.
+//
+// The 14-day kumunita.auth cookie + Profile.Blocked per-request check already
+// enforce the security guarantees the default validator was protecting against
+// (see BlockedAccountMiddleware + KumunitaClaimsPrincipalFactory). The right
+// remedy here is to raise ValidationInterval past the cookie's own ExpireTimeSpan
+// (14 days) so the validator can never fire inside a live session, rather than to
+// disable it outright (disable = every cookie is trusted forever, even after a
+// real UpdateSecurityStampAsync admin-action that we still want to honor).
+builder.Services.Configure<SecurityStampValidatorOptions>(o =>
+{
+    o.ValidationInterval = TimeSpan.FromDays(14);
+});
+
 // AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory> registers the factory
 // against the abstract base (UserClaimsPrincipalFactory<User, IdentityRole>) — that
 // is how SignInManager resolves it. It does NOT make the concrete type resolvable,
