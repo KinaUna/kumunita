@@ -81,6 +81,27 @@ public sealed class AudienceEditorModel
         (TryParseGrants(Grants, out var parsed) && parsed.Length == 0);
 
     /// <summary>
+    /// Read-only UI projection of the form's <see cref="Grants"/> JSON — the parsed
+    /// <see cref="AudienceGrant"/> array this editor currently holds, or an empty
+    /// array when <see cref="Grants"/> is absent or fails to parse. This is a
+    /// *derived read surface* (no setter on the view model) so the partial can
+    /// pre-check the picker boxes from the seeded / round-tripped grant state
+    /// without introducing a second, parallel shape: <see cref="Grants"/> stays
+    /// the form-bound field the default model binder lands on and the
+    /// <see cref="BuildAudience"/> deserializer reads — the single-source pin holds;
+    /// this is only a read-view of it.
+    /// </summary>
+    public AudienceGrant[] ParsedGrants
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Grants))
+                return Array.Empty<AudienceGrant>();
+            return TryParseGrants(Grants, out var parsed) ? parsed : Array.Empty<AudienceGrant>();
+        }
+    }
+
+    /// <summary>
     /// Whether this editor's shape is well-formed for a round-trip. <see cref="Mode"/>
     /// must be present (a missing mode is a malformed post, not a default), and
     /// <see cref="Grants"/> if present must parse as a JSON array of

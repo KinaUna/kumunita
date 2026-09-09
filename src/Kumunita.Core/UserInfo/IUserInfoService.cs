@@ -115,6 +115,20 @@ public interface IUserInfoService
     Task<IReadOnlyList<Group>> GetGroupsForUserAsync(string userId);
 
     /// <summary>
+    /// The <b>platform-wide group list</b> (the profile grant picker's option
+    /// source — every <see cref="Group"/> document, sorted by
+    /// <see cref="Group.Created"/> descending). A *candidate set*, not an
+    /// access decision (C-M2·2): no <see cref="Authorization.AccessAudit"/>
+    /// row, no filter by membership (the picker must show groups the author
+    /// belongs to <b>and</b> groups they only own-but-aren't-in — both are
+    /// grantable; and — since the platform is invitation-only residents-only
+    /// and the audience only grants — every resident can grant any group
+    /// they know about, whether or not they are a member). Live rows
+    /// (invariant C4): a created group is visible on the next read.
+    /// </summary>
+    Task<IReadOnlyList<Group>> GetAllGroupsAsync();
+
+    /// <summary>
     /// The <b>membership rows</b> of a single <see cref="Group"/> (M2 F14 — U9's
     /// <c>GroupViewModel</c> projects <c>MemberCount = this.Count</c>; U10's
     /// <c>Groups/Detail</c> renders the member list from the same read +

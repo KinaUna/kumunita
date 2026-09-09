@@ -153,6 +153,27 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Group>> GetAllGroupsAsync()
+    {
+        // The profile grant picker's option source (the M2 editor's UX
+        // surface — every Group document, no membership filter). Live rows
+        // (invariant C4): a created group is visible on the next read.
+        // No audit row (C-M2·2: a read, not a decision). Stable id → Group
+        // lookup, sorted by Created desc (the plan-U9 "most recently
+        // created first" ordering the Web surface expects).
+        await using var session = store.QuerySession();
+        var groups = await session
+            .Query<Group>()
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var byId = groups.ToDictionary(g => g.Id);
+        return byId.Values
+            .OrderByDescending(g => g.Created)
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId)
     {
         // F14 (M2 design doc §2.2; U9's GroupViewModel.MemberCount + U10's

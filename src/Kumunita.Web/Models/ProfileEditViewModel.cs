@@ -110,7 +110,7 @@ public sealed class ProfileEditViewModel
     public AudienceEditorModel? ContactVisibility { get; set; }
 
     /// <summary>
-    /// The single validation site (the §9 pin at the view-model layer, plan
+    /// The single validation site
     /// U11's exit test target):
     /// <list type="bullet">
     /// <item><see cref="DisplayName"/> / <see cref="Email"/> required (M1's
@@ -231,3 +231,34 @@ public sealed class ProfileEditViewModel
 /// </para>
 /// </summary>
 public sealed record ViewAsOption(string SubjectId, string DisplayName);
+
+/// <summary>
+/// One row in the grant picker's user/group dropdowns (the M2 editor's UX
+/// layer over the frozen <c>AudienceEditorModel</c> transport). A
+/// <b>view-only projection</b> — not a form-bound property of
+/// <see cref="ProfileEditViewModel"/> (which keeps the U11 "exactly six
+/// form fields" pin), so the controller hands the two lists to the view
+/// through <c>ViewData["GrantPicker.Options"]</c> rather than a model
+/// property. A <b>new audience shape</b> would also be the wrong tool
+/// here — the <see cref="AudienceEditorModel.Grants"/> JSON transport is
+/// already the single form-bound surface the <c>ToProfileUpdate</c>
+/// patch builder reads; this type is only the data the partial renders
+/// into the multi-select rows and the JS picker binds against.
+/// </summary>
+public sealed record GrantOption
+{
+    /// <summary>The subject id this option represents: a
+    /// <c>Profile.SubjectId</c> for user rows, a <c>Group.Id</c> for group
+    /// rows.</summary>
+    public string Id { get; init; } = string.Empty;
+
+    /// <summary>The human-readable name shown in the dropdown —
+    /// <c>Profile.DisplayName</c> for user rows, <c>Group.Name</c> for group
+    /// rows (falling back to the id if the name is missing).</summary>
+    public string Label { get; init; } = string.Empty;
+
+    /// <summary>The wire value of the grant kind — the string form of
+    /// <see cref="Kumunita.Core.Authorization.GrantKind"/> ("User" /
+    /// "Group") as it appears in the posted <c>Grants</c> JSON element.</summary>
+    public string Kind { get; init; } = string.Empty;
+}
