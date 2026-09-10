@@ -60,8 +60,19 @@ services:
       # Must be the host-browser-reachable URL (this service's published port),
       # not the in-docker 8080 — the recipient opens the link in their own browser.
       Verification__BaseUrl: "http://localhost:5080"
+      # Data-protection keyring (Program.cs:170-176, COOLIFY.md §5.2): without it
+      # every `docker compose up --build` mints fresh keys and all cookies from
+      # before the rebuild (session/antiforgery/Identity) can no longer be
+      # decrypted — the "bounced back to login" bug. Same container path as the
+      # production convention (Dockerfile VOLUME floor) so dev and prod agree.
+      DataProtection__KeysDirectory: "/data/dataprotection-keys"
     ports:
       - "5080:8080"
+    volumes:
+      # Survives container recreation (unlike the image's VOLUME floor, whose
+      # anonymous form can be pruned); only wiped by an explicit
+      # `docker volume rm kumunita_dpkeys` or `docker compose down -v`.
+      - kumunita_dpkeys:/data/dataprotection-keys
     depends_on:
       db:
         condition: service_healthy
@@ -70,3 +81,4 @@ services:
 
 volumes:
   kumunita_pgdata:
+  kumunita_dpkeys:
