@@ -291,8 +291,10 @@ UserInfoModule
   // The directory lists every non-blocked resident's basic info (displayName/verified) to every
   // signed-in viewer — the show-everyone rule: `visibility` no longer hides a profile, and the
   // list runs no audience decision. `contactVisibility` is the *single* audience gate (the
-  // detail/preview surface's opt-in contact block, email/phone): `null` ⇒ not opted in ⇒ no
-  // decision / no audit row; non-null ⇒ one `CanAsync` decision + one AccessAudit row.
+  // detail/preview surface's opt-in contact block, email/phone) for *others*: `null` ⇒ not
+  // opted in ⇒ no decision / no audit row; non-null ⇒ one `CanAsync` decision + one AccessAudit
+  // row. A self-view (viewer == owner) always renders the owner's own contact block — a
+  // short-circuit with no decision and no audit row (the audience controls others, not the owner).
   // `visibility` stays on the document + editor (author-controlled, ADR 0003) as the audience
   // for detailed non-contact fields once they exist — it takes no effect at the directory layer.
   Profile          { subjectId, externalId?, householdId?, displayName, verified, blocked,
