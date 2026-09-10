@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Seven_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Eight_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -61,7 +61,9 @@ public sealed class GroupsDetailViewModelTests
             .ToList();
 
         // U10's six + m2b's PendingInvitations (the invite lane — the
-        // detail's pending list + cancel links projection). No Status /
+        // detail's pending list + cancel links projection) +
+        // ResidentCandidates (the "Add a member" dropdown projection —
+        // non-member, non-blocked residents). No Status /
         // InvitedBy / InvitedAt: "who invited, when" lives on the
         // GroupInvitation row's audit lane, not the UI.
         Assert.Equal(
@@ -74,6 +76,7 @@ public sealed class GroupsDetailViewModelTests
                 "OwnerDisplayName",
                 "OwnerSubjectId",
                 "PendingInvitations",
+                "ResidentCandidates",
             },
             fields.ToArray());
     }
@@ -180,7 +183,8 @@ public sealed class GroupsDetailViewModelTests
             OwnerDisplayName: "A. Resident",
             IsOwner: true,
             Members: [],
-            PendingInvitations: []);
+            PendingInvitations: [],
+            ResidentCandidates: []);
 
         var adminShape = new GroupDetailViewModel(
             GroupId: "g1",
@@ -192,7 +196,8 @@ public sealed class GroupsDetailViewModelTests
                                            // surface — the badge flips, the shape
                                            // does not.
             Members: [],
-            PendingInvitations: []);
+            PendingInvitations: [],
+            ResidentCandidates: []);
 
         Assert.True(ownerShape.IsOwner);
         Assert.False(adminShape.IsOwner);
@@ -281,7 +286,8 @@ public sealed class GroupsDetailViewModelTests
             IsOwner: true,                 // the owner (alice) is viewing their
                                            // own group.
             Members: new[] { ownerRow, memberRow },
-            PendingInvitations: []);
+            PendingInvitations: [],
+            ResidentCandidates: []);
 
         // The owner is in the member list (M1's owner-membership pin — the
         // owner's row is not special):
@@ -319,7 +325,8 @@ public sealed class GroupsDetailViewModelTests
             OwnerDisplayName: "A. Resident",
             IsOwner: false,
             Members: new[] { ownerRow2, carolRow },
-            PendingInvitations: []);
+            PendingInvitations: [],
+            ResidentCandidates: []);
 
         Assert.False(model2.IsOwner);
         Assert.Contains(model2.Members,   m => m.SubjectId == "alice");

@@ -11,3 +11,5 @@ Decision / Consequences. New decisions take the next number.
 | 0004 | Data persistence & schema evolution          | Accepted |
 | 0005 | Multilingual support (UI & static pages)     | Accepted |
 | 0006 | Module boundary contracts (Identity, UserInfo, Authorization) | Accepted |
+| 0007 | Group management lane: owner ∪ GlobalAdmin for add and remove   | Accepted |
+| 0008 | Member self-leave lane (owner excepted)   | Accepted |

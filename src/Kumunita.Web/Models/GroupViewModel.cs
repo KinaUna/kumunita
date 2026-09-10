@@ -203,10 +203,29 @@ public sealed record GroupDetailViewModel(
     string OwnerDisplayName,
     bool IsOwner,
     IReadOnlyList<GroupMemberViewModel> Members,
-    IReadOnlyList<PendingInvitationViewModel> PendingInvitations);
+    IReadOnlyList<PendingInvitationViewModel> PendingInvitations,
+    IReadOnlyList<ResidentOption> ResidentCandidates);
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching
 // U7/U8's "a form is a field, not a record" pin. The owner id the write seams
 // take (`addedBy` / `removedBy`) is always the actor's subject, minted
 // from the signed-in principal by the controller — never a form field.
+
+/// <summary>
+/// One selectable resident for the detail's "Add a member" dropdown — the
+/// same two-field shape as <see cref="GroupMemberViewModel"/>, projected from
+/// a non-blocked <see cref="Kumunita.Core.UserInfo.Profile"/> (the directory's
+/// visibility surface — every non-blocked resident, the platform is
+/// invitation-only) <i>minus</i> the group's current members (adding someone
+/// already in is a no-op the form should not offer). The view renders it as
+/// a plain <c>&lt;option&gt;</c> and filters client-side (name contains).
+/// </summary>
+/// <param name="SubjectId">The resident's
+/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/> (the form's
+/// <c>subjectId</c> field value — the add-member seam's <c>userId</c>).</param>
+/// <param name="DisplayName">The resident's
+/// <see cref="Kumunita.Core.UserInfo.Profile.DisplayName"/> (falling back to
+/// the raw <see cref="SubjectId"/> when the name is blank — fail-safe, not a
+/// silent blank option).</param>
+public sealed record ResidentOption(string SubjectId, string DisplayName);

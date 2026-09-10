@@ -41,14 +41,12 @@
                         <div class="d-flex gap-2 flex-shrink-0">
                             <form method="post"
                                   action="@Url.Action("AcceptInvitation", "Groups", new { id = inv.GroupId })">
-                                <input type="hidden" name="RequestVerificationToken"
-                                       value="@Html.AntiForgeryToken()" />
+                                @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-primary">Accept</button>
                             </form>
                             <form method="post"
                                   action="@Url.Action("DeclineInvitation", "Groups", new { id = inv.GroupId })">
-                                <input type="hidden" name="RequestVerificationToken"
-                                       value="@Html.AntiForgeryToken()" />
+                                @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">Decline</button>
                             </form>
                         </div>

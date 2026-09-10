@@ -115,7 +115,7 @@ single authority.
 
 | # | Outcome (what a resident sees / can do) | Pinned by |
 |---|---|---|
-| F16 | The group **owner** (or a GlobalAdmin) on `/groups/{id}` sees an **"Invite a resident"** form and a **"Pending invitations"** list (with cancel links); a **plain member** sees neither (the add/remove form remains — U10/F7). | C-M2b·1 (SoD) + C-M2·3 (carried) |
+| F16 | The group **owner** (or a GlobalAdmin) on `/groups/{id}` sees an **"Invite a resident"** form and a **"Pending invitations"** list (with cancel links); a **plain member** sees neither (the add-member form remains; the **remove** form is owner ∪ GlobalAdmin by C-M2·3 — the route's `TryResolveOwnerSurface` gate 404s a member's remove POST). | C-M2b·1 (SoD) + C-M2·3 (carried) |
 | F17 | The invitee on `/groups` (Index) sees a **"Your invitations"** card (group name + inviter + accept / decline buttons); a **foreign resident** (not the invitee) cannot resolve another's invitation (404 / error). Accept makes the membership **live on the very next** `GetGroupIdsAsync` / `GetGroupsForUserAsync` call (C4) and — because the group now grants — the detail page is reachable. | C-M2b·2 (self-lane) + C4 + C-M2·2 (the card's reads never audit) |
 | F18 | The owner/admin on detail can **cancel** a pending invitation (a resolved row cannot be re-cancelled — C-M2b·3's state machine — the Web maps it to `TempData["error"]`); the cancel row carries the C-M2b·1 `Via` derivation (owner ⇒ `Owner`, admin ⇒ `Admin`). | C-M2b·1 + C-M2b·3 (state machine) |
 | F19 | A resident who **declines** never becomes a member (no `GroupMembership` row, no audit row beyond `group.invite.decline`); the owner may **re-invite** afterward (C-M2b·3's reset). | C-M2b·3 (re-invite) + C3 (audit) |

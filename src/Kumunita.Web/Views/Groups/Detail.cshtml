@@ -1,3 +1,4 @@
+@using Kumunita.Web.Security
 @model Kumunita.Web.Models.GroupDetailViewModel
 @{
     ViewData["Title"] = Model.Name;
@@ -9,6 +10,24 @@
     // form field (ADR 0003 SoD by structural identity — a form-bound owner id
     // would defeat M1's Via: Owner / Admin derivation).
     var addHref  = Url.Action(nameof(Kumunita.Web.Controllers.GroupsController.AddMember),  new { id = Model.GroupId });
+
+    // The management lanes (add / remove / invite) are all owner ∪
+    // GlobalAdmin (C-M2·3, extended to the add lane by ADR 0007); the
+    // routes' TryResolveOwnerSurface gates are the real SoD walls — the
+    // forms are just not offered to plain members here, same m2b
+    // invite-lane pattern. The SELF-leave lane (ADR 0008) is the one
+    // member-wide exception: a non-owner member's own row carries the
+    // Leave form below, the owner's own row carries none (the owner
+    // cannot leave their group at all).
+    var canManage = Model.IsOwner || KumunitaPrincipal.IsGlobalAdmin(User);
+
+    // The actor's own subject (KumunitaPrincipal.SubjectId — the same
+    // single identity source the controller mints addedBy/removedBy/...
+    // from; the leave lane's target is always this value on the server
+    // side). Used per-row in the member list: the self-row carries the
+    // Leave button (ADR 0008), the owner's self-row carries none
+    // (the owner cannot leave their own group).
+    var subject = KumunitaPrincipal.SubjectId(User);
 }
 
 <div class="row justify-content-center">
@@ -44,17 +63,45 @@
             <ul class="list-group">
                 @foreach (var m in Model.Members)
                 {
+                    @*
+                        Per-row action (ADR 0008):
+                        · owner ∪ GlobalAdmin sees Remove — except on the
+                          OWNER'S OWN row (the owner cannot leave their own
+                          group; ownerSelfRow is the only row they lose the
+                          button on, so removing OTHERS stays intact);
+                        · a non-owner member sees Leave on their OWN row
+                          (the self-lane POST /groups/{id}/leave — the route
+                          mints the target from the signed-in principal, no
+                          form field), and nothing on anyone else's row;
+                        · what is offered is exactly what the route accepts
+                          (the m2b invite-lane pattern: forms are
+                          presentation, the controller gates keep the SoD).
+                    *@
+                    var ownerSelfRow = Model.IsOwner && m.SubjectId == Model.OwnerSubjectId;
+                    var isSelfRow = m.SubjectId == subject;
+
                     <li class="list-group-item d-flex align-items-center justify-content-between"
-                        id="@($"remove-{m.SubjectId}")">
+                        id="@($"member-{m.SubjectId}")">
                         <span>@m.DisplayName</span>
-                        <form method="post" action="@Url.Action("RemoveMember", "Groups", new { id = Model.GroupId })">
-                            <input type="hidden" name="RequestVerificationToken"
-                                   value="@Html.AntiForgeryToken()" />
-                            <input name="subjectId" type="hidden" value="@m.SubjectId" />
-                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                Remove
-                            </button>
-                        </form>
+                        @if (canManage && !ownerSelfRow && !isSelfRow)
+                        {
+                            <form method="post" action="@Url.Action("RemoveMember", "Groups", new { id = Model.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <input name="subjectId" type="hidden" value="@m.SubjectId" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    Remove
+                                </button>
+                            </form>
+                        }
+                        else if (isSelfRow && !ownerSelfRow)
+                        {
+                            <form method="post" action="@Url.Action("LeaveGroup", "Groups", new { id = Model.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    Leave
+                                </button>
+                            </form>
+                        }
                     </li>
                 }
             </ul>
@@ -79,8 +126,7 @@
                         <span>@p.DisplayName</span>
                         <form method="post"
                               action="@Url.Action("CancelInvitation", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
-                            <input type="hidden" name="RequestVerificationToken"
-                                   value="@Html.AntiForgeryToken()" />
+                            @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-sm btn-outline-warning">Cancel invite</button>
                         </form>
                     </li>
@@ -91,49 +137,115 @@
         @if (Model.IsOwner)
         {
             <h2 class="mt-4">Invite a resident</h2>
-            <form method="post" action="@Url.Action("InviteMember", "Groups", new { id = Model.GroupId })" class="row g-2">
-                <input type="hidden" name="RequestVerificationToken"
-                       value="@Html.AntiForgeryToken()" />
-                <div class="col-sm-8">
-                    <label class="visually-hidden" for="invite-subjectId">Subject id</label>
-                    <input type="text" class="form-control" id="invite-subjectId"
-                           name="subjectId"
-                           placeholder="resident subject id" required />
-                    <div class="text-muted small">
-                        They get an invitation on their
-                        <a asp-controller="Groups" asp-action="Index">Groups</a>
-                        page to accept or decline.
+            @if (Model.ResidentCandidates.Count > 0)
+            {
+                <form method="post"
+                      action="@Url.Action("InviteMember", "Groups", new { id = Model.GroupId })"
+                      class="row g-2">
+                    @Html.AntiForgeryToken()
+                    <div class="col-sm-8">
+                        <label class="visually-hidden" for="invite-filter">Filter residents</label>
+                        <input type="text" class="form-control" id="invite-filter"
+                               placeholder="Filter by name…" autocomplete="off" />
+                        <label class="visually-hidden" for="invite-subjectId">Resident</label>
+                        <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
+                            @foreach (var r in Model.ResidentCandidates)
+                            {
+                                <option value="@r.SubjectId">@r.DisplayName</option>
+                            }
+                        </select>
+                        <div class="text-muted small">
+                            They get an invitation on their
+                            <a asp-controller="Groups" asp-action="Index">Groups</a>
+                            page to accept or decline.
+                        </div>
                     </div>
-                </div>
-                <div class="col-sm-auto">
-                    <button type="submit" class="btn btn-primary">Invite</button>
-                </div>
-            </form>
+                    <div class="col-sm-auto align-self-end">
+                        <button type="submit" class="btn btn-primary">Invite</button>
+                    </div>
+                </form>
+                <script>
+                    // Client-side name filter (contains, case-insensitive) — same
+                    // pattern as the add-member form below.
+                    (function () {
+                        var filter = document.getElementById("invite-filter");
+                        var list = document.getElementById("invite-subjectId");
+                        filter.addEventListener("input", function () {
+                            var q = filter.value.trim().toLowerCase();
+                            for (var i = 0; i < list.options.length; i++) {
+                                list.options[i].hidden =
+                                    q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
+                            }
+                        });
+                    })();
+                </script>
+            }
+            else
+            {
+                <p class="text-muted">Every resident is already a member of this group.</p>
+            }
         }
 
         @*
-            The add-member form. It carries only the target subject (the route
-            already encodes "add"; the owner id the seam takes is the actor's
-            subject, minted from the signed-in principal in the controller —
-            ADR 0003 SoD by structural identity, never a form field).
+            The add-member form — offered to owner ∪ GlobalAdmin only
+            (C-M2·3 extended per ADR 0007; the route's owner-surface gate
+            is the real SoD wall, a plain member's POST 404s — same pattern
+            as the invite lane above).
+            It carries only the target subject (a
+            <select> over the group's candidate residents — the directory's
+            catalog minus the current members; the route already encodes "add",
+            and the owner id the seam takes is the actor's subject, minted from
+            the signed-in principal in the controller — ADR 0003 SoD by
+            structural identity, never a form field). The filter box above the
+            select narrows the options client-side (resident name contains the
+            typed string), no extra round-trip.
         *@
+        @if (canManage)
+        {
         <h2 class="mt-4">Add a member</h2>
-        <form method="post" action="@addHref" class="row g-2">
-            <input type="hidden" name="RequestVerificationToken"
-                   value="@Html.AntiForgeryToken()" />
-            <div class="col-sm-8">
-                <label class="visually-hidden" for="add-subjectId">Subject id</label>
-                <input type="text" class="form-control" id="add-subjectId"
-                       name="subjectId"
-                       placeholder="resident subject id" required />
-                <div class="text-muted small">
-                    The resident's subject id (the same id
-                    <a asp-controller="Directory" asp-action="Index">the directory</a> lists).
+        @if (Model.ResidentCandidates.Count > 0)
+        {
+            <form method="post" action="@addHref" class="row g-2">
+                @Html.AntiForgeryToken()
+                <div class="col-sm-8">
+                    <label class="visually-hidden" for="add-member-filter">Filter residents</label>
+                    <input type="text" class="form-control" id="add-member-filter"
+                           placeholder="Filter by name…" autocomplete="off" />
+                    <label class="visually-hidden" for="add-subjectId">Resident</label>
+                    <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
+                        @foreach (var r in Model.ResidentCandidates)
+                        {
+                            <option value="@r.SubjectId">@r.DisplayName</option>
+                        }
+                    </select>
+                    <div class="text-muted small">
+                        They are added to the group immediately (no invitation).
+                    </div>
                 </div>
-            </div>
-            <div class="col-sm-auto">
-                <button type="submit" class="btn btn-primary">Add</button>
-            </div>
-        </form>
+                <div class="col-sm-auto align-self-end">
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+            <script>
+                // Client-side name filter (contains, case-insensitive): hide the
+                // options that don't match what's typed in the filter box above.
+                (function () {
+                    var filter = document.getElementById("add-member-filter");
+                    var list = document.getElementById("add-subjectId");
+                    filter.addEventListener("input", function () {
+                        var q = filter.value.trim().toLowerCase();
+                        for (var i = 0; i < list.options.length; i++) {
+                            list.options[i].hidden =
+                                q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
+                        }
+                    });
+                })();
+            </script>
+        }
+        else
+        {
+            <p class="text-muted">Every resident is already a member of this group.</p>
+        }
+        }
     </div>
 </div>

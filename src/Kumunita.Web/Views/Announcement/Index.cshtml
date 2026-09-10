@@ -33,7 +33,7 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">All announcements</span>
-                @if (User.Identity?.IsAuthenticated == true)
+                @if (User!.Identity?.IsAuthenticated == true)
                 {
                     <a class="btn btn-sm btn-outline-primary" href="/announcements/new">
                         New announcement
