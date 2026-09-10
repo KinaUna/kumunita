@@ -1,47 +1,663 @@
-html {
-  font-size: 14px;
+/* ==========================================================================
+   Kumunita design system — Bootstrap 5.3 customization
+   --------------------------------------------------------------------------
+   Kumunita ships Bootstrap as precompiled dist CSS (wwwroot/lib/bootstrap;
+   no Sass build step), so the theme is applied by overriding the same CSS
+   custom properties Bootstrap 5.3 reads off :root, plus component-level
+   variable overrides for the pieces Bootstrap bakes in as literals
+   (buttons). Kumunita-specific component patterns live under the .kmb-*
+   classes (home page layout: hero, floating feature cards, stat band, CTA
+   band, footer).
+
+   Locked design decisions (see README + this file's git history):
+   - Palette .... deep pine green #1C4532 primary, warm amber #F59E0B accent,
+                  warm neutrals (#FBFAF7 canvas, #DDE3DD borders). Amber is
+                  ALWAYS paired with dark ink #17251D — never white text.
+                  All text/background pairs are chosen for WCAG AA.
+   - Type ....... Gabarito (headings/UI, variable 500-700) + Lora (body
+                  serif, variable 400-600 + italic), self-hosted in /fonts
+                  (SIL OFL). Type scale 2.75/2/1.25/1.125/1/.875rem.
+   - Surface .... 12px radius (8px chips/labels), borders + whitespace over
+                  shadow; shadow is reserved for hover states (soft) and
+                  floating surfaces (modals, dropdowns).
+   - Rhythm ..... generous section padding via --kmb-space-section.
+   ========================================================================== */
+
+/* --- Self-hosted fonts ----------------------------------------------------
+   Downloaded from the Google Fonts css2 endpoint as variable fonts
+   (latin subset only, WOFF2, SIL OFL). One file per family/style, declared
+   with a font-weight range so a single @font-face covers the whole load. */
+@font-face {
+  font-family: 'Gabarito';
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url('/fonts/gab-variable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/lor-variable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/lor-italic.woff2') format('woff2');
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+/* --- Palette, type and surface tokens (Bootstrap :root overrides) -------- */
+:root {
+  /* Type: sans (headings/UI, buttons, badges, nav) vs body (Lora serif) */
+  --bs-font-sans-serif: 'Gabarito', system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --bs-body-font-family: 'Lora', Georgia, 'Times New Roman', serif;
+  --bs-heading-font-family: 'Gabarito', system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --bs-heading-font-weight: 600;
+  --bs-heading-line-height: 1.2;
+  --bs-body-line-height: 1.65;
+
+  /* Type scale (fixed rem; hero uses .display-5) */
+  --bs-h1-font-size: 2.75rem;
+  --bs-h2-font-size: 2rem;
+  --bs-h3-font-size: 1.25rem;
+  --bs-h4-font-size: 1.125rem;
+  --bs-h5-font-size: 1rem;
+  --bs-h6-font-size: 0.875rem;
+  --bs-small-font-size: 0.875rem;
+  --bs-display-4-font-size: 3.25rem;
+  --bs-display-5-font-size: 2.5rem;
+  --bs-display-6-font-size: 2rem;
+  --bs-display-font-weight: 700;
+
+  /* Neutral surfaces + ink */
+  --bs-body-bg: #fbfaf7;
+  --bs-body-bg-rgb: 251, 250, 247;
+  --bs-body-color: #1f2a25;
+  --bs-body-color-rgb: 31, 42, 37;
+  --bs-emphasis-color: #17251d;
+  --bs-emphasis-color-rgb: 23, 37, 29;
+  --bs-secondary-color: rgba(31, 42, 37, 0.72);      /* .text-muted etc */
+  --bs-tertiary-color: rgba(31, 42, 37, 0.5);
+  --bs-tertiary-bg: #f1efe9;
+  --bs-tertiary-bg-rgb: 241, 239, 233;
+  --bs-light: #f4f3ee;
+  --bs-light-rgb: 244, 243, 238;
+  --bs-light-emphasis: #1f2a25;
+  --bs-light-emphasis-rgb: 31, 42, 37;
+  --bs-light-bg-subtle: #faf9f5;
+  --bs-light-bg-subtle-rgb: 250, 249, 245;
+  --bs-light-border-subtle: #e6e4dd;
+  --bs-dark: #17251d;
+  --bs-dark-rgb: 23, 37, 29;
+  --bs-dark-emphasis: #10180f;
+  --bs-dark-emphasis-rgb: 16, 24, 15;
+  --bs-dark-bg-subtle: #2a352f;
+  --bs-dark-bg-subtle-rgb: 42, 53, 47;
+  --bs-dark-border-subtle: #3d4a42;
+  --bs-dark-text-emphasis: #f7f6f2;
+  --bs-dark-text-emphasis-rgb: 247, 246, 242;
+
+  /* Brand: deep pine green */
+  --bs-primary: #1c4532;
+  --bs-primary-rgb: 28, 69, 50;
+  --bs-primary-emphasis: #1c4532;
+  --bs-primary-emphasis-rgb: 28, 69, 50;
+  --bs-primary-bg-subtle: #e8efe9;
+  --bs-primary-bg-subtle-rgb: 232, 239, 233;
+  --bs-primary-border-subtle: #d5e0d7;
+  --bs-primary-text-emphasis: #173728;
+  --bs-primary-text-emphasis-rgb: 23, 55, 40;
+
+  /* Brand: warm amber (accent; always with dark ink text — see .btn-secondary
+     and .text-bg-secondary below) */
+  --bs-secondary: #f59e0b;
+  --bs-secondary-rgb: 245, 158, 11;
+  --bs-secondary-emphasis: #8a5a12;
+  --bs-secondary-emphasis-rgb: 138, 90, 18;
+  --bs-secondary-bg-subtle: #f8f0e2;
+  --bs-secondary-bg-subtle-rgb: 248, 240, 226;
+  --bs-secondary-border-subtle: #ead9be;
+  --bs-secondary-text-emphasis: #8a5a12;
+  --bs-secondary-text-emphasis-rgb: 138, 90, 18;
+
+  /* Semantic */
+  --bs-success: #2f7d4f;
+  --bs-success-rgb: 47, 125, 79;
+  --bs-success-emphasis: #1d4a31;
+  --bs-success-emphasis-rgb: 29, 74, 49;
+  --bs-success-bg-subtle: #e9f2ec;
+  --bs-success-bg-subtle-rgb: 233, 242, 236;
+  --bs-success-border-subtle: #d2e5da;
+  --bs-success-text-emphasis: #1d4a31;
+  --bs-success-text-emphasis-rgb: 29, 74, 49;
+  --bs-danger: #b3403a;
+  --bs-danger-rgb: 179, 64, 58;
+  --bs-danger-emphasis: #5e201c;
+  --bs-danger-emphasis-rgb: 94, 32, 28;
+  --bs-danger-bg-subtle: #f6e9e8;
+  --bs-danger-bg-subtle-rgb: 246, 233, 232;
+  --bs-danger-border-subtle: #efdbda;
+  --bs-danger-text-emphasis: #8a2f28;
+  --bs-danger-text-emphasis-rgb: 138, 47, 40;
+  --bs-warning: #b45309;
+  --bs-warning-rgb: 180, 83, 9;
+  --bs-warning-emphasis: #6e3b0e;
+  --bs-warning-emphasis-rgb: 110, 59, 14;
+  --bs-warning-bg-subtle: #f7efe5;
+  --bs-warning-bg-subtle-rgb: 247, 239, 229;
+  --bs-warning-border-subtle: #edddc7;
+  --bs-warning-text-emphasis: #8a4d12;
+  --bs-warning-text-emphasis-rgb: 138, 77, 18;
+  --bs-info: #256d6a;
+  --bs-info-rgb: 37, 109, 106;
+  --bs-info-emphasis: #1c4a48;
+  --bs-info-emphasis-rgb: 28, 74, 72;
+  --bs-info-bg-subtle: #e7f0f0;
+  --bs-info-bg-subtle-rgb: 231, 240, 240;
+  --bs-info-border-subtle: #cfe2e1;
+  --bs-info-text-emphasis: #1c4a48;
+  --bs-info-text-emphasis-rgb: 28, 74, 72;
+
+  /* Borders, links, focus */
+  --bs-border-color: #dde3dd;
+  --bs-border-color-rgb: 221, 227, 221;
+  --bs-border-color-translucent: rgba(31, 42, 37, 0.15);
+  --bs-link-color: #1c4532;
+  --bs-link-color-rgb: 28, 69, 50;
+  --bs-link-hover-color: #122b20;
+  --bs-link-hover-color-rgb: 18, 43, 32;
+  --bs-focus-ring-width: 0.2rem;
+  --bs-focus-ring-color: rgba(28, 69, 50, 0.28);
+
+  /* Surface: 12px default radius; shadow tiers for the minimal language */
+  --bs-border-radius: 0.75rem;         /* 12px — buttons, cards, inputs      */
+  --bs-border-radius-sm: 0.5rem;       /* 8px  — chips, small elements       */
+  --bs-border-radius-lg: 0.9rem;
+  --bs-box-shadow-sm: 0 1px 2px rgba(19, 32, 26, 0.05),
+    0 1px 6px rgba(19, 32, 26, 0.04); /* "soft" — hover states only         */
+  --bs-box-shadow: 0 4px 12px rgba(19, 32, 26, 0.08),
+    0 2px 4px rgba(19, 32, 26, 0.05); /* "lift" — dropdowns, modals         */
+  --bs-box-shadow-lg: 0 10px 30px rgba(19, 32, 26, 0.14),
+    0 4px 10px rgba(19, 32, 26, 0.07);
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+/* --- Kumunita component tokens ------------------------------------------- */
+:root {
+  --kmb-ink: #1f2a25;        /* body text on light surfaces      */
+  --kmb-ink-soft: #33403a;   /* secondary text (nav, footer)     */
+  --kmb-muted: #5c6b62;      /* meta: dates, labels on light     */
+  --kmb-eyebrow: #8a5a12;    /* uppercase labels; WCAG AA on all tints */
+  --kmb-amber: #f59e0b;
+  --kmb-amber-soft: #f0c97e; /* amber text on the dark hero      */
+  --kmb-cream: #f7f6f2;      /* near-white text on dark green    */
+  --kmb-tint-a: #eff3ef;     /* cool green-tinted section band   */
+  --kmb-tint-b: #f6f1e7;     /* warm cream section band          */
+  --kmb-border: #dde3dd;
+  --kmb-space-section: clamp(4.5rem, 8vw, 7rem);
+  --kmb-space-section-sm: 3rem;
+  --kmb-overlap: 3.25rem;    /* how far feature cards sink into the next band */
+  --kmb-card-shadow-dark: 0 12px 28px rgba(13, 26, 20, 0.22);
 }
 
+/* --- Base ----------------------------------------------------------------- */
 html {
   position: relative;
   min-height: 100%;
 }
 
 body {
-  margin-bottom: 60px;
+  margin-bottom: 60px; /* keeps the (tinted) footer clear of page content */
+}
+body.kmb-page-fullbleed {
+  margin-bottom: 0; /* full-bleed landing pages carry their own rhythm */
 }
 
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-  color: var(--bs-secondary-color);
-  text-align: end;
+.lead {
+  font-weight: 400;
+  line-height: 1.6;
 }
 
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-  text-align: start;
+/* Amber is never paired with white text (AA). */
+.text-bg-secondary {
+  color: #17251d !important;
+}
+.text-secondary {
+  color: #8a5a12 !important;
+}
+.text-primary,
+.text-warning,
+.text-danger {
+  font-weight: inherit;
 }
 
-/* Pinned announcement banner (Views/Shared/_PinnedAnnouncement.cshtml).
-   The banner is rendered at the top of every page, above the navbar. It is
-   already Bootstrap-styled via alert alert-info, but the body container
-   constrains everything below the navbar, so the banner needs explicit
-   full-bleed + a thin top border so it visually reads as a distinct
-   region rather than a page-level alert. */
+/* --- Typography helpers ---------------------------------------------------- */
+.eyebrow {
+  display: inline-block;
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kmb-eyebrow);
+}
+
+/* --- Buttons ---------------------------------------------------------------- */
+.btn {
+  font-family: var(--bs-heading-font-family);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.625rem 1.5rem;
+}
+
+/* Fully pill-shaped primary CTA (hero + CTA bands). */
+.btn-pill {
+  border-radius: var(--bs-border-radius-pill) !important;
+  padding-inline: 1.75rem;
+}
+
+.btn-primary {
+  --bs-btn-color: #f7f6f2;
+  --bs-btn-bg: #1c4532;
+  --bs-btn-border-color: #1c4532;
+  --bs-btn-hover-color: #f7f6f2;
+  --bs-btn-hover-bg: #173a2c;
+  --bs-btn-hover-border-color: #173a2c;
+  --bs-btn-focus-shadow-rgb: 28, 69, 50;
+  --bs-btn-active-color: #f7f6f2;
+  --bs-btn-active-bg: #122b20;
+  --bs-btn-active-border-color: #122b20;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(19, 32, 26, 0.3);
+  --bs-btn-disabled-color: #f7f6f2;
+  --bs-btn-disabled-bg: #1c4532;
+  --bs-btn-disabled-border-color: #1c4532;
+}
+
+/* Amber CTA: dark ink text is the AA pair (white on amber fails). */
+.btn-secondary {
+  --bs-btn-color: #17251d;
+  --bs-btn-bg: #f59e0b;
+  --bs-btn-border-color: #f59e0b;
+  --bs-btn-hover-color: #17251d;
+  --bs-btn-hover-bg: #de8a07;
+  --bs-btn-hover-border-color: #de8a07;
+  --bs-btn-focus-shadow-rgb: 245, 158, 11;
+  --bs-btn-active-color: #17251d;
+  --bs-btn-active-bg: #b45309;
+  --bs-btn-active-border-color: #b45309;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(90, 54, 10, 0.3);
+  --bs-btn-disabled-color: #5c4a22;
+  --bs-btn-disabled-bg: #f59e0b;
+  --bs-btn-disabled-border-color: #f59e0b;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #1c4532;
+  --bs-btn-border-color: #1c4532;
+  --bs-btn-hover-color: #f7f6f2;
+  --bs-btn-hover-bg: #1c4532;
+  --bs-btn-hover-border-color: #1c4532;
+  --bs-btn-focus-shadow-rgb: 28, 69, 50;
+  --bs-btn-active-color: #f7f6f2;
+  --bs-btn-active-bg: #122b20;
+  --bs-btn-active-border-color: #122b20;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(19, 32, 26, 0.3);
+  --bs-btn-disabled-color: #1c4532;
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: #1c4532;
+}
+
+.btn-outline-secondary {
+  --bs-btn-color: #8a5a12;
+  --bs-btn-border-color: #c98a2e;
+  --bs-btn-hover-color: #17251d;
+  --bs-btn-hover-bg: #f59e0b;
+  --bs-btn-hover-border-color: #f59e0b;
+  --bs-btn-focus-shadow-rgb: 245, 158, 11;
+  --bs-btn-active-color: #17251d;
+  --bs-btn-active-bg: #b45309;
+  --bs-btn-active-border-color: #b45309;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(90, 54, 10, 0.3);
+  --bs-btn-disabled-color: #8a5a12;
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: #c98a2e;
+}
+
+/* Lead paragraphs: serif body at a slightly larger size, used in the hero,
+   section headings and the CTA band. */
+.kmb-hero-lead {
+  font-size: 1.125rem;
+  line-height: 1.65;
+}
+.kmb-section-lead {
+  color: #46534b;
+}
+
+/* A ghost link that reads well only on the dark green bands: keep local,
+   out of the global link scale. */
+.kmb-hero .btn-outline-primary,
+.kmb-cta-band .btn-outline-primary,
+.kmb-hero .btn-hero-ghost,
+.kmb-cta-band .btn-hero-ghost {
+  --bs-btn-color: var(--kmb-cream);
+  --bs-btn-border-color: rgba(247, 246, 242, 0.55);
+  --bs-btn-hover-color: #1c4532;
+  --bs-btn-hover-bg: var(--kmb-cream);
+  --bs-btn-hover-border-color: var(--kmb-cream);
+  --bs-btn-active-color: #122b20;
+  --bs-btn-active-bg: #f0c97e;
+  --bs-btn-active-border-color: #f0c97e;
+}
+
+/* --- Cards (minimal surface: borders first, shadow only on hover) ---------- */
+.card {
+  border-color: var(--kmb-border);
+  box-shadow: none; /* overrides the classic bootstrap card shadow */
+}
+
+.card.kmb-hoverable {
+  transition: box-shadow 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+.card.kmb-hoverable:hover {
+  border-color: #c9d3ca;
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
+/* --- Navbar ------------------------------------------------------------------ */
+.navbar {
+  box-shadow: none;
+}
+.navbar-brand {
+  font-family: var(--bs-heading-font-family);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #1c4532 !important;
+}
+.navbar-light .nav-link {
+  color: var(--kmb-ink-soft);
+  font-size: 0.9375rem;
+}
+.navbar-light .nav-link:hover,
+.navbar-light .nav-link:focus {
+  color: #1c4532;
+}
+.navbar-light .navbar-nav .nav-link.active {
+  color: #1c4532;
+  font-weight: 600;
+}
+
+/* --- Pinned announcement (Views/Shared/_PinnedAnnouncement.cshtml) --------
+   Full-bleed banner above the navbar: warm cream band, amber left accent. */
 .kumunita-pinned-announcement {
   width: 100%;
   border: 0;
-  border-bottom: 1px solid var(--bs-info-border);
+  border-inline-start: 3px solid var(--kmb-amber);
+  background-color: var(--kmb-tint-b);
+  color: var(--kmb-ink);
+  box-shadow: none;
 }
 .kumunita-pinned-announcement .container-fluid {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
+}
+.kumunita-pinned-announcement .btn-link {
+  color: #1c4532;
+  font-weight: 600;
+}
+
+/* --- Badges ------------------------------------------------------------------ */
+.badge {
+  font-family: var(--bs-heading-font-family);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* --- Section rhythm ------------------------------------------------------------ */
+.kmb-section {
+  padding-block: var(--kmb-space-section);
+}
+.kmb-section-sm {
+  padding-block: var(--kmb-space-section-sm);
+}
+.kmb-section-tint-a {
+  background-color: var(--kmb-tint-a);
+}
+.kmb-section-tint-b {
+  background-color: var(--kmb-tint-b);
+}
+
+.centered-head {
+  max-width: 46rem;
+  margin-inline: auto;
+  text-align: center;
+}
+.centered-head .eyebrow {
+  margin-bottom: 0.75rem;
+}
+.centered-head h2,
+.centered-head .h2 {
+  margin-bottom: 0.75rem;
+}
+
+/* --- Hero ----------------------------------------------------------------------
+   Full-width dark green with a subtle overlay for text contrast.
+   TODO(design): replace the gradient with a real local neighborhood photo —
+   drop the file into wwwroot/images and set `.kmb-hero { --kmb-hero-bg: url(...) }`. */
+.kmb-hero {
+  position: relative;
+  background-color: #1c4532;
+  background-image: var(--kmb-hero-bg, linear-gradient(165deg, #27543f 0%, #1c4532 55%, #142e22 100%));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: var(--kmb-cream);
+  padding-block: clamp(4.5rem, 10vw, 7.5rem);
+}
+/* Subtle dark overlay so text stays readable over a photo too. */
+.kmb-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(19, 32, 26, 0.45), rgba(19, 32, 26, 0.3));
+}
+.kmb-hero > .container,
+.kmb-hero > * {
+  position: relative;
+}
+.kmb-hero .eyebrow {
+  color: var(--kmb-amber-soft);
+}
+.kmb-hero .lead {
+  color: rgba(247, 246, 242, 0.88);
+}
+.kmb-hero a:not(.btn) {
+  color: var(--kmb-cream);
+  text-decoration-color: rgba(247, 246, 242, 0.4);
+}
+.kmb-hero a:not(.btn):hover {
+  text-decoration-color: var(--kmb-cream);
+}
+
+/* --- Floating feature cards -----------------------------------------------------
+   A dark band bleeds into the section below it; the white cards overlap the
+   boundary by --kmb-overlap. Markup: .kmb-features > .kmb-features-band +
+   <section class="kmb-features-under kmb-section-tint-a">. */
+.kmb-features {
+  position: relative;
+}
+.kmb-features-band {
+  background-color: #142e22;
+  padding-top: var(--kmb-space-section-sm);
+  padding-bottom: 0;
+}
+.kmb-features-row {
+  margin-bottom: calc(var(--kmb-overlap) * -1);
+  transform: translateY(var(--kmb-overlap));
+}
+.kmb-features-under {
+  padding-top: calc(var(--kmb-overlap) + 3rem);
+}
+
+.kmb-feat-card {
+  background-color: #ffffff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--bs-border-radius);
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--kmb-card-shadow-dark); /* lifts off the dark band */
+  height: 100%;
+}
+.kmb-feat-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin-bottom: 1rem;
+  background-color: var(--kmb-tint-a);
+  color: #1c4532;
+}
+.kmb-feat-icon.kmb-feat-icon-warm {
+  background-color: var(--kmb-tint-b);
+  color: #8a5a12;
+}
+.kmb-feat-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.kmb-feat-card h3,
+.kmb-feat-card .h3 {
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+}
+.kmb-feat-card p {
+  margin-bottom: 0;
+  color: #46534b; /* muted ink, still AA on white */
+}
+
+/* --- Stat band ------------------------------------------------------------------- */
+.kmb-stats {
+  border-block: 1px solid var(--kmb-border);
+}
+.kmb-stat {
+  text-align: center;
+  padding: 1.75rem 1rem;
+}
+.kmb-stat-value {
+  font-family: var(--bs-heading-font-family);
+  font-weight: 700;
+  font-size: clamp(2.25rem, 4vw, 3rem);
+  line-height: 1.1;
+  color: #1c4532;
+}
+.kmb-stat-label {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--kmb-muted);
+}
+
+/* --- Roadmap list (home) ----------------------------------------------------------- */
+.kmb-roadmap {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 0;
+  max-width: 46rem;
+}
+.kmb-roadmap li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--kmb-border);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- FAQ accordion (_FaqAccordion.cshtml) ----------------------------------------- */
+.accordion.kmb-faq {
+  max-width: 46rem;
+}
+.accordion.kmb-faq .accordion-item {
+  border-color: var(--kmb-border);
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+}
+.accordion.kmb-faq .accordion-button {
+  font-family: var(--bs-heading-font-family);
+  font-weight: 500;
+  color: var(--kmb-ink);
+  box-shadow: 0 0 0 transparent !important; /* divider lines instead of stacked shadows */
+}
+.accordion.kmb-faq .accordion-button:not(.collapsed) {
+  color: #1c4532;
+  background-color: var(--kmb-tint-a);
+}
+.accordion.kmb-faq .accordion-button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(28, 69, 50, 0.4) !important;
+}
+.accordion.kmb-faq .accordion-body {
+  color: #46534b;
+}
+
+/* --- CTA band (above the footer) ---------------------------------------------------- */
+.kmb-cta-band {
+  background-color: #1c4532;
+  background-image: linear-gradient(120deg, #1c4532 0%, #142e22 100%);
+  color: var(--kmb-cream);
+  padding-block: var(--kmb-space-section-sm);
+}
+.kmb-cta-band .h2,
+.kmb-cta-band h2 {
+  color: var(--kmb-cream);
+}
+.kmb-cta-band p {
+  color: rgba(247, 246, 242, 0.85);
+}
+
+/* --- Footer ------------------------------------------------------------------------- */
+.kmb-footer {
+  background-color: #f4f3ee;
+  border-top: 1px solid var(--kmb-border);
+  padding-block: 3rem 2rem;
+  color: #46534b;
+}
+.kmb-footer .navbar-brand {
+  color: #1c4532 !important;
+}
+.kmb-footer h3 {
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--kmb-muted);
+  margin-bottom: 0.75rem;
+}
+.kmb-footer a {
+  color: var(--kmb-ink-soft);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.kmb-footer a:hover {
+  color: #1c4532;
+}
+
+/* --- Forms --------------------------------------------------------------------------- */
+.form-control,
+.form-select {
+  border-color: var(--kmb-border);
+}
+.form-check-input:checked {
+  background-color: #1c4532;
+  border-color: #1c4532;
+}
+.form-check-input:focus {
+  border-color: #1c4532;
+  box-shadow: 0 0 0 calc(var(--bs-focus-ring-width) * 0.75) var(--bs-focus-ring-color);
 }
