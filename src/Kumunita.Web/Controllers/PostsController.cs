@@ -161,10 +161,12 @@ public sealed class PostsController(
             Items = items,
             Total = feed.Total,
             CanPost = canPost,
-            // The full enabled-community directory (the same candidate set used
-            // above for the 404 check) so the view can render links to the
-            // other individual community feeds.
-            Communities = components.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
+            // The viewer's own community directory only: communities they have
+            // access to (membership ∪ moderator scope ∪ GlobalAdmin — the same
+            // <see cref="AccessibleComponentsAsync"/> rule driving CanPost). A
+            // viewer with no reachable communities renders no pill directory;
+            // a GlobalAdmin still sees every enabled community.
+            Communities = accessible.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
         });
     }
 
@@ -244,10 +246,11 @@ public sealed class PostsController(
             Items = items,
             Total = feed.Total,
             CanPost = canPost,
-            // The full enabled-community directory — on the all-sections feed
-            // this is what links each badge row back to its own feed, and the
-            // view's "Communities" list is the same set.
-            Communities = components.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
+            // The viewer's own community directory only — the same reachable
+            // set that drives CanPost above (a member sees their communities,
+            // a GlobalAdmin sees every enabled one), so a viewer with no
+            // reachable communities renders no pill directory.
+            Communities = accessible.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
         });
     }
 

@@ -34,11 +34,13 @@
             </div>
         }
 
-        @* Individual-community links — the community directory for this feed.
-           On the single-community feed (Model.ComponentId set) the current one
-           is highlighted and the others are one click away; on the all-sections
-           feed every entry is a link. Hidden when there are no communities
-           (the bootstrap edge — the empty-feed branch below already covers it). *@
+        @* Individual-community links — the viewer's own community directory:
+           only the communities they have access to (same rule as the
+           "Write a post" button above). On the single-community feed
+           (Model.ComponentId set) the current one is highlighted and the
+           others are one click away; on the all-sections feed every entry is
+           a link. Hidden when the viewer has no reachable communities (the
+           bootstrap edge — the empty-feed branch below already covers it). *@
         @if (Model.Communities.Count > 0)
         {
             <div class="mb-3">
