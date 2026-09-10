@@ -18,7 +18,7 @@ namespace Kumunita.Web.Controllers;
 /// <item><c>GET /announcements</c> — the read surface, <b>open</b> to
 /// unauthenticated visitors (a public-scope announcement is by definition
 /// visible whether or not the visitor is signed in — the maintenance-notice
-/// case). The controller's <see cref="ListVisibleAsync(bool)"/> filter is the
+/// case). The controller's <see cref="ListVisibleAsync"/> filter is the
 /// sole visibility gate: public scope always, community scope when
 /// signed in.</item>
 /// <item><c>GET /announcements/new</c> + <c>POST /announcements/new</c> —
@@ -79,6 +79,21 @@ public sealed class AnnouncementController(
         return allowed;
     }
 
+    /// <summary>
+    /// Seeds a compose form's <c>AllowedScopes</c> and <c>TargetCommunities</c> —
+    /// a GlobalAdmin may target any community, a Moderator only the ones they
+    /// moderate (read from their <c>moderator:{id}</c> standing claims). A shape
+    /// convenience only; the service pins the whole split server-side at POST.
+    /// </summary>
+    private async Task SeedComposeOptionsAsync(AnnouncementComposeViewModel model, IReadOnlySet<string> roles)
+    {
+        model.AllowedScopes = RoleAllowedScopes(roles);
+        var components = await userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        model.TargetCommunities = components
+            .Where(c => roles.Contains(Roles.GlobalAdmin) || roles.Contains(Roles.ModeratorComponent(c.Id)))
+            .ToList();
+    }
+
     // ── Read (GET /announcements) ─
 
     /// <summary>
@@ -89,8 +104,9 @@ public sealed class AnnouncementController(
     [HttpGet("/announcements")]
     public async Task<IActionResult> Index()
     {
-        var isAuthenticated = User.Identity?.IsAuthenticated == true;
-        var visible = await announcements.ListVisibleAsync(isAuthenticated);
+        var subjectId = SubjectId(User);
+        var roles     = RoleSet(User);
+        var visible   = await announcements.ListVisibleAsync(subjectId, roles);
 
         var authorIds = visible.Select(a => a.AuthorId).Distinct().ToHashSet();
 
@@ -108,9 +124,12 @@ public sealed class AnnouncementController(
             authorNames[id] = name;
         }
 
+        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var componentNames = components.ToDictionary(c => c.Id, c => c.Name);
+
         var rows = visible
             .Select(a => new AnnouncementRow(a.Id, a.Scope, a.Title ?? string.Empty, a.Body, a.Created,
-                                             authorNames[a.AuthorId], a.Pinned))
+                                             authorNames[a.AuthorId], a.Pinned, a.CommunityId, a.CommunityId is not null && componentNames.TryGetValue(a.CommunityId, out var cn) ? cn : null))
             .ToList();
 
         return View(new AnnouncementIndexViewModel(rows));
@@ -126,14 +145,11 @@ public sealed class AnnouncementController(
     /// </summary>
     [HttpGet("/announcements/new")]
     [Authorize(Roles = "GlobalAdmin,Moderator")]
-    public IActionResult New()
+    public async Task<IActionResult> New()
     {
-        var roles = RoleSet(User);
-        var allowed = new List<AnnouncementScope> { AnnouncementScope.Community };
-        if (roles.Contains(Roles.GlobalAdmin))
-            allowed.Insert(0, AnnouncementScope.Public);
-
-        return View(new AnnouncementComposeViewModel { Scope = "Community", AllowedScopes = allowed });
+        var model = new AnnouncementComposeViewModel { Scope = "Community" };
+        await SeedComposeOptionsAsync(model, RoleSet(User));
+        return View(model);
     }
 
     /// <summary>
@@ -156,11 +172,7 @@ public sealed class AnnouncementController(
 
         if (!ModelState.IsValid)
         {
-            var roles = RoleSet(User);
-            var allowed = new List<AnnouncementScope> { AnnouncementScope.Community };
-            if (roles.Contains(Roles.GlobalAdmin))
-                allowed.Insert(0, AnnouncementScope.Public);
-            model.AllowedScopes = allowed;
+            await SeedComposeOptionsAsync(model, RoleSet(User));
             return View(model);
         }
 
@@ -184,6 +196,7 @@ public sealed class AnnouncementController(
                     Body   = model.Body!,
                     Scope  = scope,
                     Pinned = model.Pinned,
+                    CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -194,11 +207,7 @@ public sealed class AnnouncementController(
         catch (UnauthorizedAccessException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            var roles = RoleSet(User);
-            var allowed = new List<AnnouncementScope> { AnnouncementScope.Community };
-            if (roles.Contains(Roles.GlobalAdmin))
-                allowed.Insert(0, AnnouncementScope.Public);
-            model.AllowedScopes = allowed;
+            await SeedComposeOptionsAsync(model, RoleSet(User));
             return View(model);
         }
     }
@@ -234,15 +243,17 @@ public sealed class AnnouncementController(
             return new ForbidResult();
         }
 
-        return View(new AnnouncementComposeViewModel
+        var model = new AnnouncementComposeViewModel
         {
             Id = id,
             Title = existing.Title,
             Body  = existing.Body,
             Scope = existing.Scope.ToString(),
             Pinned = existing.Pinned,
-            AllowedScopes = RoleAllowedScopes(roles),
-        });
+            CommunityId = existing.CommunityId,
+        };
+        await SeedComposeOptionsAsync(model, roles);
+        return View(model);
     }
 
     /// <summary>
@@ -270,15 +281,9 @@ public sealed class AnnouncementController(
             // seed from — the edit target isn't loadable without a write
             // session; fall back to the role-dependent shape, the same way the
             // create lane does).
-            return View(new AnnouncementComposeViewModel
-            {
-                Id = id,
-                Title = model.Title,
-                Body  = model.Body,
-                Scope = model.Scope,
-                Pinned = model.Pinned,
-                AllowedScopes = RoleAllowedScopes(RoleSet(User)),
-            });
+            model.Id = id;
+            await SeedComposeOptionsAsync(model, RoleSet(User));
+            return View(model);
         }
 
         await using var session = store.LightweightSession();
@@ -299,6 +304,7 @@ public sealed class AnnouncementController(
                     Body   = model.Body!,
                     Scope  = scope,
                     Pinned = model.Pinned,
+                    CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
                 },
                 actorId:    actorId,
                 actorRoles: RoleSet(User),

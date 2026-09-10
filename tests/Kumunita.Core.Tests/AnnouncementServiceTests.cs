@@ -2,6 +2,7 @@ using Kumunita.Core;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.UserInfo;
 using Marten;
 using Xunit;
 
@@ -23,18 +24,25 @@ namespace Kumunita.Core.Tests;
 ///       by a <see cref="Roles.GlobalAdmin"/>; a
 ///       <see cref="AnnouncementScope.Community"/> announcement is visible
 ///       to every signed-in user and authorable by a GlobalAdmin or a
-///       <see cref="Roles.Moderator"/>. <see cref="AnnouncementService.CreateAsync"/>
-///       enforces this split at the Core layer (defense-in-depth — the
-///       ASP.NET gate narrows the author, the service pins the scope).</item>
+///       <see cref="Roles.Moderator"/>. A Community-scoped announcement may
+///       additionally <em>target</em> one community (<see cref="Announcement.CommunityId"/>):
+///       it is then visible only to that community's members, its
+///       moderators, or a GlobalAdmin, and authorable by that community's
+///       <c>moderator:{id}</c> standing (or a GlobalAdmin). <see
+///       cref="AnnouncementService.CreateAsync"/> enforces this split at the
+///       Core layer (defense-in-depth — the ASP.NET gate narrows the
+///       author, the service pins the scope <em>and</em> the target).</item>
 /// <item><b>Not an <see cref="AccessAudit"/> subject.</b> Announcements are
 ///       not audience-restricted content, so there is no per-user decision
 ///       to log — the coarse role gate IS the whole decision. The list and
 ///       delete lanes emit no <c>AccessAudit</c> row (pinned below).</item>
-/// <item><b>Read = flat public/audience split, never a <c>CanSeeAsync</c>
+/// <item><b>Read = a coarse role/standing filter, never a <c>CanSeeAsync</c>
 ///       call.</b> <see cref="AnnouncementService.ListVisibleAsync"/> is a
-///       single query filter on <c>Scope</c>; the <c>true</c> / <c>false</c>
-///       argument is the caller's authenticated state from the Web layer,
-///       not a principal's subject id.</item>
+///       single query filter on <c>Scope</c> / <see cref="Announcement.CommunityId"/>;
+///       the <c>actorId</c> + <c>roles</c> arguments are the caller's subject
+///       id and role set from the Web layer principal — the membership set
+///       is resolved through the frozen <see cref="IUserInfoService"/> seam
+///       (no <see cref="IAuthorizationService"/> decision).</item>
 /// <item><b>Hard delete.</b> <see cref="AnnouncementService.DeleteAsync"/>
 ///       removes the document (there is no <see
 ///       cref="Posts.PostStatus"/>-shaped surface on this lane — a flat
@@ -61,7 +69,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task ListVisible_Anonymous_OnlySeesPublic()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-public";
         await Plant(store, new Announcement
@@ -77,7 +86,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             AuthorId = author, Created = new DateTimeOffset(2026, 1, 14, 12, 0, 0, TimeSpan.Zero),
         });
 
-        var visible = await svc.ListVisibleAsync(isAuthenticated: false);
+        var visible = await svc.ListVisibleAsync(null, new HashSet<string>());
 
         var ids = visible.Select(a => a.Id).ToHashSet();
         Assert.Contains("pub-1", ids);
@@ -102,7 +111,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task ListVisible_Authenticated_SeesBothScopes()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-both";
         await Plant(store, new Announcement
@@ -124,7 +134,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             AuthorId = author, Created = new DateTimeOffset(2026, 1, 18, 12, 0, 0, TimeSpan.Zero),
         });
 
-        var visible = await svc.ListVisibleAsync(isAuthenticated: true);
+        var visible = await svc.ListVisibleAsync("u-resident", new HashSet<string> { Roles.Member });
 
         var ids = visible.Select(a => a.Id).ToHashSet();
         Assert.Equal(new[] { "comm-2", "comm-3", "pub-2" }, ids.OrderBy(x => x).ToArray());
@@ -140,7 +150,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task ListVisible_SortedCreated_Descending()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-sort";
         // Plant in an order deliberately different from the expected sort
@@ -152,7 +163,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         await Plant(store, new Announcement { Id = "new",   Scope = AnnouncementScope.Public,    AuthorId = author, Body = "2026-01-12", Created = c.AddDays(2) });
         await Plant(store, new Announcement { Id = "mid2",  Scope = AnnouncementScope.Community, AuthorId = author, Body = "2026-01-10", Created = c });
 
-        var visible = await svc.ListVisibleAsync(isAuthenticated: true);
+        var visible = await svc.ListVisibleAsync("u-resident", new HashSet<string> { Roles.Member });
 
         var createdOrder = visible.Select(a => a.Created).ToArray();
         Assert.Equal(createdOrder.OrderByDescending(x => x), createdOrder);
@@ -169,9 +180,10 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task ListVisible_NoDocuments_ReturnsEmptyList_NotNull()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
-        var visible = await svc.ListVisibleAsync(isAuthenticated: true);
+        var visible = await svc.ListVisibleAsync("u-resident", new HashSet<string> { Roles.Member });
 
         Assert.NotNull(visible);
         Assert.Empty(visible);
@@ -192,7 +204,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task ListVisible_NoAuditRow_Emitted()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-noaudit";
         await Plant(store, new Announcement
@@ -204,8 +217,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         // Two read calls — anonymous and resident — to pin that the *read*
         // lane emits nothing for either.
-        await svc.ListVisibleAsync(isAuthenticated: false);
-        await svc.ListVisibleAsync(isAuthenticated: true);
+        await svc.ListVisibleAsync(null, new HashSet<string>());
+        await svc.ListVisibleAsync("u-resident", new HashSet<string> { Roles.Member });
 
         var rows = await AuditRows(store);
         Assert.Empty(rows);
@@ -227,7 +240,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Public_AsGlobalAdmin_Persists()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-admin-public";
         await using var session = newSession(store);
@@ -261,7 +275,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Public_AsModerator_Denied_NotPersisted()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-moderator-public";
         await using var session = newSession(store);
@@ -294,7 +309,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Public_AsMember_Denied()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-member-public";
         await using var session = newSession(store);
@@ -323,7 +339,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Community_AsGlobalAdmin_Persists()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-admin-community";
         await using var session = newSession(store);
@@ -351,7 +368,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Community_AsModerator_Persists()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-moderator-community";
         await using var session = newSession(store);
@@ -380,7 +398,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_Community_AsMember_Denied()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string actor = "u-member-community";
         await using var session = newSession(store);
@@ -408,7 +427,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Create_EmptyRoleSet_Denied_EitherScope()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
         const string actor = "u-no-roles";
 
         await using var session = newSession(store);
@@ -445,7 +465,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Delete_Existing_RemovesFromStore()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-delete";
         await Plant(store, new Announcement
@@ -475,7 +496,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Delete_MissingId_ThrowsKeyNotFound()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -496,7 +518,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Update_Public_AsGlobalAdmin_Persists_KeepsAuthorAndCreated_StampedModified()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string originalAuthor = "u-author-original";
         var created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero);
@@ -541,7 +564,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Update_ToPublic_AsModerator_Denied_NotPersisted()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-public-denied";
         await Plant(store, new Announcement
@@ -576,7 +600,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Update_Community_AsModerator_Persists()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-community";
         await Plant(store, new Announcement
@@ -613,7 +638,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Update_MissingId_ThrowsKeyNotFound()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
@@ -635,7 +661,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Update_NoOp_DoesNotStampModified()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-noop";
         await Plant(store, new Announcement
@@ -674,7 +701,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Pinned_Anonymous_ReturnsOnlyPinnedPublic()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-pinned-visit";
         var c = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
@@ -699,7 +727,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             Created = c.AddDays(2),
         });
 
-        var pinned = await svc.PinnedAsync(isAuthenticated: false);
+        var pinned = await svc.PinnedAsync(null, new HashSet<string>());
 
         Assert.NotNull(pinned);
         Assert.Equal("pin-pub", pinned!.Id);
@@ -716,7 +744,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Pinned_Authenticated_MostRecentlyCreatedWinsAcrossScopes()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-pinned-auth";
         var c = new DateTimeOffset(2026, 2, 2, 0, 0, 0, TimeSpan.Zero);
@@ -739,7 +768,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             AuthorId = author, Created = c.AddDays(2),
         });
 
-        var pinned = await svc.PinnedAsync(isAuthenticated: true);
+        var pinned = await svc.PinnedAsync("u-resident", new HashSet<string> { Roles.Member });
 
         Assert.NotNull(pinned);
         Assert.Equal("newer-comm", pinned!.Id);
@@ -748,7 +777,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         // the anonymous call would have returned "older-pub" (newest Public)
         // — the Community pin "newer-comm" is the correct answer for a
         // signed-in caller, proving both scopes are on the table.
-        var anonymousPinned = await svc.PinnedAsync(isAuthenticated: false);
+        var anonymousPinned = await svc.PinnedAsync(null, new HashSet<string>());
         Assert.NotNull(anonymousPinned);
         Assert.Equal("older-pub", anonymousPinned!.Id);
     }
@@ -763,7 +792,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Pinned_NoPinnedAnnouncements_ReturnsNull()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         // Plant two non-pinned (Pinned = false) announcements: the pinned
         // lane must return null even though other announcements exist.
@@ -782,7 +812,7 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             Created = c.AddDays(1),
         });
 
-        var pinned = await svc.PinnedAsync(isAuthenticated: true);
+        var pinned = await svc.PinnedAsync("u-resident", new HashSet<string> { Roles.Member });
 
         Assert.Null(pinned);
     }
@@ -799,7 +829,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Pinned_UnpinnedRows_AreNotReturned()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-unpin";
         var c = new DateTimeOffset(2026, 2, 4, 0, 0, 0, TimeSpan.Zero);
@@ -816,8 +847,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
             Created = c.AddDays(1),
         });
 
-        Assert.Null(await svc.PinnedAsync(isAuthenticated: false));
-        Assert.Null(await svc.PinnedAsync(isAuthenticated: true));
+        Assert.Null(await svc.PinnedAsync(null, new HashSet<string>()));
+        Assert.Null(await svc.PinnedAsync("u-resident", new HashSet<string> { Roles.Member }));
     }
 
     /// <summary>
@@ -833,7 +864,8 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     public async Task Pinned_Anonymous_ScopeOfReturnedDoc_RespectsAuthGate()
     {
         var store = await BootStoreAsync();
-        var svc = new AnnouncementService(store);
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
 
         const string author = "u-author-scope";
         var c = new DateTimeOffset(2026, 2, 5, 0, 0, 0, TimeSpan.Zero);
@@ -853,17 +885,380 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         // Anonymous: only Public is visible. The most-recently-created
         // pinned announcement that passes the gate is "pin-pub-a" even
         // though "pin-comm-b" is newer (it's a Community pin).
-        var anon = await svc.PinnedAsync(isAuthenticated: false);
+        var anon = await svc.PinnedAsync(null, new HashSet<string>());
         Assert.NotNull(anon);
         Assert.Equal("pin-pub-a", anon!.Id);
         Assert.Equal(AnnouncementScope.Public, anon.Scope);
 
         // Signed-in: union of pinned rows, most-recently-created wins —
         // "pin-comm-b" even though it's Community scope.
-        var auth = await svc.PinnedAsync(isAuthenticated: true);
+        var auth = await svc.PinnedAsync("u-resident", new HashSet<string> { Roles.Member });
         Assert.NotNull(auth);
         Assert.Equal("pin-comm-b", auth!.Id);
         Assert.Equal(AnnouncementScope.Community, auth.Scope);
+    }
+
+    // ── Targeted announcements (CommunityId — one community instead of every resident) ──
+
+    /// <summary>
+    /// A <see cref="Announcement"/> with a <c>CommunityId</c> targets that
+    /// community: visible to the community's <em>members</em>, its
+    /// <em>moderators</em>, and a <see cref="Roles.GlobalAdmin"/> — and to no
+    /// one else (a resident who is not in the target community, or an
+    /// anonymous visitor, never sees it). The membership set is resolved
+    /// through the frozen <see cref="IUserInfoService"/> seam
+    /// (<c>GetCommunityIdsAsync</c>), the moderation standing through the
+    /// caller's <c>moderator:{id}</c> role set — the <see
+    /// cref="AnnouncementService.ListVisibleAsync"/> doc contract.
+    /// </summary>
+    [Fact]
+    public async Task ListVisible_Targeted_VisibleToMembersAndAdminsOfTargetOnly()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new ComponentMembership
+        {
+            Id = "mm-a", ComponentId = "community-A", UserId = "u-member-A",
+            AddedBy = "u-admin", At = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "targeted-A", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Community A event", Body = "x", AuthorId = "u-moderator-A",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var ids = (IReadOnlyList<Announcement> visible) => visible.Select(a => a.Id).ToHashSet();
+
+        // A member of the target community sees it.
+        Assert.Contains("targeted-A", ids(await svc.ListVisibleAsync("u-member-A", new HashSet<string> { Roles.Member })));
+
+        // A resident of another community does not — membership (not
+        // authentication) is the read gate on a targeted row.
+        Assert.DoesNotContain("targeted-A", ids(await svc.ListVisibleAsync("u-member-B", new HashSet<string> { Roles.Member })));
+
+        // An anonymous visitor never sees it.
+        Assert.DoesNotContain("targeted-A", ids(await svc.ListVisibleAsync(null, new HashSet<string>())));
+
+        // A GlobalAdmin sees it regardless of membership.
+        Assert.Contains("targeted-A", ids(await svc.ListVisibleAsync("u-admin-A", new HashSet<string> { Roles.GlobalAdmin })));
+    }
+
+    /// <summary>
+    /// The moderator standing is target-specific: a
+    /// <c>moderator:community-A</c> standing (no membership needed) makes a
+    /// target-<c>community-A</c> row visible, while a
+    /// <c>moderator:community-B</c> standing does not (the claim set carries
+    /// <em>which</em> components the moderator governs — ADR 0003).
+    /// </summary>
+    [Fact]
+    public async Task ListVisible_Targeted_ModeratorOfTargetSeesIt_OtherModeratorDoesNot()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "targeted-A", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Community A event", Body = "x", AuthorId = "u-moderator-A",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var ids = (IReadOnlyList<Announcement> visible) => visible.Select(a => a.Id).ToHashSet();
+
+        Assert.Contains("targeted-A",
+            ids(await svc.ListVisibleAsync("u-moderator-A", new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-A") })));
+
+        Assert.DoesNotContain("targeted-A",
+            ids(await svc.ListVisibleAsync("u-moderator-B", new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-B") })));
+    }
+
+    /// <summary>
+    /// The pinned lane honors the same target split: a pinned target-<c>community-A</c>
+    /// announcement is the banner for that community's members (and a
+    /// GlobalAdmin) and null for everyone else — the two-way split on the
+    /// read side, applied to the targeted shape.
+    /// </summary>
+    [Fact]
+    public async Task Pinned_Targeted_MemberOfTarget_SeesIt_OthersSeeNull()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new ComponentMembership
+        {
+            Id = "mm-a-pin", ComponentId = "community-A", UserId = "u-member-A",
+            AddedBy = "u-admin", At = DateTimeOffset.UtcNow,
+        });
+        await Plant(store, new Announcement
+        {
+            Id = "pin-targeted-A", Scope = AnnouncementScope.Community, CommunityId = "community-A", Pinned = true,
+            Title = "Community A pinned", Body = "x", AuthorId = "u-moderator-A",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var mine = await svc.PinnedAsync("u-member-A", new HashSet<string> { Roles.Member });
+        Assert.NotNull(mine);
+        Assert.Equal("pin-targeted-A", mine!.Id);
+
+        var admin = await svc.PinnedAsync("u-admin-A", new HashSet<string> { Roles.GlobalAdmin });
+        Assert.NotNull(admin);
+        Assert.Equal("pin-targeted-A", admin!.Id);
+
+        Assert.Null(await svc.PinnedAsync("u-member-B", new HashSet<string> { Roles.Member }));
+        Assert.Null(await svc.PinnedAsync(null, new HashSet<string>()));
+    }
+
+    /// <summary>
+    /// Write-lane pin: a community's own moderator (<see cref="Roles.Moderator"/>
+    /// + the <c>moderator:community-A</c> standing) may author a
+    /// target-<c>community-A</c> announcement. The stored document carries the
+    /// <c>CommunityId</c> verbatim (the service never mutates authority —
+    /// the same "author's choice verbatim" shape as the scope split).
+    /// </summary>
+    [Fact]
+    public async Task Create_Targeted_ByModeratorOfTarget_Persists()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+
+        await using var session = newSession(store);
+        var created = await svc.CreateAsync(
+            new Announcement { Scope = AnnouncementScope.Community, CommunityId = "community-A", Title = "Event", Body = "x" },
+            actorId: "u-moderator-A",
+            authorRoles: new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+            session);
+
+        Assert.Equal("community-A", created.CommunityId);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>(created.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal(AnnouncementScope.Community, stored!.Scope);
+        Assert.Equal("community-A", stored.CommunityId);
+    }
+
+    /// <summary>
+    /// A GlobalAdmin may target <em>any</em> community (the admin-lane pin on
+    /// the targeted shape — symmetric with the scope split's admin-lane pin).
+    /// </summary>
+    [Fact]
+    public async Task Create_Targeted_ByGlobalAdmin_Persists()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
+
+        await using var session = newSession(store);
+        var created = await svc.CreateAsync(
+            new Announcement { Scope = AnnouncementScope.Community, CommunityId = "community-B", Title = "Event", Body = "x" },
+            actorId: "u-admin-A",
+            authorRoles: new HashSet<string> { Roles.GlobalAdmin },
+            session);
+
+        Assert.Equal("community-B", created.CommunityId);
+    }
+
+    /// <summary>
+    /// A plain <see cref="Roles.Moderator"/> — no <c>moderator:{id}</c>
+    /// standing — cannot target a community even though they may use the
+    /// flat "all residents" Community lane (<see
+    /// cref="Create_Community_AsModerator_Persists"/>): the target pin is
+    /// the standing claim, denied <see cref="UnauthorizedAccessException"/>,
+    /// and the document is NOT persisted.
+    /// </summary>
+    [Fact]
+    public async Task Create_Targeted_ByModeratorWithoutStandingClaim_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAsync(
+                new Announcement { Scope = AnnouncementScope.Community, CommunityId = "community-A", Title = "x", Body = "x" },
+                actorId: "u-moderator-unknown",
+                authorRoles: new HashSet<string> { Roles.Moderator },
+                session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// A moderator of a <em>different</em> community cannot target this one
+    /// — the standing must name the exact <c>CommunityId</c> (a moderator
+    /// claim is a scoped standing, not a global key).
+    /// </summary>
+    [Fact]
+    public async Task Create_Targeted_ByModeratorOfOtherCommunity_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAsync(
+                new Announcement { Scope = AnnouncementScope.Community, CommunityId = "community-A", Title = "x", Body = "x" },
+                actorId: "u-moderator-B",
+                authorRoles: new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-B") },
+                session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// A target that names a <em>unknown</em> community (no
+    /// <c>Component</c> row) is a <see cref="ArgumentException"/> (the Web
+    /// layer maps that to a 400) — not a silent success or a 403. This
+    /// guards against a <c>moderator:{bogus-id}</c> shape minted by a
+    /// mis-shaped principal: the target must name a real, enabled
+    /// functional component.
+    /// </summary>
+    [Fact]
+    public async Task Create_Targeted_UnknownCommunity_ArgumentException()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateAsync(
+                new Announcement { Scope = AnnouncementScope.Community, CommunityId = "community-ghost", Title = "x", Body = "x" },
+                actorId: "u-moderator-ghost",
+                authorRoles: new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-ghost") },
+                session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// A <see cref="AnnouncementScope.Public"/> announcement may not target
+    /// a community (a public notice is, by definition, platform-wide — the
+    /// <see cref="Announcement.CommunityId"/> doc pin): even a GlobalAdmin
+    /// is refused a <c>Public</c> + <c>CommunityId</c> shape with an
+    /// <see cref="ArgumentException"/> (a shape error, mapped to a 400 by
+    /// the Web layer — not a 403 authorization denial).
+    /// </summary>
+    [Fact]
+    public async Task Create_PublicScope_WithCommunityId_ArgumentException()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.CreateAsync(
+                new Announcement { Scope = AnnouncementScope.Public, CommunityId = "community-A", Title = "x", Body = "x" },
+                actorId: "u-admin-A",
+                authorRoles: new HashSet<string> { Roles.GlobalAdmin },
+                session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<Announcement>().CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// The edit lane re-validates the <em>edited</em> target: a
+    /// target-<c>community-A</c> announcement stays editable by that
+    /// community's moderator (the same standing pin as create, applied to
+    /// the target shape) …
+    /// </summary>
+    [Fact]
+    public async Task Update_Targeted_ByModeratorOfTarget_Persists()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "edit-targeted-A", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Old", Body = "Old body", AuthorId = "u-moderator-A",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-targeted-A", Scope = AnnouncementScope.Community, CommunityId = "community-A", Title = "New", Body = "New body" },
+            actorId: "u-moderator-A",
+            actorRoles: new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+            session);
+
+        Assert.Equal("community-A", updated.CommunityId);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-targeted-A", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal("New", stored!.Title);
+        Assert.Equal("community-A", stored.CommunityId);
+    }
+
+    /// <summary>
+    /// … and a moderator whose standing names a <em>different</em> community
+    /// cannot edit a target-<c>community-A</c> row: the edit split is
+    /// re-checked against the row's current target, denied <see
+    /// cref="UnauthorizedAccessException"/>, and nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task Update_Targeted_ByModeratorOfOtherCommunity_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "edit-denied-A", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Still A's", Body = "body", AuthorId = "u-moderator-A",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateAsync(
+                new Announcement { Id = "edit-denied-A", Scope = AnnouncementScope.Community, CommunityId = "community-A", Title = "Hijacked?", Body = "x" },
+                actorId: "u-moderator-B",
+                actorRoles: new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-B") },
+                session));
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-denied-A", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal("Still A's", stored!.Title);
     }
 
     // ── Shared helpers ─────────────────────────────────────────────────────

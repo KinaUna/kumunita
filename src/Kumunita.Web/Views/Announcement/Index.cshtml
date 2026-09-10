@@ -33,7 +33,7 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">All announcements</span>
-                @if (isGlobalAdmin || isModerator)
+                @if (isGlobalAdmin || isModerator || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value.StartsWith("moderator:")) ?? false))
                 {
                     <a class="btn btn-sm btn-outline-primary" href="/announcements/new">
                         New announcement
@@ -53,6 +53,7 @@
                         var badgeClass = a.Scope == AnnouncementScope.Public
                             ? "text-bg-secondary"
                             : "text-bg-primary";
+                        bool canEdit = isGlobalAdmin || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && isModerator) || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false));
 
                         <li class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
@@ -70,7 +71,7 @@
                                 </div>
                                 <div class="d-flex flex-column align-items-end gap-2">
                                     <span class="badge @badgeClass">
-                                        @(a.Scope == AnnouncementScope.Public ? "everyone" : "residents")
+                                        @(a.Scope == AnnouncementScope.Public ? "everyone" : (a.CommunityDisplayName is not null ? a.CommunityDisplayName : "residents"))
                                     </span>
                                     @if (a.Pinned)
                                     {
@@ -78,7 +79,7 @@
                                             pinned
                                         </span>
                                     }
-                                    @if (isGlobalAdmin || (isModerator && a.Scope == AnnouncementScope.Community))
+                                    @if (canEdit)
                                     {
                                         <a class="btn btn-sm btn-link p-0" href="/announcements/@a.Id/edit">
                                             Edit

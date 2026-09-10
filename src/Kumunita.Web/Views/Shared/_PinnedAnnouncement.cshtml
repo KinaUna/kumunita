@@ -6,8 +6,9 @@
     // is the service's (public always; community only when signed in), so an
     // anonymous visitor may see a pinned Public announcement but never a
     // pinned Community one — the split pin, ADR 0006-D.
-    bool isAuthenticated = User.Identity?.IsAuthenticated == true;
-    Announcement? pinned = await Announcements.PinnedAsync(isAuthenticated);
+    string? actorId = (User?.Identity?.IsAuthenticated == true) ? Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User) : null;
+    var actorRoles = new System.Collections.Generic.HashSet<string>(User?.Claims.Where(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role).Select(c => c.Value) ?? System.Linq.Enumerable.Empty<string>());
+    Announcement? pinned = await Announcements.PinnedAsync(actorId, actorRoles);
 
     if (pinned is not null)
     {
