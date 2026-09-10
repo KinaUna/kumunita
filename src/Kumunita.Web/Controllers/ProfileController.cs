@@ -114,7 +114,80 @@ public sealed class ProfileController(
             model.OptInContactVisibility = true;
         }
 
+        // Grant-picker option lists (the M2 editor's UX layer over the frozen
+        // Grants transport). These travel on ViewBag (the standard read-only
+        // view-data channel) rather than as model properties, because the
+        // U11 "exactly six form fields" pin
+        // (ProfileEditViewModel_Has_Exactly_Six_FormFields) forbids adding
+        // a new settable write surface to ProfileEditViewModel. The
+        // _AudienceEditor partial reads them via @ViewBag (the editor name
+        // key — "Visibility" / "ContactVisibility" — selects the right
+        // pair per invocation).
+        await SeedGrantPickerOptionsAsync();
+
         return View(model);
+    }
+
+    /// <summary>
+    /// Populates <c>ViewBag.Visibility_Users</c> /
+    /// <c>ViewBag.Visibility_Groups</c> /
+    /// <c>ViewBag.ContactVisibility_Users</c> /
+    /// <c>ViewBag.ContactVisibility_Groups</c> with the user + group option
+    /// lists the editor's grant pickers render over the frozen
+    /// <see cref="AudienceEditorModel.Grants"/> JSON transport.
+    /// <b>Users</b>: every verified, non-blocked resident <i>except the
+    /// author themselves</i> (the natural "grantable account" set — the
+    /// platform's invitation-only residents; an unverified or blocked
+    /// account loses standing and is non-grantable). The author's own
+    /// subject is deliberately excluded: an author can always already see
+    /// their own profile, so granting a <c>User</c> grant to themselves is
+    /// meaningless and only clutters the list.
+    /// <b>Groups</b>: the platform-wide group list
+    /// (<c>IUserInfoService.GetAllGroupsAsync</c>) — the UI's mental model
+    /// is "who can I grant this to"; the author's membership/ownership
+    /// does not constrain which <c>Group</c> they may name in their own
+    /// profile's audience (the decision is on the <c>Group</c> subject,
+    /// not the author's standing). <see cref="GrantOption"/> is the
+    /// shared option shape (Id + Label + Kind, where Kind is the string
+    /// form of <c>GrantKind</c> — "User" / "Group").
+    /// </summary>
+    private async Task SeedGrantPickerOptionsAsync()
+    {
+        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
+        var selfId = SubjectId(User);
+        var userOptions = profiles
+            .Where(p => !p.Blocked)
+            .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
+            .Select(p => new GrantOption
+            {
+                Id    = p.SubjectId,
+                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+                Kind  = "User",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var groups = await userInfo.GetAllGroupsAsync();
+        var groupOptions = groups
+            .Select(g => new GrantOption
+            {
+                Id    = g.Id,
+                Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+                Kind  = "Group",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Stored on the statically-typed ViewDataDictionary (ViewData), NOT
+        // ViewBag: the bag's accessor is typed as object, so an index write
+        // (ViewBag["X"] = y) goes through dynamic binding and throws
+        // RuntimeBinderException; ViewData exposes a real indexer. This is
+        // the same channel the Edit view already reads EditorName / OptIn
+        // from, so partials pick it up through ViewContext.ViewData.
+        ViewData["Visibility_Users"] = userOptions;
+        ViewData["Visibility_Groups"] = groupOptions;
+        ViewData["ContactVisibility_Users"] = userOptions;
+        ViewData["ContactVisibility_Groups"] = groupOptions;
     }
 
     /// <summary>

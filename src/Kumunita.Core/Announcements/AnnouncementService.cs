@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
 
@@ -25,7 +26,11 @@ namespace Kumunita.Core.Announcements;
 /// by a <see cref="Roles.GlobalAdmin"/>; a
 /// <see cref="AnnouncementScope.Community"/> announcement is visible to
 /// every signed-in user and is authorable by a GlobalAdmin or a
-/// <see cref="Roles.Moderator"/>. <see cref="CreateAsync"/> enforces that
+/// <see cref="Roles.Moderator"/>; it may also <em>target</em> a specific
+/// community (a <c>CommunityId</c>), which then makes it visible only to
+/// that community's members or moderators and a <see cref="Roles.GlobalAdmin"/>
+/// and is authorable by that community's moderator or a
+/// <see cref="Roles.GlobalAdmin"/>. <see cref="CreateAsync"/> enforces that
 /// split at the Core layer (defense-in-depth — the ASP.NET gate already
 /// narrows the author's role, but the Web layer cannot narrow the
 /// <em>scope</em> choice by itself: a Moderator could POST a
@@ -36,10 +41,12 @@ namespace Kumunita.Core.Announcements;
 public sealed class AnnouncementService : IAnnouncementService
 {
     private readonly IDocumentStore _store;
+    private readonly IUserInfoService _userInfo;
 
-    public AnnouncementService(IDocumentStore store)
+    public AnnouncementService(IDocumentStore store, IUserInfoService userInfo)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
     }
 
     /// <summary>
@@ -47,7 +54,7 @@ public sealed class AnnouncementService : IAnnouncementService
     /// authentication state:
     /// <list type="bullet">
     /// <item><see cref="AnnouncementScope.Public"/> — always, authed or not;</item>
-    /// <item><see cref="AnnouncementScope.Community"/> — only when <paramref name="isAuthenticated"/>.</item>
+    /// <item><see cref="AnnouncementScope.Community"/> — only when <paramref name="roles"/>.</item>
     /// </list>
     /// Sorted by <c>Created</c> descending (latest first). No audit
     /// <see cref="Authorization.AccessAudit"/> row (announcements are not
@@ -55,13 +62,19 @@ public sealed class AnnouncementService : IAnnouncementService
     /// coarse role gate is the whole decision, and it's a view-model
     /// filter, not a call into <c>IAuthorizationService</c>).
     /// </summary>
-    public async Task<IReadOnlyList<Announcement>> ListVisibleAsync(bool isAuthenticated)
+    public async Task<IReadOnlyList<Announcement>> ListVisibleAsync(string? actorId, IReadOnlySet<string> roles)
     {
+        ArgumentNullException.ThrowIfNull(roles);
+        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
+
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
-            .Where(a => a.Scope == AnnouncementScope.Public ||
-                        (isAuthenticated && a.Scope == AnnouncementScope.Community))
+            .Where(a => (a.CommunityId == null &&
+                         (a.Scope == AnnouncementScope.Public ||
+                          (authed && a.Scope == AnnouncementScope.Community)))
+                      || (a.CommunityId != null &&
+                         (admin || communities.Contains(a.CommunityId!))))
             .OrderByDescending(a => a.Created)
             .ToListAsync()
             .ConfigureAwait(false);
@@ -74,20 +87,26 @@ public sealed class AnnouncementService : IAnnouncementService
     /// authentication state (the same gate as <see cref="ListVisibleAsync"/>:
     /// <see cref="AnnouncementScope.Public" /> always;
     /// <see cref="AnnouncementScope.Community" /> only when
-    /// <paramref name="isAuthenticated"/>). Returns null when no pinned
+    /// <paramref name="roles"/>). Returns null when no pinned
     /// announcement passes (the Web layer skips the banner in that case).
     /// No <c>AccessAudit</c> row (same reasoning as
     /// <see cref="ListVisibleAsync"/> — announcements are not
     /// audience-restricted; the scope-vs-role split is the whole decision).
     /// </summary>
-    public async Task<Announcement?> PinnedAsync(bool isAuthenticated)
+    public async Task<Announcement?> PinnedAsync(string? actorId, IReadOnlySet<string> roles)
     {
+        ArgumentNullException.ThrowIfNull(roles);
+        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
+
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
             .Where(a => a.Pinned == true &&
-                        (a.Scope == AnnouncementScope.Public ||
-                         (isAuthenticated && a.Scope == AnnouncementScope.Community)))
+                        (a.CommunityId == null &&
+                        ((a.Scope == AnnouncementScope.Public ||
+                          (authed && a.Scope == AnnouncementScope.Community)))
+                     || (a.CommunityId != null &&
+                        (admin || communities.Contains(a.CommunityId!)))))
             .OrderByDescending(a => a.Created)
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
@@ -122,20 +141,7 @@ public sealed class AnnouncementService : IAnnouncementService
         ArgumentNullException.ThrowIfNull(authorRoles);
         ArgumentNullException.ThrowIfNull(session);
 
-        var hasGlobalAdmin = authorRoles.Contains(Roles.GlobalAdmin);
-        var hasModerator   = authorRoles.Contains(Roles.Moderator);
-
-        switch (announcement.Scope)
-        {
-            case AnnouncementScope.Public when !hasGlobalAdmin:
-                throw new UnauthorizedAccessException("Only a GlobalAdmin may create a public-scope announcement.");
-
-            case AnnouncementScope.Community when !hasGlobalAdmin && !hasModerator:
-                throw new UnauthorizedAccessException("Only a GlobalAdmin or Moderator may create a community-scope announcement.");
-
-            default:
-                break;
-        }
+        await EnsureWritePermissionAsync(announcement, authorRoles).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(announcement.Id))
             announcement.Id = Guid.NewGuid().ToString("N");
@@ -183,20 +189,7 @@ public sealed class AnnouncementService : IAnnouncementService
         ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
 
-        var hasGlobalAdmin = actorRoles.Contains(Roles.GlobalAdmin);
-        var hasModerator   = actorRoles.Contains(Roles.Moderator);
-
-        switch (updated.Scope)
-        {
-            case AnnouncementScope.Public when !hasGlobalAdmin:
-                throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a public-scope announcement.");
-
-            case AnnouncementScope.Community when !hasGlobalAdmin && !hasModerator:
-                throw new UnauthorizedAccessException("Only a GlobalAdmin or Moderator may edit a community-scope announcement.");
-
-            default:
-                break;
-        }
+        await EnsureWritePermissionAsync(updated, actorRoles).ConfigureAwait(false);
 
         var existing = await session.LoadAsync<Announcement>(updated.Id).ConfigureAwait(false);
         if (existing is null)
@@ -205,12 +198,14 @@ public sealed class AnnouncementService : IAnnouncementService
         var changed = existing.Title != updated.Title
             || existing.Body != updated.Body
             || existing.Scope != updated.Scope
-            || existing.Pinned != updated.Pinned;
+            || existing.Pinned != updated.Pinned
+            || existing.CommunityId != updated.CommunityId;
 
         existing.Title = updated.Title;
         existing.Body  = updated.Body;
         existing.Scope = updated.Scope;
         existing.Pinned = updated.Pinned;
+        existing.CommunityId = updated.CommunityId;
         if (changed)
             existing.Modified = DateTimeOffset.UtcNow;
 
@@ -243,5 +238,93 @@ public sealed class AnnouncementService : IAnnouncementService
 
         session.Delete(announcement);
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+    /// <summary>
+    /// Resolves the actor's read-visibility for announcements: whether they are signed in
+    /// (<c>authed</c>), a GlobalAdmin (<c>admin</c> — sees every target), and the set of
+    /// communities in which they may see a targeted announcement (their membership set from
+    /// <see cref="IUserInfoService.GetCommunityIdsAsync"/> unioned with the communities they
+    /// moderate, read from their <c>moderator:{id}</c> standing claims). An anonymous or
+    /// GlobalAdmin caller gets an empty community set (the admin flag already authorizes all
+    /// targets for them, so the list is irrelevant).
+    /// </summary>
+    private async Task<(bool authed, bool admin, IReadOnlyList<string> communities)> ResolveReadVisibilityAsync(
+        string? actorId,
+        IReadOnlySet<string> roles)
+    {
+        if (string.IsNullOrWhiteSpace(actorId))
+            return (false, false, new List<string>());
+
+        var admin = roles.Contains(Roles.GlobalAdmin);
+        if (admin)
+            return (true, admin, new List<string>());
+
+        var communities = new List<string>();
+        foreach (var role in roles)
+        {
+            if (role.StartsWith("moderator:", StringComparison.Ordinal))
+                communities.Add(role[Roles.ModeratorComponent("").Length..]);
+        }
+
+        var membership = await _userInfo.GetCommunityIdsAsync(actorId).ConfigureAwait(false);
+        if (membership is not null)
+        {
+            foreach (var communityId in membership)
+                communities.Add(communityId);
+        }
+
+        return (true, false, communities);
+    }
+
+    /// <summary>
+    /// The write gate shared by <see cref="CreateAsync"/> and <see cref="UpdateAsync"/>. A
+    /// <see cref="AnnouncementScope.Public"/> announcement is always platform-wide so it cannot
+    /// carry a <c>CommunityId</c>; a <see cref="AnnouncementScope.Community"/> announcement with
+    /// no <c>CommunityId</c> is the flat "all residents" target (a GlobalAdmin or Moderator);
+    /// one with a <c>CommunityId</c> targets that community and requires a GlobalAdmin or the
+    /// <c>moderator:{CommunityId}</c> standing claim, and the target must name a real component.
+    /// A denied author is <see cref="UnauthorizedAccessException"/> (mapped to a 403); an invalid
+    /// shape or unknown target is an <see cref="ArgumentException"/> (mapped to a 400).
+    /// </summary>
+    private async Task EnsureWritePermissionAsync(Announcement announcement, IReadOnlySet<string> authorRoles)
+    {
+        ArgumentNullException.ThrowIfNull(announcement);
+        ArgumentNullException.ThrowIfNull(authorRoles);
+
+        var hasGlobalAdmin = authorRoles.Contains(Roles.GlobalAdmin);
+        var hasModerator   = authorRoles.Contains(Roles.Moderator);
+
+        if (announcement.CommunityId is not null && announcement.Scope == AnnouncementScope.Public)
+            throw new ArgumentException(
+                "A public-scope announcement cannot target a community; clear CommunityId or use the Community scope.",
+                nameof(announcement));
+
+        if (announcement.CommunityId is null)
+        {
+            switch (announcement.Scope)
+            {
+                case AnnouncementScope.Public when !hasGlobalAdmin:
+                    throw new UnauthorizedAccessException("Only a GlobalAdmin may create a public-scope announcement.");
+
+                case AnnouncementScope.Community when !hasGlobalAdmin && !hasModerator:
+                    throw new UnauthorizedAccessException("Only a GlobalAdmin or Moderator may create a community-scope announcement.");
+
+                default:
+                    break;
+            }
+            return;
+        }
+
+        var target = announcement.CommunityId!;
+        var moderatesTarget = authorRoles.Contains(Roles.ModeratorComponent(target));
+        if (!hasGlobalAdmin && !moderatesTarget)
+            throw new UnauthorizedAccessException(
+                $"Only a GlobalAdmin or a moderator of community '{target}' may target that community.");
+
+        var components = await _userInfo.GetComponentsAsync(enabledOnly: true).ConfigureAwait(false);
+        if (components is null || !components.Any(c => c.Id == target))
+            throw new ArgumentException(
+                $"Unknown community '{target}' for the announcement target.",
+                nameof(announcement));
     }
 }

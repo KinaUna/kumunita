@@ -57,41 +57,42 @@ public class AnnouncementControllerTests
 
     /// <summary>
     /// A signed-out visitor (no authenticated principal) drives the service
-    /// with <c>isAuthenticated: false</c> — the service then applies the
-    /// <see cref="AnnouncementScope.Public"/>-only filter. The controller
-    /// must not accidentally pin a resident-style read.
+    /// with a <b>null</b> <c>actorId</b> and an <b>empty</b> role set — the
+    /// service then applies the <see cref="AnnouncementScope.Public"/>-only
+    /// filter (and never surfaces a targeted <c>CommunityId</c> row). The
+    /// controller must not accidentally pin a resident-style read.
     /// </summary>
     [Fact]
-    public async Task Index_When_Anonymous_Passes_False_ToService()
+    public async Task Index_When_Anonymous_PassesNullActorId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync(false).Returns(new List<Announcement>());
+        announcements.ListVisibleAsync(null, new HashSet<string>()).Returns(new List<Announcement>());
         var controller = Build(announcements, IsAuthenticated: false);
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisibleAsync(false);
-        await announcements.DidNotReceive().ListVisibleAsync(true);
+        await announcements.Received(1).ListVisibleAsync(null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0));
+        await announcements.DidNotReceive().ListVisibleAsync(Arg.Is<string>(x => x != null), Arg.Any<IReadOnlySet<string>>());
     }
 
     /// <summary>
-    /// A signed-in resident (any authenticated role) drives the service with
-    /// <c>isAuthenticated: true</c> — the service then applies the union (public
-    /// + community). The <c>true</c> pin is the only Web-side decision
-    /// the read gate makes (the filtering is the service's, not the
-    /// controller's).
+    /// A signed-in resident drives the service with their <b>subject id</b>
+    /// plus their role set — the service then applies the union (public +
+    /// community, plus any targeted rows in the caller's communities). The
+    /// subject-id pin is the only Web-side decision the read gate makes
+    /// (the filtering is the service's, not the controller's).
     /// </summary>
     [Fact]
-    public async Task Index_When_Authenticated_Passes_True_ToService()
+    public async Task Index_When_Authenticated_PassesSubjectId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync(true).Returns(new List<Announcement>());
-        var controller = Build(announcements, IsAuthenticated: true);
+        announcements.ListVisibleAsync("subj-resident-001", new HashSet<string> { Roles.Member }).Returns(new List<Announcement>());
+        var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisibleAsync(true);
-        await announcements.DidNotReceive().ListVisibleAsync(false);
+        await announcements.Received(1).ListVisibleAsync("subj-resident-001", Arg.Is<IReadOnlySet<string>>(s => s.Count == 1 && s.Contains(Roles.Member)));
+        await announcements.DidNotReceive().ListVisibleAsync(null, Arg.Any<IReadOnlySet<string>>());
     }
 
     // ── Read gate display-name fallback (null-safe) ──
@@ -110,7 +111,7 @@ public class AnnouncementControllerTests
     {
         const string author = "subj-anon-author-001";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync(true).Returns(new List<Announcement>
+        announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(new List<Announcement>
         {
             new()
             {
@@ -122,8 +123,9 @@ public class AnnouncementControllerTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)null);
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
 
-        var controller = Build(announcements, userInfo, IsAuthenticated: true);
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
         var view = (await controller.Index()) as ViewResult;
         Assert.NotNull(view);
@@ -148,7 +150,7 @@ public class AnnouncementControllerTests
         const string author = "subj-admin-001";
         const string display = "Kumunita Admin";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync(true).Returns(new List<Announcement>
+        announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(new List<Announcement>
         {
             new()
             {
@@ -164,8 +166,9 @@ public class AnnouncementControllerTests
             SubjectId = author,
             DisplayName = display,
         });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
 
-        var controller = Build(announcements, userInfo, IsAuthenticated: true);
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
         var view = (await controller.Index()) as ViewResult;
         Assert.NotNull(view);
@@ -189,12 +192,12 @@ public class AnnouncementControllerTests
     /// POST — the POST would succeed, but that's not the documented UX).
     /// </summary>
     [Fact]
-    public void New_When_GlobalAdmin_Scopes_BothInOrder()
+    public async Task New_When_GlobalAdmin_Scopes_BothInOrder()
     {
         var controller = Build(Substitute.For<IAnnouncementService>(),
             roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true);
 
-        var result = controller.New() as ViewResult;
+        var result = (await controller.New()) as ViewResult;
 
         Assert.NotNull(result);
 
@@ -218,12 +221,12 @@ public class AnnouncementControllerTests
     /// defense-in-depth, not the <em>sole</em> gate).
     /// </summary>
     [Fact]
-    public void New_When_Moderator_Scopes_OnlyCommunity()
+    public async Task New_When_Moderator_Scopes_OnlyCommunity()
     {
         var controller = Build(Substitute.For<IAnnouncementService>(),
             roles: new[] { Roles.Moderator }, IsAuthenticated: true);
 
-        var result = controller.New() as ViewResult;
+        var result = (await controller.New()) as ViewResult;
 
         Assert.NotNull(result);
 
@@ -564,12 +567,103 @@ public class AnnouncementControllerTests
         return new DefaultHttpContext
         {
             User = new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test")),
-            Session = session,
-        };
-    }
+                     Session = session,
+                };
+            }
 
-    /// <summary>
-    /// Builds an <see cref="AnnouncementController"/> with a substituted
+            // ──── Target-community picker (GET /announcements/new, targeting lane) ───
+
+            /// <summary>
+            /// A moderator's picker is scoped to the communities they hold the
+            /// moderator-for claim about — the other community is hidden even though
+            /// it is enabled and listed by the component seam.
+            /// </summary>
+            [Fact]
+            public async Task New_When_Moderator_TargetCommunities_OnlyTheirs()
+            {
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+                {
+                    new() { Id = "community-A", Name = "Community A" },
+                    new() { Id = "community-B", Name = "Community B" },
+                });
+                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo,
+                    roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+                    IsAuthenticated: true, subjectId: "subj-mod-001");
+
+                var result = (await controller.New()) as ViewResult;
+
+                var model = Assert.IsType<AnnouncementComposeViewModel>(result?.Model);
+                var ids = model.TargetCommunities.Select(c => c.Id).ToHashSet();
+                Assert.Contains("community-A", ids);
+                Assert.DoesNotContain("community-B", ids);
+            }
+
+            /// <summary>
+            /// A global admin gets every enabled community in the picker.
+            /// </summary>
+            [Fact]
+            public async Task New_When_GlobalAdmin_TargetCommunities_All()
+            {
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+                {
+                    new() { Id = "community-A", Name = "Community A" },
+                    new() { Id = "community-B", Name = "Community B" },
+                });
+                var controller = Build(Substitute.For<IAnnouncementService>(), userInfo: userInfo,
+                    roles: new[] { Roles.GlobalAdmin },
+                    IsAuthenticated: true, subjectId: "subj-admin-001");
+
+                var result = (await controller.New()) as ViewResult;
+
+                var model = Assert.IsType<AnnouncementComposeViewModel>(result?.Model);
+                var ids = model.TargetCommunities.Select(c => c.Id).ToHashSet();
+                Assert.Contains("community-A", ids);
+                Assert.Contains("community-B", ids);
+            }
+
+            /// <summary>
+            /// A targeted row's <c>CommunityId</c> is resolved to a display name in
+            /// the index feed (the feed's one read of the component seam), and the raw
+            /// id is preserved on the row.
+            /// </summary>
+            [Fact]
+            public async Task Index_When_TargetedAnnouncement_CommunityDisplayNameResolved()
+            {
+                const string author = "subj-mod-001";
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new List<Announcement>
+                    {
+                        new()
+                        {
+                            Id = "ann-targeted", Scope = AnnouncementScope.Community,
+                            CommunityId = "community-A",
+                            Title = "Potluck Saturday", Body = "Community A potluck, bring a side",
+                            AuthorId = author, Created = new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero),
+                        },
+                    });
+
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Community Moderator" });
+                userInfo.GetComponentsAsync(true).Returns(new List<Component>
+                {
+                    new() { Id = "community-A", Name = "Community A" },
+                });
+
+                var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+                var result = (await controller.Index()) as ViewResult;
+
+                var rows = Assert.IsType<List<AnnouncementRow>>((result?.Model as AnnouncementIndexViewModel)?.Announcements!);
+                var row = rows.Single();
+                Assert.Equal("community-A", row.CommunityId);
+                Assert.Equal("Community A", row.CommunityDisplayName);
+            }
+
+            /// <summary>
+            /// Builds an <see cref="AnnouncementController"/> with a substituted
     /// <see cref="IAnnouncementService"/> + <see cref="IUserInfoService"/>
     /// (the two store-adjacent seams) and a minted signed-in / signed-out
     /// principal (the <c>ClaimTypes.Role</c> claim type is Kumunita's — per
@@ -581,9 +675,17 @@ public class AnnouncementControllerTests
         IAnnouncementService announcements,
         IUserInfoService? userInfo = null,
         string[]? roles = null,
-        bool IsAuthenticated = false)
+        bool IsAuthenticated = false,
+        string? subjectId = null)
     {
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
+        // The compose shape seeds the target-community picker from the UserInfo
+        // seam (an empty candidate set is a valid shape — the view renders an
+        // "all residents"-only picker for a plain Moderator). Only defaulted
+        // here for a caller-provided substitute its own setup wins.
+        if (userInfo is null)
+            userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
@@ -595,10 +697,14 @@ public class AnnouncementControllerTests
 
         if (IsAuthenticated || (roles is { Length: > 0 }))
         {
+            var claims = new List<Claim>();
+            if (subjectId is not null)
+                claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+            if (roles is { Length: > 0 })
+                claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
             controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(
-                new ClaimsIdentity(
-                    roles?.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)) ?? Enumerable.Empty<Claim>(),
-                    authenticationType: "test"));
+                new ClaimsIdentity(claims, authenticationType: "test"));
         }
 
         return controller;

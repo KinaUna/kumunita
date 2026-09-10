@@ -52,6 +52,12 @@ public static class M1DocTypes
         opts.Schema.For<Group>();
         opts.Schema.For<GroupMembership>()
                .UniqueIndex(m => m.GroupId, m => m.UserId);   // business key
+        // M2b (owner-invited group membership): the invitation row, the same
+        // one-row-per-(group, user) business-key convention as GroupMembership —
+        // re-inviting after a resolution resets the existing Pending row rather
+        // than inserting a second one (C-M2b·3).
+        opts.Schema.For<GroupInvitation>()
+               .UniqueIndex(i => i.GroupId, i => i.UserId);   // business key
         opts.Schema.For<DelegationGrant>();
         opts.Schema.For<Component>();
         opts.Schema.For<ModeratorAssignment>();

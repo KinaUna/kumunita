@@ -27,13 +27,13 @@ public interface IAnnouncementService
     /// <summary>
     /// The set of <see cref="Announcement"/>s visible at the caller's
     /// authentication state: <see cref="AnnouncementScope.Public"/> always,
-    /// <see cref="AnnouncementScope.Community"/> when <paramref name="isAuthenticated"/>.
+    /// <see cref="AnnouncementScope.Community"/> when signed in.
     /// Sorted by <c>Created</c> descending (latest first); no
     /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row (announcements
     /// are not audience-restricted). See <see cref="AnnouncementService.ListVisibleAsync"/>
     /// for the full contract.
     /// </summary>
-    Task<IReadOnlyList<Announcement>> ListVisibleAsync(bool isAuthenticated);
+    Task<IReadOnlyList<Announcement>> ListVisibleAsync(string? actorId, IReadOnlySet<string> roles);
 
     /// <summary>
     /// The single announcement to render as a site-wide banner — the
@@ -41,13 +41,13 @@ public interface IAnnouncementService
     /// true that passes the caller's authentication state (the same
     /// <see cref="ListVisibleAsync"/> visibility gate: <see cref="AnnouncementScope.Public"/>
     /// always; <see cref="AnnouncementScope.Community"/> only when
-    /// <paramref name="isAuthenticated"/>). Returns null when no pinned
+    /// signed in). Returns null when no pinned
     /// announcement passes the gate (the Web layer skips the banner in
     /// that case). No <see cref="Kumunita.Core.Authorization.AccessAudit"/> row.
     /// See <see cref="AnnouncementService.PinnedAsync"/> for the full
     /// contract.
     /// </summary>
-    Task<Announcement?> PinnedAsync(bool isAuthenticated);
+    Task<Announcement?> PinnedAsync(string? actorId, IReadOnlySet<string> roles);
 
     /// <summary>
     /// Creates an <see cref="Announcement"/> in the <b>caller's</b> in-flight

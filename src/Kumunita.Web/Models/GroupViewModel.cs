@@ -29,16 +29,45 @@ namespace Kumunita.Web.Models;
 public sealed record GroupViewModel(string Id, string Name, int MemberCount);
 
 /// <summary>
-/// The <b>group list</b> view model (M2 plan U9). Holds the
+/// One <b>invitation the actor received</b> on the <c>/groups</c> list
+/// (m2b — the "Your invitations" card; the accept/decline self-lane's UI
+/// shape). <see cref="GroupId"/> is the route's <c>{id}</c> the two action
+/// forms post to; <see cref="GroupName"/> is the display label (resolved at
+/// projection through the m2b <c>GetGroupAsync</c> read — the invitee cannot
+/// reach the group detail, owner ∪ member gate, until they accept; the name
+/// must not depend on it). The <see cref="Kumunita.Core.UserInfo.GroupInvitation"/>
+/// source row's <c>Status</c> / <c>InvitedAt</c> / resolution stamps never
+/// reach the model — the card only ever carries <em>pending</em> rows, and
+/// "who resolved it" is an <c>AccessAudit</c> lane fact, not a UI fact
+/// (docs/design/m2b-group-invitations.md).
+/// </summary>
+public sealed record InvitationViewModel(
+    string GroupId,
+    string GroupName,
+    string InvitedByDisplayName);
+
+/// <summary>
+/// The <b>group list</b> view model (M2 plan U9 + m2b). Holds the
 /// <see cref="IReadOnlyList{GroupViewModel}"/> projection the
-/// <c>/groups</c> <c>Index</c> action renders. Exactly one member (the
-/// <see cref="Groups"/> collection) — nothing else; the view has no channel to a
+/// <c>/groups</c> <c>Index</c> action renders plus — since m2b — the actor's
+/// own pending invitations (<see cref="Invitations"/>; empty for an actor
+/// without any). The view has no channel to a
 /// <see cref="Kumunita.Core.UserInfo.Group"/>'s raw fields.
 /// </summary>
 public sealed class GroupListViewModel
 {
     /// <summary>The groups the actor owns or is a member of (F14's projection).</summary>
     public IReadOnlyList<GroupViewModel> Groups { get; init; } = Array.Empty<GroupViewModel>();
+
+    /// <summary>
+    /// The actor's <b>own</b> pending group invitations (m2b read lane #2 —
+    /// the <c>GetPendingInvitationsForUserAsync</c> projection, each row's
+    /// group name resolved through the single-group read). Empty when the
+    /// actor holds none; the card is then absent from the view (not an
+    /// "no invitations" placeholder — an empty pending list is the absence of
+    /// a feature, not a state).
+    /// </summary>
+    public IReadOnlyList<InvitationViewModel> Invitations { get; init; } = Array.Empty<InvitationViewModel>();
 }
 
 /// <summary>
@@ -62,6 +91,22 @@ public sealed class GroupCreateModel
     [Display(Name = "Description (optional)")]
     public string? Description { get; set; }
 }
+
+/// <summary>
+/// One <b>pending invitation row</b> on the <c>/groups/{id}</c> invite lane
+/// (m2b — the owner's "Pending invitations" list with its cancel links).
+/// Strict projection, the <see cref="GroupMemberViewModel"/> 2-tuple pin
+/// carried to the invitation axis: <see cref="SubjectId"/> (the invitee's
+/// opaque <see cref="Kumunita.Core.UserInfo.GroupInvitation.UserId"/> — the
+/// cancel route's <c>{subjectId}</c>) + <see cref="DisplayName"/> (a single
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/>
+/// read; the raw subject id when the profile is absent — fail-safe, not a
+/// silent blank row). The source row's <c>InvitedBy</c> / <c>InvitedAt</c>
+/// / <c>Status</c> never reach the model: the list shows only <em>pending</em>
+/// rows, and "who invited, when" is an <c>AccessAudit</c> lane fact, not a
+/// member-list-shaped UI fact (docs/design/m2b-group-invitations.md).
+/// </summary>
+public sealed record PendingInvitationViewModel(string SubjectId, string DisplayName);
 
 /// <summary>
 /// One <b>member row</b> on the <c>/groups/{id}</c> member list (M2 plan U10).
@@ -110,9 +155,11 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// field is a <i>presentation</i> state, not a gate).
 /// <para>
 /// **Not a <see cref="Kumunita.Core.UserInfo.Group"/> dump** — <c>GroupId</c> is
-/// carried only to survive the add/remove POSTs (a form field), <c>Description</c>
-/// and <c>Created</c> are omitted (the M1 "admin surface" owns them, not this
-/// resident-facing one), and <c>IsOwner</c> is derived from a string compare
+/// carried only to survive the add/remove POSTs (a form field) and
+/// <c>Created</c> is omitted (a M1-era admin-surface fact, not a resident-facing
+/// one). <see cref="Description"/> is carried since ADR 0009 (the detail's
+/// "About" block + the owner ∪ GlobalAdmin edit lane's form default), and
+/// <c>IsOwner</c> is derived from a string compare
 /// rather than a separate role claim (the single identity source is the
 /// signed-in principal — ADR 0003 SoD by structural identity, mirroring U9).
 /// </para>
@@ -121,6 +168,12 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// (opaque string — same pin as the U9 list-row <see cref="GroupViewModel.Id"/>
 /// deviation from the frozen <see cref="Kumunita.Core.UserInfo.Group"/>.</param>
 /// <param name="Name">The group's name (the detail header).</param>
+/// <param name="Description">The group's optional
+/// <see cref="Kumunita.Core.UserInfo.Group.Description"/> (rendered under the
+/// header when non-empty — ADR 0009); null when the group holds none. The
+/// edit lane's form default is <b>the actor minting nothing form-bound</b>:
+/// the lane's standing (owner ∪ GlobalAdmin, ADR 0007's new-lane rule) is the
+/// controller's <c>TryResolveOwnerSurface</c> gate, never a field here.</param>
 /// <param name="OwnerSubjectId">The group owner's opaque
 /// <see cref="Kumunita.Core.UserInfo.Group.OwnerId"/> subject (the form's
 /// "removedBy" hint + the <see cref="IsOwner"/> compare source — never a
@@ -142,16 +195,46 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// through <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupMembersAsync"/>
 /// (the U9 second M2 read — one read lane serves both U9's <c>MemberCount</c>
 /// and U10's <c>Members</c>; never a third seam, design doc §2.7).</param>
+/// <param name="PendingInvitations">The group's pending invitations
+/// (m2b read lane #3 — the <c>GetPendingInvitationsForGroupAsync</c>
+/// projection, each row's display name resolved through
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/>).
+/// Empty when the group holds none; the invite lane then renders its
+/// invite form only. The detail's <see cref="IsOwner"/> badge is the
+/// *presentation* hint for it — the real SoD gate (C-M2b·1: owner ∪
+/// GlobalAdmin) is in the controller's invite/cancel actions, not on this
+/// carrier.</param>
 public sealed record GroupDetailViewModel(
     string GroupId,
     string Name,
+    string? Description,
     string OwnerSubjectId,
     string OwnerDisplayName,
     bool IsOwner,
-    IReadOnlyList<GroupMemberViewModel> Members);
+    IReadOnlyList<GroupMemberViewModel> Members,
+    IReadOnlyList<PendingInvitationViewModel> PendingInvitations,
+    IReadOnlyList<ResidentOption> ResidentCandidates);
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching
 // U7/U8's "a form is a field, not a record" pin. The owner id the write seams
 // take (`addedBy` / `removedBy`) is always the actor's subject, minted
 // from the signed-in principal by the controller — never a form field.
+
+/// <summary>
+/// One selectable resident for the detail's "Add a member" dropdown — the
+/// same two-field shape as <see cref="GroupMemberViewModel"/>, projected from
+/// a non-blocked <see cref="Kumunita.Core.UserInfo.Profile"/> (the directory's
+/// visibility surface — every non-blocked resident, the platform is
+/// invitation-only) <i>minus</i> the group's current members (adding someone
+/// already in is a no-op the form should not offer). The view renders it as
+/// a plain <c>&lt;option&gt;</c> and filters client-side (name contains).
+/// </summary>
+/// <param name="SubjectId">The resident's
+/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/> (the form's
+/// <c>subjectId</c> field value — the add-member seam's <c>userId</c>).</param>
+/// <param name="DisplayName">The resident's
+/// <see cref="Kumunita.Core.UserInfo.Profile.DisplayName"/> (falling back to
+/// the raw <see cref="SubjectId"/> when the name is blank — fail-safe, not a
+/// silent blank option).</param>
+public sealed record ResidentOption(string SubjectId, string DisplayName);

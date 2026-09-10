@@ -153,6 +153,27 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Group>> GetAllGroupsAsync()
+    {
+        // The profile grant picker's option source (the M2 editor's UX
+        // surface — every Group document, no membership filter). Live rows
+        // (invariant C4): a created group is visible on the next read.
+        // No audit row (C-M2·2: a read, not a decision). Stable id → Group
+        // lookup, sorted by Created desc (the plan-U9 "most recently
+        // created first" ordering the Web surface expects).
+        await using var session = store.QuerySession();
+        var groups = await session
+            .Query<Group>()
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var byId = groups.ToDictionary(g => g.Id);
+        return byId.Values
+            .OrderByDescending(g => g.Created)
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId)
     {
         // F14 (M2 design doc §2.2; U9's GroupViewModel.MemberCount + U10's
@@ -325,6 +346,345 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         session.Store(audit);
         await session.SaveChangesAsync().ConfigureAwait(false);
         return;
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateGroupDescriptionAsync(string groupId, string? description, string updatedBy)
+    {
+        // Set (or clear with null) Group.Description; load the group in the same
+        // session; append AccessAudit (Action "group.update", TargetKind "group",
+        // TargetId = groupId) with Via per the derivation rule; one SaveChangesAsync
+        // (ADR 0009; the AddGroupMemberAsync lane's shape minus the membership row).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        group.Description = description;
+        session.Store(group);
+
+        var via = updatedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : updatedBy;
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = updatedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.update",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    // ── M2b: group invitations (docs/design/m2b-group-invitations.md;
+    // one session + one SaveChangesAsync per call, mirroring the M1 group
+    // lifecycle shape above — invariants C-M2b·1..3) ──────────────────
+
+    /// <inheritdoc />
+    public async Task<Group?> GetGroupAsync(string groupId)
+    {
+        // One-document read (the GetProfileAsync shape on the Group axis).
+        // Candidate read, not a decision — no AccessAudit row (C-M2·2 carried).
+        await using var session = store.QuerySession();
+        return await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<GroupInvitation> InviteGroupMemberAsync(string groupId, string userId, string invitedBy)
+    {
+        // Upsert the (group, user) invitation row; load the group's OwnerId in
+        // the same session for the Via derivation (C-M2b·1: the audit lane is
+        // derived exactly like AddGroupMemberAsync — invitedBy == OwnerId ⇒
+        // Owner, else Admin); append AccessAudit (action "group.invite");
+        // one SaveChangesAsync (invariant C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // Business key (GroupId, UserId) — the unique index in M1DocTypes
+        // enforces "one row per (group, user)" (C-M2b·3, the same pair
+        // convention as GroupMembership).
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+        {
+            row = new GroupInvitation
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = userId,
+                InvitedBy = invitedBy,
+                Status = InvitationStatus.Pending,
+                InvitedAt = now
+            };
+        }
+        else
+        {
+            // Re-invite (C-M2b·3): a resolved row (or an already-Pending
+            // re-stamp) resets to the fresh Pending shape — the two resolve
+            // stamps are cleared with it.
+            row.InvitedBy = invitedBy;
+            row.Status = InvitationStatus.Pending;
+            row.InvitedAt = now;
+            row.ResolvedAt = null;
+            row.ResolvedBy = null;
+        }
+
+        session.Store(row);
+
+        var via = invitedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : invitedBy;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = invitedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.invite",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc />
+    public async Task AcceptGroupInvitationAsync(string groupId, string actorId)
+    {
+        // Self-lane (C-M2b·2): the actor resolves their OWN row — verified in
+        // this method, not only by the Web gate. In the same session the row
+        // moves Pending → Accepted and the GroupMembership row is upserted
+        // (live on the next GetGroupIdsAsync / GetGroupsForUserAsync — C4
+        // carried). One SaveChangesAsync (invariant C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == actorId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        // C-M2b·2: a row that isn't the actor's own is an invalid self-lane
+        // call (the Web's 404 gate is the first wall; this is the Core's).
+        if (row is null || row.UserId != actorId)
+            throw new InvalidOperationException(
+                $"No group invitation for {actorId} in group {groupId}");
+
+        // C-M2b·3: only Pending resolves; an already-resolved row (Accepted /
+        // Declined / Cancelled) is an invalid transition.
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be accepted.");
+
+        row.Status = InvitationStatus.Accepted;
+        row.ResolvedAt = now;
+        row.ResolvedBy = actorId;
+        session.Store(row);
+
+        // The membership lands here — the exact AddGroupMemberAsync upsert
+        // shape (strong consistency, invariant C4).
+        var membership = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId && m.UserId == actorId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            membership = new GroupMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = actorId,
+                AddedBy = actorId,
+                At = now
+            };
+        }
+        else
+        {
+            membership.AddedBy = actorId;
+            membership.At = now;
+        }
+
+        session.Store(membership);
+
+        // Self-lane audit: the invitee's own standing (not the owner's, not
+        // an admin's) — Via Owner with the invitee as all three identities.
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "group.invite.accept",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task DeclineGroupInvitationAsync(string groupId, string actorId)
+    {
+        // Self-lane (C-M2b·2) — the same gate + state check as
+        // AcceptGroupInvitationAsync, but no GroupMembership row is touched.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == actorId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null || row.UserId != actorId)
+            throw new InvalidOperationException(
+                $"No group invitation for {actorId} in group {groupId}");
+
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be declined.");
+
+        row.Status = InvitationStatus.Declined;
+        row.ResolvedAt = now;
+        row.ResolvedBy = actorId;
+        session.Store(row);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "group.invite.decline",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Owner,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task CancelGroupInvitationAsync(string groupId, string userId, string cancelledBy)
+    {
+        // Owner/admin lane (C-M2b·1): the row must exist and be Pending
+        // (C-M2b·3); the Via derivation is exactly the group add/remove rule
+        // (cancelledBy == OwnerId ⇒ Owner, else Admin). One SaveChangesAsync
+        // (invariant C3).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No group invitation for {userId} in group {groupId} to cancel.");
+
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be cancelled.");
+
+        row.Status = InvitationStatus.Cancelled;
+        row.ResolvedAt = now;
+        row.ResolvedBy = cancelledBy;
+        session.Store(row);
+
+        var via = cancelledBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : cancelledBy;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = cancelledBy,
+            EffectivePrincipalId = effective,
+            Action = "group.invite.cancel",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    // ── M2b read lanes (candidate reads — no AccessAudit row, C-M2·2
+    // carried; live rows, invariant C4) ─────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForUserAsync(string userId)
+    {
+        // The invitee's own pending set (the /groups list's "Your invitations"
+        // card + the self-lane's Web gate). Pending rows only, newest first.
+        if (string.IsNullOrEmpty(userId))
+            return Array.Empty<GroupInvitation>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupInvitation>()
+            .Where(i => i.UserId == userId && i.Status == InvitationStatus.Pending)
+            .OrderByDescending(i => i.InvitedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForGroupAsync(string groupId)
+    {
+        // The group's pending set (the /groups/{id} invite lane). Pending rows
+        // only, oldest first ("who is still holding" order).
+        if (string.IsNullOrEmpty(groupId))
+            return Array.Empty<GroupInvitation>();
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.Status == InvitationStatus.Pending)
+            .OrderBy(i => i.InvitedAt)
+            .ToListAsync()
+            .ConfigureAwait(false);
     }
 
     // ── Delegation (plan step 5 — one session per call) ──────────────────

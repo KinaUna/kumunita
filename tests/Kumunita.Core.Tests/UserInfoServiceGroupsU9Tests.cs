@@ -137,6 +137,56 @@ public class UserInfoServiceGroupsU9Tests(PostgresFixture fixture) : IClassFixtu
         Assert.Empty(await svc.GetGroupsForUserAsync(string.Empty));
     }
 
+    // ── Test 5 — member self-leave (ADR 0008): userId == removedBy == member ──
+    //
+    // The leave lane writes through the <b>same frozen seam</b> as U10's
+    // remove-member — RemoveGroupMemberAsync(groupId, userId, removedBy) with
+    // the member as both the target and the remover. The Web route enforces
+    // "member ∩ own row ∩ ¬owner" and the seam does not re-gate the actor's
+    // standing (ADR 0006-D: Web shapes HTTP, Core decides), so the
+    // self-leave shape of the call must be proven here: the membership is
+    // deleted live on the next call (C4), the owner's own membership row
+    // stays intact, and the AccessAudit row records the member themself as
+    // the actor (Action "group.remove-member" — the seam's single audit
+    // lane; ADR 0008 does not mint a new action verb for the self-lane).
+    [Fact]
+    public async Task RemoveGroupMemberAsync_SelfLeave_MembershipLive_C4_AuditActorIsSelf()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+
+        const string owner = "u-u9-selfleave-owner";
+        const string member = "u-u9-selfleave-member";
+
+        var group = await svc.CreateGroupAsync(owner, "Self-leave group", null);
+        await svc.AddGroupMemberAsync(group.Id, member, addedBy: owner);
+
+        // The member leaves themself — userId == removedBy == member.
+        await svc.RemoveGroupMemberAsync(group.Id, member, removedBy: member);
+
+        // C4: the leave is live on the very next read, on both read lanes
+        // (the per-group member read and the user-axis group projection).
+        var after = await svc.GetGroupMembersAsync(group.Id);
+        Assert.Single(after);
+        Assert.Equal(owner, after[0].UserId);
+
+        var groupsForMember = await svc.GetGroupsForUserAsync(member);
+        Assert.DoesNotContain(group.Id, groupsForMember.Select(g => g.Id));
+
+        // The audit row: Action "group.remove-member", ActorId = the member
+        // (themselves), TargetId = the group — the self-leave is the fact
+        // on the existing lane, not a new action.
+        await using (var session = store.QuerySession())
+        {
+            var audits = await session.Query<Authorization.AccessAudit>()
+                .Where(a => a.Action == "group.remove-member" && a.TargetId == group.Id)
+                .ToListAsync(TestContext.Current.CancellationToken);
+            var selfAudits = audits.Where(a => a.ActorId == member).ToList();
+            Assert.NotEmpty(selfAudits);
+            Assert.Equal(group.Id, selfAudits[0].TargetId);
+        }
+    }
+
     // ── Shared helper (mirror U6's BootStoreAsync shape in this assembly) ──
     private async Task<IDocumentStore> BootStoreAsync()
     {

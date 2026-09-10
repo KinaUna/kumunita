@@ -1,4 +1,5 @@
 using Kumunita.Core.Announcements;
+using Kumunita.Core.UserInfo;
 
 namespace Kumunita.Web.Models;
 
@@ -11,7 +12,9 @@ public sealed record AnnouncementRow(
     string Body,
     DateTimeOffset Created,
     string AuthorDisplayName,
-    bool Pinned);
+    bool Pinned,
+    string? CommunityId,
+    string? CommunityDisplayName);
 
 /// <summary>The /announcements read surface (GET): the caller-visible
 /// <see cref="Announcement"/> set (public scope always; community scope when
@@ -33,6 +36,21 @@ public sealed class AnnouncementComposeViewModel
     public string? Title { get; set; }
     public string Body { get; set; } = string.Empty;
     public string? Scope { get; set; }
+
+    /// <summary>The community this announcement targets (bound from a
+    /// <c>&lt;select&gt;</c> in <c>New</c>/<c>Edit</c>). Empty → null = the flat
+    /// "everyone" target (no specific community); a <c>Component</c> id →
+    /// targeted at that community (visible to that community's members or
+    /// moderators, or a GlobalAdmin; authorable by that community's moderator
+    /// or a GlobalAdmin). A public-scope announcement must keep this null —
+    /// the service rejects a Public + CommunityId shape.</summary>
+    public string? CommunityId { get; set; }
+
+    /// <summary>The <see cref="Component"/> options for <see cref="CommunityId"/>
+    /// (a GlobalAdmin may target any community; a Moderator only the ones they
+    /// moderate). Shape convenience only — the service pins the split
+    /// server-side at POST and the ASP.NET gate narrows the author.</summary>
+    public IReadOnlyCollection<Component> TargetCommunities { get; set; } = [];
 
     /// <summary>Whether this announcement is pinned to the top of all pages (site-wide banner).
     /// Binds from a pair of form fields in <c>New</c>/<c>Edit</c>: a checkbox

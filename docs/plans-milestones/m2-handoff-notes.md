@@ -247,4 +247,35 @@ Unit series (U1–U14). Test counts are the specs each unit *shipped*; the U12 g
 
 **Seams frozen across M2 (for the M3 agent — unchanged, do not re-derive):** `IUserInfoService` 14 public methods (11 M1 + 3 M2 ADDs: `GetProfilesAsync(bool)` U3, `GetGroupsForUserAsync(string)` U9, `GetGroupMembersAsync(string)` U9); `ProfileToAuditableResource` (6 members, U4); `DirectoryService.{ListAsync, DetailAsync, PreviewAsAsync}` (U5, ctor `(IUserInfoService, IAuthorizationService)`); `ProfileEditViewModel.{Visibility, ContactVisibility, ToProfileUpdate(subjectId)}` (U11). The single write lane is still `IUserInfoService.UpsertProfileAsync(profile, patch)` (M1) — M2 added no new handoff.
 
-**Note for the M3 agent (the handoff this file is for):** the M2 surface is complete and tested (115/115). The one *unrunnable* item is U13's Playwright spec (D2) — it is the only deferred item that is a *capability* (everything else is a cleanup). M3's first e2e-landing unit should close the "Playwright e2e arrives later (§7)" forward reference in `docs/ARCHITECTURE.md` in the same commit and record a pass count **here** (append a `## U<m> — U13's spec executed` section; do not rewrite `e2e-m2.spec.ts` — the M2 drift-guard "frozen once written" rule applies).
+## Post-M2 — Owner-exemption rule (self-view is never gated) — recorded
+
+**Change (product rule, owner-decided 2026-09-10):** a resident's *own* directory detail always
+renders the full contact block, whatever their saved `ContactVisibility` is. The contact audience
+is an author control on what **others** see — not a way to hide one's own data from oneself.
+A self-view is a short-circuit: no `CanAsync`, no `AccessAudit` row (the same shape as the §2.4
+`null` ⇒ "not opted in" short-circuit). This supersedes the (then-current) expectation that an
+opted-out owner's self-view rendered the "hasn't shared a contact method" branch.
+
+- **Production code (1 file):** `src/Kumunita.Core/UserInfo/DirectoryService.cs` —
+  `EvaluateContactGateAsync` (the shared gate for `DetailAsync` *and* `PreviewAsAsync`) returns
+  `ShowContactBlock = true` when the viewer subject equals the profile owner, before the
+  `null`-audience short-circuit and the `CanAsync` decision. A blocked profile still fails closed
+  (checked first), and `PreviewAsAsync`'s self-preview inherits the rule through the same call.
+- **Unit test (1 new, `DirectoryServiceTests_U6`):**
+  `SelfView_Always_Shows_Full_ContactBlock` — two shapes (owner opted out → `null` audience;
+  owner's audience excludes the owner) pin: outside viewer still gets the §2.4 row-1/row-2
+  shapes (hidden; one Deny row in the row-2 case); owner's self-view returns
+  `ShowContactBlock = true` and commits **no** audit row. Suite: 195/195 Core + 57/57 Web.
+- **Spec (a) rewrite (the one permitted deviation from the "frozen once written" rule —
+  the owner changed the requirement this spec pins, so the pin is rewritten to the new rule,
+  not the old one):** `tests/Kumunita.Web.Tests/e2e-m2.spec.ts` test (a) step 5 now asserts,
+  after opt-out, that (i) alice's **self-view** still shows the Email row and the muted
+  paragraph does **not** appear (owner exemption), and (ii) a second resident's view of the
+  opted-out profile keeps the original §2.4 pin (no Email/Phone rows; muted paragraph MUST).
+
+**Seams unchanged:** `DirectoryService` ctor and signatures are untouched; only the gate's
+self-view branch is new. For the M3 agent: the owner-exemption rule is now *part of the pin* —
+the muted "hasn't shared a contact method" branch is, as of this record, scoped to
+non-owner viewers in both the unit and e2e surfaces.
+
+**Note for the M3 agent (the handoff this file is for):** the M2 surface is complete and tested (115/115).

@@ -73,7 +73,23 @@
                 </div>
             </div>
 
-            <div class="card mb-4">
+            
+@if (Model.TargetCommunities.Count > 0)
+{
+<div class="card mb-4"><div class="card-body">
+<label class="form-label" for="community" style="font-weight:600;">Target community (optional)</label>
+<select class="form-control" id="community" name="CommunityId">
+<option value="" selected="@(Model.CommunityId is null ? "selected" : null)">All residents</option>
+@foreach (var t in Model.TargetCommunities)
+{
+<option value="@t.Id" selected="@(Model.CommunityId == t.Id ? "selected" : null)">@t.Name</option>
+}
+</select>
+<div class="text-muted small mt-2">Leave as All residents to reach everyone, or pick a community to limit the audience. A public announcement always applies platform-wide.</div>
+</div></div>
+}
+
+<div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="title" style="font-weight:600;">
                         Title

@@ -47,6 +47,16 @@ public sealed class Announcement
     public AnnouncementScope Scope { get; set; } = AnnouncementScope.Public;
 
     /// <summary>
+    /// When <see cref="Scope"/> is <see cref="AnnouncementScope.Community"/> and this is set, the
+    /// announcement is targeted at one community (a <see cref="Kumunita.Core.UserInfo.Component"/> by
+    /// id) instead of every resident: only members and moderators of that community see it. When
+    /// <see cref="Scope"/> is <see cref="AnnouncementScope.Public"/> this must stay <c>null</c>
+    /// (public announcements are platform-wide). A targeted announcement may be authored only by
+    /// a GlobalAdmin or a moderator of exactly that community (<c>moderator:{CommunityId}</c>).
+    /// </summary>
+    public string? CommunityId { get; set; }
+
+    /// <summary>
     /// When true, this announcement is "pinned" — the Web layer may render it
     /// as a site-wide banner at the top of every page (including the home page)
     /// in addition to its place in the regular <c>/announcements</c> list.

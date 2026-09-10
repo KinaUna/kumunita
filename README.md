@@ -131,6 +131,10 @@ stays trivial and the authorization rules can grow freely.
 `localhost:5433`, the app on `http://localhost:5080` (built from `Dockerfile`,
 running `Development` so the `mt` schema auto-applies on a fresh database —
 ADR 0004), and Mailpit for SMTP (`localhost:1025`, UI at `http://localhost:8025`).
+Logins survive container rebuilds: the data-protection keyring persists in the
+`kumunita_dpkeys` named volume (same `/data/dataprotection-keys` container
+path as prod — COOLIFY §5.2), so `--build` recreations don't wipe session/
+antiforgery state.
 Smoke test: `GET /health` → `{"status":"ok","database":"ok","build":"<sha>",…}` and `/`
 renders the configured `Community__Name`. On a **fresh** database the versioned boot block
 initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**

@@ -17,6 +17,44 @@
             <div class="alert alert-danger" role="alert">@err</div>
         }
 
+        @*
+            m2b — "Your invitations" card: the actor's OWN pending group
+            invitations (GroupListViewModel.Invitations). The invitee cannot
+            reach the group detail (owner ∪ member gate) until accepting, so
+            the group's name is rendered from the list-side projection, and
+            the two cards (accept / decline) post to the self-lane routes.
+        *@
+        @if (Model.Invitations.Count > 0)
+        {
+            <h2>
+                Invitations
+                <span class="badge bg-warning text-dark">@Model.Invitations.Count pending</span>
+            </h2>
+            <div class="list-group mb-3">
+                @foreach (var inv in Model.Invitations)
+                {
+                    <div class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <strong>@inv.GroupName</strong>
+                            <div class="text-muted small">Invited by @inv.InvitedByDisplayName</div>
+                        </div>
+                        <div class="d-flex gap-2 flex-shrink-0">
+                            <form method="post"
+                                  action="@Url.Action("AcceptInvitation", "Groups", new { id = inv.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-primary">Accept</button>
+                            </form>
+                            <form method="post"
+                                  action="@Url.Action("DeclineInvitation", "Groups", new { id = inv.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Decline</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
         @if (Model.Groups.Count == 0)
         {
             <div class="alert alert-info">

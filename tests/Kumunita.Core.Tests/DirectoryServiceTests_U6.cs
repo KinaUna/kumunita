@@ -553,6 +553,81 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
         Assert.False(afterRemoveDetail.ShowContactBlock);
     }
 
+    // ── Test — SelfView_Always_Shows_Full_ContactBlock (owner exemption) ─────
+    //
+    // A resident's <b>own</b> profile is never gated by the contact audience: the
+    // saved `ContactVisibility` is an author control on what *others* see, not a way
+    // to hide one's own data from oneself. Two shapes pin both sides of the rule:
+    //   • `null` ContactVisibility (opted out): an outside viewer still gets the
+    //     §2.4 "null ⇒ not opted in" short-circuit (contact hidden, no audit row);
+    //     the owner sees the full contact block, and the self-view commits no audit
+    //     row (a short-circuit, not an evaluation — no `CanAsync`, no row).
+    //   • Audience that excludes the owner (e.g. a grant to another resident): the
+    //     outside viewer Denies (one audit row, unchanged §2.4 row 2); the owner
+    //     still sees the contact block, and their self-view adds no further audit
+    //     row (the count stays at exactly the outside viewer's one Deny).
+
+    [Fact]
+    public async Task SelfView_Always_Shows_Full_ContactBlock()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var svc = new DirectoryService(userInfo, authz);
+
+        const string otherViewer = "u6-self-other-viewer";
+
+        var optedOut = new Profile
+        {
+            SubjectId = "u6-self-opted-out",
+            DisplayName = "Opted out owner",
+            Verified = true,
+            Email = "optedout@example.com",
+            Phone = "+356 9900 0004",
+            ContactVisibility = null, // author opted out: hidden from *others*
+        };
+
+        var ownerExcluding = new Profile
+        {
+            SubjectId = "u6-self-owner-excluding",
+            DisplayName = "Owner excluding audience",
+            Verified = true,
+            Email = "ownerexcl@example.com",
+            Phone = "+356 9900 0005",
+            // A grant to a third resident — neither the owner nor the outside
+            // viewer is in the audience, so the outside viewer Denies, but the
+            // owner still sees their own data (self-view is not gated).
+            ContactVisibility = new Audience(AudienceMode.Any,
+                [new AudienceGrant(GrantKind.User, "u6-self-other-resident")]),
+        };
+
+        await userInfo.UpsertProfileAsync(optedOut, new ProfileUpdate(null, null, null, null, null));
+        await userInfo.UpsertProfileAsync(ownerExcluding, new ProfileUpdate(null, null, null, null, null));
+
+        // Shape 1 — `null` audience: the outside viewer keeps the §2.4 row-1
+        // short-circuit (hidden, no audit row); the owner sees the full block with
+        // no new audit row (a short-circuit, not a decision).
+        var outside = await svc.DetailAsync(otherViewer, optedOut.SubjectId);
+        Assert.NotNull(outside.Profile);
+        Assert.False(outside.ShowContactBlock);
+        var self = await svc.DetailAsync(optedOut.SubjectId, optedOut.SubjectId); // self-view
+        Assert.NotNull(self.Profile);
+        Assert.True(self.ShowContactBlock);
+        Assert.Equal(0, await RowCount(store, optedOut.SubjectId));
+
+        // Shape 2 — audience excluding the owner: outside viewer Denies (one row,
+        // unchanged §2.4); the owner's self-view allows and commits no additional
+        // audit row — the count stays at exactly the outside viewer's one Deny.
+        var denied = await svc.DetailAsync(otherViewer, ownerExcluding.SubjectId);
+        Assert.NotNull(denied.Profile);
+        Assert.False(denied.ShowContactBlock);
+        Assert.Single(await OutcomeRowCount(store, ownerExcluding.SubjectId, AccessOutcome.Deny));
+        var ownerSelf = await svc.DetailAsync(ownerExcluding.SubjectId, ownerExcluding.SubjectId); // self-view
+        Assert.NotNull(ownerSelf.Profile);
+        Assert.True(ownerSelf.ShowContactBlock);
+        Assert.Equal(1, await RowCount(store, ownerExcluding.SubjectId));
+    }
+
     // ── Shared helpers (mirror `DirectoryServiceTests`'s `BootStoreAsync` shape) ──
 
     private async Task<IDocumentStore> BootStoreAsync()

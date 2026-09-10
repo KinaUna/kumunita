@@ -21,7 +21,9 @@ public sealed record DirectoryList(IReadOnlyList<Profile> Visible);
 /// <see cref="Profile.ContactVisibility"/> audience (the §2.4 rule, now a *single*
 /// decision): a null / absent audience short-circuits to <c>false</c> with no contact
 /// decision (no audit row); a non-null audience runs the one <c>CanAsync</c>, one
-/// <see cref="AccessAudit"/> row. <see cref="Profile"/> is <c>null</c> only for the
+/// <see cref="AccessAudit"/> row. A <b>self-view</b> (viewer is the profile's owner)
+/// unconditionally renders the full contact block — the owner's audience gates *others*,
+/// never themselves — with no decision and no audit row.
 /// fail-closed empty shape — the target profile does not exist, or the resident is
 /// <see cref="Profile.Blocked"/> (a suspended account whose profile has no public
 /// presence at all) — in which case no decision ran, no audit row.
@@ -132,7 +134,9 @@ public sealed class DirectoryService
     /// one-decision rule): <c>null</c> <see cref="Profile.ContactVisibility"/> short-circuits
     /// to <c>ShowContactBlock = false</c> with no <c>CanAsync</c> call and no
     /// <see cref="AccessAudit"/> row; a non-null audience runs one <c>CanAsync</c> and one
-    /// audit row. The profile's <b>basic</b> info (<c>DisplayName</c>/<c>Verified</c>) is
+    /// audit row. A <b>self-view</b> (viewer subject equals the profile owner) short-circuits
+    /// to <c>ShowContactBlock = true</c> with neither — the owner always sees their own
+    /// contact block, whatever their saved audience says.
     /// the only thing the detail renders *always* — <see cref="Profile.Visibility"/> no
     /// longer hides the whole profile (the platform is invitation-only and limited to
     /// residents, so "who is here" is not gated). A missing target profile, or a
@@ -180,6 +184,14 @@ public sealed class DirectoryService
         // no audit row).
         if (profile is null || profile.Blocked)
             return new DirectoryDetail(ShowContactBlock: false, Profile: null);
+
+        // Self-view: a resident's own profile is never gated — the contact audience is an
+        // author control on what *others* see, not a way to hide one's own data from
+        // oneself. Short-circuits like the `null`-audience case: the viewer is the owner,
+        // so the decision is trivially allowed — no <c>CanAsync</c> call, no
+        // <see cref="AccessAudit"/> row.
+        if (!string.IsNullOrEmpty(viewerSubjectId) && viewerSubjectId == profileSubjectId)
+            return new DirectoryDetail(ShowContactBlock: true, Profile: profile);
 
         // §2.4 / C-M2·1 short-circuit: `null` ContactVisibility ⇒ no contact decision, no
         // <see cref="AccessAudit"/> row. Basic info still renders; only the contact block

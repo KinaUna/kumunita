@@ -147,12 +147,13 @@ async function submitForm(page: Page, scope?: string): Promise<void> {
 
 test.describe('M2 e2e', () => {
   // ── (a) Directory round-trip — contact block ON vs OFF ──────────
-  // The author's own `Visibility` is the bootstrap self-only shape
-  // (ADR 0001-B — the Owner branch is always Allow), so the author
-  // always sees their own profile. Flipping the contact opt-in is
-  // the *only* thing that changes whether the Email/Phone dl rows
-  // render — the §2.4 "null ⇒ short-circuit" shape (C-M2·1) at the
-  // Web layer.
+  // The contact audience (owner-exemption rule) controls what
+  // *others* see: the author's own detail page always renders their
+  // own contact block, whatever the saved `ContactVisibility` says
+  // (a self-view is a short-circuit — no decision, no audit row).
+  // For an outside viewer, flipping the contact opt-in is the thing
+  // that changes whether the Email/Phone dl rows render — the §2.4
+  // "null ⇒ short-circuit" shape (C-M2·1) at the Web layer.
   test('a. directory round-trip — contact block on (opt-in) and off (opted out)', async ({ page, kumunita }) => {
     // 1) Sign up + verify (the M1 handoff) + sign in.
     const alice = await kumunita.signup('Alice R.', 'alice@example.com', 'Passw0rd!');
@@ -178,14 +179,31 @@ test.describe('M2 e2e', () => {
     await page.goto('/directory/' + encodeURIComponent(alice.subjectId));
     await expect(page.locator('dt', { hasText: 'Email' })).toBeVisible();
 
-    // 5) Contact block OFF (opted out): uncheck + save; the §2.4
-    //    "null ⇒ short-circuit" shape returns → the Email/Phone dl
-    //    rows must NOT render, and the "hasn't shared a contact
-    //    method" muted paragraph MUST (U8's Detail.cshtml else-branch).
+    // 5) Contact block OFF (opted out): uncheck + save. Two surfaces,
+    //    two rules:
+    //   • the owner's exemption — the contact audience controls what
+    //     OTHERS see, not the owner: alice's own detail page still
+    //     renders her contact block (Email row visible), and the
+    //     "hasn't shared a contact method" paragraph must NOT appear.
+    //   • the §2.4 "null ⇒ short-circuit" shape is preserved for an
+    //     outside viewer — a second resident (bob) sees no Email/Phone
+    //     dl rows and the muted paragraph MUST.
     await page.goto('/profile/edit');
     await page.locator('#optin-contact').uncheck();
     await submitForm(page);
 
+    // (i) Self-view: the owner always sees her own contact info.
+    await page.goto('/directory/' + encodeURIComponent(alice.subjectId));
+    await expect(page.locator('dt', { hasText: 'Email' })).toBeVisible();
+    await expect(page.locator('p.text-muted',
+      { hasText: /hasn't shared a contact method/i })).toHaveCount(0);
+
+    // (ii) Outside viewer's view of the opted-out profile: the §2.4
+    //      "null ⇒ not opted in" short-circuit (U8's Detail.cshtml
+    //      else-branch — U8's original contact-guard pin, now scoped
+    //      to non-owner viewers).
+    const bob = await kumunita.signup('Bob T.', 'bob@example.com', 'Passw0rd!');
+    await kumunita.login(page, 'bob@example.com', 'Passw0rd!');
     await page.goto('/directory/' + encodeURIComponent(alice.subjectId));
     await expect(page.locator('dt', { hasText: 'Email' })).toHaveCount(0);
     await expect(page.locator('dt', { hasText: 'Phone' })).toHaveCount(0);
