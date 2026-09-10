@@ -20,7 +20,7 @@ M3 posts + audience-scoped feeds + the M3b moderation lane
 (file/assign/resolve + `PostStatus`) — all server-rendered MVC + Razor, with
 a durable Wolverine outbox, retry + dead-letter, and the `/health` degraded
 gate. The deployable surface has grown but the topology hasn't changed:
-`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`),
+`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`, `Kumunita.Web.Tests`),
 multi-stage Docker image, the versioned schema boot (Marten feature + EF
 Identity migration + first-boot seeder), a `/health` liveness probe, and a
 `Coolify`-based deploy (Coolify `app` + dedicated Postgres 18, image parity
@@ -43,13 +43,15 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 
 - Resident directory (profiles, opt-in contact details)
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
-- Events with RSVP and reminders
-- Collaborative projects (goals, tasks, contributors)
+- Events with RSVP and reminders *(planned — M4, see the "Roadmap" below)*
+- Collaborative projects (goals, tasks, contributors) *(planned — M5, see the "Roadmap" below)*
 - **Groups** for reusable access lists
 - **Delegation** — owners grant family/caretakers scoped access
 - Moderation with component-scoped moderators and full audit
-- **Multilingual** — UI and platform texts (terms, about, help) are translatable;
-  admins add/remove supported languages and set the default in-app (ADR 0005)
+- **Multilingual** — UI and platform texts (terms, about, help) are translatable,
+  and the language catalog + instance default are seeded at first boot. The full
+  admin-managed language + translation surface lands with **M6** (ADR 0005; see
+  the "Roadmap" below).
 
 ## Tech stack
 
@@ -162,5 +164,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0006)
+- `docs/adr/` — architecture decision records (0001–0009)
 - `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization)

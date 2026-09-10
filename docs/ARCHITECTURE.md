@@ -68,7 +68,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0006
+    │   ├── adr/                    # 0001–0009
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
@@ -77,13 +77,13 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
     │   │   ├── M1DocTypes.cs       # M1 Marten-native doc registration (ADR 0004 §B.1)
     │   │   ├── M3DocTypes.cs       # M3 + M3b Marten-native doc registration (Post, PostReply, Report, Announcement)
-    │   │   ├── Bootstrap/          # DbBootstrap, SchemaBootstrap, FirstBootSeeder
-    │   │   ├── Identity/           # IdentityModule (M1) — also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
+    │   │   ├── Bootstrap/          # SchemaBootstrap, FirstBootSeeder
+    │   │   ├── Identity/           # IdentityModule (M1) + DbBootstrap (first-boot pristine gate); also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
     │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService
     │   │   ├── Authorization/      # AuthorizationModule (M1) — audiences, policy, audit; AuditPurgeService (Wolverine-free tiering); AdminOverride (break-glass read path)
     │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
-    │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-12)
+    │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
     │   │   ├── Localization/       # ADR 0005 — LanguageCatalog, LocaleSettings (shipped in M1's surface); TranslationResource / LocalizedPage land with M6's admin UI
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
@@ -314,7 +314,7 @@ Content
   Component        { id, name, description, icon, sortOrder, enabled, moderatorAccess }
   Post             { id, kind: Announcement|Discussion, componentId?, authorId, title, body,
                      audience, pinned, hidden, created, updated }
-  Reply            { id, postId, authorId, body, created }
+  PostReply        { id, postId, authorId, body, created }
   Audience         { mode: Any|All, grants: [ { kind: User|Group, id } ] }   (embedded)
 
 Events
@@ -502,7 +502,11 @@ dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.
 
 ## 9. Localization (multilingual)
 
-Design and rationale in ADR 0005; this is the operating shape.
+Design and rationale in ADR 0005; this is the operating shape. **Current state:** the
+shipped surface is the first-boot seed of the language catalog + instance default
+(`LanguageCatalog`, `LocaleSettings`; M1). Everything below — the translation provider,
+user preference, the admin surface, `LocalizedPage` — lands with M6 (see
+`M1DocTypes.cs` and the README roadmap).
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine
