@@ -568,6 +568,7 @@ body.kmb-page-fullbleed {
   padding-left: 0;
   margin-bottom: 0;
   max-width: 46rem;
+  margin-inline: auto;
 }
 .kmb-roadmap li {
   display: flex;
