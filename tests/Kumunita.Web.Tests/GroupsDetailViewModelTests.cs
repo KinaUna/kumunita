@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Eight_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Nine_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -63,12 +63,15 @@ public sealed class GroupsDetailViewModelTests
         // U10's six + m2b's PendingInvitations (the invite lane — the
         // detail's pending list + cancel links projection) +
         // ResidentCandidates (the "Add a member" dropdown projection —
-        // non-member, non-blocked residents). No Status /
+        // non-member, non-blocked residents) + Description (ADR 0009 — the
+        // group's M1 field becomes resident-facing: the detail's "About"
+        // block + the edit lane's form default). No Status /
         // InvitedBy / InvitedAt: "who invited, when" lives on the
         // GroupInvitation row's audit lane, not the UI.
         Assert.Equal(
             new[]
             {
+                "Description",
                 "GroupId",
                 "IsOwner",
                 "Members",
@@ -101,10 +104,13 @@ public sealed class GroupsDetailViewModelTests
     [Fact]
     public void GroupDetailViewModel_Excludes_SourceGroupFields()
     {
-        // The source Group's own fields (Description, Created) must have *no*
-        // corresponding member on the row type — the M1 admin surface owns
-        // those; the resident-facing Groups surface does not re-surface them.
-        var excluded = new[] { "Description", "Created" };
+        // The source Group's remaining non-resurfaced fields must have *no*
+        // corresponding member on the row type: Created is a M1-era
+        // admin-surface fact the resident-facing Groups surface does not
+        // surface. Description left the exclusion list with ADR 0009 — it is
+        // now a projected field of the detail (the "About" block + the
+        // owner ∪ GlobalAdmin edit lane's form default).
+        var excluded = new[] { "Created" };
         var props = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(p => p.Name)
@@ -179,6 +185,7 @@ public sealed class GroupsDetailViewModelTests
         var ownerShape = new GroupDetailViewModel(
             GroupId: "g1",
             Name: "Building 4",
+            Description: null,
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: true,
@@ -189,6 +196,7 @@ public sealed class GroupsDetailViewModelTests
         var adminShape = new GroupDetailViewModel(
             GroupId: "g1",
             Name: "Building 4",
+            Description: null,
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: false,               // the actor is a non-owner (a global
@@ -281,6 +289,7 @@ public sealed class GroupsDetailViewModelTests
         var model = new GroupDetailViewModel(
             GroupId: "g1",
             Name: "Building 4",
+            Description: "Residents of Building 4",   // ADR 0009 — the detail's "About" field.
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: true,                 // the owner (alice) is viewing their
@@ -321,6 +330,7 @@ public sealed class GroupsDetailViewModelTests
         var model2 = new GroupDetailViewModel(
             GroupId: "g1",
             Name: "Building 4",
+            Description: "Residents of Building 4",
             OwnerSubjectId: "alice",
             OwnerDisplayName: "A. Resident",
             IsOwner: false,

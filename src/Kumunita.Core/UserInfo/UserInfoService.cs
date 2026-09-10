@@ -348,6 +348,45 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         return;
     }
 
+    /// <inheritdoc />
+    public async Task UpdateGroupDescriptionAsync(string groupId, string? description, string updatedBy)
+    {
+        // Set (or clear with null) Group.Description; load the group in the same
+        // session; append AccessAudit (Action "group.update", TargetKind "group",
+        // TargetId = groupId) with Via per the derivation rule; one SaveChangesAsync
+        // (ADR 0009; the AddGroupMemberAsync lane's shape minus the membership row).
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        group.Description = description;
+        session.Store(group);
+
+        var via = updatedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : updatedBy;
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = updatedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.update",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
     // ── M2b: group invitations (docs/design/m2b-group-invitations.md;
     // one session + one SaveChangesAsync per call, mirroring the M1 group
     // lifecycle shape above — invariants C-M2b·1..3) ──────────────────

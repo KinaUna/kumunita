@@ -155,9 +155,11 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// field is a <i>presentation</i> state, not a gate).
 /// <para>
 /// **Not a <see cref="Kumunita.Core.UserInfo.Group"/> dump** — <c>GroupId</c> is
-/// carried only to survive the add/remove POSTs (a form field), <c>Description</c>
-/// and <c>Created</c> are omitted (the M1 "admin surface" owns them, not this
-/// resident-facing one), and <c>IsOwner</c> is derived from a string compare
+/// carried only to survive the add/remove POSTs (a form field) and
+/// <c>Created</c> is omitted (a M1-era admin-surface fact, not a resident-facing
+/// one). <see cref="Description"/> is carried since ADR 0009 (the detail's
+/// "About" block + the owner ∪ GlobalAdmin edit lane's form default), and
+/// <c>IsOwner</c> is derived from a string compare
 /// rather than a separate role claim (the single identity source is the
 /// signed-in principal — ADR 0003 SoD by structural identity, mirroring U9).
 /// </para>
@@ -166,6 +168,12 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// (opaque string — same pin as the U9 list-row <see cref="GroupViewModel.Id"/>
 /// deviation from the frozen <see cref="Kumunita.Core.UserInfo.Group"/>.</param>
 /// <param name="Name">The group's name (the detail header).</param>
+/// <param name="Description">The group's optional
+/// <see cref="Kumunita.Core.UserInfo.Group.Description"/> (rendered under the
+/// header when non-empty — ADR 0009); null when the group holds none. The
+/// edit lane's form default is <b>the actor minting nothing form-bound</b>:
+/// the lane's standing (owner ∪ GlobalAdmin, ADR 0007's new-lane rule) is the
+/// controller's <c>TryResolveOwnerSurface</c> gate, never a field here.</param>
 /// <param name="OwnerSubjectId">The group owner's opaque
 /// <see cref="Kumunita.Core.UserInfo.Group.OwnerId"/> subject (the form's
 /// "removedBy" hint + the <see cref="IsOwner"/> compare source — never a
@@ -199,6 +207,7 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 public sealed record GroupDetailViewModel(
     string GroupId,
     string Name,
+    string? Description,
     string OwnerSubjectId,
     string OwnerDisplayName,
     bool IsOwner,

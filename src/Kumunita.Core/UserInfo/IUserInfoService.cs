@@ -45,6 +45,24 @@ public interface IUserInfoService
     Task RemoveGroupMemberAsync(string groupId, string userId, string removedBy);
 
     /// <summary>
+    /// Set (or clear, with null) the group's <see cref="Group.Description"/>
+    /// (ADR 0009 — the description's write lane). The SoD standing is owner ∪
+    /// GlobalAdmin: the Web surface gates that and passes the <b>actor</b> as
+    /// <paramref name="updatedBy"/>; the seam does not re-gate (ADR 0006-D).
+    /// One session, one <c>SaveChangesAsync</c> (the
+    /// <see cref="AddGroupMemberAsync"/> lane's shape): load the group, mutate
+    /// the field, append an <see cref="Authorization.AccessAudit"/> row
+    /// (action <c>group.update</c>, <c>TargetKind</c> "group",
+    /// <c>TargetId</c> = group, <see cref="Authorization.AccessVia"/> derived
+    /// exactly like the other group lanes: <c>updatedBy == Group.OwnerId ⇒
+    /// Owner</c>, else <c>Admin</c>), in the same transaction (invariant C3).
+    /// Strong-consistency (C4): the new value is live on the very next
+    /// <see cref="GetGroupAsync"/> / <see cref="GetGroupsForUserAsync"/> call.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id exists.</exception>
+    Task UpdateGroupDescriptionAsync(string groupId, string? description, string updatedBy);
+
+    /// <summary>
     /// Grant a scoped delegation (invariant C2): the effective standing for
     /// <paramref name="delegateId"/> is <paramref name="ownerId"/> *only for* the actions
     /// named in <paramref name="scope"/>. <paramref name="from"/> is the effective

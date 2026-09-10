@@ -259,6 +259,7 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
         return View(new GroupDetailViewModel(
             group.Id,
             group.Name,
+            group.Description,
             group.OwnerId,
             ownerProfile?.DisplayName ?? group.OwnerId,
             isOwner,
@@ -438,6 +439,51 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
 
         TempData["info"] = $"You have left “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ── ADR 0009: the group's description (resident-facing display + the
+    // owner ∪ GlobalAdmin write lane) ──────────────────────────────────
+
+    /// <summary>
+    /// Update the group's description (ADR 0009):
+    /// <c>POST /groups/{id}/update-description</c>. The SoD lane is the
+    /// <see cref="TryResolveOwnerSurface"/> owner ∪ GlobalAdmin standing
+    /// (ADR 0007's new-lane rule — identical to the add/remove/invite
+    /// lanes): a plain member's POST 404s, the same consistent failure shape
+    /// as every other group write lane. The form carries the description
+    /// value only — the actor is minted from the signed-in principal and
+    /// passed as <c>updatedBy</c> (never a form field; the seam's
+    /// <c>Via</c> derivation is the single SoD source, exactly the U10
+    /// add-member pin). A blank value clears the description (the create
+    /// lane's whitespace-is-null mapping, U9) so "clear" and "set" are the
+    /// same route. The Core seam
+    /// <see cref="IUserInfoService.UpdateGroupDescriptionAsync"/> loads the
+    /// group's <c>OwnerId</c> in the same session and derives the audit
+    /// row's <c>Via</c> (actor == OwnerId ⇒ Owner, else Admin; action
+    /// <c>group.update</c>); the change is strong-consistency (C4) — the
+    /// detail on the very next request renders the new value.
+    /// </summary>
+    [HttpPost("{id}/update-description")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDescription(string id, [FromForm] string? description)
+    {
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        // Same whitespace mapping as the create lane (U9): a blank textarea
+        // clears the description rather than storing whitespace.
+        var value = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+        await userInfo.UpdateGroupDescriptionAsync(
+            groupId: resolved.Group.Id,
+            description: value,
+            updatedBy: resolved.Actor);
+
+        TempData["info"] = value is null
+            ? $"Cleared the description of “{resolved.Group.Name}”."
+            : $"Saved the description of “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
     // ── M2b: owner-invited membership (invite → accept/decline; the

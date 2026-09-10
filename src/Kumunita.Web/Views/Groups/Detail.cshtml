@@ -53,6 +53,34 @@
             <div class="alert alert-danger" role="alert">@err</div>
         }
 
+        @*
+            ADR 0009 — the group's description (the M1 Group.Description field,
+            resident-facing since ADR 0009): rendered for everyone who reaches
+            the detail (owner ∪ member gate) when it holds one. The edit form
+            is offered to owner ∪ GlobalAdmin only (the same canManage
+            expression that gates the Remove/invite/Add forms — the route's
+            TryResolveOwnerSurface gate is the real SoD wall; what a user sees
+            is exactly what the route accepts). The form carries the value
+            only — updatedBy is the actor's subject, minted in the controller.
+        *@
+        @if (!string.IsNullOrWhiteSpace(Model.Description))
+        {
+            <p>@Model.Description</p>
+        }
+
+        @if (canManage)
+        {
+            <h2>About this group</h2>
+            <form method="post" action="@Url.Action("UpdateDescription", "Groups", new { id = Model.GroupId })">
+                @Html.AntiForgeryToken()
+                <label class="form-label" for="description">Description (optional)</label>
+                <textarea class="form-control" id="description" name="description" rows="3" maxlength="500"
+                          placeholder="What is this group about? (visible to everyone who can reach this page)">@Model.Description</textarea>
+                <div class="form-text mt-1">Leave blank to clear the description.</div>
+                <button type="submit" class="btn btn-primary mt-2">Save description</button>
+            </form>
+        }
+
         <h2>Members</h2>
         @if (Model.Members.Count == 0)
         {
