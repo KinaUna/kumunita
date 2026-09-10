@@ -36,11 +36,13 @@
 
         @* Individual-community links — the viewer's own community directory:
            only the communities they have access to (same rule as the
-           "Write a post" button above). On the single-community feed
-           (Model.ComponentId set) the current one is highlighted and the
-           others are one click away; on the all-sections feed every entry is
-           a link. Hidden when the viewer has no reachable communities (the
-           bootstrap edge — the empty-feed branch below already covers it). *@
+           "Write a post" button above). An "All" pill (first) links back to
+           the all-sections feed (/community, Posts.AllSections); the current
+           pill is highlighted — on the single-community feed (Model.ComponentId
+           set) that's the community's own pill, on the all-sections feed (no
+           ComponentId) it's "All". Hidden when the viewer has no reachable
+           communities (the bootstrap edge — the empty-feed branch below
+           already covers it). *@
         @if (Model.Communities.Count > 0)
         {
             <div class="mb-3">
@@ -48,13 +50,19 @@
                     @(Model.ComponentId != null ? "Communities" : "Browse communities")
                 </div>
                 <ul class="nav nav-pills flex-wrap">
+                    <li class="nav-item">
+                        <a class="nav-link @(string.IsNullOrEmpty(Model.ComponentId) ? "active" : "text-dark text-decoration-none")"
+                           href="@Url.Action("AllSections", "Posts")">
+                           All
+                        </a>
+                    </li>
                     @foreach (var c in Model.Communities)
                     {
                         var isCurrent = Model.ComponentId == c.Id;
                         <li class="nav-item">
                             <a class="nav-link @(isCurrent ? "active" : "text-dark text-decoration-none")"
                                href="@Url.Action("Index", "Posts", new { componentId = c.Id })">
-                                @c.Name
+                               @c.Name
                             </a>
                         </li>
                     }
