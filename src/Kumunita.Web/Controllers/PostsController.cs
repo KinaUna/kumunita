@@ -397,6 +397,58 @@ public sealed class PostsController(
         return all.Where(c => accessible.Contains(c.Id)).ToList();
     }
 
+    /// <summary>
+    /// Seeds the composer's "Who to grant to" option lists for the shared
+    /// <c>Views/Shared/_GrantPickers</c> partial — the <b>same option
+    /// source</b> the M2 <see cref="ProfileController"/>'s editor uses
+    /// (its private <c>SeedGrantPickerOptionsAsync</c>, mirrored here for
+    /// the composer surface): <b>Users</b> — every visible, non-blocked,
+    /// verified <c>Profile</c> <b>except the actor themselves</b> (the F6
+    /// "thin token, fat authorization" rule: self-access is implicit and
+    /// needs no stored grant); <b>Groups</b> — the platform-wide group
+    /// list (<c>IUserInfoService.GetAllGroupsAsync</c>; a resident's
+    /// membership does not constrain which groups they may name in a
+    /// post's audience — the decision is on the <c>Group</c> subject).
+    /// Stored on the statically-typed <see cref="Controller.ViewData"/>
+    /// (NOT <c>ViewBag</c> — the bag's indexer throws
+    /// <see cref="RuntimeBinderException"/>; the same channel the M2
+    /// profile editor reads its options from). Read-only view data, never
+    /// model properties on <see cref="PostComposeViewModel"/> — the
+    /// only form-bound grants field remains the partial's hidden
+    /// <c>Audience.Grants</c> textarea (the M2 U11 / F13 single-source
+    /// pin, carried verbatim to the composer).
+    /// </summary>
+    private async Task SeedGrantPickerOptionsAsync()
+    {
+        var profiles = await userInfo.GetProfilesAsync(verifiedOnly: true);
+        var selfId = SubjectId(User);
+        var userOptions = profiles
+            .Where(p => !p.Blocked)
+            .Where(p => !string.Equals(p.SubjectId, selfId, StringComparison.Ordinal))
+            .Select(p => new GrantOption
+            {
+                Id    = p.SubjectId,
+                Label = string.IsNullOrWhiteSpace(p.DisplayName) ? p.SubjectId : p.DisplayName,
+                Kind  = "User",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var groups = await userInfo.GetAllGroupsAsync();
+        var groupOptions = groups
+            .Select(g => new GrantOption
+            {
+                Id    = g.Id,
+                Label = string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+                Kind  = "Group",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        ViewData["Audience_Users"] = userOptions;
+        ViewData["Audience_Groups"] = groupOptions;
+    }
+
     [HttpGet("/posts/new")]
     public async Task<IActionResult> New()
     {
@@ -437,6 +489,11 @@ public sealed class PostsController(
                 Grants = "[]",
             },
         };
+
+        // The "Who to grant to" option lists (verified residents +
+        // groups) the shared _GrantPickers partial renders — the same
+        // single source the M2 Profile/Edit editor uses.
+        await SeedGrantPickerOptionsAsync();
 
         return View(model);
     }
@@ -495,6 +552,12 @@ public sealed class PostsController(
         // admissible component (the §2.3 row 2 shape).
         var components = await AccessibleComponentsAsync(User);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
+
+        // Re-seed the picker option lists so a failed-shape re-render
+        // below still shows the "Who to grant to" options (the
+        // unauthenticated guard above renders without them — an
+        // acceptable edge: the picker then shows its empty-pool note).
+        await SeedGrantPickerOptionsAsync();
 
         if (!model.IsValid)
         {

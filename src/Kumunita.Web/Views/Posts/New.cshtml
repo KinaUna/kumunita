@@ -117,16 +117,32 @@
                         </div>
                     }
 
-                    <label class="form-label mt-3" for="aud-grants" style="font-weight:600;">
-                        Grants
-                    </label>
-                    <textarea class="form-control font-monospace"
-                              name="Audience.Grants" id="aud-grants" rows="3"
-                              placeholder='[{"Kind":"User","Id":"&lt;subject-id&gt;"}] — or leave empty for "no one (except you as the author)"'>
-                        @(Model.Audience.Grants ?? string.Empty)
-                    </textarea>
+                    @* "Who to grant to" — the shared picker partial
+                       (Views/Shared/_GrantPickers.cshtml, the same
+                       "Who to grant to" UX the Profile/Edit audience
+                       editors use; extracted from
+                       Views/Profile/_AudienceEditor.cshtml for this).
+                       Checkboxes are display-only (no name=) — the
+                       hidden <c>Grants</c> textarea the partial renders
+                       is the only form-bound grant field, posting as
+                       <c>Audience.Grants</c>; the
+                       <c>_GrantPickerScripts</c> partial (in
+                       @section Scripts below) keeps the textarea in
+                       two-way sync with the selection. *@
+                    <partial name="_GrantPickers" model="@(new GrantPickersModel
+                    {
+                        EditorName = "Audience",
+                        // A null/absent bound editor renders the
+                        // well-formed-but-empty shape (the M2 off-shape
+                        // fallback pattern from _AudienceEditor).
+                        Editor     = Model.Audience
+                                    ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                    })" />
 
-                    @if (Model.Audience.IsEmpty)
+                    @if (Model.Audience is not null
+                        && Model.Audience.IsEmpty)
                     {
                         <div class="alert alert-warning mt-2 mb-0">
                             <b>Empty audience.</b>
@@ -149,14 +165,14 @@
                     }
 
                     <small class="text-muted d-block mt-2">
-                        A single-JSON-array of
-                        <code>{ "Kind": "User" | "Group", "Id": "&lt;id&gt;" }</code>
-                        elements. This is the *only* audience on the post —
-                        never auto-augmented by any logic above or below this
+                        Whatever you pick here is written <b>verbatim</b>
+                        as the post's <b>only</b> audience — never
+                        auto-augmented by any logic above or below this
                         form (ADR 0001-B; the
                         <c>Post</c> document's
                         <c>Audience</c> field is
-                        written verbatim to exactly what you post).
+                        written exactly to what you post — and an empty
+                        pick denies everyone but you, as warned above).
                     </small>
                 </div>
             </div>
@@ -171,5 +187,10 @@
 </div>
 
 @section Scripts {
-
+    @* The grant-picker sync (shared with Profile/Edit — the
+       <c>_GrantPickerScripts</c> partial): keeps the hidden
+       <c>Audience.Grants</c> textarea in two-way sync with the
+       checkbox pickers above; the textarea is the only element
+       posted. *@
+    <partial name="_GrantPickerScripts" />
 }
