@@ -63,11 +63,23 @@ namespace Kumunita.Web.Controllers;
 /// boundary and the C-MED·5 size/type guard (both stay in
 /// <c>Kumunita.Web</c>; Core keeps the HTTP-free seam).
 /// </para>
+/// <para>
+/// <b>U7 addition (ADR 0011; C-MED·1/2/3/5):</b> the ctor also takes
+/// <c>IAuthorizationService</c> — the <c>Avatar</c> serving action's frozen
+/// single decision path (<see cref="Kumunita.Core.Authorization.AccessAction.Read"/>
+/// on the profile via
+/// <see cref="Kumunita.Core.UserInfo.ProfileToAuditableResource"/>, the audit
+/// row committed by the seam in its own commit — C-MED·2: Allow <i>and</i>
+/// Deny, the action never re-implements). This is the serving-lane
+/// <b>contract</b> every follow-on lane copies — FACES M1–M6 (design doc
+/// §2.5). No new <c>AccessAction</c> / <c>AccessVia</c> id (C-MED·1).
+/// </para>
 /// </summary>
 [Authorize]
 public sealed class ProfileController(
     IUserInfoService userInfo,
     DirectoryService directory,
+    Kumunita.Core.Authorization.IAuthorizationService authz,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts) : Controller
 {
@@ -369,6 +381,62 @@ public sealed class ProfileController(
         await userInfo.SetProfileAvatarAsync(subject, mediaObject.Id, subject); // C-MED·8 single lane
 
         return RedirectToAction("Edit");
+    }
+
+    // ── Avatar (GET — the U7 serving-lane contract, design doc §2.3) ──────
+
+    /// <summary>
+    /// <c>GET /profile/avatar/{subjectId}</c> — the avatar serving action
+    /// (design doc §2.3, ADR 0011; C-MED·1/2/3/5). This is the <b>contract</b>
+    /// every follow-on serving lane copies: one
+    /// <see cref="Kumunita.Core.Authorization.IAuthorizationService.CanAsync"/> on the profile's
+    /// <see cref="Kumunita.Core.Authorization.AccessAction.Read"/> audience via
+    /// <see cref="Kumunita.Core.UserInfo.ProfileToAuditableResource"/>
+    /// (C-MED·1: the frozen seam, no new <c>AccessAction</c> /
+    /// <c>AccessVia</c>), the audit row committed by the seam in its own
+    /// commit (C-MED·2: Allow <i>and</i> Deny, the action never re-implements
+    /// the audit), and the payload served <b>only</b> through the app
+    /// endpoint (<see cref="IMediaStore.OpenReadAsync"/>) — never a static
+    /// path (C-MED·3) — with <c>X-Content-Type-Options: nosniff</c> + the
+    /// stored <see cref="Kumunita.Core.Media.MediaObject.ContentType"/>
+    /// (C-MED·5).
+    /// <para>
+    /// <b>FACES M1–M6 mapping (design doc §2.5):</b>
+    /// M6 (unsigned) → <c>Challenge()</c>; M5 (unknown profile) →
+    /// <c>404</c>; M4 (blocked profile) → <c>404</c> <i>before</i> the
+    /// decision (blocked supersedes — no <c>CanAsync</c> call, no audit row;
+    /// the repo's fail-closed idiom in <see cref="DirectoryService"/>); M3
+    /// (denied audience) → <c>404</c> <i>after</i> the seam (audit already
+    /// committed); M1 (owner) / M2 (authorized other) → the same
+    /// <c>CanAsync</c> call's owner/audience branch → <c>200</c> + stored
+    /// <c>Content-Type</c>. No avatar set (AvatarId empty) → <c>404</c>.
+    /// </para>
+    /// </summary>
+    [HttpGet("/profile/avatar/{subjectId}")]
+    public async Task<IActionResult> Avatar([FromRoute] string subjectId)
+    {
+        var viewer = SubjectId(User);
+        if (viewer is null) return Challenge();            // M6 (unsigned → challenge)
+
+        var profile = await userInfo.GetProfileAsync(subjectId);
+        if (profile is null) return NotFound();            // M5 (unknown profile)
+        if (profile.Blocked) return NotFound();            // M4 (blocked supersedes — no decision, no audit row)
+        if (string.IsNullOrEmpty(profile.AvatarId)) return NotFound(); // no avatar set → fail-closed 404
+
+        // One decision (C-MED·1 single path; C-MED·2 audit committed by the seam —
+        // Allow and Deny both land):
+        var decision = await authz.CanAsync(viewer, AccessAction.Read, new ProfileToAuditableResource(profile));
+        if (!decision.Allowed) return NotFound();          // M3 (Deny → 404; audit already committed)
+        // M1 (owner) + M2 (authorized other) auto-allow through the same call.
+
+        // C-MED·7: the mt catalog (the reference) and the volume (the bytes)
+        // are distinct — the action bridges the two via IMediaStore; a
+        // missing doc or a missing byte is a fail-closed 404 (never a 500):
+        var mediaObject = await media.GetAsync(profile.AvatarId);
+        if (mediaObject is null) return NotFound();        // doc missing → fail-closed
+        var stream = await media.OpenReadAsync(profile.AvatarId);
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(stream, mediaObject.ContentType);      // stored Content-Type (C-MED·5)
     }
 
     // ── Private helpers ────────────────────────────────────────────────────

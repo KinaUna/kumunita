@@ -22,7 +22,7 @@
 | U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **done** (2026-09-11) |
 | U5 | Core test: `SetProfileAvatarAsync` lane | **done** (2026-09-11) |
 | U6 | Web: `AvatarUpload` (self-only upload) | **done** (2026-09-11) |
-| U7 | Web: `Avatar` (serving-lane contract) | **pending** |
+| U7 | Web: `Avatar` (serving-lane contract) | **done** (2026-09-11) |
 | U8 | Web views: form + list + detail + preview | **pending** |
 | U9 | Web seam tests: upload guard + FACES M1–M6 | **pending** |
 | U10 | ADR 0011 + SECURITY/OPS/ARCHITECTURE/README + close | **pending** |
@@ -469,3 +469,96 @@
   `Profile.ToAuditableResource()` + `CanAsync(…Read…)` audit gate,
   `X-Content-Type-Options: nosniff` + the stored `Content-Type`, the FACES
   M1–M6 serving contract).
+
+## U7 — Web: `ProfileController.Avatar` (the serving-lane contract) (done 2026-09-11)
+
+- **Entry read:** `plan-media-file-storage.md` §U7; `media-u7-plan.md`
+  (the authored self-contained unit); `media-u6-exec-plan.md` (the exec-plan
+  format); design doc §2.3 (the pinned action shape) + §2.5 (FACES M1–M6) +
+  §2.7 (the drift guards).
+- **Prior section read:** `## U6` (latest — the ctor order + the `IMediaStore`
+  store-first idiom it already uses) + `## U2` (the verbatim `IMediaStore` seam
+  + U4's `Profile.AvatarId`).
+- **What landed:** one modified file — `src/Kumunita.Web/Controllers/ProfileController.cs`.
+- **The serving action (the contract every follow-on lane copies):**
+  - Route: `[HttpGet("/profile/avatar/{subjectId}")]` on
+    `public async Task<IActionResult> Avatar([FromRoute] string subjectId)`.
+  - `var viewer = SubjectId(User); if (viewer is null) return Challenge();`
+    — the M6 (unsigned) defensive guard; the class-level `[Authorize]` is the
+    primary gate.
+  - Fail-closed ordering (design doc §2.3, verbatim order preserved):
+    `userInfo.GetProfileAsync(subjectId)` → `profile is null → NotFound()` (M5)
+    → `profile.Blocked → NotFound()` (M4, **before** the decision — blocked
+    supersedes, no `CanAsync`, no audit row — the exact `DirectoryService`
+    early-return idiom) → `string.IsNullOrEmpty(profile.AvatarId) → NotFound()`
+    (no avatar set — fail-closed, not 500) → **one**
+    `authz.CanAsync(viewer, AccessAction.Read, new
+    ProfileToAuditableResource(profile))` → `!decision.Allowed → NotFound()`
+    (M3) — M1 (owner) + M2 (authorized other) auto-allow through the same call.
+    The audit row is committed by the `CanAsync` seam in its own commit
+    (C-MED·2, Allow **and** Deny) — the action never re-implements the audit.
+  - `media.GetAsync(profile.AvatarId)` → `null → NotFound()` (fail-closed, so
+    the normal path serves without a 500) → `media.OpenReadAsync(profile.AvatarId)`
+    → `Response.Headers["X-Content-Type-Options"] = "nosniff";` (C-MED·5;
+    resolution 7) → `return File(stream, mediaObject.ContentType)` (the stored,
+    U6-validated `Content-Type`). No static path, no temp dir (C-MED·3/6).
+- **DI:** the primary ctor gains `Kumunita.Core.Authorization.IAuthorizationService
+  authz` (after `DirectoryService directory`, before `media`, `mediaOpts`) —
+  the **frozen** seam reused from `DirectoryService`/`PostService`;
+  `AddTransient<IAuthorizationService, AuthorizationService>` (DI L45) already
+  resolves it. No new seam, no DI change, no new `AccessAction`/`AccessVia` id
+  (C-MED·1).
+- **FACES M1–M6 mapping (the serving contract U9 will lock; design doc §2.5):**
+  M6 (unsigned) → `Challenge()`; M5 (unknown profile) → `404` (the seam is
+  never called, no audit row); M4 (blocked profile) → `404` **before** the
+  decision (no audit row, blocked supersedes — like `DirectoryService`); M3
+  (denied audience) → `404` **after** `CanAsync` (the audit row already
+  committed by the seam); M1 (owner) / M2 (authorized other) → `200` + stored
+  `Content-Type` (the audit Allow row committed). Deny is `404`, never `403`
+  (the repo's fail-closed idiom).
+- **Deliberate resolutions (all noted per §2.7):**
+  1. `Profile.ToAuditableResource()` → `new ProfileToAuditableResource(profile)`
+     — the doc's method-shorthand has no code counterpart; the shipped idiom is
+     the adapter class (used by `DirectoryService`/`PostService`, covered by
+     `ProfileToAuditableResourceTests`). No new seam/type (rules 1/2).
+  2. `IAuthorizationService authz` ctor param (the design doc's `_authz`) — the
+     **frozen** seam injected at the controller; the design doc is the higher
+     authority (§2.7), overriding the register's "reuse the composition-read
+     idiom" pointer.
+  3. `var mediaObject = …` over the design doc's `var media = …` local — the
+     primary-ctor `IMediaStore` param is named `media`; a `var media` would
+     shadow it (a self-reference compile error).
+  4. No action-level `[Authorize]` — the class is already `[Authorize]`-gated;
+     M6 is the defensive in-action `viewer is null → Challenge()` guard.
+  5. `SubjectId(User)` over `User.FindFirstValue(ClaimTypes.NameIdentifier)` —
+     `KumunitaPrincipal.SubjectId` is the repo's single claim-shaping helper
+     (the U6 resolution-3 precedent).
+  6. **`IAuthorizationService` name collision (CS0104):** the file imports both
+     `Kumunita.Core.Authorization` (L2) and `Microsoft.AspNetCore.Authorization`
+     (L7, for the class `[Authorize]`), so the bare name is ambiguous. The Core
+     seam is fully-qualified at its point of use
+     (`Kumunita.Core.Authorization.IAuthorizationService` on the ctor param +
+     in the action's `<see cref>`); `AccessAction`/`ProfileToAuditableResource`
+     are already unambiguous and stay bare.
+  7. **`Response.Headers[…] = …` over the design doc's `Response.TryAddHeader(…)`
+     (CS1061):** `TryAddHeader` is not a member of
+     `Microsoft.AspNetCore.Http.HttpResponse`; the nosniff header is
+     single-valued, so the shipped idiom is
+     `Response.Headers["X-Content-Type-Options"] = "nosniff";` (assign, not
+     `Append`). C-MED·5 still satisfied — the value is exactly `nosniff`.
+- **Gate (verified, not assumed):** `run_build` on `Kumunita.Web` (and
+  `dotnet build Kumunita.slnx -c Debug`) → **0 errors, 0 warnings** (the
+  register's Exit: green on `Kumunita.Web`); `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` (AGENTS.md
+  path, not `dotnet test`) → **Total: 60, Errors: 0, Failed: 0** (= U5/U6's
+  60/60 baseline — U7 adds no tests; no regressions from the ctor+action change).
+  `Kumunita.Core.Tests` not run this pass — U7 touches **no** Core file (U4/U5
+  pinned its 223/223 on the last Core change).
+- **Working plan recorded:** `media-u7-exec-plan.md` (mirrors U1–U6's exec-plan
+  tier; records the seven resolutions + the FACES M1–M6 row table + the
+  constraint set pinned while writing).
+- **Nothing staged or committed** (user wants to review first) — the
+  controller change + the exec plan + this note are uncommitted.
+- **Next:** U8 appends `## U8` (Web views + editor wiring — the avatar `<img>`
+  `src` pointing at `GET /profile/avatar/{subjectId}`, the edit-form file input
+  wired to U6's `POST /profile/avatar/upload`, the list/detail/preview views).
