@@ -41,11 +41,12 @@ public sealed class LocalVolumeMediaStoreTests(PostgresFixture fixture)
     [Fact]
     public async Task LocalVolumeMediaStore_Put_dedups_by_content_hash()
     {
+        var ct = TestContext.Current.CancellationToken;
         var store = await NewMediaStoreAsync();
         var content = new byte[] { 1, 2, 3, 250, 251 };
 
-        var first = await store.PutAsync(content, "cat.png", "image/png", "actor-a");
-        var second = await store.PutAsync(content, "cat-copy.png", "image/png", "actor-b");
+        var first = await store.PutAsync(content, "cat.png", "image/png", "actor-a", ct);
+        var second = await store.PutAsync(content, "cat-copy.png", "image/png", "actor-b", ct);
 
         // Same content id (lowercase-hex SHA-256 of the payload).
         Assert.Equal(first.Id, second.Id);
@@ -58,9 +59,9 @@ public sealed class LocalVolumeMediaStoreTests(PostgresFixture fixture)
         Assert.Equal("cat.png", second.Filename);
 
         // And the payload still round-trips from the single volume file.
-        await using var stream = await store.OpenReadAsync(first.Id);
+        await using var stream = await store.OpenReadAsync(first.Id, ct);
         var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
+        await stream.CopyToAsync(ms, ct);
         Assert.Equal(content, ms.ToArray());
     }
 
@@ -72,12 +73,13 @@ public sealed class LocalVolumeMediaStoreTests(PostgresFixture fixture)
     [Fact]
     public async Task LocalVolumeMediaStore_OpenRead_missing_doc_throws_KeyNotFound()
     {
+        var ct = TestContext.Current.CancellationToken;
         var store = await NewMediaStoreAsync();
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => store.OpenReadAsync(KnownHash));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => store.OpenReadAsync(KnownHash, ct));
 
         // And nothing was written behind that id (no orphan to serve).
-        Assert.Null(await store.GetAsync(KnownHash));
+        Assert.Null(await store.GetAsync(KnownHash, ct));
     }
 
     /// <summary>
@@ -90,11 +92,12 @@ public sealed class LocalVolumeMediaStoreTests(PostgresFixture fixture)
     {
         var store = await NewMediaStoreAsync();
         var content = new byte[321]; // non-trivial size
+        var ct = TestContext.Current.CancellationToken;
         for (var i = 0; i < content.Length; i++)
             content[i] = (byte)(i % 256);
 
-        var doc = await store.PutAsync(content, "pic.jpg", "image/jpeg", "actor-x");
-        var loaded = await store.GetAsync(doc.Id);
+        var doc = await store.PutAsync(content, "pic.jpg", "image/jpeg", "actor-x", ct);
+        var loaded = await store.GetAsync(doc.Id, ct);
 
         Assert.NotNull(loaded);
         Assert.Equal("image/jpeg", doc.ContentType);

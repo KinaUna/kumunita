@@ -37,13 +37,14 @@ public class LocalVolumeFileStoreTests : IDisposable
     [Fact]
     public async Task LocalVolumeFileStore_Put_open_read_roundtrips()
     {
+        var ct = TestContext.Current.CancellationToken;
         var (opts, store) = NewStoreInTempDir();
         var content = new byte[] { 0, 1, 2, 255, 254, 253, 42 };
 
-        await store.PutAsync(ContentId, content);
+        await store.PutAsync(ContentId, content, ct);
 
-        Assert.True(await store.ExistsAsync(ContentId));
-        await using var stream = await store.OpenReadAsync(ContentId);
+        Assert.True(await store.ExistsAsync(ContentId, ct));
+        await using var stream = await store.OpenReadAsync(ContentId, ct);
         Assert.Equal(content, await ReadAllAsync(stream));
 
         // Sharding: the payload is at {RootPath}/{id[0..2]}/{id}, never a
@@ -61,13 +62,14 @@ public class LocalVolumeFileStoreTests : IDisposable
     [Fact]
     public async Task LocalVolumeFileStore_Put_idempotent_same_id_no_second_writer()
     {
+        var ct = TestContext.Current.CancellationToken;
         var (opts, store) = NewStoreInTempDir();
         var content = new byte[] { 7, 7, 7, 7 };
 
-        await store.PutAsync(ContentId, content);
-        await store.PutAsync(ContentId, content); // same id + same bytes again
+        await store.PutAsync(ContentId, content, ct);
+        await store.PutAsync(ContentId, content, ct); // same id + same bytes again
 
-        await using var stream = await store.OpenReadAsync(ContentId);
+        await using var stream = await store.OpenReadAsync(ContentId, ct);
         Assert.Equal(content, await ReadAllAsync(stream));
 
         // No writer litter in the shard dir: exactly one file (the payload).
@@ -84,9 +86,10 @@ public class LocalVolumeFileStoreTests : IDisposable
     [Fact]
     public async Task LocalVolumeFileStore_OpenRead_missing_throws_FileNotFound()
     {
+        var ct = TestContext.Current.CancellationToken;
         var (_, store) = NewStoreInTempDir();
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() => store.OpenReadAsync(ContentId));
+        await Assert.ThrowsAsync<FileNotFoundException>(() => store.OpenReadAsync(ContentId, ct));
     }
 
     /// <summary>
@@ -97,9 +100,10 @@ public class LocalVolumeFileStoreTests : IDisposable
     [Fact]
     public async Task LocalVolumeFileStore_Delete_missing_throws_FileNotFound()
     {
+        var ct = TestContext.Current.CancellationToken;
         var (_, store) = NewStoreInTempDir();
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() => store.DeleteFileAsync(ContentId));
+        await Assert.ThrowsAsync<FileNotFoundException>(() => store.DeleteFileAsync(ContentId, ct));
     }
 
     // ── Shared helpers ─────────────────────────────────────────────────────

@@ -80,7 +80,7 @@ public class DirectoryServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await using (var blockedSession = store.OpenSession(new Marten.Services.SessionOptions()))
         {
             blockedSession.Store(blockedProfile);
-            await blockedSession.SaveChangesAsync();
+            await blockedSession.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         // (a) Unverified viewer: sees BOTH non-blocked residents (not just themselves),
