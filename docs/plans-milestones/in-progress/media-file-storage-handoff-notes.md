@@ -20,7 +20,7 @@
 | U2 | Core: `MediaObject` + `IMediaStore` + `LocalVolumeMediaStore` + `MediaDocTypes` | **done** (2026-09-11) |
 | U3 | Core tests: file store + media store | **done** (2026-09-11) |
 | U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **done** (2026-09-11) |
-| U5 | Core test: `SetProfileAvatarAsync` lane | **pending** |
+| U5 | Core test: `SetProfileAvatarAsync` lane | **done** (2026-09-11) |
 | U6 | Web: `AvatarUpload` (self-only upload) | **pending** |
 | U7 | Web: `Avatar` (serving-lane contract) | **pending** |
 | U8 | Web views: form + list + detail + preview | **pending** |
@@ -305,3 +305,71 @@
 - **Nothing staged or committed** (user wants to review first).
 - **Next:** U5 appends `## U5` (the `SetProfileAvatarAsync` lane tests —
   the three §2.5 names, on the existing `PostgresFixture` model).
+
+## U5 — Core test: the `SetProfileAvatarAsync` lane (done 2026-09-11)
+
+- **Deliverables** (1 new test file — the register's Deliverables and the
+  §2.5 pinned path; **new file, not folded** into an existing test file —
+  the register's "new or append" clause, the choice noted here):
+  - `tests/Kumunita.Core.Tests/UserInfo/ProfileAvatarLaneTests.cs` — the 3
+    §2.5 lane tests (set / clear / missing-profile), on the
+    **existing `PostgresFixture`** (one shared `postgres:18` Testcontainers,
+    `NewDatabaseAsync()` scratch DB per test +
+    `DocumentStore.For(opts => { Connection; DatabaseSchemaName = "mt";
+    opts.Storage.Add<KumunitaFeature>(); opts.Storage.Add<AuthorizationFeature>();
+    M1DocTypes.Configure(opts); })` +
+    `ApplyAllConfiguredChangesToDatabaseAsync` — the
+    `UserInfoServiceGroupDescriptionTests.BootStoreAsync` shape in this
+    assembly, mirrored verbatim). `Profile` seeded through the service's own
+    `UpsertProfileAsync(profile, new ProfileUpdate(null ×5))` (all-null
+    patch ⇒ the record supplies every field — the `UserInfoServiceTests` L62
+    idiom). The avatar id is a plain lowercase-hex `KnownHash` constant
+    (the U3 idiom; C-MED·4) — the lane references the catalog by id only,
+    so **no `MediaDocTypes` surface and no `MediaObject` doc** in the
+    scratch schema.
+- **Pinned test names (design doc §2.5 lines 542–545, verbatim — 3 names):**
+  - `UserInfoService_SetProfileAvatar_sets_id`
+  - `UserInfoService_SetProfileAvatar_null_clears`
+  - `UserInfoService_SetProfileAvatar_missing_profile_throws_KeyNotFound`
+- **Stale-name note (drift-guard §2.7 rule 3, "rename only with a note"):**
+  the authored `media-u5-plan.md` §Assumptions lists a *single* stale draft
+  name (`SetProfileAvatarAsync_Sets_And_Clears_And_FailsClosed_On_Missing`).
+  The **design doc §2.5 is the pinned source and won** (three names) — the
+  same doc-wins resolution U3 recorded for its own stale draft; recorded
+  here and in `media-u5-exec-plan.md`.
+- **Behaviour pinned per test (all trace to U4's shipped impl,
+  `UserInfoService.cs` L872–891 — tests assert U4's pinned behaviour,
+  nothing new):**
+  - *set:* the new id is live on the very next `GetProfileAsync` (C4), and
+    the fresh read proves the save landed; the other profile fields are
+    untouched (DisplayName asserted equal).
+  - *null clears:* after a set + a `null` call, a **fresh** `GetProfileAsync`
+    still sees `AvatarId == null` (the clear **persists** — `media-u5-plan.md`
+    §Risks: an in-memory-only assertion would not prove the save); the id
+    is then re-settable (plain field write, no tombstone).
+  - *missing profile:* **`KeyNotFoundException`** (U4's doc-wins note over
+    the group lanes' `InvalidOperationException`) **and no profile created**
+    — fail closed without side effects (the lane is load-throw-set-save,
+    never load-or-create).
+- **`actorBy` note (carried from U4):** the lane accepts it per the pinned
+  signature but does not persist it; the tests pass it and pin zero
+  observable effect beyond the field write (the serving-lane audit row is
+  U7's `CanAsync` gate, C-MED·2).
+- **Gate (verified — `dotnet exec` path per AGENTS.md §"Running the tests",
+  not `dotnet test`):** `run_build` (full `Kumunita.slnx`) → **0
+  errors**; `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\
+  Kumunita.Core.Tests.dll -filterVSTest
+  "FullyQualifiedName~ProfileAvatarLaneTests"` → **Total: 3, Errors: 0,
+  Failed: 0** (the three §2.5 names discover + pass, 7.8 s Testcontainers);
+  full `Kumunita.Core.Tests` → **Total: 223, Errors: 0, Failed: 0** (= U4's
+  220 baseline + the 3 new lane tests, no regressions), 23.4 s;
+  `Kumunita.Web.Tests` → **60/60** (unchanged, as expected — no Web surface
+  touched yet).
+- **Working plan recorded:** `media-u5-exec-plan.md` (mirrors U1–U4's
+  exec-plan tier; records the stale-name resolution + the constraint set
+  pinned while writing).
+- **Nothing staged or committed** (user wants to review first) — the test
+  file + the exec plan + this note are uncommitted.
+- **Next:** U6 appends `## U6` (the Web `AvatarUpload` action — the
+  `IFormFile` boundary, owner-scoped self-only, size/type validated against
+  `MediaOptions`, then the `PutAsync` → `SetProfileAvatarAsync` write).
