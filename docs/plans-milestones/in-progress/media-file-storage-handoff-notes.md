@@ -23,7 +23,7 @@
 | U5 | Core test: `SetProfileAvatarAsync` lane | **done** (2026-09-11) |
 | U6 | Web: `AvatarUpload` (self-only upload) | **done** (2026-09-11) |
 | U7 | Web: `Avatar` (serving-lane contract) | **done** (2026-09-11) |
-| U8 | Web views: form + list + detail + preview | **pending** |
+| U8 | Web views: form + list + detail + preview | **done (2026-09-11)** |
 | U9 | Web seam tests: upload guard + FACES M1–M6 | **pending** |
 | U10 | ADR 0011 + SECURITY/OPS/ARCHITECTURE/README + close | **pending** |
 
@@ -562,3 +562,126 @@
 - **Next:** U8 appends `## U8` (Web views + editor wiring — the avatar `<img>`
   `src` pointing at `GET /profile/avatar/{subjectId}`, the edit-form file input
   wired to U6's `POST /profile/avatar/upload`, the list/detail/preview views).
+
+## U8
+
+**What I did:** the Web-rendering unit — the register's **4 view files + 1
+CSS file, no view-models, no controllers** (U6's upload action and U7's
+serving action both stay **frozen**; U8 only points the render surfaces at
+them):
+
+- Four view files:
+  - `src/Kumunita.Web/Views/Profile/Edit.cshtml` — the avatar **form**
+    (file input + submit + hint) and the **current-avatar preview**.
+  - `src/Kumunita.Web/Views/Directory/Index.cshtml` — the per-resident
+    avatar `<img>` (subject = the row's `p.SubjectId`).
+  - `src/Kumunita.Web/Views/Directory/Detail.cshtml` — the detail avatar
+    `<img>` (subject = the route's `{subjectId}`).
+  - `src/Kumunita.Web/Views/Profile/Preview.cshtml` — the author's own
+    avatar `<img>` (the preview composes the signed-in **author's** saved
+    profile as seen by the `?as=` viewer — so the profile, and its
+    avatar, is always the author's: FACES M1's owner row).
+- `src/Kumunita.Web/wwwroot/css/site.css` — the `.avatar` /
+  `.avatar-mono` presentation tokens (appended section; written in the
+  file's existing design-system vocabulary — `--kmb-tint-a` /
+  `--kmb-border` / `--kmb-ink-soft`, the Gabarito heading face).
+
+**Form shape (pinned — drift-guarded):** a **separate** `<form>`
+(a nested `<form>` would be invalid HTML — the profile form keeps its
+own action) with **`method="post"`**, **`action="/profile/avatar"`**
+(literal — the pinned U6 route; the action is path-attribute-routed),
+**`enctype="multipart/form-data"`** (the `IFormFile` boundary, C-MED·6),
+**`@Html.AntiForgeryToken()`** (the action's `[ValidateAntiForgeryToken]`),
+a file input **named `file`** (binds the `[FromForm] IFormFile? file`
+param), `required` +
+`accept="image/jpeg,image/png,image/webp,image/gif"` (a browser
+pre-filter mirroring the C-MED·5 `MediaOptions` default allow-list) and
+a one-line `form-text` hint (format + the `5 MiB` cap — the
+`MediaOptions.MaxBytes` pinned `5L * 1024 * 1024` default). The form
+carries **no subject field** — self-only by structural identity (the
+§2.4 U7a pin; the target is the signed-in principal, minted
+server-side).
+
+**Render `<img>` contract:** every avatar `<img>` now carries
+**`src="/profile/avatar/" + subject`** — U7's serving endpoint, **never a
+static path** (C-MED·3, §2.7 rule 5; the audit-by-default gate + the
+fail-closed `CanAsync` decision run on the endpoint, not on the `<img>`).
+The endpoint's 404 fail-safe rows (FACES M3–M5 + "no avatar set") mean a
+failed load is not an error to display — each `<img>` carries one
+`onerror` (two `style.display` assignments, no JS file) that hides it and
+reveals a **server-rendered sibling**: `.avatar-mono` (the resident's
+initial, Razor-rendered from the display name where one exists; an empty
+circle where the surface has no name channel — the Preview self-view).
+404 = "no face shown, no error chrome" — the monogram keeps the directory
+grid visually consistent (`Lean + Boring`). `alt=""` (decorative — the
+display name sits next to it).
+
+**The subject channels (per surface):**
+
+| Surface | Subject | Channel |
+|---------|---------|---------|
+| `Profile/Edit.cshtml` | the actor's own (self-only editor — FACES M1) | `KumunitaPrincipal.SubjectId(User)` (the repo's single claim-shaping helper — the same one the controller mints with; the `@using Kumunita.Web.Security` idiom per `Groups/Detail.cshtml`) |
+| `Profile/Preview.cshtml` | the author's own (the preview is **the author's** profile, by composition) | `KumunitaPrincipal.SubjectId(User)` — `ProfilePreviewViewModel` deliberately carries **no raw subject id** (the contact-peek pin), so the view mints it |
+| `Directory/Index.cshtml` | the resident (per row) | `p.SubjectId` — the frozen `VisibleProfile` row already carries it (no view-model change needed) |
+| `Directory/Detail.cshtml` | the target resident | `httpContextAccessor.HttpContext?.Request.RouteValues["subjectId"] as string` via `@inject Microsoft.AspNetCore.Http.IHttpContextAccessor` — the stable route value of `DirectoryController.Detail`'s `[HttpGet("{subjectId}")]` (the list rows link through the same value) |
+
+**Key decisions (recorded):**
+
+1. **No view-model fields** — the register's `ProfileEditViewModel` /
+   `DirectoryViewModel` additions were **optional** ("if the views need
+   them"); the views don't (the row already has `SubjectId`, the detail
+   subject is the stable route value, and the two self-avatars are the
+   signed-in principal). This also keeps `DirectoryViewModel.Detail`'s
+   "exactly these fields" pin (the `DirectoryController.ProjectDetail`
+   remark) and touches **no** controller file (outside the Deliverables —
+   §2.7 rule 1). The view-model shape test files in
+   `Kumunita.Web.Tests` (`DirectoryDetailViewModelTests` /
+   `DirectoryIndexViewModelTests` / `ProfileEditViewModelTests`) stay
+   green by construction.
+2. **The detail-subject read channel** (resolution 2 in
+   `media-u8-exec-plan.md`): the tried-and-rejected variants are recorded
+   there — `ViewContext.RouteData["subjectId"]` (CS0021: no public
+   indexer on the MVC `RouteData` surface; `GetValue` is CS0411-ambiguous
+   against the `ConfigurationBinder` extension), `Url.RouteData[...]`
+   (CS1061 — a Razor *View*'s `Url` is `IUrlHelper`), bare
+   `Request…` / `HttpContext…` (CS0103 / CS0120 — bare `HttpContext`
+   resolves to the implicit `using`'s **static**
+   `Microsoft.AspNetCore.Http.HttpContext` class). The
+   `IHttpContextAccessor` `@inject` is the working in-view channel.
+3. **Route-typo note (recorded per §2.7):** the `## U7` handoff's "Next:"
+   line names the upload target `POST /profile/avatar/upload` — that is a
+   **typo**. The **shipped `AvatarUpload` action** and the design doc
+   §2.4 (line 503) both pin **`POST /profile/avatar`**; the form `action`
+   is the literal `/profile/avatar` (the code + doc win).
+4. **Upload-failure presentation stays U6's pinned behaviour** — the
+   action's direct `400` / `413` / `415` responses (the U9 `Upload_*`
+   tests will lock those codes); U8 does **not** add redirects or error
+   views for them (a shape change into U6/U9 territory); it contributes
+   the `accept` / `required` / `form-text` first-line UX only.
+5. **The `RZ1010` catch (recorded):** an `@{ … }` block **inside** the
+   `@foreach` body is illegal (Razor is already in the C# context there) —
+   the per-row monogram local in `Index.cshtml` is a bare `string
+   avatarInitial = …` declaration in the loop body, not `@{ … }`.
+
+**Gate:** `dotnet build Kumunita.slnx -c Debug` → **0 errors, 0
+warnings** (a `CS8602` nullable deref on the `IHttpContextAccessor`
+chain was caught at build and resolved with the `?.` chain).
+`dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+→ **60/60 passing** (U8 adds **no tests** — U9 writes the FACES M1–M6 +
+U7a/b/c suites; U8 touches **no Core file**, so the Core 223/223 baseline
+from the last Core change (U4/U5) is unchanged and un-run by design).
+
+- **Nothing staged or committed** (user wants to review first) — the
+  four view files + the `site.css` section + the exec plan + this note
+  are uncommitted.
+- **Next:** U9 appends `## U9` — the FACES M1–M6 + U7a/b/c tests (the
+  pinned names in design doc §2.5); the `## U7` "Next:" line's
+  `/profile/avatar/upload` is the typo decision 3 above (the shipped
+  target is `POST /profile/avatar`).
+
+**Noted per media-u8-plan:** the register's "optional" view-model step
+was exercised as **not needed** — the frozen `ProfileEditViewModel` /
+`DirectoryViewModel` shapes are untouched (the U11 "exactly six form
+fields" and the M2 "exactly these fields" pins remain intact). The
+working detail + all resolutions live in
+`docs/plans-milestones/in-progress/media-u8-exec-plan.md`.

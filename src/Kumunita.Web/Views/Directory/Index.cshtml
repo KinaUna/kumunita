@@ -19,13 +19,34 @@
             <ul class="list-group">
                 @foreach (var p in Model.Profiles)
                 {
+                    @*
+                      U8 of the media feature: the per-resident avatar. The
+                      <img> src is always U7's serving endpoint (GET
+                      /profile/avatar/{subjectId}, C-MED·3 — never a static
+                      path; the gate + audit run on the endpoint, not on the
+                      <img>). The row's own SubjectId is the subject — the
+                      frozen VisibleProfile already carries it. The endpoint
+                      fails closed to 404 (no avatar set, a denied audience
+                      or a blocked profile — FACES M3–M5), so on load error
+                      the monogram sibling takes over (no broken-image icon).
+                    *@
+                    string avatarInitial = !string.IsNullOrWhiteSpace(p.DisplayName)
+                        ? char.ToUpperInvariant(p.DisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
                     <li class="list-group-item d-flex align-items-center justify-content-between">
-                        <span>
-                            <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
-                            @if (!string.IsNullOrEmpty(p.Address))
-                            {
-                                <span class="text-muted small"> · @p.Address</span>
-                            }
+                        <span class="d-flex align-items-center gap-2">
+                            <span class="d-inline-flex align-items-center">
+                                <img class="avatar" src="/profile/avatar/@p.SubjectId" alt=""
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                                <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                            </span>
+                            <span>
+                                <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
+                                @if (!string.IsNullOrEmpty(p.Address))
+                                {
+                                    <span class="text-muted small"> · @p.Address</span>
+                                }
+                            </span>
                         </span>
                         <span>
                             @if (p.Verified)

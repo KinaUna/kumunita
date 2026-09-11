@@ -1,7 +1,25 @@
 @model Kumunita.Web.Models.DirectoryViewModel.Detail
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor
 
 @{
     ViewData["Title"] = Model.DisplayName;
+
+    // U8 of the media feature: the avatar's subject is this detail row's
+    // resident — the {subjectId} of the route (DirectoryController.Detail's
+    // [HttpGet("{subjectId}")] parameter, the same value the directory list's
+    // rows link through). The Detail view-model record is pinned to exactly
+    // its contact-gate fields (the M2 register's pin at
+    // DirectoryController.ProjectDetail — no avatar field added), so the
+    // subject comes from the stable URL contract, not a view-model shape.
+    // Same fail-closed contract as the list rows: U7's serving endpoint
+    // (GET /profile/avatar/{subjectId}, C-MED·3 — never a static path)
+    // returns 404 when the profile is blocked, the audience denies, or no
+    // avatar is set (FACES M3–M5), and the monogram sibling then takes
+    // over (no broken-image icon).
+    string? avatarSubject = httpContextAccessor.HttpContext?.Request.RouteValues["subjectId"] as string;
+    string avatarInitial = !string.IsNullOrWhiteSpace(Model.DisplayName)
+        ? char.ToUpperInvariant(Model.DisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
 }
 
 <div class="row justify-content-center">
@@ -11,13 +29,27 @@
                 &larr; Back to the directory
             </a>
         </p>
-        <h1>
-            @Model.DisplayName
-            @if (Model.Verified)
+        <div class="d-flex align-items-center gap-3">
+            @if (!string.IsNullOrEmpty(avatarSubject))
             {
-                <span class="badge text-bg-success">Verified</span>
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar avatar-lg" src="/profile/avatar/@avatarSubject" alt=""
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                    <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
+                </span>
             }
-        </h1>
+            else
+            {
+                <span class="avatar-mono avatar-lg">@avatarInitial</span>
+            }
+            <h1 class="mb-0">
+                @Model.DisplayName
+                @if (Model.Verified)
+                {
+                    <span class="badge text-bg-success">Verified</span>
+                }
+            </h1>
+        </div>
 
         @*
           Contact-block opt-in pin (M2 design doc §2.4, invariant C-M2·1,

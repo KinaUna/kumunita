@@ -677,3 +677,46 @@ body.kmb-page-fullbleed {
   border-color: #1c4532;
   box-shadow: 0 0 0 calc(var(--bs-focus-ring-width) * 0.75) var(--bs-focus-ring-color);
 }
+
+/* --- Avatar (media feature, U8) -------------------------------------------------------
+   Every avatar <img> carries the app endpoint /profile/avatar/{subjectId}
+   as its src (C-MED·3 — served only through the audited serving lane, never
+   a static path). When that endpoint fails closed to a 404 (no avatar set,
+   a blocked profile, or a denied audience — FACES M3–M5), the <img>'s
+   onerror hides it and .avatar-mono, a sibling rendered server-side (the
+   resident's initial, or an empty circle when the surface has no
+   display-name channel), takes its place — no broken-image icon. */
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  flex: none;
+}
+.avatar-mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--kmb-tint-a);
+  border: 1px solid var(--kmb-border);
+  color: var(--kmb-ink-soft);
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  flex: none;
+  user-select: none;
+}
+.avatar.avatar-lg {
+  width: 64px;
+  height: 64px;
+}
+.avatar-mono.avatar-lg {
+  width: 64px;
+  height: 64px;
+  font-size: 1.5rem;
+}

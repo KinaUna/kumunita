@@ -1,4 +1,5 @@
 @using Kumunita.Web.Models
+@using Kumunita.Web.Security
 @model ProfileEditViewModel
 @{
     ViewData["Title"] = "Edit your profile";
@@ -12,6 +13,64 @@
             Whatever you choose here is exactly what the neighbor directory
             shows — no surprises.
         </p>
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">Your avatar</h5>
+        @*
+          U8 of the media feature (design doc §2.4; C-MED·5/6/8): the avatar
+          upload is its OWN write lane (U6's AvatarUpload — POST /profile/avatar,
+          [ValidateAntiForgeryToken]), so this is a SEPARATE <form> (a nested
+          <form> would be invalid HTML). It is self-only by structural identity:
+          the form carries the image file + the antiforgery token and NOTHING
+          else — no subject field (the §2.4 U7a pin: the target is the
+          signed-in principal, minted server-side, never a form value). The
+          current-avatar preview on this page, and every avatar <img> on the
+          platform, point at U7's
+          GET /profile/avatar/{subjectId} — never a static path (C-MED·3); the
+          endpoint fails closed to 404 (no avatar set / a denied audience —
+          FACES M1–M5), so on load error the monogram sibling takes over
+          instead of a broken-image icon.
+        *@
+        @{
+            // The avatar rendered here (and the upload's preview subject) is
+            // the actor's OWN profile — the editor is self-only (FACES M1's
+            // owner row). Minted in the view from the signed-in principal via
+            // the repo's single claim-shaping helper, exactly as
+            // ProfileController mints it; never a view-model / form field
+            // (ProfileEditViewModel keeps its frozen shape — the U8 media
+            // register's optional view-model step was not needed).
+            string? avatarSubject = KumunitaPrincipal.SubjectId(User);
+            string avatarInitial = !string.IsNullOrWhiteSpace(Model.DisplayName)
+                ? char.ToUpperInvariant(Model.DisplayName.TrimStart()[0]).ToString()
+                : string.Empty;
+        }
+        <div class="d-flex align-items-center gap-3">
+            @if (!string.IsNullOrEmpty(avatarSubject))
+            {
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@avatarSubject" alt=""
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                </span>
+            }
+            else
+            {
+                <span class="avatar-mono">@avatarInitial</span>
+            }
+            <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <input type="file" name="file" required
+                           accept="image/jpeg,image/png,image/webp,image/gif"
+                           aria-label="Avatar image"
+                           class="form-control form-control-sm">
+                    <button type="submit" class="btn btn-primary btn-sm">Save avatar</button>
+                </div>
+                <div class="form-text small">
+                    JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the
+                    avatar currently shown in the directory.
+                </div>
+            </form>
+        </div>
 
         @if (TempData["info"] is string info)
         {
