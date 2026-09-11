@@ -156,10 +156,16 @@
                                 <span class="text-muted small me-1">post:</span>
                                 @foreach (var c in Model.Components)
                                 {
-                                    <label title="@c.Name" aria-label="@c.Name"
+                                    // ADR 0012 — a mandatory community is a member of
+                                    // everyone: shown checked (the union read already
+                                    // includes it) and locked, since unchecking is a
+                                    // server-side no-op and re-checking a redundant row.
+                                    var cMandatory = Model.Communities.FirstOrDefault(x => x.Id == c.Id)?.Mandatory == true;
+                                    <label title="@(cMandatory ? c.Name + " (mandatory — everyone is a member)" : c.Name)" aria-label="@c.Name"
                                            style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
                                         <input type="checkbox" name="communityIds" value="@c.Id"
-                                               checked="@(a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
+                                               @(cMandatory ? "disabled" : null)
+                                               checked="@(cMandatory || a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
                                         <span class="badge text-bg-light border">@c.Name</span>
                                     </label>
                                 }
@@ -277,6 +283,13 @@ else
                             else
                             {
                                 <span class="badge text-bg-warning">disabled</span>
+                            }
+                            @* ADR 0012 — the mandatory badge: everyone is a member;
+                               toggled on the community's manage page (the
+                               moderator's lane), read-only here. *@
+                            @if (c.Mandatory)
+                            {
+                                <span class="badge text-bg-dark" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
                             }
                         </td>
                         <td class="text-end">

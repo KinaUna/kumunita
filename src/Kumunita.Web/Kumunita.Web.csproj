@@ -34,6 +34,21 @@
     <ProjectReference Include="..\Kumunita.Core\Kumunita.Core.csproj" />
   </ItemGroup>
 
+  <!-- TypeScript.MSBuild compiles the .ts under client/ into wwwroot/js (untracked
+       build output) via RunTscCompile on CoreCompileDependsOn, but the SDK's
+       DefineStaticWebAssets *task* runs from the ResolveProjectStaticWebAssets
+       target during reference resolution — before CoreCompile. Since
+       a non-incremental `dotnet build` runs Clean first (whose CleanTypeScriptOutputs
+       deletes wwwroot/js), a solution build can define the static assets while the
+       emitted files are absent and fail with "No file exists for the asset ...
+       wwwroot/js/lib/api.js". Ensure tsc has emitted before any target that
+       defines/generates the static-web-assets manifest. (BeforeTargets must name
+       real MSBuild *targets* — DefineStaticWebAssets is only a task, so hooking
+       it directly matches nothing.) -->
+  <Target Name="EmitTypeScriptBeforeStaticWebAssets"
+          BeforeTargets="ResolveProjectStaticWebAssets;GenerateStaticWebAssetsManifest;GenerateComputedBuildStaticWebAssets;StaticWebAssetsPrepareForRun"
+          DependsOnTargets="RunTscCompile" />
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>

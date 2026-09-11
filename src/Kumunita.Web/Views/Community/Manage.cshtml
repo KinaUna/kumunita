@@ -1,0 +1,141 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.ManageCommunityViewModel
+{
+    ViewData["Title"] = $"{Model.Name} — manage";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Posts", new { componentId = Model.ComponentId })">← Back to the feed</a></p>
+
+        @*
+            ADR 0012 — the surface under /community/manage/{id}: the
+            mandatory toggle (checked = everyone is a member), the member
+            list with per-row remove (hidden on mandatory), and the
+            add-picker. Standing is enforced by the route, not the button.
+        *@
+
+        <h1>@Model.Name</h1>
+
+        <p class="text-muted">
+            Manage membership for this community.
+            @if (Model.ActorHasScopeClaim)
+            {
+                <span class="badge bg-success">You moderate this community</span>
+            }
+            @if (!Model.Enabled)
+            {
+                <span class="badge bg-dark">Disabled</span>
+            }
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        @*
+            ADR 0012 — the mandatory state. A single checkbox IS the whole
+            surface (the Groups "Private group" toggle shape, ADR 0010):
+            checked ⇒ Mandatory=true (everyone in the neighborhood is a
+            member; nobody can be removed or leave), cleared ⇒ false. The
+            value is bool form-bound — an unchecked checkbox omits the field
+            and binds to false, so one toggle covers both directions. The
+            route's standing gate is the real SoD wall; this form is only
+            offered to the actor who can act on it.
+        *@
+        <h2>Availability</h2>
+        <form method="post" action="@Url.Action("SetMandatory", "Community", new { componentId = Model.ComponentId })">
+            @Html.AntiForgeryToken()
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="mandatory"
+                       name="Mandatory" value="true" @(Model.Mandatory ? "checked" : "") />
+                <label class="form-check-label" for="mandatory">
+                    Mandatory community — everyone in the neighborhood is a member
+                </label>
+            </div>
+            <div class="form-text mt-1">
+                Mandatory communities can't have members removed and can't be left;
+                clear the checkbox to make membership optional again.
+            </div>
+            <button type="submit" class="btn btn-primary mt-2">
+                @(Model.Mandatory ? "Make optional" : "Make mandatory")
+            </button>
+        </form>
+
+        <h2 class="mt-4">Members</h2>
+        @if (Model.Mandatory)
+        {
+            <p>
+                This community is mandatory — everyone is a member, so there's no
+                one to remove. The listed rows are explicit memberships, kept in
+                case the community is made optional again.
+            </p>
+        }
+        @if (Model.Members.Count == 0)
+        {
+            <p class="text-muted">No explicit members yet — add some below.</p>
+        }
+        @if (Model.Members.Count > 0)
+        {
+            <ul class="list-group">
+                @foreach (var m in Model.Members)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            @(m.DisplayName ?? m.SubjectId)
+                            @if (m.SubjectId == KumunitaPrincipal.SubjectId(User))
+                            {
+                                <span class="badge bg-secondary">You</span>
+                            }
+                        </span>
+                        @if (!Model.Mandatory)
+                        {
+                            var removeLabel = m.DisplayName ?? "this member";
+                            <form method="post"
+                                  action="@Url.Action("RemoveMember", "Community", new { componentId = Model.ComponentId })"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Remove @removeLabel from @Model.Name?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="UserId" value="@m.SubjectId" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            The add picker: non-blocked profiles that aren't already members
+            (the controller computed this from the live profile candidate read —
+            nothing is pre-filtered on the client; the form is only offered to
+            the actor who can act on it).
+        *@
+        <h2 class="mt-4">Add a member</h2>
+        @if (Model.Candidates.Count == 0)
+        {
+            <p class="text-muted">Everyone in the neighborhood is already a member here.</p>
+        }
+        @if (Model.Candidates.Count > 0)
+        {
+            <form method="post" action="@Url.Action("AddMember", "Community", new { componentId = Model.ComponentId })">
+                @Html.AntiForgeryToken()
+                <div class="input-group">
+                    <select class="form-select" id="addUser" name="UserId" required>
+                        <option value="" disabled selected>Pick a resident to add…</option>
+                        @foreach (var c in Model.Candidates)
+                        {
+                            <option value="@c.SubjectId">@(c.DisplayName ?? c.SubjectId)</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-primary">Add to @Model.Name</button>
+                </div>
+            </form>
+        }
+    </div>
+</div>

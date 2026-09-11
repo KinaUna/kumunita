@@ -16,3 +16,4 @@ Decision / Consequences. New decisions take the next number.
 | 0009 | Group description: resident-facing display + owner ∪ GlobalAdmin edit | Accepted |
 | 0010 | Private groups: a membership/organizing unit, hidden from the audience pickers | Accepted |
 | 0011 | Media & file storage: content-addressed local-volume bytes + a `mt` catalog | Accepted |
+| 0012 | Community membership: mandatory communities + moderator-managed optional membership | Accepted |

@@ -27,6 +27,23 @@ public sealed class Component
     public bool Enabled { get; set; } = true;
 
     public bool ModeratorAccess { get; set; }
+
+    /// <summary>
+    /// **Mandatory membership** (ADR 0012): when <c>true</c>, every verified
+    /// resident is a member of this community — membership is *implicit*
+    /// (the <c>GetCommunityIdsAsync</c> read seam unions the enabled
+    /// ∩ mandatory set in with the explicit <see cref="ComponentMembership"/>
+    /// rows), nobody may be removed from it, and a resident may not leave it
+    /// (the self-leave / removal lanes refuse). <b>OFF by default</b> — a
+    /// community is optional unless a moderator (or a GlobalAdmin) marks it
+    /// mandatory through the single write lane
+    /// <see cref="IUserInfoService.SetCommunityMandatoryAsync"/>. A
+    /// <b>disabled</b> component grants no memberships even when mandatory
+    /// (the read seam is enabled ∩ mandatory, mirroring the <see
+    /// cref="Enabled"/> "the row and its posts remain; the surface is off"
+    /// convention).
+    /// </summary>
+    public bool Mandatory { get; set; }
 }
 
 /// <summary>

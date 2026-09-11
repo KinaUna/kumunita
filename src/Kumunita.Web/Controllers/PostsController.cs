@@ -129,6 +129,16 @@ public sealed class PostsController(
         var accessible = await AccessibleComponentsAsync(User);
         var canPost = accessible.Any(c => c.Id == componentId);
 
+        // ADR 0012 — the feed-header surface flags (the CommunityController
+        // route gates are the SoD walls; these only decide what the view
+        // offers to this viewer): mandatory state (the badge), management
+        // standing (the "Manage" link), the self-leave offer (a member with
+        // no management standing, optional community only).
+        var manages = KumunitaPrincipal.IsGlobalAdmin(User)
+            || KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId));
+        var isMandatory = component.Mandatory;
+        var canLeave = canPost && !manages && !isMandatory;
+
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -162,6 +172,9 @@ public sealed class PostsController(
             Items = items,
             Total = feed.Total,
             CanPost = canPost,
+            IsMandatory = isMandatory,
+            CanManageCommunity = manages,
+            CanLeaveCommunity = canLeave,
             // The viewer's own community directory only: communities they have
             // access to (membership ∪ moderator scope ∪ GlobalAdmin — the same
             // <see cref="AccessibleComponentsAsync"/> rule driving CanPost). A

@@ -308,8 +308,15 @@ public interface IUserInfoService
     /// <summary>
     /// Strong-consistency membership resolution for the posting gate
     /// (invariant C4): returns the set of <c>componentId</c> values the
-    /// account is a member of *at this instant* — from the live
-    /// <see cref="ComponentMembership"/> rows (no projection lag, no cache).
+    /// account is a member of *at this instant* — the live
+    /// <see cref="ComponentMembership"/> rows **∪** the enabled, mandatory
+    /// communities (ADR 0012: <see cref="Component.Mandatory"/> membership is
+    /// implicit — every verified resident is a member, and a disabled
+    /// component grants none even when mandatory) — with no projection lag,
+    /// no cache. This is the single "who is a member" definition: the
+    /// posting gate (<see cref="Posts.PostService"/>), the composer's
+    /// community picker, and the feed's directory all read through it, so a
+    /// mandatory toggle is live on the very next read.
     /// Mirrors <see cref="GetGroupIdsAsync"/> in shape and audit
     /// behavior: the **write** lanes
     /// (<see cref="SetCommunityMembershipAsync"/> /
@@ -345,13 +352,122 @@ public interface IUserInfoService
     /// <see cref="Posts.PostService.CreatePostAsync"/> call. A **no-op** when
     /// the pair has no row (does not throw) — admins editing a "set" of
     /// components per user are free to uncheck rows that were never there.
+    /// <b>ADR 0012: a <see cref="Component.Mandatory"/> community is a
+    /// no-op skip</b> (no row deleted, no audit appended — nothing changed):
+    /// membership there is implicit (<see cref="GetCommunityIdsAsync"/> still
+    /// returns it), and the <c>/admin</c> set form plus the self-leave route
+    /// must be able to call this lane on a mandatory pair without a hard
+    /// failure. The *moderator* removal lane
+    /// (<see cref="RemoveCommunityMemberAsync"/>) refuses the same pair with
+    /// an <see cref="InvalidOperationException"/> — the Web lane that wants
+    /// the surfaced message.
     /// Appends an <see cref="Authorization.AccessAudit"/> row (action
     /// "community.remove-member", targetKind "component", via Admin, outcome
-    /// Allow).
+    /// Allow) when a row is actually removed.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/> or
     /// <paramref name="userId"/> is null/whitespace.</exception>
     Task ClearCommunityMembershipAsync(string componentId, string userId, string actorId);
+
+    // ── ADR 0012 — mandatory communities + moderator member-management
+    // lanes (the community's <see cref="Identity.Roles.Moderator"/> scope ∪
+    // <see cref="Identity.Roles.GlobalAdmin"/> standing; ADR 0006-E
+    // compatible — appended to the owning module's public surface, additive)
+
+    /// <summary>
+    /// Set a community's <see cref="Component.Mandatory"/> flag (ADR 0012):
+    /// <c>true</c> makes every verified resident an implicit member (nobody
+    /// may be removed from it — <see cref="RemoveCommunityMemberAsync"/>
+    /// refuses, <see cref="ClearCommunityMembershipAsync"/> skips — and
+    /// nobody may leave it, the self-leave route is Web-gated on the flag);
+    /// <c>false</c> restores ordinary optional membership (explicit rows alone
+    /// then decide). **Standing gate** (thin token, decision in Core — the
+    /// same <c>actorRoles</c> seam as <see cref="Posts.PostService"/>'s
+    /// composer gate): the actor must carry the
+    /// <see cref="Identity.Roles.ModeratorComponent(string)"/> scope claim for
+    /// <paramref name="componentId"/> ∪ <see cref="Identity.Roles.
+    /// GlobalAdmin"/> — an <see cref="UnauthorizedAccessException"/> otherwise
+    /// (fail-closed). Strong consistency (invariant C4): the toggle is live
+    /// on the very next <see cref="GetCommunityIdsAsync"/>.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.set-mandatory" when switching on, "community.set-optional"
+    /// when off; targetKind "component", via <b>Moderator</b> when the actor
+    /// holds the component's scope claim else Admin — the narrower standing
+    /// records, outcome Allow) in the same transaction as the flag flip
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> or
+    /// <paramref name="actorId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor's role set
+    /// carries neither standing.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// Add a resident to a community (the moderator ∪ GlobalAdmin side of
+    /// ADR 0012's optional-membership management): the same idempotent
+    /// <c>(componentId, userId)</c> upsert row as
+    /// <see cref="SetCommunityMembershipAsync"/> — a row on an already
+    /// mandatory community is a harmless no-op (the implicit union read
+    /// already includes them; kept so the forms round-trip without special
+    /// cases). **Standing gate** as
+    /// <see cref="SetCommunityMandatoryAsync"/> (component scope ∪ GlobalAdmin,
+    /// else <see cref="UnauthorizedAccessException"/>).
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.add-member", targetKind "component", via Moderator or
+    /// Admin as above, outcome Allow) in the same transaction (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/>,
+    /// <paramref name="userId"/> or <paramref name="actorId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor's role set
+    /// carries neither standing.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task AddCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// Remove a resident's membership from a community (the moderator ∪
+    /// GlobalAdmin side of ADR 0012): deletes the <c>(componentId,
+    /// userId)</c> row; a **no-op** when the pair has no row (does not
+    /// throw — the set-form shape, consistent with the frozen admin lane).
+    /// **Mandatory communities refuse** (ADR 0012's invariant: no one is a
+    /// non-member of a mandatory community) — an <see
+    /// cref="InvalidOperationException"/> the Web lane surfaces, not a
+    /// silent skip (this lane is where the product message lives).
+    /// **Standing gate** as <see cref="SetCommunityMandatoryAsync"/>;
+    /// **no** target-standing gate — a community's own moderator *can* be
+    /// removed (unlike the ADR 0008 group owner's own row): moderator
+    /// standing outlives membership (they govern and post on the
+    /// <see cref="Identity.Roles.ModeratorComponent(string)"/> claim alone,
+    /// so no orphan state results; the GlobalAdmin role lane re-adds scope
+    /// when the membership matters again).
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.remove-member", targetKind "component", via Moderator or
+    /// Admin, outcome Allow) in the same transaction (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/>,
+    /// <paramref name="userId"/> or <paramref name="actorId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor's role set
+    /// carries neither standing.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id
+    /// exists, or the community is <see cref="Component.Mandatory"/>.</exception>
+    Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// The <b>membership rows</b> of a single community (a
+    /// <see cref="Component"/> row) — the manage-page member list (ADR
+    /// 0012) and the candidate source for the add picker. The
+    /// <see cref="GetGroupMembersAsync"/> analog on the component axis: a
+    /// *candidate projection*, not an access decision — no
+    /// <see cref="Authorization.AccessAudit"/> row. Strong-consistency live
+    /// rows (C4): an add/remove in the same commit is live on the very next
+    /// call. Note this returns the **explicit rows only** — a mandatory
+    /// community's implicit members are *all* residents, which no list
+    /// enumerates; the manage surface shows the flag instead (the view's
+    /// job, not this read's).
+    /// </summary>
+    Task<IReadOnlyList<ComponentMembership>> GetCommunityMembersAsync(string componentId);
 
     // ── M2b additions (ADR 0006-E compatible lane — owner-invited group
     // membership: invite → accept/decline, plus the owner's cancel lane.

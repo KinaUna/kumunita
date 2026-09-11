@@ -1137,12 +1137,29 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             return System.Array.Empty<string>();
 
         await using var session = store.QuerySession();
-        return (await session
+        var explicitMembership = await session
             .Query<ComponentMembership>()
             .Where(m => m.UserId == userId)
             .Select(m => m.ComponentId)
             .ToListAsync()
-            .ConfigureAwait(false)) as IReadOnlyCollection<string>;
+            .ConfigureAwait(false);
+
+        // ADR 0012: mandatory communities — every verified resident is a
+        // member, so the union below is the single "who is a member"
+        // definition (posting gate, composer picker, feed directory all read
+        // through it — a flag toggle is live on the very next read, C4).
+        // Enabled ∩ mandatory: a disabled component is the user-chosen
+        // "removed" shape and grants no membership at all.
+        var mandatory = await session
+            .Query<Component>()
+            .Where(c => c.Enabled && c.Mandatory)
+            .Select(c => c.Id)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var union = new HashSet<string>(explicitMembership);
+        union.UnionWith(mandatory);
+        return union;
     }
 
     /// <inheritdoc />
@@ -1222,6 +1239,18 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await using var session = store.OpenSession(new SessionOptions());
 
+        // ADR 0012: a mandatory community's membership is implicit — the
+        // GetCommunityIdsAsync union would return the pair no matter which
+        // row we clear, so "clearing" it changes nothing. No-op skip (not an
+        // error — the /admin diff form and the self-leave route may
+        // legitimately reach this lane with a mandatory pair, and nothing is
+        // removed there), and no audit row (a no-op writes nothing). The
+        // *refused* shape lives in RemoveCommunityMemberAsync (the
+        // moderator lane that wants the surfaced product message).
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is not null && component.Mandatory)
+            return;
+
         // Delete (if any) — strong consistency (invariant C4): the next
         // GetCommunityIdsAsync is live; an absent row is a no-op (not an error).
         var membership = await session.Query<ComponentMembership>()
@@ -1249,6 +1278,220 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         });
 
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ── ADR 0012 — mandatory communities + moderator member lanes ─────────
+    // Thin token, fat authorization: these lanes gate on the caller's current
+    // role set (the <c>actorRoles</c> seam — the same <c>IReadOnlySet&lt;string&gt;</c>
+    // shape PostService.CreatePostAsync / AnnouncementService.CreateAsync take,
+    // minted at the Web boundary from KumunitaPrincipal.RoleSet), and the
+    // decision is made here in Core: the set must carry
+    // Roles.GlobalAdmin ∪ the community's Roles.ModeratorComponent scope.
+    // Writes audit in the same session (C3) with the narrower standing
+    // recorded — a claim-holder acting through their community scope
+    // records <c>Via: Moderator</c>; a pure GlobalAdmin records
+    // <c>Via: Admin</c>.
+
+    /// <inheritdoc />
+    public async Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+
+        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        component.Mandatory = mandatory;
+        session.Store(component);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = mandatory ? "community.set-mandatory" : "community.set-optional",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task AddCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+
+        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // The component must exist (a membership on a missing component is a data
+        // bug, not a no-op — the frozen admin lane's shape, kept).
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // Same idempotent business-key upsert as SetCommunityMembershipAsync
+        // (the M1DocTypes unique index enforces one row per pair). A row on a
+        // mandatory community is a harmless no-op — the union read already
+        // includes the resident (kept so the forms round-trip with one lane).
+        var existing = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            existing = new ComponentMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = componentId,
+                UserId = userId,
+                AddedBy = actorId,
+                At = now
+            };
+        }
+        else
+        {
+            // Refresh the idempotency metadata on a re-add (no new row).
+            existing.AddedBy = actorId;
+            existing.At = now;
+        }
+
+        session.Store(existing);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.add-member",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+
+        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // ADR 0012's invariant: no one is a non-member of a mandatory
+        // community. The union read (GetCommunityIdsAsync) would include
+        // <paramref name="userId"/> no matter which row we deleted, so a
+        // removal here is a refusal — not a no-op (the Clear lane skips
+        // because the /admin diff form may legitimately reach that pair;
+        // this lane is where the product message surfaces).
+        if (component.Mandatory)
+            throw new InvalidOperationException(
+                $"Community \"{component.Name}\" is mandatory — residency in it is implicit and cannot be removed. Mark it optional first.");
+
+        // Delete (if any) — strong consistency (invariant C4): the union read
+        // drops the pair on the very next call; an absent row is a no-op
+        // (the admin-set-form shape, consistent with the frozen lane).
+        var membership = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is not null)
+            session.Delete(membership);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.remove-member",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ComponentMembership>> GetCommunityMembersAsync(string componentId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+
+        // Live-row read (invariant C4), the GetGroupMembersAsync analog on
+        // the component axis: the explicit membership rows of one Component,
+        // as an access decision. No audit row (a read, not a decision).
+        await using var session = store.QuerySession();
+        return await session
+            .Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The ADR 0012 standing gate for the community-management lanes: the
+    /// caller's current role set (their <c>actorRoles</c> argument — never a
+    /// re-derivation from the database; Core decides from the standing the
+    /// principal mints) must carry <see cref="Identity.Roles.GlobalAdmin"/>
+    /// ∪ the community's <see cref="Identity.Roles
+    /// .ModeratorComponent(string)"/> scope claim —
+    /// <see cref="UnauthorizedAccessException"/> otherwise (fail-closed: a
+    /// null/empty set holds neither). Also resolves the <b>recorded</b>
+    /// standing: the narrower scope wins — a claim-holder acting
+    /// through their community scope records via <c>Moderator</c> (M3B's
+    /// "Via: Moderator when scoped" shape), a pure GlobalAdmin via <c>Admin</c>.
+    /// </summary>
+    private static Authorization.AccessVia GateCommunityStanding(
+        string componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var isGlobalAdmin = actorRoles is not null
+            && actorRoles.Contains(Identity.Roles.GlobalAdmin);
+        var isComponentModerator = actorRoles is not null
+            && actorRoles.Contains(Identity.Roles.ModeratorComponent(componentId));
+
+        if (!isGlobalAdmin && !isComponentModerator)
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} does not hold GlobalAdmin or the moderator scope for community {componentId}.");
+
+        return isComponentModerator
+            ? Authorization.AccessVia.Moderator
+            : Authorization.AccessVia.Admin;
     }
 
     /// <summary>

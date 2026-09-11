@@ -1,6 +1,8 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
 using Kumunita.Core.UserInfo;
+using System.Linq;
 using Marten;
 using Marten.Services;
 using Xunit;
@@ -1031,6 +1033,201 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Contains(c1, ids);
         Assert.Contains(c2, ids);
         Assert.DoesNotContain(c3, ids);
+    }
+
+    // ── ADR 0012 — mandatory + moderator-managed optional communities ──────
+
+    private static IReadOnlySet<string> RoleSet(params string[] roles)
+    {
+        var s = new HashSet<string>(roles);
+        return s.AsReadOnly();
+    }
+
+    [Fact]
+    public async Task SetCommunityMandatory_Admin_TogglesFlag_AndAuditsVerbs()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-mand-admin";
+        await Plant(store, new Component { Id = comp, Name = "Mand", Enabled = true });
+
+        await svc.SetCommunityMandatoryAsync(comp, true, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.True((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.Single(await AuditsFor(store, "a-admin", "community.set-mandatory"),
+            a => a.TargetKind == "component" && a.TargetId == comp);
+
+        await svc.SetCommunityMandatoryAsync(comp, false, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.False((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.Single(await AuditsFor(store, "a-admin", "community.set-optional"), a => a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task SetCommunityMandatory_ComponentModerator_AuditsViaModerator()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-mand-mod";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+        const string mod = "mod-mod";
+
+        await svc.SetCommunityMandatoryAsync(comp, true, mod,
+            RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp)));
+
+        var audits = await AuditsFor(store, mod, "community.set-mandatory");
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Moderator, audits[0].Via);
+    }
+
+    [Fact]
+    public async Task SetCommunityMandatory_PlainMember_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-mand-mbr";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetCommunityMandatoryAsync(comp, true, "u-member", RoleSet(Roles.Member)));
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_Union_EncompassesEnabledMandatory_DropsWhenToggledOff()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string mand = "c-union-mand";
+        await Plant(store, new Component { Id = mand, Name = "M", Enabled = true, Mandatory = true });
+
+        Assert.Contains(mand, await svc.GetCommunityIdsAsync("u-union-none")); // no explicit row
+
+        await svc.SetCommunityMandatoryAsync(mand, false, "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.DoesNotContain(mand, await svc.GetCommunityIdsAsync("u-union-none"));
+    }
+
+    [Fact]
+    public async Task GetCommunityIdsAsync_ExcludesDisabledMandatoryCommunity()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-union-disabled";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = false, Mandatory = true });
+
+        Assert.DoesNotContain(comp, await svc.GetCommunityIdsAsync("u-anyone"));
+    }
+
+    [Fact]
+    public async Task AddCommunityMember_AdminAndModerator_PersistRows_AndAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-add";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+
+        await svc.AddCommunityMemberAsync(comp, "u-a", "a-admin", RoleSet(Roles.GlobalAdmin));
+        Assert.Equal("u-a", (await LoadMembership(store, comp, "u-a")).UserId);
+        Assert.Single(await AuditsFor(store, "a-admin", "community.add-member"), a => a.TargetId == comp);
+
+        await svc.AddCommunityMemberAsync(comp, "u-b", "mod-add",
+            RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp)));
+        Assert.Equal("u-b", (await LoadMembership(store, comp, "u-b")).UserId);
+        var audits = await AuditsFor(store, "mod-add", "community.add-member");
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Moderator, audits[0].Via);
+    }
+
+    [Fact]
+    public async Task AddCommunityMember_PlainMember_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-add-mbr";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.AddCommunityMemberAsync(comp, "u-a", "u-member", RoleSet(Roles.Member)));
+    }
+
+    [Fact]
+    public async Task RemoveCommunityMember_Mandatory_Refuses_LeavesRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-rm-mand";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new ComponentMembership { Id = "m-rm", ComponentId = comp, UserId = "u-t" });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.RemoveCommunityMemberAsync(comp, "u-t", "a-admin", RoleSet(Roles.GlobalAdmin)));
+        Assert.Equal("u-t", (await LoadMembership(store, comp, "u-t")).UserId);
+    }
+
+    [Fact]
+    public async Task RemoveCommunityMember_Optional_DeletesRow_AndAudits()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-rm-opt";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-rm2", ComponentId = comp, UserId = "u-t" });
+
+        await svc.RemoveCommunityMemberAsync(comp, "u-t", "a-admin", RoleSet(Roles.GlobalAdmin));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => { await LoadMembership(store, comp, "u-t"); });
+        Assert.Single(await AuditsFor(store, "a-admin", "community.remove-member"), a => a.TargetId == comp);
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_Mandatory_SkipsDelete_AuditsNothing()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-clear-mand";
+        await Plant(store, new Component { Id = comp, Name = "M", Enabled = true, Mandatory = true });
+        await Plant(store, new ComponentMembership { Id = "m-clear", ComponentId = comp, UserId = "u-t" });
+
+        await svc.ClearCommunityMembershipAsync(comp, "u-t", "a-admin"); // frozen admin lane
+
+        Assert.Equal("u-t", (await LoadMembership(store, comp, "u-t")).UserId);
+        Assert.Empty(await AuditsFor(store, "a-admin", "community.remove-member"));
+    }
+
+    [Fact]
+    public async Task ClearCommunityMembership_SelfLeaveShape_AuditsTheMemberAsActor()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-selfleave";
+        await Plant(store, new Component { Id = comp, Name = "Club", Enabled = true });
+        const string actor = "u-self";
+        await Plant(store, new ComponentMembership { Id = "m-self", ComponentId = comp, UserId = actor });
+
+        await svc.ClearCommunityMembershipAsync(comp, actor, actor); // userId == actorId → self-lane
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => { await LoadMembership(store, comp, actor); });
+        var audits = await AuditsFor(store, actor, "community.remove-member");
+        Assert.Single(audits);
+        Assert.Equal(AccessVia.Admin, audits[0].Via); // self-leave reuses the frozen lane → Via Admin
+    }
+
+    [Fact]
+    public async Task GetCommunityMembersAsync_ReturnsExplicitRows_ForCommunityOnly()
+    {
+        var store = await BootStoreAsync();
+        var svc = new UserInfoService(store);
+        const string comp = "c-members";
+        const string other = "c-members-other";
+        await Plant(store, new Component { Id = comp, Name = "A", Enabled = true });
+        await Plant(store, new Component { Id = other, Name = "B", Enabled = true });
+        await Plant(store, new ComponentMembership { Id = "m-1", ComponentId = comp, UserId = "u-a" });
+        await Plant(store, new ComponentMembership { Id = "m-2", ComponentId = comp, UserId = "u-b" });
+        await Plant(store, new ComponentMembership { Id = "m-3", ComponentId = other, UserId = "u-x" });
+
+        var rows = await svc.GetCommunityMembersAsync(comp);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, r => r.UserId == "u-a");
+        Assert.Contains(rows, r => r.UserId == "u-b");
+        Assert.DoesNotContain(rows, r => r.UserId == "u-x");
     }
 
     // ── Shared helpers for the membership tests ──────────────────

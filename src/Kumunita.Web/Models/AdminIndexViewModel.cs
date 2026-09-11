@@ -58,6 +58,11 @@ public sealed class AdminIndexViewModel
         public int SortOrder { get; init; }
         public bool Enabled { get; init; } = true;
         public bool ModeratorAccess { get; init; }
+        /// <summary>ADR 0012 — the community is mandatory: every verified
+        /// resident is an implicit member (nobody may be removed or leave it;
+        /// toggled on the community's manage page or the moderator lane, read
+        /// only here).</summary>
+        public bool Mandatory { get; init; }
     }
 
     public IReadOnlyList<CommunityRow> Communities { get; init; } = [];

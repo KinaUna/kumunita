@@ -9,14 +9,49 @@
             <div>
                 <h1 style="display:inline;">@Model.ComponentName</h1>
                 <span class="text-muted ms-3">(feed)</span>
+                @* ADR 0012 — the mandatory badge: single-community feeds only
+                   (the all-sections feed keeps this false). *@
+                @if (Model.IsMandatory)
+                {
+                    <span class="badge bg-dark ms-3" title="Everyone in the neighborhood is a member of this community — no one can be removed or leave it.">
+                        Everyone
+                    </span>
+                }
             </div>
-            @if (Model.CanPost)
-            {
-                <a class="btn btn-primary"
-                   href="@Url.Action("New","Posts")">
-                    Write a post
-                </a>
-            }
+            <div class="d-flex gap-2">
+                @* ADR 0012 — the moderator's member-management lane (the
+                   route at /community/manage/{id} is the real SoD wall; this
+                   link is offered only to the standing that route accepts). *@
+                @if (Model.CanManageCommunity)
+                {
+                    <a class="btn btn-outline-secondary"
+                       href="@Url.Action("Manage", "Community", new { componentId = Model.ComponentId })">
+                        Manage members
+                    </a>
+                }
+                @if (Model.CanPost)
+                {
+                    <a class="btn btn-primary"
+                       href="@Url.Action("New","Posts")">
+                        Write a post
+                    </a>
+                }
+                @* ADR 0012 / the ADR 0008 self-leave shape: offered to exactly
+                   a member without management standing on an optional
+                   community. The POST lane's target user is *this* viewer
+                   (minted server-side in the controller — never a form field);
+                   a mandatory community never reaches this branch (CanLeave
+                   is false, and the route re-checks the flag server-side). *@
+                @if (Model.CanLeaveCommunity)
+                {
+                    <form method="post"
+                          action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
+                          onsubmit="return confirm('Leave @Model.ComponentName?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger">Leave</button>
+                    </form>
+                }
+            </div>
         </div>
 
         @if (TempData["info"] is string info)

@@ -113,7 +113,8 @@ public sealed class AdminController(
                 Description     = c.Description,
                 SortOrder       = c.SortOrder,
                 Enabled         = c.Enabled,
-                ModeratorAccess = c.ModeratorAccess
+                ModeratorAccess = c.ModeratorAccess,
+                Mandatory       = c.Mandatory
             })
             .ToList();
 
@@ -290,6 +291,14 @@ public sealed class AdminController(
         // on them regardless of Enabled state).
         var allComponents = (await userInfo.GetComponentsAsync(enabledOnly: false)).Select(c => c.Id).ToHashSet();
 
+        // ADR 0012 — the enabled mandatory ids (the union read in
+        // GetCommunityIdsAsync always carries them — see the scope note
+        // below the diff).
+        var mandatoryComponentIds = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            .Where(c => c.Mandatory)
+            .Select(c => c.Id)
+            .ToHashSet();
+
         var newSet = model.CommunityIds
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct()
@@ -303,7 +312,15 @@ public sealed class AdminController(
         // loop tight).
         newSet.IntersectWith(allComponents);
 
-        var currentSet = (await userInfo.GetCommunityIdsAsync(model.TargetSubjectId)).ToHashSet();
+        // ADR 0012 — mandatory components are out of this form's scope: every
+        // verified resident is an implicit member (the union read in
+        // GetCommunityIdsAsync always includes an enabled mandatory id), so
+        // "unchecking" one would be a silent no-op (the Core lane skips it)
+        // and "checking" it a redundant row. Drop them from both sides of the
+        // diff so the added/removed counts stay honest.
+        newSet.ExceptWith(mandatoryComponentIds);
+        var currentSet = new HashSet<string>(await userInfo.GetCommunityIdsAsync(model.TargetSubjectId));
+        currentSet.ExceptWith(mandatoryComponentIds);
 
         var toAdd    = newSet.Except(currentSet).ToList();
         var toRemove = currentSet.Except(newSet).ToList();

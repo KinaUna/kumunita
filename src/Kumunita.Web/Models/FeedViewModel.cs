@@ -48,6 +48,35 @@ public sealed class FeedViewModel
     public bool CanPost { get; set; }
 
     /// <summary>
+    /// The community is <see cref="Kumunita.Core.UserInfo.Component.Mandatory"/>
+    /// (ADR 0012): everyone in the neighborhood is a member, no one may be
+    /// removed from or leave it. Single-community feeds only (the
+    /// all-sections feed leaves it false); the view renders the badge.
+    /// </summary>
+    public bool IsMandatory { get; set; }
+
+    /// <summary>
+    /// The viewer holds the community's management standing (ADR 0012):
+    /// GlobalAdmin ∪ the community's
+    /// <see cref="Kumunita.Core.Identity.Roles.ModeratorComponent(string)"/>
+    /// scope claim — the same fail-closed rule the
+    /// <see cref="Kumunita.Web.Controllers.CommunityController"/> route gates
+    /// enforce. Single-community feeds only; the view renders the "Manage"
+    /// link to <c>/community/manage/{Id}</c>.
+    /// </summary>
+    public bool CanManageCommunity { get; set; }
+
+    /// <summary>
+    /// The viewer is a member of the community (posting right, this component)
+    /// but does **not** hold its management standing, and the community is
+    /// optional (not <see cref="IsMandatory"/>): the self-leave lane (ADR
+    /// 0008 shape, the
+    /// <see cref="Kumunita.Web.Controllers.CommunityController.Leave"/> route)
+    /// is offered to exactly this viewer. Single-community feeds only.
+    /// </summary>
+    public bool CanLeaveCommunity { get; set; }
+
+    /// <summary>
     /// The communities the current viewer has access to, as a navigable list
     /// of links to their individual feeds (<c>/community/{Id}</c>). The same
     /// reachable set that drives <see cref="CanPost"/> (membership ∪
