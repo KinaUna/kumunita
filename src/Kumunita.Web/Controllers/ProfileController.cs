@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
 
@@ -54,12 +56,20 @@ namespace Kumunita.Web.Controllers;
 /// <c>IIdentityService</c> is <b>not</b> in the ctor (the U9/U10
 /// <c>(IUserInfoService)</c>-only pattern holds; the preview's own
 /// principal is the signed-in actor, never a form field).
+/// <para>
+/// <b>U6 addition (ADR 0011; C-MED·6):</b> the ctor also takes
+/// <c>IMediaStore</c> + <c>IOptions<MediaOptions></c> — the
+/// <c>AvatarUpload</c> write lane's Web-only <c>IFormFile</c>-to-bytes
+/// boundary and the C-MED·5 size/type guard (both stay in
+/// <c>Kumunita.Web</c>; Core keeps the HTTP-free seam).
 /// </para>
 /// </summary>
 [Authorize]
 public sealed class ProfileController(
     IUserInfoService userInfo,
-    DirectoryService directory) : Controller
+    DirectoryService directory,
+    IMediaStore media,
+    IOptions<MediaOptions> mediaOpts) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -315,6 +325,50 @@ public sealed class ProfileController(
             Email: email,
             Phone: phone,
             Address: address));
+    }
+
+    // ── Avatar (POST — the U6 write lane, design doc §2.4) ────────────────
+
+    /// <summary>
+    /// <c>POST /profile/avatar</c> — the avatar upload lane (design doc §2.4,
+    /// ADR 0011; C-MED·5/6/8). The <c>IFormFile</c> boundary is
+    /// <b>Web-only</b> (C-MED·6: <c>Kumunita.Core</c> stays HTTP-free) — this
+    /// action reads the upload into bytes, then runs the <b>two-Core-lane
+    /// write</b> in the pinned order: <c>IMediaStore.PutAsync</c> <b>first</b>
+    /// (the <c>MediaObject</c> id comes from the store's content-hash dedup,
+    /// C-MED·4), then
+    /// <see cref="IUserInfoService.SetProfileAvatarAsync"/> pointing
+    /// <c>Profile.AvatarId</c> at the stored id (the C-MED·8 single write
+    /// lane; <c>actorBy</c> is this same self-subject, the lane's pinned
+    /// third parameter).
+    /// </summary>
+    [HttpPost("/profile/avatar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AvatarUpload([FromForm] IFormFile? file)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Unauthorized(); // §2.4 U7a defensive (the class [Authorize] already gates)
+
+        // The three guards run BEFORE any Put (a Put with a disallowed type
+        // or an oversize payload would write a volume file that must not
+        // exist: C-MED·5 / MediaOptions.MaxBytes; the codes are the pinned
+        // §2.5 U7a/b/c seam U9 locks):
+        if (file is null || file.Length == 0)
+            return BadRequest("Choose an image.");                          // §2.4 U7c empty
+        if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
+            return StatusCode(StatusCodes.Status413RequestEntityTooLarge);  // §2.4 U7b
+        if (!mediaOpts.Value.IsAllowed(file.ContentType))
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // §2.4 U7c type (incl. SVG)
+
+        // C-MED·6: the IFormFile never crosses into Core — copy to bytes, then
+        // store-first, profile-second (orphan-safe order, C-MED·7):
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var mediaObject = await media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject);
+        await userInfo.SetProfileAvatarAsync(subject, mediaObject.Id, subject); // C-MED·8 single lane
+
+        return RedirectToAction("Edit");
     }
 
     // ── Private helpers ────────────────────────────────────────────────────

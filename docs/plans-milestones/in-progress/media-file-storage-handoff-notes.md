@@ -21,7 +21,7 @@
 | U3 | Core tests: file store + media store | **done** (2026-09-11) |
 | U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **done** (2026-09-11) |
 | U5 | Core test: `SetProfileAvatarAsync` lane | **done** (2026-09-11) |
-| U6 | Web: `AvatarUpload` (self-only upload) | **pending** |
+| U6 | Web: `AvatarUpload` (self-only upload) | **done** (2026-09-11) |
 | U7 | Web: `Avatar` (serving-lane contract) | **pending** |
 | U8 | Web views: form + list + detail + preview | **pending** |
 | U9 | Web seam tests: upload guard + FACES M1–M6 | **pending** |
@@ -373,3 +373,99 @@
 - **Next:** U6 appends `## U6` (the Web `AvatarUpload` action — the
   `IFormFile` boundary, owner-scoped self-only, size/type validated against
   `MediaOptions`, then the `PutAsync` → `SetProfileAvatarAsync` write).
+
+## U6 — Web: `ProfileController.AvatarUpload` (self-only upload) (done 2026-09-11)
+
+- **Deliverables** (1 file, modify — exactly the register's Deliverables
+  set, nothing else):
+  - `src/Kumunita.Web/Controllers/ProfileController.cs` — the ctor gains
+    `IMediaStore media, IOptions<MediaOptions> mediaOpts` (after the
+    `IUserInfoService` / `DirectoryService` params — the primary-constructor
+    shape the class already used, the "U9/U10 ctor precedent" per the
+    class doc-comment) + the `AvatarUpload` action (design doc §2.4, below).
+  - no DI change needed — U1/U2's registrations already supply both
+    (`AddOptions<MediaOptions>()` + U2's `Configure<MediaOptions>(… "Media")`
+    + U2's `AddTransient<IMediaStore, LocalVolumeMediaStore>()`), verified
+    against the U1/U2 handoff lines.
+- **Action signature (design doc §2.4, doc wins; the five deliberate
+  resolutions are noted below per §2.7):**
+  ```csharp
+  [HttpPost("/profile/avatar")]
+  [ValidateAntiForgeryToken]
+  public async Task<IActionResult> AvatarUpload([FromForm] IFormFile? file)
+  ```
+  - `subject` minted via the repo's single claim-shaping helper
+    `SubjectId(User)` = `KumunitaPrincipal.SubjectId` (the `NameIdentifier`
+    claim the §2.4 snippet reads directly — same behaviour, the codebase
+    idiom every other controller uses); `subject is null → Unauthorized()`
+    (the §2.4 U7a defensive row, class `[Authorize]` already gates).
+  - guards, **before** any `Put` (a `Put` with a disallowed type / oversize
+    payload would write a volume file that must not exist — C-MED·5 /
+    `MediaOptions.MaxBytes`): `file is null || file.Length == 0` →
+    `BadRequest("Choose an image.")` (U7c empty, the pinned body);
+    `MaxBytes > 0 && file.Length > MaxBytes` → `413` (U7b);
+    `!IsAllowed(file.ContentType)` → `415` (U7c type, incl. SVG — C-MED·5;
+    the decision stays on Core's `MediaOptions.IsAllowed`, the Web only
+    reads the form).
+  - `using var ms = new MemoryStream(); await file.CopyToAsync(ms);` then the
+    **two-Core-lane call order (pinned §2.4 L518–520):**
+    1. `IMediaStore.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject)`
+       — **first** (the `MediaObject.Id` comes from the store's
+       content-hash dedup, C-MED·4; bytes-first/orphan-safe, C-MED·7);
+    2. `IUserInfoService.SetProfileAvatarAsync(subject, mediaObject.Id, subject)`
+       — the C-MED·8 single write lane (U4/U5's `load-throw-set-save`;
+       `actorBy` = this same self-subject, the lane's pinned third
+       parameter);
+    then `RedirectToAction("Edit")` (pinned §2.4 L521 — U8 renders the
+    form there).
+- **`IFormFile` is Web-only (C-MED·6 confirmed):** the action is the only
+  place the form type is touched; it is copied to `byte[]` before crossing
+  the seam — `IMediaStore.PutAsync` takes `byte[] / filename / contentType
+  / actorId` (U2's verbatim seam), `Kumunita.Core` remains HTTP-free
+  (ADR 0006-D). No `IFormFile` reference added to Core (drift-free — the
+  U1/U2 scans plus this unit's change hold).
+- **§2.5 U7a/b/c test names U9 will lock (design doc L555–559, verbatim):**
+  - `Upload_OwnerValidRaster_SetsAvatarAndServes`
+  - `Upload_Oversize_Returns413_NoFileWritten`
+  - `Upload_WrongType_Returns415_NoFileWritten`
+  - `Upload_Empty_Returns400`
+  (the 400/413/415 codes + the empty-body string are what the action pins;
+  the `NoFileWritten` halves are U9's assertion surface over the
+  guards-before-`Put` order this unit implemented.)
+- **Deliberate resolutions (none is a seam/shape change; noted per §2.7,
+  "rename only with a note" — the U3/U5 precedent):**
+  1. **`[ValidateAntiForgeryToken]`** — the §2.4 snippet omits it, but every
+     write-lane POST in this controller/repo carries it (`Edit`'s POST at
+     L205–206; the Groups/Posts/Announcements write actions); U9's
+     direct-invocation tests bypass the antiforgery middleware, so the
+     attribute is transparent to them.
+  2. **No action-level `[Authorize]`** — the class is `[Authorize]`-gated
+     (L61); the snippet's action-level attribute would be redundant.
+  3. **`SubjectId(User)` helper** over `User.FindFirstValue(ClaimTypes.NameIdentifier)`
+     (the `KumunitaPrincipal` idiom — same `NameIdentifier` claim).
+  4. **Primary-ctor params** `media` / `mediaOpts` over the snippet's
+     `_media` / `_mediaOpts` fields (the controller's existing constructor
+     shape; `IOptions<T>.Value` is the read site).
+  5. **`IFormFile` unqualified** — the Web SDK's implicit
+     `using Microsoft.AspNetCore.Http;` supplies it; no new using added for
+     it (`MemoryStream` / `StatusCodes` are the same story).
+  6. **Class doc-comment** synced (the "U9/U10 ctor precedent" paragraph
+     now names the U6 `IMediaStore` + `IOptions<MediaOptions>` addition
+     with the C-MED·6 note) — doc↔code parity per the repo instructions.
+- **Gate (verified, not assumed):** `run_build` /
+  `dotnet build Kumunita.slnx -c Debug` → **0 errors, 0 warnings**
+  (the register's Exit: green on `Kumunita.Web`); `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  (AGENTS.md path, not `dotnet test`) → **Total: 60, Errors: 0, Failed: 0**
+  (= U5's 60/60 baseline — U6 adds no tests; no regressions from the ctor
+  change). `Kumunita.Core.Tests` not run this pass — U6 touches **no**
+  Core file (U4/U5 pinned its 223/223 on the last Core change).
+- **Working plan recorded:** `media-u6-exec-plan.md` (mirrors U1–U5's
+  exec-plan tier; records the six resolutions + the constraint set pinned
+  while writing).
+- **Nothing staged or committed** (user wants to review first) — the
+  controller change + the exec plan + this note are uncommitted.
+- **Next:** U7 appends `## U7` (the `Avatar` serving action — the
+  `Profile.ToAuditableResource()` + `CanAsync(…Read…)` audit gate,
+  `X-Content-Type-Options: nosniff` + the stored `Content-Type`, the FACES
+  M1–M6 serving contract).
