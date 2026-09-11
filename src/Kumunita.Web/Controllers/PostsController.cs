@@ -405,10 +405,13 @@ public sealed class PostsController(
     /// the composer surface): <b>Users</b> — every visible, non-blocked,
     /// verified <c>Profile</c> <b>except the actor themselves</b> (the F6
     /// "thin token, fat authorization" rule: self-access is implicit and
-    /// needs no stored grant); <b>Groups</b> — the platform-wide group
-    /// list (<c>IUserInfoService.GetAllGroupsAsync</c>; a resident's
-    /// membership does not constrain which groups they may name in a
-    /// post's audience — the decision is on the <c>Group</c> subject).
+    /// <b>Groups</b> — the platform-wide <i>public</i> group
+    /// list (<c>IUserInfoService.GetPublicGroupsAsync</c>; ADR 0010 — a
+    /// private group is an organizing/membership unit, never granted as an
+    /// audience, so it stays out of the composer's picker; a resident's
+    /// membership does not constrain which <i>public</i> groups they may
+    /// name in a post's audience — the decision is on the <c>Group</c>
+    /// subject).
     /// Stored on the statically-typed <see cref="Controller.ViewData"/>
     /// (NOT <c>ViewBag</c> — the bag's indexer throws
     /// <see cref="RuntimeBinderException"/>; the same channel the M2
@@ -434,7 +437,9 @@ public sealed class PostsController(
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var groups = await userInfo.GetAllGroupsAsync();
+        // ADR 0010: the composer's audience = public groups only (a private
+        // group is an organizing unit, never granted as an audience).
+        var groups = await userInfo.GetPublicGroupsAsync();
         var groupOptions = groups
             .Select(g => new GrantOption
             {

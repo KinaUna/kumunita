@@ -45,7 +45,9 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
 - Events with RSVP and reminders *(planned — M4, see the "Roadmap" below)*
 - Collaborative projects (goals, tasks, contributors) *(planned — M5, see the "Roadmap" below)*
-- **Groups** for reusable access lists
+- **Groups** — public groups power reusable access lists; **private groups**
+  (ADR 0010) are a membership/organizing unit for a family or circle, and stay
+  out of the audience pickers
 - **Delegation** — owners grant family/caretakers scoped access
 - Moderation with component-scoped moderators and full audit
 - **Multilingual** — UI and platform texts (terms, about, help) are translatable,
@@ -80,7 +82,7 @@ stays trivial and the authorization rules can grow freely.
 
 - An **audience** is a set of grants to **users** and/or **groups**, combined with
   **Any** (union, default) or **All** (intersection).
-- **Groups** are the reuse unit — grant a post to a group once; membership changes ripple everywhere.
+- **Groups** are the reuse unit — grant a post to a group once; membership changes ripple everywhere. **Private groups** (ADR 0010) are a membership/organizing unit *not* in the reuse unit — they do not appear in the audience pickers (decluttering) and are intended for the group's own members, e.g. a family or a close circle.
 - **Delegation** lets an owner grant another person scoped access; the system resolves an *effective principal* for that actor.
 - **Moderator access** to audience-restricted content is **off by default**. A filed **report** grants the assigned moderator audited access to that item; an admin can enable standing moderator visibility per scope.
 - **Audit** of access decisions is always on.

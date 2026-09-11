@@ -142,14 +142,16 @@ public sealed class ProfileController(
     /// subject is deliberately excluded: an author can always already see
     /// their own profile, so granting a <c>User</c> grant to themselves is
     /// meaningless and only clutters the list.
-    /// <b>Groups</b>: the platform-wide group list
-    /// (<c>IUserInfoService.GetAllGroupsAsync</c>) — the UI's mental model
-    /// is "who can I grant this to"; the author's membership/ownership
-    /// does not constrain which <c>Group</c> they may name in their own
-    /// profile's audience (the decision is on the <c>Group</c> subject,
-    /// not the author's standing). <see cref="GrantOption"/> is the
-    /// shared option shape (Id + Label + Kind, where Kind is the string
-    /// form of <c>GrantKind</c> — "User" / "Group").
+    /// <b>Groups</b>: the platform-wide <i>public</i> group list
+    /// (<c>IUserInfoService.GetPublicGroupsAsync</c>; ADR 0010 — a private
+    /// group is an organizing/membership unit and never gets granted as an
+    /// audience, so it stays out of this picker) — the UI's mental model is
+    /// "who can I grant this to"; the author's membership/ownership does not
+    /// constrain which <i>public</i> <c>Group</c> they may name in their own
+    /// profile's audience (the decision is on the <c>Group</c> subject, not
+    /// the author's standing). <see cref="GrantOption"/> is the shared
+    /// option shape (Id + Label + Kind, where Kind is the string form of
+    /// <c>GrantKind</c> — "User" / "Group").
     /// </summary>
     private async Task SeedGrantPickerOptionsAsync()
     {
@@ -167,7 +169,9 @@ public sealed class ProfileController(
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var groups = await userInfo.GetAllGroupsAsync();
+        // ADR 0010: the grant/access lists are public groups only (a private
+        // group is an organizing unit, never granted as an audience).
+        var groups = await userInfo.GetPublicGroupsAsync();
         var groupOptions = groups
             .Select(g => new GrantOption
             {

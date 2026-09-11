@@ -162,7 +162,9 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
       Task<DelegationGrant?> GetActiveGrantAsync(string delegateId);
       // Returns the delegate's active grant (if any): { ownerId, scope, from, to? }.
       // Noun note: "delegate" is the actor; "owner" is the principal they act as.
-      // CreateGroup / AddMember / RemoveMember
+      // Create / Read / membership-management lanes, plus the group
+      // description and privacy seams (ADR 0009 / ADR 0010):
+      // SetDescription, SetPrivacy, GetPublicGroups.
     }
 
     // AuthorizationModule
@@ -180,7 +182,7 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
 ### 4.3 Access model
 
 - **Audience** = grants to users and/or groups; combine **Any** (union, default) | **All** (intersection).
-- **Groups** = the reuse unit.
+- **Groups** = the reuse unit (ADR 0010: **private** groups are a membership/organizing unit, hidden from the audience pickers).
 - **Delegation** = scoped acting; resolves an effective principal.
 - **Moderator access** to audience-restricted content = **off by default**; a report grants
   the assigned moderator audited access to that item; an admin can enable standing

@@ -80,6 +80,12 @@ public sealed class GroupListViewModel
 /// <see cref="Description"/> is optional (M1's
 /// <see cref="Kumunita.Core.UserInfo.Group.Description"/> is a nullable
 /// <c>string?</c>).
+/// <para>
+/// ADR 0010 adds <see cref="IsPrivate"/> (opt-in; <c>false</c> keeps the
+/// group public — the back-office "keep it out of the grant/access lists"
+/// switch, not a role/ACL: a private group's privacy gate is ADR 0003 SoD by
+/// the same standing as its description edit lane — owner ∪ GlobalAdmin).
+/// </para>
 /// </summary>
 public sealed class GroupCreateModel
 {
@@ -90,6 +96,9 @@ public sealed class GroupCreateModel
     [MaxLength(500)]
     [Display(Name = "Description (optional)")]
     public string? Description { get; set; }
+
+    [Display(Name = "Private group")]
+    public bool IsPrivate { get; set; }
 }
 
 /// <summary>
@@ -204,6 +213,8 @@ public sealed record GroupMemberViewModel(string SubjectId, string DisplayName);
 /// *presentation* hint for it — the real SoD gate (C-M2b·1: owner ∪
 /// GlobalAdmin) is in the controller's invite/cancel actions, not on this
 /// carrier.</param>
+/// <param name="IsPrivate">ADR 0010 — the group's
+/// <see cref="Kumunita.Core.UserInfo.Group.IsPrivate"/></param>
 public sealed record GroupDetailViewModel(
     string GroupId,
     string Name,
@@ -213,7 +224,8 @@ public sealed record GroupDetailViewModel(
     bool IsOwner,
     IReadOnlyList<GroupMemberViewModel> Members,
     IReadOnlyList<PendingInvitationViewModel> PendingInvitations,
-    IReadOnlyList<ResidentOption> ResidentCandidates);
+    IReadOnlyList<ResidentOption> ResidentCandidates,
+    bool IsPrivate = false);
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching

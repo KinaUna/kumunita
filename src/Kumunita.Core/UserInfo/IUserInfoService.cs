@@ -33,8 +33,18 @@ public interface IUserInfoService
     /// </summary>
     Task<DelegationGrant?> GetActiveGrantAsync(string delegateId);
 
-    /// <summary>Create a group (owner = the creator; membership starts as owner-only).</summary>
-    Task<Group> CreateGroupAsync(string ownerId, string name, string? description);
+    /// <summary>
+    /// Create a group (owner = the creator; membership starts as owner-only).
+    /// <paramref name="isPrivate"/> (ADR 0010) sets <see cref="Group.IsPrivate"/>
+    /// at creation — <c>false</c> (the default: a group is public unless the
+    /// caller opts in) is a public group; <c>true</c> makes it private (hidden
+    /// from the audience / grant pickers, still a working member group). The Web
+    /// create form is the sole caller that passes <c>true</c>; every other caller
+    /// (M1's seeders, tests, cross-context reads) gets the public default, so the
+    /// new parameter is a compatible addition to the frozen surface
+    /// (ADR 0006-A), not a break.
+    /// </summary>
+    Task<Group> CreateGroupAsync(string ownerId, string name, string? description, bool isPrivate = false);
 
     /// <summary>Add a user to a group (strong-consistency: the new membership is
     /// live on the next <see cref="GetGroupIdsAsync"/> call).</summary>
@@ -63,7 +73,29 @@ public interface IUserInfoService
     Task UpdateGroupDescriptionAsync(string groupId, string? description, string updatedBy);
 
     /// <summary>
-    /// Grant a scoped delegation (invariant C2): the effective standing for
+    /// Set the group's <see cref="Group.IsPrivate"/> flag (ADR 0010 — the
+    /// privacy write lane). The SoD standing is owner ∪ GlobalAdmin: the Web
+    /// surface gates that (the <c>TryResolveOwnerSurface</c> lane, ADR
+    /// 0007's new-lane rule) and passes the <b>actor</b> as
+    /// <paramref name="updatedBy"/>; the seam does not re-gate (ADR 0006-D) and
+    /// derives the audit <c>Via</c> exactly like every other group write lane:
+    /// <c>updatedBy == Group.OwnerId ⇒ Owner</c>, else <c>Admin</c> (effective
+    /// principal folds to the owner on the Owner lane). One session, one
+    /// <c>SaveChangesAsync</c>; appends one
+    /// <see cref="Authorization.AccessAudit"/> row (action <c>group.update</c> —
+    /// the same non-lane-specific verb ADR 0009 introduced for the description
+    /// lane, one group field changed under an owner ∪ GlobalAdmin standing —
+    /// <c>TargetKind</c> "group", <c>TargetId</c> = group) in the same
+    /// transaction (invariant C3). Strong-consistency (C4): the new value is
+    /// live on the very next <see cref="GetGroupAsync"/> /
+    /// <see cref="GetGroupsForUserAsync"/> / <see cref="GetPublicGroupsAsync" />
+    /// call.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id exists.</exception>
+    Task SetGroupPrivacyAsync(string groupId, bool isPrivate, string updatedBy);
+
+    /// <summary>
+    /// Grant a scoped delegation (invariant C2):
     /// <paramref name="delegateId"/> is <paramref name="ownerId"/> *only for* the actions
     /// named in <paramref name="scope"/>. <paramref name="from"/> is the effective
     /// start; <paramref name="to"/> (null = open-ended) the expiry. Appends an audit
@@ -141,10 +173,29 @@ public interface IUserInfoService
     /// belongs to <b>and</b> groups they only own-but-aren't-in — both are
     /// grantable; and — since the platform is invitation-only residents-only
     /// and the audience only grants — every resident can grant any group
-    /// they know about, whether or not they are a member). Live rows
-    /// (invariant C4): a created group is visible on the next read.
+    /// they know about, whether or not they are a member). <b>ADR 0010:</b> the
+    /// audience / grant pickers now source from
+    /// <see cref="GetPublicGroupsAsync"/> (public only); this remains the
+    /// unfiltered "every <see cref="Group"/> document" read (including private
+    /// groups). Live rows (invariant C4): a created group is visible on the
+    /// next read.
     /// </summary>
     Task<IReadOnlyList<Group>> GetAllGroupsAsync();
+
+    /// <summary>
+    /// The <b>public-only group list</b> (ADR 0010) — the audience / grant
+    /// picker's option source (the profile contact-visibility picker and the
+    /// post composer's group audience both read from this). Identical shape and
+    /// ordering to <see cref="GetAllGroupsAsync"/> (sorted by
+    /// <see cref="Group.Created"/> descending) except it omits groups whose
+    /// <see cref="Group.IsPrivate"/> is <c>true</c> — a private group is a
+    /// back-office organizing unit (e.g. a family) kept out of the
+    /// grant/access lists, so only users + public groups appear there. A
+    /// *candidate set*, not an access decision (C-M2·2): no
+    /// <see cref="Authorization.AccessAudit"/> row. Live rows (invariant C4):
+    /// a public↔private flip is live on the very next call.
+    /// </summary>
+    Task<IReadOnlyList<Group>> GetPublicGroupsAsync();
 
     /// <summary>
     /// The <b>membership rows</b> of a single <see cref="Group"/> (M2 F14 — U9's

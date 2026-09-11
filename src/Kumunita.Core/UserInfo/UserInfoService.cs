@@ -174,6 +174,27 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<Group>> GetPublicGroupsAsync()
+    {
+        // ADR 0010: the audience / grant picker's option source (public groups
+        // only) — same shape and ordering as GetAllGroupsAsync (Created desc),
+        // but private groups are a back-office organizing unit and stay out of
+        // the grant/access lists. No audit row (C-M2·2: a read, not a decision).
+        // Live rows (invariant C4): a public↔private flip is live on the next call.
+        await using var session = store.QuerySession();
+        var groups = await session
+            .Query<Group>()
+            .Where(g => !g.IsPrivate)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var byId = groups.ToDictionary(g => g.Id);
+        return byId.Values
+            .OrderByDescending(g => g.Created)
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<GroupMembership>> GetGroupMembersAsync(string groupId)
     {
         // F14 (M2 design doc §2.2; U9's GroupViewModel.MemberCount + U10's
@@ -212,7 +233,7 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     // ── Group lifecycle (plan step 4 — one session + one SaveChangesAsync) ──
 
     /// <inheritdoc />
-    public async Task<Group> CreateGroupAsync(string ownerId, string name, string? description)
+    public async Task<Group> CreateGroupAsync(string ownerId, string name, string? description, bool isPrivate = false)
     {
         // New Group (guid) + GroupMembership(owner → owner) in one session; no audit row.
         var now = DateTimeOffset.UtcNow;
@@ -221,6 +242,7 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             Id = Guid.NewGuid().ToString("N"),
             Name = name,
             Description = description,
+            IsPrivate = isPrivate,
             OwnerId = ownerId,
             Created = now
         };
@@ -364,6 +386,46 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             throw new InvalidOperationException($"Group not found: {groupId}");
 
         group.Description = description;
+        session.Store(group);
+
+        var via = updatedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : updatedBy;
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = updatedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.update",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
+    /// <inheritdoc />
+    public async Task SetGroupPrivacyAsync(string groupId, bool isPrivate, string updatedBy)
+    {
+        // ADR 0010: the privacy write lane. Set (or clear) Group.IsPrivate; load
+        // the group in the same session; append AccessAudit (Action "group.update"
+        // — the same non-lane-specific verb ADR 0009 introduced, one group field
+        // changed under an owner ∪ GlobalAdmin standing — TargetKind "group",
+        // TargetId = groupId) with Via per the derivation rule; one SaveChangesAsync.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        group.IsPrivate = isPrivate;
         session.Store(group);
 
         var via = updatedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;

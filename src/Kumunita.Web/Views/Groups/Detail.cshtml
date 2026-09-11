@@ -42,6 +42,10 @@
             {
                 <span class="badge bg-success">You own this group</span>
             }
+            @if (Model.IsPrivate)
+            {
+                <span class="badge bg-dark">Private</span>
+            }
         </p>
 
         @if (TempData["info"] is string info)
@@ -78,6 +82,35 @@
                           placeholder="What is this group about? (visible to everyone who can reach this page)">@Model.Description</textarea>
                 <div class="form-text mt-1">Leave blank to clear the description.</div>
                 <button type="submit" class="btn btn-primary mt-2">Save description</button>
+            </form>
+
+            @*
+                ADR 0010 — the group's privacy (public ↔ private). Same standing
+                as the description edit lane (owner ∪ GlobalAdmin; the route's
+                TryResolveOwnerSurface gate is the real SoD wall, so this form
+                is exactly what the route accepts — a plain member never sees it).
+                A single "Private group" checkbox IS the whole surface: checked
+                ⇒ isPrivate=true (hidden from the grant/access lists), cleared ⇒
+                isPrivate=false (public, shows up as an option elsewhere). The
+                value is form-bound as a bool — an unchecked checkbox omits the
+                field and binds to false, so a single toggle covers both
+                directions (the U10 add-member pattern, the actor's subject is
+                minted in the controller, never a field).
+            *@
+            <h2 class="mt-4">Privacy</h2>
+            <form method="post" action="@Url.Action("UpdatePrivacy", "Groups", new { id = Model.GroupId })">
+                @Html.AntiForgeryToken()
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="isPrivate"
+                           name="isPrivate" value="true" @(Model.IsPrivate ? "checked" : "") />
+                    <label class="form-check-label" for="isPrivate">Private group</label>
+                </div>
+                <div class="form-text mt-1">
+                    Private groups (e.g. a family) are hidden from everyone else's
+                    grant/access lists; only the people you add as members can use
+                    them. Clear the box to make the group public again.
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">Save</button>
             </form>
         }
 
