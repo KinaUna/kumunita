@@ -869,6 +869,28 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy)
+    {
+        // C-MED·8 single write lane (design doc §2.2): point Profile.AvatarId at a
+        // MediaObject (a content hash) or clear it when avatarId is null. The
+        // owner-scope check happens at the Web boundary (the self-only upload
+        // lane) — this lane writes Profile.AvatarId only. One session, one
+        // SaveChangesAsync (C3); no audit row (a Profile field write — the
+        // UpsertProfileAsync shape, "not an access decision"; the serving lane's
+        // audit row is owned by the caller's CanAsync gate, C-MED·2). Fail closed
+        // on a missing profile (design doc §2.2).
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.AvatarId = avatarId;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,

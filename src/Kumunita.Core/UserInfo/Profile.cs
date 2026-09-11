@@ -90,6 +90,13 @@ public sealed class Profile
     /// Free-text (a single street line) — the repo has no structured address sub-model.
     /// </summary>
     public string? Address { get; set; }
+
+    /// <summary>
+    /// The profile's avatar media object id (ADR 0011; C-MED·8) →
+    /// <c>MediaObject.Id</c> (a content hash). Nullable: no avatar set. This is
+    /// an *additive* field (ADR 0004 §B.1), like M3's `Post.Status`.
+    /// </summary>
+    public string? AvatarId { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own

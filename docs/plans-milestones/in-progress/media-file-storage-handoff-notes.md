@@ -19,7 +19,7 @@
 | U1 | Core: `MediaOptions` + `IMediaFileStore` + `LocalVolumeFileStore` | **done** (2026-09-11) |
 | U2 | Core: `MediaObject` + `IMediaStore` + `LocalVolumeMediaStore` + `MediaDocTypes` | **done** (2026-09-11) |
 | U3 | Core tests: file store + media store | **done** (2026-09-11) |
-| U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **pending** |
+| U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **done** (2026-09-11) |
 | U5 | Core test: `SetProfileAvatarAsync` lane | **pending** |
 | U6 | Web: `AvatarUpload` (self-only upload) | **pending** |
 | U7 | Web: `Avatar` (serving-lane contract) | **pending** |
@@ -240,3 +240,68 @@
   files + the exec plan + this note are uncommitted.
 - **Next:** U4 appends `## U4` (the avatar reference lane —
   `Profile.AvatarId` + `SetProfileAvatarAsync`, the UserInfo side).
+
+## U4 — Avatar reference lane (UserInfo side): `Profile.AvatarId` + `SetProfileAvatarAsync` (done 2026-09-11)
+
+- **Deliverables** (3 files, all modify — exactly the U4 set, nothing else):
+  - `src/Kumunita.Core/UserInfo/Profile.cs` — additive
+    `public string? AvatarId { get; set; }` (ADR 0004 §B.1, like M3's
+    `Post.Status`), appended after `Address`.
+  - `src/Kumunita.Core/UserInfo/IUserInfoService.cs` — the **single** write
+    lane in a new "── Media additions (ADR 0011; C-MED·8) ──" block (the
+    file's named ADR 0006-E compatible-addition idiom), before the M3 block.
+  - `src/Kumunita.Core/UserInfo/UserInfoService.cs` — impl right after
+    `UpsertProfileAsync` (one `OpenSession(new SessionOptions())` session,
+    `LoadAsync<Profile>` → set field → `Store` → one `SaveChangesAsync`).
+- **Verbatim seam shapes (design doc §2.2, doc wins):**
+  - `Profile.cs` L95–100:
+    ```csharp
+    public string? AvatarId { get; set; }
+    ```
+  - `IUserInfoService.cs` (Media additions block):
+    ```csharp
+    Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy);
+    ```
+  - both doc-comments verbatim from §2.2 lines 442–457.
+- **Behavior:** `avatarId == null` → clears the field (the lane still stores +
+  saves, so the clear persists); a missing profile **throws
+  `KeyNotFoundException("Profile not found: {subjectId}")`** (fail closed —
+  the doc §2.2 pins that exception type; see deviation note below).
+- **`IUserInfoService` seams untouched (C-MED·1):** **no existing seam was
+  reshaped** — the block is purely additive (verified: no other implementer
+  of `IUserInfoService` exists in src/ or tests/, so the additive interface
+  method is compile-safe); no new `AccessAction` / `AccessVia` id introduced;
+  `Profile.ToAuditableResource` untouched (U7's to reuse).
+- **Deviations (both noted here per §2.7 rule 3 — "rename only with a note";
+  neither is a shape change):**
+  1. **Exception type on a missing profile:** the existing group lanes
+     (`UpdateGroupDescriptionAsync` / `SetGroupPrivacyAsync`) throw
+     `InvalidOperationException` on a missing group, and
+     `media-u4-plan.md` §Risks says "match the existing lane idiom". The
+     **design doc §2.2 pins `KeyNotFoundException`** for *this* lane — the
+     doc is the higher authority (§2.7: "on a mismatch **the doc wins**"),
+     and the fail-closed posture (throw, not create) is the same in both.
+     Used the doc's type.
+  2. **`actorBy` accepted but not persisted:** the sealed signature requires
+     it (§2.2 line 457; also anticipated in `media-u4-plan.md` §Risks). The
+     pinned impl line points at `UpsertProfileAsync`'s shape first, and that
+     lane appends **no** `AccessAudit` row ("not an access decision") — so
+     this lane writes the field only, no audit row. The avatar *serving*
+     lane's audit row is owned by U7's existing `CanAsync(…Read…)` gate
+     (C-MED·2). `actorBy` is recorded-by-signature only for now; U5's lane
+     tests (the §2.5 names) can pin the observable behavior.
+- **Session idiom** — the existing codebase-shape from `UpsertProfileAsync`
+  in the same file (`store.OpenSession(new SessionOptions())` +
+  `LoadAsync` + one `SaveChangesAsync`), not the design doc's prose;
+  consistent with U2/U3's "Marten 9.31.2 async sessions" note.
+- **Gate (verified, not assumed):** `run_build` (full `Kumunita.slnx`) →
+  **0 errors** — green on `Kumunita.Core` (the U4 Exit) and `Kumunita.Web`;
+  `dotnet exec` (AGENTS.md path, not `dotnet test`) → `Kumunita.Web.Tests`
+  **60/60**, `Kumunita.Core.Tests` **220/220** — exactly the U3 baseline
+  (additive field + additive interface method: no regressions).
+- **Working plan recorded:** `media-u4-exec-plan.md` (mirrors U1–U3's
+  exec-plan tier; records the two deviation resolutions + the constraint
+  set pinned while writing).
+- **Nothing staged or committed** (user wants to review first).
+- **Next:** U5 appends `## U5` (the `SetProfileAvatarAsync` lane tests —
+  the three §2.5 names, on the existing `PostgresFixture` model).

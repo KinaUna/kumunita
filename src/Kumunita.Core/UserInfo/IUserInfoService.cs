@@ -110,6 +110,16 @@ public interface IUserInfoService
     /// or <c>via: Owner</c>).</summary>
     Task RevokeDelegationAsync(string grantId, string revokedBy);
 
+    // ── Media additions (ADR 0011; C-MED·8 — the *single* avatar write lane,
+    // named; the ADR 0006-E compatible-addition idiom this file uses) ───────
+
+    /// <summary>
+    /// Point a profile's avatar at a media object (or clear it when `avatarId`
+    /// is null; C-MED·8). The owner-scope check happens at the Web boundary;
+    /// this lane writes `Profile.AvatarId` only.
+    /// </summary>
+    Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 
