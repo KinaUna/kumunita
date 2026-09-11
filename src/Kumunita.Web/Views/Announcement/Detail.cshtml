@@ -46,12 +46,27 @@
                    the list rows; preserve the author's line breaks. *@
                 <div class="text-body whitespace-pre-line">@Model.Body</div>
             </div>
-            <div class="card-footer bg-white text-muted small">
-                by @Model.AuthorDisplayName — @Model.Created.DateTime.ToString("ddd, MMM d yyyy")
-                @if (Model.Modified is not null)
-                {
-                    <span> — edited @Model.Modified.Value.DateTime.ToString("ddd, MMM d yyyy")</span>
-                }
+            @* Author avatar (the Directory pattern): the <img> links the audited
+               serving lane (GET /profile/avatar/{subjectId}) and on its
+               fail-closed 404 the monogram sibling takes over. *@
+            @{
+                string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+                    ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
+            }
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                </span>
+                <span>
+                    by @Model.AuthorDisplayName — @Model.Created.DateTime.ToString("ddd, MMM d yyyy")
+                    @if (Model.Modified is not null)
+                    {
+                        <span> — edited @Model.Modified.Value.DateTime.ToString("ddd, MMM d yyyy")</span>
+                    }
+                </span>
             </div>
         </div>
     </div>

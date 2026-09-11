@@ -12,6 +12,11 @@ public sealed record AnnouncementRow(
     string Body,
     DateTimeOffset Created,
     string AuthorDisplayName,
+    /// <summary>The author's subject id (the <c>Announcement</c>'s
+    /// <see cref="AuthorId"/>) — a display convenience: the row's avatar links
+    /// the audited serving lane <c>GET /profile/avatar/{subjectId}</c> (the
+    /// same "a read, not a decision" pin as <see cref="AuthorDisplayName"/>).</summary>
+    string AuthorSubjectId,
     bool Pinned,
     string? CommunityId,
     string? CommunityDisplayName);
@@ -38,6 +43,12 @@ public sealed record AnnouncementDetailViewModel(
     DateTimeOffset Created,
     DateTimeOffset? Modified,
     string AuthorDisplayName,
+    /// <summary>The author's subject id (the <c>Announcement</c>'s
+    /// <see cref="AuthorId"/>) — a display convenience: the author's avatar
+    /// links the audited serving lane <c>GET /profile/avatar/{subjectId}</c>
+    /// (the same "a read, not a decision" pin as
+    /// <see cref="AuthorDisplayName"/>).</summary>
+    string AuthorSubjectId,
     bool Pinned,
     string? CommunityDisplayName);
 

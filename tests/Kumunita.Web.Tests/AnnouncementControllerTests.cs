@@ -134,6 +134,7 @@ public class AnnouncementControllerTests
         Assert.NotNull(model);
         Assert.Single(model!.Announcements);
         Assert.Equal(author, model.Announcements[0].AuthorDisplayName);
+        Assert.Equal(author, model.Announcements[0].AuthorSubjectId); // the avatar lane's subject
     }
 
     /// <summary>
@@ -176,6 +177,7 @@ public class AnnouncementControllerTests
         var model = view!.ViewData.Model as AnnouncementIndexViewModel;
         Assert.NotNull(model);
         Assert.Equal(display, model!.Announcements[0].AuthorDisplayName);
+        Assert.Equal(author, model.Announcements[0].AuthorSubjectId); // the avatar lane's subject
     }
 
     // ── Scope-picker seeding (GET /announcements/new) ──────────────────────
@@ -701,6 +703,7 @@ public class AnnouncementControllerTests
                 Assert.Equal(longBody, model.Body);        // the full text, not a truncated preview
                 Assert.True(model.Pinned);
                 Assert.Equal("Site Admin", model.AuthorDisplayName);
+                Assert.Equal("subj-admin-001", model.AuthorSubjectId); // the avatar lane's subject
             }
 
             /// <summary>
@@ -750,6 +753,7 @@ public class AnnouncementControllerTests
                 await announcements.Received(1).GetAsync("ann-public", null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0));
                 var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
                 Assert.Equal("subj-admin-001", model.AuthorDisplayName);
+                Assert.Equal("subj-admin-001", model.AuthorSubjectId); // the avatar lane's subject
             }
 
             /// <summary>

@@ -54,6 +54,12 @@
                             ? "text-bg-secondary"
                             : "text-bg-primary";
                         bool canEdit = isGlobalAdmin || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && isModerator) || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false));
+                        // Author avatar monogram fallback (the Directory pattern —
+                        // avatar.ts hides the <img> on the 404 the serving lane
+                        // fails closed to; see site.css).
+                        string authorAvatarInitial = !string.IsNullOrWhiteSpace(a.AuthorDisplayName)
+                            ? char.ToUpperInvariant(a.AuthorDisplayName.TrimStart()[0]).ToString()
+                            : string.Empty;
 
                         @* The body is long by design (a pinned announcement can
                            run to pages) — the list shows only the first 250
@@ -69,8 +75,13 @@
                                         @(a.Body.Length > 250 ? a.Body[..250].TrimEnd() + "…" : a.Body)
                                         <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">Read more…</a>
                                     </div>
-                                    <div class="text-muted small mt-1">
-                                        by @a.AuthorDisplayName — @a.Created.DateTime.ToString("ddd, MMM d yyyy")
+                                    <div class="d-flex align-items-center gap-2 text-muted small mt-1">
+                                        <span class="d-inline-flex align-items-center">
+                                            <img class="avatar" src="/profile/avatar/@a.AuthorSubjectId" alt=""
+                                                 data-avatar-fallback>
+                                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                        </span>
+                                        <span>by @a.AuthorDisplayName — @a.Created.DateTime.ToString("ddd, MMM d yyyy")</span>
                                     </div>
                                 </div>
                                 <div class="d-flex flex-column align-items-end gap-2">

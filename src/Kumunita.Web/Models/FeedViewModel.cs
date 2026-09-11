@@ -92,5 +92,11 @@ public sealed record PostListItem(
     string BodyPreview,
     DateTimeOffset Created,
     string AuthorDisplayName,
+    /// <summary>The author's subject id (the <see cref="Post"/>'s
+    /// <c>AuthorId</c>) — a display convenience: the row's avatar links the
+    /// audited serving lane <c>GET /profile/avatar/{subjectId}</c> (the same
+    /// "a read, not a decision" pin as <see cref="AuthorDisplayName"/>; the
+    /// gate + audit run on the endpoint, never on this field).</summary>
+    string AuthorSubjectId,
     string? ComponentName = null,
     string? ComponentId = null);

@@ -31,6 +31,12 @@ public sealed class PostDetailViewModel
 {
     public Post Post { get; set; } = null!;
     public string AuthorDisplayName { get; set; } = string.Empty;
+
+    /// <summary>The author's subject id (the <see cref="Post"/>'s
+    /// <c>AuthorId</c>) — a display convenience: the author's avatar links the
+    /// audited serving lane <c>GET /profile/avatar/{subjectId}</c> (the same
+    /// "a read, not a decision" pin as <see cref="AuthorDisplayName"/>).</summary>
+    public string AuthorSubjectId { get; set; } = string.Empty;
     public IReadOnlyList<ReplyItem> Replies { get; set; } = [];
     public bool IsAuthor { get; set; }
 }
@@ -50,5 +56,10 @@ public sealed class PostDetailViewModel
 public sealed record ReplyItem(
     string Id,
     string AuthorDisplayName,
+    /// <summary>The replier's subject id (the <see cref="PostReply"/>'s
+    /// <c>AuthorId</c>) — a display convenience: the reply's avatar links the
+    /// audited serving lane <c>GET /profile/avatar/{subjectId}</c> (the same
+    /// "a read, not a decision" pin as <see cref="AuthorDisplayName"/>).</summary>
+    string AuthorSubjectId,
     string Body,
     DateTimeOffset Created);

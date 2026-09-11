@@ -2,6 +2,11 @@
 @{
     ViewData["Title"] = Model.Post.Title ?? "Post";
     string postId = Model.Post.Id;
+    // Author avatar monogram fallback (the Directory pattern — avatar.ts hides
+    // the <img> on the 404 the serving lane fails closed to; see site.css).
+    string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
 }
 
 <div class="row justify-content-center">
@@ -26,9 +31,14 @@
                         ? Model.Post.Title
                         : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
                 </h4>
-                <p class="text-muted small mb-3">
-                    @Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")
-                </p>
+                <div class="d-flex align-items-center gap-2 text-muted small mb-3">
+                    <span class="d-inline-flex align-items-center">
+                        <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                             data-avatar-fallback>
+                        <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    </span>
+                    <span>@Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")</span>
+                </div>
 
                 <div class="mb-3">
                     @Model.Post.Body
@@ -83,11 +93,22 @@
             <ul class="list-group mb-4">
                 @foreach (var r in Model.Replies)
                 {
+                    // Replier avatar — same pattern as the author's above.
+                    string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
+                        ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
                     <li class="list-group-item">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
                             <div class="text-end text-muted small">
-                                <div>@r.AuthorDisplayName</div>
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <span class="d-inline-flex align-items-center">
+                                        <img class="avatar" src="/profile/avatar/@r.AuthorSubjectId" alt=""
+                                             data-avatar-fallback>
+                                        <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
+                                    </span>
+                                    <span>@r.AuthorDisplayName</span>
+                                </div>
                                 <div>@r.Created.LocalDateTime.ToString("d")</div>
                             </div>
                         </div>

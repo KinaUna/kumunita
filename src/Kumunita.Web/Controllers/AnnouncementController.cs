@@ -138,7 +138,7 @@ public sealed class AnnouncementController(
 
         var rows = visible
             .Select(a => new AnnouncementRow(a.Id, a.Scope, a.Title ?? string.Empty, a.Body, a.Created,
-                                             authorNames[a.AuthorId], a.Pinned, a.CommunityId, a.CommunityId is not null && componentNames.TryGetValue(a.CommunityId, out var cn) ? cn : null))
+                                             authorNames[a.AuthorId], a.AuthorId, a.Pinned, a.CommunityId, a.CommunityId is not null && componentNames.TryGetValue(a.CommunityId, out var cn) ? cn : null))
             .ToList();
 
         return View(new AnnouncementIndexViewModel(rows));
@@ -184,7 +184,7 @@ public sealed class AnnouncementController(
 
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
-            authorName, a.Pinned, communityName));
+            authorName, a.AuthorId, a.Pinned, communityName));
     }
 
     // ── Create (GET + POST /announcements/new) ─────────────────────────────

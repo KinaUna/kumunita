@@ -151,7 +151,8 @@ public sealed class PostsController(
                 post.Title,
                 preview,
                 post.Created,
-                profile?.DisplayName ?? post.AuthorId));
+                profile?.DisplayName ?? post.AuthorId,
+                post.AuthorId));
         }
 
         return View(new FeedViewModel
@@ -236,6 +237,7 @@ public sealed class PostsController(
                 preview,
                 post.Created,
                 profile?.DisplayName ?? post.AuthorId,
+                post.AuthorId,
                 nameByComponentId.TryGetValue(post.ComponentId, out var name) ? name : null,
                 post.ComponentId));
         }
@@ -314,6 +316,7 @@ public sealed class PostsController(
             replyItems.Add(new ReplyItem(
                 reply.Id,
                 replyAuthorProfile?.DisplayName ?? reply.AuthorId,
+                reply.AuthorId,
                 reply.Body,
                 reply.Created));
         }
@@ -322,6 +325,7 @@ public sealed class PostsController(
         {
             Post = result.Post,
             AuthorDisplayName = authorProfile?.DisplayName ?? result.Post.AuthorId,
+            AuthorSubjectId = result.Post.AuthorId,
             Replies = replyItems,
             IsAuthor = result.Post.AuthorId == actor,
         });

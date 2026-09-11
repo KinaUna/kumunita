@@ -89,6 +89,12 @@
             <ul class="list-group">
                 @foreach (var p in Model.Items)
                 {
+                    @* Author avatar (the Directory pattern): the <img> links the
+                       audited serving lane (GET /profile/avatar/{subjectId}) and
+                       on its fail-closed 404 the monogram sibling takes over. *@
+                    string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
+                        ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
                     <li class="list-group-item d-flex justify-content-between align-items-start">
                         <div class="pe-3">
                             <a href="@Url.Action("Detail","Posts", new { id = p.Id })"
@@ -111,7 +117,14 @@
                             <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
                         </div>
                         <div class="text-end text-muted small">
-                            <div>@p.AuthorDisplayName</div>
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                </span>
+                                <span>@p.AuthorDisplayName</span>
+                            </div>
                             <div>@p.Created.LocalDateTime.ToString("d")</div>
                         </div>
                     </li>
