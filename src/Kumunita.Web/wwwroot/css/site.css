@@ -681,10 +681,12 @@ body.kmb-page-fullbleed {
 /* --- Avatar (media feature, U8) -------------------------------------------------------
    Every avatar <img> carries the app endpoint /profile/avatar/{subjectId}
    as its src (C-MED·3 — served only through the audited serving lane, never
-   a static path). When that endpoint fails closed to a 404 (no avatar set,
-   a blocked profile, or a denied audience — FACES M3–M5), the <img>'s
-   onerror hides it and .avatar-mono, a sibling rendered server-side (the
-   resident's initial, or an empty circle when the surface has no
+   When that endpoint fails closed to a 404 (no avatar set,
+   a blocked profile, or a denied audience — FACES M3–M5), the
+   client/lib/avatar.ts module (loaded in the _Layout as ~/js/lib/avatar.js;
+   SECURITY.md §6 — no inline on*) hides the <img> marked
+   data-avatar-fallback and .avatar-mono, a sibling rendered server-side
+   (the resident's initial, or an empty circle when the surface has no
    display-name channel), takes its place — no broken-image icon. */
 .avatar {
   width: 24px;

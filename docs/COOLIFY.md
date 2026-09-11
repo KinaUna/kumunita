@@ -142,8 +142,9 @@ port (OPS §10).
 | `SeedAdmin__Email` / `SeedAdmin__Token` | one-time setup token — **created per OPS Procedure 2, removed from env after first login** |
 | `Verification__BaseUrl` | this instance's public base URL — the §2 domain, scheme included, **no trailing slash** (e.g. `https://maplewood.kumunita.example`). The verification email's link is built from it; a recipient's mail client cannot resolve a bare `/account/verify` path, so an unset value degrades the email to a relative path. See **§5.3**. |
 | `DataProtection__KeysDirectory` | **recommended** — a persistent directory (Coolify's `/data` volume, e.g. `/data/keys`) holding the data-protection keyring. See **§5.2** below. Omit to keep the in-memory default. |
+| `Media__RootPath` | **recommended — required in production** — the path of the dedicated media volume holding the avatar *bytes* (ADR 0011; `Media__MaxBytes` / `Media__AllowedContentTypes` are optional knobs — OPS *Configuration reference*). See **§5.2A** below. Omit to keep the in-image default (`/app/media`) — in production, uploads are then lost on every redeploy. |
 
-The `Host` value is the addon's internal service name (visible on the
+The `Host` value is the addon's internal service name
 addon's page / psql connection block).
 
 ### 5.1 SMTP — concrete env values
@@ -321,6 +322,60 @@ the app used on boot #1 and boot #2 are different. Check, in order:
   pre-attach sessions are invalidated — log in again after the first
   post-attach boot, and they should survive subsequent deploys.
 
+### 5.2A Media volume persistence (required in production)
+
+The avatar **bytes** are not in Postgres (ADR 0011): the dump carries the
+catalog (`MediaObject` rows), while the content-addressed files live under
+`Media__RootPath`. The in-code default is `{BaseDirectory}/media` — inside
+the image layer — so a Coolify deployment **as documented above but without
+a media volume loses its uploads on every redeploy**. Same two steps as
+§5.2, different path:
+
+1. **A persistent volume on the app container** — the same
+   **Volumes / Persistent Data** section as §5.2 step 1 (Coolify *can*
+   express a named volume on the app container; a host-path bind works too
+   if you prefer it, but the named volume is the standard path, matching
+   the keyring). Add a row:
+
+   | Field | Value |
+   |---|---|
+   | **Target / Container path** | `/data/media` |
+   | **Source / Type** | Named volume (Coolify-managed), e.g. `coolify_kumunita_media` |
+   | **Mode** | `rw` |
+
+   (The image itself declares `VOLUME /data/media` in the `Dockerfile` as
+   a floor — see its comment — but a bare anonymous volume that Coolify
+   drops on redeploy is exactly the failure mode this section exists to
+   prevent.)
+
+2. **`Media__RootPath` pointing at that path** (env var), set at the same
+   scope as §5.2 step 2:
+
+   | Variable | Value |
+   |---|---|
+   | `Media__RootPath` | `/data/media` (must match the container path from step 1) |
+
+   `LocalVolumeFileStore` runs `Directory.CreateDirectory(RootPath)`
+   (idempotent) on construction, so a freshly created volume just works —
+   no pre-population step.
+
+**Verify the two steps worked:** upload an avatar, then **redeploy** the
+app — the avatar must still be there (the real pass/fail signal, exactly
+as in §5.2). From the VPS: `docker inspect <app-container>
+| grep -A 4 Mounts` should show the media mount with `Source` naming the
+Coolify volume and `Destination` = `/data/media`. If avatars 404 for
+everyone after a redeploy (the page shows the initial-circle monograms),
+the volume is not attached and/or `Media__RootPath` drifted between
+deploys — check the mount, then the env var, in that order.
+
+**Backups (align with OPS §4/§5):** the media volume is the *second
+restore surface* — the `media-<date>.tgz` snapshot of `Media__RootPath`
+belongs to the **same backup set as the `pg_dump`** (taken just before it,
+offsite, same retention — OPS §4) and is restored **into `Media__RootPath`
+before the app starts** (OPS §5). A `MediaObject` with no file degrades to
+an avatar 404 and is re-hydratable (the owner re-uploads; the content hash
+is the integrity key); an orphan file is inert.
+
 ### 5.3 Domains
 
 Attach the neighborhood's domain (§2). Coolify + Let's Encrypt issue it —
@@ -368,7 +423,8 @@ SHA, admin contact, dates).
 
 | Symptom | First look |
 |---|---|
-| Logged out / bounced to login after a redeploy, or log shows `antiforgery token could not be decrypted` / `key not found in the key ring` | data-protection keyring is being lost between boots. Two things must both be true (see §5.2): a **Coolify-managed named volume** attached to the **app container** at `/data/dataprotection-keys` (this is the common miss — the Postgres addon's `/data` volume is a different surface), **and** the `DataProtection__KeysDirectory` env var pointing at that same path. Verify the mount with `docker inspect <container>` (look at `Mounts`) and the env var in the Coolify env settings. Do **not** use the `warn: FileSystemXmlRepository … may not be persisted` log line as a signal: ASP.NET Core emits it every time `PersistKeysToFileSystem` is registered, regardless of whether the target is a real volume |
+| Avatars 404 for everyone after a redeploy (initial-circle monograms shown), or an upload vanished | the media volume is being lost between boots. Two things must both be true (see §5.2A): a **Coolify-managed named volume** attached to the **app container** at `/data/media` (the Postgres addon's `/data` volume is a different surface, same trap as §5.2) **and** the `Media__RootPath` env var pointing at that same path, every deploy. Verify with `docker inspect <app-container>` (`Mounts`) and the Coolify env settings. Note the catalog row may still exist (Postgres) while the *bytes* are gone (volume) — restore the media tarball from the same backup set (OPS §4/§5) |
+| Logged out / bounced to login after a redeploy,
 | Health check `database` failed on boot | `Host` in the connection string (should be the internal addon name, not `localhost`) |
 | Boot loops, "permission denied: schema" | the `kumunita` role isn't the **owner** of the `kumunita` database — re-run §4 step 5 |
 | TLS not issued | DNS not pointing at the VPS yet (§2), or port 80/443 closed |

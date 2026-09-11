@@ -68,7 +68,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0009
+    │   ├── adr/                    # 0001–0011
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
@@ -77,6 +77,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── KumunitaFeature.cs  # first versioned `mt` storage feature (ADR 0004 §B)
     │   │   ├── M1DocTypes.cs       # M1 Marten-native doc registration (ADR 0004 §B.1)
     │   │   ├── M3DocTypes.cs       # M3 + M3b Marten-native doc registration (Post, PostReply, Report, Announcement)
+    │   │   ├── MediaDocTypes.cs    # M4-adjacent Marten-native doc registration (MediaObject) — ADR 0011
     │   │   ├── Bootstrap/          # SchemaBootstrap, FirstBootSeeder
     │   │   ├── Identity/           # IdentityModule (M1) + DbBootstrap (first-boot pristine gate); also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
     │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService
@@ -85,6 +86,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
     │   │   ├── Localization/       # ADR 0005 — LanguageCatalog, LocaleSettings (shipped in M1's surface); TranslationResource / LocalizedPage land with M6's admin UI
+    │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11)
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
     │   │   └── Projects/           # M5 — not yet created
@@ -125,9 +127,13 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, translated UI
   strings and static pages (ADR 0005); consumed by the presentation layer, never
   by feature authorization.
-- **Feature modules** — Directory, Posts, Events, Projects, Moderation. Directory and
-  Posts are both *consumers* of the single bulk visibility capability (`CanSeeAsync`,
-  §4.2) — list authorization is one platform primitive, not per-feature logic.
+- **Feature modules** — Directory, Posts, Events, Projects, Moderation, Media.
+  Directory and Posts are both *consumers* of the single bulk visibility
+  capability (`CanSeeAsync`, §4.2) — list authorization is one platform
+  primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
+  content-addressed payloads on a dedicated volume behind the HTTP-free
+  `IMediaStore` seam, cataloged in `mt`, served only through an audited app
+  endpoint (the profile avatar is the reference lane).
 
 Dependency rule: feature modules depend on the three identity/access modules (and Marten),
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never
@@ -275,8 +281,12 @@ Every decision on audience-restricted content is audited, Allow or Deny.
 
 One Postgres per instance, two schemas (ADR 0004):
   - `mt`       — all domain documents below + Marten projections; schema via Marten versioned migrations
-  - `identity` — stock ASP.NET Core Identity tables (`AspNet*`); schema via EF Core migrations
-Neither ORM touches the other schema; a single `pg_dump` captures both.
+     - `identity` — stock ASP.NET Core Identity tables (`AspNet*`); schema via EF Core migrations
+  Neither ORM touches the other schema; a single `pg_dump` captures both.
+  Media (ADR 0011) is the one stored payload outside Postgres: the bytes are
+  content-addressed on a dedicated volume (`Media__RootPath`), the catalog is a
+  document on `mt` — a **second restore surface** that must be snapshotted
+  alongside the DB dump (OPS.md §4/§5).
 
 Identity (EF Core, `identity` schema — framework-managed, not hand-rolled)
   AspNetUsers, AspNetRoles, AspNetUserRoles, ...  (+ `ExternalId` reserved for future OIDC `sub`)
@@ -350,6 +360,15 @@ Email outbox
   // The operator re-queues or discards from here (OPS.md §7).
   EmailDeadLetter  { id, idempotencyKey, recipient, subject, lastError, attempts,
                      createdAt, deadAt }
+
+Media (ADR 0011 — content-addressed byte store; catalog here, bytes on the volume)
+  // Registered via MediaDocTypes (one doc surface per feature, M1/M3 pattern).
+  // The payload itself is NOT a document: it is the file at
+  // {Media__RootPath}/{id[0..2]}/{id}; the hash (sha256 of the payload) is the id.
+  // Served only through the app endpoint (audited CanAsync(Read)); C-MED invariants
+  // in design/media-file-storage-design.md.
+  MediaObject      { id = sha256(payload, lowercase hex), filename?, contentType,
+                     sizeBytes, created, createdById? }
 
 Conventions: UUIDv7 (time-ordered) where order matters, else GUID; every document carries
 `created` / `updated`; `Audience` is embedded (small, always read with the resource).

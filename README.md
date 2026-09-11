@@ -25,6 +25,9 @@ multi-stage Docker image, the versioned schema boot (Marten feature + EF
 Identity migration + first-boot seeder), a `/health` liveness probe, and a
 `Coolify`-based deploy (Coolify `app` + dedicated Postgres 18, image parity
 with `dev-db-init` + `docker-compose.yml`: **18**).
+Profile **avatars** have also landed — the reference lane of the content-addressed
+local-volume media store (ADR 0011, its own design doc); it adds a second restore
+surface next to the Postgres dump (OPS.md §4/§5).
 **M4** next: events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
@@ -49,6 +52,10 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
   (ADR 0010) are a membership/organizing unit for a family or circle, and stay
   out of the audience pickers
 - **Delegation** — owners grant family/caretakers scoped access
+- **Avatars & media** — profile avatar upload + serving on a content-addressed
+  local-volume byte store behind an HTTP-free seam (ADR 0011). Group logos, post
+  attachments and badge icons are **follow-on lanes reusing the same seam** — each
+  with its own design doc, not this one.
 - Moderation with component-scoped moderators and full audit
 - **Multilingual** — UI and platform texts (terms, about, help) are translatable,
   and the language catalog + instance default are seeded at first boot. The full
@@ -166,5 +173,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0009)
-- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization)
+- `docs/adr/` — architecture decision records (0001–0011)
+- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)

@@ -607,3 +607,62 @@ entry-read list (in `docs/plans-milestones/in-progress/plan-media-file-storage.m
 cites the § it implements. The doc is written once (by the plan author) and
 only ever touched per the §2.7 drift-guard — never by a unit deciding a shape
 twice.*
+
+---
+
+## Media — Closed (recorded)
+
+**2026-09-11.** Unit U10 (governance + close) records the close. The §2.6 gate
+ran clean, zero drift from the U9 / U5 baselines:
+
+- `dotnet build Kumunita.slnx -c Debug` — **0 Warning(s), 0 Error(s)** (00:00:10.07)
+- `dotnet exec Kumunita.Web.Tests.dll` — **Total: 70, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (0.799 s)
+- `dotnet exec Kumunita.Core.Tests.dll` — **Total: 223, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (27.061 s)
+
+**Shipped (U1–U9):** U1 `MediaOptions` + `IMediaFileStore`/`LocalVolumeFileStore`
+(atomic, sharded, content-hex id) · U2 `MediaObject` + `IMediaStore`/
+`LocalVolumeMediaStore` + `MediaDocTypes` (new `mt` doc surface) · U3 file-
+store & media-store tests (dedup, roundtrip, missing-doc/file) · U4
+`Profile.AvatarId` + `IUserInfoService.SetProfileAvatarAsync` (single write
+lane) · U5 lane tests (set / clear / missing) · U6 `POST /profile/avatar`
+(self-only upload, 400/413/415 guards before write, `[ValidateAntiForgeryToken]`)
+· U7 `GET /profile/avatar/{subjectId}` (FACES M1–M6, one frozen
+`CanAsync(Read)` → both outcomes audited, `nosniff`) · U8 avatar form +
+`<img src="/profile/avatar/{subject}">` + monogram fallback · U9 serving +
+upload test suites. **U10** — this record + ADR 0011 + the governance
+reconciliations below. No unit rewrote another's seam; the only deviations
+from this doc were the reconciled ones the units recorded in the handoff:
+U4's `KeyNotFoundException` doc-wins, U6's `[ValidateAntiForgeryToken]`, U7's
+`Response.Headers["X-Content-Type-Options"] = "nosniff"` idiom, U8's
+`IHttpContextAccessor` `@inject` for the subject id, U9's local
+`TestFormFile : IFormFile` (the .NET 10 `FormFile` setter NRE).
+
+**Governance reconciled in close (ADR 0011 + docs):** ADR 0011
+(`docs/adr/0011-media-and-file-storage.md`, accepted 2026-09-11); `SECURITY.md`
+data class **(e)** + the two C-MED control rows (`SECURITY.md` §3/§5);
+`OPS.md` `Media__*` config rows + the **second restore surface** (the media
+volume) in §4 backups and §5 restore; `ARCHITECTURE.md` §2/§3/§5 (Media module
+row, feature-module list, `MediaObject` POC, "one database + one volume");
+`README.md` status + features + ADR range (0001–0011). Per §2.7 rule 6 the
+ADR conformed to this doc — no drift guard fired against it.
+
+**Follow-on lanes — deliberately NOT shipped here** (Scope; each reuses
+§2.1–2.4, §2.7-7; each gets its own design doc + units before its first unit):
+
+1. **Group logos** — the `Group` doc's `LogoId` lane; the M2 group surface
+   already exists, so this is a U2-shaped catalog doc + a U4/U6/U7/U8-shaped
+   lane on the group surface.
+2. **Post / reply attachments** — the M3 thread docs' `AttachmentIds` lane;
+   needs a per-post audience intersection decision (a reply's audience ∩ the
+   post's audience) — own design doc, not a Media lane.
+3. **Badge / icon catalog** — the platform's own small-icon set served by the
+   same lane; the only candidate for widening `Media__AllowedContentTypes`
+   (raster allowlist already admits icons) — own design doc.
+4. **Video / office documents** — the §4 Revisit trigger: the raster-only
+   allowlist + 5 MiB default explicitly exclude them; if a lane ships, the
+   OPS `Media__MaxBytes` guidance and the SEC (e) class sensitivity line both
+   need revisiting in the same unit.
+
+**Sole handoff artifact:** `docs/plans-milestones/in-progress/
+media-file-storage-handoff-notes.md` `## Summary` — read it first when starting
+any follow-on lane's U1.

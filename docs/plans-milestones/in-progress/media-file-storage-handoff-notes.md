@@ -25,7 +25,8 @@
 | U7 | Web: `Avatar` (serving-lane contract) | **done** (2026-09-11) |
 | U8 | Web views: form + list + detail + preview | **done (2026-09-11)** |
 | U9 | Web seam tests: upload guard + FACES M1–M6 | **done (2026-09-11)** |
-| U10 | ADR 0011 + SECURITY/OPS/ARCHITECTURE/README + close | **pending** |
+| U10 | ADR 0011 + SECURITY/OPS/ARCHITECTURE/README + close | **done (2026-09-11)** |
+| U11 | Follow-up fixes: U8 `onerror`, prod media volume, OPS §3; COOLIFY.md check | **done (2026-09-11)** |
 
 ## U0 — Plan authored (by the plan author, not a unit)
 
@@ -801,3 +802,275 @@ production file touched** (U6/U7's actions and U8's views stay frozen):
   update, and the `## Media — Closed (recorded)` section in the design
   doc + the `## Summary` in this file). U10 *additionally* re-runs the
   Core test suite (223/223) to record the full-suite §2.6 gate.
+
+## U10 — Governance + close (governance, no code)
+
+**Scope as executed:** ADR 0011 + the four governance-doc reconciliations +
+the design-doc close + this `## Summary`. No code file touched; the §2.6
+full-suite gate is the (re-)run U9 deferred.
+
+**§2.6 gate — recorded (2026-09-11, zero drift vs U9/U5 baselines):**
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded, 0 Warning(s), 0 Error(s)** (00:00:10.07)
+- `dotnet exec Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` — **Total: 70, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (0.799 s)
+- `dotnet exec Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` — **Total: 223, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (27.061 s)
+
+**Deliverables landed (all in this review, uncommitted):**
+- `docs/adr/0011-media-and-file-storage.md` — **created** (accepted
+  2026-09-11; amends ADR 0004's "single `pg_dump`" story with the volume
+  second restore surface). Names C-MED·1/2/3/5 in its decision text; the
+  two-schema / Weasel-feature precedent (ADR 0004 §B) is the shape model.
+- `docs/adr/README.md` — 0011 index row added.
+- `docs/SECURITY.md` — §3 data-class row **(e) Media & uploaded bytes**;
+  §5 two control rows (serving-endpoint audit, C-MED·1/2/3; upload
+  allowlist + self-only lane, C-MED·5/8).
+- `docs/OPS.md` — config rows `Media__RootPath` (Recommended; the default
+  path lives **inside the image layer** — prod must attach a volume),
+  `Media__MaxBytes` (Optional, default 5242880), `Media__AllowedContentTypes`
+  (Optional, raster allowlist, SVG excluded); §4 a **second restore
+  surface** block (snapshot the volume beside its `pg_dump`; verify
+  round-trip at the quarterly test; the half-restore degrades safely —
+  `MediaObject` is re-hydratable, orphaned files inert); §5 the volume
+  paragraph after the DR list.
+- `docs/ARCHITECTURE.md` — §2 tree `MediaDocTypes.cs` + `Media/` rows; §3
+  feature-modules list now includes Media (byte-store module blurb); §5 the
+  "one database + one volume" note + the `MediaObject` POC block; the stale
+  ADR range corrected to 0001–0011 (it was 0001–0009 — pre-existing, it
+  was already missing 0010).
+- `README.md` — Status note (avatar landed, ADR 0011, second restore
+  surface); Features bullet (avatars + the follow-on-lane note); ADR range
+  0001–0011; the design-doc row.
+- `docs/design/media-file-storage-design.md` — **`## Media — Closed
+  (recorded)`** appended (gate verbatim, U1–U10 line, deviations, the
+  4-item follow-on-lane list, the governance reconciliation list, sole
+  handoff-artifact pointer).
+- `media-u10-exec-plan.md` — this unit's exec plan + the actual gate block.
+- This file — Status row now **done**; `## U10` + `## Summary`.
+
+**Deviations from the design doc (all per the §2.7 process, all already
+recorded at their unit):** U4 `KeyNotFoundException` doc-wins ·
+U6 `[ValidateAntiForgeryToken]` · U7 `nosniff` header idiom
+(`Response.Headers[…]='nosniff'`, not `TryAddHeader`) · U8
+`IHttpContextAccessor` `@inject` for the subject id (Razor
+`RouteData`-based lookups hit CS0021/CS1061) · U9 local
+`TestFormFile : IFormFile` (.NET 10 `FormFile` setter NRE). The ADR (rule 6)
+conformed to the doc; no drift-guard fired against it.
+
+**Findings carried forward (open, not fixed — no-code unit; each needs a
+named follow-up owner when the lane it belongs to is planned):**
+1. **U8's inline `onerror`** on the avatar `<img>` contradicts
+   `SECURITY.md §6`'s CSP discipline ("no inline `on*`"). U8 predates this
+   U10 pass; needs a small follow-up unit (a `client/*.ts` monogram
+   fallback) or a scoped SEC-6 decision. Flagged in `## Summary`.
+2. **Production media mount is undefined infra.** The `Dockerfile` has no
+   `VOLUME` for media and `docker-compose.yml` only names
+   `kumunita_dpkeys`; a bare container would lose uploads on re-deploy.
+   `OPS.md` now *requires* an attached volume at `Media__RootPath`, but the
+   compose/Dockerfile wiring is a code change — out of this unit's
+   deliverables. Owner: the first follow-on media lane, or a small infra unit.
+3. **Stale ADR range "0001–0009"** in `README.md` + `ARCHITECTURE.md` was
+   already missing 0010 before this feature; corrected to 0001–0011 in this
+   pass as part of the legitimate touch-set (not drift on the media doc
+   itself).
+4. **`OPS.md §3` names an `mt.migrations` ledger** but ADR 0004 §B states
+   the Weasel pattern has **no** `mt.migrations` ledger (delta detection).
+   Pre-existing doc drift, not a media concern — flagged for the next
+   OPS.md touch, left alone here.
+5. **U7a's non-owner 403 half** has no dedicated test — the self-only shape
+   is structural (subject is minted server-side, not a path param); the
+   404 row in `ProfileAvatarServingTests` + the form's self-only shape pin the
+   positive side. Noted in the design-doc close; no test to add retroactively.
+6. **Route name:** the shipped route is `POST /profile/avatar` (U6 register
+   + design doc §2.4); U7's handoff "Next:" line wrote it as
+   `POST /profile/avatar/upload` — a typo, the shipped handler is
+   `AvatarUpload`, the route is `/profile/avatar`.
+
+**Nothing staged or committed by U10.** The U1–U9 code surface is already
+committed by its units (the `Media(U#)` commits, U1..U9, in `git log`).
+The uncommitted review change set from this unit's pass is exactly the
+nine doc files: 7 modified (`README.md`, `docs/ARCHITECTURE.md`,
+`docs/OPS.md`, `docs/SECURITY.md`, `docs/adr/README.md`,
+`docs/design/media-file-storage-design.md`, this handoff file) + 2 created
+(`docs/adr/0011-media-and-file-storage.md`, `media-u10-exec-plan.md`).
+
+## Summary
+
+**Feature: Media & file storage — closed 2026-09-11.** Ten units, one seam,
+one doc surface, one volume. The reference lane (the profile avatar) is
+live end-to-end; the primitive is seam-ready for the follow-on lanes below.
+
+| Unit | Deliverable | Gate at unit | Status |
+|------|-------------|--------------|--------|
+| U1 | `MediaOptions` + `IMediaFileStore` + `LocalVolumeFileStore` | build 0/0 | done |
+| U2 | `MediaObject` + `IMediaStore` + `LocalVolumeMediaStore` + `MediaDocTypes` | build 0/0 | done |
+| U3 | File-store + media-store tests (dedup, roundtrip, missing-doc/file) | Core suite green | done |
+| U4 | `Profile.AvatarId` + `IUserInfoService.SetProfileAvatarAsync` | build 0/0 | done |
+| U5 | Lane tests (set / clear / missing) | Core 223/223 | done |
+| U6 | `POST /profile/avatar` — self-only upload, 400/413/415 before write, `ValidateAntiForgeryToken` | build 0/0 | done |
+| U7 | `GET /profile/avatar/{subjectId}` — FACES M1–M6, one frozen `CanAsync(Read)` → Allow *and* Deny audited, `nosniff` | build 0/0 | done |
+| U8 | Avatar form + `<img src="/profile/avatar/{subject}">` + monogram fallback (inline `onerror` — see Finding 1) | build 0/0 | done |
+| U9 | `ProfileAvatarServingTests` (M1–M6) + `ProfileAvatarUploadTests` (U7a/b/c); local `TestFormFile : IFormFile` | Web 70/70 | done |
+| U10 | ADR 0011 + SECURITY/OPS/ARCH/README + design-doc close + this `## Summary` | **build 0/0 · Web 70/70 · Core 223/223** (2026-09-11, zero drift) | done |
+
+**Deviations (all reconciled, all unit-recorded — see the design-doc
+close for the full five):** U4 `KeyNotFoundException` doc-wins;
+U6 `ValidateAntiForgeryToken`; U7 nosniff idiom; U8 `IHttpContextAccessor`;
+U9 `TestFormFile : IFormFile`.
+
+**Deferred follow-on lanes (each its own design doc + units —
+`## Media — Closed (recorded)` in the design doc is the named list with the
+next-owner cue):** **group logos** · **post / reply attachments** ·
+**badge / icon catalog** · **video / office documents** (this one crosses
+the raster-only allowlist + 5 MiB default — the §4 Revisit trigger).
+
+**Open findings (carry into the next unit on the media surface —
+none blocking, none fixed here):** Finding 1 (the U8 inline `onerror`
+CSP-§6 conflict) · Finding 2 (the prod media volume is not yet wired in
+`compose` / `Dockerfile`) · Finding 4 (the `OPS.md §3` `mt.migrations`
+ledger claim contradicts ADR 0004 §B). Findings 3/5/6 are
+record-and-done.
+
+**Sole handoff artifact going forward:** this `## Summary` — read it first
+when starting any follow-on lane's U1 (it holds the unit table, the
+reconciled gate counts, the 4-item deferral list, the 3 live open
+findings in one place).
+
+**U11 addendum (this unit, 2026-09-11):** the three open findings above are
+closed — Finding 1 (inline `onerror`) → the `client/lib/avatar.ts` module
+(tsc-compiled to `wwwroot/js/lib/avatar.js`, loaded by the Razor layout as
+`<script type="module" src="~/js/lib/avatar.js">`; the four U8 view
+files now carry a hidden monogram sibling + `data-avatar-fallback`, and
+the inline attribute is gone — no SECURITY.md §6 exception needed);
+Finding 2 (prod media volume) → `Dockerfile` `VOLUME /data/media` +
+`docker-compose.yml` `Media__RootPath: "/data/media"` + named volume
+`kumunita_media`, mirroring the `kumunita_dpkeys` precedent (the
+`U11` section below carries the live `docker compose` survival check);
+Finding 4 (OPS §3 `mt.migrations`) → Confirmed-drift-and-corrected (the
+code — Weasel storage features + delta detection, ADR 0004 §B — is
+truth; OPS §3 now says so). `## U11` has the unit plan + dispositions +
+gate counts.
+
+## U11 — Follow-up fixes: the three open findings (done 2026-09-11)
+
+**Plan:** `media-u11-plan.md` (in this folder; the `U11` sections of the
+unit table below mirror its D1–D4 dispositions).
+
+### D1 — inline `onerror` (SECURITY.md §6 CSP discipline) — **Fixed**
+
+- `src/Kumunita.Web/client/lib/avatar.ts` (new) — the monogram fallback
+  module, one `error` listener per `img[data-avatar-fallback]` (capture:
+  `onerror` never fires for images that never load, and the listener
+  survives a lazy-load deferral an inline attribute would not).
+- `Views/Profile/Edit.cshtml` · `Preview.cshtml` · `Views/Directory/
+  Index.cshtml` · `Detail.cshtml` — the inline `onerror` attribute
+  removed; each avatar `<img>` gains `data-avatar-fallback`, each monogram
+  sibling gains `class="avatar-mono"` (+ `avatar-lg` at lg size) and
+  stays `style="display:none"` until the module flips it.
+- `Views/Shared/_Layout.cshtml` — one `<script type="module"
+  src="~/js/lib/avatar.js"></script>` after the bootstrap script (the
+  ARCH §7 pattern; global because the fallback is a lib-level concern).
+- Compile + ship (`wwwroot/js/` is .gitignored build output — no csproj
+  change needed): `Microsoft.TypeScript.MSBuild` (7.0.1, already in
+  `Kumunita.Web.csproj`) drives tsc from the project-root
+  `tsconfig.json` (`client/**/*.ts` → `wwwroot/js`; `rootDir: client`) —
+  `dotnet build` emits `wwwroot/js/lib/avatar.js`, and `dotnet publish`
+  (the Docker build's path) was verified to carry it into the output
+  alongside the U8 `site.js` lane. This tree has no npm build; the tsc
+  lane is MSBuild-driven.
+- `wwwroot/css/site.css` — the U8 comment block that named the `onerror`
+  reworded to the module; the `.avatar-mono` monogram fallback class added
+  (the four views' `<span>`s already carried its size classes — they were
+  dead pending this).
+- **No** SECURITY.md change: the inline attribute is gone, so no
+  §6 exception was recorded.
+- `Models/AvatarUpload.cshtml.cs` — unchanged: its `IsAvatar` doc-comment
+  names U7's seam semantics (FACES M3–M5), not the inline fallback.
+
+### D2 — production media volume — **Wired**
+
+- `Dockerfile` — `VOLUME /data/media` floor, same comment style +
+  floor-not-replacement rationale as `VOLUME /data/dataprotection-keys`.
+- `docker-compose.yml` — `Media__RootPath: "/data/media"` on the app
+  service (the exact path OPS.md's config row and ADR 0011 name for the
+  prod mount), `- kumunita_media:/data/media` in the app `volumes:`, and
+  `kumunita_media:` in the top-level `volumes:` block — the
+  `kumunita_dpkeys` precedent mirrored line-for-line.
+- Verified with the live stack (this box has Docker; the plan's
+  "recorded as a manual step" contingency was not needed): a real
+  signup → login → `POST /profile/avatar` (a 70 B PNG upload) against a
+  fresh `docker compose up --build -d`, the served avatar recorded
+  (`200 image/png`, SHA-256 `35227EEA…DAC7D`, stored content-addressed
+  at `/data/media/35/35227…` on the `kumunita_media` volume); then a
+  **whole-stack re-creation** (`docker compose up --force-recreate -d` —
+  app + db + mailpit all rebuilt from disk) and the **byte-identical
+  avatar served back** from the same named volume — the upload survives,
+  exactly per the `kumunita_dpkeys` precedent.
+### D3 — OPS.md §3 `mt.migrations` drift (Finding 3)
+
+Dispo: **Confirmed-drift-and-corrected** (ADR 0004 §B wins; OPS.md fixed).
+
+- **Code truth:** there is no `mt.migrations` ledger anywhere — not in
+  `Program.cs` (boot is `Marten` feature-schema boot from the
+  `M1DocTypes`/`M3DocTypes` registration surfaces), not in `M1DocTypes`
+  (its comment is explicit: "Marten owns the schema — no hand-written
+  `migrations/` files"), and not on the live stack: `pg_tables` on the
+  compose `kumunita` DB shows the `identity` schema (7 AspNet* tables),
+  the `mt` schema (31 feature/doc tables, **no** `mt.migrations`), and
+  `public.__EFMigrationsHistory` (EF Core's ledger for *Identity*'s
+  tables only — the EF Core `IdentityDbContext` half of ADR 0004 §B).
+- **Correction:** OPS.md §3 now says the domain/feature schema surface
+  follows ADR 0004 §B's **Weasel-feature pattern** (delta detection
+  against the live schema, no recorded-applied ledger) and that the only
+  migration ledger is `public.__EFMigrationsHistory` for Identity. The
+  old "list migrations and check `mt` for the ledger" restore step was
+  removed; §4/§5's second restore surface (media volume) is unchanged
+  and now matches the wired `Dockerfile`/`docker-compose.yml` state.
+- ADR 0004 §B was **not** touched — the code proves it right.
+
+### D4 — `COOLIFY.md` production path (the check)
+
+Dispo: **Fixed** — COOLIFY.md as it stood after U10 pointed its env
+table at `Media__RootPath` but shipped **no volume step in the app
+creation flow**, so a production deploy following §5 alone would have
+lost uploads on every redeploy. U11 closed that, and the shipped state
+now documents the second restore surface consistently with OPS.md:
+
+- §5 env table: `Media__RootPath` row (required in production; omit =
+  in-image default `/app/media` ⇒ uploads lost on redeploy).
+- **§5.2A — Media volume persistence (required in production)**:
+  a **Coolify-managed named volume** on the app container at
+  `/data/media` (e.g. `coolify_kumunita_media`; a host-path bind is
+  mentioned only as an optional fallback) + the `Media__RootPath` env
+  pointing at that path — the exact two-step shape of §5.2 for the
+  keyring, and the same container path as the `Dockerfile`'s
+  `VOLUME /data/media` and the compose `kumunita_media` named volume.
+  Backup/restore paragraph is aligned with OPS §4/§5 (`media-<date>.tgz`
+  snapshot of `Media__RootPath` in the same backup set as the `pg_dump`,
+  restored into `Media__RootPath` before app start).
+- §5.2A verify step + `## Troubleshooting (quick)` row: avatars 404 for
+  everyone after a redeploy (monograms shown) ⇒ volume not attached
+  or `Media__RootPath` drifted; catalog row may survive (Postgres) while
+  the *bytes* are gone (volume).
+
+No OPS.md/COOLIFY.md contradiction: both name the container
+`/data/media` path, the `Media__RootPath` env, and the media volume as
+the *second restore surface* alongside Postgres. A deployment following
+the updated COOLIFY.md does **not** lose uploads on redeploy — the
+named volume outlives the container.
+
+### Gate
+
+Re-verified on `release` @ `8d849bf Media(U9)` + the uncommitted
+U10/U11 working-tree change set (U10/U11 ship per the house rule — user
+reviews first):
+
+- `dotnet build Kumunita.slnx -c Debug` → **0 Warning(s), 0 Error(s)**.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Total: 70, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0**
+  (the recorded U10 baseline of 70, verbatim — U11 adds no tests).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  → **Total: 223, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0**
+  (the recorded U10 baseline of 223, verbatim — U11 adds no tests).
+
+**Both suites fully green, at the recorded baselines.** No new tests
+were added this unit (the work was view/client-script + deployment/docs
+corrections), so the counts are expected to hold at exactly 70 and 223.

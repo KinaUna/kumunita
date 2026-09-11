@@ -15,3 +15,4 @@ Decision / Consequences. New decisions take the next number.
 | 0008 | Member self-leave lane (owner excepted)   | Accepted |
 | 0009 | Group description: resident-facing display + owner ∪ GlobalAdmin edit | Accepted |
 | 0010 | Private groups: a membership/organizing unit, hidden from the audience pickers | Accepted |
+| 0011 | Media & file storage: content-addressed local-volume bytes + a `mt` catalog | Accepted |

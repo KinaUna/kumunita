@@ -36,6 +36,9 @@ All per-instance identity and integration is env. The *image* is identical every
 | `SeedAdmin__Email`          | First-run | No     | Initial GlobalAdmin address                    |
 | `SeedAdmin__Token`          | First-run | Yes    | **One-time** setup token, consumed on first login — never a reusable password |
 | `DataProtection__KeysDirectory` | Recommended | No | Persistent directory holding the data-protection keyring — keeps sign-in + antiforgery state across redeploys (COOLIFY §5.2). Omit = in-memory (sessions die on restart) |
+| `Media__RootPath` | Recommended | No | The dedicated media volume mount (content-addressed byte store, ADR 0011). The in-code default (`{appDir}/media`) sits **inside the image layer** — in prod this must point at an operator-provided attached volume, or uploads are lost on redeploy, same discipline as `DataProtection__KeysDirectory` |
+| `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
+| `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The extension point for follow-on lanes (group logos, attachments) |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -115,10 +118,13 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 2. **Take a fresh backup** (Procedure 4) and note the current **commit SHA** (from
    `/health` → `build`, or Coolify's deploy history) — this is the rollback target.
 3. Merge the tested `main` tip into **`release`** (which Coolify deploys from). Deploy.
-4. On boot, pending **versioned migrations** are applied — Marten steps (tracked in
-   `mt.migrations`) and Identity migrations (`identity.__EFMigrationsHistory`); check the
-   logs confirm each step ran. Migrations are forward-only and live in the image, so the
-   new image must always carry a superset of the running schema's steps (ADR 0004).
+4. On boot, pending **versioned migrations** are applied — the Marten storage features
+   (`FeatureSchemaBase` / doc-type changes) are **delta-detected against the live `mt`
+   catalog** and applied idempotently (Weasel-feature pattern: no `mt.migrations` ledger —
+   ADR 0004 §B) and Identity migrations run against `identity.__EFMigrationsHistory`;
+   check the logs confirm the steps ran. Schema evolution is forward-only and lives in the
+   image, so the new image must always carry a superset of the running schema's steps
+   (ADR 0004).
 5. Smoke test: home page renders, `/health` OK; the `build` SHA matches the deployed
    commit. (The full smoke set — login, create a post, open a component — exists from M1/M3.)
 6. **Rollback (if needed):** reselect the **previous commit SHA** recorded in step 2 in
@@ -140,8 +146,27 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 - **Offsite:** to object storage (S3 / Backblaze B2 / rclone) — **not** only on the same VPS.
 - **Retention:** e.g. 7 daily, 4 weekly, 6 monthly (tune to need).
 - **Config:** include the instance's env set (encrypted) in the same backup set.
-- **Verify:** restore a recent dump to a scratch DB at least quarterly. *A backup you can't
-  restore is not a backup.* Update "Last backup verified" in the inventory.
+- **Verify:** restore a recent dump to a scratch DB at least quarterly. *A backup
+  you can't restore is not a backup.* Update "Last backup verified" in the inventory.
+
+**Second restore surface — the media volume (ADR 0011):** the *byte payload* of
+avatars lives on the dedicated volume at `Media__RootPath`, not in Postgres; the
+dump carries only the catalog (the `MediaObject` rows). So:
+
+- **Snapshot the volume in the same backup set as its dump** — a
+  `media-<date>.tgz` of `Media__RootPath`, taken just before that `pg_dump`
+  (so the snapshot brackets the dump); offsite + retention exactly like the
+  dump.
+- **Verify:** at the quarterly restore test, restore the media tarball too
+  (extract to a scratch dir and confirm the `{hash[0..2]}/{hash}` trees
+  round-trip) — a volume snapshot without its matching Postgres snapshot (or
+  vice versa) is an **inconsistent restore**.
+- **A half-restore still degrades safely** (the content hash is the integrity
+  key): a `MediaObject` with no file manifests as an avatar `404` and is
+  **re-hydratable** — the owner re-uploads the same bytes, the hash matches,
+  and the existing catalog row is reused (nothing duplicated); an orphan file
+  (file with no doc) is **inert** — nothing references a bare hash. The
+  failure mode is a missing picture, never cross-contamination.
 
 ### 5. Restore
 
@@ -159,6 +184,14 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 3. **Version compatibility:** restore a dump into a compatible app version — check the image
    tag the backup was taken under before proceeding.
 4. Re-point DNS; verify email + TLS + `/health`.
+
+**The media volume too (ADR 0011, second surface):** if the backup set
+includes the media snapshot, it lands at `Media__RootPath` **before the app
+starts** — same instance: restore the tarball as step 2.5 (between `pg_restore`
+and start); disaster recovery: attach a volume to the new instance (Procedure 1)
+and extract the tarball into its `Media__RootPath`. A half-restore (surviving
+on one surface only) presents as avatar `404`s and is re-hydratable by the
+owner re-uploading (the hash is the integrity key — §4).
 
 ### 6. TLS & domain
 
