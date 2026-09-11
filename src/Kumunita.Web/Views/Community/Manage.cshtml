@@ -1,6 +1,6 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Models.ManageCommunityViewModel
-{
+@{
     ViewData["Title"] = $"{Model.Name} — manage";
 }
 
@@ -45,27 +45,31 @@
             member; nobody can be removed or leave), cleared ⇒ false. The
             value is bool form-bound — an unchecked checkbox omits the field
             and binds to false, so one toggle covers both directions. The
-            route's standing gate is the real SoD wall; this form is only
-            offered to the actor who can act on it.
+            route's standing gate is GlobalAdmin-only (mandatory state is
+            the admin's decision), and this form is offered only to them —
+            moderators see member management without it.
         *@
-        <h2>Availability</h2>
-        <form method="post" action="@Url.Action("SetMandatory", "Community", new { componentId = Model.ComponentId })">
-            @Html.AntiForgeryToken()
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" id="mandatory"
-                       name="Mandatory" value="true" @(Model.Mandatory ? "checked" : "") />
-                <label class="form-check-label" for="mandatory">
-                    Mandatory community — everyone in the neighborhood is a member
-                </label>
-            </div>
-            <div class="form-text mt-1">
-                Mandatory communities can't have members removed and can't be left;
-                clear the checkbox to make membership optional again.
-            </div>
-            <button type="submit" class="btn btn-primary mt-2">
-                @(Model.Mandatory ? "Make optional" : "Make mandatory")
-            </button>
-        </form>
+        @if (Model.CanSetMandatory)
+        {
+            <h2>Availability</h2>
+            <form method="post" action="@Url.Action("SetMandatory", "Community", new { componentId = Model.ComponentId })">
+                @Html.AntiForgeryToken()
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mandatory"
+                           name="Mandatory" value="true" @(Model.Mandatory ? "checked" : "") />
+                    <label class="form-check-label" for="mandatory">
+                        Mandatory community — everyone in the neighborhood is a member
+                    </label>
+                </div>
+                <div class="form-text mt-1">
+                    Mandatory communities can't have members removed and can't be left;
+                    clear the checkbox to make membership optional again.
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">
+                    @(Model.Mandatory ? "Make optional" : "Make mandatory")
+                </button>
+            </form>
+        }
 
         <h2 class="mt-4">Members</h2>
         @if (Model.Mandatory)

@@ -17,12 +17,13 @@ namespace Kumunita.Web.Tests;
 ///       <see cref="Kumunita.Core.Identity.Roles.Member"/>-only principal gets
 ///       <see cref="Controller.NotFound"/> from every manage-lane action, and the
 ///       service is <em>never</em> invoked (no write, no audit).</item>
-/// <item><b>Delegation — the correct seam and actor identity</b>: the four POST
-///       lanes call the four IUserInfoService community seams with the principal's
-///       subject id as <c>actorId</c> and the claim-set-derived role set — the role
-///       set is the standing the Core gate re-checks, so a missing claim is the
-///       failure shape (Core throws <c>UnauthorizedAccessException</c> → the
-///       controller's catch → error TempData, never a 500).</item>
+/// <item><b>Delegation — the correct seam and actor identity</b>: the POST
+///       lanes call the IUserInfoService community seams with the principal's
+///       subject id as <c>actorId</c> and the claim-set-derived role set —
+///       add/remove are the moderator ∪ GlobalAdmin lanes; set-mandatory is
+///       **GlobalAdmin-only** (a component-scoped moderator gets the same
+///       fail-closed 404 as a plain member). A failing service call is
+///       swallowed into error TempData (the catch is the pin), never a 500.</item>
 /// <item><b>Self-leave shape</b>: <c>POST /leave</c> routes the acting member
 ///       through the frozen lane as both target and actor (userId == actorId) —
 ///       the Core audit records the member as the actor.</item>
@@ -73,6 +74,23 @@ public class CommunityControllerTests
         await userInfo.DidNotReceive().SetCommunityMandatoryAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>());
     }
 
+    [Fact]
+    public async Task SetMandatory_Moderator_Returns404_NeverInvokesService()
+    {
+        // The product decision under test: mandatory state is the admin's
+        // call — the community moderator's own standing is not enough for
+        // this lane (unlike add/remove, which are their surface).
+        var userInfo = Substitute.For<IUserInfoService>();
+        var controller = Build(userInfo,
+            roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
+            subjectId: ModSubject);
+
+        var result = await controller.SetMandatory(CompId, true, TestContext.Current.CancellationToken);
+
+        Assert.IsType<NotFoundResult>(result);
+        await userInfo.DidNotReceive().SetCommunityMandatoryAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>());
+    }
+
     // ── Manage (GET) — members + candidates ────────────────────────────────
 
     [Fact]
@@ -102,6 +120,7 @@ public class CommunityControllerTests
         Assert.NotNull(model);
         Assert.Equal(CompId, model!.ComponentId);
         Assert.False(model.Mandatory);
+        Assert.False(model.CanSetMandatory); // a moderator never sees the toggle
         Assert.Single(model.Members, m => m.SubjectId == "u-member-a");
         Assert.Single(model.Candidates, c => c.SubjectId == "u-candidate"); // the moderator themself is excluded
         Assert.DoesNotContain(model.Members, m => m.SubjectId == ModSubject);
@@ -123,27 +142,10 @@ public class CommunityControllerTests
 
         Assert.NotNull(view);
         Assert.True(view!.ViewData.Model is ManageCommunityViewModel vm && vm.Mandatory);
+        Assert.True(((ManageCommunityViewModel)view.ViewData.Model!).CanSetMandatory); // admin sees the toggle
     }
 
-    // ── SetMandatory (POST) — delegation + exception handling ──────────────
-
-    [Fact]
-    public async Task SetMandatory_Moderator_DelegatesActorAndRoleSet()
-    {
-        var userInfo = Substitute.For<IUserInfoService>();
-        var controller = Build(userInfo,
-            roles: [Kumunita.Core.Identity.Roles.Moderator, Roles.ModeratorComponent(CompId)],
-            subjectId: ModSubject);
-
-        // Repo harness convention: the controller's TempData write NREs
-        // in-process (no ISessionStore) — the pin is the NSubstitute call log
-        // (see AnnouncementControllerTests "NRE lands *after* the Core lane").
-        await Assert.ThrowsAnyAsync<NullReferenceException>(() => controller.SetMandatory(CompId, true, TestContext.Current.CancellationToken));
-
-        await userInfo.Received(1).SetCommunityMandatoryAsync(
-            CompId, true, ModSubject,
-            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.ModeratorComponent(CompId)) && s.Contains(Kumunita.Core.Identity.Roles.Moderator)));
-    }
+    // ── SetMandatory (POST) — GlobalAdmin-only delegation + exception handling ──
 
     [Fact]
     public async Task SetMandatory_ServiceThrowsForMissingCommunity_DoesNotThrow_Redirects()

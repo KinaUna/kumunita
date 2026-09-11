@@ -20,8 +20,10 @@ gaps were settled by this request:
    resident to the explicit rows — and every sign-up after. What was wanted:
    mark a community **mandatory** and it is instantly *and* permanently
    "everyone is a member", with no one able to be removed from it or leave
-   it, and the community's own **moderator** (not only the GlobalAdmin) may
-   make that call — it is their community's standing decision.
+   it. Product decision on who may make that call: the toggle is the
+   **GlobalAdmin's** — the community's own moderator manages its *members*,
+   but whether the community is mandatory at all is an admin-level call,
+   not delegated down.
 2. **Optional communities need their owner's managing hand.** For ordinary
    communities the *moderator* (the `moderator:{id}` scope claim of ADR 0003)
    should add and remove members — today only the GlobalAdmin can, via the
@@ -52,28 +54,35 @@ one flag, one definition of membership, one gate.
   the `/admin` index all read through this one seam, so mandatory-ness is
   C4-live on the very next read. No new read path, no new projection.
 - **`SetCommunityMandatoryAsync(componentId, mandatory, actorId, actorRoles)`**
-  flips the flag. Audits `community.set-mandatory` (on) /
-  `community.set-optional` (off), same transaction (C3).
+   flips the flag — **GlobalAdmin-only** (product decision above; the
+   community's own moderator gets `UnauthorizedAccessException`). Audits
+   `community.set-mandatory` (on) /
+   `community.set-optional` (off), via `Via: Admin`, same transaction (C3).
 - **`AddCommunityMemberAsync(componentId, userId, actorId, actorRoles)`** —
   the same idempotent upsert as the frozen admin lane; a row on a mandatory
   community is a harmless no-op (the union read already includes them; kept
   so forms round-trip without special cases). Audits
   `community.add-member` (C3).
 - **`RemoveCommunityMemberAsync(componentId, userId, actorId, actorRoles)`** —
-  deletes the row; no-op when there is no row (the set-form shape).
-  **Refuses on a mandatory community** — `InvalidOperationException`, the
-  message the Web lane surfaces — membership there is implicit and cannot be
-  *removed* (only the flag can be turned off, by the standing that may
-  manage it). Audits `community.remove-member` (C3).
-- **Standing gate on all four new seams** (thin token, fail-closed): the
-  actor's role set must carry the `moderator:{componentId}` scope claim
-  **∪ GlobalAdmin** — `UnauthorizedAccessException` otherwise. The audit row
-  records the **narrower** standing: `Via: Moderator` when the claim is
-  present (even for a GlobalAdmin, who also holds it), else `Via: Admin`.
-  `GetCommunityMembersAsync(componentId)` — the manage-page member list and
-  add-picker: explicit rows only (a mandatory community's members are *all*
-  residents, which no list enumerates), candidate read, no audit — the
-  `GetGroupMembersAsync` analog on the component axis.
+   deletes the row; no-op when there is no row (the set-form shape).
+   **Refuses on a mandatory community** — `InvalidOperationException`, the
+   message the Web lane surfaces — membership there is implicit and cannot be
+   *removed* (only the flag can be turned off — and that is the admin's
+   toggle). Audits `community.remove-member` (C3).
+- **Standing gates** (thin token, fail-closed) — two lanes, deliberately
+   different (the product decision above):
+   - `SetCommunityMandatoryAsync` is **GlobalAdmin-only**; a scoped
+     community moderator (or anyone else) gets
+     `UnauthorizedAccessException`, and the audit row is always `Via: Admin`.
+   - `AddCommunityMemberAsync` / `RemoveCommunityMemberAsync` admit the
+     actor's role set carrying the `moderator:{componentId}` scope claim
+     **∪ GlobalAdmin** — `UnauthorizedAccessException` otherwise. The audit
+     row records the **narrower** standing: `Via: Moderator` when the claim
+     is present, else `Via: Admin`.
+- **`GetCommunityMembersAsync(componentId)`** — the manage-page member list and
+   add-picker: explicit rows only (a mandatory community's members are *all*
+   residents, which no list enumerates), candidate read, no audit — the
+   `GetGroupMembersAsync` analog on the component axis.
 - **The frozen admin lane `ClearCommunityMembershipAsync` is amended, not
   replaced**: on a mandatory pair it is a no-op skip (no delete, no audit —
   nothing changed). The `/admin` per-account set form must keep working on
@@ -86,10 +95,13 @@ one flag, one definition of membership, one gate.
 
 - **New `CommunityController`** on the community feed — the standing's own
   surface, ADR 0003-style per-component:
-  - `GET /community/manage/{id}` — mandatory state + toggle form, member
+  - `GET /community/manage/{id}` — mandatory state (the toggle form is
+    offered to the **GlobalAdmin only**; a community moderator sees member
+    management without it), member
     list (per-row remove, hidden on mandatory — nothing to hide behind the
     "Everyone" badge), add-picker of non-member verified profiles.
-  - `POST /community/manage/{id}/mandatory` (the bool form field),
+  - `POST /community/manage/{id}/mandatory` (the bool form field — this lane
+    is GlobalAdmin-gated, the moderator gets the same fail-closed 404),
     `POST /community/manage/{id}/add`, `POST /community/manage/{id}/remove`
     (the `UserId` form field). `manage` is a literal path segment (not the
     `{id}` slot) so it can't collide with the `{id}`-shaped component routes.
@@ -127,12 +139,14 @@ is view-only.
 ## Consequences
 
 - The community's own moderator gains a managing surface on their community
-  (mandatory-state, add/remove members). Removing *themself* through the
-  manage form is refused there (the message points at the feed's Leave
-  button) — self-departure is the `/leave` lane, audited as the member
-  acting, exactly like a non-moderator's; re-posting standing survives on
-  the scope claim alone either way (there is no owner whose departure is a
-  transfer question). A community's *moderator* may, however, be removed
+   (add/remove members — but *not* the mandatory/optional toggle: that view
+   is offered to the GlobalAdmin only, and the route 404s the moderator). Removing
+   *themself* through the
+   manage form is refused there (the message points at the feed's Leave
+   button) — self-departure is the `/leave` lane, audited as the member
+   acting, exactly like a non-moderator's; re-posting standing survives on
+   the scope claim alone either way (there is no owner whose departure is a
+   transfer question, because the mandatory-state call is the admin's).
   from membership by the standing; this is deliberate: standing is not
   built on membership, so removal never orphans anything (unlike the ADR
   0008 group-owner exception, which exists because the owner row *is* the
@@ -143,7 +157,7 @@ is view-only.
   the account; `Mandatory` does not grant posting on a block), the
   self-leave route refuses, the moderator remove lane refuses with a message,
   the `/admin` set form can't remove. Turning it off is one toggle on the
-  existing `moderator:{id}` ∪ GlobalAdmin standing, audited
+  **GlobalAdmin** standing (the moderator cannot), audited
   (`community.set-optional`), and C4-live everywhere.
 - Audit vocabulary gains four verbs (the two toggles + two manage-lane
   verbs), all `targetKind: component`, all C3, all Allow; the self-leave

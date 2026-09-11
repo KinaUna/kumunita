@@ -381,25 +381,24 @@ public interface IUserInfoService
     /// refuses, <see cref="ClearCommunityMembershipAsync"/> skips — and
     /// nobody may leave it, the self-leave route is Web-gated on the flag);
     /// <c>false</c> restores ordinary optional membership (explicit rows alone
-    /// then decide). **Standing gate** (thin token, decision in Core — the
-    /// same <c>actorRoles</c> seam as <see cref="Posts.PostService"/>'s
-    /// composer gate): the actor must carry the
-    /// <see cref="Identity.Roles.ModeratorComponent(string)"/> scope claim for
-    /// <paramref name="componentId"/> ∪ <see cref="Identity.Roles.
-    /// GlobalAdmin"/> — an <see cref="UnauthorizedAccessException"/> otherwise
+    /// then decide). **Standing gate — GlobalAdmin only** (thin token, decision
+    /// in Core): whether a community is mandatory is an *admin* call even
+    /// though the component's moderator governs its members (ADR 0012, product
+    /// decision) — the actor's <c>actorRoles</c> must carry
+    /// <see cref="Identity.Roles.GlobalAdmin"/>; a component-scoped moderator
+    /// (and anyone else) gets an <see cref="UnauthorizedAccessException"/>
     /// (fail-closed). Strong consistency (invariant C4): the toggle is live
     /// on the very next <see cref="GetCommunityIdsAsync"/>.
     /// Appends an <see cref="Authorization.AccessAudit"/> row (action
     /// "community.set-mandatory" when switching on, "community.set-optional"
-    /// when off; targetKind "component", via <b>Moderator</b> when the actor
-    /// holds the component's scope claim else Admin — the narrower standing
-    /// records, outcome Allow) in the same transaction as the flag flip
+    /// when off; targetKind "component", via <b>Admin</b> — the sole admitted
+    /// standing — outcome Allow) in the same transaction as the flag flip
     /// (invariant C3).
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/> or
     /// <paramref name="actorId"/> is null/whitespace.</exception>
-    /// <exception cref="UnauthorizedAccessException">The actor's role set
-    /// carries neither standing.</exception>
+    /// <exception cref="UnauthorizedAccessException"><paramref name="actorRoles"/>
+    /// lacks <see cref="Identity.Roles.GlobalAdmin"/>.</exception>
     /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
     Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles);
 
@@ -410,12 +409,16 @@ public interface IUserInfoService
     /// <see cref="SetCommunityMembershipAsync"/> — a row on an already
     /// mandatory community is a harmless no-op (the implicit union read
     /// already includes them; kept so the forms round-trip without special
-    /// cases). **Standing gate** as
-    /// <see cref="SetCommunityMandatoryAsync"/> (component scope ∪ GlobalAdmin,
-    /// else <see cref="UnauthorizedAccessException"/>).
+    /// cases). **Standing gate** (thin token, decision in Core): the actor's
+    /// <c>actorRoles</c> must carry the <see cref="Identity.Roles
+    /// .ModeratorComponent(string)"/> scope claim for <paramref
+    /// name="componentId"/> ∪ <see cref="Identity.Roles.GlobalAdmin"/> — a
+    /// <see cref="UnauthorizedAccessException"/> otherwise. (Narrower than the
+    /// set-mandatory lane, which is GlobalAdmin-only.)
     /// Appends an <see cref="Authorization.AccessAudit"/> row (action
-    /// "community.add-member", targetKind "component", via Moderator or
-    /// Admin as above, outcome Allow) in the same transaction (invariant C3).
+    /// "community.add-member", targetKind "component", via <b>Moderator</b>
+    /// when the actor holds the component's scope claim else Admin,
+    /// outcome Allow) in the same transaction (invariant C3).
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/>,
     /// <paramref name="userId"/> or <paramref name="actorId"/> is
@@ -434,7 +437,8 @@ public interface IUserInfoService
     /// non-member of a mandatory community) — an <see
     /// cref="InvalidOperationException"/> the Web lane surfaces, not a
     /// silent skip (this lane is where the product message lives).
-    /// **Standing gate** as <see cref="SetCommunityMandatoryAsync"/>;
+    /// **Standing gate** as <see cref="AddCommunityMemberAsync"/> (component
+    /// scope ∪ GlobalAdmin — *not* the GlobalAdmin-only set-mandatory lane);
     /// **no** target-standing gate — a community's own moderator *can* be
     /// removed (unlike the ADR 0008 group owner's own row): moderator
     /// standing outlives membership (they govern and post on the
@@ -442,8 +446,9 @@ public interface IUserInfoService
     /// so no orphan state results; the GlobalAdmin role lane re-adds scope
     /// when the membership matters again).
     /// Appends an <see cref="Authorization.AccessAudit"/> row (action
-    /// "community.remove-member", targetKind "component", via Moderator or
-    /// Admin, outcome Allow) in the same transaction (invariant C3).
+    /// "community.remove-member", targetKind "component", via <b>Moderator</b>
+    /// when the actor holds the component's scope claim else Admin,
+    /// outcome Allow) in the same transaction (invariant C3).
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/>,
     /// <paramref name="userId"/> or <paramref name="actorId"/> is

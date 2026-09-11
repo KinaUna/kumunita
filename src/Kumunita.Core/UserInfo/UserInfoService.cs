@@ -1285,12 +1285,13 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     // role set (the <c>actorRoles</c> seam — the same <c>IReadOnlySet&lt;string&gt;</c>
     // shape PostService.CreatePostAsync / AnnouncementService.CreateAsync take,
     // minted at the Web boundary from KumunitaPrincipal.RoleSet), and the
-    // decision is made here in Core: the set must carry
-    // Roles.GlobalAdmin ∪ the community's Roles.ModeratorComponent scope.
-    // Writes audit in the same session (C3) with the narrower standing
-    // recorded — a claim-holder acting through their community scope
-    // records <c>Via: Moderator</c>; a pure GlobalAdmin records
-    // <c>Via: Admin</c>.
+    // decision is made here in Core: the **set-mandatory lane is GlobalAdmin-only**
+    // (a standing-wide decision the product puts in the admin's hands), while
+    // the member add/remove lanes carry Roles.GlobalAdmin ∪ the community's
+    // Roles.ModeratorComponent scope. Writes audit in the same session (C3)
+    // with the narrower standing recorded — a claim-holder acting through
+    // their community scope records <c>Via: Moderator</c>; a GlobalAdmin
+    // records <c>Via: Admin</c>.
 
     /// <inheritdoc />
     public async Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles)
@@ -1298,7 +1299,8 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         if (string.IsNullOrWhiteSpace(componentId))
             throw new ArgumentException("Component id is required.", nameof(componentId));
 
-        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        GateCommunityGlobalAdmin(componentId, actorId, actorRoles);
+        var via = Authorization.AccessVia.Admin;
         var now = DateTimeOffset.UtcNow;
 
         await using var session = store.OpenSession(new SessionOptions());
@@ -1492,6 +1494,23 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         return isComponentModerator
             ? Authorization.AccessVia.Moderator
             : Authorization.AccessVia.Admin;
+    }
+
+    /// <summary>
+    /// The stricter ADR 0012 gate on <b>set-mandatory only</b> (the flag is
+    /// a standing-wide decision the product puts in the admin's hands): the
+    /// caller's role set must carry <see cref="Identity.Roles.GlobalAdmin"/> —
+    /// <see cref="UnauthorizedAccessException"/> otherwise, including for a
+    /// community moderator's scope claim alone.
+    /// </summary>
+    private static void GateCommunityGlobalAdmin(string componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        if (actorRoles is null || !actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} does not hold GlobalAdmin (required to change the mandatory state of community {componentId}).");
     }
 
     /// <summary>

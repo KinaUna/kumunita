@@ -1053,8 +1053,9 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
 
         await svc.SetCommunityMandatoryAsync(comp, true, "a-admin", RoleSet(Roles.GlobalAdmin));
         Assert.True((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
-        Assert.Single(await AuditsFor(store, "a-admin", "community.set-mandatory"),
-            a => a.TargetKind == "component" && a.TargetId == comp);
+        var mandatoryAudit = (await AuditsFor(store, "a-admin", "community.set-mandatory"))
+            .Single(a => a.TargetKind == "component" && a.TargetId == comp);
+        Assert.Equal(AccessVia.Admin, mandatoryAudit.Via); // admin-only lane → never Moderator
 
         await svc.SetCommunityMandatoryAsync(comp, false, "a-admin", RoleSet(Roles.GlobalAdmin));
         Assert.False((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
@@ -1062,7 +1063,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
     }
 
     [Fact]
-    public async Task SetCommunityMandatory_ComponentModerator_AuditsViaModerator()
+    public async Task SetCommunityMandatory_ComponentModerator_UnauthorizedAccess()
     {
         var store = await BootStoreAsync();
         var svc = new UserInfoService(store);
@@ -1070,14 +1071,17 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         await Plant(store, new Component { Id = comp, Name = "M", Enabled = true });
         const string mod = "mod-mod";
 
-        await svc.SetCommunityMandatoryAsync(comp, true, mod,
-            RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp)));
+        // Product decision under test: the community's own moderator manages
+        // its *members*, but the mandatory/optional toggle is the admin's
+        // call — standing is not enough for this lane.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.SetCommunityMandatoryAsync(comp, true, mod,
+                RoleSet(Roles.Moderator, Roles.ModeratorComponent(comp))));
 
-        var audits = await AuditsFor(store, mod, "community.set-mandatory");
-        Assert.Single(audits);
-        Assert.Equal(AccessVia.Moderator, audits[0].Via);
+        // No side effects of the refusal: flag untouched, no audit row at all.
+        Assert.False((await svc.GetComponentsAsync(enabledOnly: false)).Single(c => c.Id == comp).Mandatory);
+        Assert.Empty(await AuditsFor(store, mod, "community.set-mandatory"));
     }
-
     [Fact]
     public async Task SetCommunityMandatory_PlainMember_UnauthorizedAccess()
     {

@@ -1,12 +1,14 @@
-// ── /community/manage/{id} — the moderator's community-membership lane (ADR 0012)
+// ── /community/manage/{id} — the community-membership management lane (ADR 0012)
 //
 // Mirrors the PostsController surface conventions: [Authorize] primary ctor,
-// full-route templates, explicit CTS, and the same fail-closed standing rule as
-// the posting gate (GlobalAdmin, or the community-scoped moderator claim —
-// never the bare "Moderator" role — or no standing at all). Standing the actor
-// does NOT have renders/behaves as **404** (ADR 0008 "U10" shape): the community
-// itself stays visible in the feed to reachable viewers; only membership
-// *management* is scoped.
+// full-route templates, explicit CTS, and fail-closed standing (never the
+// bare "Moderator" role): member add/remove is the community-scoped
+// moderator ∪ GlobalAdmin, while toggling the mandatory flag is
+// **GlobalAdmin-only** (whether a community is mandatory is an admin call —
+// the moderator governs its members, not its standing). Standing the actor
+// does NOT have renders/behaves as **404** (ADR 0008 "U10" shape): the
+// community itself stays visible in the feed to reachable viewers; only
+// membership *management* is scoped.
 namespace Kumunita.Web.Controllers;
 
 using Kumunita.Core.Identity;
@@ -40,6 +42,8 @@ public sealed class CommunityController : Controller
     // missing one (404, no body) — same shape as the group leave-lane (ADR 0008).
     // componentId is an unconstrained route value — component ids are
     // slugs (e.g. "social"), not GUIDs (same rule as /community/{componentId}).
+    // The mandatory toggle is offered in the view only to GlobalAdmins; a
+    // community moderator sees member management without it.
     [HttpGet("/community/manage/{componentId}")]
     public async Task<IActionResult> Manage(string componentId, CancellationToken ct = default)
     {
@@ -78,6 +82,7 @@ public sealed class CommunityController : Controller
             Description = component.Description,
             Mandatory = component.Mandatory,
             Enabled = component.Enabled,
+            CanSetMandatory = KumunitaPrincipal.IsGlobalAdmin(User),
             ActorHasScopeClaim = KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId)),
             Members = members,
             Candidates = candidates,
@@ -87,18 +92,20 @@ public sealed class CommunityController : Controller
     // ── Forms (all redirect back to Manage with a TempData message) ────────
 
     // POST /community/manage/{componentId}/mandatory — the on/off switch the
-    // requirement puts in the moderator's hands ("set by the moderator").
+    // requirement puts in the **admin's** hands (product decision: mandatory
+    // state is an admin call; the community's moderator manages *members*,
+    // not the flag). Moderators hitting this route get the same fail-closed
+    // 404 as a community they can't manage.
     [HttpPost("/community/manage/{componentId}/mandatory")]
     public async Task<IActionResult> SetMandatory(string componentId, [FromForm] bool Mandatory, CancellationToken ct = default)
     {
         var actorId = KumunitaPrincipal.SubjectId(User);
-        if (!Standing(actorId, componentId))
+        if (actorId is null || !KumunitaPrincipal.IsGlobalAdmin(User))
             return NotFound();
 
         try
         {
-            // Standing() above implies actorId is non-null (fail-closed null check).
-            await userInfo.SetCommunityMandatoryAsync(componentId, Mandatory, actorId!, KumunitaPrincipal.RoleSet(User));
+            await userInfo.SetCommunityMandatoryAsync(componentId, Mandatory, actorId, KumunitaPrincipal.RoleSet(User));
             TempData["info"] = Mandatory
                 ? "Marked mandatory — everyone in the neighborhood is a member."
                 : "Marked optional.";

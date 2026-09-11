@@ -35,8 +35,8 @@ public sealed class Component
     /// ∩ mandatory set in with the explicit <see cref="ComponentMembership"/>
     /// rows), nobody may be removed from it, and a resident may not leave it
     /// (the self-leave / removal lanes refuse). <b>OFF by default</b> — a
-    /// community is optional unless a moderator (or a GlobalAdmin) marks it
-    /// mandatory through the single write lane
+    /// community is optional unless a **GlobalAdmin** marks it mandatory
+    /// through the single write lane
     /// <see cref="IUserInfoService.SetCommunityMandatoryAsync"/>. A
     /// <b>disabled</b> component grants no memberships even when mandatory
     /// (the read seam is enabled ∩ mandatory, mirroring the <see
