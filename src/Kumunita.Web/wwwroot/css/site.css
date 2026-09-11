@@ -579,6 +579,21 @@ body.kmb-page-fullbleed {
   border-bottom: 1px solid var(--kmb-border);
   font-variant-numeric: tabular-nums;
 }
+/* Milestone ID chip: solid tinted background with high-contrast dark text,
+   larger than the default .badge so it reads at a glance. */
+.kmb-milestone-id {
+  display: inline-block;
+  font-family: var(--bs-heading-font-family);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #1c4532;
+  background-color: rgba(28, 69, 50, 0.12);
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.6rem;
+  line-height: 1;
+  white-space: nowrap;
+}
 
 /* --- FAQ accordion (_FaqAccordion.cshtml) ----------------------------------------- */
 .accordion.kmb-faq {

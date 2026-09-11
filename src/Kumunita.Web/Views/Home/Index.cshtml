@@ -7,10 +7,10 @@
 <section class="kmb-section">
     <div class="container">
         <div class="row justify-content-center text-center">
-            <div class="col-12 col-lg-8">
+            <div class="col-12 kmb-hero">
                 <div class="eyebrow">Where this project stands</div>
                 <h1 class="mt-2 mb-3">@Model.CommunityName</h1>
-                <p class="kmb-section-lead mx-auto" style="max-width: 42rem;">
+                <p class="kmb-section-lead mx-auto text-white-50" style="max-width: 42rem;">
                     A private home for one neighbourhood — built in the open,
                     one milestone at a time. This is the same list you'll find
                     in the README, and the code behind every item is on the
@@ -23,7 +23,7 @@
             @foreach (var m in Milestones.All)
             {
                 <li>
-                    <span class="flex-grow-1"><span class="badge opacity-50 me-2">@m.Id</span>@m.Title</span>
+                    <span class="flex-grow-1"><span class="kmb-milestone-id me-2">@m.Id</span>@m.Title</span>
                     <span class="badge rounded-pill @Milestones.BadgeClass(m.Status)">@Milestones.LabelFor(m.Status)</span>
                 </li>
             }
