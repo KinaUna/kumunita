@@ -2,6 +2,7 @@ using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Media;
 using Kumunita.Web;
 using Kumunita.Web.Security;
 using Kumunita.Web.SideEffects;
@@ -38,6 +39,12 @@ builder.Services.AddSingleton<ILogger>(sp => sp.GetRequiredService<ILoggerFactor
 builder.Services.Configure<CommunityOptions>(
     builder.Configuration.GetSection(CommunityOptions.SectionName));
 
+// Media (plan U2): per-instance media-store config (ADR 0011). Same bind shape
+// as CommunityOptions — `Media__*` (OPS.md); the RootPath default + the raster
+// allowlist live in MediaOptions (C-MED·5).
+builder.Services.Configure<MediaOptions>(
+    builder.Configuration.GetSection(MediaOptions.SectionName));
+
 // Marten: the domain document store (ADR 0001/0004). All domain documents live in the `mt`
 // schema; the custom KumunitaFeature contributes the first versioned schema change.
 var kumunitaConnection = builder.Configuration.GetConnectionString("Kumunita")
@@ -72,6 +79,12 @@ var marten = builder.Services.AddMarten(opts =>
     // announcements" lane). All use the conventional string Id, so no non-default
     // convention needed. ADR 0004 §B.1.
     M3DocTypes.Configure(opts);
+
+    // Media (plan U2): the media catalog doc (MediaObject) — its Id *is* the
+    // content hash (C-MED·4), so Marten's default Id-unique mapping is the dedup;
+    // no business-key index (the M3 "string Id" convention). ADR 0004 §B.1. Without
+    // this call the MediaObject doc is invisible to Marten (C-MED·7 drift).
+    MediaDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
