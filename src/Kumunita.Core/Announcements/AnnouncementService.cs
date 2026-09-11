@@ -81,6 +81,35 @@ public sealed class AnnouncementService : IAnnouncementService
     }
 
     /// <summary>
+    /// The single announcement to render at <c>/announcements/{id}</c>
+    /// (the detail view): loaded by id, passed through the <em>same</em>
+    /// visibility gate as <see cref="ListVisibleAsync"/>. Returns null —
+    /// not an exception — when the id is missing <em>or</em> not visible
+    /// to the caller (the two are deliberately indistinguishable:
+    /// <see cref="PinnedAsync"/> returns null the same way, and there is no
+    /// <c>AccessAudit</c> lane on this bounded context to log the "denied"
+    /// side — the Web layer maps null to a 404).
+    /// </summary>
+    public async Task<Announcement?> GetAsync(string id, string? actorId, IReadOnlySet<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        if (string.IsNullOrEmpty(id)) return null;
+        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Announcement>()
+            .Where(a => a.Id == id &&
+                        (a.CommunityId == null &&
+                        ((a.Scope == AnnouncementScope.Public ||
+                          (authed && a.Scope == AnnouncementScope.Community)))
+                     || (a.CommunityId != null &&
+                        (admin || communities.Contains(a.CommunityId!)))))
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// The single announcement to render as a site-wide banner:
     /// the most-recently-created <see cref="Announcement"/> with
     /// <see cref="Announcement.Pinned" /> true that passes the caller's

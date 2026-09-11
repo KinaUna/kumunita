@@ -15,6 +15,15 @@ namespace Kumunita.Web.Controllers;
 /// distinct from the per-community <see cref="PostsController"/>'s
 /// audience-restricted <see cref="Posts.Post"/> lanes):
 /// <list type="bullet">
+/// <item><c>GET /announcements/{id}</c> — the detail view: the full body
+/// of one announcement. <b>Open</b> to unauthenticated visitors, like the
+/// list; the
+/// <see cref="Kumunita.Core.Announcements.IAnnouncementService.GetAsync"/>
+/// visibility gate is the sole reader (public scope always, community
+/// scope when signed in, a community-targeted row visible to that
+/// community's moderator/members or a GlobalAdmin). A missing or not
+/// visible id is a 404 (announcements are not audience-restricted
+/// content, so there is no 403/audit lane — see the service's seam).</item>
 /// <item><c>GET /announcements</c> — the read surface, <b>open</b> to
 /// unauthenticated visitors (a public-scope announcement is by definition
 /// visible whether or not the visitor is signed in — the maintenance-notice
@@ -133,6 +142,49 @@ public sealed class AnnouncementController(
             .ToList();
 
         return View(new AnnouncementIndexViewModel(rows));
+    }
+
+    // ── Detail (GET /announcements/{id}) ───────────────────────────────────
+
+    /// <summary>
+    /// The detail view: one announcement's full body (the /announcements list
+    /// shows a preview link per row). No [Authorize]: the same as the list,
+    /// the service's <see cref="Kumunita.Core.Announcements.IAnnouncementService.GetAsync"/>
+    /// gate is the reader (public scope always, community scope when signed
+    /// in, a community-targeted row visible to that community's
+    /// moderator/members or a GlobalAdmin). A missing or not-visible id both
+    /// return null and map to <see cref="NotFound"/> (announcements are not
+    /// audience-restricted content — no 403/audit lane on this bounded
+    /// context, unlike the <see cref="PostsController"/>'s post lane).
+    /// </summary>
+    [HttpGet("/announcements/{id}")]
+    public async Task<IActionResult> Detail(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return NotFound();
+
+        var a = await announcements.GetAsync(id, SubjectId(User), RoleSet(User));
+        if (a is null)
+            return NotFound();
+
+        // The author's display name — a *display* read (GetProfileAsync),
+        // never an access decision (the visibility gate already ran inside
+        // the service). Missing profile row: fall back to the raw subject id.
+        var profile = await userInfo.GetProfileAsync(a.AuthorId);
+        string authorName = profile?.DisplayName is not null && profile.DisplayName.Length > 0
+            ? profile.DisplayName
+            : a.AuthorId;
+
+        string? communityName = null;
+        if (a.CommunityId is not null)
+        {
+            var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+            communityName = components.FirstOrDefault(c => c.Id == a.CommunityId)?.Name;
+        }
+
+        return View(new AnnouncementDetailViewModel(
+            a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
+            authorName, a.Pinned, communityName));
     }
 
     // ── Create (GET + POST /announcements/new) ─────────────────────────────

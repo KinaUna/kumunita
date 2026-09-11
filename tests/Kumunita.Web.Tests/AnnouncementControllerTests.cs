@@ -662,6 +662,96 @@ public class AnnouncementControllerTests
                 Assert.Equal("Community A", row.CommunityDisplayName);
             }
 
+            // ──── Detail (GET /announcements/{id}) — full-body read ────────────────
+
+            /// <summary>
+            /// The happy path: the service's <see cref="IAnnouncementService.GetAsync"/>
+            /// returns the announcement (the gate already ran in the service) and the
+            /// controller hands the view the <em>full</em> body — this is the surface
+            /// the list's 250-character preview / the banner's 150-character preview
+            /// link into. The author's display name resolves from the profile seam,
+            /// the community-targeted row resolves its display name, and the pinned
+            /// flag passes through untouched.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Visible_ReturnsFullBodyModel()
+            {
+                const string author = "subj-admin-001";
+                string longBody = string.Concat(Enumerable.Repeat("Maintenance window text. ", 20));
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-detail", "subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new Announcement
+                    {
+                        Id = "ann-detail", Scope = AnnouncementScope.Public,
+                        Title = "Scheduled maintenance", Body = longBody,
+                        AuthorId = author, Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+                        Modified = new DateTimeOffset(2026, 1, 20, 12, 0, 0, TimeSpan.Zero), Pinned = true,
+                    });
+
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Site Admin" });
+
+                var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+                var view = (await controller.Detail("ann-detail")) as ViewResult;
+                Assert.NotNull(view);
+
+                var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+                Assert.Equal("ann-detail", model.Id);
+                Assert.Equal(longBody, model.Body);        // the full text, not a truncated preview
+                Assert.True(model.Pinned);
+                Assert.Equal("Site Admin", model.AuthorDisplayName);
+            }
+
+            /// <summary>
+            /// A missing <em>or</em> not-visible id both arrive as the service's
+            /// <c>null</c> return (the gate — missing and denied are indistinguishable
+            /// by design, no 403/audit lane on this bounded context) and the
+            /// controller maps that to a clean <see cref="NotFound"/> — never a
+            /// blank page, never a 500.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Missing_OrNotVisible_ReturnsNotFound()
+            {
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-missing", "subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+                var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+                var result = await controller.Detail("ann-missing");
+
+                Assert.IsType<NotFoundResult>(result);
+                await announcements.DidNotReceive().ListVisibleAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>());
+            }
+
+            /// <summary>
+            /// The anonymous visitor detail lane (public-scope announcements are
+            /// visible signed out, e.g. a maintenance notice): the controller passes
+            /// a <b>null</b> <c>actorId</c> and an <b>empty</b> role set to the
+            /// service — the same shape pin as the list's read gate.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Anonymous_PassesNullActorId_ToService()
+            {
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-public", null, Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new Announcement
+                    {
+                        Id = "ann-public", Scope = AnnouncementScope.Public,
+                        Title = "Maintenance", Body = "Saturday 02:00-04:00 UTC",
+                        AuthorId = "subj-admin-001", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+                    });
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync("subj-admin-001").Returns((Profile?)null); // missing profile → subject-id fallback
+                var controller = Build(announcements, userInfo, IsAuthenticated: false);
+
+                var view = (await controller.Detail("ann-public")) as ViewResult;
+                Assert.NotNull(view);
+
+                await announcements.Received(1).GetAsync("ann-public", null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0));
+                var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+                Assert.Equal("subj-admin-001", model.AuthorDisplayName);
+            }
+
             /// <summary>
             /// Builds an <see cref="AnnouncementController"/> with a substituted
     /// <see cref="IAnnouncementService"/> + <see cref="IUserInfoService"/>

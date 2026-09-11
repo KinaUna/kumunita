@@ -6,8 +6,9 @@ namespace Kumunita.Core.Announcements;
 /// <summary>
 /// The <c>/announcements</c> bounded-context's service seam (M3b — the "platform
 /// announcements" lane, part of M3's roadmap scope). The public surface of <see cref="AnnouncementService"/>:
-/// the <see cref="ListVisibleAsync"/> / <see cref="CreateAsync"/> /
-/// <see cref="UpdateAsync"/> / <see cref="DeleteAsync"/> quartet.
+/// the <see cref="ListVisibleAsync"/> / <see cref="GetAsync"/> /
+/// <see cref="CreateAsync"/> / <see cref="UpdateAsync"/> /
+/// <see cref="DeleteAsync"/> surface.
 /// <para>
 /// Kept behind an interface so the Web-side consumer (the
 /// <see cref="Kumunita.Web.Controllers.AnnouncementController"/>) can be tested
@@ -36,7 +37,23 @@ public interface IAnnouncementService
     Task<IReadOnlyList<Announcement>> ListVisibleAsync(string? actorId, IReadOnlySet<string> roles);
 
     /// <summary>
-    /// The single announcement to render as a site-wide banner — the
+    /// A single caller-visible <see cref="Announcement"/> by id — the
+    /// <c>/announcements/{id}</c> detail view's read shape. The visibility
+    /// gate is the same as <see cref="ListVisibleAsync"/>:
+    /// <see cref="AnnouncementScope.Public"/> always;
+    /// <see cref="AnnouncementScope.Community"/> when signed in (community-
+    /// targeted rows: that community's moderator, its members, or a
+    /// <see cref="Roles.GlobalAdmin"/>). Returns null when the id is missing
+    /// <em>or</em> not visible to the caller (announcements are not
+    /// audience-restricted content, so no
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row — the Web
+    /// layer maps both to a 404). See <see cref="AnnouncementService.GetAsync"/>
+    /// for the full contract.
+    /// </summary>
+    Task<Announcement?> GetAsync(string id, string? actorId, IReadOnlySet<string> roles);
+
+    /// <summary>
+    /// The single announcement to render as a site-wide banner
     /// most-recently-created announcement with <see cref="Announcement.Pinned"/>
     /// true that passes the caller's authentication state (the same
     /// <see cref="ListVisibleAsync"/> visibility gate: <see cref="AnnouncementScope.Public"/>

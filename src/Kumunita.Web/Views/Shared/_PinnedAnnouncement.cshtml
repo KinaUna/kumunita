@@ -24,13 +24,19 @@
                     <span class="badge @badgeClass">
                         @(pinned.Scope == AnnouncementScope.Public ? "everyone" : "residents")
                     </span>
+                    @* The banner shows only the first 150 characters of the
+                       body (a pinned announcement can run to pages) — the
+                       full text is one click away at the detail view. *@
                     <span class="me-auto me-2">
                         @if (!string.IsNullOrWhiteSpace(pinned.Title))
                         {
                             <strong class="me-1">@pinned.Title</strong>
                         }
-                        @pinned.Body
+                        @(pinned.Body.Length > 150 ? pinned.Body[..150].TrimEnd() + "…" : pinned.Body)
                     </span>
+                    <a class="btn btn-sm btn-link text-nowrap p-0"
+                       href="/announcements/@pinned.Id"
+                       aria-label="Read this announcement in full">Read more</a>
                     <a class="btn btn-sm btn-link text-nowrap p-0" href="/announcements"
                        aria-label="See all announcements">All announcements</a>
                     <button type="button" class="btn-close"

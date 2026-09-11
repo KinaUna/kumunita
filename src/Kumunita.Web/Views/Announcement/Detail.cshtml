@@ -1,0 +1,58 @@
+@model Kumunita.Web.Models.AnnouncementDetailViewModel
+@using Kumunita.Core.Announcements
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Announcement" : Model.Title;
+
+    string badgeClass = Model.Scope == AnnouncementScope.Public
+        ? "text-bg-secondary"
+        : "text-bg-primary";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/announcements" class="btn btn-link p-0">
+                &larr; Back to the announcements
+            </a>
+        </p>
+
+        <h1 class="mb-1">
+            @if (string.IsNullOrWhiteSpace(Model.Title))
+            {
+                <span class="text-body-tertiary">Untitled announcement</span>
+            }
+            else
+            {
+                @Model.Title
+            }
+        </h1>
+
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="badge @badgeClass">
+                @(Model.Scope == AnnouncementScope.Public ? "everyone" : (Model.CommunityDisplayName is not null ? Model.CommunityDisplayName : "residents"))
+            </span>
+            @if (Model.Pinned)
+            {
+                <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
+                    pinned
+                </span>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                @* The full body (the /announcements list shows the first 250
+                   characters and links here). Plain text — same treatment as
+                   the list rows; preserve the author's line breaks. *@
+                <div class="text-body whitespace-pre-line">@Model.Body</div>
+            </div>
+            <div class="card-footer bg-white text-muted small">
+                by @Model.AuthorDisplayName — @Model.Created.DateTime.ToString("ddd, MMM d yyyy")
+                @if (Model.Modified is not null)
+                {
+                    <span> — edited @Model.Modified.Value.DateTime.ToString("ddd, MMM d yyyy")</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>

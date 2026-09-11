@@ -24,6 +24,23 @@ public sealed record AnnouncementRow(
 /// a display-name lookup, never an access decision).</summary>
 public sealed record AnnouncementIndexViewModel(IReadOnlyList<AnnouncementRow> Announcements);
 
+/// <summary>The /announcements/{id} detail view (the full-body read
+/// surface — the list shows a truncated preview and links here): the
+/// announcement's own shape plus the resolved author display name
+/// (null-safe: falls back to the raw subject id if the author's profile
+/// row is missing — a display-name lookup, never an access decision) and
+/// the community name (when the row is community-targeted; null otherwise).</summary>
+public sealed record AnnouncementDetailViewModel(
+    string Id,
+    AnnouncementScope Scope,
+    string Title,
+    string Body,
+    DateTimeOffset Created,
+    DateTimeOffset? Modified,
+    string AuthorDisplayName,
+    bool Pinned,
+    string? CommunityDisplayName);
+
 /// <summary>The /announcements/new create form (the write lane) — also reused for the
 /// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share
 /// the same Title/Body/Scope shape and both enforce the scope-vs-role split server-side

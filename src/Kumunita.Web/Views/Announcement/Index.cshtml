@@ -55,15 +55,19 @@
                             : "text-bg-primary";
                         bool canEdit = isGlobalAdmin || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && isModerator) || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false));
 
+                        @* The body is long by design (a pinned announcement can
+                           run to pages) — the list shows only the first 250
+                           characters; the full text lives at the row's detail
+                           view (GET /announcements/{id}). *@
                         <li class="list-group-item">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div class="me-3">
-                                    @if (!string.IsNullOrWhiteSpace(a.Title))
-                                    {
-                                        <h5 class="mb-1">@a.Title</h5>
-                                    }
+                                    <h5 class="mb-1">
+                                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })" class="text-body">@a.Title</a>
+                                    </h5>
                                     <div class="text-body">
-                                        @a.Body
+                                        @(a.Body.Length > 250 ? a.Body[..250].TrimEnd() + "…" : a.Body)
+                                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">Read more…</a>
                                     </div>
                                     <div class="text-muted small mt-1">
                                         by @a.AuthorDisplayName — @a.Created.DateTime.ToString("ddd, MMM d yyyy")
