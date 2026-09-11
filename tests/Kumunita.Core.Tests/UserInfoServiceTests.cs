@@ -926,7 +926,6 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         Assert.Equal(admin, mem.AddedBy);
         Assert.Equal(comp, mem.ComponentId);
         Assert.Equal(target, mem.UserId);
-        Assert.NotNull(mem.At);
 
         var audits = await AuditsFor(store, actor: admin, action: "community.add-member");
         Assert.Single(audits, a => a.TargetKind == "component" && a.TargetId == comp);
@@ -951,7 +950,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         await using var session = store.QuerySession();
         var count = await session.Query<ComponentMembership>()
             .Where(m => m.ComponentId == comp && m.UserId == target)
-            .CountAsync();
+            .CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, count);
 
         // Two add audit rows (one per admin action).
@@ -1005,7 +1004,7 @@ public class UserInfoServiceTests(PostgresFixture fixture) : IClassFixture<Postg
         await using var s = store.QuerySession();
         var rows = await s.Query<AccessAudit>()
             .Where(a => a.ActorId == admin && a.Action == "community.remove-member" && a.TargetId == comp)
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(rows);
     }
 

@@ -1,4 +1,9 @@
 @using Kumunita.Web.Security
+@*
+    Right-hand nav actions (the public section links live in the layout's
+    left nav). Signed in: Profile · Admin (global admins only) · Sign out.
+    Signed out: Sign in · Sign up.
+*@
 @{
     bool isAuthenticated = User.Identity?.IsAuthenticated == true;
     // KumunitaPrincipal.IsGlobalAdmin reads the Kumunita.Role claim type (not the BCL
@@ -11,33 +16,6 @@
     {
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
-        </li>
-        @* M2 (U8): the resident-facing directory — the visible-profile list
-           + the two-gate detail (§9 pin at DirectoryController.ProjectDetail).
-           The DirectoryController is [Authorize]-gated, so the link belongs
-           in the signed-in branch here rather than the layout's anonymous
-           nav. *@
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
-        </li>
-        @* M2 (U9/U10): the resident-facing group surface — list, create,
-           detail (owner ∪ member, F14) + owner/admin member management.
-           GroupsController is [Authorize]-gated too, so this link lives in
-           the signed-in branch like the Directory one above. *@
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">Groups</a>
-        </li>
-        @* M3 (U8): the single-entry Community nav link.
-           one component (id "safety", per FirstBootSeeder's seed order) —
-           the "default community". Now repointed to the all-sections feed
-           (GET /community) so the link shows the union of every enabled
-           section; each per-section feed remains one click away at
-           /community/{sectionId}. *@
-        <li class="nav-item">
-            <a class="nav-link text-dark"
-               asp-controller="Posts" asp-action="AllSections">
-                Community
-            </a>
         </li>
         @if (isGlobalAdmin)
         {

@@ -3,16 +3,26 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1c4532" />
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
-<body>
+@{
+    // Landing-style pages opt out of the shared .container wrapper (see the
+    // <main> block below) so their sections can run full-bleed. Set with
+    // ViewData["FullBleed"] = true in the page (home page, Views/Home/Index).
+    bool fullBleed = ViewData["FullBleed"] is true;
+}
+
+<body class="@(fullBleed ? "kmb-page-fullbleed" : null)">
     @await Html.PartialAsync("_PinnedAnnouncement")
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Kumunita</a>
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <img src="~/images/logo/kumunita_k_logo_42x42.png" alt="Kumunita" />
+                </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -25,6 +35,15 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" href="/announcements">Announcements</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections">Community</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">Groups</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
+                        </li>
                     </ul>
 
                     <partial name="_AccountNav" />
@@ -32,19 +51,69 @@
             </div>
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+    <main role="main" class="pb-3">
+        @if (fullBleed)
+        {
             @RenderBody()
-        </main>
-    </div>
+        }
+        else
+        {
+            <div class="container">
+                @RenderBody()
+            </div>
+        }
+    </main>
 
-    <footer class="border-top footer text-muted">
+    <footer class="kmb-footer">
         <div class="container">
-            &copy; @DateTime.Now.Year - Kumunita
+            <div class="row g-4">
+                <div class="col-12 col-md-5 col-lg-4">
+                    <p class="navbar-brand mb-2">Kumunita</p>
+                    <p class="mb-2" style="max-width: 34ch;">
+                        A private home for one neighborhood — the feed, the groups
+                        and the pinned notes. What happens on your street stays on
+                        your street.
+                    </p>
+                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita · self-hosted by your community</p>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <h3>Community</h3>
+                    <ul class="list-unstyled d-grid gap-2">
+                        <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
+                        <li><a asp-area="" asp-controller="Home" asp-action="About">About</a></li>
+                        <li><a href="/announcements">Announcements</a></li>
+                        <li><a asp-controller="Posts" asp-action="AllSections">The feed</a></li>
+                    </ul>
+                </div>
+                <div class="col-6 col-md-4 col-lg-3">
+                    <h3>The project</h3>
+                    <ul class="list-unstyled d-grid gap-2">
+                        @foreach (var link in RepositoryInfo.Links)
+                        {
+                            <li>
+                                <a href="@link.Url" target="_blank" rel="noopener noreferrer">@link.Label</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <div class="col-12 col-md-3 col-lg-3">
+                    <h3>Good to know</h3>
+                    <p class="small mb-2">
+                        Private by default: each post's audience is chosen by its author,
+                        and everything is readable by you, not the world.
+                    </p>
+                    <p class="small mb-0">
+                        Kumunita is open source — the code, the decisions, the docs.
+                    </p>
+                </div>
+            </div>
         </div>
     </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
+         no inline on*/<script> in Razor views; the U8 onerror it replaced is per img) -->
+    <script type="module" src="~/js/lib/avatar.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

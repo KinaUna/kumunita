@@ -51,7 +51,7 @@ authors** or **what U10 records**, the sealed register + design doc win
      count **or** the fixture-throw status if still open").
 
 2. **`docs/design/m3b-moderation.md` — MODIFY** — append
-   `### Run result (M3b acceptance gate — 2026-09-12)` **above**
+   `### Run result (M3b acceptance gate — 2026-09-09)` **above**
    the current `## Part 1 ends here...` trailer (which is at line 324
    of the design doc). Mirror the M3 shape *verbatim* (`m3-posts-design.
    md` § `Run result (M3 acceptance gate — 2026-09-04)`, lines 697–760):
@@ -137,7 +137,7 @@ authors** or **what U10 records**, the sealed register + design doc win
   precedent).
 - **Do not touch the design-doc's `## Part 1` or `## Part 2`
   sections.** U10 appends a new top-level `### Run result (M3b
-  acceptance gate — 2026-09-12)` section *above* the final
+  acceptance gate — 2026-09-09)` section *above* the final
   `*Part 1 ends here...*` trailer at line 324.
 - **Do not modify `package.json`.** The `@playwright/test` /
   `typescript` dep is already there (M2 U13's scaffolding). Node 22 +
@@ -158,7 +158,7 @@ authors** or **what U10 records**, the sealed register + design doc win
   `Kumunita.Web.Tests`**, **total 155/155** vs. M3's 105/105 + 37/37
   = 142/142 — the +13 is U9's 13 seam-test ADDs).
 - `docs/design/m3b-moderation.md` § `### Run result (M3b acceptance
-  gate — 2026-09-12)` landed with the three-test table + the E2E-
+  gate — 2026-09-09)` landed with the three-test table + the E2E-
   status paragraph (fixture-throw, not pass count, because the M2 D2
   deviation is still open).
 - `docs/plans-milestones/m3b-handoff-notes.md` → `## U10` appended,

@@ -1,0 +1,170 @@
+@using Kumunita.Web
+@model Kumunita.Web.Models.HomeViewModel
+@{
+    ViewData["Title"] = "About";
+    // Landing-style page: opt out of the shared .container so sections
+    // run full-bleed (see _Layout.cshtml and the .kmb-* rules in site.css).
+    ViewData["FullBleed"] = true;
+}
+
+<!-- ══════════ 1. Hero ══════════ -->
+<section class="kmb-hero">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-12 col-lg-9">
+                <div class="eyebrow">Private by default</div>
+                <h1 class="display-5 mb-4">@Model.CommunityName</h1>
+                <p class="kmb-hero-lead mx-auto mb-4" style="max-width: 42rem;">
+                    One home for everything your neighborhood does — the feed,
+                    the groups, and the notes that deserve better than a group
+                    chat. Private, plain-language, and yours.
+                </p>
+                <div class="d-flex flex-wrap justify-content-center gap-3 kmb-hero-actions">
+                    <a asp-controller="Posts" asp-action="AllSections" class="btn btn-pill btn-primary">
+                        See the feed
+                    </a>
+                    <a href="/announcements" class="btn btn-pill btn-hero-ghost">
+                        Read the pinned notes
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 2. Feature cards (floating over the dark band) ══════════ -->
+<section class="kmb-features" aria-label="What Kumunita is">
+    <div class="kmb-features-band">
+        <div class="container">
+            <div class="row g-4 justify-content-center">
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 1 1 16.1-3.8z"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title">One feed for the street</h3>
+                        <p>Posts and threads from your blocks and lanes, in one
+                           quiet place — no algorithm, no noise.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon kmb-feat-icon-warm mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title">Groups that fit</h3>
+                        <p>Garden swap, book club, street watch — a group for
+                           whatever the neighbourhood already does.</p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 17v5"/>
+                                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title">Pinned where it matters</h3>
+                        <p>Water cuts, roadworks, the new speed bumps — notes
+                           that stay put instead of scrolling away.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 3. Stats band (counter pattern) ══════════ -->
+@*
+    TODO(counts): replace the placeholder values below with real counts,
+    e.g. injected in HomeController:
+      - neighbor count from IUserManager (Kumunita.Identity)
+      - group / community count from IGroupService (Kumunita.UserInfo)
+      - posts + threads from IPostService (Kumunita.Posts)
+    until then, keep the band's meaning honest (no fake numbers):
+    consider hiding this section for a first deployment.
+*@
+<section class="kmb-section kmb-section-tint-a" aria-label="Community at a glance">
+    <div class="container">
+        <div class="row kmb-stats g-4 justify-content-center text-center">
+            <div class="col-6 col-md-3">
+                <div class="kmb-stat-value">42</div><!-- TODO(counts): real neighbor count -->
+                <div class="kmb-stat-label">neighbors on board</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kmb-stat-value">6</div><!-- TODO(counts): real community/group count -->
+                <div class="kmb-stat-label">groups &amp; communities</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kmb-stat-value">128</div><!-- TODO(counts): real this-month posts + threads -->
+                <div class="kmb-stat-label">posts &amp; threads this month</div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kmb-stat-value">9</div><!-- TODO(counts): real pinned-note count -->
+                <div class="kmb-stat-label">pinned notes out now</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 4. Code, docs & links ══════════ -->
+<section class="kmb-section" aria-label="The project">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-12 col-lg-8">
+                <div class="eyebrow">Open source</div>
+                <h2 class="h3 mt-2">The code, the decisions, the design docs</h2>
+                <p class="kmb-section-lead mx-auto mt-3" style="max-width: 42rem;">
+                    If you're curious how it works — or if you're about to host
+                    it for your neighbourhood — everything is public.
+                </p>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap justify-content-center gap-2 mt-5">
+            @foreach (var link in RepositoryInfo.Links)
+            {
+                <a href="@link.Url" target="_blank" rel="noopener noreferrer"
+                   class="btn btn-pill btn-outline-primary btn-sm">
+                    @link.Label
+                    <span aria-hidden="true">&#8599;</span>
+                </a>
+            }
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 5. Contact CTA band ══════════ -->
+<section class="kmb-cta-band" aria-label="Get in touch">
+    <div class="container d-flex flex-column flex-md-row align-items-center justify-content-between gap-4">
+        <div>
+            <h2 class="h4 text-white fw-semibold mb-1">Questions, feedback, or a bug?</h2>
+            @if (!string.IsNullOrWhiteSpace(Model.SupportEmail))
+            {
+                <p class="kmb-hero-lead mx-0 mb-0">
+                    Write to <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a> —
+                    a person reads it.
+                </p>
+            }
+            else
+            {
+                <p class="kmb-hero-lead mx-0 mb-0">
+                    Open an issue on the repository — a person reads that too.
+                </p>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.SupportEmail))
+        {
+            <a href="mailto:@Model.SupportEmail" class="btn btn-pill btn-primary flex-shrink-0">
+                Open a conversation
+            </a>
+        }
+    </div>
+</section>

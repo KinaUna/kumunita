@@ -1,4 +1,5 @@
 @using Kumunita.Web.Models
+@using Kumunita.Web.Security
 @model ProfileEditViewModel
 @{
     ViewData["Title"] = "Edit your profile";
@@ -12,6 +13,64 @@
             Whatever you choose here is exactly what the neighbor directory
             shows — no surprises.
         </p>
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">Your avatar</h5>
+        @*
+          U8 of the media feature (design doc §2.4; C-MED·5/6/8): the avatar
+          upload is its OWN write lane (U6's AvatarUpload — POST /profile/avatar,
+          [ValidateAntiForgeryToken]), so this is a SEPARATE <form> (a nested
+          <form> would be invalid HTML). It is self-only by structural identity:
+          the form carries the image file + the antiforgery token and NOTHING
+          else — no subject field (the §2.4 U7a pin: the target is the
+          signed-in principal, minted server-side, never a form value). The
+          current-avatar preview on this page, and every avatar <img> on the
+          platform, point at U7's
+          GET /profile/avatar/{subjectId} — never a static path (C-MED·3); the
+          endpoint fails closed to 404 (no avatar set / a denied audience —
+          FACES M1–M5), so on load error the monogram sibling takes over
+          instead of a broken-image icon.
+        *@
+        @{
+            // The avatar rendered here (and the upload's preview subject) is
+            // the actor's OWN profile — the editor is self-only (FACES M1's
+            // owner row). Minted in the view from the signed-in principal via
+            // the repo's single claim-shaping helper, exactly as
+            // ProfileController mints it; never a view-model / form field
+            // (ProfileEditViewModel keeps its frozen shape — the U8 media
+            // register's optional view-model step was not needed).
+            string? avatarSubject = KumunitaPrincipal.SubjectId(User);
+            string avatarInitial = !string.IsNullOrWhiteSpace(Model.DisplayName)
+                ? char.ToUpperInvariant(Model.DisplayName.TrimStart()[0]).ToString()
+                : string.Empty;
+        }
+        <div class="d-flex align-items-center gap-3">
+            @if (!string.IsNullOrEmpty(avatarSubject))
+            {
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@avatarSubject" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                </span>
+            }
+            else
+            {
+                <span class="avatar-mono">@avatarInitial</span>
+            }
+            <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+                @Html.AntiForgeryToken()
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <input type="file" name="file" required
+                           accept="image/jpeg,image/png,image/webp,image/gif"
+                           aria-label="Avatar image"
+                           class="form-control form-control-sm">
+                    <button type="submit" class="btn btn-primary btn-sm">Save avatar</button>
+                </div>
+                <div class="form-text small">
+                    JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the
+                    avatar currently shown in the directory.
+                </div>
+            </form>
+        </div>
 
         @if (TempData["info"] is string info)
         {
@@ -105,160 +164,13 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    @* The grant-picker sync: keeps the hidden textarea
-       (the form-bound Grants JSON — the U11 / F13 single-source pin)
-       and the two multi-select elements (the user-friendly UX) in
-       two-way sync. The textarea is the only element posted; the
-       pickers are display-only (no name=). *@
-     <script type="text/javascript">
-    (function () {
-        'use strict';
-
-        function parseGrants(textarea) {
-            var raw = (textarea.value || '').trim();
-            if (!raw) { return []; }
-            try {
-                var arr = JSON.parse(raw);
-                return (Array.isArray(arr) ? arr : [])
-                    .filter(function (g) { return g && g.Id; });
-            } catch (e) { return []; }
-        }
-
-        function visibleChecksFor(editorName, kind) {
-            // Returns { ids: {id:true}, boxes: [checkbox, ...] } for the
-            // checkbox list rendered by _AudienceEditor, or null if there
-            // is no list for this kind right now. The section div carries
-            // data-editor + data-kind; each checkbox inside carries
-            // data-kind (scoped here via the section, so the editor name
-            // doesn't need to be repeated on every input).
-            var section = document.querySelector(
-                '.kw-grant-section[data-editor="' + editorName + '"][data-kind="' + kind + '"]');
-            if (!section) { return null; }
-            var checks = section.querySelectorAll('input.kw-grant-check');
-            if (checks.length === 0) { return null; }
-            var ids = {};
-            Array.prototype.forEach.call(checks, function (c) { ids[c.value] = true; });
-            return { ids: ids, boxes: Array.prototype.slice.call(checks) };
-        }
-
-        function selectedGrantsFor(editorName, kind) {
-            var list = visibleChecksFor(editorName, kind);
-            if (!list) { return []; }
-            var out = [];
-            Array.prototype.forEach.call(list.boxes, function (c) {
-                if (c.checked && c.value) { out.push({ Kind: kind, Id: c.value }); }
-            });
-            return out;
-        }
-
-        // Tri-state helper for the "all X" shortcut checkbox: checked when
-        // every item is selected, unchecked when none is, and the
-        // indeterminate (mixed) state otherwise — the standard look for a
-        // select-all control that also stays consistent with individual items
-        // being toggled directly.
-        function renderAllCheckbox(state, allCb) {
-            allCb.checked = state === 'all';
-            allCb.indeterminate = state === 'some';
-        }
-
-        // Keep the "all" shortcut checkbox in sync with the individual
-        // checkboxes, after any of them (or the "all" box itself) changed.
-        function syncAllBoxes(section) {
-            var allCb = section.querySelector('.kw-grant-all');
-            if (!allCb) { return; }
-            var boxes = Array.prototype.slice.call(section.querySelectorAll('input.kw-grant-check'));
-            if (boxes.length === 0) { allCb.checked = false; allCb.indeterminate = false; return; }
-            var checked = boxes.filter(function (c) { return c.checked; }).length;
-            renderAllCheckbox(checked === 0 ? 'none' : (checked === boxes.length ? 'all' : 'some'), allCb);
-        }
-
-        function setAllBoxes(section, checked) {
-            Array.prototype.forEach.call(section.querySelectorAll('input.kw-grant-check'), function (c) { c.checked = checked; });
-            syncAllBoxes(section);
-        }
-
-        // Recompute ONE editor's textarea from its pickers, PRESERVING
-        // "orphan" grants: any saved grant whose target is no longer in the
-        // option pool (a resident since blocked/unverified, a group since
-        // deleted) is NOT representable in the picker, so it is kept verbatim
-        // rather than silently dropped. The textarea stays the source of
-        // truth (U11/F13 single-source pin); the picker is a view over it.
-        function syncEditor(textarea) {
-            var name = textarea.dataset.editorName;
-            if (!name) { return; }
-            var existing = parseGrants(textarea);
-            var next = [];
-
-            ['User', 'Group'].forEach(function (kind) {
-                var visible = visibleChecksFor(name, kind);
-                // Orphans: saved grants of this kind that the checkbox list
-                // no longer offers (visible === null means no list at all, so
-                // every saved grant of that kind is orphaned).
-                existing.forEach(function (g) {
-                    if (g.Kind !== kind) { return; }
-                    if (visible === null || !visible.ids[g.Id]) { next.push(g); }
-                });
-                // Newly visible: whatever the user currently has checked.
-                selectedGrantsFor(name, kind).forEach(function (g) { next.push(g); });
-            });
-
-            // De-duplicate on (Kind,Id) — an id can't be both an orphan and a
-            // visible option, but guard anyway against double entries.
-            var seen = {};
-            var deduped = [];
-            next.forEach(function (g) {
-                var key = g.Kind + ':' + g.Id;
-                if (!seen[key]) { seen[key] = true; deduped.push(g); }
-            });
-
-            var json = JSON.stringify(deduped.length ? deduped : []);
-            if (textarea.value !== json) { textarea.value = json; }
-
-            // Refresh the "N of M selected" counters (counts list-visible
-            // selections only — orphans are hidden by design).
-            ['User', 'Group'].forEach(function (kind) {
-                var list = visibleChecksFor(name, kind);
-                if (!list) { return; }
-                var section = document.querySelector(
-                    '.kw-grant-section[data-editor="' + name + '"][data-kind="' + kind + '"]');
-                if (!section) { return; }
-                var countEl = section.querySelector('small[data-role="grant-count"]');
-                if (countEl) {
-                    var checked = list.boxes.filter(function (c) { return c.checked; }).length;
-                    countEl.textContent = checked + ' of ' + list.boxes.length + ' selected';
-                }
-            });
-        }
-
-        // Wire each grant checkbox (and the "all" shortcut) to its matching
-        // hidden textarea. No on-load rewrite: the server already rendered
-        // the textarea from the saved grants, pre-checked the matching boxes,
-        // and pre-rendered the counters, so an initial pass would only risk
-        // clobbering orphans.
-        document.querySelectorAll('.kw-grant-section').forEach(function (section) {
-            var name = section.dataset.editor;
-            section.addEventListener('change', function (e) {
-                var target = e.target;
-                if (target.classList && target.classList.contains('kw-grant-all')) {
-                    setAllBoxes(section, target.checked);
-                } else {
-                    syncAllBoxes(section);
-                }
-                var ta = document.querySelector('textarea[data-editor-name="' + name + '"]');
-                if (ta) { syncEditor(ta); }
-            });
-            // Normalize the server-rendered indeterminate state of the "all"
-            // box to the browser-visible API (Razor can express it via an
-            // `indeterminate` attribute, but browsers ignore that on render —
-            // only the JS property works).
-            var allCb = section.querySelector('.kw-grant-all');
-            if (allCb) {
-                var boxes = Array.prototype.slice.call(section.querySelectorAll('input.kw-grant-check'));
-                var checked = boxes.filter(function (c) { return c.checked; }).length;
-                renderAllCheckbox(checked === 0 ? 'none' : (checked === boxes.length ? 'all' : 'some'), allCb);
-            }
-        });
-    })();
-    </script>
+    @* The grant-picker sync, moved to the shared partial
+       <c>Views/Shared/_GrantPickerScripts.cshtml</c> (shared with the
+       M3 composer, which renders the same shared picker): keeps the
+       hidden textarea (the form-bound Grants JSON — the U11 / F13
+       single-source pin) and the two checkbox-list sections (the
+       user-friendly UX) in two-way sync. The textarea is the only
+       element posted; the pickers are display-only (no name=). *@
+    <partial name="_GrantPickerScripts" />
 }
 

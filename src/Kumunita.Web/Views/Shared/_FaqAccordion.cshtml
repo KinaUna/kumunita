@@ -1,0 +1,83 @@
+@*
+    _FaqAccordion — drop-in FAQ section (Bootstrap accordion, no custom JS).
+
+    Usage:
+        <!-- as a full block: -->
+        <section class="kmb-section">
+            <div class="container">
+                @await Html.PartialAsync("_FaqAccordion")
+            </div>
+        </section>
+
+    TODO(faq): the questions/answers below are placeholders — replace them with
+    the real FAQ content for this deployment (each Q/A is one <div> in the
+    accordion-body; icons are optional — the +/- toggle is Bootstrap's own
+    accordion icon via .accordion-button's ::after).
+*@
+@{
+    string faqIdPrefix = $"faq-{Guid.NewGuid().ToString("n").Substring(0, 8)}";
+}
+
+<h2 class="text-center h3 mt-2">Frequently asked questions</h2>
+
+<div class="accordion kmb-faq mt-5" id="@faqIdPrefix">
+
+    <div class="accordion-item">
+        <h3 class="accordion-header">
+            <button class="accordion-button" type="button"
+                data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q1"
+                aria-expanded="true" aria-controls="@faqIdPrefix-q1">
+                Who can see my posts?
+            </button>
+        </h3>
+        <div id="@faqIdPrefix-q1" class="accordion-collapse collapse show" data-bs-parent="#@faqIdPrefix">
+            <div class="accordion-body">
+                <p class="mb-0">
+                    Whoever you choose when you post: just you, your group,
+                    your community, or everyone on the instance. Audience is a
+                    choice you make per post — it's not a global setting.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h3 class="accordion-header">
+            <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q2"
+                aria-expanded="false" aria-controls="@faqIdPrefix-q2">
+                Where do announcements like water cuts and roadworks live?
+            </button>
+        </h3>
+        <div id="@faqIdPrefix-q2" class="accordion-collapse collapse" data-bs-parent="#@faqIdPrefix">
+            <div class="accordion-body">
+                <p class="mb-0">
+                    Pinned announcements, at <a href="/announcements">/announcements</a> —
+                    the read side is open so nobody has to log in to find out
+                    when the street gets repainted.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion-item">
+        <h3 class="accordion-header">
+            <button class="accordion-button collapsed" type="button"
+                data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q3"
+                aria-expanded="false" aria-controls="@faqIdPrefix-q3">
+                Is this private by default?
+            </button>
+        </h3>
+        <div id="@faqIdPrefix-q3" class="accordion-collapse collapse" data-bs-parent="#@faqIdPrefix">
+            <div class="accordion-body">
+                <p class="mb-0">
+                    Yes. Every access to audience-restricted content is
+                    recorded, the data stays on a single Postgres instance
+                    owned by the neighbourhood's host, and there is no ads or
+                    analytics side-channel to start with.
+                </p>
+            </div>
+        </div>
+    </div>
+
+</div>

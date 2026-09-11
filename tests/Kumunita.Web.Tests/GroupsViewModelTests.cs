@@ -51,7 +51,7 @@ public sealed class GroupsViewModelTests
     }
 
     [Fact]
-    public void GroupCreateModel_Exposes_OnlyNameAndDescription()
+    public void GroupCreateModel_Exposes_Name_Description_And_IsPrivate()
     {
         var fields = typeof(GroupCreateModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -59,10 +59,11 @@ public sealed class GroupsViewModelTests
             .OrderBy(n => n)
             .ToList();
 
-        // Name + Description only. No OwnerId / Owner — the actor is minted as
-        // the owner by the controller from the signed-in principal (ADR 0003 SoD
-        // by structural identity, never a form-bound owner id).
-        Assert.Equal(new[] { "Description", "Name" }, fields.ToArray());
+        // Name + Description + IsPrivate (ADR 0010 — the opt-in private flag).
+        // No OwnerId / Owner — the actor is minted as the owner by the
+        // controller from the signed-in principal (ADR 0003 SoD by structural
+        // identity, never a form-bound owner id).
+        Assert.Equal(new[] { "Description", "IsPrivate", "Name" }, fields.ToArray());
     }
 
     // ── m2b drift lane: the two invitation-projection records ────────────

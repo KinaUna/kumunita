@@ -32,6 +32,19 @@
                 <div class="form-text">Optional — a short note other residents will see.</div>
             </div>
 
+            <div class="mb-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" asp-for="IsPrivate" />
+                    <label asp-for="IsPrivate" class="form-check-label"></label>
+                </div>
+                <div class="form-text">
+                    A private group (e.g. a family) is hidden from everyone else's
+                    grant/access lists — only people you add as members can use it.
+                    A public group (e.g. "Mushroom hunters") shows up as an option
+                    in other residents' pickers.
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-primary">Create group</button>
         </form>
     </div>

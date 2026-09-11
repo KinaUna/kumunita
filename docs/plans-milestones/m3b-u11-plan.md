@@ -8,11 +8,11 @@ that closes M3b. No code, no build (register § `### U11` Exit: "no build").
 
 1. **`docs/design/m3b-moderation.md` — MODIFY** — append
    `## M3b — Closed (recorded)` **after** the `### Run result (M3b
-   acceptance gate — 2026-09-12)` section and its `*U11 (the M3b close)
+   acceptance gate — 2026-09-09)` section and its `*U11 (the M3b close)
    appends ...*` trailer line (design doc line 1102–1105). Mirrors M3 U12's
    close shape in `docs/design/m3-posts-design.md § ## M3 — Closed
    (recorded)` (lines 768+): the three gate tests (G1 / G2 / G3, taken
-   verbatim from U10's § `Run result (M3b acceptance gate — 2026-09-12)`
+   verbatim from U10's § `Run result (M3b acceptance gate — 2026-09-09)`
    table) + the `ARCHITECTURE.md §2 Moderation/` line flip to
    **M3b ✓ live** + any still-open item named explicitly rather than
    silently dropped.
@@ -21,7 +21,7 @@ that closes M3b. No code, no build (register § `### U11` Exit: "no build").
    "M3b — not yet created ..." to the **M3b ✓ live** phrasing used on
    M2 directory (line 82) and M3 posts (line 83): the three gate tests
    + the 13 M3b-pin unit specs (U9's) + the § Run result
-   reference (2026-09-12). The `## 3. Feature modules` bullet (line
+   reference (2026-09-09). The `## 3. Feature modules` bullet (line
    119–121) is already "Directory, Posts, Events, Projects, Moderation"
    — no change needed; the "Directory and Posts are both consumers of
    the single bulk visibility capability" sentence stays as-is.
@@ -94,7 +94,7 @@ that closes M3b. No code, no build (register § `### U11` Exit: "no build").
 
 - `docs/design/m3b-moderation.md` has a `## M3b — Closed (recorded)`
   section appended below the `### Run result (M3b acceptance gate —
-  2026-09-12)` trailer line (design doc § Run result is at line 1105;
+  2026-09-09)` trailer line (design doc § Run result is at line 1105;
   U11's section goes below it).
 - The Close section's **three gate tests** are present, re-stated from
   U10's run-result table (G1 / G2 / G3 with their "Evidence (actual

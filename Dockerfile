@@ -43,4 +43,13 @@ EXPOSE 8080
 # a floor, not a replacement for the operator attaching a named volume to the
 # Application in the Coolify UI.
 VOLUME /data/dataprotection-keys
+# Second persistence surface (ADR 0011, OPS.md §4/§5 "second restore surface"):
+# the media byte store — the content-addressed avatar bytes live on this
+# volume, not in Postgres (the dump carries only the MediaObject catalog).
+# Media__RootPath is configured at /data/media in docker-compose.yml and MUST
+# be set to an operator-provided mounted volume in production (COOLIFY.md
+# §5.2A); the in-code default ({BaseDirectory}/media = /app/media) sits inside
+# the image layer, so without the mount uploads are lost on redeploy — exact
+# same floor-not-replacement rationale as the keyring volume above.
+VOLUME /data/media
 ENTRYPOINT ["dotnet", "Kumunita.Web.dll"]

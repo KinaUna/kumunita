@@ -134,7 +134,8 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
         var group = await userInfo.CreateGroupAsync(
             ownerId: subject,
             name: name,
-            description: description);
+            description: description,
+            isPrivate: model.IsPrivate);
 
         TempData["info"] = $"Group “{group.Name}” created.";
         return RedirectToAction(nameof(Index));
@@ -265,7 +266,8 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
             isOwner,
             members,
             pendingInvitations,
-            residentCandidates));
+            residentCandidates,
+            group.IsPrivate));
     }
 
     // ── Shared write-path helper (M2 plan U10, line 152) ────────────────
@@ -483,6 +485,49 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
         TempData["info"] = value is null
             ? $"Cleared the description of “{resolved.Group.Name}”."
             : $"Saved the description of “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── ADR 0010: the group's privacy (public ↔ private; the back-office
+    // grant-list hide behind a single owner ∪ GlobalAdmin standing) ────
+
+    /// <summary>
+    /// Toggle the group's privacy (ADR 0010):
+    /// <c>POST /groups/{id}/update-privacy</c>. The SoD lane is
+    /// <see cref="TryResolveOwnerSurface"/> (owner ∪ GlobalAdmin — identical
+    /// to the description edit lane's standing, ADR 0007's new-lane rule): a
+    /// plain member's POST 404s, the same consistent failure shape as every
+    /// other group write lane (a member can <i>see</i> the detail — owner ∪
+    /// member — but not flip the privacy flag). The form carries only the
+    /// boolean — an unchecked checkbox clears the field and binds
+    /// <paramref name="isPrivate"/> to <c>false</c>, a checked one to
+    /// <c>true</c>, so "make public" and "make private" are the same route and
+    /// a single "Private group" checkbox is the whole surface. The actor is
+    /// minted from the signed-in principal and passed as <c>updatedBy</c>
+    /// (never a form field; the <c>Via</c> derivation is the single SoD
+    /// source, exactly the description / U10 add-member pins). The Core seam
+    /// <see cref="IUserInfoService.SetGroupPrivacyAsync"/> loads the group in
+    /// the same session and derives the audit row's <c>Via</c> (actor ==
+    /// OwnerId ⇒ Owner, else Admin; action <c>group.update</c>); strong
+    /// consistency (C4) — the very next <c>/groups</c> grant picker read and
+    /// the detail badge render the new value.
+    /// </summary>
+    [HttpPost("{id}/update-privacy")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePrivacy(string id, [FromForm] bool isPrivate)
+    {
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        await userInfo.SetGroupPrivacyAsync(
+            groupId: resolved.Group.Id,
+            isPrivate: isPrivate,
+            updatedBy: resolved.Actor);
+
+        TempData["info"] = isPrivate
+            ? $"“{resolved.Group.Name}” is now private."
+            : $"“{resolved.Group.Name}” is now public.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 

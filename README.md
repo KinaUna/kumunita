@@ -20,11 +20,14 @@ M3 posts + audience-scoped feeds + the M3b moderation lane
 (file/assign/resolve + `PostStatus`) — all server-rendered MVC + Razor, with
 a durable Wolverine outbox, retry + dead-letter, and the `/health` degraded
 gate. The deployable surface has grown but the topology hasn't changed:
-`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`),
+`Kumunita.slnx` (`Kumunita.Core`, `Kumunita.Web`, `Kumunita.Core.Tests`, `Kumunita.Web.Tests`),
 multi-stage Docker image, the versioned schema boot (Marten feature + EF
 Identity migration + first-boot seeder), a `/health` liveness probe, and a
 `Coolify`-based deploy (Coolify `app` + dedicated Postgres 18, image parity
 with `dev-db-init` + `docker-compose.yml`: **18**).
+Profile **avatars** have also landed — the reference lane of the content-addressed
+local-volume media store (ADR 0011, its own design doc); it adds a second restore
+surface next to the Postgres dump (OPS.md §4/§5).
 **M4** next: events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
@@ -43,13 +46,21 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 
 - Resident directory (profiles, opt-in contact details)
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
-- Events with RSVP and reminders
-- Collaborative projects (goals, tasks, contributors)
-- **Groups** for reusable access lists
+- Events with RSVP and reminders *(planned — M4, see the "Roadmap" below)*
+- Collaborative projects (goals, tasks, contributors) *(planned — M5, see the "Roadmap" below)*
+- **Groups** — public groups power reusable access lists; **private groups**
+  (ADR 0010) are a membership/organizing unit for a family or circle, and stay
+  out of the audience pickers
 - **Delegation** — owners grant family/caretakers scoped access
+- **Avatars & media** — profile avatar upload + serving on a content-addressed
+  local-volume byte store behind an HTTP-free seam (ADR 0011). Group logos, post
+  attachments and badge icons are **follow-on lanes reusing the same seam** — each
+  with its own design doc, not this one.
 - Moderation with component-scoped moderators and full audit
-- **Multilingual** — UI and platform texts (terms, about, help) are translatable;
-  admins add/remove supported languages and set the default in-app (ADR 0005)
+- **Multilingual** — UI and platform texts (terms, about, help) are translatable,
+  and the language catalog + instance default are seeded at first boot. The full
+  admin-managed language + translation surface lands with **M6** (ADR 0005; see
+  the "Roadmap" below).
 
 ## Tech stack
 
@@ -78,7 +89,7 @@ stays trivial and the authorization rules can grow freely.
 
 - An **audience** is a set of grants to **users** and/or **groups**, combined with
   **Any** (union, default) or **All** (intersection).
-- **Groups** are the reuse unit — grant a post to a group once; membership changes ripple everywhere.
+- **Groups** are the reuse unit — grant a post to a group once; membership changes ripple everywhere. **Private groups** (ADR 0010) are a membership/organizing unit *not* in the reuse unit — they do not appear in the audience pickers (decluttering) and are intended for the group's own members, e.g. a family or a close circle.
 - **Delegation** lets an owner grant another person scoped access; the system resolves an *effective principal* for that actor.
 - **Moderator access** to audience-restricted content is **off by default**. A filed **report** grants the assigned moderator audited access to that item; an admin can enable standing moderator visibility per scope.
 - **Audit** of access decisions is always on.
@@ -162,5 +173,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0006)
-- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization)
+- `docs/adr/` — architecture decision records (0001–0011)
+- `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)

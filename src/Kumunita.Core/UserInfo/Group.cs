@@ -13,6 +13,21 @@ public sealed class Group
 
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Whether the group is <b>private</b> (ADR 0010). <c>false</c> (the default
+    /// — a group is public unless made private) means the group may appear in the
+    /// audience / grant pickers; <c>true</c> means it is hidden from those
+    /// grant/access lists (the profile's contact-visibility group picker and the
+    /// post composer's group audience picker both exclude private groups) while
+    /// still working normally for membership — a private group is a back-office
+    /// organizing unit (e.g. a family) that owners and members see in their own
+    /// "groups I own / belong to" list and manage exactly as a public one. The
+    /// write lane is <c>SetGroupPrivacyAsync</c> (owner ∪ GlobalAdmin, ADR 0007's
+    /// standing); the create-time value is set by the caller of
+    /// <c>CreateGroupAsync</c>.
+    /// </summary>
+    public bool IsPrivate { get; set; }
+
     /// <summary>The account that created (and owns) the group.</summary>
     public string OwnerId { get; set; } = string.Empty;
 

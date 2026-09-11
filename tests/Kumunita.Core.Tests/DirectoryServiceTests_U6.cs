@@ -199,7 +199,7 @@ public class DirectoryServiceTests_U6(PostgresFixture fixture) : IClassFixture<P
                 Verified = true,
                 Blocked = true,
             });
-            await blockedSession.SaveChangesAsync();
+            await blockedSession.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
         var result = await svc.ListAsync(unverifiedViewer);

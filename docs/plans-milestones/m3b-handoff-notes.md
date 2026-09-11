@@ -1533,8 +1533,8 @@ assert both independently.
 
   ## U10 — E2E spec + acceptance gate record
 
-  - **Date: 2026-09-12.** Gate recorded in `docs/design/m3b-moderation.md`
-    § `### Run result (M3b acceptance gate — 2026-09-12)` — three-gate
+  - **Date: 2026-09-09.** Gate recorded in `docs/design/m3b-moderation.md`
+    § `### Run result (M3b acceptance gate — 2026-09-09)` — three-gate
     table (G1 closed-loop / G2 handoff / G3 part-vs-whole, shape
     mirrored from M3 § `Run result (M3 acceptance gate — 2026-09-04)`
     verbatim — the "command + pass counts + three-test table +
@@ -1579,7 +1579,7 @@ assert both independently.
        render" assertion) — **never** the Core-level `AccessAudit.
        Via` literal (that is U9 test row 3's job at the Core level).
     2. **`docs/design/m3b-moderation.md` — MODIFY.** Appended
-       `### Run result (M3b acceptance gate — 2026-09-12)` between
+       `### Run result (M3b acceptance gate — 2026-09-09)` between
        the *"Part 2 ends here..."* footer and a new *"U11 (the
        M3b close) appends `## M3b — Closed (recorded)`..."*
        trailer, mirroring M3's § `Run result (M3 acceptance gate
@@ -1654,7 +1654,7 @@ assert both independently.
       UI; the `[Authorize]` + `GlobalAdmin` gate per ADR 0003
       §SoD).
 
-  - **Pass counts (verified run, not assumed — 2026-09-12):**
+  - **Pass counts (verified run, not assumed — 2026-09-09):**
     - `run_tests` filter `Project=Kumunita.Core.Tests` → **118/118
       passed, 0 failed** (13 M3b-pinned from U9 + 105 inherited
       M1/M2/M3; same composition as M3's 105/105 + 18 but with
@@ -1778,7 +1778,7 @@ assert both independently.
 
   ## U11 — M3b final: close the loop
 
-  - **Date: 2026-09-12.** The M2 U15 / M3 U12 analog: confirm the
+  - **Date: 2026-09-09.** The M2 U15 / M3 U12 analog: confirm the
     three-tier contract is mutually consistent and write the line that
     closes M3b. **Doc-only, no build** (register § `### U11` Exit:
     "no build … the `## Summary` is the sole M3b→next-milestone
@@ -1789,7 +1789,7 @@ assert both independently.
        execution plan (the per-unit file convention held by U3–U10).
     2. **`docs/design/m3b-moderation.md` — MODIFY.** Appended
        `## M3b — Closed (recorded)` **below** the `### Run result
-       (M3b acceptance gate — 2026-09-12)` section (whose own
+       (M3b acceptance gate — 2026-09-09)` section (whose own
        trailer — lines 1102–1105 — anticipated this exact append).
        Mirrors M3 U12's close shape
        (`m3-posts-design.md § ## M3 — Closed (recorded)`): the three
@@ -1806,7 +1806,7 @@ assert both independently.
        the `/moderation` queue/resolve UI — live; 3 gate tests +
        13 M3b-pinned unit specs 0-failed; see
        `design/m3b-moderation.md § Run result (M3b acceptance gate
-       — 2026-09-12)` + `§ M3b — Closed (recorded)`. The §2 line-26
+       — 2026-09-09)` + `§ M3b — Closed (recorded)`. The §2 line-26
        value-chain table already names "M3 posts, components,
        moderation" (its "a report links to a moderator" cue is the
        M3b lane) — left as-is; the §3 "Feature modules — … Moderation"
@@ -1819,7 +1819,7 @@ assert both independently.
   - **Three-tier consistency re-confirmed (the Close's whole point):**
     - **Register ↔ Design:** the register's § U11 Deliverables map 1:1
        onto the design doc's `### Run result (M3b acceptance gate —
-       2026-09-12)` (G1 / G2 / G3) + the design doc's own trailer
+       2026-09-09)` (G1 / G2 / G3) + the design doc's own trailer
        ("U11 … appends `## M3b — Closed (recorded)` below this
        section"). The three-tier contract — the sealed register,
        the design doc's pinned gate table, and the handoff-note
@@ -1835,7 +1835,7 @@ assert both independently.
        `PostStatus.Active` default — ADR 0004 §B.1 additive).
     - **Test ↔ Evidence:** U9's 13 tests (8 `ModerationServiceTests`
        + 5 `PostServiceTests`) are the Core-level evidence for the
-       design doc's § `Run result (M3b acceptance gate — 2026-09-12)`
+       design doc's § `Run result (M3b acceptance gate — 2026-09-09)`
        three-gate table (G1 / G2 / G3). U10's e2e spec
        (`tests/Kumunita.Web.Tests/e2e-m3.spec.ts`) re-states the same
        three gates at the browser level against the six M3b FACES
@@ -1908,7 +1908,7 @@ assert both independently.
   | U7 | `/moderation` queue + resolve UI + assign form — `ModerationController` (5 routes: GET Index, GET Resolve, POST Assign/Unlock/ResolvePost) + `Moderation{Queue,Resolve}ViewModel` + Razor views `Index.cshtml` / `Resolve.cshtml` | 0 new | **§2.5 rows 15 + 16 unlanded** (U10's finding, U11 defers to M4, same shape as U6/row-14): `ModerationController_QueueRead_ReturnsAllReportsOrderByAtDesc` + `ModerationController_ResolvePostAction_InvokesResolveReportAsync` are not present in `tests/Kumunita.Web.Tests/`. U11's drift note: "deferred to M4; same §2.5 name-pin + §2.7 hold; not a §2.6 drift-pause." |
   | U8 | "Report this post" resident-facing action — `[HttpPost] Report` on `PostsController` (delegating to the frozen U4 `ModerationService.FileReportAsync`) + a small "Report this post" form on `Views/Posts/Detail.cshtml` | 0 new | None for the C-M3b·1 intake lane; **no §2.5 row unlanded here** (U8's Web action is not itself a §2.5 row-14/15/16 target — the register's § U9 line 1422 + U10's finding scope rows 14–16 to U6 / U7's Web surfaces). |
   | U9 | 13 pinned `[Fact]`s: rows 1–8 in `tests/Kumunita.Core.Tests/ModerationServiceTests.cs` (new) + rows 9–13 in `tests/Kumunita.Core.Tests/PostServiceTests.cs` (additions) | **13** (13 discovered, 13 executed, 13 passed, 0 failed — verified run) | **(a) U9 drift note 1** (see U3 row). **(b) U9 drift note 2** (see U5 row). Both reconciled in U11's `## M3b — Closed (recorded)` Close section (the design doc's close). Full `Kumunita.Core.Tests` 118/118 pass; no regressions from the M1 / M2 / M3 baseline. |
-  | U10 | `tests/Kumunita.Web.Tests/e2e-m3.spec.ts` (new — 3 specs: closed-loop, handoff, per-lane) + `### Run result (M3b acceptance gate — 2026-09-12)` appended to the design doc | **Gate: 3-test shape (all PASS)** · unit-suite: **155/155** (118 Core + 37 Web) | **(a) M2 D2 `kumunita` fixture documented-throw, still open** (the M2 U13 / M3 U10 / M3b U10 chain, now U11-reaffirmed); the *unit-suite* evidence is the pass criterion recorded in this milestone. **(b) §2.5 rows 14–16 unlanded** finding (U11 defers to M4, same discipline). **(c) Plan-documentation slip U10 flags** (the register's § U9 line 1422 anticipated the deferral: "tests 14–16 are U10's / U7's Web-layer surface, *not* U9's scope") — not a §2.6 drift-pause. |
+  | U10 | `tests/Kumunita.Web.Tests/e2e-m3.spec.ts` (new — 3 specs: closed-loop, handoff, per-lane) + `### Run result (M3b acceptance gate — 2026-09-09)` appended to the design doc | **Gate: 3-test shape (all PASS)** · unit-suite: **155/155** (118 Core + 37 Web) | **(a) M2 D2 `kumunita` fixture documented-throw, still open** (the M2 U13 / M3 U10 / M3b U10 chain, now U11-reaffirmed); the *unit-suite* evidence is the pass criterion recorded in this milestone. **(b) §2.5 rows 14–16 unlanded** finding (U11 defers to M4, same discipline). **(c) Plan-documentation slip U10 flags** (the register's § U9 line 1422 anticipated the deferral: "tests 14–16 are U10's / U7's Web-layer surface, *not* U9's scope") — not a §2.6 drift-pause. |
   | U11 | This close: `## M3b — Closed (recorded)` appended to the design doc (the three-gate table + the `ARCHITECTURE.md §2 Moderation/` flip + the still-open list + the M4 deferral list); `ARCHITECTURE.md §2 Moderation/` line flipped to **M3b ✓ live**; `## Summary` table in this file; no build | — (docs only, no build) | (a) **§2.5 rows 14–16 — deferred to M4** (named above; not landed by U11, not silently dropped). (b) **M2 D2 `kumunita` fixture — still open** (named above; the M4 / M5 / M6 Playwright-runtime unit lands it and records the pass count in a future `### Run result (M3b e2e — <date>)` section above the Close). (c) **Both U9 drift notes reconciled** (design doc wins for the pin; U9's shape is the observable record; §2.7 "this file is the contract" holds). (d) **Plan-documentation slip (U10 → U11, not a §2.6 drift-pause)** — same shape as U11 (M3)'s own close at `m3-posts-design.md § ## M3 — Closed (recorded)` line 764. |
 
   ### M4 deferral list (each named, each with a next-owner cue)

@@ -293,7 +293,7 @@ public class AnnouncementControllerTests
 
         var store = Substitute.For<IDocumentStore>();
         var readSession = Substitute.For<IQuerySession>();
-        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(null));
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(null));
         store.QuerySession().Returns(readSession);
 
         var controller = new AnnouncementController(
@@ -326,7 +326,7 @@ public class AnnouncementControllerTests
 
         var store = Substitute.For<IDocumentStore>();
         var readSession = Substitute.For<IQuerySession>();
-        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(existing));
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
         var controller = new AnnouncementController(
@@ -386,7 +386,7 @@ public class AnnouncementControllerTests
 
         var store = Substitute.For<IDocumentStore>();
         var readSession = Substitute.For<IQuerySession>();
-        readSession.LoadAsync<Announcement>(id).Returns(Task.FromResult<Announcement?>(existing));
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
         store.QuerySession().Returns(readSession);
 
         var controller = new AnnouncementController(

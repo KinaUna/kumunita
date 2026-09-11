@@ -33,7 +33,6 @@
         ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty };
 
     var modePrefix = editorName + ".Mode";
-    var grantsPrefix = editorName + ".Grants";
     string[] modes = { "Any", "All" };
 
     // Whether the editor *block* should visually dim (the off shape is
@@ -85,152 +84,53 @@
             </div>
             }
 
-            @* The grant pickers — the user-friendly UX layer over the
-               frozen <c>Grants</c> JSON transport. Two checkbox-list sections
-               (one for users, one for groups) are rendered from
-               the option lists the controller seeds on <c>ViewBag</c>
-               ("&lt;EditorName&gt;_Users" / "&lt;EditorName&gt;_Groups").
-               These are read-only view data — they are NOT model properties
-               on <c>ProfileEditViewModel</c> (the U11 "exactly six form
-               fields" shape-pin test forbids a new writable surface; the
-               <c>Grants</c> JSON string is the only form-bound grant
-               field).
-
-               A small script in @section Scripts below syncs the user's
-               selection back into the hidden textarea — which is the only
-               form-bound element the default model binder lands on, the
-               U11 / F13 single-source pin. The hidden textarea posts as
-               <Name>.Grants; the checkboxes themselves have no name= and are
-               display-only. When JS is unavailable the checkboxes are inert
-               but the textarea remains (hidden) — the e2e spec still
-               finds it via its textarea selector pin.
-
-               Each section also gets a "Select all" shortcut checkbox; its
-               tri-state (checked / unchecked / indeterminate) is managed by
-               the same client-side script. *@
+            @* The grant option lists are read-only view data seeded on
+                <c>ViewData</c> (NOT <c>ViewBag</c> — the bag's indexer
+                throws RuntimeBinderException; see below) and are NOT
+                model properties on <c>ProfileEditViewModel</c> (the U11
+                "exactly six form fields" shape pin); the hidden
+                <c>Grants</c> textarea rendered by the partial is the
+                only form-bound grant field. *@
             @{
-                var bagKey = string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase)
-                             ? "Visibility" : "ContactVisibility";
-                // Read from the statically-typed ViewDataDictionary (the
-                // channel the controller's SeedGrantPickerOptionsAsync wrote
-                // into), not ViewBag — the bag's indexer goes through
-                // dynamic binding and throws RuntimeBinderException.
+                // Read the option lists from the statically-typed
+                // ViewDataDictionary (the channel the controller's
+                // SeedGrantPickerOptionsAsync wrote into), not ViewBag —
+                // the bag's indexer goes through dynamic binding and
+                // throws RuntimeBinderException. (bagKey == editorName;
+                // this view's two editors seed under their own name.)
                 var vd = ViewContext.ViewData;
-                var userOpts  = (vd[bagKey + "_Users"]  as List<GrantOption>)
+                var userOpts  = (vd[editorName + "_Users"]  as List<GrantOption>)
                                 ?? new List<GrantOption>();
-                var groupOpts = (vd[bagKey + "_Groups"] as List<GrantOption>)
+                var groupOpts = (vd[editorName + "_Groups"] as List<GrantOption>)
                                 ?? new List<GrantOption>();
 
-                var usersSelected = activeEditor.ParsedGrants
-                    .Where(g => g.Kind == GrantKind.User)
-                    .Select(g => g.Id)
-                    .ToHashSet(StringComparer.Ordinal);
-                var groupsSelected = activeEditor.ParsedGrants
-                    .Where(g => g.Kind == GrantKind.Group)
-                    .Select(g => g.Id)
-                    .ToHashSet(StringComparer.Ordinal);
-
-                var userCount  = userOpts.Count;
-                var groupCount = groupOpts.Count;
-
-                // Renders one checkbox-list section (a "select all" shortcut
-                // row + one form-check per option). Checkboxes are display-
-                // only (no name=) — the hidden Grants textarea is still the
-                // only form-bound grant field (the U11 / F13 single-source
-                // pin); the Edit.cshtml script keeps them in two-way sync.
-                string renderGrantCheckboxSection(string kind, List<GrantOption> opts,
-                    HashSet<string> selected, string groupLabel)
+                // The shared picker (Views/Shared/_GrantPickers.cshtml,
+                // extracted from this view when the M3 composer's
+                // "Audience" editor adopted the same "Who to grant to"
+                // UI) computes the selected sets from
+                // activeEditor.ParsedGrants and renders the checkbox
+                // sections, the empty-pool notes, and the hidden
+                // Grants textarea itself.
+                var pickers = new GrantPickersModel
                 {
-                    var sb = new System.Text.StringBuilder();
-                    string sectionId = editorName + "-grants-" + kind.ToLowerInvariant();
-                    string allId = sectionId + "-all";
-                    sb.Append(
-                        "<div class=\"kw-grant-section\" data-editor=\"" + Html.Encode(editorName) + "\"" +
-                        " data-kind=\"" + kind + "\">" +
-                        "<div class=\"form-check ms-1\" style=\"margin-bottom:0.25rem;\">" +
-                        "<input class=\"form-check-input kw-grant-all\" type=\"checkbox\" id=\"" + allId + "\"" +
-                        " aria-label=\"Select all " + groupLabel.ToLowerInvariant() + "\" />" +
-                        "<label class=\"form-check-label small fw-semibold\" for=\"" + allId + "\">" +
-                        "Select all " + Html.Encode(groupLabel) + "</label>" +
-                        "</div>" +
-                        "<div class=\"kw-grant-boxes ms-1\" style=\"max-height:14rem;overflow:auto;\">");
-                    foreach (var o in opts)
-                    {
-                        string boxId = sectionId + "-" + o.Id;
-                        sb.Append(
-                            "<div class=\"form-check\">" +
-                            "<input class=\"form-check-input kw-grant-check\" type=\"checkbox\"" +
-                            " id=\"" + boxId + "\" value=\"" + Html.Encode(o.Id) + "\"" +
-                            " data-kind=\"" + kind + "\"" +
-                            (selected.Contains(o.Id) ? " checked" : "") +
-                            " aria-label=\"" + Html.Encode(o.Label) + "\" />" +
-                            "<label class=\"form-check-label\" for=\"" + boxId + "\">" +
-                            Html.Encode(o.Label) + "</label>" +
-                            "</div>");
-                    }
-                    sb.Append("</div>" +
-                            "<small class=\"text-muted ms-1\" data-role=\"grant-count\">" +
-                            selected.Count + " of " + opts.Count + " selected</small>" +
-                            "</div>");
-                    return sb.ToString();
-                }
+                    EditorName = editorName,
+                    Editor     = activeEditor,
+                    Users      = userOpts,
+                    Groups     = groupOpts,
+                };
             }
 
-            <div class="form-label mt-3" style="font-weight:600;">
-                Who to grant to
-            </div>
-            <div class="small text-muted" style="margin-left:0.25rem;">
-                Check one or many — or use the "Select all" row above each
-                list as a shortcut.
-            </div>
-
-            @if (userCount > 0)
-            {
-                <div class="mt-1">
-                    @Html.Raw(renderGrantCheckboxSection("User", userOpts, usersSelected, "Residences"))
-                </div>
-            }
-            else
-            {
-                <p class="mb-1 text-muted small ms-1">
-                    You're the only verified resident, so there's no one else
-                    to grant to yet.
-                </p>
-            }
-
-            @if (groupCount > 0)
-            {
-                <div class="mt-2">
-                    @Html.Raw(renderGrantCheckboxSection("Group", groupOpts, groupsSelected, "Groups"))
-                </div>
-            }
-            else
-            {
-                <p class="mb-1 mt-2 text-muted small ms-1">
-                    No groups exist on the platform yet — create one under
-                    "Groups" to add group-scoped visibility.
-                </p>
-            }
-
-            @* The grants textarea — now hidden (d-none) as the form's
-                posting element only. The e2e spec's selector pin
-                (textarea[name="Visibility.Grants"]) survives unchanged;
-                the script in @section Scripts below keeps its value in
-                sync with the pickers' selection as the user toggles
-                options, so the posted JSON always reflects their choice.
-                The U11 / F13 single-source pin: the <c>BuildAudience</c>
-                deserializer on AudienceEditorModel is the only
-                deserialization site; this textarea is the only
-                serialization site (the controller's ToEditorModel the
-                dual on the GET). The JSON shape is the transport, not a
-                second audience object — the <c>Audience</c> document is
-                the only audience the M1 write seam receives (F13). The
-                hidden textarea also remains editable by hand for the no-JS
-                fallback path. *@
-            <textarea class="d-none"
-                      name="@grantsPrefix" id="@grantsPrefix" rows="1"
-                      data-editor-name="@editorName">
-@(activeEditor.Grants ?? string.Empty)</textarea>
+            @* "Who to grant to" — the shared picker partial
+               (Views/Shared/_GrantPickers.cshtml, extracted from this
+               view when the M3 composer's "Audience" editor adopted the
+               same "Who to grant to" UI): the two checkbox-list
+               sections, the "Select all" shortcuts, the empty-pool
+               "no options" notes, and the hidden <c>Grants</c> textarea
+               (the only form-bound grant field — the U11 / F13
+               single-source pin). The <c>_GrantPickerScripts</c>
+               partial (Edit.cshtml's @section Scripts) keeps the
+               textarea in two-way sync with the selection. *@
+            <partial name="_GrantPickers" model="pickers" />
 
             @if (string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
             {

@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
 
@@ -54,12 +56,32 @@ namespace Kumunita.Web.Controllers;
 /// <c>IIdentityService</c> is <b>not</b> in the ctor (the U9/U10
 /// <c>(IUserInfoService)</c>-only pattern holds; the preview's own
 /// principal is the signed-in actor, never a form field).
+/// <para>
+/// <b>U6 addition (ADR 0011; C-MED·6):</b> the ctor also takes
+/// <c>IMediaStore</c> + <c>IOptions<MediaOptions></c> — the
+/// <c>AvatarUpload</c> write lane's Web-only <c>IFormFile</c>-to-bytes
+/// boundary and the C-MED·5 size/type guard (both stay in
+/// <c>Kumunita.Web</c>; Core keeps the HTTP-free seam).
+/// </para>
+/// <para>
+/// <b>U7 addition (ADR 0011; C-MED·1/2/3/5):</b> the ctor also takes
+/// <c>IAuthorizationService</c> — the <c>Avatar</c> serving action's frozen
+/// single decision path (<see cref="Kumunita.Core.Authorization.AccessAction.Read"/>
+/// on the profile via
+/// <see cref="Kumunita.Core.UserInfo.ProfileToAuditableResource"/>, the audit
+/// row committed by the seam in its own commit — C-MED·2: Allow <i>and</i>
+/// Deny, the action never re-implements). This is the serving-lane
+/// <b>contract</b> every follow-on lane copies — FACES M1–M6 (design doc
+/// §2.5). No new <c>AccessAction</c> / <c>AccessVia</c> id (C-MED·1).
 /// </para>
 /// </summary>
 [Authorize]
 public sealed class ProfileController(
     IUserInfoService userInfo,
-    DirectoryService directory) : Controller
+    DirectoryService directory,
+    Kumunita.Core.Authorization.IAuthorizationService authz,
+    IMediaStore media,
+    IOptions<MediaOptions> mediaOpts) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -142,14 +164,16 @@ public sealed class ProfileController(
     /// subject is deliberately excluded: an author can always already see
     /// their own profile, so granting a <c>User</c> grant to themselves is
     /// meaningless and only clutters the list.
-    /// <b>Groups</b>: the platform-wide group list
-    /// (<c>IUserInfoService.GetAllGroupsAsync</c>) — the UI's mental model
-    /// is "who can I grant this to"; the author's membership/ownership
-    /// does not constrain which <c>Group</c> they may name in their own
-    /// profile's audience (the decision is on the <c>Group</c> subject,
-    /// not the author's standing). <see cref="GrantOption"/> is the
-    /// shared option shape (Id + Label + Kind, where Kind is the string
-    /// form of <c>GrantKind</c> — "User" / "Group").
+    /// <b>Groups</b>: the platform-wide <i>public</i> group list
+    /// (<c>IUserInfoService.GetPublicGroupsAsync</c>; ADR 0010 — a private
+    /// group is an organizing/membership unit and never gets granted as an
+    /// audience, so it stays out of this picker) — the UI's mental model is
+    /// "who can I grant this to"; the author's membership/ownership does not
+    /// constrain which <i>public</i> <c>Group</c> they may name in their own
+    /// profile's audience (the decision is on the <c>Group</c> subject, not
+    /// the author's standing). <see cref="GrantOption"/> is the shared
+    /// option shape (Id + Label + Kind, where Kind is the string form of
+    /// <c>GrantKind</c> — "User" / "Group").
     /// </summary>
     private async Task SeedGrantPickerOptionsAsync()
     {
@@ -167,7 +191,9 @@ public sealed class ProfileController(
             .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var groups = await userInfo.GetAllGroupsAsync();
+        // ADR 0010: the grant/access lists are public groups only (a private
+        // group is an organizing unit, never granted as an audience).
+        var groups = await userInfo.GetPublicGroupsAsync();
         var groupOptions = groups
             .Select(g => new GrantOption
             {
@@ -311,6 +337,106 @@ public sealed class ProfileController(
             Email: email,
             Phone: phone,
             Address: address));
+    }
+
+    // ── Avatar (POST — the U6 write lane, design doc §2.4) ────────────────
+
+    /// <summary>
+    /// <c>POST /profile/avatar</c> — the avatar upload lane (design doc §2.4,
+    /// ADR 0011; C-MED·5/6/8). The <c>IFormFile</c> boundary is
+    /// <b>Web-only</b> (C-MED·6: <c>Kumunita.Core</c> stays HTTP-free) — this
+    /// action reads the upload into bytes, then runs the <b>two-Core-lane
+    /// write</b> in the pinned order: <c>IMediaStore.PutAsync</c> <b>first</b>
+    /// (the <c>MediaObject</c> id comes from the store's content-hash dedup,
+    /// C-MED·4), then
+    /// <see cref="IUserInfoService.SetProfileAvatarAsync"/> pointing
+    /// <c>Profile.AvatarId</c> at the stored id (the C-MED·8 single write
+    /// lane; <c>actorBy</c> is this same self-subject, the lane's pinned
+    /// third parameter).
+    /// </summary>
+    [HttpPost("/profile/avatar")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AvatarUpload([FromForm] IFormFile? file)
+    {
+        var subject = SubjectId(User);
+        if (subject is null)
+            return Unauthorized(); // §2.4 U7a defensive (the class [Authorize] already gates)
+
+        // The three guards run BEFORE any Put (a Put with a disallowed type
+        // or an oversize payload would write a volume file that must not
+        // exist: C-MED·5 / MediaOptions.MaxBytes; the codes are the pinned
+        // §2.5 U7a/b/c seam U9 locks):
+        if (file is null || file.Length == 0)
+            return BadRequest("Choose an image.");                          // §2.4 U7c empty
+        if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
+            return StatusCode(StatusCodes.Status413RequestEntityTooLarge);  // §2.4 U7b
+        if (!mediaOpts.Value.IsAllowed(file.ContentType))
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // §2.4 U7c type (incl. SVG)
+
+        // C-MED·6: the IFormFile never crosses into Core — copy to bytes, then
+        // store-first, profile-second (orphan-safe order, C-MED·7):
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var mediaObject = await media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject);
+        await userInfo.SetProfileAvatarAsync(subject, mediaObject.Id, subject); // C-MED·8 single lane
+
+        return RedirectToAction("Edit");
+    }
+
+    // ── Avatar (GET — the U7 serving-lane contract, design doc §2.3) ──────
+
+    /// <summary>
+    /// <c>GET /profile/avatar/{subjectId}</c> — the avatar serving action
+    /// (design doc §2.3, ADR 0011; C-MED·1/2/3/5). This is the <b>contract</b>
+    /// every follow-on serving lane copies: one
+    /// <see cref="Kumunita.Core.Authorization.IAuthorizationService.CanAsync"/> on the profile's
+    /// <see cref="Kumunita.Core.Authorization.AccessAction.Read"/> audience via
+    /// <see cref="Kumunita.Core.UserInfo.ProfileToAuditableResource"/>
+    /// (C-MED·1: the frozen seam, no new <c>AccessAction</c> /
+    /// <c>AccessVia</c>), the audit row committed by the seam in its own
+    /// commit (C-MED·2: Allow <i>and</i> Deny, the action never re-implements
+    /// the audit), and the payload served <b>only</b> through the app
+    /// endpoint (<see cref="IMediaStore.OpenReadAsync"/>) — never a static
+    /// path (C-MED·3) — with <c>X-Content-Type-Options: nosniff</c> + the
+    /// stored <see cref="Kumunita.Core.Media.MediaObject.ContentType"/>
+    /// (C-MED·5).
+    /// <para>
+    /// <b>FACES M1–M6 mapping (design doc §2.5):</b>
+    /// M6 (unsigned) → <c>Challenge()</c>; M5 (unknown profile) →
+    /// <c>404</c>; M4 (blocked profile) → <c>404</c> <i>before</i> the
+    /// decision (blocked supersedes — no <c>CanAsync</c> call, no audit row;
+    /// the repo's fail-closed idiom in <see cref="DirectoryService"/>); M3
+    /// (denied audience) → <c>404</c> <i>after</i> the seam (audit already
+    /// committed); M1 (owner) / M2 (authorized other) → the same
+    /// <c>CanAsync</c> call's owner/audience branch → <c>200</c> + stored
+    /// <c>Content-Type</c>. No avatar set (AvatarId empty) → <c>404</c>.
+    /// </para>
+    /// </summary>
+    [HttpGet("/profile/avatar/{subjectId}")]
+    public async Task<IActionResult> Avatar([FromRoute] string subjectId)
+    {
+        var viewer = SubjectId(User);
+        if (viewer is null) return Challenge();            // M6 (unsigned → challenge)
+
+        var profile = await userInfo.GetProfileAsync(subjectId);
+        if (profile is null) return NotFound();            // M5 (unknown profile)
+        if (profile.Blocked) return NotFound();            // M4 (blocked supersedes — no decision, no audit row)
+        if (string.IsNullOrEmpty(profile.AvatarId)) return NotFound(); // no avatar set → fail-closed 404
+
+        // One decision (C-MED·1 single path; C-MED·2 audit committed by the seam —
+        // Allow and Deny both land):
+        var decision = await authz.CanAsync(viewer, AccessAction.Read, new ProfileToAuditableResource(profile));
+        if (!decision.Allowed) return NotFound();          // M3 (Deny → 404; audit already committed)
+        // M1 (owner) + M2 (authorized other) auto-allow through the same call.
+
+        // C-MED·7: the mt catalog (the reference) and the volume (the bytes)
+        // are distinct — the action bridges the two via IMediaStore; a
+        // missing doc or a missing byte is a fail-closed 404 (never a 500):
+        var mediaObject = await media.GetAsync(profile.AvatarId);
+        if (mediaObject is null) return NotFound();        // doc missing → fail-closed
+        var stream = await media.OpenReadAsync(profile.AvatarId);
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(stream, mediaObject.ContentType);      // stored Content-Type (C-MED·5)
     }
 
     // ── Private helpers ────────────────────────────────────────────────────

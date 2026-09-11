@@ -66,6 +66,13 @@ services:
       # decrypted — the "bounced back to login" bug. Same container path as the
       # production convention (Dockerfile VOLUME floor) so dev and prod agree.
       DataProtection__KeysDirectory: "/data/dataprotection-keys"
+      # Media byte store (ADR 0011; OPS §4/§5 "second restore surface"): the
+      # avatar bytes live on the named volume, not in Postgres (the dump
+      # carries only the MediaObject catalog). Without this, MediaOptions
+      # falls back to {BaseDirectory}/media inside the image layer and every
+      # `docker compose up --build` loses the uploads — same discipline as the
+      # keyring mount just above.
+      Media__RootPath: "/data/media"
     ports:
       - "5080:8080"
     volumes:
@@ -73,6 +80,9 @@ services:
       # anonymous form can be pruned); only wiped by an explicit
       # `docker volume rm kumunita_dpkeys` or `docker compose down -v`.
       - kumunita_dpkeys:/data/dataprotection-keys
+      # ADR 0011 second restore surface (OPS §4: snapshot beside its pg_dump;
+      # §5: restore before the app starts). Same wipe caveat as kumunita_dpkeys.
+      - kumunita_media:/data/media
     depends_on:
       db:
         condition: service_healthy
@@ -82,3 +92,5 @@ services:
 volumes:
   kumunita_pgdata:
   kumunita_dpkeys:
+  # Deduped avatar bytes (ADR 0011) — the app's second persistence surface.
+  kumunita_media:

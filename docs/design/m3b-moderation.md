@@ -1017,7 +1017,7 @@ C-M3b·1..4), ADR clauses (C1/C2/C3/C4/C5/C6; ADR 0001-B; ADR 0003
 *Part 2 ends here. U3–U10 implement against this section. The
 drift-guard (§2.7) is the change policy.*
 
-### Run result (M3b acceptance gate — 2026-09-12)
+### Run result (M3b acceptance gate — 2026-09-09)
 
 Command: VS Test Explorer `run_tests` (filter
 `Project=Kumunita.Core.Tests`, `Project=Kumunita.Web.Tests`), plus
@@ -1109,7 +1109,7 @@ contract re-confirmation + the `## Summary` table in
 ## M3b — Closed (recorded)
 
 M3b is closed. The three-test gate is recorded above in § `Run result
-(M3b acceptance gate — 2026-09-12)` (all PASS:
+(M3b acceptance gate — 2026-09-09)` (all PASS:
 `closed-loop · handoff · part-vs-whole`, `Kumunita.Core.Tests` 118/118 +
 `Kumunita.Web.Tests` 37/37 = **155/155**, 0 failed, M1 + M2 + M3 anchors
 re-run unchanged; **13 M3b-pinned** `ModerationServiceTests` +

@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Media;
 using Kumunita.Core.UserInfo;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -111,6 +112,20 @@ public static class ServiceCollectionExtensions
         // Step-7 (M1 plan §6.4): the AuditPurge tiering is per-instance config,
         // not improvised (§5: "the purge decision ... is set in the job's config").
         services.AddOptions<Authorization.AuditPurgeOptions>();
+
+        // Media (plan U1): the byte-I/O seam's per-instance config + the
+        // local-volume implementation. Core stays HTTP-free (ADR 0006-D):
+        // LocalVolumeFileStore is a BCL file-store behind IMediaFileStore.
+        services.AddOptions<MediaOptions>();
+        services.AddTransient<IMediaFileStore, LocalVolumeFileStore>();
+
+        // Media (plan U2): the single decision-path module seam (C-MED·1). It
+        // composes U1's byte seam (IMediaFileStore) with the host-registered
+        // Marten IDocumentStore (registered by the host's AddMarten call — the
+        // same "concrete service in the Core composition root" shape as M3 U6's
+        // PostService above). Resolved by the Web serving lane (U7) + upload
+        // lane (U6); never touched by the raw volume directly (C-MED·6).
+        services.AddTransient<IMediaStore, LocalVolumeMediaStore>();
         return services;
     }
 }

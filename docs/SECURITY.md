@@ -79,6 +79,7 @@ How each class is stored and what its loss means.
 | **(b) Private content** | audience-restricted posts, replies, RSVPs, project members | `mt` | High — private conversations; disclosure breaks community trust permanently |
 | **(c) Audit & moderation** | `AccessAudit`, `Report`, `AdminOverride` | `mt` | **High, asymmetric** — reveals *who accessed what*, incl. *denied* items (see §3.1) |
 | **(d) Secrets** | DB/SMTP credentials, seed token, backup keys | env / secrets manager / object store | Critical — full instance compromise |
+| **(e) Media & uploaded bytes** | raster avatars (jpeg/png/webp/gif) — identifying images of residents — and the `MediaObject` catalog (hash id, original filename, size, first-storer) | bytes: dedicated volume (OPS.md §4/§5, second restore surface); catalog: `mt` (ADR 0011) | High — a face is identity material; served **only** through an auth + audit-gated app endpoint (never a static path), raster-only (SVG excluded as a script vector) |
 
 ### 3.1 The audit log is a disclosure surface (accepted by design)
 
@@ -133,6 +134,8 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Pinned image + packages | A6 | OPS.md §10 |
 | SPF / DKIM / DMARC, stable From: | phishing-as-us (A3 impersonation) | OPS.md §7 |
 | Audit log (always-on, tiered retention) | accountability for A3, A4 | ARCHITECTURE.md §5 |
+| Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |
+| Upload type/size allowlist at the edge — raster only (SVG = excluded script vector), 5 MiB cap, self-only write lane | A3 (payload-as-XSS, self-impersonation of others) | ADR 0011 (C-MED·5/8); `Media__*` keys (OPS.md) |
 
 ## 6. Decisions & open items
 
