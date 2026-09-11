@@ -18,7 +18,7 @@
 |------|-------|--------|
 | U1 | Core: `MediaOptions` + `IMediaFileStore` + `LocalVolumeFileStore` | **done** (2026-09-11) |
 | U2 | Core: `MediaObject` + `IMediaStore` + `LocalVolumeMediaStore` + `MediaDocTypes` | **done** (2026-09-11) |
-| U3 | Core tests: file store + media store | **pending** |
+| U3 | Core tests: file store + media store | **done** (2026-09-11) |
 | U4 | Avatar lane: `Profile.AvatarId` + `SetProfileAvatarAsync` | **pending** |
 | U5 | Core test: `SetProfileAvatarAsync` lane | **pending** |
 | U6 | Web: `AvatarUpload` (self-only upload) | **pending** |
@@ -180,3 +180,63 @@
   mirrors U1's exec-plan tier).
 - **Next:** unchanged — U3 appends `## U3` (the §2.5 byte-store +
   media-store test names, on a temp dir + a `Marten` doc store).
+
+## U3 — Core tests: file store + media store (byte-store correctness) (done 2026-09-11)
+
+- **Deliverables** (2 new test files; the plan's optional shared fixture was
+  **deliberately skipped** — each class is self-contained with a small shared
+  helper, noted here per rule 1 "never modify a file not in its own
+  Deliverables", and no third file is needed):
+  - `tests/Kumunita.Core.Tests/Media/LocalVolumeFileStoreTests.cs` — the 4
+    §2.5 file-store tests on a **temp dir** (`MediaOptions.RootPath` =
+    `Path.GetTempPath()/kumunita-media-tests-{guid10}` via
+    `Options.Create(new MediaOptions { RootPath = root })` — the
+    `SmtpHealthCheckTests` `IOptions<>` idiom), no Docker.
+  - `tests/Kumunita.Core.Tests/Media/LocalVolumeMediaStoreTests.cs` — the 3
+    §2.5 media-store tests on the **existing `PostgresFixture`** (one shared
+    `postgres:18` Testcontainers, `NewDatabaseAsync()` scratch DB per test,
+    `DocumentStore.For(opts => { Connection; DatabaseSchemaName = "mt";
+    MediaDocTypes.Configure(opts); })` +
+    `ApplyAllConfiguredChangesToDatabaseAsync`, the
+    `AnnouncementServiceTests.BootStoreAsync` shape) composited over a
+    temp-dir `LocalVolumeFileStore`. **Schema carries only `MediaObject`**
+    (no M1/M3 lanes needed here).
+- **Pinned test names (design doc §2.5, verbatim — 7 names):**
+  - `LocalVolumeFileStore_Put_open_read_roundtrips`
+  - `LocalVolumeFileStore_Put_idempotent_same_id_no_second_writer`
+  - `LocalVolumeFileStore_OpenRead_missing_throws_FileNotFound`
+  - `LocalVolumeFileStore_Delete_missing_throws_FileNotFound`
+  - `LocalVolumeMediaStore_Put_dedups_by_content_hash`
+  - `LocalVolumeMediaStore_OpenRead_missing_doc_throws_KeyNotFound`
+  - `LocalVolumeMediaStore_Put_sets_CreatedById_and_SizeBytes`
+- **Stale-name note (drift-guard §2.7 rule 3, "rename only with a note"):**
+  the authored `media-u3-plan.md` §Risks lists a *stale* 5-name draft
+  (e.g. `LocalVolumeFileStore_Writes_Shards_Atomic_And_RoundTrips`). The
+  **design doc §2.5 is the pinned source and won** (the plan itself says
+  the exact names are fixed by §2.5); I used the §2.5 names verbatim.
+- **One test-body corrected after the first full-suite run (my test, not
+  the code) — per §2.7 rule 3 (name kept verbatim, no silent drift):**
+  `LocalVolumeFileStore_Put_idempotent_same_id_no_second_writer` first
+  asserted first-writer-wins for same-id-different-bytes. That contradicts
+  the C-MED·4 contract — the content id *is* the SHA-256 of the payload
+  (id ⇒ bytes), and U1's `PutAsync` is an idempotent atomic **overwrite**
+  (`File.Move(tmp, final, overwrite: true)`), not first-writer-wins for
+  a state that cannot exist under C-MED·4. Corrected the test to put the
+  *same* bytes twice and assert one file, no `.tmp` litter, payload
+  unchanged. Implementation (C-MED·4/7) was correct as U1/U2 shipped it.
+- **Gate (verified — `dotnet exec` path per AGENTS.md §"Running the tests",
+  not `dotnet test`):** `dotnet build Kumunita.slnx -c Debug` → **0
+  errors** (21 pre-existing xUnit warnings, none from U3); `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+  **`Total: 220, Errors: 0, Failed: 0, Skipped: 0`** (= U2's 213 baseline +
+  the 7 new §2.5 tests, all discovered and passing), 23 s (Testcontainers);
+  filtered `-filterVSTest "FullyQualifiedName~Core.Tests.Media"` run → **7
+  total, 0 failed** — the §2.5 test names discover + pass.
+- **Working plan recorded:** `media-u3-exec-plan.md` (mirrors U1/U2's
+  exec-plan tier) — includes the constraints pinned while writing (file-
+  store idempotency semantics, dedup lane, fail-closed, cleanup discipline)
+  and the risks (stale names, the first-run failure and its correction).
+- **Nothing staged or committed** (user wants to review first) — the 2 test
+  files + the exec plan + this note are uncommitted.
+- **Next:** U4 appends `## U4` (the avatar reference lane —
+  `Profile.AvatarId` + `SetProfileAvatarAsync`, the UserInfo side).
