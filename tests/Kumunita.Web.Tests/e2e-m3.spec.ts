@@ -47,7 +47,14 @@
 //   POST   /posts/{id}/report         (form: `form:has(textarea#
 //                                      report-reason)` with
 //                                      `name="reason"`, CSRF;
-//                                      lands back on `/posts/{id}`
+//                                      the form body is a
+//                                      Bootstrap collapse (`#
+//                                      report-form`) expanded
+//                                      via `button[data-bs-
+//                                      toggle="collapse"],
+//                                      data-bs-target="#report-
+//                                      form"` before fill; lands
+//                                      back on `/posts/{id}`
 //                                      with `TempData["info"]`)
 //
 //   ── M3b U6 — the reply route micro-fix (deferral item 5) ───────
@@ -181,6 +188,17 @@ async function submitForm(page: Page, scope?: string): Promise<void> {
     .first().click();
 }
 
+// The Detail page's "Report this" card (M3b U8) keeps the form
+// body in a collapsed `<div id="report-form">` until the toggle
+// button is clicked; a direct `fill` on a hidden textarea would
+// time out, so expand it first. Spec-local, same as submitForm.
+async function expandReportForm(page: Page): Promise<void> {
+  await page.locator(
+    'button[data-bs-toggle="collapse"][data-bs-target="#report-form"]',
+  ).click();
+  await expect(page.locator('#report-reason')).toBeVisible();
+}
+
 // Wait for the `.alert` (Bootstrap's alert — M3b's views use
 // `alert-success` / `alert-danger` on both Detail.cshtml and
 // Index.cshtml) to appear. Same as M3's U8 precedent (the "lands
@@ -219,6 +237,7 @@ test.describe('M3b e2e', () => {
     //    — the `TempData["info"]` alert on the next render of
     //    `/posts/{postId}`.
     await page.goto('/posts/' + encodeURIComponent(postId));
+    await expandReportForm(page);
     await page.locator('#report-reason').fill('Testing the file lane');
     await submitForm(page, 'form:has(#report-reason)');
     await expectAlert(page, /report filed|report recorded|filed/i);
@@ -330,6 +349,7 @@ test.describe('M3b e2e', () => {
 
     await kumunita.login(page, 'handoff-m@example.com', 'Passw0rd!');
     await page.goto('/posts/' + encodeURIComponent(postId));
+    await expandReportForm(page);
     await page.locator('#report-reason').fill('G2 handoff pin');
     await submitForm(page, 'form:has(#report-reason)');
     const reportId = await kumunita.lastCreatedReportId();
@@ -409,6 +429,7 @@ test.describe('M3b e2e', () => {
     await submitForm(page);
     const postId = await kumunita.lastCreatedPostId();
     await page.goto('/posts/' + encodeURIComponent(postId));
+    await expandReportForm(page);
     await page.locator('#report-reason').fill('F1 filing pin');
     await submitForm(page, 'form:has(#report-reason)');
     await expectAlert(page, /report filed|report recorded|filed/i);
