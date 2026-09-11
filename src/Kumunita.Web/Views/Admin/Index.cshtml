@@ -221,14 +221,19 @@
 @* ── Add community ── *@
 <form method="post" asp-action="AddCommunity" class="mb-4">
     @Html.AntiForgeryToken()
-    <div class="row g-2 align-items-end">
-        <div class="col-md-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
             <label for="addName" class="form-label">Name</label>
             <input name="Name" id="addName" type="text" class="form-control" maxlength="100" required autocomplete="off" />
         </div>
-        <div class="col-md-5">
+        <div class="col-md-4">
             <label for="addDesc" class="form-label">Description (optional)</label>
             <input name="Description" id="addDesc" type="text" class="form-control" maxlength="500" autocomplete="off" />
+        </div>
+        <div class="col-md-2 d-flex align-items-center ps-2">
+            <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
+            <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
+                   title="Everyone in the neighborhood is a member — no one can be removed or leave it.">Mandatory</label>
         </div>
         <div class="col-md-3 text-end">
             <button class="btn btn-primary" type="submit">Add community</button>
@@ -285,8 +290,10 @@ else
                                 <span class="badge text-bg-warning">disabled</span>
                             }
                             @* ADR 0012 — the mandatory badge: everyone is a member;
-                               toggled on the community's manage page (the
-                               moderator's lane), read-only here. *@
+                               toggled here (the Make optional / Make mandatory
+                               button) or on the community's manage page — both
+                               are the GlobalAdmin-only lane, never the
+                               moderator's. *@
                             @if (c.Mandatory)
                             {
                                 <span class="badge text-bg-dark" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
@@ -294,6 +301,16 @@ else
                         </td>
                         <td class="text-end">
                             <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                            <form method="post" asp-action="ToggleCommunityMandatory" class="d-inline-flex me-1">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="componentId" value="@c.Id" />
+                                <input type="hidden" name="mandatory" value="@(c.Mandatory ? "false" : "true")" />
+                                <button class="btn btn-sm @(c.Mandatory ? "btn-dark" : "btn-outline-dark")"
+                                        type="submit"
+                                        title="@(c.Mandatory ? "Make optional — membership is explicit rows again." : "Make mandatory — everyone in the neighborhood becomes a member.")">
+                                    @(c.Mandatory ? "Make optional" : "Make mandatory")
+                                </button>
+                            </form>
                             <form method="post" asp-action="ToggleCommunityEnabled" class="d-inline-flex">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="componentId" value="@c.Id" />

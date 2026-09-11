@@ -123,11 +123,17 @@ one flag, one definition of membership, one gate.
   Leave form for a member who is neither standing nor implicit (the button
   tree mirrors exactly what the routes would accept — ADR 0008's
   presentation rule).
-- **`/admin`**: the communities table shows the mandatory badge (read-only —
-  the toggle belongs on the community's own manage surface); the
-  per-account set form renders mandatory communities as *checked, disabled*
-  rows, and its remove diff filters them out — the counts stay honest
-  because `GetCommunityIdsAsync` still returns them (union read).
+- **`/admin`**: the communities table shows the mandatory badge backed by a
+  **GlobalAdmin-only toggle** — the same `SetCommunityMandatoryAsync` lane the
+  community's own manage page uses, so the standing rule is unchanged (the
+  admin's decision, never the moderator's); only the surface is duplicated,
+  the manage page staying the primary one. The "add a community" form accepts
+  the mandatory flag (create via the frozen `CreateCommunityAsync`, then the
+  same `set-mandatory` lane flips it on — a second audited row, correct
+  because it *is* a distinct action). The per-account set form still renders
+  mandatory communities as *checked, disabled* rows, and its remove diff
+  filters them out — the counts stay honest because `GetCommunityIdsAsync`
+  still returns them (union read).
 
 ### Presentation of "mandatory" vs "members"
 

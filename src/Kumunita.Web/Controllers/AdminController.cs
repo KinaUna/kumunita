@@ -148,8 +148,27 @@ public sealed class AdminController(
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
         {
-            await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
-            TempData["info"] = $"Community “{model.Name}” added.";
+            var created = await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
+            // ADR 0012 — the form's "mandatory" checkbox: the Core CreateAsync
+            // defaults Mandatory=false, so flip the flag on through the same
+            // GlobalAdmin-only audited lane (the admin's standing, never the
+            // moderator's). A second audit row (community.set-mandatory) is
+            // correct — it *is* a distinct, audited action.
+            if (model.Mandatory)
+            {
+                await userInfo.SetCommunityMandatoryAsync(created.Id, true, admin, KumunitaPrincipal.RoleSet(User));
+            }
+            TempData["info"] = model.Mandatory
+                ? $"Community “{model.Name}” added (mandatory — everyone in the neighborhood is a member)."
+                : $"Community “{model.Name}” added.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Unreachable in practice (this page is [Authorize(Roles=GlobalAdmin)]
+            // so RoleSet(User) carries GlobalAdmin), but the mandatory lane
+            // re-checks standing in Core (thin token) — fail closed.
+            TempData["error"] = "You are not permitted to set a community as mandatory.";
+            return RedirectToAction(nameof(Index));
         }
         catch (ArgumentException ex)
         {
@@ -218,6 +237,44 @@ public sealed class AdminController(
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    // ── Mandatory toggle (the ADR 0012 GlobalAdmin decision, now reachable
+    // from the /admin list too — the same lane the community's manage page
+    // uses, so the standing rule is identical; only the surface changes) ────
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleCommunityMandatory([FromForm] string componentId, [FromForm] bool mandatory)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            // RoleSet(User) carries GlobalAdmin (this page is
+            // [Authorize(Roles=GlobalAdmin)]) — the Core standing gate holds.
+            await userInfo.SetCommunityMandatoryAsync(componentId, mandatory, admin, KumunitaPrincipal.RoleSet(User));
+            TempData["info"] = mandatory
+                ? $"Community marked mandatory — everyone in the neighborhood is a member."
+                : $"Community marked optional — membership is now explicit again.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Unreachable (page is GlobalAdmin-gated) but the Core lane
+            // re-checks standing (thin token) — fail closed.
+            TempData["error"] = "You are not permitted to set a community's mandatory standing.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (ArgumentException)
+        {
             return RedirectToAction(nameof(Index));
         }
         catch (InvalidOperationException ex)

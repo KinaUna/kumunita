@@ -59,9 +59,11 @@ public sealed class AdminIndexViewModel
         public bool Enabled { get; init; } = true;
         public bool ModeratorAccess { get; init; }
         /// <summary>ADR 0012 — the community is mandatory: every verified
-        /// resident is an implicit member (nobody may be removed or leave it;
-        /// toggled on the community's manage page or the moderator lane, read
-        /// only here).</summary>
+        /// resident is an implicit member (nobody may be removed or leave it).
+        /// Toggled on the community's manage page <em>or</em> from here on
+        /// <c>/admin</c> (both are the GlobalAdmin-only
+        /// <c>SetCommunityMandatoryAsync</c> lane — the standing rule is
+        /// unchanged, the admin's decision, never the moderator's).</summary>
         public bool Mandatory { get; init; }
     }
 
