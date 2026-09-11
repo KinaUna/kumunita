@@ -150,3 +150,33 @@
   from the new doc surface + DI registration.
 - **Next:** U3 appends `## U3` (the file-store + media-store Core tests on the
   pinned §2.5 seam-test names).
+
+## U2 (verification pass — 2026-09-11; this unit, gate re-run)
+
+- **Re-verified against the design doc §2.2 (doc wins, §2.7 rule):** the four
+  new files (`MediaObject`, `IMediaStore`, `LocalVolumeMediaStore`,
+  `MediaDocTypes`) match the pinned shapes verbatim; the sole intentional
+  deviation is the **Marten 9.31.2 async-only session**
+  (`await using var session = _store.LightweightSession();`) — the
+  codebase-proven idiom (`PostsController` / `AnnouncementController`)
+  replacing the design doc's pre-9 `using var` line. The dedup lane (C-MED·4)
+  is exactly `Sha256Hex → LoadAsync → return-or-store`, bytes-first
+  (C-MED·7).
+- **Gate re-run (this pass):** `run_build` (full `Kumunita.slnx`) → **0
+  errors** — green on both `Kumunita.Core` and `Kumunita.Web`; `dotnet exec`
+  (AGENTS.md path, not `dotnet test`) → `Kumunita.Web.Tests` 60/60,
+  `Kumunita.Core.Tests` 213/213 — matching the U1/U2 claims above.
+- **Wiring confirmed at the pinned lines:** `IMediaStore` registration at
+  `DependencyInjection.cs` L128 (right after U1's block);
+  `MediaDocTypes.Configure(opts)` at `Program.cs` L87 (immediately after
+  `M3DocTypes.Configure(opts);`); the `Media__*` binding at `Program.cs`
+  L45–46 (`Configure<MediaOptions>(… GetSection(MediaOptions.SectionName))`,
+  `SectionName = "Media"`).
+- **Drift scan:** no Web/HTTP type (`IFormFile` etc.) in the four new files
+  (C-MED·6 holds); no EF reference to `MediaObject`; U6/U7 seams are untouched
+  (the Web layer only references the doc surface + a comment at
+  `Program.cs` L83–86).
+- **Working plan recorded:** `media-u2-exec-plan.md` (committed this pass;
+  mirrors U1's exec-plan tier).
+- **Next:** unchanged — U3 appends `## U3` (the §2.5 byte-store +
+  media-store test names, on a temp dir + a `Marten` doc store).
