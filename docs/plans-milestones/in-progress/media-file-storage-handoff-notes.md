@@ -24,7 +24,7 @@
 | U6 | Web: `AvatarUpload` (self-only upload) | **done** (2026-09-11) |
 | U7 | Web: `Avatar` (serving-lane contract) | **done** (2026-09-11) |
 | U8 | Web views: form + list + detail + preview | **done (2026-09-11)** |
-| U9 | Web seam tests: upload guard + FACES M1–M6 | **pending** |
+| U9 | Web seam tests: upload guard + FACES M1–M6 | **done (2026-09-11)** |
 | U10 | ADR 0011 + SECURITY/OPS/ARCHITECTURE/README + close | **pending** |
 
 ## U0 — Plan authored (by the plan author, not a unit)
@@ -685,3 +685,119 @@ was exercised as **not needed** — the frozen `ProfileEditViewModel` /
 fields" and the M2 "exactly these fields" pins remain intact). The
 working detail + all resolutions live in
 `docs/plans-milestones/in-progress/media-u8-exec-plan.md`.
+
+## U9
+
+**What I did:** the Web-seam-test unit — **two new test files, no
+production file touched** (U6/U7's actions and U8's views stay frozen):
+
+- `tests/Kumunita.Web.Tests/ProfileAvatarServingTests.cs` — the
+  **FACES M1–M6** serving gate, design-doc §2.5 names verbatim:
+  - `Serving_SignedAuthorizedOwner_Returns200_CorrectContentType` (M1)
+  - `Serving_SignedAuthorizedOther_Returns200` (M2)
+  - `Serving_SignedDeniedAudience_Returns404_And_Audits` (M3)
+  - `Serving_BlockedProfile_Returns404` (M4)
+  - `Serving_UnknownProfile_Returns404` (M5)
+  - `Serving_Unsigned_Challenges_No200` (M6)
+- `tests/Kumunita.Web.Tests/ProfileAvatarUploadTests.cs` — the
+  **U7a/b/c** upload-guard suite, §2.5 names verbatim:
+  - `Upload_OwnerValidRaster_SetsAvatarAndServes` (M1 roundtrip)
+  - `Upload_Oversize_Returns413_NoFileWritten` (U7b)
+  - `Upload_WrongType_Returns415_NoFileWritten` (U7c type)
+  - `Upload_Empty_Returns400` (U7c empty / defensive U7a)
+- `docs/plans-milestones/in-progress/media-u9-exec-plan.md` — the working
+  detail + resolutions for this unit (the register's U9 "Entry reads"
+  and "Deliverables" are fully covered).
+
+**How each pin is proven (the assertion shape):**
+
+| Test | Pin | Assertion surface |
+|------|-----|-------------------|
+| M1 / M2 | 200 + stored `Content-Type` + `nosniff` | `Assert.IsAssignableFrom<FileStreamResult>` + drain-copy byte equality + `file.ContentType == MediaObject.ContentType` + the `nosniff` header via `httpContext.Response.Headers` (the action sets it on `HttpContext`) |
+| M3 | 404 **and** the `CanAsync` decision was made (audit committed by the seam) | `Assert.IsType<NotFoundResult>` + `authz.Received(1).CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other))` + `media.DidNotReceiveWithAnyArgs().GetAsync(...)` / `.OpenReadAsync(...)` (the "And_Audits" half — the seam's job, C-MED·2; the payload is never reached) |
+| M4 | 404 **before** the decision | `Assert.IsType<NotFoundResult>` + `userInfo.Received(1).GetProfileAsync(Other)` (the profile is read — its `Blocked=true` short-circuits) + `authz.DidNotReceiveWithAnyArgs().CanAsync(...)` (the fail-closed row — no decision, no audit; `DirectoryService`'s idiom surfaces through the seam) |
+| M5 | 404 — unknown profile | `Assert.IsType<NotFoundResult>` + `userInfo.Received(1).GetProfileAsync(Unknown)` + `authz.DidNotReceiveWithAnyArgs().CanAsync(...)` + `media.DidNotReceiveWithAnyArgs().GetAsync(...)` (a null profile is the pin; nothing downstream runs) |
+| M6 | Challenge, no 200 | `Assert.IsType<ChallengeResult>` + `Assert.IsNotAssignableFrom<FileStreamResult>(result)` (M6's "No200" half, pinned) |
+| 413 / 415 / 400 | status + **no file written** | `Assert.IsType<StatusCodeResult>` (413/415) / `Assert.IsType<BadRequestObjectResult>` (400 — see decision 4) + `media.DidNotReceiveWithAnyArgs().PutAsync(Arg.Any<byte[]>(), Arg.Any<...>(), ...)` (the full-arity `Arg.Any` including `CancellationToken`, xUnit1051-clean) + `userInfo.DidNotReceiveWithAnyArgs().SetProfileAvatarAsync(...)` |
+| M1 roundtrip | the store-first / profile-second ordering (C-MED·7 orphan-safe) | `media.Received(1).PutAsync(Arg.Is<byte[]>(b => b.SequenceEqual(Png)), "pixel.png", "image/png", Owner, Arg.Any<CancellationToken>())` then `userInfo.Received(1).SetProfileAvatarAsync(Owner, MediaId, Owner)` + `Assert.IsType<RedirectToActionResult>` (the 302 `Edit`) |
+
+**Key decisions (recorded):**
+
+1. **No new route/authz fixture invented.** The repo's existing
+   `Kumunita.Web.Tests` idiom (the sealed `DirectoryService` +
+   `DefaultHttpContext` + `Kumunita` identity principal + NSubstitute)
+   already covers the seam — `IUserInfoService` / `IAuthorizationService`
+   / `IMediaStore` are substituted, `ProfileController` is the real
+   SUT, and `Kumunita.Core.Identity.ClaimTypes.Subject` (the single
+   claim the `KumunitaPrincipal` mints) is the `User` channel. No
+   `IHttpContextAccessor` `@inject` needed (that's a Razor view thing;
+   the controller reads `User` directly).
+2. **The local `TestFormFile : IFormFile`** (not the ASP.NET `FormFile`):
+   `FormFile.set_ContentType` throws NRE in this harness (a .NET 10
+   `FormFile` quirk — the property's nullability / backing is off for a
+   direct object-initializer call from the test process). The
+   `IFormFile` surface the action under test reads — `Length` /
+   `ContentType` / `FileName` / `CopyToAsync` / `CopyTo` / `Open` /
+   `OpenReadStream` / `Name` / `Headers` / `ContentDisposition` /
+   `Dispose` — is a small local class the byte-array `content` drives,
+   so the action's `await file.CopyToAsync(ms)` and the `Png`-equals
+   assertion both hold without a real multipart pipeline (the seam is
+   `IFormFile`, not the pipeline — the `C-MED·6` pin).
+3. **`Arg.Any<CancellationToken>()` on every `PutAsync` / `GetProfileAsync`
+   / `CanAsync` NSub invocation** (both `Received` / `DidNotReceiveWithAnyArgs`
+   and `Returns`): `IMediaStore` / `IUserInfoService` /
+   `IAuthorizationService` all take an optional `CancellationToken`
+   parameter (xUnit1051 — the "omitted trailing optional" rule). The
+   `Arg.Is<byte[]>(b => b.SequenceEqual(Png))` (not `Arg.IsFunc` — that
+   doesn't exist in NSub v5) is the byte-matching shape for the
+   `PutAsync` payload.
+4. **The 400 test's exact type pin**: the `Assert.IsType<StatusCodeResult>`
+   that works for 413/415 **fails** for the 400 (empty-file) row —
+   because the action does `return BadRequest("Choose an image.")`
+   (U6/U7's frozen line), which produces a **`BadRequestObjectResult :
+   ObjectResult`** — a *sibling* of `StatusCodeResult`, not a child. So the
+   400 test's exact pin is `Assert.IsType<BadRequestObjectResult>` with
+   a `StatusCodes.Status400BadRequest` on the `StatusCode` property
+   (which the ObjectResult surface exposes via `ObjectResult.StatusCode`).
+   **This pins U6's exact `BadRequest(string)` shape** — a drift in that
+   line to `BadRequest()` (no arg) would flip the result to a
+   `StatusCodeResult`-descendant and break this test, which is the
+   intended guard.
+5. **FACES M3's "And_Audits" is the *positive-received* pin on the seam call.**
+   The audit row is committed inside the `CanAsync` seam (C-MED·2) — the
+   action never writes it. The test asserts
+   `authz.Received(1).CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other))`
+   (the decision ran for the *right* profile + subject); the audit-row
+   *shape* is the `M1` seam tests' pin (out of U9's scope — U9 does not
+   re-pin the audit-row *bytes*, only that the decision was made and
+   the 404 result surfaced). The `Arg.Is<ProfileToAuditableResource>`
+   Id-matcher (not `Arg.Any`) is what keeps M4/M5's `DidNotReceive` pin
+   from accidentally satisfying M3's `Received` pin in the *same* seam
+   shape — the `Id` is the disambiguator.
+6. **No §2.7 drift**: no new test name, no new seam, no
+   `AccessAction` / `AccessVia` id, no volume write bypassing the
+   `IMediaStore` seam (all four 4xx rows and the M4/M6 rows pin the
+   `DidNotReceive` surface), no `MediaObject` / `Profile` shape change.
+
+**Gate (§2.5 + §2.6):**
+- `run_build` (whole solution, net10.0): **0 errors, 0 warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`:
+  **70/70 passing** (U9 adds 10 — the two files above — to the 60
+  baseline U8 saw; the 6 `ProfileAvatarServingTests` + 4
+  `ProfileAvatarUploadTests` are all green in that pass).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`:
+  **not re-run** — U9 touches **no** Core file, so the last
+  Core-change baseline (U4/U5, 223/223; U6's Core-untouched `Profile`
+  surface re-run unchanged by U6 itself) stands. Running it would leave
+  a Testcontainers `postgres:18` behind (AGENTS.md's cleanup note)
+  with no change to assert; U10's close (the full-suite `## Media —
+  Closed` record) is the re-run.
+
+- **Nothing staged or committed** (user wants to review first) — the
+  two test files + the exec plan + this note are uncommitted.
+- **Next:** U10 appends `## U10` (the governance + close —
+  ADR 0011, the `SECURITY.md` (e) row, the `OPS.md` "second surface"
+  row, the `ARCHITECTURE.md` context entry, the `README.md` Roadmap
+  update, and the `## Media — Closed (recorded)` section in the design
+  doc + the `## Summary` in this file). U10 *additionally* re-runs the
+  Core test suite (223/223) to record the full-suite §2.6 gate.
