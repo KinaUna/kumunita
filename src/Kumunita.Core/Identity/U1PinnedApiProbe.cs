@@ -1,5 +1,5 @@
 // M1 step 7 (C3 fix) — U1 compile-truth probe.
-// See docs/plans-milestones/plan-m1-step-7-outbox-email-c3.md, unit U1 —
+// See docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md, unit U1 —
 // the deliverable of this probe file is proving the exact Wolverine
 // `IMessageContext` member the `OutboxEmailStager` will call, by actually
 // compiling it against the WolverineFx 6.33.0 assembly the repo pins.

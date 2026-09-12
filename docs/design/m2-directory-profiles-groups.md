@@ -191,7 +191,7 @@ namespaces are the contract U3–U14 must implement against. If a later
 unit (U3–U14) discovers an implemented signature or a required M1 seam
 that does not exist verbatim here, the drift-guard (§2.7) applies:
 **this file wins**; the unit updates this file in the same commit and
-appends a one-line drift note to `docs/plans-milestones/m2-handoff-notes.md`.
+appends a one-line drift note to `docs/plans-milestones/done/m2-handoff-notes.md`.
 
 Namespace conventions (matching M1):
 
@@ -796,7 +796,7 @@ This design doc's §2.5 (the "22 seam tests" name list) freezes 22 `F[0-9]_`-pre
 
 ## M2 — Closed (recorded)
 
-**Closed 2026-09-04 by U15** (the final M2 unit; the M2→M3 handoff lives in `docs/plans-milestones/m2-handoff-notes.md` § Summary). This section freezes M2's closure. The M2→M3 handoff artifact is the *sole* one: this doc's § Acceptance Gate + the handoff-notes § Summary. There is no U16.
+**Closed 2026-09-04 by U15** (the final M2 unit; the M2→M3 handoff lives in `docs/plans-milestones/done/m2-handoff-notes.md` § Summary). This section freezes M2's closure. The M2→M3 handoff artifact is the *sole* one: this doc's § Acceptance Gate + the handoff-notes § Summary. There is no U16.
 
 **Recorded acceptance gate (the three tests, from U12 — see § Acceptance Gate above):**
 

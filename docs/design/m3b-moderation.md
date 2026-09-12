@@ -208,7 +208,7 @@ Part 1.
 - If a later unit (U2–U11) finds a mismatch between an implemented signature
   and the pin in **this** Part, **this doc wins**. The unit updates this file
   in the same commit and appends a one-line drift note to
-  `docs/plans-milestones/m3b-handoff-notes.md`.
+  `docs/plans-milestones/done/m3b-handoff-notes.md`.
 - The invariant *numbers* — the four M3b-owned **C-M3b·1..4**; ADR 0006's
   **C1, C2, C3, C4, C5, C6** (still binding, re-pinned in the "ADRs M3b must
   keep holding" list above); ADR **0001-B**; ADR **0003 §SoD**; ADR
@@ -336,7 +336,7 @@ namespaces are the contract U3–U11 must implement against. If a later unit
 discovers an implemented signature that does not match verbatim here, the
 drift-guard (§2.7) applies: **this file wins**; the unit updates this file
 in the same commit and appends a drift note to
-`docs/plans-milestones/m3b-handoff-notes.md`.
+`docs/plans-milestones/done/m3b-handoff-notes.md`.
 
 Namespace conventions:
 
@@ -964,7 +964,7 @@ deferral item 6 — `e2e-m3.spec.ts`), mirroring `m3-posts-design.md` §
   implemented signature and the pin in **this** section, **this file
   wins**; the unit updates this file **in the same commit** and
   appends a one-line drift note to
-  `docs/plans-milestones/m3b-handoff-notes.md` (the M3b Plan §
+  `docs/plans-milestones/done/m3b-handoff-notes.md` (the M3b Plan §
   "Per-unit template" Exit rule).
 - **The four `Via` literal pins** (items 1 and 3 of §2.3 = filing +
   hide/remove lanes; the read-branch pin at item 3 of §2.4 =
@@ -1068,7 +1068,7 @@ records the *pass count* in a future `### Run result (M3b e2e —
 Exit and design doc §2.6 G3 note, U10 **records** the
 fixture-throw status (does **not** silently re-defer — the gap is
 this paragraph + a matching bullet in
-`docs/plans-milestones/m3b-handoff-notes.md` § `## U10`), and the
+`docs/plans-milestones/done/m3b-handoff-notes.md` § `## U10`), and the
 gate's *unit-suite* evidence above (155/155) is the pass criterion
 recorded in this milestone. The M2 D2 `kumunita` fixture re-records
 **the same documented-throw status** it carried at U13 and re-carried
@@ -1102,7 +1102,7 @@ drift-pause rule binds to a **frozen pin being broken**, not to a
  *U11 (the M3b close) appends `## M3b — Closed (recorded)` below
 this section — same shape as M2's U15 / M3's U12 (three-tier
 contract re-confirmation + the `## Summary` table in
-`docs/plans-milestones/m3b-handoff-notes.md`).*
+`docs/plans-milestones/done/m3b-handoff-notes.md`).*
 
 ---
 
@@ -1118,7 +1118,7 @@ re-run unchanged; **13 M3b-pinned** `ModerationServiceTests` +
 (the `Events/` and `Projects/` lines are untouched — they are
 still M4 / M5 scope). **This design-doc close is the *record*
 close; the sole M3b→next-milestone *handoff* artifact is
-`docs/plans-milestones/m3b-handoff-notes.md` § `## Summary` (U11's
+`docs/plans-milestones/done/m3b-handoff-notes.md` § `## Summary` (U11's
 close)** — read that section first when starting the next milestone's
 U1 (it holds the U1→U11 table + the reconciled count drift + the
 deferred items in a single artifact).
@@ -1249,7 +1249,7 @@ explicitly rather than silently dropped"):
    schema sense — but requires the ADR-amendment path above").
 **U11's Close is the last M3b unit's record; the M3b→M4 handoff
 is complete when U11's `## U11` section is appended below (see
-`docs/plans-milestones/m3b-handoff-notes.md`) and this
+`docs/plans-milestones/done/m3b-handoff-notes.md`) and this
 `## M3b — Closed (recorded)` section above is in place. That
 two-part pair — the design-doc close and the handoff-note
 `## Summary` table — is the *sole* M3b→M4 handoff artifact,

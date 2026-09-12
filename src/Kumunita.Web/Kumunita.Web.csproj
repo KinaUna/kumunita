@@ -20,7 +20,7 @@
          broken by M1 step 7 (plan U1/U2) — `Kumunita.Core` now also references
          WolverineFx 6.33.0 directly for the transactional-outbox `IMessageContext`
          enqueue. Both projects pin the same version (R4: no skew). See
-         docs/plans-milestones/plan-m1-step-7-outbox-email-c3.md. -->
+         docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md. -->
     <PackageReference Include="WolverineFx" Version="6.33.0" />
     <PackageReference Include="WolverineFx.Marten" Version="6.33.0" />
     <!-- Wolverine 6.33 no longer ships the runtime compiler (IAssemblyGenerator/Roslyn)

@@ -188,7 +188,7 @@ without re-deriving them.
 - If a later unit (U3–U12) finds a mismatch between an implemented signature
   and the pin in this Part, **this doc wins**. The unit updates this file in
   the same commit and appends a one-line drift note to
-  `docs/plans-milestones/m3-handoff-notes.md`.
+  `docs/plans-milestones/done/m3-handoff-notes.md`.
 - The invariant *numbers* — ADR 0006's **C1, C2, C3, C4, C5, C6**; the three
   M3-owned **C-M3·1, C-M3·2, C-M3·3**; ADR **0001-B**; ADR **0004 §B.1** — are
   stable for the rest of M3. Adding a new M3-owned invariant (C-M3·4+)
@@ -222,7 +222,7 @@ namespaces are the contract U3–U11 must implement against. If a later unit
 discovers an implemented signature that does not exist verbatim here, the
 drift-guard (§2.7) applies: **this file wins**; the unit updates this file in
 the same commit and appends a drift note to
-`docs/plans-milestones/m3-handoff-notes.md`.
+`docs/plans-milestones/done/m3-handoff-notes.md`.
 
 Namespace conventions:
 

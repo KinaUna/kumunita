@@ -169,7 +169,7 @@ const extended = baseTest.extend<{ kumunita: Kumunita }>({
       '(e2e-m2.spec.ts) for the signup/login shape; the three new ' +
       'helpers (signupGlobalAdmin, lastCreatedPostId, ' +
       'lastCreatedReportId, assignModeratorToComponent) are M3b ' +
-      'ADDs. See docs/plans-milestones/m3b-handoff-notes.md § U10.',
+      'ADDs. See docs/plans-milestones/done/m3b-handoff-notes.md § U10.',
     );
     // `use` is required by the Playwright fixture API. The throw
     // above fires first (before `use` is ever called), so there is
