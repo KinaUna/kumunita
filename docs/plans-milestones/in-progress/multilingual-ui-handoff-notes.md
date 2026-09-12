@@ -278,3 +278,107 @@ unit instructions specified.
 
 **Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
 contradiction, no out-of-scope string attempted).
+
+## U4 — the Groups views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 2.9s)
++ all 13 `groups.*` `<kw-l>` placements present in the four touched views.
+
+**What was changed (4 files modified, 0 new — the closed set):**
+- **`Views/Groups/Index.cshtml` — 4 keys:** `groups.title` (the
+  `<h1>Groups</h1>`), `groups.lead` (the `<p class="text-muted">` directly
+  below the `<h1>`), `groups.empty` (the **first sentence** of the compound
+  empty-state `<div class="alert alert-info">` — see Note 1), `groups.create`
+  (the bottom `<a class="btn btn-primary">Create a group</a>` button — see Note
+  1).
+- **`Views/Groups/Detail.cshtml` — 5 keys:** `groups.back_all` (the back-link
+  `<a class="text-muted">← All groups</a>` — entire text incl. arrow, Note 2),
+  `groups.posts_heading` (the `<h2 class="mb-0">Posts</h2>`),
+  `groups.new_post` (the `<a class="btn btn-primary">New post</a>` in the
+  `Model.CanPost` branch), `groups.posts_empty_can` (the `Model.CanPost`
+  empty-state `<text>`), `groups.posts_empty` (the else-branch empty-state
+  `<text>`).
+- **`Views/Groups/New.cshtml` — 3 keys:** `groups.new_back` (the back-link
+  `<a class="text-muted">&larr; back to the group</a>` — text after the arrow
+  only, Note 3), `groups.new_title` (the `<h1>Post to this group</h1>`),
+  `groups.new_submit` (the form's `<button type="submit">Post to group</button>`).
+- **`Views/Groups/PostDetail.cshtml` — 1 key:** `groups.new_back` (the
+  back-link `<a class="text-muted small">&larr; back to the group</a>` — text
+  after the arrow only, same as Note 3).
+
+**13 `<kw-l>` elements placed** (4 + 5 + 3 + 1). Each wraps the **exact current
+English** (matching the registry `en` value) as inner text (the M·1 source
+floor — a fresh `en` instance renders identically). All 12 registry `groups.*`
+keys verified to exactly match the current view text before replacing (the
+exact-match principle — no drift). The two empty-state `<text>` blocks
+(`groups.posts_empty_can` / `groups.posts_empty`) keep their `<text>` wrapper
+with the `<kw-l>` inside; the `@if (Model.CanPost)` / `@else` structure
+untouched — text-only replacement. No `href`/`action`/`method`/`name`/`id`/
+`@Html.AntiForgeryToken()`/`@if`/`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`/
+`ViewContext.RouteData` changed — only the visible English text that matched a
+`groups.*` key.
+
+**The three notes (and how each was resolved):**
+- **Note 1 — `groups.empty` compound message (Index.cshtml):** the empty-state
+  div is `No groups yet. <a>…Create one…</a> to organize residents (e.g. …)`.
+  The registry's `groups.empty` = "No groups yet." is **only the first
+  sentence** — wrapped just that part, left the rest of the compound message
+  (incl. the "Create one" link text) **as-is**. The `groups.create` key
+  ("Create a group") was applied to the **separate** bottom button (a
+  different string), **not** to the empty-state's "Create one" — a different
+  string, not a registry key.
+- **Note 2 — `groups.back_all` arrow (Detail.cshtml):** the registry value is
+  "← All groups" (with the arrow character). The view already used the literal
+  `←`, so the inner text is the exact registry value — the **entire** link text
+  (arrow + words) is wrapped: `<kw-l key="groups.back_all">← All groups</kw-l>`.
+- **Note 3 — `groups.new_back` arrow (New.cshtml + PostDetail.cshtml):** the
+  registry value is "back to the group" (**without** an arrow). The views use
+  `&larr; back to the group`; wrapped **only the text after the arrow**:
+  `&larr; <kw-l key="groups.new_back">back to the group</kw-l>`. The arrow
+  (`&larr;`) is a visual affordance, left outside the element — same in both
+  files (2 placements of the one key).
+
+**`ViewData["Title"]` — left as-is (U3 convention):** `Index.cshtml`
+`= "Groups"`, `New.cshtml` `= "Post to group"` (static) and `Detail.cshtml`
+`= Model.Name` / `PostDetail.cshtml` `= Model.Post.Title ?? "Post"`
+(dynamic/UGC) all left untouched. Localizing a browser-tab title requires a
+C# `@{}` line calling the provider (not a `<kw-l>` element) — outside U4's
+closed view-text scope, matching the U3 decision. If the tab title should
+also be localized, that is a **U9 follow-on proposal** (not implemented here).
+
+**Left as-is (deliberate, out-of-scope strings confirmed and not keyed —
+rule 3):**
+- **`Index.cshtml`:** the Invitations section ("Invitations", the
+  `@Model.Invitations.Count pending` badge, "Invited by", "Accept",
+  "Decline"), the "Create one" empty-state link, the "to organize residents
+  (e.g. …)" tail, `@g.Name` (UGC), `@g.MemberCount`.
+- **`Detail.cshtml`:** "Owned by", "You own this group", "Private" (badges),
+  `@Model.Description` (UGC), "About this group", "Description (optional)",
+  "Save description", "Privacy", "Private group", "Save" (the two owner/admin
+  forms), the group-post list items (title / body-preview / author / date —
+  UGC/M·3), the "…in this group; …shown to you" hidden-count hint, the
+  "Members" section (heading, "No members yet.", Remove / Leave buttons), the
+  invitation lanes ("Pending invitations", "Cancel invite", "Invite a
+  resident", "Invite", the resident-picker helper copy), all `@*…*@` design
+  comments.
+- **`New.cshtml`:** the "Your post will be visible to the current members…"
+  helper paragraph, the "Title" / "Body" labels, the "optional" placeholder,
+  the "A short headline (≤ 120 chars) …" helper, the "Cancel" link.
+- **`PostDetail.cshtml`:** the post title / body (UGC), the author name +
+  date, the "You can see this post because …" access-explanation line, the
+  replies section (heading, count, "No replies yet…", each reply's body /
+  author / date — UGC/M·3), the reply form ("Reply" heading/label/button, the
+  reply helper copy).
+
+None of these are in the `groups.*` registry, so none are keyed (unit-series
+rule 3 — never key an out-of-scope string; rule 4 — never wrap UGC).
+
+**Deviations vs the plan:** none. All 13 placements, the three notes, the
+`ViewData["Title"]` left-as-is decision, and the out-of-scope non-touch are
+exactly as the unit instructions specified. `Create.cshtml` (a separate view,
+not in U4's closed set — the in-scope surface is Index / Detail / New /
+PostDetail) was **not** read or touched.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).

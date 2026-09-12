@@ -12,9 +12,9 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <p><a class="text-muted" href="@($"/groups/{groupId}")">&larr; back to the group</a></p>
+        <p><a class="text-muted" href="@($"/groups/{groupId}")">&larr; <kw-l key="groups.new_back">back to the group</kw-l></a></p>
 
-        <h1>Post to this group</h1>
+        <h1><kw-l key="groups.new_title">Post to this group</kw-l></h1>
         <p class="text-muted">
             Your post will be visible to the current members of this group only —
             membership is the single access decision on this channel.
@@ -65,7 +65,7 @@
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Post to group</button>
+                <button type="submit" class="btn btn-primary"><kw-l key="groups.new_submit">Post to group</kw-l></button>
                 <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}")">Cancel</a>
             </div>
         </form>

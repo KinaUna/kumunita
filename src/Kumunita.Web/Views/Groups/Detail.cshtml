@@ -32,7 +32,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-        <p><a class="text-muted" href="@Url.Action("Index", "Groups")">← All groups</a></p>
+        <p><a class="text-muted" href="@Url.Action("Index", "Groups")"><kw-l key="groups.back_all">← All groups</kw-l></a></p>
 
         <h1>@Model.Name</h1>
 
@@ -126,10 +126,10 @@
             post" button is offered to exactly them.
         *@
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h2 class="mb-0">Posts</h2>
+            <h2 class="mb-0"><kw-l key="groups.posts_heading">Posts</kw-l></h2>
             @if (Model.CanPost)
             {
-                <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/posts/new")">New post</a>
+                <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/posts/new")"><kw-l key="groups.new_post">New post</kw-l></a>
             }
         </div>
 
@@ -138,11 +138,11 @@
             <p class="text-muted">
                 @if (Model.CanPost)
                 {
-                    <text>No posts yet. Write the first one — it will be visible to the current members.</text>
+                    <text><kw-l key="groups.posts_empty_can">No posts yet. Write the first one — it will be visible to the current members.</kw-l></text>
                 }
                 else
                 {
-                    <text>No posts here yet.</text>
+                    <text><kw-l key="groups.posts_empty">No posts here yet.</kw-l></text>
                 }
             </p>
         }
