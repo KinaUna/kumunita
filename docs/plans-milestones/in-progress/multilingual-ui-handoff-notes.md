@@ -668,3 +668,114 @@ no registry key was added (D7-3 — `settings.choose_language` was reused).
 **Drift-pause count: 0** (no key outside the registry; the frozen
 `LocaleCookie` / `LocaleSettings` / `GetPageAsync` seams are present and as
 claimed).
+
+## U8 — the FACES gate (L1–L9 + the acceptance gate)
+
+**Date:** 2026-09-12 · **Kind:** test unit (no `src` code) · **Exit:** both
+assemblies green under the reliable runner (`dotnet build` + `dotnet exec`),
+the three gate [Facts] present, and this note appended **before** the folder
+move (U9's close owns the move — not this unit).
+
+**The gate's whole, recorded:**
+- **`Kumunita.Core.Tests` → Total: 291, Errors: 0, Failed: 0** (30.2s,
+  Testcontainers). The 19 `ML` anchors **and** the `MLUI_U6_*` test **and** the
+  new L1/L2/L4/L5-core/L6/L7/L8 + the three gate [Facts] run in the **same**
+  process — the part-vs-whole evidence.
+- **`Kumunita.Web.Tests` → Total: 100, Errors: 0, Failed: 0** (0.66s). The
+  new L3 (+ `clear=1`), L5-web, and L9 (three branches) join the existing
+  `PublicLocaleAndAboutTests` et al.
+
+**Two new test files, zero `src` changes, zero `.csproj` changes:**
+- **`tests/Kumunita.Core.Tests/MLUI_FacesTests.cs` (NEW)** — L1, L2, L4,
+  L5-core, L6, L7, L8 at the Core seams + the three gate [Facts]. Same
+  fixture/harness as `LocalizationServiceTests` (`IClassFixture<PostgresFixture>`
+  + the copied private helper set: `BootStoreAsync`, `SeedM1RowAsync`,
+  `Plant`, `AddLanguage`, `UpsertTranslation`, `UpsertPage`, `AuditRows`, plus
+  a new `SeedEnFloor` mirroring the seeder step).
+- **`tests/Kumunita.Web.Tests/MLUI_FacesTests.cs` (NEW)** — L3 (incl. the
+  `clear=1` branch + the `ITempDataProvider` fake), L5-web, L9 (three branches)
+  at the controller level, on the existing direct-construction harness
+  (NSubstitute + `DefaultHttpContext`, no TestServer — D8-3).
+
+**FACES test inventory (every [Fact] name, per project):**
+- **Core.Tests** — `MLUI_U8_L1_PreferenceResolvesNavKeyInPolish`;
+  `MLUI_U8_L2_MissingKeyFallsBackPerStringRestStaysPolish`;
+  `MLUI_U8_L4_FreshInstance_RendersEnglishFloor`;
+  `MLUI_U8_L5_BatchRead_ReanchoredOnRegistry`;
+  `MLUI_U8_L6_SaveRegistryKey_VisibleNextRequest_OneAuditRow`;
+  `MLUI_U8_L7_CompletenessRealForPl_FullForEn`;
+  `MLUI_U8_L8_UgcBodyAsAuthored_ProviderNeverConsultsUgc`;
+  `MLUI_U8_Gate_ClosedLoop_RegistryKeySave`;
+  `MLUI_U8_Gate_Handoff_DefaultPl_PerStringFallbackOnRegistry`;
+  `MLUI_U8_Gate_PartVsWhole_InheritedAnchorsHoldOnRegistry`.
+- **Web.Tests** — `MLUI_U8_L3_SavePreference_WritesLocaleCookie`;
+  `MLUI_U8_L3_ClearPreference_DeletesCookie`;
+  `MLUI_U8_L5_EditorListIsClosedRegistry`;
+  `MLUI_U8_L9_AboutAbsent_ProductStoryView`;
+  `MLUI_U8_L9_AboutEnPage_PrefPlNoPlRow_RendersEnPage`;
+  `MLUI_U8_L9_AboutPlPage_PrefPl_RendersPlPage`.
+
+**Three-gate mapping (which test = which gate):**
+- **Closed loop** → `MLUI_U8_Gate_ClosedLoop_RegistryKeySave` (L6's shape, a
+  registry key: save → visible on the next request + one `translation.save`
+  audit row, `Via = Admin`).
+- **Handoff** → `MLUI_U8_Gate_Handoff_DefaultPl_PerStringFallbackOnRegistry`
+  (default set to `pl`; a resident with **no** preference: a no-`pl` registry
+  key falls back to `en` while a sibling resolves `pl` — the `LocaleSettings`
+  change picked up live, per-string, M·2, re-anchored on registry keys).
+- **Part-vs-whole** → `MLUI_U8_Gate_PartVsWhole_InheritedAnchorsHoldOnRegistry`
+  (a thin [Fact] re-running the M1 + M9 + M12 assertions on registry keys in
+  sequence). **The real part-vs-whole evidence is the full-assembly run count
+  above** — the 19 `ML` anchors AND the new L/gate tests pass in the same
+  `Kumunita.Core.Tests` process (D8-10).
+
+**D8 deviations (recorded):**
+- **D8-4 (L3) — the U7 deferral is closed.** `PublicLocaleController.Save`
+  writes `TempData["info"]`, which NREs without an `ITempDataProvider`. The
+  test supplies a no-op `ITempDataProvider` via
+  `controller.TempData = new TempDataDictionary(HttpContext, provider)`
+  (set on the `Controller`, not the `ControllerContext` — `ControllerContext`
+  has no `TempData` member in this ASP.NET Core). The `Set-Cookie` header
+  (`kumunita.locale=pl`, `HttpOnly`, `SameSite=Lax`) is then asserted — the
+  frozen `LocaleCookie.Write` shape. The `clear=1` branch asserts the
+  deletion's epoch `Expires` (the `CookieOptions.Delete` idiom) — the header
+  is `kumunita.locale=; expires=Thu, 01 Jan 1970 00:00:00 …`, **not**
+  `Max-Age=0` (that literal was my first attempt's wrong guess; corrected).
+- **L5-web "no hand-typed key"** is asserted on the **model shape** (the
+  `TranslationEditorViewModel` exposes exactly `{ Code, Rows }` — no
+  free-form string input), not on `TranslationRow.Key`'s `CanWrite`
+  (init-accessors report `CanWrite == true`, so that reflection check is not
+  a discriminator). This is the faithful "assert on the types, not the HTML"
+  reading of D8-6.
+- **L4/L7 seeder mirroring (the blocker protocol's sanctioned path):**
+  `FirstBootSeeder.SeedTranslationResourcesAsync` is **private** and
+  `SeedAsync` needs the whole bootstrap dependency set, so the tests **mirror**
+  the seeder step's exact shape — an `en` `TranslationResource` row per key in
+  `KnownTranslationKeys.EnValues` (the `SeedM1RowAsync`-mirrors-
+  `SeedLanguageCatalogAsync` precedent). The registry is the single source of
+  truth both the seeder and the test read, so the mirror is exact.
+
+**D8-3 held:** no package added, no TestServer, no `WebApplicationFactory`.
+`Kumunita.Core` is reachable in `Web.Tests` transitively via `Kumunita.Web`,
+so `KnownTranslationKeys` / the controllers / `LocaleCookie` are all in scope
+with no `.csproj` change.
+
+**L8 UGC surface (D8-8):** asserted by reflection — no method on
+`ITranslationProvider` takes a `Post` / `PostReply` / `Group` (the surface
+never consults UGC, M·3); the post's `Body` is re-loaded byte-identical; the
+provider resolves a registry key + a page independently.
+
+**Drift-pause count: 0.** No shipped seam behaved differently than the U6/U7
+notes claim; no test required a harness feature that isn't present (the L3
+`ITempDataProvider` gap is a documented, expected part of the deferred
+assertion, closed exactly as D8-4 prescribes). **No `src` fix was needed —
+U8 did not fix code.**
+
+**Runner note (this session's environment quirk, for the next agent):** the
+file-edit tools updated the **editor buffer** (what `read_file`/`grep_search`
+see) but did **not** reliably flush to **disk** (what `dotnet build` compiles)
+for an already-open file. The reliable path that landed correct bytes on disk
+was `create_file` on a **new** path + terminal `Move-Item` to the canonical
+name, then `dotnet build`. If a test "fails with an assertion you already
+removed", suspect a stale disk copy — verify with the terminal's own
+`Get-Content`, not the workspace `read_file`.
