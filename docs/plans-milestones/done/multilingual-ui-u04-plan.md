@@ -1,6 +1,6 @@
 # ML-UI · U4 — wire the Groups views to `<kw-l>`
 
-> Part of the `ML-UI` lane (`docs/plans-milestones/in-progress/plan-multilingual-ui.md`,
+> Part of the `ML-UI` lane (`docs/plans-milestones/done/plan-multilingual-ui.md`,
 > **M·10**). Per-unit template (Goal / Entry reads / Deliverables / Exit). U4 builds on
 > U1 (`KnownTranslationKeys`, 52 keys) + U2 (`<kw-l>` TagHelper) + U3 (Posts views).
 
@@ -14,9 +14,9 @@ a `pl`-preferring resident with `pl` rows sees those strings in Polish.
 
 ## Entry reads (in order)
 
-1. `docs/plans-milestones/in-progress/plan-multilingual-ui.md` — M·10, the
+1. `docs/plans-milestones/done/plan-multilingual-ui.md` — M·10, the
    in-scope surface, the U4 row + entry-read list, unit-series rules (3 & 4).
-2. `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` — the
+2. `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` — the
    **U3** section (the `ViewData["Title"]` tab-title limitation, the
    leave-out-of-scope-as-is pattern, exact-match principle).
 3. `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the 12
@@ -56,7 +56,7 @@ controllers/models/tests.
   changed. (Full behavioral proof — a `pl` preference renders the Groups pages
   in Polish — is U8's job, not U4's.)
 - **Handoff note:** append a short `## U4` section to
-  `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` (the 13
+  `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` (the 13
   placements, the three notes + resolutions, the `ViewData["Title"]`
   left-as-is decision, out-of-scope strings confirmed and left untouched, any
   deviations) **before** the folder move.

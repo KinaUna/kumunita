@@ -262,11 +262,11 @@ entry appended *before* the folder move; the unit plan file moved to `done/`).
   `ILocalizationService`, `LocaleCookie`, `FirstBootSeeder`) + the **Pinned
   contract** above (the new `KnownTranslationKeys` / TagHelper / optional batch
   read). The exact C# each unit codes against is named per unit.
-- **Secondary — this file** (`docs/plans-milestones/in-progress/plan-multilingual-ui.md`)
+- **Secondary — this file** (`docs/plans-milestones/done/plan-multilingual-ui.md`)
   — the unit registry with each unit's deliverables and exit criteria (and
   pointers to the per-unit plan files).
 - **Scratch — the rolling handoff note**
-  (`docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md`,
+  (`docs/plans-milestones/done/multilingual-ui-handoff-notes.md`,
   **created by U0** — this session's kickoff). One section per unit, appended
   (never rewritten); each unit writes exactly one short section before it
   exits; the next unit reads only that section + its own entry-read list.

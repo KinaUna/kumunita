@@ -28,10 +28,14 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 Profile **avatars** have also landed — the reference lane of the content-addressed
 local-volume media store (ADR 0011, its own design doc); it adds a second restore
 surface next to the Postgres dump (OPS.md §4/§5).
-**Multilingual** has landed — the UI + platform-texts lane (ADR 0005): the
-admin-managed language catalog + instance default, the per-request translation
-provider (preference cookie → default → `en`, per-string/per-page fallback), the
-`/admin/languages` surface, and the `/terms` + `/help` static-page routes.
+**Multilingual** has landed as **two lanes**. `ML` (ADR 0005) shipped the
+**seam**: the admin-managed language catalog + instance default, the per-request
+translation provider (preference cookie → default → `en`, per-string/per-page
+fallback), the `/admin/languages` surface, and the `/terms` + `/help`
+static-page routes. `ML-UI` (ADR 0015) then wired the **live UI**: every in-scope
+view resolves per request, a seeded `en` floor is always present, the admin
+edits the **closed** key list at `/admin/languages`, a signed-out visitor can
+pick a language at `/language`, and `/about` is a static page.
 **Next is M4** — events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
@@ -72,7 +76,12 @@ provider (preference cookie → default → `en`, per-string/per-page fallback),
   instance default in `/admin/languages` (audited), and residents pick their
   language on the settings page (a cookie, never a claim). A non-English-speaking
   neighborhood can run its platform in its own language with no code change or
-  deploy (ADR 0005; see the "Roadmap" below).
+  deploy (ADR 0005). The `ML-UI` lane (ADR 0015) then makes it **real in the
+  UI**: a resident **sees** the platform in their language (every in-scope view
+  resolves per request, with a seeded `en` floor that is always present), the
+  admin edits the **closed** key list per language (no hand-typed key), a
+  **signed-out** visitor can pick a language at `/language`, and `/about` renders
+  an admin-authored page or the product story.
 
 ## Tech stack
 
@@ -127,8 +136,8 @@ stays trivial and the authorization rules can grow freely.
 - **M3** — Posts/announcements in components; moderation + reports.
 - **Multilingual** (`ML`, ADR 0005) — UI + platform texts (terms, help)
   translatable; admin-managed language catalog & default; `/admin/languages`
-  surface + `/terms`/`/help` static pages. **Done.** (The `/about` static-page
-  route is the one remaining follow-on — recorded in the design doc §Closed.)
+  surface + `/terms`/`/help` static pages. **Done.**
+- **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
@@ -188,5 +197,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0014)
+- `docs/adr/` — architecture decision records (0001–0015)
 - `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)

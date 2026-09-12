@@ -17,11 +17,11 @@ sees those 7 strings in Polish.
 
 ## Entry reads (in this order)
 
-1. `docs/plans-milestones/in-progress/plan-multilingual-ui.md` — **M·10**,
+1. `docs/plans-milestones/done/plan-multilingual-ui.md` — **M·10**,
    **in-scope surface** (the Posts row), the **U3 row**, U3's entry-read list,
    unit-series rules (rule 3 — never key an out-of-scope string; rule 4 — never
    wrap UGC).
-2. `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` — the
+2. `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` — the
    **U2** section (the TagHelper's real shape: `IHttpContextAccessor` +
    `SetContent`, not `SetHtmlContent`; the `ViewContext` gotcha — U3 does not hit
    it since it is view-only).

@@ -508,6 +508,11 @@ design doc §Acceptance gate table.
   a row exists (fall back to the current view), reusing `Views/StaticPages/
   Page.cshtml` + `MarkdownRenderer`. The seam is ready; only the route/wiring
   remains.
+  — **shipped (ML-UI U7, 2026-09-12):** `StaticPagesController.Slugs` now
+  includes `"about"`; `GET /about` renders the `LocalizedPage` (per-page
+  fallback) or the product-story view when truly absent; `HomeController.About`
+  deleted (one route, one owner). See `done/multilingual-ui-handoff-notes.md` §
+  U7.
 - **Folder moves (U9, this close):** `in-progress/multilingual-u09-plan.md` →
   `done/` (this unit's own). **U1–U8's plan files are all already in `done/`**
   (each moved by its own unit at exit; U8's by its note). On close, the whole

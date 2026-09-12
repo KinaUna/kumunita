@@ -1,6 +1,6 @@
 # ML-UI · U5 — wire the remaining in-scope views to `<kw-l>`
 
-> Part of the `ML-UI` lane (`docs/plans-milestones/in-progress/plan-multilingual-ui.md`,
+> Part of the `ML-UI` lane (`docs/plans-milestones/done/plan-multilingual-ui.md`,
 > **M·10**). Per-unit template (Goal / Entry reads / Deliverables / Exit). U5 builds on
 > U1 (`KnownTranslationKeys`, 52 keys) + U2 (`<kw-l>` TagHelper) + U3 (Posts views) +
 > U4 (Groups views). U5 completes the **view-wiring track** (U2–U5).
@@ -18,9 +18,9 @@ element.
 
 ## Entry reads (in order)
 
-1. `docs/plans-milestones/in-progress/plan-multilingual-ui.md` — M·10, the
+1. `docs/plans-milestones/done/plan-multilingual-ui.md` — M·10, the
    in-scope surface, the U5 row + entry-read list, unit-series rules (3 & 4).
-2. `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` — the
+2. `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` — the
    **U3** + **U4** sections (the `ViewData["Title"]` tab-title left-as-is
    convention, the out-of-scope leave-untouched pattern, exact-match
    principle, arrow-entity handling).
@@ -68,7 +68,7 @@ controllers/models/tests/docs.
   changed. (Full behavioral proof — a `pl` preference renders all in-scope
   pages in Polish — is U8's job, not U5's.)
 - **Handoff note:** append a short `## U5` section to
-  `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` (the 16
+  `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` (the 16
   placements, the two notes + resolutions, the `ViewData["Title"]` left-as-is
   decision, out-of-scope strings confirmed and left untouched — especially the
   Login setup-token section, the `home.lead` multi-line handling, any

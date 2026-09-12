@@ -28,7 +28,7 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M5** projects (goals, tasks, contributors) | **coordination → outcome** — many signals re-linked into one goal with owners |
   | **M6** portability, iCal, notifications, search | **outcome + world seams** — the loop closes *into* the residents' lives |
 
-  (Named lanes — `GP` group posts, media (ADR 0011), and `ML` multilingual (ADR 0005) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` is a *shipped* lane, `GP` and media likewise.)
+  (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
 - **The seams are the architecture.** The "modular monolith" in §3 is the
   integration discipline applied: few stable module interfaces over one process,
@@ -87,7 +87,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
-    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
+    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
     │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11)
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
@@ -544,8 +544,13 @@ Design and rationale in ADR 0005; this is the operating shape. **Current state: 
 § Multilingual — Closed) — the two content documents (`TranslationResource` /
 `LocalizedPage`), the `ITranslationProvider` read seam, the `ILocalizationService`
 admin seam, the `LocaleCookie` preference, and the `/admin/languages` + settings +
-`/terms`/`/help` Web surface are all live. The one remaining follow-on is the
-`/about` static-page route (recorded in the design doc § Closed).
+`/terms`/`/help` Web surface are all live. **`ML-UI` (ADR 0015, 2026-09-12) then
+wired that seam into the in-scope views** — every in-scope view resolves per
+request through a `<kw-l>` TagHelper against the provider, the `en` floor is
+seeded from the `KnownTranslationKeys` registry, the admin editor is
+key-managed (a closed list, no hand-typed key), and the picker is public
+(signed-out residents can choose a language) — closing the `/about` follow-on
+the `ML` record had left open.
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine

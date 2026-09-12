@@ -3,7 +3,7 @@
 > **Scratch tier.** One section per unit, **appended** (never rewritten). Each
 > unit writes exactly one short `## U#` section before it exits; the next unit
 > reads only that section + its own entry-read list (the three-tier contract,
-> `docs/plans-milestones/in-progress/plan-multilingual-ui.md`). **U0** is this
+> `docs/plans-milestones/done/plan-multilingual-ui.md`). **U0** is this
 > session's kickoff — the verification unit that confirms the four gaps still
 > hold before any code unit runs.
 
@@ -779,3 +779,74 @@ was `create_file` on a **new** path + terminal `Move-Item` to the canonical
 name, then `dotnet build`. If a test "fails with an assertion you already
 removed", suspect a stale disk copy — verify with the terminal's own
 `Get-Content`, not the workspace `read_file`.
+
+## U9 — the close
+
+**Date:** 2026-09-12 · **Kind:** doc/roadmap unit (no `src` beyond
+`Milestones.cs`; no new tests) · **Exit:** build green + the Web assembly
+green, `in-progress/` empty, references swept.
+
+**The lane is closed.** U1–U7 shipped the code, U8 recorded the gate (291/291
+Core, 100/100 Web). U9 settles D1/D2 as **ADR 0015** — "UI view-localization
+mechanics": **D1** a `<kw-l>` TagHelper resolves per request against
+`ITranslationProvider` (cookie via `LocaleCookie`, M·5/M·8) with the **key
+itself** as the last-resort floor (M·1); **D2** the curated bounded registry
+`KnownTranslationKeys` (keys **+** `en` source text) in Core, materialized
+`en`-only by the seeder, read by the seeder / the key-managed editor / the
+completeness view. It names the `ML` lane (ADR 0005) as the seam this one
+wires, records the `SetContent`-not-`SetHtmlContent` deviation (U2) and the
+un-localized `ViewData["Title"]` limitation (U3/U4/U5) as consequences, and
+cross-references ADR 0005 (the seam completed) + ADR 0013 (the named-lane
+precedent).
+
+**Deliverable set (1 new, 7 modified, 2 moved):**
+- **NEW** `docs/adr/0015-ui-view-localization-mechanics.md`.
+- **Modified** `docs/adr/README.md` — one index row after 0014.
+- **Modified** `src/Kumunita.Web/Milestones.cs` — the `ML-UI` row between
+  `ML` and `M4` (D9-2); `M4` stays the sole `StatusNext`.
+- **Modified** `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the order pin
+  renamed to `Roadmap_Covers_M0_Through_M6_Plus_Named_Lanes_In_Order` with
+  `ML-UI` in the array; the done-set pin gains `"ML-UI"`; the
+  single-in-progress pin is **unchanged** (`M4` remains the sole `StatusNext`
+  — the point); the blank-title pin is untouched (it iterates the list).
+- **Modified** `README.md` — the status paragraph restated as **two** shipped
+  lanes (`ML` + `ML-UI`); the Features **Multilingual** bullet extended with
+  the live-UI facts (keep the ADR 0005 cite, **add** ADR 0015); the Roadmap
+  `ML` row **loses** its `/about` follow-on sentence (U7 shipped it) and a new
+  `ML-UI` row is added; the `docs/adr/` range bumped to 0001–0015.
+- **Modified** `docs/ARCHITECTURE.md` — the §2 named-lanes note gains `ML-UI`
+  (ADR 0015, shipped); the §9 `Localization/` tree note gains
+  `KnownTranslationKeys` + the `GetTranslationsForAsync` batch read; the §9
+  "Current state" gains the `ML-UI` sentence (seam wired into the in-scope
+  views, editor key-managed, picker public).
+- **Modified** `done/multilingual-handoff-notes.md` (the `ML` close record) —
+  exactly one appended line on the `/about` follow-on block: **shipped
+  (ML-UI U7, 2026-09-12)**. History not rewritten.
+- **This section** appended (step below), then the two `in-progress/` files
+  move to `done/`.
+
+**Gate counts (from U8, cited):** `Kumunita.Core.Tests` Total: 291, Errors: 0,
+Failed: 0 · `Kumunita.Web.Tests` Total: 100, Errors: 0, Failed: 0.
+
+**This unit's verification (D9-8 — build + the Web assembly only, no
+`Core.Tests` re-run):**
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Warning(s),
+  0 Error(s)** (the `Milestones.cs` edit compiles).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Kumunita.Web.Tests  Total: 100, Errors: 0, Failed: 0, Skipped: 0,
+  Not Run: 0, Time: 0.615s** — the count is **unchanged from U8** (U9 adds no
+  tests), as expected.
+
+**Folder moves + reference sweep (D9-7):** `plan-multilingual-ui.md` +
+`multilingual-ui-handoff-notes.md` moved `in-progress/` → `done/` (this unit's
+own, after this section is written). The nine `multilingual-ui-uNN-plan.md`
+files were already in `done/`. A repo-wide sweep re-pointed every surviving
+reference to those two files (this note's own header + the plan file's
+secondary-tier self-reference + the four unit plans U0/U3/U4/U5 that cite the
+master plan and the handoff note) from their `in-progress/` paths to their
+`done/` paths; **zero** references to the two files' old `in-progress/` paths
+survive. `in-progress/` is **empty** at exit.
+
+**Drift-pause count: 0.** No ADR fact required code verification beyond the
+U1/U2/U6/U7/U8 notes; the `MilestonesTests` pins matched the D9-2/D9-3 intent
+on first read (no `ML`-U9 discrepancy recorded).

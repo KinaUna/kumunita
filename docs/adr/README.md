@@ -19,3 +19,4 @@ Decision / Consequences. New decisions take the next number.
 | 0012 | Community membership: mandatory communities + moderator-managed optional membership | Accepted |
 | 0013 | Group posts: a membership-scoped group channel | Accepted |
 | 0014 | Post edit lane: author-only (no moderator/admin branch) | Accepted |
+| 0015 | UI view-localization mechanics (TagHelper + curated registry) | Accepted |

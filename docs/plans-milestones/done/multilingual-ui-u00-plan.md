@@ -2,10 +2,10 @@
 
 **Milestone:** `ML-UI` (the UI-wiring completion of the `ML` / ADR 0005
 promise) · **Read first (5 min):**
-`docs/plans-milestones/in-progress/plan-multilingual-ui.md` (master register —
+`docs/plans-milestones/done/plan-multilingual-ui.md` (master register —
 the four verified gaps, the pinned contract, invariants M·10/M·11, FACES
 L1–L9, the 9-unit table, unit-series rules) + the **U0** section of
-`docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` (this
+`docs/plans-milestones/done/multilingual-ui-handoff-notes.md` (this
 session's verification record). **No repo-wide scan.**
 
 ## Goal
@@ -14,7 +14,7 @@ the scratch handoff note with this U0 section, and finalize this plan file's
 per-unit entry-read lists. **Doc unit — no code, no build.**
 
 ## Entry reads (the minimal set — read in this order)
-1. `docs/plans-milestones/in-progress/plan-multilingual-ui.md` — the whole
+1. `docs/plans-milestones/done/plan-multilingual-ui.md` — the whole
    file (it is this session's output; the gaps, the pinned contract, the
    invariants, the FACES, and the unit table are all here).
 2. The `ML` close record — the "## Multilingual — Closed (recorded by U9)"
@@ -52,7 +52,7 @@ shipped (or the `ML` close record is stale) — **pause** and record
 proceeding.
 
 ## Deliverables (2 files)
-1. **New:** `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md`
+1. **New:** `docs/plans-milestones/done/multilingual-ui-handoff-notes.md`
    — the scratch tier, created with the **U0** section (this session's
    verification record: the four gaps with their grep evidence, the frozen-seam
    list, the only-allowed-ADDs, the roadmap state, D1/D2, the unit count, the
@@ -70,7 +70,7 @@ no view edits, no tests, no README / ADR / `Milestones.cs` edits. U1 creates
 - The four-gap verification above ran and the counts match the expected values
   (recorded in the handoff note's U0 section with the exact grep output).
 - The handoff note exists at
-  `docs/plans-milestones/in-progress/multilingual-ui-handoff-notes.md` with the
+  `docs/plans-milestones/done/multilingual-ui-handoff-notes.md` with the
   **U0** section appended **before** this unit plan file's folder move.
 - This unit plan file moved to
   `docs/plans-milestones/done/multilingual-ui-u00-plan.md`.
