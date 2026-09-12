@@ -2,9 +2,9 @@
 
 > **Primary reference tier** for the multilingual lane (`ML`, ADR 0005). This doc
 > is **authored in full up front** (unlike group posts, whose Part 2 was written by
-> U2) — the unit register `docs/plans-milestones/plan-multilingual.md` is the
+> U2) — the unit register `docs/plans-milestones/done/plan-multilingual.md` is the
 > **secondary** tier, and
-> `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` is the
+> `docs/plans-milestones/done/multilingual-handoff-notes.md` is the
 > **scratch** tier. This file pins the invariant numbers (**M·1–M·9**), the FACES
 > numbers (**M1–M13**), the **exact C#** of every seam, the **19 pinned seam-test
 > names**, the **three-test acceptance gate**, and the **drift guard**. Every
@@ -531,7 +531,60 @@ Record (shape mirrored from the group-posts `§Gate (recorded by U10)` —
 
 ## Multilingual — Closed (recorded by U9)
 
-*Placeholder — U9 appends the close (the consistency checklist: seams present,
-19 test names verbatim, `Milestones.cs` `ML` → done / `M4` → next, README
-Roadmap, `ARCHITECTURE.md` §8/§9, the folder moves, and the drift-pause count =
-0) here. Until then this section is empty and must not be read as closed.*
+**Date:** 2026-09-12 · **Machine:** Windows (PowerShell terminal) ·
+**Runner (re-verified at close):** the AGENTS.md reliable path — `dotnet build
+Kumunita.slnx -c Debug` (green) then `dotnet exec` on each test assembly (**not**
+`dotnet test` / VS Test Explorer — the xunit.v3 discovery quirk on this machine).
+U9 is a **doc + roadmap close**: it changes **no production code**, adds **no**
+test, and re-verifies the two assemblies stay green after the roadmap bump.
+
+**Consistency checklist (all confirmed):**
+- **Seams present (frozen when landed):** the 2 content docs
+  (`TranslationResource` / `LocalizedPage`, U1) + the 2 `M1DocTypes` unique
+  indexes (U1) · `ITranslationProvider` + `TranslationProvider` (U2) ·
+  `ILocalizationService` + `LocalizationService` + `LanguageCompleteness` (U3) ·
+  `LocaleCookie` (the **one** Web HTTP seam, U4) + the two `AddTransient` DI
+  registrations in `DependencyInjection.cs` (U4) · `LanguagesController` (U5) +
+  `LocaleController` (settings page) + `StaticPagesController` (`/terms`,
+  `/help`) + `MarkdownRenderer` + the admin/ locale/ static-page Razor views
+  (U6). Every seam matches this doc's §Pinned contract verbatim (no re-shape).
+- **19 §Pinned-seam-test names verbatim:** all 19 are present character-for-
+  character in `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` (U7's
+  freeze held — no rename lane was exercised), and re-ran green at close
+  (re-verified below).
+- **Roadmap bump:** `src/Kumunita.Web/Milestones.cs` — `ML` → `StatusDone`,
+  `M4` → `StatusNext` (order unchanged; `ML` keeps index 5).
+  `tests/Kumunita.Web.Tests/MilestonesTests.cs` kept in step — the single
+  in-progress milestone is now `M4` (the `M0_Through_M3_Are_Marked_Done` pin was
+  extended to `GP` + `ML` and the single-in-progress test renamed to
+  `Events_Is_The_Single_InProgress_Milestone`, asserting `M4`).
+- **README Roadmap + status + feature bullet:** `Multilingual` restated as
+  **shipped** (roadmap row now **Done.**, `M4` now **Next.**) and the feature
+  bullet restated as the live admin + resident surface.
+- **`ARCHITECTURE.md` §8/§9:** §9 "Current state" restated to **`ML` lane
+  shipped**; the `M1DocTypes` / `Localization/` tree note restated from "lands
+  with M6" to **shipped (ML)**; the value-chain milestone table de-`ML`-folds
+  (multilingual is a *named lane*, like `GP`/media, not an M-letter row) — and
+  M6's row no longer lists "multilingual".
+- **Drift-pause count = 0:** no `## U<m> — Drift pause` section in
+  `multilingual-handoff-notes.md` across U0–U9; every unit exited on its own
+  green gate (U7: 280/280 + 90/90; U8: 370/370 recorded).
+
+**Follow-on recorded (deliberately NOT shipped in this lane):** the `LocalizedPage`
+static-page engine (ADR 0005 A) names **terms, about, help**. U6 shipped the
+`/terms` + `/help` routes (`StaticPagesController`, slug-guarded to
+`{ terms, help }`) but **not** `/about` — the existing `/about` route is
+`HomeController.About` (the product-story landing page). Making `/about` render a
+`LocalizedPage` body is a **new Web ADD** (a route + a `HomeController` change)
+outside this lane's sealed scope (unit-series rule 4: any other Web ADD is a drift
+pause), so it is **recorded, not shipped**. The exact change for the M4 lane (or a
+small follow-up unit) is: add `"about"` to `StaticPagesController.Slugs` **or**
+point `HomeController.About` at `ITranslationProvider.GetPageAsync("about", …)`
+when a row exists (fall back to the current product-story view), reusing the
+existing `Views/StaticPages/Page.cshtml` + `MarkdownRenderer`. The seam is ready —
+only the route/wiring remains.
+
+**Close re-verification (this unit):** `dotnet build Kumunita.slnx -c Debug`
+green; `Kumunita.Web.Tests` **90/90** (including the re-pinned `MilestonesTests`
+with `M4` as the single in-progress); `Kumunita.Core.Tests` **280/280** (unchanged
+— U9 adds no Core test). **Total: 370/370 passed, 0 failed.** No drift.

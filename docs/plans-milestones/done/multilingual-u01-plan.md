@@ -3,9 +3,9 @@
 **Milestone:** multilingual (`ML`, ADR 0005) · **Read first (5 min):**
 `docs/design/multilingual-design.md` §Pinned contract §1 (the **exact** C# of both
 POCOs and the registration snippet — this unit matches it verbatim) +
-`docs/plans-milestones/plan-multilingual.md` (master register — invariants M·1–M·9,
+`docs/plans-milestones/done/plan-multilingual.md` (master register — invariants M·1–M·9,
 FACES M1–M13, unit-series rules) + the **U0** section of
-`docs/plans-milestones/in-progress/multilingual-handoff-notes.md`. **No repo-wide scan.**
+`docs/plans-milestones/done/multilingual-handoff-notes.md`. **No repo-wide scan.**
 
 ## Goal
 Ship the two ADR 0005 B content documents — `TranslationResource` (UI strings)
@@ -16,7 +16,7 @@ surface with the pair-idiom unique indexes. **Code unit — build must be green.
 ## Entry reads (the minimal set — read in this order)
 1. `docs/design/multilingual-design.md` §Pinned contract §1 only — the exact
    POCOs + the `M1DocTypes` registration snippet (verbatim contract).
-2. `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` — the U0
+2. `docs/plans-milestones/done/multilingual-handoff-notes.md` — the U0
    section (what's already shipped: `LanguageCatalog` / `LocaleSettings`, the
    seeder, the already-bumped roadmap — **do not re-do any of that**).
 3. `src/Kumunita.Core/Localization/LanguageCatalog.cs` (the existing seed
@@ -55,6 +55,6 @@ changes, no tests (U7), no README / ADR edits (U9).
 ## Exit
 - `dotnet build Kumunita.slnx -c Debug` **green**.
 - The U1 handoff-note section appended to
-  `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+  `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
   the folder move.
 - This unit plan file moved to `docs/plans-milestones/done/multilingual-u01-plan.md`.

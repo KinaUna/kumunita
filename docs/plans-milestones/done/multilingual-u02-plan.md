@@ -3,9 +3,9 @@
 **Milestone:** multilingual (`ML`, ADR 0005) · **Read first (5 min):**
 `docs/design/multilingual-design.md` §Pinned contract §2 (the **exact** C# of
 `ITranslationProvider` — this unit matches it verbatim) +
-`docs/plans-milestones/plan-multilingual.md` (master register — invariants M·1–M·9,
+`docs/plans-milestones/done/plan-multilingual.md` (master register — invariants M·1–M·9,
 FACES M1–M13, unit-series rules) + the **U1** section of
-`docs/plans-milestones/in-progress/multilingual-handoff-notes.md` (the two content
+`docs/plans-milestones/done/multilingual-handoff-notes.md` (the two content
 docs + `M1DocTypes` indexes are already in place — the provider reads them).
 **No repo-wide scan.**
 
@@ -17,7 +17,7 @@ Ship the per-request read seam — the `ITranslationProvider` interface and the
 ## Entry reads (the minimal set — read in this order)
 1. `docs/design/multilingual-design.md` §Pinned contract §2 only — the exact
    interface signature + doc-comments (verbatim contract).
-2. `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` — the U1
+2. `docs/plans-milestones/done/multilingual-handoff-notes.md` — the U1
    section (the two content docs + `M1DocTypes` indexes are shipped; the `en`
    floor + `LocaleSettings` seed are already in place — **do not re-do any of
    that**).
@@ -69,6 +69,6 @@ ships the two files), no seeder changes, no Web changes, no tests (U7), no READM
 ## Exit
 - `dotnet build Kumunita.slnx -c Debug` **green**.
 - The U2 handoff-note section appended to
-  `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+  `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
   the folder move.
 - This unit plan file moved to `docs/plans-milestones/done/multilingual-u02-plan.md`.

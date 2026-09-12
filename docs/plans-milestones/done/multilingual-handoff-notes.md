@@ -3,7 +3,7 @@
 > **Scratch tier.** One section per unit, **appended** (never rewritten). Each
 > unit writes exactly one short `## U#` section before it exits; the next unit
 > reads only that section + its own entry-read list (the three-tier contract,
-> `docs/plans-milestones/plan-multilingual.md`). **U0** is this session's
+> `docs/plans-milestones/done/plan-multilingual.md`). **U0** is this session's
 > kickoff — the plan-authoring unit that produced the two reference-tier
 > artifacts, before any code unit runs.
 
@@ -50,7 +50,7 @@ onward create their own `multilingual-uNN-plan.md` as they start).
   `ILocalizationService` + `LanguageCompleteness`, `LocaleCookie`, the
   admin-surface actions) · **Pinned seam tests (19)** · **Acceptance gate
   (three-test shape)** · **Drift guard**.
-- **Secondary** — `docs/plans-milestones/plan-multilingual.md`: the three-tier
+- **Secondary** — `docs/plans-milestones/done/plan-multilingual.md`: the three-tier
   contract · Understanding · Assumptions · the invariant / FACES / pinned-seam-
   test tables (cross-referenced to the design doc) · the **sealed-unit table
   (U1–U9)** · the unit-series rules.
@@ -451,3 +451,72 @@ design doc §Acceptance gate table.
   files are already in `done/` — U1–U7 each moved their own at exit; U8's
   is the one moved by this note). **Nothing is staged or committed —
   the user reviews first.**
+## U9 — the close (roadmap bump + doc sync + folder moves)
+
+- **Close: DONE, 2026-09-12, this machine (Windows/PowerShell).** U9 is a
+  **doc + roadmap** close — it changed **no production code**, added **no**
+  test, and re-verified both assemblies stay green after the bump.
+  **Re-verification (AGENTS.md `dotnet exec` path):** `dotnet build
+  Kumunita.slnx -c Debug` **green** → `Kumunita.Web.Tests` **90/90, 0 failed**
+  (0.6 s; includes the re-pinned `MilestonesTests`) → `Kumunita.Core.Tests`
+  **280/280, 0 failed** (27.7 s; Testcontainers `postgres:18`, containers
+  stopped + deleted by the run). **Total: 370/370 passed, 0 failed.** No reds.
+- **Roadmap bump (the one code-adjacent delta, data-only):**
+  - `src/Kumunita.Web/Milestones.cs` — `ML` `StatusNext` → `StatusDone`;
+    `M4` `StatusPlanned` → `StatusNext`. **Order unchanged** (`M0, M1, M2,
+    M3, GP, ML, M4, M5, M6`; `ML` keeps index 5, only its status flips);
+    `M5`/`M6` stay `StatusPlanned`.
+  - `tests/Kumunita.Web.Tests/MilestonesTests.cs` — kept in step (the
+    register's `MilestonesTests` pin): the "shipped are done" test was
+    extended to assert `M0–M3` **+ `GP` + `ML`** are all `StatusDone`
+    (renamed `Shipped_Milestones_Are_Marked_Done`), and the single-in-progress
+    test was renamed `Multilingual_Is_The_Single_InProgress_Milestone` →
+    `Events_Is_The_Single_InProgress_Milestone`, now asserting **`M4`** is the
+    single `StatusNext`. (A **roadmap-test** rename, **not** a §Pinned-seam-test
+    rename — the 19 multilingual names are untouched.)
+- **README (3 references synced):** the `Multilingual next …` status paragraph
+  → restated **shipped** (`M4` now next); the `## Roadmap` section —
+  `Multilingual … Next.` → **Done.** (+ the `/about` follow-on note) and
+  `M4 … (Deferred until after multilingual.)` → **Next.**; the `Multilingual`
+  **feature bullet** → restated as the **live** admin + resident surface
+  (no longer "next"). The `## Deferred` MT-of-UGC bullet left **as-is**
+  (ADR 0005 C, still deferred).
+- **`ARCHITECTURE.md` (3 references synced):** §9 "Current state" → **`ML`
+  lane shipped** (2026-09-12); the `Localization/` tree note "lands with M6"
+  → **shipped (ML)** (the two content docs + both interfaces + the record);
+  the §2 value-chain table — "multilingual" removed from the **M6** row and a
+  note added that named lanes (`GP`/media/`ML`) are not M-letter rows there
+  (consistent with how `GP` is already handled — a self-correction: I initially
+  added an `ML` row, then removed it to match the `GP`/media convention).
+- **Design doc `## Multilingual — Closed (recorded by U9)`:** filled
+  (placeholder removed, heading kept) with the consistency checklist —
+  seams present (all 5 frozen when landed), 19 seam-test names verbatim,
+  roadmap bump, README/ARCHITECTURE sync, **drift-pause count = 0** (no
+  `## U<m> — Drift pause` across U0–U9), and the **`/about` follow-on**
+  (below).
+- **`/about` follow-on (recorded, NOT shipped in this lane):** the ADR 0005 A
+  static-page engine names **terms, about, help**; U6 shipped `/terms` + `/help`
+  (`StaticPagesController`, slug-guarded `{ terms, help }`) but **not** `/about`
+  (the current `/about` is `HomeController.About`, the product-story landing
+  page; U6 deferred touching `HomeController` to U9). Making `/about` render a
+  `LocalizedPage` body is a **new Web ADD** (a route + a `HomeController`
+  change) **outside this lane's sealed scope** (unit-series rule 4: any other
+  Web ADD is a drift pause), so it is **recorded, not shipped** — the exact
+  change is named in the design-doc § Closed for the **M4 lane** (or a small
+  follow-up unit): add `"about"` to `StaticPagesController.Slugs` **or** point
+  `HomeController.About` at `ITranslationProvider.GetPageAsync("about", …)` when
+  a row exists (fall back to the current view), reusing `Views/StaticPages/
+  Page.cshtml` + `MarkdownRenderer`. The seam is ready; only the route/wiring
+  remains.
+- **Folder moves (U9, this close):** `in-progress/multilingual-u09-plan.md` →
+  `done/` (this unit's own). **U1–U8's plan files are all already in `done/`**
+  (each moved by its own unit at exit; U8's by its note). On close, the whole
+  lane's plan set was folded into `done/` to match the group-posts / media /
+  m1–m3b convention (their master `plan-*.md` + `*-handoff-notes.md` both live in
+  `done/`): `plan-multilingual.md` (the master register) and this
+  `multilingual-handoff-notes.md` (the rolling scratch log) both moved to
+  `done/`, leaving `in-progress/` **empty**. All references to both files across
+  the design doc + U1–U9 unit plans were updated to their `done/` paths.
+- **Handing off:** the `ML` lane is **closed** — `M4` (events) is the next
+  lane to plan. **Nothing is staged or committed — the user reviews first**
+  (a draft commit message is provided at the end of the session).

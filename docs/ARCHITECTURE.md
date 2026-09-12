@@ -26,7 +26,9 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M3** posts, components, moderation | **understanding → decision** — a signal reaches its audience; a report links to a moderator |
   | **M4** events, RSVP, reminders | **coordination** — a decision becomes an owned, scheduled, reminded action |
   | **M5** projects (goals, tasks, contributors) | **coordination → outcome** — many signals re-linked into one goal with owners |
-  | **M6** portability, iCal, notifications, search, multilingual | **outcome + world seams** — the loop closes *into* the residents' lives (ADR 0005) |
+  | **M6** portability, iCal, notifications, search | **outcome + world seams** — the loop closes *into* the residents' lives |
+
+  (Named lanes — `GP` group posts, media (ADR 0011), and `ML` multilingual (ADR 0005) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` is a *shipped* lane, `GP` and media likewise.)
 
 - **The seams are the architecture.** The "modular monolith" in §3 is the
   integration discipline applied: few stable module interfaces over one process,
@@ -85,7 +87,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
-    │   │   ├── Localization/       # ADR 0005 — LanguageCatalog, LocaleSettings (shipped in M1's surface); TranslationResource / LocalizedPage land with M6's admin UI
+    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
     │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11)
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
@@ -537,12 +539,13 @@ dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.
 
 ## 9. Localization (multilingual)
 
-Design and rationale in ADR 0005; this is the operating shape. **Current state:** the
-shipped surface is the first-boot seed of the language catalog + instance default
-(`LanguageCatalog`, `LocaleSettings`; M1). Everything below — the translation provider,
-user preference, the admin surface, `LocalizedPage` — is the **multilingual lane
-(`ML`)**, pulled forward from M6 to be the next lane (see `M1DocTypes.cs` and the
-README roadmap).
+Design and rationale in ADR 0005; this is the operating shape. **Current state: the
+`ML` lane is shipped** (2026-09-12 — see `design/multilingual-design.md`
+§ Multilingual — Closed) — the two content documents (`TranslationResource` /
+`LocalizedPage`), the `ITranslationProvider` read seam, the `ILocalizationService`
+admin seam, the `LocaleCookie` preference, and the `/admin/languages` + settings +
+`/terms`/`/help` Web surface are all live. The one remaining follow-on is the
+`/about` static-page route (recorded in the design doc § Closed).
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine

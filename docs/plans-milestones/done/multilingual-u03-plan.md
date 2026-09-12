@@ -4,9 +4,9 @@
 `docs/design/multilingual-design.md` §Pinned contract §3 (the **exact** C# of
 `ILocalizationService`, `LanguageCompleteness`, and the audit-row shape table —
 this unit matches the interface and record verbatim) +
-`docs/plans-milestones/plan-multilingual.md` (master register — invariants
+`docs/plans-milestones/done/plan-multilingual.md` (master register — invariants
 M·1–M·9, FACES M1–M13, unit-series rules) + the **U2** section of
-`docs/plans-milestones/in-progress/multilingual-handoff-notes.md`. **No
+`docs/plans-milestones/done/multilingual-handoff-notes.md`. **No
 repo-wide scan.**
 
 ## Goal
@@ -22,7 +22,7 @@ row). **Code unit — build must be green.**
 ## Entry reads (the minimal set — read in this order)
 1. `docs/design/multilingual-design.md` §Pinned contract §3 only — the exact
    interface + record + audit-row shape table (verbatim contract).
-2. `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` — the U2
+2. `docs/plans-milestones/done/multilingual-handoff-notes.md` — the U2
    section (what U2 shipped: `ITranslationProvider` + `TranslationProvider` —
    the provider and the service are **independent**, no coupling).
 3. `src/Kumunita.Core/UserInfo/UserInfoService.cs` (the audit-row write
@@ -77,6 +77,6 @@ no README / ADR edits (U9).
 ## Exit
 - `dotnet build Kumunita.slnx -c Debug` **green**.
 - The U3 handoff-note section appended to
-  `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+  `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
   the folder move.
 - This unit plan file moved to `docs/plans-milestones/done/multilingual-u03-plan.md`.

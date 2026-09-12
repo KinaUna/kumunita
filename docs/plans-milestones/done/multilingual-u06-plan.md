@@ -5,8 +5,8 @@
 > `docs/design/multilingual-design.md` §4 (`LocaleCookie`) + §5 tail (the
 > settings page + the `/terms` `/about` `/help` routes) + §Pinned seam tests
 > M7/M8/M5 anchors. **Secondary** is the unit register
-> `docs/plans-milestones/plan-multilingual.md` (this unit's row). **Scratch** is
-> `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` (read the
+> `docs/plans-milestones/done/plan-multilingual.md` (this unit's row). **Scratch** is
+> `docs/plans-milestones/done/multilingual-handoff-notes.md` (read the
 > **U5** section — it confirms the `LanguagesController` + its two public
 > nested view models are the stable HTTP surface U6 builds against).
 
@@ -70,6 +70,6 @@ localized view), not a U6 concern.
    and the two one-line nav/layout edits all compile; Razor compiles the
    `@model` bindings against the U5-pinned view-model shapes).
 2. The **U6** section is appended to
-   `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+   `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
    the folder move.
 3. This plan file is moved `in-progress/` → `done/`.

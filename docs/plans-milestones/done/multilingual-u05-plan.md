@@ -4,8 +4,8 @@
 > one at a time. The **primary** reference is the design doc
 > `docs/design/multilingual-design.md` §5 (the admin-surface actions table) +
 > §Drift guard (the 10-action pin). **Secondary** is the unit register
-> `docs/plans-milestones/plan-multilingual.md` (this unit's row). **Scratch** is
-> `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` (read the
+> `docs/plans-milestones/done/plan-multilingual.md` (this unit's row). **Scratch** is
+> `docs/plans-milestones/done/multilingual-handoff-notes.md` (read the
 > **U4** section — it confirms every Core seam this controller delegates to is
 > already registered in the host container).
 
@@ -93,6 +93,6 @@ register.)
    `Kumunita.Web` — the controller compiles against the shipped
    `ILocalizationService` / `LanguageCatalog` / `LanguageCompleteness` shapes).
 2. The **U5** section is appended to
-   `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+   `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
    the folder move.
 3. This plan file is moved `in-progress/` → `done/`.

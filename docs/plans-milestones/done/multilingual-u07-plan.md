@@ -5,8 +5,8 @@
 > `docs/design/multilingual-design.md` §Pinned seam tests (19 exact names) +
 > §Pinned contract (the exact C# of every seam U1–U6 shipped) + the 13 FACES
 > rows. **Secondary** is the unit register
-> `docs/plans-milestones/plan-multilingual.md` (this unit's row). **Scratch**
-> is `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` (read
+> `docs/plans-milestones/done/plan-multilingual.md` (this unit's row). **Scratch**
+> is `docs/plans-milestones/done/multilingual-handoff-notes.md` (read
 > the **U6** section — it confirms the Core seams U7's tests consume are the
 > final U1–U6 state: two content docs, two interfaces + `LanguageCompleteness`,
 > both registered in the DI graph).
@@ -189,7 +189,7 @@ table):
    `Kumunita.Web.Tests` assembly also passes (unchanged, but verified as part
    of the exit).
 3. The **U7** section is appended to
-   `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` **before**
+   `docs/plans-milestones/done/multilingual-handoff-notes.md` **before**
    the folder move.
 4. This plan file is moved `in-progress/` → `done/`.
 

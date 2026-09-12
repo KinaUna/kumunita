@@ -28,9 +28,11 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 Profile **avatars** have also landed — the reference lane of the content-addressed
 local-volume media store (ADR 0011, its own design doc); it adds a second restore
 surface next to the Postgres dump (OPS.md §4/§5).
-**Multilingual** next — the UI + platform-texts lane (ADR 0005), pulled forward
-so the test platform can be exercised in more than one language before the
-circle widens; then **M4**: events, RSVPs, reminders (per the roadmap table in
+**Multilingual** has landed — the UI + platform-texts lane (ADR 0005): the
+admin-managed language catalog + instance default, the per-request translation
+provider (preference cookie → default → `en`, per-string/per-page fallback), the
+`/admin/languages` surface, and the `/terms` + `/help` static-page routes.
+**Next is M4** — events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
 ## Principles
@@ -64,11 +66,13 @@ circle widens; then **M4**: events, RSVPs, reminders (per the roadmap table in
   audience lane is never evaluated, and replies inherit the parent's single
   membership decision.
 - Moderation with component-scoped moderators and full audit
-- **Multilingual** — UI and platform texts (terms, about, help) are translatable,
-  and the language catalog + instance default are seeded at first boot. The full
-  admin-managed language + translation surface is **next** — pulled forward from
-  M6 so the platform can be exercised in more than one language before the
-circle widens (ADR 0005; see the "Roadmap" below).
+- **Multilingual** — UI and platform texts (terms, help) are translatable,
+  resolved per request (user preference → instance default → `en`, with
+  per-string / per-page fallback). The admin manages the language catalog +
+  instance default in `/admin/languages` (audited), and residents pick their
+  language on the settings page (a cookie, never a claim). A non-English-speaking
+  neighborhood can run its platform in its own language with no code change or
+  deploy (ADR 0005; see the "Roadmap" below).
 
 ## Tech stack
 
@@ -121,9 +125,11 @@ stays trivial and the authorization rules can grow freely.
 - **M1** — Identity, groups, delegation, and the authorization model above.
 - **M2** — Directory & profiles with visibility rules.
 - **M3** — Posts/announcements in components; moderation + reports.
-- **Multilingual** (pulled forward from M6) — UI + platform texts (terms, about,
-  help) translatable; admin-managed language catalog & default (ADR 0005). **Next.**
-- **M4** — Events, RSVPs, reminders. (Deferred until after multilingual.)
+- **Multilingual** (`ML`, ADR 0005) — UI + platform texts (terms, help)
+  translatable; admin-managed language catalog & default; `/admin/languages`
+  surface + `/terms`/`/help` static pages. **Done.** (The `/about` static-page
+  route is the one remaining follow-on — recorded in the design doc §Closed.)
+- **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
 

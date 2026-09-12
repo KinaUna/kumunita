@@ -8,7 +8,7 @@
 > including the §Pinned contract and the 19 pinned seam-test names). The
 > **secondary** tier is **this file** (unit registry + deliverables + exit
 > criteria). The **scratch** tier is
-> `docs/plans-milestones/in-progress/multilingual-handoff-notes.md` (one appended
+> `docs/plans-milestones/done/multilingual-handoff-notes.md` (one appended
 > section per unit, never rewritten).
 >
 > **The M1 seed is already shipped** — `LanguageCatalog` / `LocaleSettings` are in
@@ -141,11 +141,11 @@ file moved to `done/`).
 - **Primary — the design doc** (`docs/design/multilingual-design.md`, authored
   in full up front) — the exact C# of every seam U1–U6 must match, the 19 pinned
   seam-test names, the gate shape, the drift-guard.
-- **Secondary — this file** (`docs/plans-milestones/plan-multilingual.md`) — the
+- **Secondary — this file** (`docs/plans-milestones/done/plan-multilingual.md`) — the
   unit registry with each unit's deliverables and exit criteria (and pointers to
   the per-unit plan files).
 - **Scratch — the rolling handoff note**
-  (`docs/plans-milestones/in-progress/multilingual-handoff-notes.md`, **created
+  (`docs/plans-milestones/done/multilingual-handoff-notes.md`, **created
   by U0** — this session's kickoff). One section per unit, appended (never
   rewritten); each unit writes exactly one short section before it exits; the
   next unit reads only that section + its own entry-read list.
