@@ -79,12 +79,21 @@ public static class M1DocTypes
         opts.Schema.For<OutboxEmail>();
         opts.Schema.For<EmailDeadLetter>();
 
-        // Localization (ADR 0005): the language catalog + the per-instance default.
-        // The seeder materializes the `en` row and a default of `en` on first boot;
-        // the full TranslationResource/LocalizedPage surface lands with M6's
-        // localization work (the ADR's module surface, not the first-boot lane).
+        // Localization (ADR 0005, the ML lane): the language catalog + the
+        // per-instance default (the seeder materializes the `en` row and a default
+        // of `en` on first boot — already shipped), plus the two content documents
+        // this lane ships (the ADR's module surface on top of that seed).
+        // The pair idiom (surrogate Id + unique index on the business-key pair) is
+        // the GroupMembership / ComponentMembership convention: one text per key
+        // per language, one page per slug per language. Rows are **retained** when
+        // a language is removed (M·7) — that retention is the ILocalizationService's
+        // job (U3), not a delete here.
         opts.Schema.For<LanguageCatalog>();
         opts.Schema.For<LocaleSettings>();
+        opts.Schema.For<TranslationResource>()
+               .UniqueIndex(t => t.Key, t => t.LanguageCode);   // business key (one text per key per language)
+        opts.Schema.For<LocalizedPage>()
+               .UniqueIndex(p => p.Slug, p => p.LanguageCode);  // business key (one page per slug per language)
 
         // Authorization (audit only — AdminOverride is hand-rolled, see AuthorizationFeature)
         opts.Schema.For<AccessAudit>();

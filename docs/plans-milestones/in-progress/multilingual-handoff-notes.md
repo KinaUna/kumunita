@@ -74,3 +74,34 @@ touched); the `Kumunita.Web.Tests` assembly still passes (verified via the
 AGENTS.md `dotnet exec` path, **not** `dotnet test`); the plan is consistent
 with the already-bumped roadmap (verified, not re-edited). **Next: U1** (the
 content documents + the `M1DocTypes` indexes), per the unit register.
+
+## U1 — Content documents + M1DocTypes indexes
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (3 files, matching the design doc §Pinned contract §1 verbatim):**
+- **New** `src/Kumunita.Core/Localization/TranslationResource.cs` — the UI-string
+  doc: surrogate `Id` + the business-key pair (`Key`, `LanguageCode`) + `Text`
+  (sealed, doc-comment anchors M·1/M·2/M·4/M·9 — the key-itself floor).
+- **New** `src/Kumunita.Core/Localization/LocalizedPage.cs` — the static-page
+  doc: `Id` + (`Slug`, `LanguageCode`) + `Title`, `Body` (Markdown), `Updated`
+  (sealed; M·7's row-retention note is here, the *behavior* is U3's).
+- **Modified** `src/Kumunita.Core/M1DocTypes.cs` — appended the two
+  registrations on the **existing** surface (no new `DocTypes` class, per
+  ADR 0004 §B.1 additive — Marten's delta picks them up, **no re-seed**):
+  `UniqueIndex(t => t.Key, t => t.LanguageCode)` and
+  `UniqueIndex(p => p.Slug, p => p.LanguageCode)` — the pair idiom
+  (`GroupMembership` / `ComponentMembership` precedent). Also corrected the
+  stale Localization comment that said the surface "lands with M6" — it lands
+  **now** (`ML` lane); retention is called out as U3's job, not a delete here.
+
+**State for U2 (the `ITranslationProvider` read seam):** both content docs exist
+in `Kumunita.Core.Localization` with exactly the pinned member names — the
+provider reads `TranslationResource` / `LocalizedPage` + the M1 seed
+(`LanguageCatalog` / `LocaleSettings`), never UGC (M·3). `en` floor (M·9) is the
+seeder's row, already shipped — the provider's last fallback is the **key
+itself**, not a blank. Nothing else changed: no seeder edit (M1's `en` row is
+untouched), no interface yet, no Web change. **Next: U2** —
+`ITranslationProvider` + `TranslationProvider`, per the design doc
+§Pinned contract §2.
