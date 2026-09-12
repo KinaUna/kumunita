@@ -352,3 +352,68 @@ read a static page (M5 FACES), and an admin can manage the full catalog
 (M9/M10/M11/M12/M13 FACES). U7 ships `LocalizationServiceTests.cs` — the
 19 names from the design doc §Pinned seam tests. **Next: U7** — the 19
 seam tests, per the design doc §Pinned seam tests table.
+
+## U7 — the 19 pinned seam tests (`LocalizationServiceTests.cs`)
+
+**Date:** 2026-09-12 · **Role:** test unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (1 file, all 19 names verbatim from the design doc §Pinned
+seam tests):**
+- **New** `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` — the
+  19 pinned `[Fact]`s (13 FACES M1–M13 + 6 audit-row-shape), class
+  `public class LocalizationServiceTests(PostgresFixture fixture) :
+  IClassFixture<PostgresFixture>`. Each test drives the **shipped** Core
+  seams (`TranslationProvider` / `LocalizationService`) over a fresh scratch
+  Postgres DB (the `PostgresFixture` harness — the `PostServiceTests`
+  template, extended with `M3DocTypes.Configure` for M6's `Post` plant).
+  - **FACES M1–M13:** each test seeds the M1 row (`en` catalog row +
+    `LocaleSettings` singleton) via a private `SeedM1RowAsync` helper (mirrors
+    `FirstBootSeeder.SeedLanguageCatalogAsync` exactly — idempotent
+    load-then-store), then drives the provider / service per the pinned
+    FACES row. M6 plants an `en` `Post` directly (the provider **never**
+    reads a `Post` body — the negative pin is the test's assertion that the
+    `Post`'s `Body` is unchanged and the provider's platform-text returns
+    are independent). M8 removes `pl` via the service's `RemoveLanguageAsync`
+    (not the default — allowed) and asserts the provider falls back to `en`.
+    M13 removes `pl`, re-adds it, and asserts the `pl` `LocalizedPage` row
+    is **restored** (M·7 retention).
+  - **Audit-row-shape (6):** each test drives the matching
+    `LocalizationService` mutation and asserts the **single** committed
+    `AccessAudit` row with the pinned shape (`Action`, `TargetKind`,
+    `TargetId`, `Via = Admin`, `Outcome = Allow`, `ActorId = actor`) — the
+    design doc §Pinned contract §3 table.
+  - **M·7 fail-closed (M11 + test 19):** `RemoveLanguageAsync("en", …)`
+    (the default) throws `InvalidOperationException`; the `en` catalog row
+    is unchanged; **no `language.remove` audit row** is committed (M11
+    filters for `action = "language.remove"` — the setup's `language.add`
+    from `AddLanguage` is a separate audit row; test 19 has no setup writes,
+    so the full-table-empty assertion pins the fail-closed absence).
+
+**Test-harness conventions (matching `PostServiceTests`):** fresh scratch
+DB per test (`PostgresFixture.NewDatabaseAsync`) → `DocumentStore.For` with
+`KumunitaFeature` + `AuthorizationFeature` + `M1DocTypes.Configure` +
+`M3DocTypes.Configure` → `ApplyAllConfiguredChangesToDatabaseAsync`. The
+`Plant` / `UpsertTranslation` / `UpsertPage` / `SetDefault` helpers are
+direct write-session seeds (test fixture seeding, **not** service write
+seams) — the audit-row-shape tests drive the service's own methods for the
+M·6 assertions. `TestContext.Current.CancellationToken` throughout.
+
+**Run (AGENTS.md `dotnet exec` path — not `dotnet test`):**
+- `dotnet build Kumunita.slnx -c Debug` — **green** (all 4 projects).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 280, Errors: 0, Failed: 0, Skipped: 0** (the 19 new
+  `LocalizationServiceTests` `[Fact]`s + the inherited M1/M2/M3/M3b/media/
+  group-posts anchors).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 90, Errors: 0, Failed: 0, Skipped: 0** (unchanged, verified).
+
+**State for U8 (the acceptance gate run + record):** the 19 seam tests are
+green and in the same assembly as the inherited anchors — the
+**part-vs-whole** gate input is ready. U8 owns the *recording* of the
+three-test gate (closed loop / handoff / part-vs-whole) into the design
+doc's `## Multilingual — Gate` placeholder. The closed-loop and handoff
+gate tests are **not** new `[Fact]`s — they are the acceptance-gate run
+(U8's), composed from the already-green seam tests + the M9/M10 FACES.
+**Next: U8** — run + record the multilingual acceptance gate, per the
+design doc §Acceptance gate table.
