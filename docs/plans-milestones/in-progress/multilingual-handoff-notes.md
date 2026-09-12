@@ -1,0 +1,76 @@
+# Multilingual (UI & platform texts) — handoff notes (ML)
+
+> **Scratch tier.** One section per unit, **appended** (never rewritten). Each
+> unit writes exactly one short `## U#` section before it exits; the next unit
+> reads only that section + its own entry-read list (the three-tier contract,
+> `docs/plans-milestones/plan-multilingual.md`). **U0** is this session's
+> kickoff — the plan-authoring unit that produced the two reference-tier
+> artifacts, before any code unit runs.
+
+## U0 — Plan kickoff (this session)
+
+**Date:** 2026-09-12 · **Machine:** Windows (PowerShell terminal) · **Role:**
+plan authoring only — **no code, no per-unit plan files** in this session (U1
+onward create their own `multilingual-uNN-plan.md` as they start).
+
+**Scope (verbatim from ADR 0005 A–D; see the design doc `## Scope`):**
+- **In scope:** UI strings via `TranslationResource` (per-request, preference →
+  default → `en`, per-string fallback) · static pages via `LocalizedPage`
+  (terms / about / help, one page engine) · the `/admin/languages` admin surface
+  (add/remove languages, set default, edit/preview static-page translations,
+  per-language completeness — audited) · the user preference as a **cookie**
+  (+ a settings page) · the `en` source-language floor (already seeded in M1).
+- **Out of scope:** machine translation of UGC (ADR 0005 C, *Deferred*) ·
+  federation (ADR 0001-B) · **any renumbering of M4/M5/M6** (multilingual is
+  `ML`, a named lane — the M-letters stay Events / Projects / Portability).
+
+**What's already shipped (the M1 seed surface this lane builds on):**
+- `LanguageCatalog` + `LocaleSettings` — `src/Kumunita.Core/Localization/LanguageCatalog.cs`.
+- Both registered on **`M1DocTypes`** (the existing surface — the design doc
+  appends the two new docs there, not a new `DocTypes` surface):
+  `opts.Schema.For<LanguageCatalog>(); opts.Schema.For<LocaleSettings>();`.
+- Materialized by the first-run seeder — `FirstBootSeeder` step 4
+  (`SeedLanguageCatalogAsync`): the source-language `en` row (enabled, sort 0)
+  + the instance default (`LocaleSettings.DefaultLanguageCode`) set to `en`
+  (ADR 0005 B — "the source language ships with the code"). **Already shipped —
+  do not re-do.** This lane ships the **two content documents + the read path +
+  the admin surface** that the ADR's module surface promises on top of that seed.
+
+**Roadmap (already bumped — do not re-bump; U9 moves `ML` → done / `M4` → next):**
+- `src/Kumunita.Web/Milestones.cs` — `new("ML", "Multilingual — … (ADR 0005)", StatusNext)`.
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs` — pins the order
+  `M0, M1, M2, M3, GP, ML, M4, M5, M6` + `ML` as the single in-progress.
+- `README.md` / `docs/ARCHITECTURE.md` §8/§9 / `how-it-works.md` — already name
+  the lane. This session **verified, did not edit** them.
+
+**Reference-tier artifacts produced this session (the two deliverables):**
+- **Primary** — `docs/design/multilingual-design.md`: Context · Scope (verbatim
+  from ADR 0005 A–D) · **Invariants M·1–M·9** · **FACES M1–M13** · **Pinned
+  contract** (the exact C# of the two content docs, `ITranslationProvider`,
+  `ILocalizationService` + `LanguageCompleteness`, `LocaleCookie`, the
+  admin-surface actions) · **Pinned seam tests (19)** · **Acceptance gate
+  (three-test shape)** · **Drift guard**.
+- **Secondary** — `docs/plans-milestones/plan-multilingual.md`: the three-tier
+  contract · Understanding · Assumptions · the invariant / FACES / pinned-seam-
+  test tables (cross-referenced to the design doc) · the **sealed-unit table
+  (U1–U9)** · the unit-series rules.
+
+**Unit count: 9** — U1 (content docs + `M1DocTypes` indexes) · U2
+(`ITranslationProvider`) · U3 (`ILocalizationService` + `LanguageCompleteness`)
+· U4 (`LocaleCookie` + DI) · U5 (`LanguagesController`) · U6 (settings page +
+static-page routes) · U7 (the 19 seam tests) · U8 (run + record the gate) ·
+U9 (close: `Milestones.cs` / README / ARCHITECTURE sync + folder moves).
+
+**Pinned counts (the freeze at a glance — see the design doc §Drift guard):**
+9 invariants (M·1–M·9) · 13 FACES (M1–M13) · 2 content docs · 2 `M1DocTypes`
+unique indexes · 2 Core interfaces + 1 record · 1 Web HTTP seam (`LocaleCookie`)
++ 1 controller + settings/static-page routes · **19** test names (13 FACES + 6
+audit-row-shape) · 3 gate tests.
+
+**Definition of done (this session, all met):** the design doc + the unit
+register exist with every required section; this handoff note has the U0
+kickoff; `dotnet build Kumunita.slnx -c Debug` is **green** (doc-only — no code
+touched); the `Kumunita.Web.Tests` assembly still passes (verified via the
+AGENTS.md `dotnet exec` path, **not** `dotnet test`); the plan is consistent
+with the already-bumped roadmap (verified, not re-edited). **Next: U1** (the
+content documents + the `M1DocTypes` indexes), per the unit register.
