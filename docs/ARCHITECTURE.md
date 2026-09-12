@@ -183,6 +183,14 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
       Task<VisibleSet> CanSeeAsync(string actorId, Action action,
                                    IEnumerable<IAuditableResource> candidates);
       // VisibleSet = { visible: [ { id, via: Owner|Audience|Delegation } ], hiddenCount }
+      // Group lane (ADR 0013, group posts milestone) — membership is the SOLE
+      // decision: CanSeeGroupAsync(actorId, groupId, targetPostId?) for
+      // detail/create-gate (one decision audit row) and
+      // CanSeeGroupFeedAsync(actorId, groupId, candidateCount) for the feed
+      // (one aggregate row). Via = Group, or Delegation when an in-scope
+      // `read` grant acts with the owner's membership. There is NO moderator
+      // and NO break-glass branch (G·4 — "nobody peeks", standing not
+      // available), and the audience lane is never evaluated.
     }
 
 ### 4.3 Access model
@@ -326,6 +334,12 @@ Content
   Component        { id, name, description, icon, sortOrder, enabled, moderatorAccess }
   Post             { id, kind: Announcement|Discussion, componentId?, authorId, title, body,
                      audience, pinned, hidden, created, updated }
+  // Group lane (ADR 0013, group posts milestone): a group post is a Post with
+  // `groupId` non-empty — membership is the sole access decision, `audience`
+  // is written non-null and empty (never evaluated), `componentId` empty (the
+  // post is excluded from component + "all sections" feeds); PostReply is
+  // unchanged (lane-neutral) — a reply inherits the parent's single
+  // group-lane decision.
   PostReply        { id, postId, authorId, body, created }
   Audience         { mode: Any|All, grants: [ { kind: User|Group, id } ] }   (embedded)
 
@@ -352,7 +366,7 @@ Moderation / audit
   // visibleCount/hiddenCount instead of a single targetId
   AccessAudit      { id, at, actorId, effectivePrincipalId?, action, targetKind, targetId?,
                      visibleCount?, hiddenCount?,
-                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin,
+                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin|Group,
                      outcome: Allow|Deny }
 
 Email outbox

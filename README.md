@@ -56,6 +56,11 @@ surface next to the Postgres dump (OPS.md §4/§5).
   local-volume byte store behind an HTTP-free seam (ADR 0011). Group logos, post
   attachments and badge icons are **follow-on lanes reusing the same seam** — each
   with its own design doc, not this one.
+- **Group posts** — the post channel *inside* a group (`/groups/{id}/posts`):
+  a membership-scoped feed, detail, composer and replies (ADR 0013). Members
+  only — a non-member (moderator or admin alike) neither sees nor posts; the
+  audience lane is never evaluated, and replies inherit the parent's single
+  membership decision.
 - Moderation with component-scoped moderators and full audit
 - **Multilingual** — UI and platform texts (terms, about, help) are translatable,
   and the language catalog + instance default are seeded at first boot. The full

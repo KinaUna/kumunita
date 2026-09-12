@@ -671,3 +671,73 @@ or committed; the user is asked to review first.**
   documented in their notes; no production file needed a one-line mirror fix.
 - U9's plan file moves to `done/` immediately after this note (per the workflow) —
   a plain file move: **nothing is staged or committed; the user reviews first.**
+
+## U11 — docs close (README / Milestones.cs / ARCHITECTURE.md) + folder reconcile
+
+- **Deliverables (3 files, all small additive edits — the closed set):**
+  - **`README.md` — Features** (one new bullet, the **media precedent**: a
+    shipped non-lettered lane lives in *Features*, not the M-named Roadmap —
+    media has no Roadmap line and no `Milestones.cs` entry either):
+    **Group posts** — the post channel *inside* a group
+    (`/groups/{id}/posts`): membership-scoped feed / detail / composer /
+    replies (ADR 0013); members only — a non-member (moderator or admin
+    alike) neither sees nor posts; the audience lane is never evaluated;
+    replies inherit the parent's single membership decision. The
+    **M4/M5/M6 Roadmap lines are untouched** (still Events / Projects /
+    Portability).
+  - **`src/Kumunita.Web/Milestones.cs`** — one matching `Entry`, slotted
+    **after M3** (shipping order), `StatusDone`:
+    `new("GP", "Group posts — the membership-scoped post channel inside a
+    group (ADR 0013)", StatusDone)`. The README↔`Milestones.cs` contract
+    holds: both name the same lane, both say done; `M0–M6` byte-untouched.
+    **Build green:** `dotnet build Kumunita.slnx -c Debug` — Build
+    succeeded, 7.4 s, all four projects clean.
+  - **`docs/ARCHITECTURE.md`** — the two additive spots (the unit plan's
+    (a)/(b)), each with the ADR 0013 pointer:
+    - **(b) §4.2 `IAuthorizationService` sketch** — one comment block after
+      the `VisibleSet` line: the group lane — `CanSeeGroupAsync(actorId,
+      groupId, targetPostId?)` (detail / create-gate, one decision row) +
+      `CanSeeGroupFeedAsync(actorId, groupId, candidateCount)` (feed, one
+      aggregate row); `Via = Group` or `Delegation` (in-scope `read` grant
+      acts with the owner's membership); **no** moderator / **no**
+      break-glass branch (G·4 "nobody peeks"); the audience lane is never
+      evaluated.
+    - **(a) §5 `Content` block** — one comment above `PostReply`: a group
+      post = `Post.groupId` non-empty; `audience` written non-null **empty**
+      (never evaluated); `componentId` empty (excluded from component +
+      "all sections" feeds); `PostReply` **unchanged** (lane-neutral),
+      replies inherit the parent's single group-lane decision.
+    - **One line beyond the two (stale-fix, recorded):** §5 `AccessAudit`
+      via-list — appended **`Group`** to `…|BreakGlass|Admin` (the 8th
+      value landed by U5; the list was stale without it, and U12's
+      consistency check greps it).
+- **Folder reconcile (the Exit's "verify every prior unit's plan file is in
+  `done/`"):**
+  - `done/` — `group-posts-u01-plan.md` … `group-posts-u10-plan.md` **all
+    present at entry** ✓ (no move needed).
+  - **Moved (the debt U10 flagged — "several plan files from U1–U9 are still
+    in `in-progress/`"):** the nine stray **`group-posts-u{01…09}-exec-plan.md`
+    working files** (the media precedent archives its exec-plans in `done/`;
+    U7's note records its own Exit move never happened).
+  - `in-progress/` now holds exactly: `group-posts-handoff-notes.md`
+    (**stays** — living scratch, never archived), `group-posts-u11-exec-plan.md`
+    (my working note, the media exec-plan precedent), `group-posts-u11-plan.md`
+    (moves to `done/` at this Exit), `group-posts-u12-plan.md` (**stays** —
+    U12's spec).
+  - **ADR index:** U3's 0013 line is **present** in `docs/adr/README.md`
+    (verified — no edit needed, per the plan's "if U3's entry is missing").
+- **Handing to U12 (final consistency + close record):** the three close
+  docs now agree with each other and with the design doc's §2 seams;
+  `AccessVia.Group` is in the §5 via-list; the 19-test gate line is U10's
+  section above (ALL THREE PASS). **One open prose item for U12's
+  checklist:** `done/group-posts-u07-plan.md` (archived spec) still reads
+  "403 on Deny" for the detail action — the **landed behavior is 404**
+  (U6/U7 both pinned it; the design doc is authoritative). It is a
+  *plan*-file prose line in an archived file — **not** a seam and **not** a
+  drift-pause header in this note; flag it as a known-stale archived line,
+  do not count it as a `## U<m> — Drift pause`.
+- **Drift pauses: none.** No `## U<m> — Drift pause` header was added by
+  this unit.
+- U11's plan file moves to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**
