@@ -47,14 +47,14 @@
             @if (!string.IsNullOrEmpty(avatarSubject))
             {
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@avatarSubject" alt=""
+                    <img class="avatar avatar-lg" src="/profile/avatar/@avatarSubject" alt=""
                          data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                    <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
                 </span>
             }
             else
             {
-                <span class="avatar-mono">@avatarInitial</span>
+                <span class="avatar-mono avatar-lg">@avatarInitial</span>
             }
             <form method="post" action="/profile/avatar" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()

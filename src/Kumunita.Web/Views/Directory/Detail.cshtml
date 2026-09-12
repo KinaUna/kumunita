@@ -44,11 +44,11 @@
             }
             <h1 class="mb-0">
                 @Model.DisplayName
-                @if (Model.Verified)
-                {
-                    <span class="badge text-bg-success">Verified</span>
-                }
             </h1>
+            @if (Model.Verified)
+            {
+                <span class="badge text-bg-success">Verified</span>
+            }
         </div>
 
         @*
