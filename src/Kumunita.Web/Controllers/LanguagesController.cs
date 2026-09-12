@@ -28,8 +28,10 @@ namespace Kumunita.Web.Controllers;
 ///
 /// The resident-facing surface (the cookie-writing settings page + the
 /// <c>/terms</c> <c>/about</c> <c>/help</c> static-page routes) and the Razor
-/// views that bind to this controller are **U6**'s; this controller is the
-/// stable HTTP surface U6 builds against.
+/// views that bind to this controller were **U6**'s (the key-managed editor,
+/// <see cref="Translations"/>) — built on top of this controller's stable HTTP
+/// surface (<see cref="SaveTranslation"/> / <see cref="SavePage"/>), which it
+/// reused rather than reshaped.
 /// </summary>
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class LanguagesController(
@@ -156,6 +158,39 @@ public sealed class LanguagesController(
 
     // ── /admin/languages/{code}/translations — UI-string upsert (M9) ────────────────
 
+    // U6 (ML-UI): the key-managed editor. A closed, per-key list view (FACES L5)
+    // — no hand-typed key anywhere. The row list is built from
+    // KnownTranslationKeys.AllKeys in registry order; the <c>en</c> reference is
+    // KnownTranslationKeys.EnValues[key]; the current value comes from the D6-1
+    // batch read (missing key → empty string, never null). Saving a row posts
+    // through the existing <see cref="SaveTranslation"/> below (D6-3) — no new
+    // save path, no re-shape of UpsertTranslationAsync (M·6 audit row semantics
+    // stay byte-identical).
+    [HttpGet]
+    public async Task<IActionResult> Translations(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            return RedirectToAction(nameof(Index));
+
+        var values = await localization.GetTranslationsForAsync(code);
+        var rows = new List<TranslationRow>(KnownTranslationKeys.AllKeys.Count);
+        foreach (var key in KnownTranslationKeys.AllKeys)
+        {
+            rows.Add(new TranslationRow
+            {
+                Key         = key,
+                EnReference = KnownTranslationKeys.EnValues[key],
+                CurrentValue = values.TryGetValue(key, out var text) ? text : string.Empty,
+            });
+        }
+
+        return View("Translations", new TranslationEditorViewModel
+        {
+            Code = code,
+            Rows = rows,
+        });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveTranslation(string code, string key, string text)
@@ -223,5 +258,21 @@ public sealed class LanguagesController(
         public string Title { get; init; } = string.Empty;
         public string Body { get; init; } = string.Empty;
         public bool HasSaved { get; init; }
+    }
+
+    // U6 (ML-UI): the key-managed editor (FACES L5). Same D6-5 pattern as the
+    // two view models above — nested **public** types so the separately-
+    // compiled view class can bind to them.
+    public sealed class TranslationEditorViewModel
+    {
+        public string Code { get; init; } = string.Empty;
+        public IReadOnlyList<TranslationRow> Rows { get; init; } = Array.Empty<TranslationRow>();
+    }
+
+    public sealed class TranslationRow
+    {
+        public string Key { get; init; } = string.Empty;
+        public string EnReference { get; init; } = string.Empty;
+        public string CurrentValue { get; init; } = string.Empty;
     }
 }

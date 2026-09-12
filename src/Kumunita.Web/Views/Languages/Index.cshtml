@@ -125,6 +125,9 @@
                             <a href="/admin/languages/@row.Code/pages/terms"
                                class="btn btn-outline-info">Edit pages</a>
 
+                            <a href="/admin/languages/@row.Code/translations"
+                               class="btn btn-outline-info">UI strings</a>
+
                             <form method="post" action="/admin/languages/@row.Code" class="d-inline"
                                   onsubmit="return confirm('Remove @row.Code? Its translation and page rows are retained and will be restored if the language is re-added.');">
                                 @Html.AntiForgeryToken()

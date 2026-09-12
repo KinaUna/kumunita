@@ -5,6 +5,7 @@
 
 <p>
     <a href="/admin/languages" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back to languages</a>
+    <a href="/admin/languages/@Model.Code/translations" class="btn btn-outline-info btn-sm mb-3">UI strings</a>
 </p>
 
 <h1>Page: <code>@Model.Slug</code> — @Model.Code</h1>
@@ -47,30 +48,4 @@
     </div>
 
     <button type="submit" class="btn btn-primary">Save page</button>
-</form>
-
-<!-- ── UI-string editor (SaveTranslation) ───────────────────────────────── -->
-<h2 class="mt-4">UI strings for @Model.Code</h2>
-<p class="text-muted">
-    Upsert a single UI-string translation. The key is the code identifier
-    (e.g. <code>nav.home</code>, <code>feed.reply</code>); the text is what
-    a resident sees.
-</p>
-<form method="post" action="/admin/languages/@Model.Code/translations" class="mb-4">
-    @Html.AntiForgeryToken()
-    <div class="row g-2 align-items-end">
-        <div class="col-sm-4">
-            <label for="key" class="form-label">Key</label>
-            <input type="text" class="form-control" name="key" id="key"
-                   required placeholder="nav.home" maxlength="128" />
-        </div>
-        <div class="col-sm-5">
-            <label for="text" class="form-label">Text</label>
-            <input type="text" class="form-control" name="text" id="text"
-                   required maxlength="512" />
-        </div>
-        <div class="col-sm-3">
-            <button type="submit" class="btn btn-primary">Save translation</button>
-        </div>
-    </div>
 </form>

@@ -69,6 +69,27 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, string>> GetTranslationsForAsync(string languageCode)
+    {
+        // M·4 read path: one QuerySession, one query, no fallback (the editor
+        // shows raw rows — the provider's M·2 fallback is the resident's path).
+        // No audit row: this is a read.
+        await using var session = _store.QuerySession();
+        var ct = System.Threading.CancellationToken.None;
+
+        var rows = await session
+            .Query<TranslationResource>()
+            .Where(t => t.LanguageCode == languageCode)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var map = new Dictionary<string, string>(rows.Count, StringComparer.Ordinal);
+        foreach (var row in rows)
+            map[row.Key] = row.Text;
+        return map;
+    }
+
+    /// <inheritdoc />
     public async Task<LocalizedPage?> GetPageAsync(string slug, string languageCode)
     {
         await using var session = _store.QuerySession();

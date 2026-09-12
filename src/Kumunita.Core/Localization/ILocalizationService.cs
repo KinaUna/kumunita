@@ -47,6 +47,16 @@ public interface ILocalizationService
     // ── UI strings — TargetKind "translation" ───────────────────────
     Task<TranslationResource?> GetTranslationAsync(string key, string languageCode);
 
+    /// <summary>
+    /// Batch read (M·4 read path — live rows, no projection, no audit: it is a
+    /// read). Returns **every** stored <see cref="TranslationResource"/> row for
+    /// <paramref name="languageCode"/> as a <c>key → text</c> map — **no
+    /// fallback** (the provider's M·2 per-string fallback is the *resident's*
+    /// read path, not an editor's). A code with no rows returns an **empty**
+    /// map, never null. One query, one round-trip (M·2 "no N round-trips").
+    /// </summary>
+    Task<IReadOnlyDictionary<string, string>> GetTranslationsForAsync(string languageCode);
+
     /// <summary>Upserts one UI string — audited <c>translation.save</c>,
     /// TargetId = key (M·6; M9 FACES). Takes effect on the next request (M·4).</summary>
     Task UpsertTranslationAsync(string key, string languageCode, string text, string actorId);

@@ -410,6 +410,40 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("pl-terms-body", page.Body);
     }
 
+    // ── ML-UI U6 — the batch read (D6-1: raw rows, no fallback, empty-not-null) ──
+    // Seed two rows for "pl", one for "en". GetTranslationsForAsync("pl") →
+    // exactly the two pl key → text pairs; no fallback into en; a code with no
+    // rows → an empty map, never null. One query (no N round-trips).
+    // (M·4 read path — the editor shows raw rows; no audit row: it is a read.)
+
+    [Fact]
+    public async Task MLUI_U6_GetTranslationsFor_ReturnsRawRows_NoFallback()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+        await AddLanguage(store, "pl", "Polski");
+
+        // pl has two rows; en has a third key pl lacks (the fallback trap).
+        await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
+        await UpsertTranslation(store, "nav.groups", "pl", "Grupy");
+        await UpsertTranslation(store, "nav.directory", "en", "Directory");
+
+        var svc = new LocalizationService(store);
+
+        // Exactly the stored pl rows — no fallback into the en universe (D6-1).
+        var pl = await svc.GetTranslationsForAsync("pl");
+        Assert.NotNull(pl);
+        Assert.Equal(2, pl.Count);
+        Assert.Equal("Strona główna", pl["nav.home"]);
+        Assert.Equal("Grupy", pl["nav.groups"]);
+        Assert.False(pl.ContainsKey("nav.directory"));
+
+        // A code with no rows → empty map, never null.
+        var zz = await svc.GetTranslationsForAsync("zz");
+        Assert.NotNull(zz);
+        Assert.Empty(zz);
+    }
+
     // ── Audit-row-shape tests (6) ────────────────────────────────────────────
 
     // 14 — Admin_AddLanguage_AuditRowShape_ViaAdmin

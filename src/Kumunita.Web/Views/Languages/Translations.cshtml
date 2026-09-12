@@ -1,0 +1,56 @@
+@model Kumunita.Web.Controllers.LanguagesController.TranslationEditorViewModel
+@{
+    ViewData["Title"] = $"UI strings — {Model.Code}";
+}
+
+<p>
+    <a href="/admin/languages" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back to languages</a>
+</p>
+
+<h1>UI strings for @Model.Code</h1>
+<p class="text-muted">
+    The closed list of canonical platform keys. Each row shows the key, its
+    <code>en</code> reference text, and the current value in
+    <strong>@Model.Code</strong>. Save a row to upsert its translation —
+    visible on the next request.
+</p>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Key</th>
+                <th>English reference</th>
+                <th>Value in @Model.Code</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td class="text-nowrap"><code>@row.Key</code></td>
+                    <td>@row.EnReference</td>
+                    <td>
+                        <form method="post" action="/admin/languages/@Model.Code/translations" class="d-flex gap-2">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="key" value="@row.Key" />
+                            <input type="text" class="form-control form-control-sm"
+                                   name="text" value="@row.CurrentValue" maxlength="512"
+                                   aria-label="Value for @row.Key in @Model.Code" />
+                            <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">Save</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

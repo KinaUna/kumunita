@@ -503,3 +503,68 @@ all exactly as the unit instructions specified.
 
 **Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
 contradiction, no out-of-scope string attempted).
+
+## U6 — the key-managed admin translation editor
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 8.2s)
++ the new batch-read test passing in isolation
+(`-method …MLUI_U6_GetTranslationsFor_ReturnsRawRows_NoFallback` →
+`Total: 1, Errors: 0, Failed: 0`). **The admin-side Gap 3 is closed:** the
+editor lists the closed key set — no hand-typed key exists anywhere.
+
+**What was changed (5 files modified + 1 new — the closed set):**
+- **`ILocalizationService.cs` (D6-1):** added the pinned batch read,
+  verbatim signature `Task<IReadOnlyDictionary<string, string>>
+  GetTranslationsForAsync(string languageCode);` with XML doc in the seam's
+  M·4 read-path style (no audit — it is a read).
+- **`LocalizationService.cs` (D6-1):** implemented in the seam's read-path
+  style — one `QuerySession`, one query filtered on
+  `LanguageCode == languageCode`, `ConfigureAwait(false)`, an empty
+  `Dictionary` (ordinal comparer) for a code with no rows (never null), **no
+  fallback** (raw rows — the provider's M·2 fallback is the resident's path).
+- **`LanguagesController.cs`:** new `public async Task<IActionResult>
+  Translations(string code)` GET — builds rows from
+  `KnownTranslationKeys.AllKeys` in registry order, `EnReference` from
+  `KnownTranslationKeys.EnValues[key]`, `CurrentValue` from
+  `GetTranslationsForAsync(code)` (missing key → empty string); returns
+  `View("Translations", …)`. Nested public `TranslationEditorViewModel`
+  (`Code`, `IReadOnlyList<TranslationRow> Rows`) + `TranslationRow`
+  (`Key`, `EnReference`, `CurrentValue`) — the D6-5 pattern. Class
+  doc-comment's U6 sentence updated (the editor views are U6's; the
+  `SaveTranslation` / `SavePage` actions are the stable HTTP surface it built
+  against). **`SaveTranslation` itself is untouched** (frozen — D6-3).
+- **`Views/Languages/Translations.cshtml` (NEW, D6-4):** per-key list editor —
+  a back link to `/admin/languages`, a 52-row table (key `<code>` · `en`
+  reference · current value), each row a form POSTing `key` (hidden) + `text`
+  to `/admin/languages/@Model.Code/translations` with `@Html.AntiForgeryToken()`
+  (the exact D6-3 shape), `TempData["info"]` / `["error"]` alerts. The 52 rows
+  render from the model — **no hardcoded key list in the view**; the chrome
+  text is plain English (D6-4).
+- **`Views/Languages/Index.cshtml`:** each language row's actions cell gains a
+  **"UI strings"** button → `/admin/languages/@row.Code/translations`; the
+  existing "Edit pages" link (→ `…/pages/terms`) is kept.
+- **`Views/Languages/PreviewPage.cshtml`:** the hand-typed-key
+  "UI strings" form section is **deleted**; a "UI strings" link (same target)
+  added beside the back link. The static-page editor form and
+  `PageEditorViewModel` binding are untouched (D6-2).
+- **`LocalizationServiceTests.cs`:** new
+  `MLUI_U6_GetTranslationsFor_ReturnsRawRows_NoFallback` [Fact] — seeds two
+  `pl` rows + one `en`-only row, asserts exactly the two `pl` pairs are
+  returned (no fallback into `en`), and a code with no rows returns an empty
+  (not null) map. Matches the file's style.
+
+**FACES L5 / L6:** L5 (the closed-list editor, per-key, no hand-typed key) is
+now true in the admin surface; L6 (save → visible next request + exactly one
+`translation.save` audit row, `Via = Admin`) is inherited from the frozen
+`SaveTranslation` / `UpsertTranslationAsync` path, which this unit reuses
+without re-shaping. **FACES tests for the GET action are U8's job** (not
+written here, per the unit's scope).
+
+**Deviations vs the plan:** none — the D6-1 signature is verbatim, the D6-3
+save shape is byte-identical to the frozen action's binding, and no frozen
+seam was touched.
+
+**Drift-pause count: 0** (no key outside the registry was needed; the
+`SaveTranslation` / `UpsertTranslationAsync` seams are present and as the ML
+close record claims).
