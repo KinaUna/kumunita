@@ -28,7 +28,9 @@ with `dev-db-init` + `docker-compose.yml`: **18**).
 Profile **avatars** have also landed — the reference lane of the content-addressed
 local-volume media store (ADR 0011, its own design doc); it adds a second restore
 surface next to the Postgres dump (OPS.md §4/§5).
-**M4** next: events, RSVPs, reminders (per the roadmap table in
+**Multilingual** next — the UI + platform-texts lane (ADR 0005), pulled forward
+so the test platform can be exercised in more than one language before the
+circle widens; then **M4**: events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
 ## Principles
@@ -46,7 +48,7 @@ surface next to the Postgres dump (OPS.md §4/§5).
 
 - Resident directory (profiles, opt-in contact details)
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
-- Events with RSVP and reminders *(planned — M4, see the "Roadmap" below)*
+- Events with RSVP and reminders *(planned — M4, deferred until after multilingual; see the "Roadmap" below)*
 - Collaborative projects (goals, tasks, contributors) *(planned — M5, see the "Roadmap" below)*
 - **Groups** — public groups power reusable access lists; **private groups**
   (ADR 0010) are a membership/organizing unit for a family or circle, and stay
@@ -64,8 +66,9 @@ surface next to the Postgres dump (OPS.md §4/§5).
 - Moderation with component-scoped moderators and full audit
 - **Multilingual** — UI and platform texts (terms, about, help) are translatable,
   and the language catalog + instance default are seeded at first boot. The full
-  admin-managed language + translation surface lands with **M6** (ADR 0005; see
-  the "Roadmap" below).
+  admin-managed language + translation surface is **next** — pulled forward from
+  M6 so the platform can be exercised in more than one language before the
+circle widens (ADR 0005; see the "Roadmap" below).
 
 ## Tech stack
 
@@ -118,10 +121,11 @@ stays trivial and the authorization rules can grow freely.
 - **M1** — Identity, groups, delegation, and the authorization model above.
 - **M2** — Directory & profiles with visibility rules.
 - **M3** — Posts/announcements in components; moderation + reports.
-- **M4** — Events, RSVPs, reminders.
+- **Multilingual** (pulled forward from M6) — UI + platform texts (terms, about,
+  help) translatable; admin-managed language catalog & default (ADR 0005). **Next.**
+- **M4** — Events, RSVPs, reminders. (Deferred until after multilingual.)
 - **M5** — Projects (goals, tasks, contributors).
-- **M6** — Portability (export/import), iCal, notifications, search, multilingual
-  support (ADR 0005), responsive pass.
+- **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
 
 ## Deferred (future, by design)
 
@@ -178,5 +182,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0011)
+- `docs/adr/` — architecture decision records (0001–0014)
 - `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)

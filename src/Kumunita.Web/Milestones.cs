@@ -25,9 +25,10 @@ public static class Milestones
         new("M2", "Directory of residents, profile visibility & group management", StatusDone),
         new("M3", "Posts & announcements in components; moderation + reports", StatusDone),
         new("GP", "Group posts — the membership-scoped post channel inside a group (ADR 0013)", StatusDone),
-        new("M4", "Events, RSVPs & reminders", StatusNext),
+        new("ML", "Multilingual — UI & platform texts (terms, about, help) translatable; admin manages languages (ADR 0005)", StatusNext),
+        new("M4", "Events, RSVPs & reminders", StatusPlanned),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
-        new("M6", "Portability (export/import), iCal, notifications, search, multilingual support", StatusPlanned),
+        new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch

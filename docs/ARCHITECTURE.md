@@ -540,8 +540,9 @@ dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.
 Design and rationale in ADR 0005; this is the operating shape. **Current state:** the
 shipped surface is the first-boot seed of the language catalog + instance default
 (`LanguageCatalog`, `LocaleSettings`; M1). Everything below — the translation provider,
-user preference, the admin surface, `LocalizedPage` — lands with M6 (see
-`M1DocTypes.cs` and the README roadmap).
+user preference, the admin surface, `LocalizedPage` — is the **multilingual lane
+(`ML`)**, pulled forward from M6 to be the next lane (see `M1DocTypes.cs` and the
+README roadmap).
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine

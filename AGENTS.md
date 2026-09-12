@@ -6,8 +6,10 @@ no multi-tenant data model.
 
 ## Start here
 
-- `README.md` — what the platform is, its current status (M3 shipped, M4 next),
-  principles, tech stack, and the **Running** instructions.
+- `README.md` — what the platform is, its current status (M3 + group posts
+  shipped; **multilingual is next** — pulled forward from M6 so the platform can
+  be exercised in more than one language before the circle widens; then M4
+  events/RSVPs, M5 projects), principles, tech stack, and the **Running** instructions.
 - `docs/ARCHITECTURE.md` — the detailed map: stack, data model, the three
   bounded contexts (Identity / UserInfo / Authorization), the module-boundary
   contracts, and the CQRS-lite & side-effects (Wolverine) convention.
@@ -81,7 +83,16 @@ when you change behavior:
 - The **README Roadmap** and `src/Kumunita.Web/Milestones.cs` — the home page
   renders `Milestones.cs`, and its doc-comment names the README as the source
   of truth. Bump a milestone to "done" in one when it ships and the other
-  follows.
+  follows. **Tests pin the exact order + the single-in-progress milestone
+  (`tests/Kumunita.Web.Tests/MilestonesTests.cs`)** — keep that file in step
+  with any roadmap reorder.
+- When a **new capability lands out of the M-letter order**, it gets a *named
+  lane* with a short ID — **not** a renumber. Precedent: the media/avatars
+  lane (ADR 0011, "M4-adjacent") and **group posts** (`GP`, ADR 0013, "no
+  milestone letter; roadmap M4/M5/M6 stay Events/Projects/Portability"). The
+  same rule now applies to **multilingual** (`ML`, ADR 0005, pulled forward to
+  *next* in 2026-09-12 so the platform can be exercised in more than one
+  language before the circle widens) — M4/M5/M6 are untouched.
 - The **bounded-context / persistence layout** described in `docs/ARCHITECTURE.md`
   and ADR 0004/0006 — if you add a new context, doc-type surface, or change how
   contexts are registered in `DependencyInjection.cs`, reflect it in the relevant

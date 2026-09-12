@@ -24,7 +24,7 @@ to choose who sees what you post.
   topics like Safety, Maintenance, Social, and Governance — so a question
   about a street light isn't lost in a pile of birthday wishes.
 - **Plan events.** Events with sign-ups (RSVP) and reminders, so "who's
-  coming?" has an answer. *(Planned for M4 — not built yet.)*
+  coming?" has an answer. *(Planned — later, after the platform is multilingual; not built yet.)*
 - **Work on projects together.** A goal, a list of tasks, and the people
   helping — the roofer, the move on Saturday, the garden.
   *(Planned for M5 — not built yet.)*
