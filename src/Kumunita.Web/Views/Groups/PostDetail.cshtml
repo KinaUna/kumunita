@@ -9,7 +9,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <a href="@($"/groups/@Model.GroupId/posts")" class="text-muted small">
+        <a href="@($"/groups/{Model.GroupId}/posts")" class="text-muted small">
             &larr; back to group posts
         </a>
 
@@ -113,7 +113,7 @@
         <div class="card">
             <div class="card-body">
                 <form class="mb-0" method="post"
-                      action="@($"/groups/@Model.GroupId/posts/@postId/replies")">
+                      action="@($"/groups/{Model.GroupId}/posts/{postId}/replies")">
                     @Html.AntiForgeryToken()
                     <label class="form-label" for="reply-body" style="font-weight:600;">
                         Reply
