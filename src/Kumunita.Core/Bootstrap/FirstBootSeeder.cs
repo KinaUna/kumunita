@@ -17,7 +17,7 @@ namespace Kumunita.Core.Bootstrap;
 /// touching data on a warm boot (the design doc's "first boot is also the first seeder
 /// run", SchemaBootstrap.cs).
 /// <para>
-/// Five steps, in the order the plan pins them (step 6 of the M1 plan):
+/// Six steps, in the order the plan pins them (step 6 of the M1 plan):
 /// </para>
 /// <ol>
 /// <li><b>Community row</b> in <c>mt.community</c> (id "default"): M1 makes this the
@@ -37,6 +37,12 @@ namespace Kumunita.Core.Bootstrap;
 /// <li><b>Language catalog</b>: the source-language <c>en</c> row (enabled, sort 0)
 /// + the instance default (<see cref="LocaleSettings.DefaultLanguageCode"/>) set to
 /// <c>en</c> (ADR 0005 B — the "source language ships with the code" clause).</li>
+/// <li><b>Canonical <c>en</c> UI strings + pages</b> (ML-UI U1, D2): the closed set
+/// in <see cref="Localization.KnownTranslationKeys"/> materialized as <c>en</c>
+/// <c>TranslationResource</c> rows, plus the <c>en</c> <c>terms</c> / <c>help</c>
+/// <c>LocalizedPage</c> rows. Code-wins upsert for <c>en</c> only (never touches a
+/// non-<c>en</c> row); <c>about</c> is intentionally not seeded. Makes the M·9
+/// <c>en</c> floor and the M·12 completeness view real on first boot.</li>
 /// <li><b>First-boot setup email</b> to the seed admin (OPS §2 handoff — staged on
 /// the session, dispatched by the durable handler in M1 step 7). Honors absence:
 /// no seed admin ⇒ no email (the lane is skipped end-to-end).</li>
@@ -91,6 +97,13 @@ public static class FirstBootSeeder
 
         // 4. Language catalog (ADR 0005: source-language row + instance default).
         await SeedLanguageCatalogAsync(mt, logger, ct);
+
+        // 5. Canonical `en` UI strings + the `en` terms/help pages (ML-UI U1 — D2):
+        // materializes the M·9 `en` floor + the M·12 completeness universe. Runs
+        // AFTER the catalog/default (step 4) so the `en` language row already exists;
+        // `about` is intentionally NOT seeded (a fresh instance's /about keeps its
+        // product-story view — an admin creates an `about` page at runtime).
+        await SeedTranslationResourcesAsync(mt, logger, ct);
 
         logger.LogInformation("First boot: initialization complete.");
     }
@@ -252,6 +265,142 @@ public static class FirstBootSeeder
 
         logger.LogInformation("First boot: language catalog seeded (source language '{Lang}' enabled, default '{Lang}').",
             SourceLanguage, SourceLanguage);
+    }
+
+    /// <summary>
+    /// Step 5 — the canonical <c>en</c> UI-string floor + the <c>en</c> terms/help
+    /// pages (ML-UI U1, D2). Materializes, as <c>en</c> rows, every key in
+    /// <see cref="KnownTranslationKeys"/> (one <see cref="TranslationResource"/>
+    /// per key) plus the <c>en</c> <see cref="LocalizedPage"/> rows for
+    /// <c>terms</c> and <c>help</c>. This is what makes M·9's "<c>en</c> floor is
+    /// always seeded" and M·12's completeness view (missing = <c>en</c>-present
+    /// minus <c>code</c>-present) real the moment a fresh instance boots.
+    /// <para>
+    /// <b>Upsert semantics (code-wins, <c>en</c>-only).</b> Each key is upserted
+    /// by its business key <c>(Key, "en")</c> / <c>(Slug, "en")</c> — the same
+    /// pair idiom as <c>LocalizationService.Upsert*</c> (query-then-<c>Store</c>,
+    /// create-with-a-fresh-<c>Id</c> or overwrite-in-place), but with two deliberate
+    /// differences that make it idempotent AND upgrade-safe:
+    /// </para>
+    /// <list type="bullet">
+    /// <li><b>Code wins for <c>en</c>.</b> The registry's text is always written,
+    /// so a new key added to <see cref="KnownTranslationKeys"/> appears on the next
+    /// start (upgrade) and an edited <c>en</c> value refreshes the row. ADR 0005 B:
+    /// the source language's UI strings are <i>embedded and materialized</i> by the
+    /// seeder — they are code, not admin data.</li>
+    /// <li><b>Never touches a non-<c>en</c> row.</b> The query and the <c>Store</c>
+    /// are both scoped to <c>LanguageCode == "en"</c>; admin translations for other
+    /// languages (and an admin-created <c>about</c> page) are data, not config, and
+    /// are left exactly as the admin wrote them (M·4).</li>
+    /// </list>
+    /// <para>
+    /// <b>No <c>AccessAudit</c> row.</b> Unlike the admin <c>Upsert*</c> path, a
+    /// first-boot seed is not an actor's auditable action (the seeder is not a
+    /// principal), so the single <c>SaveChangesAsync</c> commits the content rows
+    /// only. One session, one save — the whole step is atomic.
+    /// </para>
+    /// </summary>
+    private static async Task SeedTranslationResourcesAsync(
+        IDocumentStore mt, ILogger logger, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        // UI strings: one `en` TranslationResource row per key in the canonical
+        // registry (code-wins upsert by (Key, "en"); never a non-`en` row).
+        foreach (var (key, enText) in KnownTranslationKeys.EnValues)
+        {
+            var existing = await session
+                .Query<TranslationResource>()
+                .Where(t => t.Key == key && t.LanguageCode == SourceLanguage)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new TranslationResource
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Key = key,
+                    LanguageCode = SourceLanguage,
+                    Text = enText
+                });
+            }
+            else
+            {
+                existing.Text = enText;   // code wins: refresh the `en` value
+                session.Store(existing);
+            }
+        }
+
+        // Static pages: the `en` terms + help rows (code-wins upsert by
+        // (Slug, "en")). `about` is deliberately NOT seeded — a fresh instance's
+        // /about keeps its product-story view, and an admin can create an
+        // `about` page at runtime (the seeder never writes it).
+        var enPages = new (string Slug, string Title, string Body)[]
+        {
+            ("terms", "Terms",
+             "## Terms of use\n\n" +
+             "Kumunita is a self-hosted platform for one neighborhood. As its operator, " +
+             "you are responsible for how your community uses it: who joins, what they " +
+             "post, and how you moderate it.\n\n" +
+             "- **Residency is by design.** The platform assumes a single, bounded " +
+             "neighborhood — not a public feed.\n" +
+             "- **Audiences are chosen by the author.** Every post carries the audience " +
+             "its author picked; the platform enforces it.\n" +
+             "- **You own your data.** The database and the uploaded files are yours to " +
+             "back up, migrate, and retire.\n"),
+            ("help", "Help",
+             "## Getting started\n\n" +
+             "Kumunita is a private home for one neighborhood — the feed, the groups, " +
+             "and the pinned notes.\n\n" +
+             "- **Post** to a community feed and choose who can see it (an individual, a " +
+             "group, or everyone in the neighborhood).\n" +
+             "- **Groups** let you organize residents around a building, a project, or a " +
+             "shared interest.\n" +
+             "- **Directory** shows the residents on the platform and the details each " +
+             "has chosen to share.\n" +
+             "- **Moderation** lets a global admin (and, where granted, a moderator) " +
+             "keep the feed a safe place.\n\n" +
+             "Need help with the instance itself? That's an operator concern — see the " +
+             "self-hosted documentation linked in the footer.\n"),
+        };
+        foreach (var (slug, title, body) in enPages)
+        {
+            var existing = await session
+                .Query<LocalizedPage>()
+                .Where(p => p.Slug == slug && p.LanguageCode == SourceLanguage)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new LocalizedPage
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Slug = slug,
+                    LanguageCode = SourceLanguage,
+                    Title = title,
+                    Body = body,
+                    Updated = now
+                });
+            }
+            else
+            {
+                existing.Title = title;
+                existing.Body = body;
+                existing.Updated = now;   // code wins: refresh the `en` page
+                session.Store(existing);
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "First boot: canonical `en` UI strings seeded ({Keys} keys) + `en` terms/help pages " +
+            "({Pages} pages); `about` is not seeded (admin-created at runtime).",
+            KnownTranslationKeys.EnValues.Count, enPages.Length);
     }
 
     private static string SeedAdminBody(string email, string userId, string token) =>
