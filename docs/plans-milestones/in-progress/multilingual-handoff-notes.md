@@ -417,3 +417,37 @@ gate tests are **not** new `[Fact]`s — they are the acceptance-gate run
 (U8's), composed from the already-green seam tests + the M9/M10 FACES.
 **Next: U8** — run + record the multilingual acceptance gate, per the
 design doc §Acceptance gate table.
+
+## U8 — gate run + record
+
+- **Gate: ALL THREE PASS, 2026-09-12, this machine (Windows/PowerShell).**
+  Runner per AGENTS.md: `dotnet build Kumunita.slnx -c Debug` (green,
+  3.1 s) → `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` →
+  **90/90, 0 failed** (0.6 s) → `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+  **280/280, 0 failed** (27.6 s; Testcontainers `postgres:18`, Docker
+  Desktop / WSL2 backend — containers stopped and deleted by the run itself,
+  no `docker container prune` needed). **Total: 370/370 passed, 0 failed.**
+- **Part-vs-whole evidence:** all 19 §Pinned-seam-test names are present
+  character-for-character in
+  `tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` (19 `[Fact]`s
+  counted) and are **inside** the 280-passing run alongside the inherited
+  M1/M2/M3/M3b/group-posts suites (the same-run requirement of the
+  `## Acceptance gate` row 3). **No drift:** U7's freeze held, so the
+  rename lane was not exercised — no `## U8 — Drift pause`.
+- **Record:** filled `## Multilingual — Gate (recorded by U8)` in
+  `docs/design/multilingual-design.md` (the designated placeholder, kept its
+  heading). Closed loop = `M9_AdminSavesTranslation_VisibleNextRequest` +
+  `Admin_SaveTranslation_AuditRowShape_ViaAdmin`; handoff =
+  `M10_AdminSetsDefault_ResidentSeesNewDefault` +
+  `Admin_SetDefaultLanguage_AuditRowShape_ViaAdmin`; part-vs-whole = the
+  19-name line above.
+- **Handing to U9 (the close):** U8 changed **no** production code and
+  added **no** tests — the only repo delta this unit is the design-doc
+  gate section + this handoff entry + the plan-file move. U9 owns the
+  close: `Milestones.cs` `ML` → done / `M4` → next + README Roadmap +
+  `ARCHITECTURE.md` §8/§9 sync + the folder moves (several U1–U7 plan
+  files are already in `done/` — U1–U7 each moved their own at exit; U8's
+  is the one moved by this note). **Nothing is staged or committed —
+  the user reviews first.**

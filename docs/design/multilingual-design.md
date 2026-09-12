@@ -503,10 +503,31 @@ verbatim, rename it in the same commit + one-line drift note).
 
 ## Multilingual — Gate (recorded by U8)
 
-*Placeholder — U8 appends the recorded run (date, machine, runner path, the
-`Kumunita.Core.Tests` / `Kumunita.Web.Tests` pass counts, and the # | Test |
-Evidence table) here. Until then this section is empty and must not be read as
-closed.*
+**Date:** 2026-09-12 · **Machine:** Windows (PowerShell terminal) ·
+**Runner:** the AGENTS.md reliable path — `dotnet build Kumunita.slnx
+-c Debug` (green, 3.1 s) then in-process execution, **not** `dotnet
+test` / VS Test Explorer (the xunit.v3 discovery quirk on this machine).
+Testcontainers `postgres:18` (Docker Desktop, WSL2 backend); `PostgresFixture`
+fresh scratch DB per class.
+
+**`Kumunita.Core.Tests` 280/280 passed, 0 failed, 0 skipped** (27.6 s) —
+including the 19 multilingual pinned `[Fact]`s (`LocalizationServiceTests`)
+**and** the inherited M1/M2/M3/M3b/group-posts suites, all re-run
+unchanged in the same execution. **`Kumunita.Web.Tests` 90/90 passed,
+0 failed** (0.6 s), including the `ML`-lane settings/static-page and
+`LanguagesController` coverage. **Total: 370/370 passed, 0 failed.** No reds.
+No drift: all 19 `§Pinned seam tests` names landed verbatim in
+`tests/Kumunita.Core.Tests/LocalizationServiceTests.cs` (U7's freeze held —
+no `## U8 — Drift pause`, so no rename lane was exercised).
+
+Record (shape mirrored from the group-posts `§Gate (recorded by U10)` —
+`#` | `Test` | `Evidence (actual test names)`):
+
+| # | Test | Evidence (actual test names — all passed) |
+|---|------|-------------------------------------------|
+| 1 | **Closed loop** (the GlobalAdmin saves a `TranslationResource` (`key`, `pl`, text) via the admin seam → the **next** `pl`-preference request resolves that key to the saved Polish text; the `translation.save` audit row exists: `Action = "translation.save"`, `TargetKind = "translation"`, `TargetId = key`, `Via = Admin`, `Outcome = Allow` — M9, M·4, M·6) | `LocalizationServiceTests.M9_AdminSavesTranslation_VisibleNextRequest` (M9 FACES; the save-then-resolve round-trip — `UpsertTranslationAsync` then the provider's `GetAsync` returns the stored `pl` text on the next read) and `LocalizationServiceTests.Admin_SaveTranslation_AuditRowShape_ViaAdmin` (M·6; the *single* committed `AccessAudit` row — `Action = "translation.save"`, `TargetKind = "translation"`, `TargetId = key`, `Via = Admin`, `Outcome = Allow`, the closed-loop's observable audit shape). |
+| 2 | **Handoff** (the GlobalAdmin sets the default language to `pl` → a resident with **no** preference cookie now sees the platform in Polish on the **next** request — the `LocaleSettings` change is picked up **live**, no projection lag, M·4; the `language.set-default` audit row is present — M10, M·1, M·6) | `LocalizationServiceTests.M10_AdminSetsDefault_ResidentSeesNewDefault` (M10 FACES; `SetDefaultLanguageAsync` writes the `LocaleSettings` singleton, then a no-preference `GetAsync` resolves the `pl` row on the very next read — the live-singleton handoff) and `LocalizationServiceTests.Admin_SetDefaultLanguage_AuditRowShape_ViaAdmin` (M·6; the *single* committed `AccessAudit` row — `Action = "language.set-default"`, `TargetKind = "language"`, `TargetId = code`, `Via = Admin`, `Outcome = Allow`). |
+| 3 | **Part-vs-whole** (the 19 `§Pinned seam tests` names are the **whole**; gates 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited anchors) | all 19 `LocalizationServiceTests` `[Fact]`s — `M1_PreferenceCookie_ResolvesPolishUIString` · `M2_MissingStringInPreferredFallsBackPerString` · `M3_NoPreference_UsesInstanceDefault` · `M4_FreshInstance_DefaultIsEnglish` · `M5_StaticPageLocalizesPerPage` · `M6_UgcRendersAsAuthored_NotTranslated` · `M7_PreferenceChange_TakesEffectNextRequest` · `M8_PreferenceAtRemovedLanguage_FallsBackToDefault` · `M9_AdminSavesTranslation_VisibleNextRequest` · `M10_AdminSetsDefault_ResidentSeesNewDefault` · `M11_RemoveDefaultLanguage_Blocked` · `M12_CompletenessView_ShowsMissingKeys` · `M13_RemovedLanguagePageRows_Retained` · `Admin_AddLanguage_AuditRowShape_ViaAdmin` · `Admin_RemoveLanguage_AuditRowShape_ViaAdmin` · `Admin_SetDefaultLanguage_AuditRowShape_ViaAdmin` · `Admin_SaveTranslation_AuditRowShape_ViaAdmin` · `Admin_SavePage_AuditRowShape_ViaAdmin` · `Admin_RemoveDefaultLanguage_Blocked_NoAuditRow` — green **in the same execution** as the inherited M1/M2/M3/M3b/group-posts suites (`AuthorizationServiceTests`, `ClaimShapingInvariantBTests`, `AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`, `DbBootstrapIsPristineTests`, `SideEffectHarnessTests`, `DirectoryServiceTests`, `DirectoryServiceTests_U6`, `ProfileToAuditableResourceTests`, `UserInfoServiceTests`, `UserInfoServiceGroupsU9Tests`, `UserInfoServiceGroupPrivacyTests`, `UserInfoServiceGroupInvitationsM2bTests`, `UserInfoServiceGroupDescriptionTests`, `GroupIsPrivateUpgradePathTests`, `PostServiceTests`, `GroupPostServiceTests`, `ModerationServiceTests`, `AnnouncementServiceTests`, `EmailDeadLetterCounterTests`, `SmtpHealthCheckTests`, `CommunityOptionsTests`) — **`Kumunita.Core.Tests` 280/280 passed, 0 failed** in this run; `Kumunita.Web.Tests` 90/90 in its own run. |
 
 ## Multilingual — Closed (recorded by U9)
 
