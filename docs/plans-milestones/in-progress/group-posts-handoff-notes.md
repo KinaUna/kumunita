@@ -604,6 +604,36 @@ or committed; the user is asked to review first.**
     `SaveChangesAsync` path returns the readable post.
   - **Delegation (G·6/C2):** G9 — an in-scope `read` grant ⇒ the delegate reads the
     *owner's* group post, audit row `Via = Delegation`
+
+## U10 — gate run + record
+
+- **Gate: ALL THREE PASS, 2026-09-12, this machine (Windows/PowerShell).**
+  Runner per AGENTS.md: `dotnet build Kumunita.slnx -c Debug` (green) →
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **90/90, 0 failed** → `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+  **254/254, 0 failed** (Testcontainers `postgres:18`, containers stopped and
+  deleted by the run itself — no `docker container prune` needed).
+- **Part-vs-whole evidence:** all 19 §2.5 pinned names are present
+  character-for-character in `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs`
+  (19 `[Fact]`s counted) and are **inside** the 254-passing run alongside the
+  inherited M1/M2/M3/M3b/media suites — the same-run requirement of §2.4 row 3.
+  **No drift:** U2's freeze held, so the §2.5 rename lane was not exercised.
+- **Record:** appended `## Group posts — Gate (recorded by U10)` to
+  `docs/design/group-posts-design.md`, immediately **above** the untouched
+  `## Group posts — Closed` placeholder (which remains U12's close marker).
+  Closed loop = `G5_MemberCreatesGroupPostSeesIt` +
+  `Feed_AggregateAuditRowShape_GroupPost`; handoff =
+  `G3_MembershipAddReScopesNextFeed` + `G9_DelegateWithReadInScopeSeesOwnerGroupPosts`;
+  part-vs-whole = the 19-name line above.
+- **Handing to U11 (docs close + folder moves):** U10 changed **no** code and
+  added **no** tests — the only repo delta this unit is the design-doc section.
+  U11 may treat the group-posts surface (U4–U9) as gate-verified when it syncs
+  `ARCHITECTURE.md` / `Milestones.cs` / README and reconciles the folder moves
+  (several plan files from U1–U9 are still in `in-progress/` — the register
+  says each unit's Exit moves its own file, and the U7 note records one such
+  line left as-is for U11 to reconcile). **Nothing is staged or committed —
+  the user reviews first.**
     (`Detail_DecisionAuditRowShape_ViaDelegation`); G10 — a grant whose scope is
     `["write"]` (no `read`) ⇒ denied, delegate acts as themself (scope entries are
     action ids; `AccessAction` only defines `Read`/`Moderate`, so the out-of-scope

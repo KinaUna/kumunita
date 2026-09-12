@@ -729,8 +729,37 @@ event, §2.7):
 | gate tests (§2.4) | 3 | U10 |
 | `M3DocTypes` changes | **0** | — |
 
+## Group posts — Gate (recorded by U10)
+
+**Date:** 2026-09-12 · **Machine:** Windows (PowerShell terminal) ·
+**Runner:** the AGENTS.md reliable path — `dotnet build Kumunita.slnx
+-c Debug` (green, 4.4 s) then in-process execution, **not** `dotnet
+test` / VS Test Explorer (the xunit.v3 discovery quirk on this machine).
+Testcontainers `postgres:18` (Docker Desktop, WSL2 backend); `PostgresFixture`
+fresh scratch DB per class.
+
+**`Kumunita.Core.Tests` 254/254 passed, 0 failed, 0 skipped** (27.5 s) —
+including the 19 M3-lane-adjacent group-post pinned `[Fact]`s
+(`GroupPostServiceTests`) **and** the inherited M1/M2/M3/M3b/media suites,
+all re-run unchanged in the same execution. **`Kumunita.Web.Tests` 90/90
+passed, 0 failed** (0.6 s), including the group-channel view-model
+coverage. **Total: 344/344 passed, 0 failed.** No reds. No drift: all 19
+§2.5 names landed verbatim in `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs`
+(U9's freeze held — no §2.7 drift pause needed, so no rename lane was
+exercised).
+
+Record (shape mirrored from M3's "Run result (M3 acceptance gate —
+2026-09-04)" — `#` | `Test` | `Evidence (actual test names)`):
+
+| # | Test | Evidence (actual test names — all passed) |
+|---|------|-------------------------------------------|
+| 1 | **Closed-loop** (a member creates a group post → it appears in **their** group feed; the feed's aggregate `AccessAudit` row exists with `TargetKind = "grouppost"`, `TargetId = null`, `VisibleCount ≥ 1`, `HiddenCount = 0`, `Outcome = Allow`) | `GroupPostServiceTests.G5_MemberCreatesGroupPostSeesIt` (G5 FACES; G·3 gate-Allow + the create-then-see round-trip: `ComponentId = ""`, `GroupId = draft.GroupId`, and the post is present in the member's next `ListGroupFeedAsync`) and `GroupPostServiceTests.Feed_AggregateAuditRowShape_GroupPost` (G·5; the feed's *single* aggregate row — `TargetKind = "grouppost"`, `TargetId = null`, `Action = "read"`, `VisibleCount`/`HiddenCount` set, the closed-loop's `VisibleCount ≥ 1` / `HiddenCount = 0` the observable shape). |
+| 2 | **Handoff** (a member added **after** the post was created sees it on the **next** feed — strong consistency, C4; the in-scope delegated `read` branch is the handoff onto a delegate, the *same* pin) | `GroupPostServiceTests.G3_MembershipAddReScopesNextFeed` (G3 FACES; C4 — the `GroupMembership` row planted *after* the create re-scopes the *very next* `ListGroupFeedAsync` via the live `GetGroupIdsAsync` read; no projection lag) and `GroupPostServiceTests.G9_DelegateWithReadInScopeSeesOwnerGroupPosts` (G9 FACES; G·6/C2 — the in-scope `read` grant acts with the *owner's* membership; the decision row is `Via = Delegation`, `EffectivePrincipalId = owner` per `Detail_DecisionAuditRowShape_ViaDelegation`). |
+| 3 | **Part-vs-whole** (the 19 §2.5 names are the **whole**; gates 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited anchors) | all 19 `GroupPostServiceTests` `[Fact]`s — `G1_MemberSeesGroupFeed` · `G2_NonMemberFeedEmptyWithDenyRow` · `G3_MembershipAddReScopesNextFeed` · `G4_MembershipRemoveRevokesNextDetail` · `G5_MemberCreatesGroupPostSeesIt` · `G5_GroupPostAudienceWrittenEmpty` · `G6_NonMemberCreateDenied` · `G7_ModeratorNonMemberDenied` · `G8_BreakGlassDoesNotApplyToGroupPosts` · `G9_DelegateWithReadInScopeSeesOwnerGroupPosts` · `G10_DelegateWithoutReadDenied` · `G11_ReplyInheritsParentGroupLane` · `G11_ReplyNotEvaluatedOnParentDeny` · `G12_GroupPostExcludedFromComponentFeed` · `G13_GroupPostExcludedFromAllFeed` · `Feed_AggregateAuditRowShape_GroupPost` · `Detail_DecisionAuditRowShape_ViaGroup` · `Detail_DecisionAuditRowShape_ViaDelegation` · `PostService_MakesNoModerateOrBreakGlassCallOnGroupPosts` — green **in the same execution** as the M1/M2/M3/M3b/media inherited suites (`AuthorizationServiceTests`, `ClaimShapingInvariantBTests`, `AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`, `DbBootstrapIsPristineTests`, `SideEffectHarnessTests`, `DirectoryServiceTests`, `DirectoryServiceTests_U6`, `ProfileToAuditableResourceTests`, `UserInfoServiceTests`, `UserInfoServiceGroupsU9Tests`, `PostServiceTests` + the moderation/media anchors) — **`Kumunita.Core.Tests` 254/254 passed, 0 failed** in this run; `Kumunita.Web.Tests` 90/90 in its own run. |
+
 ## Group posts — Closed
 
-*Placeholder — U10's gate record lands here; U11/U12 append their close
-entries. Empty until the gate has run. (U2 added this heading: Part 1's
-drift guard references it, but the file never had the section.)*
+*Placeholder — U11/U12 append their close entries below. The gate record
+(§above, U10) has landed; this section stays U12's close marker. (U2
+added this heading: Part 1's drift guard references it, but the file
+never had the section.)*
