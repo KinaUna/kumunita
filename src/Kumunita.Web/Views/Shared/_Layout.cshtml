@@ -30,19 +30,19 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><kw-l key="nav.home">Home</kw-l></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" href="/announcements">Announcements</a>
+                            <a class="nav-link text-dark" href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections">Community</a>
+                            <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">Groups</a>
+                            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
+                            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a>
                         </li>
                     </ul>
 
@@ -69,12 +69,8 @@
             <div class="row g-4">
                 <div class="col-12 col-md-5 col-lg-4">
                     <p class="navbar-brand mb-2">Kumunita</p>
-                    <p class="mb-2" style="max-width: 34ch;">
-                        A private home for one neighborhood — the feed, the groups
-                        and the pinned notes. What happens on your street stays on
-                        your street.
-                    </p>
-                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita · self-hosted by your community</p>
+                    <p class="mb-2" style="max-width: 34ch;"><kw-l key="footer.tagline">A private home for one neighborhood — the feed, the groups and the pinned notes. What happens on your street stays on your street.</kw-l></p>
+                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita <kw-l key="footer.copyright">· self-hosted by your community</kw-l></p>
                 </div>
                 <div class="col-6 col-md-4 col-lg-2">
                     <h3>Community</h3>
@@ -97,14 +93,9 @@
                     </ul>
                 </div>
                 <div class="col-12 col-md-3 col-lg-3">
-                    <h3>Good to know</h3>
-                    <p class="small mb-2">
-                        Private by default: each post's audience is chosen by its author,
-                        and everything is readable by you, not the world.
-                    </p>
-                    <p class="small mb-0">
-                        Kumunita is open source — the code, the decisions, the docs.
-                    </p>
+                    <h3><kw-l key="footer.gtk_heading">Good to know</kw-l></h3>
+                    <p class="small mb-2"><kw-l key="footer.gtk_privacy">Private by default: each post's audience is chosen by its author, and everything is readable by you, not the world.</kw-l></p>
+                    <p class="small mb-0"><kw-l key="footer.gtk_oss">Kumunita is open source — the code, the decisions, the docs.</kw-l></p>
                 </div>
             </div>
         </div>

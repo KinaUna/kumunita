@@ -15,34 +15,32 @@
     @if (isAuthenticated)
     {
         <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
+            <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
         </li>
         <li class="nav-item">
-            <a class="nav-link text-dark" href="/settings/language">Settings</a>
+            <a class="nav-link text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
         </li>
         @if (isGlobalAdmin)
         {
             <li class="nav-item">
-                <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index">Admin</a>
+                <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
             </li>
         }
         <li class="nav-item">
             <form class="form-inline" asp-controller="Account" asp-action="Logout" method="post"
                   style="display:inline;">
                 @Html.AntiForgeryToken()
-                <button type="submit" class="btn-link nav-link text-dark" style="border:none; background:none;">
-                    Sign out
-                </button>
+                <button type="submit" class="btn-link nav-link text-dark" style="border:none; background:none;"><kw-l key="nav.sign_out">Sign out</kw-l></button>
             </form>
         </li>
     }
     else
     {
         <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Sign in</a>
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login"><kw-l key="nav.sign_in">Sign in</kw-l></a>
         </li>
         <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup">Sign up</a>
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup"><kw-l key="nav.sign_up">Sign up</kw-l></a>
         </li>
     }
 </ul>

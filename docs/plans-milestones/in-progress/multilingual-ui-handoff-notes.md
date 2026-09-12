@@ -160,3 +160,67 @@ proof — `en` completeness 100%, fresh-instance nav in `en` — is U8's job, no
 U1's.)
 
 **Drift-pause count: 0.**
+
+## U2 — the `<kw-l>` TagHelper + the shared layout wiring
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded).
+
+**What was added (the four deliverables):**
+- **New** `src/Kumunita.Web/TagHelpers/LocalizeTagHelper.cs` — the
+  `<kw-l>` TagHelper (D1). `[HtmlTargetElement("kw-l", Attributes = "key")]`,
+  `public sealed class LocalizeTagHelper : TagHelper`, ctor-injected
+  `ITranslationProvider` + `IHttpContextAccessor`. `[HtmlAttributeName]
+  public string Key { get; set; } = "";`
+- **Modified** `Views/_ViewImports.cshtml` — added one line after the existing
+  `@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers`:
+  `@addTagHelper *, Kumunita.Web.TagHelpers` (existing line untouched).
+- **Modified** `Views/Shared/_Layout.cshtml` — **5 nav** labels
+  (`nav.home`, `nav.announcements`, `nav.community`, `nav.groups`,
+  `nav.directory`) + **5 footer** strings (`footer.tagline`,
+  `footer.copyright`, `footer.gtk_heading`, `footer.gtk_privacy`,
+  `footer.gtk_oss`) wrapped in `<kw-l key="…">en</kw-l>`. Left untouched: the
+  `<title>`/`@ViewData["Title"]`, the logo, the RepositoryInfo links, the
+  `<script>` tags, the `fullBleed` logic, `@RenderBody()`/`@RenderSectionAsync`,
+  and the footer's "Community" / "The project" column headings + their "Home" /
+  "Announcements" / "The feed" links (not in the registry — out-of-scope).
+- **Modified** `Views/Shared/_AccountNav.cshtml` — **6 labels**
+  (`nav.profile`, `settings.settings`, `nav.admin`, `nav.sign_out`,
+  `nav.sign_in`, `nav.sign_up`) wrapped in `<kw-l key="…">en</kw-l>`. Left
+  untouched: `@Html.AntiForgeryToken()`, the `asp-*`/`method` attributes, the
+  `KumunitaPrincipal.IsGlobalAdmin` check, the form structure.
+
+**16 `<kw-l>` elements placed** (5 nav + 5 footer + 6 account-nav). Each
+element's inner text is the exact `en` string from U1's registry (the M·1
+source floor, and what a fresh `en` instance renders identically).
+
+**`ProcessAsync` logic (as shipped):** read
+`_httpContextAccessor.HttpContext?.Request` → `LocaleCookie.Read(request)`
+(null-safe — a missing context degrades to "no preference") →
+`await _provider.GetAsync(Key, pref)` → `output.TagMode =
+TagMode.StartTagAndEndTag; output.Content.SetContent(text);`.
+
+**`SetContent` vs `SetHtmlContent` — chose `SetContent`.** The plan allows
+either. I chose `SetContent` (auto-escaping) because the resolved value is
+platform copy and the safer path against any injection from an admin-entered
+translation string; the element's inner `en` reference is still the source M·1
+floor. (The provider already resolves the value — escaping it again is
+harmless and conservative.)
+
+**One build-fix (recorded, per the unit-series "deviation" duty):** the plan's
+pinned-contract snippet used `context.ViewContext.HttpContext.Request`, but
+`TagHelperContext` does **not** expose `ViewContext` (first build failed:
+`error CS1061: 'TagHelperContext' does not contain a definition for
+'ViewContext'`). The idiomatic, repo-consistent fix is to ctor-inject
+`IHttpContextAccessor` (registered via `AddHttpContextAccessor()` at
+`Program.cs:209`; the same seam `ClaimsSource` ctor-injects and
+`Views/Directory/Detail.cshtml` `@inject`s). This is **not** a re-shape of a
+frozen seam and **not** a new DI registration — it uses the existing
+`IHttpContextAccessor` registration. The provider call is unchanged.
+
+**Deviations vs the plan:** only the `IHttpContextAccessor` substitution above
+(a C#-API correction to the pinned-contract *snippet's* intent, not a design
+change). Everything else — the TagHelper shape, the key set, the 16 placements,
+the frozen-seam non-touch — is exactly as planned.
+
+**Drift-pause count: 0.**
