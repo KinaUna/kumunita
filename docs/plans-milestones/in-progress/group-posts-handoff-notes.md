@@ -562,3 +562,82 @@ or committed; the user is asked to review first.**
   reconcile (it is a *plan*-file prose line, not a seam, so no design-doc drift).
 - U7's plan file moves to `done/` immediately after this note (per the workflow) —
   a plain file move: **nothing is staged or committed; the user reviews first.**
+
+## U9 — the 19 pinned group-post seam tests (`GroupPostServiceTests`)
+
+- **The Deliverable (closed set = 1 new file):** `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs`
+  — class `GroupPostServiceTests(PostgresFixture) : IClassFixture<PostgresFixture>`,
+  all **19 `[Fact]`s with the exact §2.5 names, character-for-character** (no rename —
+  §2.7 drift guard): `G1_MemberSeesGroupFeed`, `G2_NonMemberFeedEmptyWithDenyRow`,
+  `G3_MembershipAddReScopesNextFeed`, `G4_MembershipRemoveRevokesNextDetail`,
+  `G5_MemberCreatesGroupPostSeesIt`, `G5_GroupPostAudienceWrittenEmpty`,
+  `G6_NonMemberCreateDenied`, `G7_ModeratorNonMemberDenied`,
+  `G8_BreakGlassDoesNotApplyToGroupPosts`, `G9_DelegateWithReadInScopeSeesOwnerGroupPosts`,
+  `G10_DelegateWithoutReadDenied`, `G11_ReplyInheritsParentGroupLane`,
+  `G11_ReplyNotEvaluatedOnParentDeny`, `G12_GroupPostExcludedFromComponentFeed`,
+  `G13_GroupPostExcludedFromAllFeed`, `Feed_AggregateAuditRowShape_GroupPost`,
+  `Detail_DecisionAuditRowShape_ViaGroup`, `Detail_DecisionAuditRowShape_ViaDelegation`,
+  `PostService_MakesNoModerateOrBreakGlassCallOnGroupPosts`. No production file
+  touched — the U4–U8 surface is asserted, not amended.
+- **Fixture shape (reuses the suite's existing harness, no new plumbing):** each test
+  boots its own store via `PostgresFixture`'s connection + a fresh `IDocumentStore`
+  (`BootStoreAsync` → `(store, conn)`), plants domain rows directly (a
+  `GroupMembership` per test — the *sole* decision input, G·4), and builds the trio
+  (`IUserInfoService`, `IAuthorizationService`, `PostService`) with
+  `DependencyInjection`-style composition mirroring `AuthorizationServiceTests` /
+  `PostServiceTests`. G8's consumed + unexpired `AdminOverride` and G7's
+  `ModeratorAssignment` (for a *different* component) are planted via raw Npgsql,
+  following the `AuthorizationServiceTests` precedent.
+- **What the suite pins (per §2.5 intent, against the landed U6 seams):**
+  - **Membership is the whole decision (G·4 "nobody peeks"):** G1 allow / G2 deny +
+    empty feed with the deny row / G3 add re-scopes next feed / G4 remove revokes
+    next detail / G6 create denied with the exact
+    `UnauthorizedAccessException` message / **G7: a moderator of *another*
+    component is still denied** / **G8: a consumed, unexpired `AdminOverride` is
+    still denied** — both are fixture proofs that *some* standing exists and it is
+    *ignored*. No test needs a "moderator sees it" positive case; that case does not
+    exist in the lane.
+  - **Create writes the group shape (C·shape):** G5 writes `ComponentId = ""`,
+    `GroupId = draft.GroupId`, and **`Audience` stays empty**
+    (`G5_GroupPostAudienceWrittenEmpty` — the audience lane is structurally unused
+    here, not merely denied); G5's create-then-see round-trip proves the single
+    `SaveChangesAsync` path returns the readable post.
+  - **Delegation (G·6/C2):** G9 — an in-scope `read` grant ⇒ the delegate reads the
+    *owner's* group post, audit row `Via = Delegation`
+    (`Detail_DecisionAuditRowShape_ViaDelegation`); G10 — a grant whose scope is
+    `["write"]` (no `read`) ⇒ denied, delegate acts as themself (scope entries are
+    action ids; `AccessAction` only defines `Read`/`Moderate`, so the out-of-scope
+    id is a literal string, mirroring how `Grant.Scope` is written elsewhere).
+  - **Replies inherit the lane (G·7):** G11-allow — a member replying to a visible
+    parent lands a reply child with `GroupId` inherited from the parent and the
+    detail still returns the post + replies as-is; G11-deny — parent Deny ⇒ the
+    reply is never evaluated (no child row, parent detail is `Post = null`).
+  - **Exclusion from the other feeds:** G12 — the component feed (a post's own
+    `ComponentId` feed) excludes group posts; G13 — the all-feed excludes them.
+    (Group posts have `ComponentId = ""`, so both are the additive's negative
+    shape, not a new query path.)
+  - **Audit row shapes (C3):** `Feed_AggregateAuditRowShape_GroupPost` —
+    `TargetId = null`, `VisibleCount`/`HiddenCount` set, `TargetKind = "grouppost"`,
+    `Action = "read"`; `Detail_DecisionAuditRowShape_ViaGroup` — decision shape
+    `TargetId = postId`, counts null, `Via = Group`; delegation variant as above.
+- **Test #19 — the "nobody peeks" invariant is enforced structurally, not just by
+  fixtures:** a nested `RecordingAuthz(IAuthorizationService inner) : IAuthorizationService`
+  spy wraps the real service; the test drives one feed + one detail + one create
+  through `PostService` and asserts **`GroupLaneCalls >= 4`**,
+  **`AudienceLaneCalls == 0`** (the lane never calls the frozen `CanAsync` /
+  `CanSeeAsync` for group rows), **`ModerateCalls == 0`** (the lane never asks for
+  `AccessAction.Moderate`). This is the machine-checkable half of G·4; G7/G8 are
+  its fixture half.
+- **Verified (the AGENTS.md reliable path):** `dotnet build Kumunita.slnx -c Debug`
+  — **Build succeeded**, all four projects clean; `dotnet exec
+  tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+  **Total: 254, Errors: 0, Failed: 0, Skipped: 0, Time: 27.5s** — that is U8's
+  235 baseline + these 19, zero regressions in the suite.
+- **One compile fix made while landing (no seam impact):** the first draft of G10
+  used `AccessAction.Write.Id`, which does not exist (`AccessAction` defines only
+  `Read` and `Moderate`). Corrected to the literal id `["write"]` — the intended
+  semantic (an out-of-scope action, no `read`) is unchanged.
+- **Drift pauses: none.** Every assertion matched the landed U4–U8 seams as
+  documented in their notes; no production file needed a one-line mirror fix.
+- U9's plan file moves to `done/` immediately after this note (per the workflow) —
+  a plain file move: **nothing is staged or committed; the user reviews first.**
