@@ -37,6 +37,17 @@
                     pinned
                 </span>
             }
+            @* The Edit affordance (only when the caller's role split allows it —
+               the same CanEditAnnouncement rule the /announcements index uses,
+               carried to the detail page; the service's write-lane re-check at
+               POST is the real gate, so a non-authorized viewer never sees it). *@
+            @if (Model.CanEdit)
+            {
+                <a class="btn btn-sm btn-outline-primary ms-auto"
+                   href="@($"/announcements/@Model.Id/edit")">
+                    Edit
+                </a>
+            }
         </div>
 
         <div class="card">

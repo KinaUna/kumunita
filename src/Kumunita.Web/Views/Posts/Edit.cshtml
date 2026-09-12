@@ -1,0 +1,180 @@
+@model Kumunita.Web.Models.PostComposeViewModel
+@{
+    ViewData["Title"] = "Edit post";
+    string[] modes = { "Any", "All" };
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <a href="@($"/posts/{ViewContext.RouteData.Values["id"]}")" class="btn btn-link p-0">
+            &larr; Back to the post
+        </a>
+
+        <h1 class="mt-2">Edit post</h1>
+        <p class="text-muted">
+            You are editing your own post. Only you can edit it. The
+            <b>community</b> this post appears in is fixed — it cannot be
+            changed after you post; only the title, body, and audience
+            below are editable.
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (Model.Components.Count == 0)
+        {
+            <div class="alert alert-warning">
+                This post's community feed is no longer available. You can
+                still edit the title, body, and audience below.
+            </div>
+        }
+
+        <form id="edit-post-form" method="post"
+              action="@($"/posts/{ViewContext.RouteData.Values["id"]}/edit")">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="component" style="font-weight:600;">
+                        Community (the feed this post appears in — fixed)
+                    </label>
+                    <select class="form-control" id="component" name="ComponentId" disabled>
+                        @foreach (var (id, name) in Model.Components)
+                        {
+                            <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">
+                                @name
+                            </option>
+                        }
+                    </select>
+                    <input type="hidden" name="ComponentId" value="@Model.ComponentId" />
+                    <div class="text-muted small mt-2">
+                        The community only decides which feed your post appears
+                        in — it does not decide who can see it, and it is fixed
+                        once posted.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col">
+                            <label class="form-label" for="title" style="font-weight:600;">
+                                Title
+                            </label>
+                            <input class="form-control" type="text" id="title" name="Title"
+                                   maxlength="120" value="@Model.Title"
+                                   placeholder="optional" />
+                            <div class="text-muted small mt-1">
+                                A short headline (up to 120 characters). Leave
+                                blank for a body-only post — the list will show
+                                your first line of the body instead.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="body" style="font-weight:600;">
+                                Body
+                            </label>
+                            <textarea class="form-control" id="body" name="Body" rows="6" required
+                                      placeholder="…">@Model.Body</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;">
+                        Audience — who can see this post
+                    </h6>
+
+                    <div class="form-label mt-2" style="font-weight:600;">How the picks combine</div>
+                    @foreach (var m in modes)
+                    {
+                        var checkedMark =
+                            string.Equals(Model.Audience.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                ? "checked"
+                                : null;
+                        <div class="form-check" style="margin-left:0.5rem;">
+                            <input class="form-check-input" type="radio"
+                                   name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                   value="@m" @checkedMark required />
+                            <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                @m @(" — " + (m == "Any"
+                                    ? "a viewer matches if they're on any of the picks"
+                                    : "a viewer must be on every pick — an empty list denies everyone"))
+                            </label>
+                        </div>
+                    }
+
+                    @* "Who to grant to" — the shared picker partial
+                       (Views/Shared/_GrantPickers.cshtml, the same
+                       "Who to grant to" UX the Profile/Edit audience
+                       editors use). Checkboxes are display-only (no
+                       name=) — the hidden <c>Grants</c> textarea the
+                       partial renders is the only form-bound grant field,
+                       posting as <c>Audience.Grants</c>; the
+                       <c>_GrantPickerScripts</c> partial keeps the
+                       textarea in two-way sync with the selection. The
+                       picker pre-checks the post's current grants (seeded
+                       by <c>AudienceEditorModel.FromAudience</c>). *@
+                    <partial name="_GrantPickers" model="@(new GrantPickersModel
+                    {
+                        EditorName = "Audience",
+                        Editor     = Model.Audience
+                                    ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                    })" />
+
+                    @if (Model.Audience is not null
+                        && Model.Audience.IsEmpty)
+                    {
+                        <div class="alert alert-warning mt-2 mb-0">
+                            <b>Empty audience.</b>
+                            <text>With no picks, no one
+                            matches, so no one else can see your post — only
+                            you (the author) can.
+                            </text>
+                        </div>
+                    }
+
+                    <small class="text-muted d-block mt-2">
+                        Changing the audience here changes who can see the post
+                        from now on. An empty pick means only you can see it.
+                    </small>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save changes</button>
+                <a href="@($"/posts/{ViewContext.RouteData.Values["id"]}")"
+                   class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @* The grant-picker sync (shared with Profile/Edit — the
+       <c>_GrantPickerScripts</c> partial): keeps the hidden
+       <c>Audience.Grants</c> textarea in two-way sync with the
+       checkbox pickers above; the textarea is the only element
+       posted. *@
+    <partial name="_GrantPickerScripts" />
+}

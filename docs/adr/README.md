@@ -18,3 +18,4 @@ Decision / Consequences. New decisions take the next number.
 | 0011 | Media & file storage: content-addressed local-volume bytes + a `mt` catalog | Accepted |
 | 0012 | Community membership: mandatory communities + moderator-managed optional membership | Accepted |
 | 0013 | Group posts: a membership-scoped group channel | Accepted |
+| 0014 | Post edit lane: author-only (no moderator/admin branch) | Accepted |

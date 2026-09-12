@@ -279,6 +279,65 @@ public sealed class PostService
     }
 
     /// <summary>
+    /// Edits a post in the **caller's** in-flight session (invariant C3 — the
+    /// same-transaction lane, mirroring <see cref="CreatePostAsync"/>'s write
+    /// shape). **Author-only**: the acting actor must be the post's author
+    /// (<see cref="Post.AuthorId"/> == <paramref name="actorId"/>); any other
+    /// actor is a hard <see cref="UnauthorizedAccessException"/> (the Web layer
+    /// maps that to a 403). This is the whole decision — there is no
+    /// moderator / admin edit branch on a post (a post's content belongs to
+    /// its author; a moderator's lever over a post is the
+    /// <see cref="HidePostAsync"/> / <see cref="RemovePostAsync"/> lane, not a
+    /// re-write of its text).
+    /// <para>
+    /// Applies the edit fields (<paramref name="title"/> /
+    /// <paramref name="body"/> / <paramref name="audience"/>) and stamps
+    /// <see cref="Post.Modified"/> — the <c>AuthorId</c>,
+    /// <c>ComponentId</c>, <c>Created</c>, <see cref="PostStatus"/>, and
+    /// <see cref="Post.GroupId"/> fields are deliberately **not** touched (a
+    /// post's authoring identity, feed organizer, moderation state, and
+    /// group-lane membership are immutable after creation). The
+    /// <paramref name="audience"/> is written **verbatim** (ADR 0001-B) — the
+    /// author re-chooses the audience on edit exactly as on create; there is
+    /// no auto-augmentation. A missing id is a <see cref="KeyNotFoundException"/>
+    /// (the Web layer maps that to a 404); a non-author is the
+    /// <see cref="UnauthorizedAccessException"/> above.
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
+    public async Task<Post> UpdatePostAsync(
+        string postId,
+        string actorId,
+        string? title,
+        string body,
+        Authorization.Audience audience,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(audience);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to edit.");
+
+        // Author-only gate (the sole decision on this lane): only the author may edit.
+        if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a post may edit it.");
+
+        post.Title = title;
+        post.Body = body ?? string.Empty;
+        post.Audience = audience; // ADR 0001-B — written verbatim; never auto-augmented.
+        post.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(post);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return post;
+    }
+
+    /// <summary>
     /// Creates a one-level reply in the **caller's** in-flight session (invariant
     /// C3). The reply carries **no** <c>Audience</c> (C-M3·1): the parent's
     /// <c>Read</c> decision has already been made by the caller (the Web layer's

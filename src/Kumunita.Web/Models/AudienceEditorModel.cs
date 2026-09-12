@@ -170,4 +170,29 @@ public sealed class AudienceEditorModel
 
         return new Audience(mode, grants);
     }
+
+    /// <summary>
+    /// The inverse of <see cref="BuildAudience"/>: seeds this editor's form shape
+    /// from an existing <see cref="Audience"/> document value (the read-direction
+    /// round-trip the post-edit lane needs — the edit form is pre-filled with the
+    /// post's current audience, exactly as the create form is seeded with the
+    /// bootstrap self-only shape). The <see cref="Mode"/> is the value name of the
+    /// audience's <see cref="AudienceMode"/> ("Any" / "All"), and
+    /// <see cref="Grants"/> is the audience's grant list serialized to the same
+    /// JSON-array-of-<see cref="AudienceGrant"/> shape the form posts and
+    /// <see cref="BuildAudience"/> reads back (the single-source pin: one
+    /// serialized grant field, no parallel shape). A null audience falls back to
+    /// the empty self-only shape (Mode "Any", Grants "[]") — the same
+    /// deny-by-default bootstrap default the composer seeds (ADR 0001-B,
+    /// invariant C1).
+    /// </summary>
+    public static AudienceEditorModel FromAudience(Audience? audience)
+    {
+        if (audience is null)
+            return new AudienceEditorModel { Mode = "Any", Grants = "[]" };
+
+        var mode = audience.Mode == AudienceMode.All ? "All" : "Any";
+        var grantsJson = JsonSerializer.Serialize(audience.Grants?.ToArray() ?? Array.Empty<AudienceGrant>(), JsonOptions);
+        return new AudienceEditorModel { Mode = mode, Grants = grantsJson };
+    }
 }

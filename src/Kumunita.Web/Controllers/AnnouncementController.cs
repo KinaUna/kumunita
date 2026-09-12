@@ -182,9 +182,45 @@ public sealed class AnnouncementController(
             communityName = components.FirstOrDefault(c => c.Id == a.CommunityId)?.Name;
         }
 
+        // The Edit button's affordance flag — the same scope-vs-role split the
+        // service's EnsureWritePermissionAsync re-checks server-side at POST,
+        // evaluated against the *stored* row (the /announcements index's canEdit
+        // rule, carried to the detail page). A shape convenience only: the
+        // real gate is the service, so a non-authorized viewer never sees the
+        // button and never has to hit the 403.
+        bool canEdit = CanEditAnnouncement(a, RoleSet(User));
+
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
-            authorName, a.AuthorId, a.Pinned, communityName));
+            authorName, a.AuthorId, a.Pinned, communityName, canEdit));
+    }
+
+    /// <summary>
+    /// The scope-vs-role write split for a **stored** announcement (the
+    /// <c>CanEdit</c> affordance flag on the index + detail surfaces): a
+    /// <see cref="AnnouncementScope.Public"/> row requires GlobalAdmin; a
+    /// <see cref="AnnouncementScope.Community"/> row with no target requires
+    /// GlobalAdmin or Moderator; a <c>Community</c> row with a target requires
+    /// GlobalAdmin or the <c>moderator:{CommunityId}</c> standing claim. This
+    /// mirrors the service's
+    /// <see cref="Kumunita.Core.Announcements.AnnouncementService"/>
+    /// <c>EnsureWritePermissionAsync</c> split exactly (the service is the real
+    /// gate at POST; this is only the button's visibility decision).
+    /// </summary>
+    private static bool CanEditAnnouncement(Announcement a, IReadOnlySet<string> roles)
+    {
+        var isGlobalAdmin = roles.Contains(Roles.GlobalAdmin);
+        var isModerator = roles.Contains(Roles.Moderator);
+
+        if (a.Scope == AnnouncementScope.Public)
+            return isGlobalAdmin;
+
+        // Community scope: flat (no target) needs a Moderator; targeted needs
+        // that community's moderator.
+        if (a.CommunityId is null)
+            return isGlobalAdmin || isModerator;
+
+        return isGlobalAdmin || roles.Contains(Roles.ModeratorComponent(a.CommunityId));
     }
 
     // ── Create (GET + POST /announcements/new) ─────────────────────────────

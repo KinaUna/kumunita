@@ -50,7 +50,22 @@ public sealed record AnnouncementDetailViewModel(
     /// <see cref="AuthorDisplayName"/>).</summary>
     string AuthorSubjectId,
     bool Pinned,
-    string? CommunityDisplayName);
+    string? CommunityDisplayName,
+    /// <summary>
+    /// Whether the signed-in caller may edit this announcement (the same
+    /// scope-vs-role split the
+    /// <see cref="Kumunita.Core.Announcements.AnnouncementService"/>
+    /// write-lane re-checks server-side at POST, evaluated against the
+    /// *stored* row: a <c>Public</c> scope requires GlobalAdmin; a
+    /// <c>Community</c> scope with no target requires GlobalAdmin or
+    /// Moderator; a <c>Community</c> scope with a target requires GlobalAdmin
+    /// or the <c>moderator:{CommunityId}</c> standing claim). A shape
+    /// convenience for the detail page's Edit button (the
+    /// <see cref="Kumunita.Web.Controllers.AnnouncementController"/>
+    /// <c>EnsureWritePermissionAsync</c> split is the real gate — the button
+    /// is just the affordance, so a non-authorized viewer never sees it).
+    /// </summary>
+    bool CanEdit);
 
 /// <summary>The /announcements/new create form (the write lane) — also reused for the
 /// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share

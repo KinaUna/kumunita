@@ -68,7 +68,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0011
+    │   ├── adr/                    # 0001–0014
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/

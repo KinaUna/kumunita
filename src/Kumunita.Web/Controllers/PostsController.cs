@@ -657,6 +657,172 @@ public sealed class PostsController(
         return Redirect($"/posts/{post.Id}");
     }
 
+    // ── Edit (GET + POST /posts/{id}/edit) — author-only write lane ─────────
+
+    /// <summary>
+    /// <c>GET /posts/{id}/edit</c> — the author-only edit lane's shape. The form
+    /// is seeded from the post's current Title/Body/Audience (the
+    /// <see cref="Kumunita.Web.Models.AudienceEditorModel.FromAudience"/>
+    /// round-trip seeds the audience editor from the post's
+    /// <see cref="Kumunita.Core.Authorization.Audience"/> value — the inverse
+    /// of the composer's <c>BuildAudience</c> deserialization site, so the
+    /// "Who to grant to" picker pre-checks the current grants).
+    /// <para>
+    /// <b>Authz shape (author-only):</b> the acting user must be the post's
+    /// author (<see cref="Post.AuthorId"/> == the signed-in subject). A
+    /// non-author never reaches the form — the <c>Detail</c> GET's
+    /// <c>CanSeeAsync</c> already ran on the read, but the edit lane's decision
+    /// is a *different* one (write-by-authorship, not read-by-audience), so it
+    /// is re-checked here as a Web-layer shape gate and then re-pinned
+    /// server-side by <see cref="PostService.UpdatePostAsync"/> (defense-in-depth:
+    /// the same "form is a shape, service is the gate" split the
+    /// <see cref="AnnouncementController"/> edit lane uses). A missing id and a
+    /// non-author are both a <c>Forbid()</c> 403 (the M3 U7 "403 on denied, not
+    /// a blank page" pin; a 404 would leak which ids are real).
+    /// </para>
+    /// </summary>
+    [HttpGet("/posts/{id}/edit")]
+    public async Task<IActionResult> Edit(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User) ?? string.Empty;
+        await using var session = store.QuerySession();
+        var post = await session.LoadAsync<Post>(id);
+        if (post is null)
+            return Forbid();
+
+        // Author-only shape gate (the service's UpdatePostAsync re-pins this
+        // at POST — the Web layer's 403 here is the fail-closed shape, not the
+        // decision). A non-author never sees the form.
+        if (post.AuthorId != actor)
+            return Forbid();
+
+        var model = new PostComposeViewModel
+        {
+            ComponentId = post.ComponentId,
+            Title = post.Title,
+            Body = post.Body,
+            Audience = AudienceEditorModel.FromAudience(post.Audience),
+            // The picker is not editable on the edit lane (the post's feed
+            // organizer is immutable after creation — UpdatePostAsync does not
+            // touch ComponentId); seed it with the single current component so
+            // the read-only display is well-formed.
+            Components = await SeedEditableComponentListAsync(post.ComponentId),
+        };
+        await SeedGrantPickerOptionsAsync();
+        return View(model);
+    }
+
+    /// <summary>
+    /// <c>POST /posts/{id}/edit</c> — the author-only edit write lane. On
+    /// success, redirects to the post's <c>/posts/{id}</c> (the edit is visible
+    /// to the viewer immediately). A denied author is a 403 (the
+    /// <see cref="PostService.UpdatePostAsync"/>
+    /// <c>UnauthorizedAccessException</c> maps to <c>Forbid()</c>; a missing id
+    /// is a 404). The audience editor's
+    /// <see cref="AudienceEditorModel.BuildAudience"/> deserializer is the
+    /// single deserialization site (the M2 single-source pin, carried verbatim
+    /// to the edit lane); the post's <see cref="Post.ComponentId"/> is
+    /// **immutable** on this lane (the post's feed organizer is a creation-time
+    /// choice — a re-targeting edit is out of scope for the author-edit).
+    /// </summary>
+    [HttpPost("/posts/{id}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(string id, [FromForm] PostComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to edit this post.");
+            return Forbid();
+        }
+
+        // Load the post up front: the author-only gate + the post's real
+        // ComponentId (the component is immutable on this lane — the posted
+        // model.ComponentId is pinned to the post's own, so a tampered value
+        // cannot re-target the post's feed organizer). A missing id or a
+        // non-author is a 403 (the M3 U7 "403 on denied, not a blank page"
+        // pin; a 404 would leak which ids are real). The service's
+        // UpdatePostAsync re-pins the author-only gate at POST (defense-in-depth).
+        await using var probe = store.QuerySession();
+        var post = await probe.LoadAsync<Post>(id);
+        if (post is null || post.AuthorId != actor)
+            return Forbid();
+
+        model.ComponentId = post.ComponentId;
+        model.Components = await SeedEditableComponentListAsync(post.ComponentId);
+        await SeedGrantPickerOptionsAsync();
+
+        if (string.IsNullOrWhiteSpace(model.Body))
+            ModelState.AddModelError(nameof(model.Body), "Body is required.");
+        if (model.Audience is null || !model.Audience.IsValid)
+            ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+
+        if (!ModelState.IsValid)
+            return View(model);
+
+        // The false branch above guarantees model.Audience is non-null and
+        // well-formed; bind it to a local so the deserialization call is
+        // null-obviously-safe (the single deserialization site, the M2
+        // single-source pin).
+        var audienceEditor = model.Audience
+            ?? new AudienceEditorModel { Mode = "Any", Grants = "[]" };
+        var audience = audienceEditor.BuildAudience();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdatePostAsync(
+                id,
+                actor,
+                string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+                model.Body,
+                audience,
+                session);
+            TempData["info"] = "Post updated.";
+            return Redirect($"/posts/{id}");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Not the author — the shape is a 403 (a re-render of the form would
+            // leak the post's content to a non-author; a 404 would leak which ids
+            // are real; the 403 tells the viewer nothing about either).
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    /// <summary>
+    /// Seeds the edit form's <see cref="PostComposeViewModel.Components"/>
+    /// picker list with the **single** component the post already belongs to
+    /// (the post's <c>ComponentId</c> is immutable on the edit lane — the feed
+    /// organizer is a creation-time choice, never a re-targetable edit). Reads
+    /// the component's name so the read-only display is well-formed; returns an
+    /// empty list when the component is missing/disabled (a fail-closed shape —
+    /// the form still renders, the picker is just empty, and the service's
+    /// author-only gate is the real deny).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Name)>> SeedEditableComponentListAsync(string? componentId)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            return [];
+
+        var components = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var component = components.FirstOrDefault(c => c.Id == componentId);
+        if (component is null)
+            return [];
+
+        return new List<(string Id, string Name)> { (component.Id, component.Name) };
+    }
+
     // ── Reply (POST /posts/{id}/replies) — M3b U6 micro-fix ─────────────────
 
     /// <summary>

@@ -26,6 +26,18 @@
 
         <div class="card mt-2 mb-4">
             <div class="card-body">
+                @* Author-only edit entry point (the edit lane is author-only at
+                   the Web layer — the non-author never sees the button, so there
+                   is no 403 surface to reach from the detail page). *@
+                @if (Model.IsAuthor)
+                {
+                    <div class="d-flex justify-content-end mb-2">
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="@($"/posts/{postId}/edit")">
+                            Edit
+                        </a>
+                    </div>
+                }
                 <h4>
                     @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                         ? Model.Post.Title
