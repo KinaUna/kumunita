@@ -105,3 +105,38 @@ itself**, not a blank. Nothing else changed: no seeder edit (M1's `en` row is
 untouched), no interface yet, no Web change. **Next: U2** —
 `ITranslationProvider` + `TranslationProvider`, per the design doc
 §Pinned contract §2.
+
+## U2 — `ITranslationProvider` read seam + `TranslationProvider` impl
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (2 files, matching the design doc §Pinned contract §2 verbatim):**
+- **New** `src/Kumunita.Core/Localization/ITranslationProvider.cs` — the
+  per-request read seam: 4 methods (`ResolveEffectiveLanguageAsync`, `GetAsync`,
+  `GetManyAsync`, `GetPageAsync`), doc-comments anchoring M·1/M·2/M·3/M·8/M·9.
+  **HTTP-free** (M·8): `preferredLanguageCode` is a plain `string?` — no cookie,
+  no claim, no `HttpRequest`.
+- **New** `src/Kumunita.Core/Localization/TranslationProvider.cs` — the
+  implementation (takes `Marten.IDocumentStore`):
+  - `ResolveChainAsync` (private helper) resolves the effective language
+    (M·1: preferred-if-enabled → default-if-enabled → `"en"`) and builds the
+    deduplicated fallback chain (M·2).
+  - `GetAsync` / `GetManyAsync`: **one** query for all candidate rows, then
+    per-string fallback (M·2); the floor is the **key itself** (M·1 — a resident
+    never sees a blank label).
+  - `GetPageAsync`: **one** query, per-page fallback (M·2); `null` = truly
+    absent (the Web renders a 404).
+  - Reads **only** `TranslationResource` / `LocalizedPage` + `LanguageCatalog`
+    / `LocaleSettings` — **never** a `Post` / `PostReply` / `Group` body (M·3).
+  - Uses `IQuerySession` (the `EmailDeadLetterCounter` read idiom).
+
+**State for U3 (the `ILocalizationService` admin seam):** the read path is
+complete. U3 ships the admin seam + `LanguageCompleteness` — it needs `AccessAudit`
+(the audit-row shape in the design doc §Pinned contract §3) and the M1 seed
+catalog. The provider and the service are **independent** (the provider reads,
+the service writes) — no coupling between them. `DependencyInjection.cs`
+registration is **not** in U2's deliverables (the provider is registered by U4
+or the host; U2 only ships the two files). **Next: U3** —
+`ILocalizationService` + `LocalizationService` + `LanguageCompleteness`, per
+the design doc §Pinned contract §3.
