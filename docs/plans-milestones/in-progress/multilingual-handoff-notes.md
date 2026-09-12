@@ -278,3 +278,77 @@ must source it from its own read path (or the shell may render the default via
 a U6-added read; not a U5 concern). **Next: U6** — the settings page +
 static-page routes + the admin Razor views, per the design doc §Pinned
 contract §5 tail + §4.
+
+## U6 — resident Web surface (locale settings + static-page routes) + admin Razor views
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (8 files, matching the design doc §4 + §5 tail verbatim):**
+- **New** `src/Kumunita.Web/Controllers/LocaleController.cs` — the M7 FACES
+  settings page. `GET /settings/language` reads the enabled catalog (the
+  picker) + the `LocaleSettings` singleton (the "default" marker) + the
+  current cookie value (`LocaleCookie.Read`). `POST /settings/language`
+  calls `LocaleCookie.Write` (M·5: the cookie write, 365-day, HttpOnly,
+  SameSite=Lax) or `LocaleCookie.Clear` (the "reset to default" action).
+  One `[Authorize]`-gated action pair; `ILocalizationService` in the ctor
+  (the **only** Core seam — no `IDocumentStore` read for the catalog, just
+  the `LocaleSettings` singleton read for the default marker). A nested
+  **public** `LocaleSettingsViewModel` so the view binds cleanly.
+- **New** `src/Kumunita.Web/Controllers/StaticPagesController.cs` — the
+  M5 FACES static-page routes. `GET /terms` + `GET /help` over
+  `ITranslationProvider.GetPageAsync(slug, LocaleCookie.Read(Request))`
+  (M·2 per-page fallback lives in U2's provider — this controller is a thin
+  route). `null` → 404 (M·5's "truly absent"). Slug guard: only
+  `terms` / `help` are served (no route-spoofing for other slugs).
+- **New** `src/Kumunita.Web/Security/MarkdownRenderer.cs` — the **single
+  page engine** for `LocalizedPage.Body` (ADR 0005 A). Minimal, escape-first
+  Markdown→HTML: headings 1–6, paragraphs, ordered/unordered lists,
+  `**bold**`, `*italic*`, `` `code` ``, `[label](url)`, fenced code blocks.
+  **XSS-safe by construction:** links are extracted from the raw text before
+  any escaping (so URLs with `&` in query strings survive the scheme check);
+  all non-link text is HTML-escaped before inline rules run; URLs are
+  re-escaped for the attribute value (`&` → `&amp;`, `"` → `&quot;`).
+  Scheme whitelist: `http` / `https` / `mailto` / relative only —
+  `javascript:`, `data:`, and any other scheme render as plain text.
+- **Modified** `src/Kumunita.Web/Views/Shared/_AccountNav.cshtml` — added
+  the **Settings** nav link (signed-in only, next to Profile) — the
+  discovery point for the locale page.
+- **New** `src/Kumunita.Web/Views/Locale/Index.cshtml` — the settings-page
+  body: the enabled-language `<select>` (with the "instance default" marker),
+  the current-preference echo, a "Save" button (POST), and a "Reset to
+  instance default" button (POST with `clear=1`). TempData flash.
+- **New** `src/Kumunita.Web/Views/StaticPages/Page.cshtml` — the shared
+  static-page view (binds to `LocalizedPage`): renders `Title` as an `<h1>`
+  and `Body` via `MarkdownRenderer.RenderHtml` (the single page engine).
+  Used by both `/terms` and `/help`.
+- **New** `src/Kumunita.Web/Views/Admin/Languages/Index.cshtml` — the
+  GlobalAdmin catalog shell (binds to
+  `IReadOnlyList<LanguagesController.LanguageRowViewModel>`): the
+  add-language form, per-language enable/disable/set-default/remove buttons,
+  a reorder form, and the M·12 completeness summary (present/missing keys +
+  page slugs). TempData flash, `@Html.AntiForgeryToken()` on every form.
+- **New** `src/Kumunita.Web/Views/Admin/Languages/PreviewPage.cshtml` —
+  the editor/preview pane (binds to
+  `LanguagesController.PageEditorViewModel`): the title + body form
+  (`SavePage`), and a translation-key editor (key + text,
+  `SaveTranslation`). The "no saved translation yet" state
+  (`HasSaved == false`) renders an empty form.
+
+**About-page note (U9 follow-on):** the existing `/about` route is owned by
+`HomeController.About` (the product-story landing page). U6's deliverables do
+**not** touch `HomeController.cs` (unit rule 1). The about-page localization
+is reachable through `ITranslationProvider.GetPageAsync("about", …)` — U7's
+seam tests exercise that path. If U9 (the close) wants `/about` to render
+the `LocalizedPage` body when one exists, that is a **U9** follow-on (a
+one-line change to `HomeController.About` + a small localized view), not a U6
+concern.
+
+**State for U7 (the 19 pinned seam tests):** every Core seam U7's tests
+consume is registered in the host container (`ITranslationProvider` → U2,
+`ILocalizationService` → U3, both `AddTransient` via U4's DI block). The Web
+surface is now complete: the resident can switch their language (M7 FACES),
+read a static page (M5 FACES), and an admin can manage the full catalog
+(M9/M10/M11/M12/M13 FACES). U7 ships `LocalizationServiceTests.cs` — the
+19 names from the design doc §Pinned seam tests. **Next: U7** — the 19
+seam tests, per the design doc §Pinned seam tests table.

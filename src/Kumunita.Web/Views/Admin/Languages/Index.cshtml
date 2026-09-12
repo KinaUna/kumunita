@@ -1,0 +1,139 @@
+@model IReadOnlyList<Kumunita.Web.Controllers.LanguagesController.LanguageRowViewModel>
+@{
+    ViewData["Title"] = "Languages";
+}
+
+<h1>Languages</h1>
+<p class="text-muted">
+    Manage the languages this instance supports. Changes take effect on the
+    next request — no rebuild, no restart.
+</p>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+<!-- ── Add a language ───────────────────────────────────────────────────── -->
+<h2 class="mt-4">Add a language</h2>
+<form method="post" action="/admin/languages" class="row g-2 align-items-end mb-4">
+    @Html.AntiForgeryToken()
+    <div class="col-sm-3">
+        <label for="code" class="form-label">BCP-47 code</label>
+        <input type="text" class="form-control" name="code" id="code"
+               required placeholder="pl" maxlength="16" />
+    </div>
+    <div class="col-sm-4">
+        <label for="nativeName" class="form-label">Native name</label>
+        <input type="text" class="form-control" name="nativeName" id="nativeName"
+               required placeholder="Polski" maxlength="64" />
+    </div>
+    <div class="col-sm-3">
+        <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+</form>
+
+<!-- ── Existing languages ───────────────────────────────────────────────── -->
+<h2>Supported languages</h2>
+
+@* Reorder form — all current codes in display order. *@
+<form method="post" action="/admin/languages/reorder" class="mb-3">
+    @Html.AntiForgeryToken()
+    @for (var i = 0; i < Model.Count; i++)
+    {
+        <input type="hidden" name="codesInOrder" value="@Model[i].Code" />
+    }
+    <button type="submit" class="btn btn-outline-secondary btn-sm"
+            title="Submit the current order (as shown below) as the new sort order">
+        Reorder (confirm current order)
+    </button>
+    <span class="text-muted small ms-2">
+        Drag-and-drop reordering is not available; the reorder form accepts the
+        codes in the order they appear here. To change the order, the admin
+        should submit the list in the desired sequence.
+    </span>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Native name</th>
+                <th>Enabled</th>
+                <th>UI keys</th>
+                <th>Pages</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td><code>@row.Code</code></td>
+                    <td>@row.NativeName</td>
+                    <td>
+                        @if (row.Enabled)
+                        {
+                            <span class="badge text-bg-success">enabled</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">disabled</span>
+                        }
+                    </td>
+                    <td>
+                        <span class="text-success small">@row.PresentKeys.Count present</span>
+                        @if (row.MissingKeys.Count > 0)
+                        {
+                            <span class="text-warning small">· @row.MissingKeys.Count missing</span>
+                        }
+                    </td>
+                    <td>
+                        <span class="text-success small">@row.PresentPageSlugs.Count present</span>
+                        @if (row.MissingPageSlugs.Count > 0)
+                        {
+                            <span class="text-warning small">· @row.MissingPageSlugs.Count missing</span>
+                        }
+                    </td>
+                    <td class="text-nowrap">
+                        <div class="btn-group btn-group-sm" role="group">
+                            @if (row.Enabled)
+                            {
+                                <form method="post" action="/admin/languages/@row.Code/disable" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-secondary">Disable</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form method="post" action="/admin/languages/@row.Code/enable" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-secondary">Enable</button>
+                                </form>
+                            }
+
+                            <form method="post" action="/admin/languages/@row.Code/default" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-primary">Set default</button>
+                            </form>
+
+                            <a href="/admin/languages/@row.Code/pages/terms"
+                               class="btn btn-outline-info">Edit pages</a>
+
+                            <form method="post" action="/admin/languages/@row.Code" class="d-inline"
+                                  onsubmit="return confirm('Remove @row.Code? Its translation and page rows are retained and will be restored if the language is re-added.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-danger">Remove</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

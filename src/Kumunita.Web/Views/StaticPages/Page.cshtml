@@ -1,0 +1,15 @@
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@model LocalizedPage
+@{
+    ViewData["Title"] = Model.Title;
+}
+
+<div class="markdown">
+    <h1>@Model.Title</h1>
+    @Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))
+    <hr class="my-4" />
+    <p class="text-muted small mb-0">
+        Last updated: @Model.Updated.ToString("yyyy-MM-dd")
+    </p>
+</div>

@@ -1,0 +1,76 @@
+@model Kumunita.Web.Controllers.LanguagesController.PageEditorViewModel
+@{
+    ViewData["Title"] = $"Edit — {Model.Slug} ({Model.Code})";
+}
+
+<p>
+    <a href="/admin/languages" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back to languages</a>
+</p>
+
+<h1>Page: <code>@Model.Slug</code> — @Model.Code</h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+@if (!Model.HasSaved)
+{
+    <div class="alert alert-info" role="alert">
+        No saved translation for this page in <strong>@Model.Code</strong> yet.
+        Fill in the title and body below, then save.
+    </div>
+}
+
+<!-- ── Static-page editor (SavePage) ────────────────────────────────────── -->
+<form method="post" action="/admin/languages/@Model.Code/pages/@Model.Slug" class="mb-5">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input type="text" class="form-control" name="title" id="title"
+               value="@Model.Title" maxlength="200" />
+    </div>
+
+    <div class="mb-3">
+        <label for="body" class="form-label">Body (Markdown)</label>
+        <textarea class="form-control font-monospace" name="body" id="body"
+                  rows="16" style="min-height: 12rem;">@Model.Body</textarea>
+        <div class="form-text small">
+            Supports: headings (#), paragraphs, lists (-), **bold**, *italic*,
+            `code`, [links](url), fenced code blocks. Raw HTML is escaped.
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save page</button>
+</form>
+
+<!-- ── UI-string editor (SaveTranslation) ───────────────────────────────── -->
+<h2 class="mt-4">UI strings for @Model.Code</h2>
+<p class="text-muted">
+    Upsert a single UI-string translation. The key is the code identifier
+    (e.g. <code>nav.home</code>, <code>feed.reply</code>); the text is what
+    a resident sees.
+</p>
+<form method="post" action="/admin/languages/@Model.Code/translations" class="mb-4">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-4">
+            <label for="key" class="form-label">Key</label>
+            <input type="text" class="form-control" name="key" id="key"
+                   required placeholder="nav.home" maxlength="128" />
+        </div>
+        <div class="col-sm-5">
+            <label for="text" class="form-label">Text</label>
+            <input type="text" class="form-control" name="text" id="text"
+                   required maxlength="512" />
+        </div>
+        <div class="col-sm-3">
+            <button type="submit" class="btn btn-primary">Save translation</button>
+        </div>
+    </div>
+</form>
