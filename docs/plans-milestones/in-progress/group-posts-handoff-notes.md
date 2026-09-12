@@ -85,3 +85,36 @@
 - U2's plan file moves to `done/` immediately after this note (per the
   workflow) — a plain file move: **nothing is staged or committed; the user
   reviews first.**
+
+## U3 — ADR 0013 (group posts are a membership lane)
+
+- Authored `docs/adr/0013-group-posts-membership-lane.md` (**Accepted,
+  2026-09-12**, the 0010 shape — Context / Decision / Consequences). The ADR
+  **points at** the design doc Part 2 §2.1–§2.2 for the frozen C# instead of
+  re-deriving it. `docs/adr/README.md` register grew exactly one 0013 line
+  (next to 0012). **No code, no build, no `.cs` touched.**
+- The ADR states the ADD set as **the compatible ADR 0006-E ADD**: the
+  **4** group-lane methods (the `CanSeeGroupAsync` pair with `targetPostId`
+  + the `CanSeeGroupFeedAsync` pair — per **U2-A1/U2-A2**, *not* the
+  register's 2-overload draft) + `AccessVia.Group` (8th value, appended
+  after `Admin`; frozen `CanAsync`/`CanSeeAsync` byte-identical).
+  `Post.GroupId` stays the **single additive** (ADR 0004 §B.1, the M3b
+  `Status` precedent — no `M3DocTypes` change, no new doc surface);
+  `PostReply` / `PostService` ctor **unchanged** (ADR 0006-D: the lane owns
+  its reads).
+- **Break-glass, moderator peek, non-member authoring** are recorded in the
+  ADR as **standing "not available" (G·4)** — deliberately **not** on the
+  named deferral list (that list is the 5 design-doc Scope items:
+  moderation/report, notifications, search, cross-posting, pagination UI).
+  Re-litigating any of them requires an **ADR 0013 amendment** per Part 1's
+  drift-guard.
+- **Handing to U4 (`Post.GroupId` additive):** the ADR's Decision bullets
+  "The data is one additive, not a new doc" and "Lanes are exclusive" are
+  the standing rules U4's single-field change must satisfy — the field is
+  written **only** by `CreateGroupPostAsync` (U6) with
+  `ComponentId = string.Empty` + `Audience = new Audience()` (G·2/G·8), and
+  **no filter** is added to the M3 feeds (G12/G13 hold structurally — design
+  doc §2.3(a)).
+- U3's plan file moves to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**
