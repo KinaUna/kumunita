@@ -95,7 +95,7 @@
                 </div>
             </div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;">Your address (optional)</h5>
+            <h5 class="mt-4 mb-2" style="font-weight:600;">Your address + phone (optional)</h5>
             <div class="row g-2">
                 <div class="col-sm-12">
                     <label asp-for="Address" class="form-label"></label>
@@ -106,6 +106,19 @@
                         Shown on the directory list and detail only when you've also
                         opted in the contact block below; leave empty to keep your
                         street private to this profile.
+                    </div>
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-sm-6">
+                    <label asp-for="Phone" class="form-label"></label>
+                    <input asp-for="Phone" class="form-control" maxlength="32"
+                           placeholder="Phone — shown to neighbors when you opt in below" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                    <div class="form-text small">
+                        Shown on the directory detail only when you've opted in the
+                        contact block below; leave empty to keep your number private
+                        to this profile.
                     </div>
                 </div>
             </div>

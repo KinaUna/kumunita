@@ -117,6 +117,7 @@ public sealed class ProfileController(
             DisplayName = savedProfile?.DisplayName ?? string.Empty,
             Email = savedProfile?.Email ?? string.Empty,
             Address = savedProfile?.Address ?? string.Empty,
+            Phone = savedProfile?.Phone ?? string.Empty,
         };
 
         // The profile-level gate is non-nullable on the Profile document —
@@ -139,8 +140,8 @@ public sealed class ProfileController(
         // Grant-picker option lists (the M2 editor's UX layer over the frozen
         // Grants transport). These travel on ViewBag (the standard read-only
         // view-data channel) rather than as model properties, because the
-        // U11 "exactly six form fields" pin
-        // (ProfileEditViewModel_Has_Exactly_Six_FormFields) forbids adding
+        // U11 "exactly seven form fields" pin
+        // (ProfileEditViewModel_Has_Exactly_Seven_FormFields) forbids adding
         // a new settable write surface to ProfileEditViewModel. The
         // _AudienceEditor partial reads them via @ViewBag (the editor name
         // key — "Visibility" / "ContactVisibility" — selects the right

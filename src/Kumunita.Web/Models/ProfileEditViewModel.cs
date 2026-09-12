@@ -62,6 +62,17 @@ public sealed class ProfileEditViewModel
     [Display(Name = "Address (the street you live at)")]
     public string? Address { get; set; }
 
+    /// <summary>The resident's phone number. Optional (like <see cref="Address"/>, a
+    /// resident who doesn't want to share a number simply leaves it empty). When non-empty
+    /// and <see cref="OptInContactVisibility"/> is true, it appears with the gated contact
+    /// block on the directory detail (same gate as email); when <see
+    /// cref="OptInContactVisibility"/> is false it is still saved on the document (the
+    /// author's own field) but no directory surface renders it, since the contact-block
+    /// gate — which the phone shares — is off. Free-text, up to a phone number's worth.</summary>
+    [MaxLength(32)]
+    [Display(Name = "Phone number")]
+    public string? Phone { get; set; }
+
     // ── The two audience editors (U11, plan line 158) ─────────────────────
 
     /// <summary>The <c>Profile.Visibility</c> editor (the profile-level gate).
@@ -176,11 +187,10 @@ public sealed class ProfileEditViewModel
     /// shared <see cref="AudienceEditorModel.BuildAudience"/> single-source
     /// deserializer). The <c>DisplayName</c> / <c>Email</c> patch fields are
     /// the editor's <c>DisplayName</c> / <c>Email</c> (non-null — the
-    /// <c>IsValid</c> guard ran first); <c>Phone</c> is <c>null</c> (the M2
-    /// editor surface does not expose a phone field — the <c>Profile</c>
-    /// document's phone is a federation/M3 surface, not M2's write lane; the
-    /// null patch field leaves the current row untouched per the M1 patch
-    /// semantics).
+    /// <c>IsValid</c> guard ran first); <c>Phone</c> is the editor's phone,
+    /// trimmed (optional + clearable, like <c>Address</c> — a blank clears it,
+    /// a non-blank saves it, so the patch field is never null here and the
+    /// M1 "null => don't touch" rule stays consistent).
     /// <paramref name="subjectId"/> is the author's subject id (the
     /// <c>Profile</c> document's identity — the actor's subject, minted from
     /// the signed-in principal, never a form field).
@@ -192,7 +202,10 @@ public sealed class ProfileEditViewModel
         var patch = new Kumunita.Core.UserInfo.ProfileUpdate(
             DisplayName,
             Email,
-            null,                                  // Phone: not exposed by the M2 editor
+            Phone?.Trim() ?? string.Empty,         // optional + clearable, like Address:
+                                                   // a blank edit clears it; never null,
+                                                   // so the patch's "null => don't touch"
+                                                   // rule stays consistent
             Visibility.BuildAudience(),            // the non-null gate (always built)
             OptInContactVisibility
                 ? (ContactVisibility?.BuildAudience()
@@ -236,7 +249,7 @@ public sealed record ViewAsOption(string SubjectId, string DisplayName);
 /// One row in the grant picker's user/group dropdowns (the M2 editor's UX
 /// layer over the frozen <c>AudienceEditorModel</c> transport). A
 /// <b>view-only projection</b> — not a form-bound property of
-/// <see cref="ProfileEditViewModel"/> (which keeps the U11 "exactly six
+/// <see cref="ProfileEditViewModel"/> (which keeps the U11 "exactly seven
 /// form fields" pin), so the controller hands the two lists to the view
 /// through <c>ViewData["GrantPicker.Options"]</c> rather than a model
 /// property. A <b>new audience shape</b> would also be the wrong tool

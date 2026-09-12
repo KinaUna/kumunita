@@ -14,7 +14,7 @@ namespace Kumunita.Web.Tests;
 public sealed class ProfileEditViewModelTests
 {
     [Fact]
-    public void ProfileEditViewModel_Has_Exactly_Six_FormFields()
+    public void ProfileEditViewModel_Has_Exactly_Seven_FormFields()
     {
         var fields = typeof(ProfileEditViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -30,6 +30,7 @@ public sealed class ProfileEditViewModelTests
             "DisplayName",
             "Email",
             "OptInContactVisibility",
+            "Phone",
             "Visibility",
         }, fields);
     }

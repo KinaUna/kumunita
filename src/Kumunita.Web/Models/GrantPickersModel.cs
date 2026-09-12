@@ -26,7 +26,7 @@ namespace Kumunita.Web.Models;
 /// option lists (the M2 editor's UX layer) the controller seeds on
 /// <c>ViewData</c> ("<c>{EditorName}_Users</c>" /
 /// "<c>{EditorName}_Groups</c>") — read-only view data, never a model
-/// property (the M2 U11 "exactly six form fields" pin on
+/// property (the M2 U11 "exactly seven form fields" pin on
 /// <see cref="ProfileEditViewModel"/> applies verbatim to every
 /// view-model shape that carries an editor).</item>
 /// </list>
