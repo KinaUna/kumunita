@@ -382,3 +382,124 @@ PostDetail) was **not** read or touched.
 
 **Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
 contradiction, no out-of-scope string attempted).
+
+## U5 — the remaining in-scope views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 7.4s)
++ all 16 `<kw-l>` placements present in the six touched views. **After U5 the
+view-wiring track (U2–U5) is complete** — every in-scope string in the registry
+is wired to a `<kw-l>` element.
+
+**What was changed (6 files modified, 0 new — the closed set):**
+- **`Views/Home/Index.cshtml` — 3 keys:** `home.eyebrow` (the
+  `<div class="eyebrow">Where this project stands</div>`), `home.lead` (the
+  `<p class="kmb-section-lead">` — see the `home.lead` note below), `home.support`
+  (the **first sentence** of the support `<p>`, before the mailto `<a>` — see
+  Note 1).
+- **`Views/Account/Login.cshtml` — 3 keys:** `account.login_title` (the
+  `<h1>Sign in</h1>`), `account.login_submit` (the submit button),
+  `account.login_no_account` (the **question text only** — see Note 2).
+- **`Views/Account/Signup.cshtml` — 3 keys:** `account.signup_title` (the
+  `<h1>Sign up</h1>`), `account.signup_submit` (the submit button),
+  `account.signup_has_account` (the **question text only** — see Note 2).
+- **`Views/Directory/Index.cshtml` — 3 keys:** `directory.title` (the
+  `<h1>Directory</h1>`), `directory.lead` (the `<p class="text-muted">` directly
+  below the `<h1>`), `directory.empty` (the `<div class="alert alert-info">`
+  content).
+- **`Views/Profile/Edit.cshtml` — 2 keys:** `profile.title` (the
+  `<h1>Your profile</h1>` — **not** the tab title "Edit your profile"),
+  `profile.save_avatar` (the disabled avatar-upload submit button).
+- **`Views/Admin/Index.cshtml` — 2 keys:** `admin.title` (the
+  `<h1>Admin</h1>`), `admin.verify` (the `<button class="btn btn-outline-primary">Verify</button>`
+  in the verify form).
+
+**16 `<kw-l>` elements placed** (3 + 3 + 3 + 3 + 2 + 2). Each wraps the **exact
+current English** (matching the registry `en` value) as inner text (the M·1
+source floor — a fresh `en` instance renders identically). No
+`href`/`action`/`method`/`name`/`id`/`asp-*`/`@Html.AntiForgeryToken()`/`@if`/
+`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`/`@Model.CommunityName`/
+`Milestones.All`/`RepositoryInfo.Links` changed — only the visible English text
+that matched one of the 16 keys.
+
+**The two notes (and how each was resolved):**
+- **Note 1 — `home.support` is a substring (Home/Index.cshtml):** the view's
+  support `<p>` is a compound sentence: `Questions or feedback? Write to
+  <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a>.`. The registry's
+  `home.support` = "Questions or feedback? Write to" is **only the text before
+  the mailto link**. Wrapped **just that part**:
+  `<kw-l key="home.support">Questions or feedback? Write to</kw-l>
+  <a href="mailto:@Model.SupportEmail">…</a>.` — the `<a>` and the trailing `.`
+  are **left as-is** (dynamic / UGC-adjacent).
+- **Note 2 — the account cross-links (Login + Signup):** the "No account yet?"
+  (Login) and "Already have an account?" (Signup) strings are each followed by
+  a cross-link (`<a asp-action="Signup">Sign up</a>` /
+  `<a asp-action="Login">Sign in</a>`). Wrapped **only the question text**;
+  the cross-link `<a>` (and the trailing `.` on Signup) is **left as-is**. The
+  cross-link link text ("Sign up" / "Sign in") is **not** in the account
+  registry — it is cross-page navigation (the nav keys `nav.sign_in` /
+  `nav.sign_up` were already wired by U2 in `_AccountNav.cshtml`), so it is out
+  of U5's closed set.
+
+**`home.lead` multi-line paragraph handling (Home/Index.cshtml):** the view's
+lead paragraph was a **multi-line** block (4 source lines). Per the unit
+instructions, the **entire** paragraph is wrapped in a **single** `<kw-l>`
+element whose inner text is the **single-line registry value** (not the
+multi-line view formatting) — the TagHelper's `SetContent` emits the resolved
+text and the inner `en` is the source-readable M·1 floor. The rendered HTML is
+identical (whitespace inside the `<p>` collapses the same way).
+
+**`ViewData["Title"]` — left as-is (U3/U4 convention):** `Home` `= "Home"`,
+`Login` `= "Sign in"`, `Signup` `= "Sign up"`, `Directory` `= "Directory"`,
+`Profile/Edit` `= "Edit your profile"` (note: **different** from
+`profile.title` = "Your profile"), `Admin` `= "Admin"` — all browser-tab titles
+left untouched. Localizing a tab title requires a C# `@{}` line calling the
+provider (not a `<kw-l>` element), outside U5's closed view-text scope. If the
+tab titles should also be localized, that is a **U9 follow-on proposal** (not
+implemented here).
+
+**Left as-is (deliberate, out-of-scope strings confirmed and not keyed — rule
+3):**
+- **`Home/Index.cshtml`:** `ViewData["Title"]`, `@Model.CommunityName`
+  (dynamic/UGC), the milestone list (`Milestones.All` — dynamic), the repository
+  links (`RepositoryInfo.Links` — dynamic), the `@Model.SupportEmail` mailto
+  link + trailing `.`.
+- **`Account/Login.cshtml`:** `ViewData["Title"]`, the `@label asp-for="Email"`
+  / `"Password"` / `"RememberMe"` labels (model-bound), the "Sign up" cross-link
+  text, the **setup-token section** (`Model.ShowSetupLink` — "Received a
+  first-boot setup token? Complete setup." — **setup flow, explicitly out of
+  scope** per the lane plan), the `@if (TempData["info"])` / `Model.Error`
+  alerts.
+- **`Account/Signup.cshtml`:** `ViewData["Title"]`, the `@label asp-for=…`
+  labels (model-bound), the "Sign in" cross-link text, the "Never got the
+  confirmation email? Resend the confirmation email." section (model-conditional,
+  not in the registry).
+- **`Directory/Index.cshtml`:** `ViewData["Title"]`, the profile rows
+  (`@p.DisplayName`, `@p.Address` — UGC/UGC-adjacent), the "Verified" badge,
+  the avatar `<img>` + monogram, the U8-media design `@*…*@` comment.
+- **`Profile/Edit.cshtml`:** `ViewData["Title"]` ("Edit your profile"), the
+  "This is where you decide what other residents can see…" helper paragraph,
+  the "Your avatar" sub-heading, the avatar file input + helper text ("JPEG,
+  PNG, WebP or GIF · up to 5 MB…"), the profile-edit form fields (model-bound),
+  the "Your name + email" / "Your address + phone" / "Who can see what" headings,
+  the "Share my contact info" switch + helper, the `<partial>` audience editor,
+  the **`<button type="submit" class="btn btn-primary">Save</button>`** (the
+  profile-save button — **not** in the registry, confirmed present and left
+  untouched), the "Preview — how I appear" link.
+- **`Admin/Index.cshtml`:** `ViewData["Title"]`, the `<h2>Accounts</h2>`, the
+  account-count summary line, the "Verify an unverified account (safety valve)"
+  label, the "No unverified accounts to verify." empty state, the table headers
+  ("Account" / "Roles" / "Scope" / "Posting"), the account rows (UGC-adjacent),
+  the "unverified" / "blocked" badges, the "Set" / "Block" / "Unblock" action
+  buttons, the role/scope/post selects, the confirm() guards.
+
+None of these are in the 16-key closed set, so none are keyed (unit-series rule
+3 — never key an out-of-scope string; rule 4 — never wrap UGC).
+
+**Deviations vs the plan:** none. All 16 placements, the two notes, the
+`home.lead` single-line handling, the `ViewData["Title"]` left-as-is decision,
+and the out-of-scope non-touch (especially the Login setup-token section) are
+all exactly as the unit instructions specified.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).

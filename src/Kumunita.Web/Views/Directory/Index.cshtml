@@ -5,13 +5,13 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-        <h1>Directory</h1>
-        <p class="text-muted">Everyone in the neighborhood — every resident on the platform.</p>
+        <h1><kw-l key="directory.title">Directory</kw-l></h1>
+        <p class="text-muted"><kw-l key="directory.lead">Everyone in the neighborhood — every resident on the platform.</kw-l></p>
 
         @if (Model.Profiles.Count == 0)
         {
             <div class="alert alert-info">
-                No residents on this neighborhood yet.
+                <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
             </div>
         }
         else

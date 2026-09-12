@@ -4,7 +4,7 @@
     ViewData["Title"] = "Admin";
 }
 
-<h1>Admin</h1>
+<h1><kw-l key="admin.title">Admin</kw-l></h1>
 
 @if (TempData["info"] is string info)
 {
@@ -30,7 +30,7 @@
                 <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
             }
         </select>
-        <button class="btn btn-outline-primary" type="submit">Verify</button>
+        <button class="btn btn-outline-primary" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
     </div>
     @if (Model.UnverifiedCount == 0)
     {
