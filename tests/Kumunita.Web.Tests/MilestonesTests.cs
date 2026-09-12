@@ -16,7 +16,7 @@ public class MilestonesTests
     public void Roadmap_Covers_M0_Through_M6_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "M4", "M5", "M6" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "M4", "M5", "M6" },
             Ids.ToList());
     }
 

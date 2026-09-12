@@ -227,7 +227,38 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         // lane is owner ∪ GlobalAdmin (C-M2·3) — the view hides its form for
         // plain members and the route 404s their POST.
         var isOwner = group.OwnerId == actor;
+        // ── Group posts (ADR 0013) — the channel moved onto the detail page
+        //    (the composer + the membership-scoped feed previously rendered
+        //    at /groups/{id}/posts). Same lanes as that old feed action:
+        //    ListGroupFeedAsync is the single access decision + the
+        //    aggregate AccessAudit row (G·1/G·5), and the CanPost read is
+        //    the live GetGroupIdsAsync membership read (G·3 — the POST gate
+        //    stays the authoritative deny). The Detail page is member-scoped
+        //    by its owner ∪ member gate, so every viewer here is a member
+        //    and sees the composer + feed. ──
+        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: 1);
 
+        var groupPosts = new List<PostListItem>(feed.Visible.Count);
+        foreach (var post in feed.Visible)
+        {
+            var profile = await userInfo.GetProfileAsync(post.AuthorId);
+            const int previewLength = 200;
+            var preview = post.Body.Length <= previewLength
+                ? post.Body
+                : post.Body[..previewLength].TrimEnd() + "…";
+            groupPosts.Add(new PostListItem(
+                post.Id,
+                post.Title,
+                preview,
+                post.Created,
+                profile?.DisplayName ?? post.AuthorId,
+                post.AuthorId));
+        }
+
+        // CanPost: the SAME rule the CreateGroupPost gate enforces (G·3) —
+        // the live membership read; a display convenience that drives the
+        // composer's visibility (the POST gate is the authoritative deny).
+        var canPost = (await userInfo.GetGroupIdsAsync(actor)).Contains(group.Id);
         // m2b read lane #3 — the group's pending invitations (the owner's
         // invite surface: the pending list + cancel links). Read lane (no
         // audit, C-M2·2 carried); each row's display name via the same
@@ -269,7 +300,12 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             members,
             pendingInvitations,
             residentCandidates,
-            group.IsPrivate));
+            group.IsPrivate)
+        {
+            GroupPosts = groupPosts,
+            GroupPostsTotal = feed.Total,
+            CanPost = canPost,
+        });
     }
 
     // ── Shared write-path helper (M2 plan U10, line 152) ────────────────
@@ -723,79 +759,6 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
     //    (G·8), there is no moderator / break-glass branch to reach (G·4 —
     //    *unavailable*, not deferred), and this controller never re-derives
     //    access — no <c>IAuthorizationService</c> call here at all. ──
-
-    /// <summary>
-    /// The group channel's <b>feed</b> (ADR 0013, G1–G4 FACES):
-    /// <c>GET /groups/{id}/posts?page=N</c>. The group's absence is a 404
-    /// <b>before</b> the service call (the M2b <c>FindGroupAsync</c> pattern
-    /// — this file's <see cref="GetGroupAsync"/>-based read shape, the
-    /// "a non-visible group 404s" precedent — and a member's own group is
-    /// the only reachable one anyway, since the service's Deny shape returns
-    /// an empty feed regardless). The service's
-    /// <see cref="PostService.ListGroupFeedAsync"/> is the single
-    /// decision + aggregate <c>AccessAudit</c> row (G·5); the controller
-    /// only projects. <see cref="GroupFeedViewModel.CanPost"/> is a display
-    /// convenience (a live <c>GetGroupIdsAsync</c> read — "a read, not a
-    /// decision"): it drives the composer's visibility; the POST gate is
-    /// the authoritative deny (G·3).
-    /// </summary>
-    [HttpGet("{id}/posts")]
-    public async Task<IActionResult> GroupPosts(string id, int? page)
-    {
-        if (string.IsNullOrEmpty(id))
-            return NotFound();
-
-        var actor = SubjectId(User);
-        if (string.IsNullOrEmpty(actor))
-            return NotFound();
-
-        // The group's absence 404s before any service call (the M2b
-        // FindGroupAsync pattern; no candidate posts loaded, no audit row).
-        var group = await userInfo.GetGroupAsync(id);
-        if (group is null)
-            return NotFound();
-
-        var feed = await posts.ListGroupFeedAsync(id, actor, page is > 0 ? page.Value : 1);
-
-        // Display-only: the composer's visibility. The SAME rule the POST
-        // gate enforces (G·3 — the create gate is the group-lane membership
-        // decision; G·4 — no moderator / GlobalAdmin skip on this lane).
-        var groups = await userInfo.GetGroupIdsAsync(actor);
-        var canPost = groups.Contains(id);
-
-        var items = new List<PostListItem>(feed.Visible.Count);
-        foreach (var post in feed.Visible)
-        {
-            // The author's display name — a <c>GetProfileAsync</c> read
-            // (a *display* lookup, never an <c>AccessAudit</c> subject;
-            // the membership decision is <b>already made</b> by
-            // <see cref="PostService.ListGroupFeedAsync"/>). The M3
-            // PostsController feed N+1 precedent (a neighborhood, not a
-            // firehose). The per-row component slots stay null — the feed
-            // is group-scoped and a group post's ComponentId is empty (G·2).
-            var profile = await userInfo.GetProfileAsync(post.AuthorId);
-            const int previewLength = 200;
-            var preview = post.Body.Length <= previewLength
-                ? post.Body
-                : post.Body[..previewLength].TrimEnd() + "…";
-            items.Add(new PostListItem(
-                post.Id,
-                post.Title,
-                preview,
-                post.Created,
-                profile?.DisplayName ?? post.AuthorId,
-                post.AuthorId));
-        }
-
-        return View("Feed", new GroupFeedViewModel
-        {
-            GroupId = id,
-            GroupName = group.Name,
-            Items = items,
-            Total = feed.Total,
-            CanPost = canPost,
-        });
-    }
 
     /// <summary>
     /// A group post's <b>detail</b> + its one-level replies (ADR 0013,

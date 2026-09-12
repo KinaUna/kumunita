@@ -225,7 +225,23 @@ public sealed record GroupDetailViewModel(
     IReadOnlyList<GroupMemberViewModel> Members,
     IReadOnlyList<PendingInvitationViewModel> PendingInvitations,
     IReadOnlyList<ResidentOption> ResidentCandidates,
-    bool IsPrivate = false);
+    bool IsPrivate = false)
+{
+    // ── Group posts (ADR 0013) — the channel moved onto the detail page
+    //    (the composer + the membership-scoped feed, previously the separate
+    //    /groups/{id}/posts page). The Detail action loads these from the same
+    //    ListGroupFeedAsync / GetGroupIdsAsync lanes that page used, so the
+    //    access decision + aggregate audit row are unchanged (G·1/G·3/G·5).
+    //    These are object-initializer properties (not positional params) so
+    //    their defaults may be non-constant (a C# positional default must be a
+    //    compile-time constant — [] is not), and the existing shape-pinning Web
+    //    test keeps compiling unchanged. ──
+    public IReadOnlyList<PostListItem> GroupPosts { get; init; } = [];
+
+    public int GroupPostsTotal { get; init; }
+
+    public bool CanPost { get; init; }
+}
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching
@@ -258,58 +274,6 @@ public sealed record ResidentOption(string SubjectId, string DisplayName);
 //    the M3 <see cref="PostListItem"/> / <see cref="ReplyItem"/> records
 //    verbatim (same namespace; "reuse, don't re-invent"). The controller
 //    (GroupsController's group-post actions) is the only writer of these. ──
-
-/// <summary>
-/// The <b>group channel feed</b> surface (ADR 0013, U7) —
-/// <c>GET /groups/{id}/posts</c>. A *projection* of
-/// <see cref="Kumunita.Core.Posts.PostService.ListGroupFeedAsync"/>'s
-/// <see cref="Kumunita.Core.Posts.FeedResult"/> — never a re-derivation of
-/// access: the membership decision (G·1 — the <b>sole</b> access decision
-/// on this lane; the audience lane is never evaluated, G·8) and its single
-/// aggregate <see cref="Kumunita.Core.Authorization.AccessAudit"/> row
-/// (G·5) are already written at the Core layer. <see cref="Items"/> carries
-/// only the allowed posts; on a Deny the service returns an empty list, so
-/// a non-member's <see cref="Post"/> fields never reach this model (G2
-/// FACES). <see cref="GroupName"/> is the feed's <b>label</b> slot (the
-/// M3 <see cref="FeedViewModel"/>'s <c>ComponentName</c> analog — a display
-/// lookup, not a gate); the group's absence is enforced by the controller
-/// as a 404 precondition before the service call.
-/// </summary>
-public sealed class GroupFeedViewModel
-{
-    public string GroupId { get; set; } = string.Empty;
-
-    /// <summary>The group's name — the feed header's label (a
-    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupAsync"/>
-    /// display read, not a decision; the membership decision is already
-    /// made by <see cref="Kumunita.Core.Posts.PostService.ListGroupFeedAsync"/>'s
-    /// single <c>CanSeeGroupFeedAsync</c> call).</summary>
-    public string GroupName { get; set; } = string.Empty;
-
-    /// <summary>The visible feed rows (the M3
-    /// <see cref="PostListItem"/> shape reused verbatim — its
-    /// <c>ComponentName</c>/<c>ComponentId</c> slots stay null: a group
-    /// post's <c>ComponentId</c> is empty by G·2, and the feed is
-    /// group-scoped, so the per-row component badge has nothing to say).</summary>
-    public IReadOnlyList<PostListItem> Items { get; set; } = [];
-
-    public int Total { get; set; }
-
-    /// <summary>
-    /// Whether the current viewer may post to this group's channel —
-    /// <b>exactly</b> the rule the
-    /// <see cref="Kumunita.Core.Posts.PostService.CreateGroupPostAsync"/>
-    /// create gate enforces (G·3: the create gate <i>is</i> the group-lane
-    /// membership decision — a non-member moderator or GlobalAdmin is
-    /// denied, G·4). The view hides the composer when this is false rather
-    /// than sending the user to a form they'd only 404 back from. A display
-    /// convenience (a live
-    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService.GetGroupIdsAsync"/>
-    /// read — "a read, not a decision"; the POST gate remains the
-    /// authoritative deny and is unchanged).
-    /// </summary>
-    public bool CanPost { get; set; }
-}
 
 /// <summary>
 /// The <b>group post detail</b> surface (ADR 0013, U7) —

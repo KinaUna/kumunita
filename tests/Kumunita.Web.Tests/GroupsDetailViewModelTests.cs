@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Ten_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Thirteen_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -67,14 +67,22 @@ public sealed class GroupsDetailViewModelTests
         // group's M1 field becomes resident-facing: the detail's "About"
         // block + the edit lane's form default) + IsPrivate (ADR 0010 — the
         // group's privacy flag: the header's "Private" badge + the
-        // owner ∪ GlobalAdmin privacy toggle's form default). No Status /
-        // InvitedBy / InvitedAt: "who invited, when" lives on the
+        // owner ∪ GlobalAdmin privacy toggle's form default) + the group-posts
+        // channel (ADR 0013) — GroupPosts (the membership-scoped feed rows,
+        // loaded by the Detail action from ListGroupFeedAsync), GroupPostsTotal
+        // (the channel's total count, the "N shown to you" hint) and CanPost
+        // (the live GetGroupIdsAsync read that drives the composer's
+        // visibility — the POST gate remains the authoritative deny, G·3). No
+        // Status / InvitedBy / InvitedAt: "who invited, when" lives on the
         // GroupInvitation row's audit lane, not the UI.
         Assert.Equal(
             new[]
             {
+                "CanPost",
                 "Description",
                 "GroupId",
+                "GroupPosts",
+                "GroupPostsTotal",
                 "IsOwner",
                 "IsPrivate",
                 "Members",

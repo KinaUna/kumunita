@@ -48,22 +48,6 @@
             }
         </p>
 
-        @*
-            Group posts (ADR 0013, U8) — the channel's single entry point.
-            One link, not a new section: /groups/{id}/posts is the
-            membership-scoped feed (members see a composer there). Every
-            viewer who reaches this page is already a member (the
-            owner ∪ member gate is the controller's), so the link is
-            offered unconditionally — the feed's own CanPost flag decides
-            composer visibility there.
-        *@
-        <p class="mb-3">
-            <a class="btn btn-outline-primary btn-sm"
-               href="@Url.Action("GroupPosts", "Groups", new { id = Model.GroupId })">
-                Post to this group
-            </a>
-        </p>
-
         @if (TempData["info"] is string info)
         {
             <div class="alert alert-success" role="alert">@info</div>
@@ -128,6 +112,97 @@
                 </div>
                 <button type="submit" class="btn btn-primary mt-2">Save</button>
             </form>
+        }
+
+        @*
+            Group posts (ADR 0013) — the channel lives on the group page
+            (moved here from the old /groups/{id}/posts page). The composer
+            is offered to members (CanPost is the live GetGroupIdsAsync
+            read; the POST gate is the authoritative deny, G·3) and sits
+            above the membership-scoped feed (Model.GroupPosts, loaded by
+            the Detail action from ListGroupFeedAsync — the access decision
+            + aggregate audit row are unchanged, G·1/G·5). No audience
+            selector — the group's membership IS the lane (G·8). Every
+            viewer who reaches this page is already a member (owner ∪
+            member gate), so the composer is offered to exactly them.
+        *@
+        @if (Model.CanPost)
+        {
+            <form method="post" action="@($"/groups/{Model.GroupId}/posts")" class="mb-4">
+                @Html.AntiForgeryToken()
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label" for="gp-title" style="font-weight:600;">Title</label>
+                            <input class="form-control" type="text" id="gp-title" name="Title"
+                                   maxlength="120" placeholder="optional" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="gp-body" style="font-weight:600;">Body</label>
+                            <textarea class="form-control" id="gp-body" name="Body" rows="4" required
+                                      placeholder="…"></textarea>
+                        </div>
+                        <div class="text-muted small mb-2">
+                            Visible to the current members of @Model.Name only.
+                        </div>
+                        <button type="submit" class="btn btn-primary">Post to group</button>
+                    </div>
+                </div>
+            </form>
+        }
+
+        <h2>Posts</h2>
+        @if (Model.GroupPosts.Count == 0)
+        {
+            <p class="text-muted">
+                @if (Model.CanPost)
+                {
+                    <text>No posts yet. Write the first one — it will be visible to the current members.</text>
+                }
+                else
+                {
+                    <text>No posts here yet.</text>
+                }
+            </p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var p in Model.GroupPosts)
+                {
+                    string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
+                        ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="pe-3">
+                            <a href="@($"/groups/{Model.GroupId}/posts/{p.Id}")"
+                               class="text-decoration-none fw-semibold">
+                                @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
+                            </a>
+                            <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
+                        </div>
+                        <div class="text-end text-muted small">
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                </span>
+                                <span>@p.AuthorDisplayName</span>
+                            </div>
+                            <div>@p.Created.LocalDateTime.ToString("d")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.GroupPostsTotal > Model.GroupPosts.Count)
+            {
+                <p class="text-muted small mt-3">
+                    @Model.GroupPostsTotal post@(Model.GroupPostsTotal == 1 ? "" : "s") in this group;
+                    @Model.GroupPosts.Count shown to you.
+                </p>
+            }
         }
 
         <h2>Members</h2>
