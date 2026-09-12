@@ -227,11 +227,13 @@ public sealed record GroupDetailViewModel(
     IReadOnlyList<ResidentOption> ResidentCandidates,
     bool IsPrivate = false)
 {
-    // ── Group posts (ADR 0013) — the channel moved onto the detail page
-    //    (the composer + the membership-scoped feed, previously the separate
-    //    /groups/{id}/posts page). The Detail action loads these from the same
-    //    ListGroupFeedAsync / GetGroupIdsAsync lanes that page used, so the
-    //    access decision + aggregate audit row are unchanged (G·1/G·3/G·5).
+    // ── Group posts (ADR 0013) — the membership-scoped feed lives on the
+    //    detail page (GroupPosts / GroupPostsTotal); the composer is its
+    //    own page (GET /groups/{id}/posts/new + the paired POST). The
+    //    Detail action loads the feed from the same
+    //    ListGroupFeedAsync / GetGroupIdsAsync lanes the old
+    //    /groups/{id}/posts page used, so the access decision + aggregate
+    //    audit row are unchanged (G·1/G·3/G·5).
     //    These are object-initializer properties (not positional params) so
     //    their defaults may be non-constant (a C# positional default must be a
     //    compile-time constant — [] is not), and the existing shape-pinning Web

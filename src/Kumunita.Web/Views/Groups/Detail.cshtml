@@ -115,43 +115,24 @@
         }
 
         @*
-            Group posts (ADR 0013) — the channel lives on the group page
-            (moved here from the old /groups/{id}/posts page). The composer
-            is offered to members (CanPost is the live GetGroupIdsAsync
-            read; the POST gate is the authoritative deny, G·3) and sits
-            above the membership-scoped feed (Model.GroupPosts, loaded by
-            the Detail action from ListGroupFeedAsync — the access decision
-            + aggregate audit row are unchanged, G·1/G·5). No audience
-            selector — the group's membership IS the lane (G·8). Every
-            viewer who reaches this page is already a member (owner ∪
-            member gate), so the composer is offered to exactly them.
+            Group posts (ADR 0013) — the membership-scoped feed lives on
+            this page (Model.GroupPosts, loaded by the Detail action from
+            ListGroupFeedAsync — the access decision + aggregate audit row
+            are unchanged, G·1/G·5). The composer is its own page (GET
+            /groups/{id}/posts/new; the paired POST's gate is the
+            authoritative deny, G·3). No audience selector — the group's
+            membership IS the lane (G·8). Every viewer who reaches this
+            page is already a member (owner ∪ member gate), so the "New
+            post" button is offered to exactly them.
         *@
-        @if (Model.CanPost)
-        {
-            <form method="post" action="@($"/groups/{Model.GroupId}/posts")" class="mb-4">
-                @Html.AntiForgeryToken()
-                <div class="card">
-                    <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label" for="gp-title" style="font-weight:600;">Title</label>
-                            <input class="form-control" type="text" id="gp-title" name="Title"
-                                   maxlength="120" placeholder="optional" />
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label" for="gp-body" style="font-weight:600;">Body</label>
-                            <textarea class="form-control" id="gp-body" name="Body" rows="4" required
-                                      placeholder="…"></textarea>
-                        </div>
-                        <div class="text-muted small mb-2">
-                            Visible to the current members of @Model.Name only.
-                        </div>
-                        <button type="submit" class="btn btn-primary">Post to group</button>
-                    </div>
-                </div>
-            </form>
-        }
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="mb-0">Posts</h2>
+            @if (Model.CanPost)
+            {
+                <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/posts/new")">New post</a>
+            }
+        </div>
 
-        <h2>Posts</h2>
         @if (Model.GroupPosts.Count == 0)
         {
             <p class="text-muted">

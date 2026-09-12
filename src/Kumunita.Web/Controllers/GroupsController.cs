@@ -227,15 +227,15 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         // lane is owner ∪ GlobalAdmin (C-M2·3) — the view hides its form for
         // plain members and the route 404s their POST.
         var isOwner = group.OwnerId == actor;
-        // ── Group posts (ADR 0013) — the channel moved onto the detail page
-        //    (the composer + the membership-scoped feed previously rendered
-        //    at /groups/{id}/posts). Same lanes as that old feed action:
-        //    ListGroupFeedAsync is the single access decision + the
+        // ── Group posts (ADR 0013) — the membership-scoped feed stays on the
+        //    detail page; the composer is its own page (GET/POST under
+        //    /groups/{id}/posts/new + /posts). Same lanes as the old feed
+        //    action: ListGroupFeedAsync is the single access decision + the
         //    aggregate AccessAudit row (G·1/G·5), and the CanPost read is
         //    the live GetGroupIdsAsync membership read (G·3 — the POST gate
         //    stays the authoritative deny). The Detail page is member-scoped
         //    by its owner ∪ member gate, so every viewer here is a member
-        //    and sees the composer + feed. ──
+        //    and sees the feed + the "New post" button. ──
         var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: 1);
 
         var groupPosts = new List<PostListItem>(feed.Visible.Count);
@@ -259,6 +259,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         // the live membership read; a display convenience that drives the
         // composer's visibility (the POST gate is the authoritative deny).
         var canPost = (await userInfo.GetGroupIdsAsync(actor)).Contains(group.Id);
+        // canPost gates the "New post" button (the standalone compose page
+        // at /groups/{id}/posts/new) — the POST gate is the authoritative deny.
         // m2b read lane #3 — the group's pending invitations (the owner's
         // invite surface: the pending list + cancel links). Read lane (no
         // audit, C-M2·2 carried); each row's display name via the same
@@ -816,6 +818,34 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
     }
 
     /// <summary>
+    /// The group-post <b>composer's page</b> (the standalone compose surface
+    /// the detail page's "New post" button links to): <c>GET
+    /// /groups/{id}/posts/new</c>. Returns an empty
+    /// <see cref="GroupPostComposeViewModel"/> for <c>New.cshtml</c> (the U7
+    /// failure re-render view, now a first-class page). The group's identity
+    /// is the route's <c>{id}</c>; the membership lane that reaches this page
+    /// is the same owner ∪ member projection as the group's <see
+    /// cref="Detail"/> (the paired POST's gate is the authoritative deny,
+    /// G·3) — no separate re-gate here.
+    /// </summary>
+    [HttpGet("{id}/posts/new")]
+    public async Task<IActionResult> NewGroupPost(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        return View("New", new GroupPostComposeViewModel());
+    }
+
+    /// <summary>
     /// The group-post <b>composer's POST</b> (ADR 0013, G5/G6 FACES):
     /// <c>POST /groups/{id}/posts</c>. The form carries <b>title + body
     /// only</b> (the <see cref="GroupPostComposeViewModel"/> shape — the
@@ -857,6 +887,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
 
         if (!model.IsValid)
         {
+            // Re-render the standalone compose page, prefilled with what
+            // the actor typed (the GET /groups/{id}/posts/new shape).
             ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
             return View("New", model);
         }

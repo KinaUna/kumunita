@@ -2,16 +2,17 @@
 @{
     ViewData["Title"] = "Post to group";
     // The group's id is the route's {id} — this view is reached via
-    // /groups/{id}/posts (the U7 composer failure re-render path). The
-    // form never carries the group's id as a field (a form-bound group id
-    // would be a lane-bypass hole; the controller mints GroupPostDraft.GroupId
-    // from the route — ADR 0013, G·3).
+    // GET /groups/{id}/posts/new (the standalone composer page) and by
+    // the paired POST's failure re-render. The form never carries the
+    // group's id as a field (a form-bound group id would be a lane-bypass
+    // hole; the controller mints GroupPostDraft.GroupId from the route —
+    // ADR 0013, G·3).
     string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <p><a class="text-muted" href="@($"/groups/{groupId}/posts")">&larr; back to group posts</a></p>
+        <p><a class="text-muted" href="@($"/groups/{groupId}")">&larr; back to the group</a></p>
 
         <h1>Post to this group</h1>
         <p class="text-muted">
@@ -65,7 +66,7 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">Post to group</button>
-                <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}/posts")">Cancel</a>
+                <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}")">Cancel</a>
             </div>
         </form>
     </div>
