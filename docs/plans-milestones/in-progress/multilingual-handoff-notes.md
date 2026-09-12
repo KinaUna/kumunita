@@ -233,3 +233,48 @@ blocked `RemoveLanguageAsync` throw to **409**, and writes the audit rows
 `AccessAudit` row). `LocaleCookie` is available for U6's settings page
 (its `Read`/`Write`/`Clear` are the cookie's only touch points). **Next: U5** —
 `LanguagesController`, per the design doc §Pinned contract §5.
+
+## U5 — `LanguagesController` admin surface (thin, GlobalAdmin-gated)
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (1 file, matching the design doc §Pinned contract §5 verbatim):**
+- **New** `src/Kumunita.Web/Controllers/LanguagesController.cs` — the
+  GlobalAdmin-gated thin surface (the `AdminController`
+  `[Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]` precedent).
+  **One** constructor parameter: `ILocalizationService` — the **only** Core
+  seam this controller consumes (both GET actions and all 7 POST actions are
+  `ILocalizationService` methods; no `IDocumentStore`, no `ITranslationProvider`).
+  The 10 actions, exactly the §5 table: `Index` (GET `/admin/languages`) →
+  `ListLanguagesAsync` + `GetCompletenessAsync` (the M·12 completeness view);
+  `Add` / `Enable` / `Disable` / `Reorder` / `Remove` / `SetDefault` /
+  `SaveTranslation` / `SavePage` (POST) → the matching catalog / string / page
+  method; `PreviewPage` (GET `/admin/languages/{code}/pages/{slug}`) →
+  `GetPageAsync(slug, code)` (the editor/preview pane).
+  - **Thin-token rule (ADR 0001-B):** the actor is read per action via
+    `KumunitaPrincipal.SubjectId(User)` (the `Kumunita.Sub` claim — **not** the
+    BCL `Identity.Name`) and passed to the service as `actorId`.
+  - **M·7 → 409:** `Remove` catches the service's `InvalidOperationException`
+    (blocked removal of the current default) and returns
+    `StatusCode(409)` — the optimistic-concurrency story §5 pins; the other
+    mutations map `ArgumentException` to a `TempData` error + redirect (the
+    `AddCommunity` idiom).
+  - **No audit writes, no `IDocumentStore`** — M·6's one-`AccessAudit`-row
+    guarantee is the service's (U3). The view models
+    (`LanguageRowViewModel` / `PageEditorViewModel`) are **public** nested types
+    so U6's Razor views can bind to them as
+    `LanguagesController.LanguageRowViewModel` (a private nested type is
+    invisible to the separately-compiled view class).
+
+**Scope note (for U6):** the design doc §5 table is the **only** pin for U5;
+U6 owns the resident-facing surface (the `LocaleCookie` write on the settings
+page + the `/terms` `/about` `/help` routes over
+`ITranslationProvider.GetPageAsync`) **and** the `Views/Admin/Languages/*.cshtml`
+views that bind to this controller. U5 ships the stable HTTP surface; the
+`Index` view's `DefaultCode` (which language is the instance default) is **not**
+exposed by `ILocalizationService` (no `LocaleSettings` read on the seam) — U6
+must source it from its own read path (or the shell may render the default via
+a U6-added read; not a U5 concern). **Next: U6** — the settings page +
+static-page routes + the admin Razor views, per the design doc §Pinned
+contract §5 tail + §4.
