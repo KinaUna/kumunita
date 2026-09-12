@@ -568,3 +568,103 @@ seam was touched.
 **Drift-pause count: 0** (no key outside the registry was needed; the
 `SaveTranslation` / `UpsertTranslationAsync` seams are present and as the ML
 close record claims).
+
+## U7 — the public language picker (signed-out) + wire `/about`
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded) + the new
+Web-layer tests passing in the full Web run
+(`dotnet exec …Kumunita.Web.Tests.dll` → `Total: 94, Errors: 0, Failed: 0`,
+90 prior + 4 new). **Gap 4 (discoverability) is closed:** a signed-out visitor
+can pick a language, and `/about` now renders an admin-created `about`
+page or the product-story fallback.
+
+**What was changed (4 files modified + 3 new — the closed set):**
+- **`Controllers/PublicLocaleController.cs` (NEW, D7-1):** unauthenticated
+  `GET /language` (builds the **same** model as `LocaleController.Index` —
+  enabled catalog in `SortOrder`, `LocaleSettings` instance default via the
+  frozen `IDocumentStore` singleton load, current cookie) rendering the
+  compact `Views/PublicLocale/Index.cshtml`; and `POST /language`
+  (`code` → `LocaleCookie.Write`; `clear=1` → `LocaleCookie.Clear`),
+  `[ValidateAntiForgeryToken]`, `RedirectToAction(nameof(Index))`. Binds the
+  **existing** public nested types `LocaleController.LocaleSettingsViewModel`
+  / `LocaleOption` — **not** duplicated. `LocaleController` and
+  `Views/Locale/Index.cshtml` are untouched; `/settings/language` is still the
+  `[Authorize]`d route, `/language` is a separate route.
+- **`Views/PublicLocale/Index.cshtml` (NEW, D7-5):** the compact picker — one
+  `<select name="code">` over the enabled catalog, one submit, one `clear=1`
+  reset link, `TempData["info"]`/`["error"]` alerts. Chrome text is plain
+  English; the only translatable string is the nav link label (already keyed).
+  No "instance default" educational copy (that's the settings page).
+- **`Views/Shared/_AccountNav.cshtml` (D7-2):** **one** `Choose your language`
+  link → `/language`, wrapped in the **single new** `<kw-l key=
+  "settings.choose_language">` of this unit, placed **outside** the
+  `isAuthenticated` branches so it is visible to signed-in **and** signed-out
+  visitors (M·11). Signed-in users still also have the `settings.settings`
+  → `/settings/language` link (full settings vs. quick picker).
+- **`Views/Shared/_Layout.cshtml`:** the footer's About link is changed from
+  `asp-controller="Home" asp-action="About"` to `href="/about"`. **Justified
+  deviation:** that tag-helper is an **action lookup**, not a plain route —
+  after `HomeController.About` is deleted (D7-4) it would compose to
+  `/Home/About`, which does **not** match the `[HttpGet("/about")]` attribute
+  route (it would 404). A plain `href="/about"` matches the route (the same
+  idiom as the adjacent "Announcements" `<a href="/announcements">`), keeps
+  the link targeting `/about` (the exit checklist's requirement), and still
+  satisfies D7-6 (no new authz — it's an anonymous route). This is the only
+  out-of-named-set edit and is forced by D7-4 + the exit checklist.
+- **`Controllers/StaticPagesController.cs` (D7-4):** `Slugs` is now exactly
+  `{ "terms", "help", "about" }` (additive — `Terms`/`Help` behavior unchanged,
+  non-regression test added). New `GET /about` → `Page("about",
+  fallBackToProductStory: true)`. Constructor gains
+  `IOptions<CommunityOptions>` (mirroring `HomeController`'s ctor style). The
+  null branch: when the `about` page is **truly absent** (no row in any
+  language), it renders the **existing** product-story view via
+  `View("~/Views/Home/About", new HomeViewModel(…))` instead of a 404 —
+  L9's "truly absent" branch. `terms`/`help` still 404 when absent (M·2 page
+  floor preserved). Class doc-comment updated: the `/about` change the ML
+  close record had "recorded, not shipped" is now **shipped (ML-UI U7)**.
+- **`Controllers/HomeController.cs`:** `About()` action **deleted** (D7-4 —
+  one route, one owner). A NOTE comment marks the move to
+  `StaticPagesController.About`. Nothing else touched; `Index()`/`Error()`
+  intact.
+- **`tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs` (NEW):** 4 [Facts]
+  on the project's existing direct-construction harness (NSubstitute +
+  `DefaultHttpContext`), no TestServer:
+  (a) `GET /language` anonymous → enabled catalog in `SortOrder` + the
+  settings default flow through the model; (c) `GET /about` with **no** page
+  → the product-story view (`~/Views/Home/About`) with the `HomeViewModel`;
+  (d) `GET /about` with an `about` page → the `Page` view rendering that
+  `LocalizedPage`, with the `pl` preference handed to `GetPageAsync`;
+  plus a non-regression `GET /terms` absent → `NotFoundResult`.
+
+**FACES L3 / L9:** L9 is fully exercised here (both the product-story and
+localized-page branches). L3's *picker-reachable-unsigned-out* + *catalog
+shape* half is exercised (a). **Deferred to U8 (the authoritative FACES
+gate):** the `POST /language` → cookie-write assertion (M·11) — the direct
+harness has **no `ITempDataProvider`**, so the action's `TempData` write NREs
+before the cookie can be observed (the same reason the existing controller
+tests avoid any TempData-writing branch, e.g. `AdminControllerBlockTests`).
+U8's TestServer-backed gate verifies the actual `kumunita.locale` write
+end-to-end. **U8 owns the authoritative L3/L9 FACES tests either way.**
+
+**Why the pinned alternative was rejected (D7-4):** the pinned alternative —
+repointing the **existing** `HomeController.About` at `GetPageAsync("about")`
+— was rejected in favor of `StaticPagesController`. The `/about` route is a
+**static page** over the `LocalizedPage` engine (`MarkdownRenderer`, the
+"Last updated" line, the shared `Page.cshtml`), exactly like `terms`/`help`;
+the `StaticPagesController` guard list + `Page()` helper is the one owner of
+that engine. Adding a second `GetPageAsync` call site in `HomeController`
+would fork the rendering path and leave two owners of the static-page
+behavior. One route, one owner (D7-4) is the cleaner seam and matches the
+ML-close-record's stated intent.
+
+**Deviations vs the plan:** one forced edit — `_Layout.cshtml`'s footer
+About link changed to `href="/about"` (see above). It is **not** in the
+7-file deliverable list, but it is **required** for the exit checklist's
+"the link still targets `/about`" clause to hold after `HomeController.About`
+is removed (D7-4 forbids keeping that action). No frozen seam was touched;
+no registry key was added (D7-3 — `settings.choose_language` was reused).
+
+**Drift-pause count: 0** (no key outside the registry; the frozen
+`LocaleCookie` / `LocaleSettings` / `GetPageAsync` seams are present and as
+claimed).

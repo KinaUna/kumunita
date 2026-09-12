@@ -12,6 +12,12 @@
 }
 
 <ul class="navbar-nav">
+    @* Public quick-picker — visible to signed-in AND signed-out residents
+       (ML-UI U7, D7-2). One link, the one new kw-l in this unit. The full
+       settings experience (/settings/language) remains the [Authorize]d page. *@
+    <li class="nav-item">
+        <a class="nav-link text-dark" href="/language"><kw-l key="settings.choose_language">Choose your language</kw-l></a>
+    </li>
     @if (isAuthenticated)
     {
         <li class="nav-item">
