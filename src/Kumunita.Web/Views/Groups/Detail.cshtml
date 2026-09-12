@@ -48,6 +48,22 @@
             }
         </p>
 
+        @*
+            Group posts (ADR 0013, U8) — the channel's single entry point.
+            One link, not a new section: /groups/{id}/posts is the
+            membership-scoped feed (members see a composer there). Every
+            viewer who reaches this page is already a member (the
+            owner ∪ member gate is the controller's), so the link is
+            offered unconditionally — the feed's own CanPost flag decides
+            composer visibility there.
+        *@
+        <p class="mb-3">
+            <a class="btn btn-outline-primary btn-sm"
+               href="@Url.Action("GroupPosts", "Groups", new { id = Model.GroupId })">
+                Post to this group
+            </a>
+        </p>
+
         @if (TempData["info"] is string info)
         {
             <div class="alert alert-success" role="alert">@info</div>

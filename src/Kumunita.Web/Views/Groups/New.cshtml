@@ -1,0 +1,72 @@
+@model Kumunita.Web.Models.GroupPostComposeViewModel
+@{
+    ViewData["Title"] = "Post to group";
+    // The group's id is the route's {id} — this view is reached via
+    // /groups/{id}/posts (the U7 composer failure re-render path). The
+    // form never carries the group's id as a field (a form-bound group id
+    // would be a lane-bypass hole; the controller mints GroupPostDraft.GroupId
+    // from the route — ADR 0013, G·3).
+    string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <p><a class="text-muted" href="@($"/groups/@groupId/posts")">&larr; back to group posts</a></p>
+
+        <h1>Post to this group</h1>
+        <p class="text-muted">
+            Your post will be visible to the current members of this group only —
+            membership is the single access decision on this channel.
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" action="@($"/groups/@groupId/posts")">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="title" style="font-weight:600;">
+                            Title
+                        </label>
+                        <input class="form-control" type="text" id="title" name="Title"
+                               maxlength="120" value="@Model.Title"
+                               placeholder="optional" />
+                        <div class="text-muted small mt-1">
+                            A short headline (≤ 120 chars). Leave blank for a
+                            body-only post — the list will show your first line
+                            of the body instead.
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="body" style="font-weight:600;">
+                            Body
+                        </label>
+                        <textarea class="form-control" id="body" name="Body" rows="6" required
+                                  placeholder="…">@Model.Body</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Post to group</button>
+                <a class="btn btn-outline-secondary" href="@($"/groups/@groupId/posts")">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

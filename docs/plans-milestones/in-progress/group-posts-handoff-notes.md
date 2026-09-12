@@ -85,7 +85,89 @@
 - U2's plan file moves to `done/` immediately after this note (per the
   workflow) — a plain file move: **nothing is staged or committed; the user
   reviews first.**
+## U8 — view layer (feed / detail / new + Detail entry link)
 
+- **Deliverables (the closed set, 3 new + 1 modified):**
+  - `src/Kumunita.Web/Views/Groups/Feed.cshtml` — the channel feed; binds
+    `GroupFeedViewModel`. Inline composer at the top (offered when
+    `CanPost`), the item list (rows link to
+    `/groups/{GroupId}/posts/{Id}`), the hidden-count hint (`Total` >
+    `Items.Count`). **No** component pills, no community management / leave
+    buttons, no audience picker — all M3-only surfaces, absent by the
+    group lane's shape (G·8).
+  - `src/Kumunita.Web/Views/Groups/PostDetail.cshtml` — the group-post
+    detail; binds `GroupPostDetailViewModel`. Post card + reply list + the
+    **inline reply `<form>` block** at the bottom (exactly M3's
+    `Posts/Detail.cshtml` shape — one `body` field POSTing to
+    `/groups/{GroupId}/posts/{Post.Id}/replies`; helper text uses the
+    group-lane "reply-inherits" framing, G·7).
+  - `src/Kumunita.Web/Views/Groups/New.cshtml` — the standalone composer;
+    binds `GroupPostComposeViewModel` (title + body, `IsValid` re-check is
+    the controller's, not the view's). Rendered only by U7's failure
+    re-render path (`View("New", model)`). **Drift pause (recorded, not a
+    seam):** U7's controller has no `GET /groups/{id}/posts/new` route —
+    the `New` view's `action` and back-link recover the group id from
+    `ViewContext.RouteData.Values["id"]` (the current route is
+    `/groups/{id}/posts`, the form posts to it — the `{id}` is always
+    present). U11/U12's docs close should note the group lane has no GET
+    composer route (the inline composer on `Feed` is the primary surface,
+    the standalone `New` is the failure re-render only).
+  - `src/Kumunita.Web/Views/Groups/Detail.cshtml` — **one** link added, in
+    the header block right after the Private badge:
+    `<a class="btn btn-outline-primary btn-sm"
+       href="/groups/{Model.GroupId}/posts">Post to this group</a>`
+    (routed via `Url.Action("GroupPosts", "Groups", …)`). Every viewer who
+    reaches `Detail` is already a member (the owner ∪ member gate is the
+    controller's), so the link is offered unconditionally — composer
+    visibility on the feed itself is the `CanPost` flag's call. One link,
+    not a new section (the unit plan's "one link, not a new section" pin).
+- **Binding confirmation (view-model → view):** `Feed.cshtml` →
+  `GroupFeedViewModel` (`GroupId` / `GroupName` / `Items: List<PostListItem>`
+  / `Total` / `CanPost`) · `PostDetail.cshtml` → `GroupPostDetailViewModel`
+  (`GroupId` / `Post` / `AuthorDisplayName` / `AuthorSubjectId` /
+  `Replies: List<ReplyItem>` / `IsAuthor`) · `New.cshtml` →
+  `GroupPostComposeViewModel` (`Title` / `Body`). The rows reuse U7's
+  M3-reused `PostListItem` / `ReplyItem` records verbatim (no re-invention).
+  The M3 component/audience slots on `PostListItem` (`ComponentName` /
+  `ComponentId`) are rendered **neither linked nor shown** in
+  `Feed.cshtml` — a group post's `ComponentId` is empty (G·2) and the feed
+  is group-scoped, so there is nothing to say.
+- **Absent (explicit, for U11's closeout):** `PostDetail.cshtml` has **no**
+  "Report this post" form, **no** "Hide" / "Remove" / moderation buttons of
+  any kind, and **no** "Write a post" CTA (the composer is the inline block
+  on `Feed.cshtml`). `New.cshtml` has **no** component picker, **no**
+  audience editor, **no** grant-picker partial — the M3 audience card and
+  `@section Scripts { <partial name="_GrantPickerScripts" /> }` are both
+  **absent** (G·8: the service writes `Audience` non-null and empty
+  regardless of anything on the form). No new CSS / TS / npm assets — the
+  plain-form + plain-list pattern from M3, exactly the unit plan's "no new
+  frontend assets" pin.
+- **The group-post detail's chosen view file name:** `PostDetail.cshtml`
+  (not `Detail.cshtml`) — the existing `Views/Groups/Detail.cshtml` is the
+  M2 group-profile page, so the group-post detail gets the distinct name to
+  avoid the collision, exactly the unit plan's pin. `GroupPostDetail`
+  (U7's controller action) emits `View("PostDetail", …)` → resolves to
+  `Views/Groups/PostDetail.cshtml` under the default view-name resolution.
+- **Verified:** `dotnet build Kumunita.slnx -c Debug` — **Build
+  succeeded** in 8.3 s, all four projects clean (the touched project is
+  `Kumunita.Web`); `dotnet exec Kumunita.Web.Tests.dll` → **Total: 90,
+  Errors: 0, Failed: 0, Skipped: 0** — no M2/m2b/M3 regression (nothing in
+  the test harnesses touches the new views directly, and the M3 routes are
+  untouched).
+- **Handing to U9 (seam tests):** the 19 pinned names live in
+  `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs` (design doc Part 2
+  §2.5). The U7/U8 Web surface is presentation-only (U7's handoff pin: the
+  controller "should not re-implement membership checks"; every decision
+  is inside the U6 service calls) — U9's tests run against `PostService`'s
+  group surface (the U6 handoff's three signatures), not against the views.
+  The 404 mapping (U7's `NotFound()` on both the detail Deny and the
+  create gate's `UnauthorizedAccessException`) is the Web-side
+  fail-closed shape; U9's #6/#7/#8 tests are Core-side (the service
+  throws / returns `Post = null`) — the two are consistent, not
+  duplicates.
+- U8's plan file moves to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**
 ## U3 — ADR 0013 (group posts are a membership lane)
 
 - Authored `docs/adr/0013-group-posts-membership-lane.md` (**Accepted,

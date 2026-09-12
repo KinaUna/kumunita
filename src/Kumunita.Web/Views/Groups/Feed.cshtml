@@ -1,0 +1,117 @@
+@model Kumunita.Web.Models.GroupFeedViewModel
+@{
+    ViewData["Title"] = $"{Model.GroupName} — Posts";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Detail", "Groups", new { id = Model.GroupId })">← @Model.GroupName</a></p>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 style="display:inline;">@Model.GroupName <span class="text-muted ms-2">(posts)</span></h1>
+        </div>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @*
+            ADR 0013 — the group channel's composer (G·3: the create gate is
+            the group-lane membership decision; the POST route is the
+            authoritative deny). Offered to exactly the members (CanPost is
+            a live GetGroupIdsAsync read — "a read, not a decision"; the
+            POST gate remains the authoritative deny and is unchanged).
+            No audience selector — the group's membership IS the lane
+            (G·8: the post's Audience is written non-null and empty).
+        *@
+        @if (Model.CanPost)
+        {
+            <form method="post" action="@($"/groups/@Model.GroupId/posts")" class="mb-4">
+                @Html.AntiForgeryToken()
+                <div class="card">
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label" for="gp-title" style="font-weight:600;">Title</label>
+                            <input class="form-control" type="text" id="gp-title" name="Title"
+                                   maxlength="120" placeholder="optional" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label" for="gp-body" style="font-weight:600;">Body</label>
+                            <textarea class="form-control" id="gp-body" name="Body" rows="4" required
+                                      placeholder="…"></textarea>
+                        </div>
+                        <div class="text-muted small mb-2">
+                            Visible to the current members of @Model.GroupName only.
+                        </div>
+                        <button type="submit" class="btn btn-primary">Post to group</button>
+                    </div>
+                </div>
+            </form>
+        }
+
+        @if (Model.Items.Count == 0)
+        {
+            <div class="alert alert-info">
+                @if (Model.CanPost)
+                {
+                    <text>No posts yet. Write the first one — it will be visible to the
+                    current members of @Model.GroupName.</text>
+                }
+                else
+                {
+                    <text>No posts here yet.</text>
+                }
+            </div>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var p in Model.Items)
+                {
+                    string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
+                        ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="pe-3">
+                            <a href="@($"/groups/@Model.GroupId/posts/@p.Id")"
+                               class="text-decoration-none fw-semibold">
+                                @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
+                            </a>
+                            <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
+                        </div>
+                        <div class="text-end text-muted small">
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                </span>
+                                <span>@p.AuthorDisplayName</span>
+                            </div>
+                            <div>@p.Created.LocalDateTime.ToString("d")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.Total > Model.Items.Count)
+            {
+                <p class="text-muted small mt-3">
+                    @Model.Total post@(Model.Total == 1 ? "" : "s") in this group;
+                    @Model.Items.Count shown to you.
+                </p>
+            }
+        }
+    </div>
+</div>

@@ -1,0 +1,135 @@
+@model Kumunita.Web.Models.GroupPostDetailViewModel
+@{
+    ViewData["Title"] = Model.Post.Title ?? "Post";
+    string postId = Model.Post.Id;
+    string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <a href="@($"/groups/@Model.GroupId/posts")" class="text-muted small">
+            &larr; back to group posts
+        </a>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success mt-2" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger mt-2" role="alert">@err</div>
+        }
+
+        <div class="card mt-2 mb-4">
+            <div class="card-body">
+                <h4>
+                    @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                        ? Model.Post.Title
+                        : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
+                </h4>
+                <div class="d-flex align-items-center gap-2 text-muted small mb-3">
+                    <span class="d-inline-flex align-items-center">
+                        <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                             data-avatar-fallback>
+                        <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                    </span>
+                    <span>@Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")</span>
+                </div>
+
+                <div class="mb-3">
+                    @Model.Post.Body
+                </div>
+
+                @*
+                    ADR 0013 — the group lane's "why you can see this" line.
+                    No moderation actions here (Scope Out: the M3b component-
+                    scoped moderator standing does not reach a group lane, and
+                    break-glass is explicitly *unavailable*, G·4 — not a
+                    deferral).
+                *@
+                <div class="text-muted small mb-0">
+                    You can see this post because you are a current member of
+                    the group — membership is the single access decision on
+                    this channel.
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            Replies <span class="text-muted">(@Model.Replies.Count)</span>
+        </h5>
+
+        @if (Model.Replies.Count == 0)
+        {
+            <p class="text-muted">No replies yet. If you can see this post, you can reply to it.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-4">
+                @foreach (var r in Model.Replies)
+                {
+                    string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
+                        ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
+                            <div class="text-end text-muted small">
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <span class="d-inline-flex align-items-center">
+                                        <img class="avatar" src="/profile/avatar/@r.AuthorSubjectId" alt=""
+                                             data-avatar-fallback>
+                                        <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
+                                    </span>
+                                    <span>@r.AuthorDisplayName</span>
+                                </div>
+                                <div>@r.Created.LocalDateTime.ToString("d")</div>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            The reply form (exactly M3's Posts/Detail inline shape — a one-
+            field body POST). G·7: the reply inherits the parent's single
+            group-lane decision; there is no per-reply audience. The route
+            re-runs the parent's group-lane decision before the write (C4).
+        *@
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            @if (Model.IsAuthor)
+            {
+                <text>Reply (you are the author of this post)</text>
+            }
+            else
+            {
+                <text>Reply</text>
+            }
+        </h5>
+
+        <div class="card">
+            <div class="card-body">
+                <form class="mb-0" method="post"
+                      action="@($"/groups/@Model.GroupId/posts/@postId/replies")">
+                    @Html.AntiForgeryToken()
+                    <label class="form-label" for="reply-body" style="font-weight:600;">
+                        Reply
+                    </label>
+                    <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
+                              required
+                              placeholder="…"></textarea>
+                    <div class="text-muted small mb-3">
+                        Replies have no own audience — they are visible under
+                        this post's single group-membership decision (the
+                        "reply-inherits" rule, G·7). You are replying only
+                        where the post itself is visible.
+                    </div>
+                    <button type="submit" class="btn btn-primary">Reply</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
