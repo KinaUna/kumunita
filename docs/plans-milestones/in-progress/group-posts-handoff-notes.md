@@ -33,3 +33,55 @@
   `CanSeeGroupAsync` overloads are the group lane's ADDs on
   `IAuthorizationService` (frozen signatures untouched — ADR 0006-E). The
   "## Group posts — Closed (recorded)" section is still an empty **placeholder**.
+
+## U2 — design doc Part 2 (seams, 19 test names, gate, drift guard)
+
+- Appended **`## Seams & contracts (Part 2, written by U2)`** to
+  `docs/design/group-posts-design.md`: §2.1 the frozen seam list (the exact
+  four-method group-lane ADD + the frozen decision shape + the two row
+  shapes), §2.2 the new/changed Core types (`AccessVia.Group` 8th value,
+  `Post.GroupId` single additive, `GroupPostDraft`, three `PostService`
+  group methods — ctor unchanged, no new `PostService` dependency),
+  §2.3 the two rule tables (lane split + reply inheritance), §2.4 the
+  three-test gate (closed loop / handoff / part-vs-whole) with the reliable
+  runner path pinned (AGENTS.md quirk), §2.5 the **19** test names **verbatim**
+  (master verified 1:1 — no renames, count 19 ✓) in
+  `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs`, §2.6 the
+  module-boundary impact notes (UserInfo **unchanged**; Web calls
+  `PostService` only), §2.7 the drift guard + the U4–U12 ADD set + a
+  freeze-at-a-glance count table. **No code, no build.**
+- **U2 — contract adjustments** (both against the master's *directional*
+  draft; both are **part of the freeze** under §2.7 — a later unit "fixing
+  them back to the draft" is a drift pause, not a fix):
+  - **U2-A1 — the feed pair.** The draft's two single-target
+    `CanSeeGroupAsync` overloads cannot produce the **aggregate** row G1
+    FACES + test #16 require (`AccessAudit` has exactly two row shapes —
+    `TargetId` or counts — `AccessAudit.cs`). Frozen:
+    `CanSeeGroupFeedAsync(actorId, groupId, candidateCount[, session])` —
+    the M1 single↔bulk pair precedent (`CanAsync` ↔ `CanSeeAsync`).
+  - **U2-A2 — `targetPostId`.** Test #17 requires the detail row's
+    `TargetId =` **the post id**; the draft's two parameters carry no post
+    id. Frozen: `string? targetPostId`; row `TargetId = targetPostId ??
+    groupId` (detail ⇒ post id; gate ⇒ group id).
+  - *(The deny-Via is **pinned, not adjusted**: plain non-member ⇒ `Via = Group`;
+    a grant case ⇒ `Via = Delegation` — M1's `denyVia` pattern
+    (`AuthorizationService.Decide`/`ResolveActorAsync`) with the group
+    lane's own-standing value `Group`. And the gate's Deny row is persisted
+    by a `SaveChangesAsync()` **before** the `UnauthorizedAccessException`
+    throw — G6 FACES' "exception **and** a Deny row" — so it survives the
+    caller's rejection.)*
+- **G12/G13 are structural, not filter-based:** both M3 feed queries already
+  filter on `ComponentId`, and group posts write it empty (G·2) — **U6 adds
+  no filter**; the two tests pin the outcome (recorded in §2.3(a)).
+- **U2 note (doc hygiene):** the `## Group posts — Closed` heading that
+  Part 1's drift guard references **did not exist** in the file; I added the
+  empty placeholder at the file tail for U10/U11/U12 to fill at close.
+- **Handing to U3 (ADR 0013):** the lane's full contract is Part 2
+  §2.1–§2.3 — the ADR points **at** it (don't re-derive), keeps break-glass
+  **unavailable, not deferral** (Part 1's flag). ADR 0006-E's "named here"
+  list grows by: **4 methods** (not the draft's 2) + the `AccessVia.Group`
+  value + the `Post.GroupId` additive + the `GroupPostDraft` record (type,
+  not seam).
+- U2's plan file moves to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**
