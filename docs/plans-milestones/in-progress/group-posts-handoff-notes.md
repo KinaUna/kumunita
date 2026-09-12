@@ -161,7 +161,105 @@
   over `Post.GroupId` (now in place) via the live
   `IUserInfoService.GetGroupIdsAsync` read (the lane owns its reads —
   ADR 0006-D); **no** moderator / break-glass branch (G·4 — standing "not
-  available", not a deferral).
-- U4's plan file moves to `done/` immediately after this note (per the
-  workflow) — a plain file move: **nothing is staged or committed; the user
-  reviews first.**
+     available", not a deferral).
+  - U4's plan file moves to `done/` immediately after this note (per the
+     workflow) — a plain file move: **nothing is staged or committed; the user
+     reviews first.**
+
+  ## U5 — Authorization group lane (`AccessVia.Group` + `CanSeeGroupAsync`/`CanSeeGroupFeedAsync`)
+
+  - Implemented the **entire** frozen group-lane ADD (design doc Part 2
+    **§2.1**, per **U2-A1/A2** — the **four** methods, not the register's
+    2-overload draft) in **three** files, all in
+    `src/Kumunita.Core/Authorization/` (the touched project is
+    `Kumunita.Core`):
+    - **`Decision.cs`** — appended **`AccessVia.Group`** as the **8th** enum
+      value, **after `Admin`** (the M1 `Admin`-value precedent: an additive
+      enum value, the seven frozen values byte-untouched), with the pinned
+      doc-comment (group-lane standing, ADR 0013, group posts milestone).
+      `AccessOutcome`, `Decision`, `VisibleSet` untouched.
+    - **`IAuthorizationService.cs`** — appended the **four exact** §2.1
+      signatures, parameter names/positions verbatim: the
+      `CanSeeGroupAsync(actorId, groupId, string? targetPostId)` pair (with the
+      `IDocumentSession` session overload) + the
+      `CanSeeGroupFeedAsync(actorId, groupId, int candidateCount)` pair (with
+      the `IDocumentSession` session overload), each with a `<summary>`
+      mirroring the frozen overloads' style (G·1/G·4/G·5, C4, C3). The **four
+      frozen signatures are byte-untouched** (ADR 0006-E lane; `CanAsync`/
+      `CanSeeAsync` ADDs unchanged).
+    - **`AuthorizationService.cs`** — implemented all four plus a shared
+      private core + two row builders; the frozen methods
+      (`CanAsync`/`CanSeeAsync` public + session overloads, `Decide`,
+      `DecideAsync`, `CanSeeInternalAsync`, `EvaluateAudience`,
+      `ResolveActorAsync`, `HasBreakGlassAsync`, `ActorContext`) are
+      byte-untouched.
+  - **The core** (`DecideGroupAsync`) follows the §2.1 frozen algorithm
+    exactly:
+    - Delegation (G·6, C2): `GetActiveGrantAsync(actorId)`; an **in-scope
+      `read`** grant (`grant.Scope.Contains(AccessAction.Read.Id)`, i.e.
+      contains `"read"`) ⇒ **`principal = grant.OwnerId`**, `isDelegated =
+      true`; **out-of-scope** (or no grant) ⇒ `principal = actorId`,
+      `isDelegated = (grant is not null)`.
+    - Membership (G·1, C4): **live**
+      `GetGroupIdsAsync(principal)` — the **principal's** groups, not a
+      projection (strong consistency). `allowed = groupIds.Contains(groupId)`.
+    - `via = isDelegated ? AccessVia.Delegation : AccessVia.Group` (the Allow
+      **and** Deny deny-Via pin — `Group` where the frozen M1 lanes use
+      `Audience`); `return Decision(allowed, via, principal)`.
+    - **Absent by contract (G·4/G·1, test #19):** the lane touches **no**
+      `HasBreakGlassAsync` / `AdminOverride`, **no** `ModeratorAssignment` /
+      `Component.ModeratorAccess`, **no** `EvaluateAudience`, and never takes
+      `AccessAction.Moderate`. The action on **every** group-lane row is
+      `"read"`.
+  - **The rows** (C3; the only two shapes that exist — `AccessAudit.cs`):
+    - **decision shape** (`CanSeeGroupAsync` pair): `TargetKind "grouppost"`,
+      **`TargetId = targetPostId ?? groupId`** (detail ⇒ the post id;
+      create-gate ⇒ the group id), counts **null**, `Via` Group / Delegation,
+      `Outcome` per membership, `Action "read"`, `ActorId` the actor,
+      `EffectivePrincipalId` the principal (owner when delegated),
+      `Id Guid.NewGuid().ToString("N")`, `At` UtcNow.
+    - **aggregate shape** (`CanSeeGroupFeedAsync` pair): `TargetKind
+      "grouppost"`, **`TargetId = null`**, **`VisibleCount`/`HiddenCount`** =
+      `(candidateCount, 0)` on Allow / `(0, candidateCount)` on Deny (G·5,
+      the C-M3·3 analog) — the channel is all-or-nothing.
+  - **Transaction shape (C3), exactly the frozen lane's two-form precedent:**
+    the standalone (non-session) overloads `store.OpenSession` → decide →
+    `Store` → `SaveChangesAsync` in one commit (the M1 `CanAsync` standalone
+    lane); the `IDocumentSession` overloads `Store` the row into the
+    **caller's** in-flight transaction and leave commit to the caller (the
+    ADR 0006-E compatible lane). This is the lane U6's `CreateGroupPostAsync`
+    G·3 create-gate uses to commit the Deny row **before** the
+    `UnauthorizedAccessException` (so the row survives — G6 FACES) and the
+    Allow row + post in one atomic `SaveChangesAsync`.
+  - **Build green:** `dotnet build Kumunita.slnx -c Debug` — **Build
+    succeeded, 0 Warning(s), 0 Error(s)**, `Kumunita.Core` clean. **No
+    regression:** the reliable runner (`dotnet exec
+    Kumunita.Core.Tests.dll`) → **Total: 235, Errors: 0, Failed: 0, Skipped:
+    0, Not Run: 0** — every frozen M1/M3b/C2/C3/C4/C5/C6 lane still passes.
+  - **Cref note (adaptation, **not** a drift pause):** the group-lane
+    interface/impl doc-comments name **`PostService.CreateGroupPostAsync`**
+    (U6's frozen ADD — unit rule 4 forbids **me** creating it) and
+    **`ListGroupFeedAsync`** (U6) as **plain text**, never as
+    `<see cref>`/`<c>`-cref, so the build is green **now** without forward
+    references (the U4 case, avoided rather than introduced). Every other
+    cref in the change (`AccessVia.Group`, `AccessAction.Read`,
+    `IUserInfoService.GetGroupIdsAsync`/`GetActiveGrantAsync`,
+    `AccessAudit`, `Decision`) resolves today.
+  - **Handing to U6 (`PostService` group surface):** the lane is **live** —
+    implement the **§2.2** three frozen methods against it. Key hand-offs:
+    (1) the create gate **is** a group-lane call — use `CanSeeGroupAsync` with
+    `targetPostId: null` (⇒ the row's `TargetId = groupId`, the channel as
+    the gate's target) and take the **`IDocumentSession` overload** so the
+    Deny row + throw and the Allow row + post commit **in the caller's
+    transaction**; deny ⇒ throw `UnauthorizedAccessException` **after** the
+    row is stored (G·3/G6). (2) feed/detail: `CanSeeGroupFeedAsync`
+    (aggregate row) for the feed, `CanSeeGroupAsync` with **`targetPostId =`
+    the post id** for the detail — the row's `TargetId` becomes the post id
+    (tests #17/#18). (3) `GroupPostDraft` writes **`GroupId` non-empty**,
+    **`ComponentId = string.Empty`**, **`Audience = new Audience()`** (G·2/G·8) —
+    written **only** by `CreateGroupPostAsync`. (4) **No** moderator/break-glass
+    branch exists on this lane to reach (G·4) — the group surface cannot
+    grant access any other way.
+  - U5's plan file moves to `done/` immediately after this note (per the
+    workflow) — a plain file move: **nothing is staged or committed; the user
+    reviews first.**

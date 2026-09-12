@@ -59,4 +59,75 @@ public interface IAuthorizationService
     /// <paramref name="session"/> (invariant C3).
     /// </summary>
     Task<VisibleSet> CanSeeAsync(string actorId, AccessAction action, IEnumerable<IAuditableResource> candidates, IDocumentSession session);
+
+    /// <summary>
+    /// Group lane (ADR 0013 — the group posts milestone's ADD on this
+    /// interface, the ADR 0006-E compatible lane: the four frozen signatures
+    /// above untouched).
+    /// <para>
+    /// The decision is **membership only** (G·1): the effective principal's
+    /// <b>live</b> membership in <paramref name="groupId"/>
+    /// (<c>IUserInfoService.GetGroupIdsAsync</c>; strong consistency — C4).
+    /// **No** owner-skip (an author is allowed iff a member — G4 FACES),
+    /// **no** <c>AccessVia.Moderator</c> branch, **no** break-glass read
+    /// (<c>HasBreakGlassAsync</c> / <c>AdminOverride</c> /
+    /// <c>ModeratorAssignment</c> are never touched on this lane — G·4),
+    /// **no** audience evaluation (G·1/G·8).
+    /// </para>
+    /// <para>
+    /// Delegation (G·6, C2): an in-scope <c>read</c> grant
+    /// (<c>grant.Scope</c> contains <c>"read"</c>) acts with the
+    /// **owner's** membership; an out-of-scope grant acts as the delegate
+    /// themself (M1's acting-identity rule) and still audits
+    /// <c>Via Delegation</c>.
+    /// </para>
+    /// <para>
+    /// Rows (C3): **every** call — Allow **and** Deny — writes exactly one
+    /// <see cref="AccessAudit"/> row: <c>TargetKind</c> "grouppost",
+    /// <c>Action</c> "read". Standalone methods commit their own row; the
+    /// <c>IDocumentSession</c> overloads store the row into the caller's
+    /// transaction (same lane as <c>CanAsync(..., session)</c>).
+    /// </para>
+    /// </summary>
+
+    /// <summary>
+    /// Single-target group-lane decision. Row: the **decision** shape —
+    /// <c>TargetKind</c> "grouppost", **<c>TargetId</c> =
+    /// <paramref name="targetPostId"/> ?? <paramref name="groupId"/>**
+    /// (detail ⇒ the post id; create-gate ⇒ the group id), counts null,
+    /// Via Group / Delegation, Outcome per membership.
+    /// Records the row (always — Allow *and* Deny) in its own commit.
+    /// </summary>
+    Task<Decision> CanSeeGroupAsync(string actorId, string groupId, string? targetPostId);
+
+    /// <summary>
+    /// Same decision with the row **in the caller's transaction** — the
+    /// G·3 create-gate lane: <c>PostService.CreateGroupPostAsync</c> commits
+    /// the Deny row via its own <c>SaveChangesAsync</c> **before** throwing
+    /// (the row must survive — G6 FACES) and commits the Allow row + post in
+    /// one <c>SaveChangesAsync</c> (atomic, C3). The caller must
+    /// dispose/complete the session.
+    /// </summary>
+    Task<Decision> CanSeeGroupAsync(string actorId, string groupId, string? targetPostId, IDocumentSession session);
+
+    /// <summary>
+    /// **Feed (whole-channel)** decision: the channel is all-or-nothing for a
+    /// principal (membership — G·1), so one call per visit covers the page and
+    /// writes that visit's **aggregate** row (G·5, the C-M3·3 analog):
+    /// <c>TargetKind</c> "grouppost", **<c>TargetId</c> null**,
+    /// <c>VisibleCount</c>/<c>HiddenCount</c> = (<paramref name="candidateCount"/>, 0)
+    /// on Allow, (0, <paramref name="candidateCount"/>) on Deny.
+    /// <paramref name="candidateCount"/> = the page's candidate count this call
+    /// evaluated (<c>ListGroupFeedAsync</c> passes the count it loaded;
+    /// 0 candidates ⇒ no call, no row — the M3 feed 0-candidate shape).
+    /// Records the row in its own commit.
+    /// </summary>
+    Task<Decision> CanSeeGroupFeedAsync(string actorId, string groupId, int candidateCount);
+
+    /// <summary>
+    /// Same feed row in the caller's transaction (the C3 lane — kept for the
+    /// interface's two-form pattern). The caller must dispose/complete the
+    /// session.
+    /// </summary>
+    Task<Decision> CanSeeGroupFeedAsync(string actorId, string groupId, int candidateCount, IDocumentSession session);
 }

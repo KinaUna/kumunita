@@ -21,7 +21,14 @@ public enum AccessVia
     /// break-glass event would corrupt the "who did this, by what right" query
     /// the audit log exists to answer). Reconciled with ADR 0006 in the M1 close-out.
     /// </summary>
-    Admin
+    Admin,
+    /// <summary>
+    /// The group-lane standing (group posts milestone, ADR 0013): membership in
+    /// the target group is the only lane that allows — the M1 <see cref="Admin"/>-value
+    /// precedent, the least-distortion slot: an additive enum value, the seven
+    /// frozen values untouched.
+    /// </summary>
+    Group
 }
 
 /// <summary>The outcome an audited decision produced.</summary>

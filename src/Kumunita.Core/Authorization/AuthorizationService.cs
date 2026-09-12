@@ -100,6 +100,125 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         IDocumentSession session)
         => CanSeeInternalAsync(session, actorId, action, candidates);
 
+    // ── Group lane (group posts milestone — ADR 0013's ADDs on this class; the
+    //    frozen signatures above are untouched).
+    //
+    // G·1: membership is the **only** decision — the effective principal's
+    // live membership (IUserInfoService.GetGroupIdsAsync; C4 strong
+    // consistency). G·4 absent **by contract**: no owner-skip branch, no
+    // HasBreakGlassAsync / AdminOverride read, no ModeratorAssignment /
+    // Component.ModeratorAccess path, no EvaluateAudience (the lane never
+    // takes AccessAction.Moderate input). The action on every group-lane row
+    // is "read".
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<Decision> CanSeeGroupAsync(
+        string actorId, string groupId, string? targetPostId)
+    {
+        await using var session = store.OpenSession(new SessionOptions());
+        var decision = await DecideGroupAsync(actorId, groupId).ConfigureAwait(false);
+        session.Store(GroupLaneDecisionRow(actorId, decision, groupId, targetPostId));
+        // Standalone path (the default caller contract): commit ourselves.
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return decision;
+    }
+
+    /// <inheritdoc />
+    public async Task<Decision> CanSeeGroupAsync(
+        string actorId, string groupId, string? targetPostId, IDocumentSession session)
+    {
+        var decision = await DecideGroupAsync(actorId, groupId).ConfigureAwait(false);
+        session.Store(GroupLaneDecisionRow(actorId, decision, groupId, targetPostId));
+        // Commit ownership is the caller's (the ADR 0006-E compatible lane —
+        // the G·3 create-gate commits the Deny row before throwing and the
+        // Allow row + post in one SaveChangesAsync — atomic, C3).
+        return decision;
+    }
+
+    /// <inheritdoc />
+    public async Task<Decision> CanSeeGroupFeedAsync(
+        string actorId, string groupId, int candidateCount)
+    {
+        await using var session = store.OpenSession(new SessionOptions());
+        var decision = await DecideGroupAsync(actorId, groupId).ConfigureAwait(false);
+        session.Store(GroupLaneAggregateRow(actorId, decision, candidateCount));
+        // Standalone path (the default caller contract): commit ourselves.
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return decision;
+    }
+
+    /// <inheritdoc />
+    public async Task<Decision> CanSeeGroupFeedAsync(
+        string actorId, string groupId, int candidateCount, IDocumentSession session)
+    {
+        var decision = await DecideGroupAsync(actorId, groupId).ConfigureAwait(false);
+        session.Store(GroupLaneAggregateRow(actorId, decision, candidateCount));
+        // Commit ownership is the caller's (ADR 0006-E compatible lane — C3).
+        return decision;
+    }
+
+    // ── Group-lane core (the §2.1 frozen algorithm, the two call surfaces share
+    //    it — the same no-drift property as the frozen lane's shared
+    //    EvaluateAudience) ──────────────────────────────────────────────────
+
+    private async Task<Decision> DecideGroupAsync(string actorId, string groupId)
+    {
+        // Delegation (G·6, C2): an in-scope `read` grant ⇒ the **owner's**
+        // standing; an out-of-scope grant ⇒ the delegate acts as themself
+        // (M1's acting-identity rule) and still audits Via Delegation.
+        var grant = await userInfoService.GetActiveGrantAsync(actorId).ConfigureAwait(false);
+        var inScope = grant is not null && grant.Scope.Contains(AccessAction.Read.Id);
+        var principal = inScope ? grant!.OwnerId : actorId;
+        var isDelegated = grant is not null;
+
+        // Live membership of the **principal** (C4 — strong consistency, no
+        // cache, no projection lag).
+        var groupIds = await userInfoService.GetGroupIdsAsync(principal).ConfigureAwait(false);
+
+        var allowed = groupIds.Contains(groupId);
+        var via = isDelegated ? AccessVia.Delegation : AccessVia.Group;   // Allow **and** Deny rows
+        return new Decision(allowed, via, principal);
+    }
+
+    private static AccessAudit GroupLaneDecisionRow(
+        string actorId, Decision decision, string groupId, string? targetPostId)
+        => new()
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = decision.EffectivePrincipalId,
+            Action = AccessAction.Read.Id,
+            TargetKind = "grouppost",
+            // decision shape (design doc §2.1 / U2-A1/A2): TargetId =
+            // targetPostId ?? groupId (detail ⇒ the post id; create-gate ⇒
+            // the group id); counts null.
+            TargetId = targetPostId ?? groupId,
+            Via = decision.Via,
+            Outcome = decision.Allowed ? AccessOutcome.Allow : AccessOutcome.Deny
+        };
+
+    private static AccessAudit GroupLaneAggregateRow(
+        string actorId, Decision decision, int candidateCount)
+        => new()
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = decision.EffectivePrincipalId,
+            Action = AccessAction.Read.Id,
+            TargetKind = "grouppost",
+            // aggregate shape (G·5, C-M3·3 analog): the channel is
+            // all-or-nothing, so TargetId null and the counts carry the
+            // page's candidates (candidateCount on Allow, 0 on Deny).
+            TargetId = null,
+            VisibleCount = decision.Allowed ? candidateCount : 0,
+            HiddenCount = decision.Allowed ? 0 : candidateCount,
+            Via = decision.Via,
+            Outcome = decision.Allowed ? AccessOutcome.Allow : AccessOutcome.Deny
+        };
+
     // ── Bulk decision (one group-load, one shared passing pass, one
     //    aggregate audit row plus one row per visible audience-restricted
     //    candidate — invariant C3) ───────────────────────────────────────────
