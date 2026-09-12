@@ -56,14 +56,14 @@
             {
                 <span class="avatar-mono avatar-lg">@avatarInitial</span>
             }
-            <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+            <form method="post" action="/profile/avatar" enctype="multipart/form-data" data-avatar-upload>
                 @Html.AntiForgeryToken()
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <input type="file" name="file" required
                            accept="image/jpeg,image/png,image/webp,image/gif"
                            aria-label="Avatar image"
                            class="form-control form-control-sm">
-                    <button type="submit" class="btn btn-primary btn-sm">Save avatar</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled>Save avatar</button>
                 </div>
                 <div class="form-text small">
                     JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the

@@ -114,6 +114,9 @@
     <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
          no inline on*/<script> in Razor views; the U8 onerror it replaced is per img) -->
     <script type="module" src="~/js/lib/avatar.js"></script>
+    <!-- Avatar upload gating (client/lib/avatar-upload.ts, tsc-built — SECURITY.md §6:
+         no inline on*/<script> in Razor views; disables "Save avatar" until a file is chosen) -->
+    <script type="module" src="~/js/lib/avatar-upload.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
