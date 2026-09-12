@@ -118,3 +118,50 @@
 - U3's plan file moves to `done/` immediately after this note (per the
   workflow) — a plain file move: **nothing is staged or committed; the user
   reviews first.**
+
+## U4 — Post.GroupId additive (ADR 0004 §B.1)
+
+- Added **exactly one member** to `src/Kumunita.Core/Posts/Post.cs`, after
+  M3b's `Status`: `public string GroupId { get; set; } = string.Empty;` —
+  non-nullable `string`, default `string.Empty`, member name `GroupId`: the
+  **exact §2.2 pin**. All other POCO members + `PostStatus` byte-untouched;
+  `PostReply` untouched. Mirror of the M3b ADD block style (marker line +
+  pinned doc-comment). One file, one field — the entry plan's Deliverables.
+- The doc-comment pins (from §2.2 + the entry plan): **G·2** lane
+  exclusivity (`non-empty ⇒ group-lane post`, `ComponentId` **empty**,
+  structurally absent from `ListFeedAsync` / `ListAllFeedAsync` — §2.3(a)),
+  **G·1/G·8** (membership is the **sole** access decision; the audience lane
+  is never evaluated, audience written non-null **empty**), **G·3/G·4**
+  (only members may create or see it), empty ⇒ component post (M3/M3b)
+  unchanged, **ADR 0013**, and the ADR 0004 §B.1 additive precedent (the
+  M3b `Status` ADD).
+- **No `M3DocTypes.cs` change** (verified read-only — the registration
+  surface is `opts.Schema.For<Post>()` at `M3DocTypes.cs:26`; that file is
+  the one to cite, not modify): Marten's delta picks the new property up —
+  delta-detected, idempotent, **no re-seed**, exactly M3b's `PostStatus`
+  ADD lane, no second doc surface.
+- **Build green:** `Kumunita.Core` builds clean (the runner path AGENTS.md
+  pins). No new doc-comment warnings.
+- **Cref adaptation (recorded — not a drift pause):** the pinned
+  §2.2 comment names the writer `PostService.CreateGroupPostAsync`, which
+  does not exist yet (U6's frozen ADD — unit rule 4 forbids *me*
+  introducing it). I wrote that one reference as a `<c>` literal instead of
+  a `<see cref>` so the build stays green **now**; when U6 lands the
+  member, upgrade it to a cref. Every other cref
+  (`ListFeedAsync` / `ListAllFeedAsync` / `ComponentId`) resolves today.
+- **Handing to U5 (the authorization group lane):** the lane's full C#
+  contract is design doc Part 2 **§2.1** (the **4** group-lane methods —
+  the `CanSeeGroupAsync` pair with `targetPostId` + the
+  `CanSeeGroupFeedAsync` pair per U2-A1/A2; the frozen decision algorithm
+  and row shapes) — U5 implements **exactly that**: `AccessVia.Group`
+  appended **after** `Admin` (8th value, the M1 Admin-APPEND precedent; that
+  enum lives in `Authorization/Decision.cs`, **not** `Post.cs` — U5 does
+  not need `Post.cs` at all) + the 4 methods on
+  `IAuthorizationService` (frozen signatures untouched). The lane decides
+  over `Post.GroupId` (now in place) via the live
+  `IUserInfoService.GetGroupIdsAsync` read (the lane owns its reads —
+  ADR 0006-D); **no** moderator / break-glass branch (G·4 — standing "not
+  available", not a deferral).
+- U4's plan file moves to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**

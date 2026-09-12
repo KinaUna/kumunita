@@ -45,4 +45,20 @@ public sealed class Post
     /// <see cref="PostStatus.Active"/>.
     /// </summary>
     public PostStatus Status { get; set; } = PostStatus.Active;
+
+    // group posts ADD (ADR 0013, ADR 0004 §B.1 additive — the single new
+    // Post field after M3b's Status):
+    /// <summary>
+    /// The group channel this post belongs to (ADR 0013). **Non-empty ⇒
+    /// group-lane post** (G·2): membership is the **sole** access decision
+    /// (G·1 — the audience lane is never evaluated; G·8 — the audience is
+    /// written non-null **empty**), <see cref="ComponentId"/> is **empty**
+    /// (lane exclusivity — the post is structurally absent from
+    /// <see cref="PostService.ListFeedAsync"/> / <see cref="PostService.ListAllFeedAsync"/>,
+    /// design doc §2.3(a)), and only members may create or see it (G·3/G·4).
+    /// Empty
+    /// (the default) ⇒ component post (M3/M3b), unchanged. Written **only**
+    /// via <c>PostService.CreateGroupPostAsync</c>.
+    /// </summary>
+    public string GroupId { get; set; } = string.Empty;
 }
