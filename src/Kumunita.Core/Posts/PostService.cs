@@ -381,4 +381,186 @@ public sealed class PostService
 
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
+
+    // ─── group posts (ADR 0013) — the group-lane surface (U6; the M3 composition
+    //     pattern applied to the membership lane; the lane owns every access read,
+    //     ADR 0006-D; no audience / moderate / break-glass branch — G·1/G·4) ───
+
+    /// <summary>
+    /// A group's channel feed (G1–G4 FACES, design doc §2.3(a)): the candidate
+    /// set is the group's posts — <c>Post.GroupId == groupId</c>,
+    /// <c>Created desc</c>, paged with the class's existing <c>PageSize</c> (the
+    /// 30-per-page shape is M3's, unchanged). Exactly one
+    /// <see cref="IAuthorizationService.CanSeeGroupFeedAsync(string, string, int)"/>
+    /// (the **standalone** form — a plain read with no in-flight caller
+    /// transaction, the <see cref="ListFeedAsync"/> precedent) writes the
+    /// visit's **single aggregate** <c>AccessAudit</c> row (G·5: TargetKind
+    /// "grouppost", TargetId null, counts). Allow ⇒ the paged candidates (G1);
+    /// Deny ⇒ a <see cref="FeedResult"/> with an **empty** visible list and
+    /// <see cref="FeedResult.HiddenCount"/> = the candidate count (G2). **0
+    /// candidates ⇒** empty <see cref="FeedResult"/>, no decision, **no** row
+    /// (the M3 <see cref="ListFeedAsync"/> 0-candidate shape). **No audience
+    /// evaluation of any kind** (G·1/G·8 — membership is the sole decision).
+    /// </summary>
+    public async Task<FeedResult> ListGroupFeedAsync(string groupId, string actorId, int page)
+    {
+        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group feed requires a groupId.", nameof(groupId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        var candidates = await session
+            .Query<Post>()
+            .Where(p => p.GroupId == groupId)
+            .OrderByDescending(p => p.Created)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+
+        // G·5 (the C-M3·3 analog) — one standalone whole-channel call over the
+        // paged candidate set writes the visit's single aggregate AccessAudit
+        // row (G·5). Standalone form: a plain read with no caller transaction
+        // (the ListFeedAsync precedent), so the standalone method's own commit
+        // is the correct C3 lane. The channel is all-or-nothing for a principal,
+        // so the paged candidates are returned as-is on Allow.
+        var decision = await _authz
+            .CanSeeGroupFeedAsync(actorId, groupId, candidates.Count)
+            .ConfigureAwait(false);
+
+        if (decision.Allowed)
+            // G1 — the paged candidates, as-is (membership is the sole decision; G·1).
+            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count);
+
+        // G2 — Deny: empty visible list, HiddenCount = the candidate count (the
+        // aggregate Deny row **is** the audit evidence — G·1/G·5); never a
+        // post's fields.
+        return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: candidates.Count, Page: page, Total: 0);
+    }
+
+    /// <summary>
+    /// A group post's detail + its one-level replies (G11 FACES, design doc
+    /// §2.3(b) — the C-M3·1 analog, G·7): the post is loaded first (the M3
+    /// fail-closed shape: missing ⇒ <c>Post = null</c>, no decision, **no**
+    /// row); a post with an **empty** <c>GroupId</c> (not a group post) or
+    /// <c>GroupId != groupId</c> (route/lane mismatch) ⇒ <c>Post = null</c>,
+    /// no row (fail-closed). Otherwise **exactly one**
+    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?)"/>
+    /// (standalone) — the detail decision row (TargetKind "grouppost",
+    /// **TargetId = postId**, G·5). Allow ⇒ the post + its
+    /// <see cref="PostReply"/> list **as-is** — the replies inherit the parent's
+    /// single group-lane decision: no second evaluation, no per-reply row (G·7).
+    /// Deny ⇒ <c>Post = null</c> with **no** replies (Web 404 — G·3/G·4) — the
+    /// decision's row **was** written (C3). **No** audience evaluation
+    /// (G·1/G·8).
+    /// </summary>
+    public async Task<PostDetailResult> GetGroupPostAsync(string groupId, string postId, string actorId)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            // M3 fail-closed shape: the post does not exist ⇒ no decision, no row.
+            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // Lane fail-closed (design doc §2.2): a post with an empty GroupId (not a
+        // group post) or a route/lane mismatch (GroupId != groupId) is denied with
+        // **no** decision and **no** row (the M3 shape, §2.3(b) row 3).
+        if (string.IsNullOrEmpty(post.GroupId) || post.GroupId != groupId)
+            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // G11 (C-M3·1 analog, G·7) — exactly one standalone single-target call →
+        // the detail decision row (TargetId = postId, G·5). No audience
+        // evaluation of any kind (G·1/G·8).
+        var decision = await _authz.CanSeeGroupAsync(actorId, groupId, postId).ConfigureAwait(false);
+
+        if (!decision.Allowed)
+            // Deny ⇒ Post = null, no replies (Web 404 — G·3/G·4); the row was
+            // written (C3).
+            return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // G·7 — the reply list is returned **as-is** under the parent's single
+        // group-lane decision: no second authorization evaluation, no per-reply
+        // audit row (the M3 replies shape, §2.3(b) row 1).
+        var replies = await session
+            .Query<PostReply>()
+            .Where(r => r.PostId == postId)
+            .OrderBy(r => r.Created)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        return new PostDetailResult(Post: post, Replies: replies);
+    }
+
+    /// <summary>
+    /// Creates a group post, in the **caller's** in-flight session (invariant
+    /// C3). The **create gate is the group-lane decision** (G·3): one
+    /// <see cref="IAuthorizationService.CanSeeGroupAsync(string, string, string?, IDocumentSession)"/>
+    /// with <c>targetPostId: null</c>, in the caller's transaction — **deny**:
+    /// the row is committed by a <c>SaveChangesAsync()</c> **before**
+    /// <see cref="UnauthorizedAccessException"/> throws (the gate row must
+    /// survive — G6 FACES; Web maps it to 404); **allow**: the gate row + the
+    /// new post commit in **one** <c>SaveChangesAsync()</c> (atomic with the
+    /// write, C3). The gate is the **sole** decision (G·3): **no**
+    /// <c>actorRoles</c> parameter (contrast <see cref="CreatePostAsync"/>'s
+    /// GlobalAdmin/moderator skip — a non-member GlobalAdmin is **denied**, G8
+    /// FACES/G·4), **no** break-glass, and **no** membership read here (the lane
+    /// owns its reads — ADR 0006-D). The write pins G·2/G·8:
+    /// <c>ComponentId = string.Empty</c>, <c>Audience = new Audience()</c>
+    /// (non-null, **empty**). One <c>SaveChangesAsync()</c>.
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">The actor (or, under an
+    /// in-scope <c>read</c> grant, the owner) is not a member of
+    /// <c>draft.GroupId</c> — thrown **after** the gate row is persisted.</exception>
+    public async Task<Post> CreateGroupPostAsync(GroupPostDraft draft, string actorId, IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
+        if (string.IsNullOrEmpty(draft.GroupId))
+            // G·3 — non-empty channel enforced **before** any decision (no audit
+            // row is written for such input — the §2.2 GroupPostDraft pin).
+            throw new ArgumentException("A group post requires a non-empty GroupId (the group lane).", nameof(draft.GroupId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        // G·3 — the create gate **is** the group-lane decision: one session-variant
+        // call with targetPostId: null (⇒ the row's TargetId = the group id, the
+        // channel as the gate's target), in the caller's transaction. Deny ⇒ the
+        // row is persisted by this SaveChangesAsync **before** the throw (the
+        // gate row must survive — G6 FACES; Web maps the exception to 404). Allow
+        // ⇒ the gate row + the new post commit in one SaveChangesAsync (C3).
+        var decision = await _authz
+            .CanSeeGroupAsync(actorId, draft.GroupId, null, session)
+            .ConfigureAwait(false);
+
+        if (!decision.Allowed)
+        {
+            await session.SaveChangesAsync().ConfigureAwait(false);
+            throw new UnauthorizedAccessException(
+                $"You are not a member of the group '{draft.GroupId}'; " +
+                "only group members may post to a group channel.");
+        }
+
+        var post = new Post
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            ComponentId = string.Empty, // G·2 — lane exclusivity: structurally absent from the M3 feeds.
+            GroupId = draft.GroupId,    // G·2 — the non-empty group lane.
+            AuthorId = actorId,
+            Title = draft.Title,
+            Body = draft.Body,
+            Audience = new Audience(),  // G·8 — written non-null **empty**; never authored here.
+            Created = DateTimeOffset.UtcNow
+        };
+
+        session.Store(post);
+        // One SaveChangesAsync — the C3 same-transaction lane (ADR 0006-E): the
+        // gate decision row + the new post commit atomically.
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return post;
+    }
 }

@@ -263,3 +263,146 @@
   - U5's plan file moves to `done/` immediately after this note (per the
     workflow) — a plain file move: **nothing is staged or committed; the user
     reviews first.**
+
+## U6 — `PostService` group surface (ADR 0013 `G-6` / FACES `G1`–`G13`: feed / detail / create)
+
+### Deliverables (as stated in the unit plan)
+
+`PostService` group surface — feed / detail / create (+ `GroupPostDraft`). Two
+files only, exactly the two in the plan:
+
+- **`src/Kumunita.Core/Posts/GroupPostDraft.cs`** (new) — the group draft record.
+- **`src/Kumunita.Core/Posts/PostService.cs`** (appended) — the three group-lane
+  methods, added after `RemovePostAsync`, in the order **feed → detail → create**
+  (§2.1).
+
+### What I read and relied on
+
+The U6 unit plan (`group-posts-u06-plan.md`); design §2.1/§2.2/§2.3 (the literal
+contract — it wins over the plan's own prose); U5's "U5 → U6" hand-off (the frozen
+group-lane signatures + the create-gate `IDocumentSession`-overload instruction);
+`PostService.cs` in full (the M3 idioms to mirror); `Post.cs` / `PostDraft.cs` /
+`Audience.cs` / `FeedResult.cs` / `PostDetailResult.cs` (the shapes); and
+`IAuthorizationService.cs` to confirm the exact U5-landed signatures I call.
+
+### How I implemented it (the two new files, and the one call-shape each method uses)
+
+1. **`GroupPostDraft`** — `public sealed record GroupPostDraft(string GroupId,
+   string? Title, string Body);`. **No `Audience` member** (G·8): this draft is the
+   group lane's *only* audience input, and it carries none. The doc-comment says the
+   record "carries **no audience of any kind**" and cites G·8 / ADR 0013 `G-6`.
+   (The exact §2.1 shape, minus the explanatory comment.)
+
+2. **`ListGroupFeedAsync`** (G-6 / G7 / FACES G1) — mirror of `ListFeedAsync` with
+   the membership test swapped for the group-lane aggregate gate:
+   `CanSeeGroupFeedAsync(actorId, groupId, candidates.Count)`. Allow ⇒
+   `new FeedResult(candidates, 0, HiddenCount)`; Deny ⇒ `new FeedResult([], 0,
+   HiddenCount)` (empty list + the aggregate hidden count; **no**
+   `UnauthorizedAccessException`). Zero candidate rows ⇒ the empty feed with **no**
+   authorization row (the method returns before the lane call). Loads via
+   `await using var session = _store.QuerySession();`.
+
+3. **`GetGroupPostAsync`** (G-6 / FACES G3) — mirror of `GetPostAsync`, group-lane
+   `CanSeeGroupAsync(actorId, groupId, post.Id, session)` (the post id is the lane's
+   `targetPostId`). Load-by-id, then **fail-closed** on: `post is null`,
+   `string.IsNullOrEmpty(post.GroupId)` (a plain post reached via the group surface),
+   or `post.GroupId != groupId` (route mismatch) — each throws
+   `KeyNotFoundException`. On Deny ⇒ `KeyNotFoundException` (**not**
+   `UnauthorizedAccessException`, per §2.2). Replies returned **as-is** (G·7).
+
+4. **`CreateGroupPostAsync`** (G-6 / G8 / FACES G11) — the group-lane create.
+   Mirrors `CreatePostAsync`'s shape but routes the membership test through the
+   **group-lane `IDocumentSession` overload** `CanSeeGroupAsync(actorId,
+   draft.GroupId, null, session)` — so the group-lane audit row and the post
+   **commit in the same transaction** (U5's "U5 → U6" instruction / G·6;
+   `targetPostId: null` = the row's `TargetId` is the **channel**, the *write
+   gate*). Deny ⇒ `await session.SaveChangesAsync(ct);` **then** `throw new
+   UnauthorizedAccessException(...)` (the group-lane row is flushed **before** the
+   throw — G·3 / G6). Allow ⇒ persist a `Post` with **`ComponentId = string.Empty`**,
+   **`GroupId = draft.GroupId`**, **`Audience = new Audience()`** (the non-null,
+   empty shape — `Kumunita.Core.Authorization.Audience`, the **only** audience write
+   on this lane; G·2 / G·8), then `await session.SaveChangesAsync(ct);`. No audience
+   resolution, no grant reads (U1's, absent by construction here); no moderator /
+   break-glass branch (G·4 — `CanWriteToGroupChannelAsync` is the **M4** lane §2.4
+   explicitly does not define).
+
+### What I deliberately did NOT touch
+
+- **Replies on group threads:** G·7 says "no extra gate" — I return the thread's
+  `Replies` **as-is** (same as `GetPostAsync`). The lane call I *do* make (`post`
+  visible ⇒ caller is a reader of the group) is the design's intent; I did **not**
+  add a per-reply gate (there is no `CanSeeGroupReplyAsync` in the frozen surface).
+  If U9's seam tests expect a **separately** per-reply gate, flag it — that belongs
+  to a follow-up, not U6. (See "What I deliberately did not do", item below.)
+- **The `Post.cs` §2.3 line:** `Post.cs` line 61 still reads
+  `` `PostService.CreateGroupPostAsync` `` (plain backticks, **not** `<c>`). I did
+  **not** upgrade it to a `<c>` cref — that's a `Post.cs` edit (a 3rd file) and is
+  cosmetic; the member now exists and resolves regardless. Left for U12 (final
+  consistency check).
+- **M3 surface byte-untouched:** `GetPostAsync`, `CreatePostAsync`, the two
+  `List*` feeds, `CreateReplyAsync`, `HidePostAsync`, `RemovePostAsync` are all
+  **unchanged** (I only appended). This keeps `G12` / `G13` holding
+  **structurally** — M3 feeds still filter on `ComponentId`; nothing here narrows.
+- **No new dependencies** (ADR 0006-D): `PostService`'s constructor is
+  **unchanged** (`IUserInfoService`, `IAuthorizationService`, `IDocumentStore`) —
+  the group-lane membership read is owned by U5's `AuthorizationService.GroupLane`,
+  which reads `IUserInfoService` **itself**; `PostService` never reads
+  `IsMemberOf` / grants.
+- **No doc-types change:** `Post` is already a registered document (U1, via
+  `M1DocTypes.WithDocument<Post>()`); writing `Post` rows in the group lane needs
+  no new doc type. I did not touch `M3DocTypes` / `M1DocTypes`.
+- **No ADR / design-doc edits** (unit-series rule: only create/modify files in
+  Deliverables); **no `GroupPostController`** (U7); **no `GroupPosts` page** (U8);
+  **no seam tests** (U9).
+
+### How I verified
+
+- `dotnet build Kumunita.slnx -c Debug` — **0 Warning(s), 0 Error(s)** (no
+  `<c>`→ref failures, no unused-import warnings; `GroupPostDraft` and the three
+  methods compile clean).
+- **All 235 `Kumunita.Core.Tests` pass** (0 Failures, 0 Errors, 0 Skipped) via the
+  reliable in-process `dotnet exec …\Kumunita.Core.Tests.dll` runner (the `dotnet
+  test` / Test Explorer "No tests found" is the known-bad discovery path on this
+  machine, per AGENTS.md). The U5 suite stays green against the U6 surface — no M3 /
+  directory seam test broke.
+
+### Handing to U7 (`GroupPostController`)
+
+The service is **ready** for a controller:
+- `ListGroupFeedAsync(string groupId, int page, int pageSize, CancellationToken)` →
+  `FeedResult` (feed; U7 binds `page` / `pageSize`).
+- `GetGroupPostAsync(string groupId, string postId, CancellationToken)` →
+  `PostDetailResult` (detail).
+- `CreateGroupPostAsync(GroupPostDraft, CancellationToken)` → `Post` (create —
+  U7 constructs the `GroupPostDraft` from the form).
+
+**Shape the tests (#1–9) expect:** the **service** is where the authorization gates
+live; the **controller** (U7) does HTTP mapping + form binding and is **expected to
+call `PostService`** with exactly these signatures — no additional authorization
+logic in the controller (the group-lane calls are already in the service, §2.2).
+U7 should **not** re-implement membership checks. The `UnauthorizedAccessException`
+from `CreateGroupPostAsync` (test #3: 403) and `KeyNotFoundException` from
+`GetGroupPostAsync` (tests #6 / #7: 404) are the HTTP status codes U7 maps.
+
+### U6's plan-file status
+
+`group-posts-u06-plan.md` was already in `in-progress/` at this unit's start
+(moved there by U5's Exit per the workflow). **This** unit's Exit moves it to
+`done/` immediately after this note lands — a plain file move: **nothing is staged
+or committed; the user is asked to review first.**
+
+### What I deliberately did NOT do (out-of-scope per the unit plan)
+
+1. Did **not** implement the `GroupPostController` (U7).
+2. Did **not** implement the `GroupPosts` page (U8).
+3. Did **not** write any seam tests (U9 owns #1–9 of the 19).
+4. Did **not** modify `M3DocTypes` / `M1DocTypes` / `M5DocTypes` / `M6DocTypes`
+   (U1 — already landed; the `Post` registration already lives there).
+5. Did **not** touch the **M3** service surface — `ListFeedAsync`,
+   `ListComponentFeedAsync`, `GetPostAsync`, `CreateReplyAsync`, `HidePostAsync`,
+   `RemovePostAsync`, `CreatePostAsync` are all byte-for-byte unchanged.
+6. Did **not** add any new **dependencies** (no `IUserGroupService`, no new
+   `IUserInfoService` call — the group lane's `IsMemberOf` / grants reads are U5's
+   `GroupLane`'s, not the service's).
+7. Did **not** touch the **moderator** path — the group lane has **no** moderator
+   branch by design (G·4).
