@@ -224,3 +224,57 @@ change). Everything else — the TagHelper shape, the key set, the 16 placements
 the frozen-seam non-touch — is exactly as planned.
 
 **Drift-pause count: 0.**
+
+## U3 — the Posts views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 3.5s)
++ the 7 `posts.*` keys present as `<kw-l>` elements in the three touched views.
+
+**What was changed (3 files modified, 0 new — the closed set):**
+- **`Views/Posts/Index.cshtml` — 3 keys:** `posts.write` (the `CanPost`-branch
+  "Write a post" primary button), `posts.empty_can_post` (the `CanPost`-branch
+  empty-feed `<text>`), `posts.empty` (the else-branch empty-feed `<text>`).
+- **`Views/Posts/New.cshtml` — 2 keys:** `posts.new_title` (the
+  `<h1>Write a post</h1>`), `posts.new_submit` (the form's submit button).
+- **`Views/Posts/Edit.cshtml` — 2 keys:** `posts.edit_title` (the
+  `<h1 class="mt-2">Edit post</h1>`), `posts.edit_save` (the form's submit
+  button).
+
+**7 `<kw-l>` elements placed** (3 + 2 + 2). Each wraps the **exact current
+English** as inner text (the M·1 source floor — a fresh `en` instance renders
+identically). The multi-line `posts.empty_can_post` value stays as a single
+wrapped line inside the existing `<text>` wrapper (the `@if`/`@else` structure
+untouched — text-only replacement). No `href`/`action`/`method`/`name`/`id`/
+`@Html.AntiForgeryToken()`/`@if`/`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`
+changed — only the visible English text that matched a `posts.*` key.
+
+**Left as-is (deliberate, recorded per the unit's instructions):**
+- **`ViewData["Title"] = "Write a post"`** (`New.cshtml`) and
+  **`= "Edit post"`** (`Edit.cshtml`) — localizing a browser-tab title requires
+  a C# `@{}` code line calling the provider (not a `<kw-l>` element), which is
+  outside U3's closed view-text scope. **Deliberate U3 limitation:** the tab
+  title stays `en`; the visible `<h1>` is what gets translated. If the tab title
+  should also be localized, that is a **U9 follow-on proposal** (not implemented
+  here). `Index.cshtml`'s `ViewData["Title"] = $"{Model.ComponentName}"` and
+  `Detail.cshtml`'s `= Model.Post.Title ?? "Post"` are dynamic (UGC-adjacent)
+  and likewise out of scope.
+- **`Detail.cshtml` left untouched** — scanned in full; **none** of the 7
+  `posts.*` exact strings appear. The page is the UGC-reading surface (post
+  body, replies, author name — M·3 / unit-series rule 4) plus out-of-scope
+  strings ("Edit" button, "Report this post", "Replies", "Reply", "back to the
+  post", "No replies yet"). Not a registry key, so not keyed.
+- **All out-of-scope strings in the touched views** (per the lane plan's
+  "explicitly out of scope" list): "Manage members", "Leave", "Communities" /
+  "Browse communities" / "All", the "Everyone" ADR 0012 badge, the
+  `@Model.Total post@…` hidden-count hint, the "community" helper paragraphs,
+  the "Title" label, the "optional" placeholder, the "No community feed…" /
+  "This post's community feed…" warnings, the audience-picker copy, the "Cancel"
+  buttons — none in the `posts.*` registry, so not keyed (rule 3).
+
+**Deviations vs the plan:** none. The 7 placements, the `ViewData["Title"]`
+left-as-is decision, and the `Detail.cshtml` non-touch are all exactly as the
+unit instructions specified.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).

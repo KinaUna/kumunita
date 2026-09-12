@@ -33,7 +33,7 @@
                 {
                     <a class="btn btn-primary"
                        href="@Url.Action("New","Posts")">
-                        Write a post
+                        <kw-l key="posts.write">Write a post</kw-l>
                     </a>
                 }
                 @* ADR 0012 / the ADR 0008 self-leave shape: offered to exactly
@@ -110,12 +110,12 @@
             <div class="alert alert-info">
                 @if (Model.CanPost)
                 {
-                    <text>No posts yet here. Write the first one — it will be visible only to
-                    the audience you choose in the composer below the title.</text>
+                    <text><kw-l key="posts.empty_can_post">No posts yet here. Write the first one — it will be visible only to
+                    the audience you choose in the composer below the title.</kw-l></text>
                 }
                 else
                 {
-                    <text>No posts here yet.</text>
+                    <text><kw-l key="posts.empty">No posts here yet.</kw-l></text>
                 }
             </div>
         }
