@@ -140,3 +140,56 @@ registration is **not** in U2's deliverables (the provider is registered by U4
 or the host; U2 only ships the two files). **Next: U3** —
 `ILocalizationService` + `LocalizationService` + `LanguageCompleteness`, per
 the design doc §Pinned contract §3.
+
+## U3 — `ILocalizationService` admin seam + `LocalizationService` impl + `LanguageCompleteness`
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (3 files, matching the design doc §Pinned contract §3 verbatim):**
+- **New** `src/Kumunita.Core/Localization/ILocalizationService.cs` — the
+  admin-management seam: 12 methods across three groups (catalog / UI strings /
+  static pages) + the completeness read. Every mutating method's doc-comment
+  pins the exact `Action` string, `TargetKind`, and `TargetId` (M·6).
+  `RemoveLanguageAsync` carries the `<exception>` tag for M·7's fail-closed
+  throw. **HTTP-free** (M·8): `actorId` is a plain `string` — no cookie, no
+  claim, no `HttpRequest`.
+- **New** `src/Kumunita.Core/Localization/LanguageCompleteness.cs` — the
+  completeness record: 5 positional parameters (`LanguageCode`, `PresentKeys`,
+  `MissingKeys`, `PresentPageSlugs`, `MissingPageSlugs`). The doc-comment
+  anchors M·9 (the `en` universe) and M·12 FACES.
+- **New** `src/Kumunita.Core/Localization/LocalizationService.cs` — the
+  implementation (takes `Marten.IDocumentStore`):
+  - **Read paths** (`ListLanguagesAsync`, `GetTranslationAsync`,
+    `GetPageAsync`, `GetCompletenessAsync`): `QuerySession`, live rows (M·4 —
+    no projection, no cache). `GetCompletenessAsync` computes present/missing
+    against the `en` universe (M·9) — one session, two live-row reads (strings
+    + pages).
+  - **Catalog mutations** (`AddLanguageAsync`, `SetLanguageEnabledAsync`,
+    `ReorderLanguagesAsync`, `RemoveLanguageAsync`,
+    `SetDefaultLanguageAsync`): one `OpenSession` + one `SaveChangesAsync`;
+    each stores exactly one `AccessAudit` row (`Via = Admin`, `Outcome = Allow`,
+    `EffectivePrincipalId = actorId`) — the `UserInfoService` admin-action
+    idiom (M·6, ARCHITECTURE.md §5).
+  - **M·7 (fail-closed):** `RemoveLanguageAsync` checks the default in the
+    same transaction before any write — throws `InvalidOperationException` if
+    the code is the current `LocaleSettings.DefaultLanguageCode`; no audit row
+    is committed for the blocked attempt. Content rows
+    (`TranslationResource` / `LocalizedPage`) are **retained** (only the
+    catalog row is deleted) — re-adding the language restores them.
+  - **Translation / page upserts** (`UpsertTranslationAsync`,
+    `UpsertPageAsync`): upsert by business key (pair idiom — the unique index
+    enforces one row per pair), one `AccessAudit` row, one `SaveChangesAsync`.
+    `UpsertPageAsync` sets `Updated` to server time.
+  - Uses `IQuerySession` for reads and `OpenSession` + `SaveChangesAsync` for
+    writes (the `UserInfoService` / `TranslationProvider` idiom).
+
+**State for U4 (the `LocaleCookie` + DI registrations):** the read path (U2)
+and the admin seam (U3) are **independent** — the provider reads, the service
+writes, no coupling between them. U4 ships `LocaleCookie` (the one Web HTTP
+seam, M·5/M·8) + the `DependencyInjection.cs` registrations for both
+`ITranslationProvider` → `TranslationProvider` and `ILocalizationService` →
+`LocalizationService` (the design doc §Pinned contract §5 names this
+registration: both `AddTransient`, both receiving the host `IDocumentStore`).
+**Next: U4** — `LocaleCookie` + DI, per the design doc §Pinned contract §4 +
+§5.
