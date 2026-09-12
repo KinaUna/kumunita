@@ -520,3 +520,31 @@ design doc §Acceptance gate table.
 - **Handing off:** the `ML` lane is **closed** — `M4` (events) is the next
   lane to plan. **Nothing is staged or committed — the user reviews first**
   (a draft commit message is provided at the end of the session).
+
+## Post-close correction — U6 admin view location (view-resolution fix)
+
+- **Date:** 2026-09-12 · **Role:** fix, post-U9 (not a new lane unit — no
+  production-code change, no new seam, no test rename).
+- **What was wrong:** U6 shipped the two admin views under
+  `Views/Admin/Languages/` (the U5/U6 plans pinned that path, mirroring the
+  `AdminController` → `Views/Admin/` mapping). That mapping only holds when
+  the **controller** is named `AdminController`. The controller is
+  `LanguagesController` (no area, no `IViewLocationExpander` registered —
+  checked `Program.cs`), so ASP.NET's default view resolution looks under
+  `Views/Languages/` and `GET /admin/languages` + `GET
+  /admin/languages/{code}/pages/{slug}` would have thrown "The view
+  'Index'/'PreviewPage' was not found" **at runtime**. The build stayed
+  green because Razor only validates the `@model` bindings at compile time,
+  never the on-disk location — and no test drives these two GET actions.
+- **The fix (2 file moves, content untouched):**
+  `Views/Admin/Languages/Index.cshtml` → `Views/Languages/Index.cshtml`;
+  `Views/Admin/Languages/PreviewPage.cshtml` → `Views/Languages/PreviewPage.cshtml`;
+  the now-empty `Views/Admin/Languages/` folder removed. The views'
+  hardcoded `/admin/languages/...` form actions are **URL routes** (served
+  by the default route pattern), not view paths — they needed no change.
+- **Verification:** `dotnet build Kumunita.slnx -c Debug` **green**
+  (Razor compiled the `@model` bindings against
+  `LanguagesController.LanguageRowViewModel` / `PageEditorViewModel`).
+- **Doc note:** the sealed U5/U6 plan files still name
+  `Views/Admin/Languages/` as the deliverable path — this note is the
+  correction of record; the historical unit plans were left as-is.
