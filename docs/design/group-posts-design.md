@@ -757,9 +757,28 @@ Record (shape mirrored from M3's "Run result (M3 acceptance gate —
 | 2 | **Handoff** (a member added **after** the post was created sees it on the **next** feed — strong consistency, C4; the in-scope delegated `read` branch is the handoff onto a delegate, the *same* pin) | `GroupPostServiceTests.G3_MembershipAddReScopesNextFeed` (G3 FACES; C4 — the `GroupMembership` row planted *after* the create re-scopes the *very next* `ListGroupFeedAsync` via the live `GetGroupIdsAsync` read; no projection lag) and `GroupPostServiceTests.G9_DelegateWithReadInScopeSeesOwnerGroupPosts` (G9 FACES; G·6/C2 — the in-scope `read` grant acts with the *owner's* membership; the decision row is `Via = Delegation`, `EffectivePrincipalId = owner` per `Detail_DecisionAuditRowShape_ViaDelegation`). |
 | 3 | **Part-vs-whole** (the 19 §2.5 names are the **whole**; gates 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited anchors) | all 19 `GroupPostServiceTests` `[Fact]`s — `G1_MemberSeesGroupFeed` · `G2_NonMemberFeedEmptyWithDenyRow` · `G3_MembershipAddReScopesNextFeed` · `G4_MembershipRemoveRevokesNextDetail` · `G5_MemberCreatesGroupPostSeesIt` · `G5_GroupPostAudienceWrittenEmpty` · `G6_NonMemberCreateDenied` · `G7_ModeratorNonMemberDenied` · `G8_BreakGlassDoesNotApplyToGroupPosts` · `G9_DelegateWithReadInScopeSeesOwnerGroupPosts` · `G10_DelegateWithoutReadDenied` · `G11_ReplyInheritsParentGroupLane` · `G11_ReplyNotEvaluatedOnParentDeny` · `G12_GroupPostExcludedFromComponentFeed` · `G13_GroupPostExcludedFromAllFeed` · `Feed_AggregateAuditRowShape_GroupPost` · `Detail_DecisionAuditRowShape_ViaGroup` · `Detail_DecisionAuditRowShape_ViaDelegation` · `PostService_MakesNoModerateOrBreakGlassCallOnGroupPosts` — green **in the same execution** as the M1/M2/M3/M3b/media inherited suites (`AuthorizationServiceTests`, `ClaimShapingInvariantBTests`, `AdminOverrideDdlTests`, `KumunitaFeatureDdlTests`, `DbBootstrapIsPristineTests`, `SideEffectHarnessTests`, `DirectoryServiceTests`, `DirectoryServiceTests_U6`, `ProfileToAuditableResourceTests`, `UserInfoServiceTests`, `UserInfoServiceGroupsU9Tests`, `PostServiceTests` + the moderation/media anchors) — **`Kumunita.Core.Tests` 254/254 passed, 0 failed** in this run; `Kumunita.Web.Tests` 90/90 in its own run. |
 
-## Group posts — Closed
+## Group posts — Closed (recorded)
 
-*Placeholder — U11/U12 append their close entries below. The gate record
-(§above, U10) has landed; this section stays U12's close marker. (U2
-added this heading: Part 1's drift guard references it, but the file
-never had the section.)*
+**Date:** 2026-09-12 · **Recorded by:** U12 (the last unit, U1 → U12 strict
+order) · **Machine:** Windows (PowerShell terminal). The gate record above
+(`## Group posts — Gate (recorded by U10)`, 2026-09-12) is the "recorded"
+precedent; this is the milestone's last line, appended after it. No code
+changes, no new tests in this unit — the checklist below is the U12 entry
+reads, each line re-verified by grep/read at close.
+
+### Consistency checklist (each line PASS/FAIL)
+
+| Line | Check | Result |
+|---|---|---|
+| **seams** | `Post.GroupId` present (U4) — `src/Kumunita.Core/Posts/Post.cs:63`, `public string GroupId { get; set; } = string.Empty;` · `AccessVia.Group` (U5) — `src/Kumunita.Core/Authorization/Decision.cs:31`, 8th enum value after `Admin` · the two `CanSeeGroupAsync` overloads **and** the two `CanSeeGroupFeedAsync` overloads (U2-A1/A2 freeze) — `src/Kumunita.Core/Authorization/IAuthorizationService.cs:101/111/125/132`, implemented in `AuthorizationService.cs:116–156` · the three `PostService` group methods (U6) — `src/Kumunita.Core/Posts/PostService.cs`: `ListGroupFeedAsync:405`, `GetGroupPostAsync:460`, `CreateGroupPostAsync:520` (ctor unchanged) · `GroupPostDraft` (U6) — `src/Kumunita.Core/Posts/GroupPostDraft.cs:20`, `public sealed record GroupPostDraft(string GroupId, string? Title, string Body);` — every symbol grep'd, each named with its file, **all present** | **PASS** |
+| **tests** | the 19 §2.5 names all present in `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs` (lines 45–644), 19 `[Fact]`s, none missing / none extra, character-for-character vs §2.5 · the U10 gate line (Core 254/254 + Web 90/90, 344/344 total) still **PASS** per the recorded section above | **PASS** |
+| **close docs** | `README.md:59` — the **Group posts** Features bullet (the media precedent: a shipped non-lettered lane lives in *Features*; M4/M5/M6 Roadmap lines untouched) · `src/Kumunita.Web/Milestones.cs:27` — `new("GP", "Group posts — the membership-scoped post channel inside a group (ADR 0013)", StatusDone)` · `docs/ARCHITECTURE.md` — §4.2 `IAuthorizationService` group-lane comment (lines 186–190) + §5 `Post.groupId` non-empty / `audience` empty / `componentId` empty + the via-list `…\|BreakGlass\|Admin\|Group` — all three carry the group-posts line and **agree with §2** (U11's checklist) | **PASS** |
+| **folders** | `docs/plans-milestones/done/group-posts-u01-plan.md` … `group-posts-u11-plan.md` all present (11 spec files, plus the archived `*-exec-plan.md` working files) · the handoff note has one section each for U1–U11 (the U5 section is indented under U4's, the U5→U6 handoff was written as a nested header — content present, counted) and this one, appended at exit | **PASS** |
+| **drift** | count of `## U<m> — Drift pause` **headers** in the handoff note = **0** — **clean** (per U11's handoff: the "Drift pause" text mentions in the note are inline prose self-described *not* a drift pause, and the one known-stale archived line — `done/group-posts-u07-plan.md`'s "403 on Deny", where the landed behavior is 404 — is an archived plan-file prose line, not a seam, not a header, and not counted) | **PASS** |
+
+**Outcome: all five lines PASS — no hard failure. The group-posts milestone
+is closed.** The `## Group posts — Gate` line above is the recorded run
+(2026-09-12, ALL THREE PASS); this section is its close marker, filled by
+U12. (U2's placeholder note: the heading was added by U2 because Part 1's
+drift guard references it; U10 filled the gate, U11 synced the close docs,
+U12 records the close — done.)

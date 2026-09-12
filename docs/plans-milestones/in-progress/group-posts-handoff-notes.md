@@ -741,3 +741,49 @@ or committed; the user is asked to review first.**
 - U11's plan file moves to `done/` immediately after this note (per the
   workflow) — a plain file move: **nothing is staged or committed; the user
   reviews first.**
+
+## U12 — final consistency check + record `## Group posts — Closed (recorded)`
+
+- **Milestone closes — all five checklist lines PASS, 2026-09-12, this machine
+  (Windows/PowerShell).** This is the last unit (U1 → U12 strict order). No code
+  changes, no new tests, no folder moves beyond this file's own exit.
+- **Deliverable (1 file):** `docs/design/group-posts-design.md` — the `##
+  Group posts — Closed` placeholder (U2's, referenced by Part 1's drift guard)
+  is now **`## Group posts — Closed (recorded)`** with the date (2026-09-12) and
+  the five-line consistency checklist, each line PASS:
+  - **seams PASS** — `Post.GroupId` (`src/Kumunita.Core/Posts/Post.cs:63`),
+    `AccessVia.Group` (`src/Kumunita.Core/Authorization/Decision.cs:31`, 8th
+    value), the four group-lane methods on
+    `IAuthorizationService`/`AuthorizationService` (the two `CanSeeGroupAsync`
+    + the two `CanSeeGroupFeedAsync` — U2-A1/A2 freeze, lines 101/111/125/132),
+    the three `PostService` group methods (`PostService.cs:405/460/520`, ctor
+    unchanged), and `GroupPostDraft` (`GroupPostDraft.cs:20`). All present, each
+    named with its file.
+  - **tests PASS** — all 19 §2.5 names present in
+    `tests/Kumunita.Core.Tests/GroupPostServiceTests.cs` (lines 45–644, 19
+    `[Fact]`s), 1:1 with §2.5, none missing/extra; the U10 gate line (Core
+    254/254 + Web 90/90, 344/344) still PASS per the recorded gate section.
+  - **close docs PASS** — `README.md:59` Features bullet,
+    `Milestones.cs:27` the `GP`/`StatusDone` entry, `ARCHITECTURE.md` §4.2
+    group-lane comment + §5 `Post.groupId`/via-list `…|Group` — all three carry
+    the group-posts line and agree with §2 (U11's checklist).
+  - **folders PASS** — `done/group-posts-u01-plan.md` … `group-posts-u11-plan.md`
+    all present; the handoff note has one section each for U1–U11 (the U5 section
+    is indented under U4's — content present, counted) and this one, appended at
+    exit.
+  - **drift PASS** — `## U<m> — Drift pause` **header** count in the handoff note
+    = **0** (clean). Per U11's handoff: the "Drift pause" text mentions in the
+    note are inline prose self-described *not* a drift pause, and
+    `done/group-posts-u07-plan.md`'s "403 on Deny" prose (landed behavior is 404)
+    is a known-stale archived plan-file line — not a seam, not a header, not
+    counted. **No hard failure → the milestone is closed.**
+- **Handing forward:** none — this is the last unit. The group-posts surface
+  (U4–U9) is gate-verified (U10, ALL THREE PASS) and the close docs (U11) agree
+  with the design doc's §2 seams. The handoff note **stays** in `in-progress/`
+  (living scratch, never archived); this exec-plan and the spec
+  (`group-posts-u12-plan.md`) move to `done/` at this Exit.
+- **Drift pauses: none.** No `## U<m> — Drift pause` header was added by this
+  unit; the milestone closes clean.
+- U12's exec-plan and spec move to `done/` immediately after this note (per the
+  workflow) — a plain file move: **nothing is staged or committed; the user
+  reviews first.**
