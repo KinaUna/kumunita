@@ -1,6 +1,8 @@
+using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,7 +34,7 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("groups")]
-public sealed class GroupsController(IUserInfoService userInfo) : Controller
+public sealed class GroupsController(IUserInfoService userInfo, PostService posts, IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -710,5 +712,275 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
 
         TempData["info"] = $"Cancelled the invitation for {subjectId}.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── Group posts (ADR 0013, group-posts milestone U7) — the membership
+    //    channel: feed / detail / create / reply under /groups/{id}/posts.
+    //    Thin HTTP (ADR 0006-D: routes + shape; the M2 thin-controller
+    //    precedent in this file): every access decision comes from
+    //    <see cref="PostService"/>'s group surface (U6), the membership lane
+    //    is the sole decision (G·1), the audience lane is never evaluated
+    //    (G·8), there is no moderator / break-glass branch to reach (G·4 —
+    //    *unavailable*, not deferred), and this controller never re-derives
+    //    access — no <c>IAuthorizationService</c> call here at all. ──
+
+    /// <summary>
+    /// The group channel's <b>feed</b> (ADR 0013, G1–G4 FACES):
+    /// <c>GET /groups/{id}/posts?page=N</c>. The group's absence is a 404
+    /// <b>before</b> the service call (the M2b <c>FindGroupAsync</c> pattern
+    /// — this file's <see cref="GetGroupAsync"/>-based read shape, the
+    /// "a non-visible group 404s" precedent — and a member's own group is
+    /// the only reachable one anyway, since the service's Deny shape returns
+    /// an empty feed regardless). The service's
+    /// <see cref="PostService.ListGroupFeedAsync"/> is the single
+    /// decision + aggregate <c>AccessAudit</c> row (G·5); the controller
+    /// only projects. <see cref="GroupFeedViewModel.CanPost"/> is a display
+    /// convenience (a live <c>GetGroupIdsAsync</c> read — "a read, not a
+    /// decision"): it drives the composer's visibility; the POST gate is
+    /// the authoritative deny (G·3).
+    /// </summary>
+    [HttpGet("{id}/posts")]
+    public async Task<IActionResult> GroupPosts(string id, int? page)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The group's absence 404s before any service call (the M2b
+        // FindGroupAsync pattern; no candidate posts loaded, no audit row).
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        var feed = await posts.ListGroupFeedAsync(id, actor, page is > 0 ? page.Value : 1);
+
+        // Display-only: the composer's visibility. The SAME rule the POST
+        // gate enforces (G·3 — the create gate is the group-lane membership
+        // decision; G·4 — no moderator / GlobalAdmin skip on this lane).
+        var groups = await userInfo.GetGroupIdsAsync(actor);
+        var canPost = groups.Contains(id);
+
+        var items = new List<PostListItem>(feed.Visible.Count);
+        foreach (var post in feed.Visible)
+        {
+            // The author's display name — a <c>GetProfileAsync</c> read
+            // (a *display* lookup, never an <c>AccessAudit</c> subject;
+            // the membership decision is <b>already made</b> by
+            // <see cref="PostService.ListGroupFeedAsync"/>). The M3
+            // PostsController feed N+1 precedent (a neighborhood, not a
+            // firehose). The per-row component slots stay null — the feed
+            // is group-scoped and a group post's ComponentId is empty (G·2).
+            var profile = await userInfo.GetProfileAsync(post.AuthorId);
+            const int previewLength = 200;
+            var preview = post.Body.Length <= previewLength
+                ? post.Body
+                : post.Body[..previewLength].TrimEnd() + "…";
+            items.Add(new PostListItem(
+                post.Id,
+                post.Title,
+                preview,
+                post.Created,
+                profile?.DisplayName ?? post.AuthorId,
+                post.AuthorId));
+        }
+
+        return View("Feed", new GroupFeedViewModel
+        {
+            GroupId = id,
+            GroupName = group.Name,
+            Items = items,
+            Total = feed.Total,
+            CanPost = canPost,
+        });
+    }
+
+    /// <summary>
+    /// A group post's <b>detail</b> + its one-level replies (ADR 0013,
+    /// G11 FACES): <c>GET /groups/{id}/posts/{postId}</c>. The service's
+    /// <see cref="PostService.GetGroupPostAsync"/> is the single detail
+    /// decision row (G·5, TargetId = the post id) and returns the replies
+    /// <b>as-is</b> under the parent's single group-lane decision (G·7 —
+    /// no second evaluation, no per-reply row). A missing post, a lane
+    /// mismatch, or a membership Deny all return <c>Post = null</c> (Core
+    /// doesn't distinguish — the audit row does); the controller maps that
+    /// to a 404 (the group lane's fail-closed shape — G·3/G·4, this file's
+    /// "a non-visible group 404s" precedent).
+    /// </summary>
+    [HttpGet("{id}/posts/{postId}")]
+    public async Task<IActionResult> GroupPostDetail(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        var result = await posts.GetGroupPostAsync(id, postId, actor);
+        if (result.Post is null)
+            return NotFound();
+
+        var authorProfile = await userInfo.GetProfileAsync(result.Post.AuthorId);
+
+        var replyItems = new List<ReplyItem>(result.Replies.Count);
+        foreach (var reply in result.Replies)
+        {
+            var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
+            replyItems.Add(new ReplyItem(
+                reply.Id,
+                replyAuthorProfile?.DisplayName ?? reply.AuthorId,
+                reply.AuthorId,
+                reply.Body,
+                reply.Created));
+        }
+
+        return View("PostDetail", new GroupPostDetailViewModel
+        {
+            GroupId = id,
+            Post = result.Post,
+            AuthorDisplayName = authorProfile?.DisplayName ?? result.Post.AuthorId,
+            AuthorSubjectId = result.Post.AuthorId,
+            Replies = replyItems,
+            IsAuthor = result.Post.AuthorId == actor,
+        });
+    }
+
+    /// <summary>
+    /// The group-post <b>composer's POST</b> (ADR 0013, G5/G6 FACES):
+    /// <c>POST /groups/{id}/posts</c>. The form carries <b>title + body
+    /// only</b> (the <see cref="GroupPostComposeViewModel"/> shape — the
+    /// M3 composer minus the component picker and the audience slot; the
+    /// group's membership is the audience proxy, and the service writes the
+    /// post's <c>Audience</c> non-null and <b>empty</b> — G·8 — regardless
+    /// of anything on this form). The group's identity is the route's
+    /// <c>{id}</c>, never a form field (a form-bound group id would be a
+    /// lane-bypass hole). <para>
+    /// **Create gate (G·3):** <see
+    /// cref="PostService.CreateGroupPostAsync"/> <b>is</b> the group-lane
+    /// membership decision (the <see cref="IDocumentStore.LightweightSession"/>
+    /// lane — C3 same-transaction shape: the controller opens the session,
+    /// the service's <c>SaveChangesAsync</c> is the single write; the gate
+    /// row + the post commit atomically). A non-member (including a
+    /// non-member moderator or GlobalAdmin — G·4, no skip on this lane)
+    /// hits the <see cref="UnauthorizedAccessException"/> wall — mapped to
+    /// a 404 (the master register's "Web renders 404" pin; this file's
+    /// "a plain member's POST 404s" precedent).
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/posts")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateGroupPost(string id, [FromForm] GroupPostComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to post.");
+            return View("New", model);
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        if (!model.IsValid)
+        {
+            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            return View("New", model);
+        }
+
+        var draft = new GroupPostDraft(
+            GroupId: id,
+            Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+            Body: model.Body.Trim());
+
+        // C3 same-transaction lane: the controller opens the
+        // <c>IDocumentStore.LightweightSession()</c>, the service's
+        // <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>New</c> precedent) — the gate's audit row and
+        // the new <c>Post</c> commit atomically.
+        await using var session = store.LightweightSession();
+
+        Post post;
+        try
+        {
+            post = await posts.CreateGroupPostAsync(draft, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // G·3/G·4 — only group members may post to the channel; the
+            // gate's Deny row was persisted before the throw (G6 FACES).
+            // 404: the register's "Web renders 404" pin (a 403 on a POST
+            // would advertise a gate the UI doesn't offer).
+            return NotFound();
+        }
+
+        TempData["info"] = $"Post added to “{group.Name}”.";
+        return Redirect($"/groups/{id}/posts/{post.Id}");
+    }
+
+    /// <summary>
+    /// A group-post <b>reply</b> (ADR 0013, G11 FACES):
+    /// <c>POST /groups/{id}/posts/{postId}/replies</c>. Exactly the M3
+    /// <c>Replies(id, body)</c> one-field form shape — a plain
+    /// <c>body</c> field, no per-reply audience (G·7: a reply inherits the
+    /// parent's single group-lane decision; <see
+    /// cref="PostService.CreateReplyAsync"/> is lane-neutral and is
+    /// <b>reused as-is</b> — no new Core seam, no group field on the
+    /// <c>PostReply</c>). Before opening a write session the parent's
+    /// group-lane decision is re-run via
+    /// <see cref="PostService.GetGroupPostAsync"/> (the same
+    /// <c>Post = null</c> fail-closed shape as <see cref="GroupPostDetail"/>'s
+    /// GET, mapped to a 404 here) — the reply lands only on a post the
+    /// viewer can currently see (C4 strong consistency: a member removed
+    /// in the gap between the detail render and the POST is denied).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GroupPostReply(string id, string postId, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            // A reply is a body-only write (G·7: no own audience, no
+            // title). Fail-closed to the detail page — the form is
+            // re-presented there.
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // Authz via the parent's single group-lane decision (G·7 — the
+        // reply inherits it, so the decision is the pre-write gate).
+        // GetGroupPostAsync returns Post = null for **both** "missing /
+        // lane mismatch" and "membership denied" (Core doesn't
+        // distinguish; the audit row does) — both map to the 404 fail-
+        // closed shape (the register's non-member-404 pin).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>Replies</c> precedent).
+        await using var session = store.LightweightSession();
+        await posts.CreateReplyAsync(postId, actor, body, session);
+
+        TempData["info"] = "Reply added.";
+        return Redirect($"/groups/{id}/posts/{postId}");
     }
 }

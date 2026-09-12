@@ -398,11 +398,85 @@ or committed; the user is asked to review first.**
 3. Did **not** write any seam tests (U9 owns #1–9 of the 19).
 4. Did **not** modify `M3DocTypes` / `M1DocTypes` / `M5DocTypes` / `M6DocTypes`
    (U1 — already landed; the `Post` registration already lives there).
-5. Did **not** touch the **M3** service surface — `ListFeedAsync`,
-   `ListComponentFeedAsync`, `GetPostAsync`, `CreateReplyAsync`, `HidePostAsync`,
-   `RemovePostAsync`, `CreatePostAsync` are all byte-for-byte unchanged.
+5. Did **not** implement the **moderator** path — the group lane has **no** moderator
+   branch by design (G·4).
 6. Did **not** add any new **dependencies** (no `IUserGroupService`, no new
    `IUserInfoService` call — the group lane's `IsMemberOf` / grants reads are U5's
    `GroupLane`'s, not the service's).
-7. Did **not** touch the **moderator** path — the group lane has **no** moderator
-   branch by design (G·4).
+
+## U7 — Web controller surface (feed / detail / create / reply)
+
+- **Two files, the closed Deliverables set** (the unit plan's "≤ 3 files", met with 2;
+  the rows reuse the M3 list-item records, so no new row types were needed):
+  - **`src/Kumunita.Web/Models/GroupViewModel.cs`** (appended) — the three new types,
+    slotted into the existing groups view-model file per the unit plan's pin:
+    `GroupFeedViewModel` (mirrors M3 `FeedViewModel`; the component-name slot is
+    `GroupName`; the M3 community-specific slots — `IsMandatory` / `CanManageCommunity`
+    /
+    `CanLeaveCommunity` / `Communities` — do **not** exist here, the group lane has no
+    community management surface), `GroupPostDetailViewModel` (mirrors M3
+    `PostDetailViewModel` + a `GroupId` reply-form target slot; **no** dedicated reply
+    view-model — the reply form is inline, exactly M3), `GroupPostComposeViewModel`
+    (mirrors M3 `PostComposeViewModel` **minus** `ComponentId`/`Audience`/picker —
+    title + body only; the group's identity is the route's `{id}`, never form-bound).
+    The feed/detail rows reuse the M3 `PostListItem` / `ReplyItem` records verbatim
+    (same namespace — "reuse, don't re-invent").
+  - **`src/Kumunita.Web/Controllers/GroupsController.cs`** (appended) — the four
+    actions under the existing `/groups/{id}` route prefix, plus the constructor gain
+    `PostService posts` + `IDocumentStore store` (the M3 `PostsController` pattern;
+    the class-level `[Authorize]` and the existing M2/m2b actions are untouched):
+    `GET /groups/{id}/posts?page=N` → `View("Feed", GroupFeedViewModel)` ·
+    `GET /groups/{id}/posts/{postId}` → `View("PostDetail", GroupPostDetailViewModel)` ·
+    `POST /groups/{id}/posts` → `CreateGroupPostAsync` → `Redirect` to the new
+    post's detail · `POST /groups/{id}/posts/{postId}/replies` → **reused**
+    `CreateReplyAsync(postId, actor, body, session)` (lane-neutral, unchanged).
+    **No** `Report` / moderation action (Scope Out; G·4 is *unavailable*, not
+    deferred). **No TypeScript / new assets** (plain forms).
+- **404 mapping (the register + design doc §2.2 pins — recorded, not a drift pause):**
+  the unit plan file's detail-"403" line was superseded by the design doc
+  (authoritative): U6's `GetGroupPostAsync` returns `Post = null` and its doc pins
+  "**Web 404 — G·3/G·4**", and the master register pins "Non-member: 404" + "Web
+  renders 404" for the create gate. Both the detail-Deny and the create
+  `UnauthorizedAccessException` therefore map to **`NotFound()`** (consistent with
+  this file's standing "a plain member's POST 404s" / "a non-visible group 404s"
+  precedent) — **not** M3's `Forbid()` 403 shape, which belongs to the audience lane.
+- **Access is never re-derived (ADR 0006-D):** no `IAuthorizationService` call in the
+  controller; every decision is inside the U6 service calls. The feed's `CanPost`
+  flag is a *display* convenience (a live `GetGroupIdsAsync` read — "a read, not a
+  decision") driving the composer's visibility; the POST gate remains the
+  authoritative deny (G·3). The reply route re-runs `GetGroupPostAsync` (parent Allow
+  first) before the write — the M3 `Replies` pre-write gate, the C4 gap case (a
+  member removed between render and POST is denied).
+- **Fail-closed shapes:** group missing ⇒ 404 **before** the service call (the M2b
+  `FindGroupAsync` pattern, read via `GetGroupAsync`); null actor ⇒ 404 (this file's
+  `Detail` shape, `Unauthorized()` is the M2 read-lane variant but 404 keeps the
+  group-post family consistent); blank reply body ⇒ `TempData["error"]` + redirect
+  back to the detail (the M3 `Replies` shape).
+- **Verified:** `dotnet build Kumunita.slnx -c Debug` — **Build succeeded**, all
+  four projects clean (the touched project is `Kumunita.Web`); `dotnet exec
+  Kumunita.Web.Tests.dll` → **Total: 90, Errors: 0, Failed: 0, Skipped: 0** — no
+  M2/m2b/M3 regression (nothing in the test harnesses touches `GroupsController`
+  directly, and the M3 routes are untouched).
+- **Handing to U8 (the Razor views):** the three view names the actions emit are
+  `View("Feed")` / `View("PostDetail")` / `View("New")` **under `Views/Groups/`**
+  (the `New` view is the composer GET, rendered only on the POST's failed-shape
+  re-render — U8 should add a thin `GET /groups/{id}/posts/new`-style entry or
+  render the composer inline on `Feed` when `CanPost` — the plan names the views
+  `Feed.cshtml` / `PostDetail.cshtml`; the composer surface is U8's to place, the
+  model is `GroupPostComposeViewModel` (title + body, antiforgery, action
+  `POST /groups/{id}/posts`). `FeedViewModel`-style `CanPost` drives the
+  composer's visibility; the group name is on the model (`GroupName`) — no extra
+  reads in the view. The reply form on `PostDetail` is a one-field `body` POST to
+  `/groups/{GroupId}/posts/{Post.Id}/replies` (the `GroupId` slot exists for
+  exactly this).
+- **Drift pause (recorded, unit rule 6 — the entry reads revealed a stale line):**
+  `docs/plans-milestones/in-progress/group-posts-u07-plan.md` (the unit's own
+  spec file) still says "403 on Deny — the M3 `Detail` deny shape" for the detail
+  action, but the **authoritative** design doc §2.2 (U6's landed seam doc: "Web
+  404") + the master register ("Non-member: 404") + U6's handoff note ("tests
+  #6/#7: 404") all pin **404**. I implemented **404**. The plan file was already
+  moved to `done/` state in the in-progress folder at my entry (unlike U6's, its
+  Exit move had not happened) — the line is left as-is for U11/U12's docs close to
+  reconcile (it is a *plan*-file prose line, not a seam, so no design-doc drift).
+- U7's plan file moves to `done/` immediately after this note (per the workflow) —
+  a plain file move: **nothing is staged or committed; the user reviews first.**
