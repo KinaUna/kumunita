@@ -193,3 +193,43 @@ seam, M·5/M·8) + the `DependencyInjection.cs` registrations for both
 registration: both `AddTransient`, both receiving the host `IDocumentStore`).
 **Next: U4** — `LocaleCookie` + DI, per the design doc §Pinned contract §4 +
 §5.
+
+## U4 — `LocaleCookie` Web seam + the Core DI registrations
+
+**Date:** 2026-09-12 · **Role:** code unit · **Exit met:** build green +
+section written + plan file moved to `done/`.
+
+**What shipped (2 files, matching the design doc §Pinned contract §4 verbatim):**
+- **New** `src/Kumunita.Web/Security/LocaleCookie.cs` — the **one** Web HTTP
+  seam of the lane (M·5/M·8): `Name = "kumunita.locale"`, `MaxAgeDays = 365`,
+  and the read/write/clear trio. `Read(HttpRequest)` returns the BCP-47 code or
+  `null` (a blank value is treated as no preference → M·1's instance default);
+  `Write(HttpResponse, code)` appends `HttpOnly` + `SameSite=Lax` + the 365-day
+  max-age (M7 FACES — the settings-page save); `Clear(HttpResponse)` deletes with
+  the same attributes (the "reset to default" action). The cookie is **never**
+  a claim, **never** part of the authorization decision (thin-token rule) — it
+  is passed to the provider as a plain string. Lives in `Kumunita.Web.Security`
+  next to `KumunitaPrincipal` (matching that folder's style).
+- **Modified** `src/Kumunita.Core/DependencyInjection.cs` — inside
+  `AddKumunitaCore`, appended the two lane registrations after the media block:
+  `AddTransient<Localization.ITranslationProvider,
+  Localization.TranslationProvider>()` (U2's seam) and
+  `AddTransient<Localization.ILocalizationService,
+  Localization.LocalizationService>()` (U3's seam). Both constructors take the
+  host-registered `Marten.IDocumentStore` (verified against U2/U3's shipped
+  constructors — both are `ctor(IDocumentStore)`), so the plain `AddTransient`
+  form resolves cleanly; the host already calls `AddKumunitaCore()`
+  (`Program.cs`, after the `AddMarten` block). A lane comment names ML/U4 and
+  the M·4/M·5/M·8 anchors. No other line touched.
+
+**State for U5 (the `LanguagesController` admin surface):** **every** Core seam
+the controller needs is now registered in the host container —
+`ILocalizationService` (all 12 methods, U3) and `ITranslationProvider` (the 4
+read methods, U2, for the completeness view / preview path). U5 ships the
+GlobalAdmin-gated `LanguagesController` (the design doc §Pinned contract §5
+action table — 10 actions, one per `ILocalizationService` method), maps M·7's
+blocked `RemoveLanguageAsync` throw to **409**, and writes the audit rows
+**only** via the service (M·6 — the controller itself never touches an
+`AccessAudit` row). `LocaleCookie` is available for U6's settings page
+(its `Read`/`Write`/`Clear` are the cookie's only touch points). **Next: U5** —
+`LanguagesController`, per the design doc §Pinned contract §5.

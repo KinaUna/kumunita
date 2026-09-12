@@ -126,6 +126,17 @@ public static class ServiceCollectionExtensions
         // PostService above). Resolved by the Web serving lane (U7) + upload
         // lane (U6); never touched by the raw volume directly (C-MED·6).
         services.AddTransient<IMediaStore, LocalVolumeMediaStore>();
+
+        // Multilingual (ML, ADR 0005; plan U4): the two Core seams U2/U3 shipped —
+        // the per-request read path (ITranslationProvider, U2) and the admin
+        // management seam (ILocalizationService, U3). Both take the host-registered
+        // Marten IDocumentStore (the same "AddTransient with the store injected"
+        // shape as IMediaStore above). Core stays HTTP-free (M·8): neither touches
+        // an HttpRequest or a cookie — the Web layer passes the preferred language
+        // as a plain BCP-47 string (M·5). Languages are data, not config (M·4):
+        // an admin edit takes effect on the next request, no rebuild.
+        services.AddTransient<Localization.ITranslationProvider, Localization.TranslationProvider>();
+        services.AddTransient<Localization.ILocalizationService, Localization.LocalizationService>();
         return services;
     }
 }
