@@ -9,10 +9,10 @@
         <h1>Edit announcement</h1>
         <p class="text-muted">
             Update this announcement's title, body, and visibility. A
-            <b>public</b> announcement is visible to everyone
-            (e.g. scheduled maintenance); a <b>resident</b> announcement
-            is visible to all signed-in users (e.g. "help us with X"
-            calls).
+            <b>public</b> announcement is visible to everyone, including
+            people who are not signed in (e.g. a maintenance window). A
+            <b>resident</b> announcement is only visible to signed-in
+            residents (e.g. a "help us with X" call).
         </p>
 
         @if (TempData["info"] is string info)
@@ -59,8 +59,8 @@
                             bool isSelected = scopeValue == (Model.Scope ?? "Community");
                             <option value="@scopeValue" selected="@(isSelected ? "selected" : null)">
                                 @(s == AnnouncementScope.Public
-                                    ? "Everyone (public — visible to visitors and residents)"
-                                    : "Residents (community — visible only when signed in)")
+                                    ? "Everyone (public) — visible to visitors and residents"
+                                    : "Residents — visible only when signed in")
                             </option>
                         }
                     </select>
@@ -74,7 +74,7 @@
 @if (Model.TargetCommunities.Count > 0)
 {
 <div class="card mb-4"><div class="card-body">
-<label class="form-label" for="community" style="font-weight:600;">Target community (optional)</label>
+<label class="form-label" for="community" style="font-weight:600;">Send to a specific community (optional)</label>
 <select class="form-control" id="community" name="CommunityId">
 <option value="" selected="@(Model.CommunityId is null ? "selected" : null)">All residents</option>
 @foreach (var t in Model.TargetCommunities)
@@ -82,7 +82,7 @@
 <option value="@t.Id" selected="@(Model.CommunityId == t.Id ? "selected" : null)">@t.Name</option>
 }
 </select>
-<div class="text-muted small mt-2">Leave as All residents to reach everyone, or pick a community to limit the audience. A public announcement always applies platform-wide.</div>
+<div class="text-muted small mt-2">Leave as All residents to send to everyone, or pick a community to limit who sees it.</div>
 </div></div>
 }
 
@@ -95,7 +95,7 @@
                            maxlength="120" placeholder="optional"
                            value="@Model.Title" />
                     <div class="text-muted small mt-1">
-                        A short headline (≤ 120 chars).
+                        A short headline (up to 120 characters).
                     </div>
                 </div>
             </div>
@@ -120,13 +120,15 @@
                             Pin to the top of all pages
                         </label>
                         <div class="text-muted small mt-1">
-                            A pinned announcement is shown as a banner at the very top
-                            of every Kumunita page (including Home) in addition to
-                            the usual <b>Announcements</b> list.
-                            The visibility gate still applies: a <b>public</b> pin
-                            shows for every visitor; a <b>resident</b> pin shows
-                            only when a user is signed in.
-                            The most-recently-pinned announcement wins.
+                            A pinned announcement also appears as a banner at the
+                            very top of every page (including Home), in addition
+                            to the usual <b>Announcements</b> list.
+                            Its visibility still follows the audience you picked
+                            above: a <b>public</b> pin shows to every visitor;
+                            a <b>resident</b> pin shows only when a user is signed
+                            in.
+                            If more than one is pinned, the most recently pinned
+                            one wins.
                         </div>
                     </div>
                 </div>

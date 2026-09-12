@@ -8,8 +8,9 @@
     <div class="col-md-9 col-lg-8">
         <h1>Write a post</h1>
         <p class="text-muted">
-            A post is visible only to the audience you choose below — the
-            component picks which *feed* it lands in (a label, not a gate).
+            A post is visible only to the people you choose below. The
+            <b>community</b> you pick above just decides which feed it
+            shows up in — it does not change who can see it.
         </p>
 
         @if (TempData["info"] is string info)
@@ -30,11 +31,11 @@
         @if (Model.Components.Count == 0)
         {
             <div class="alert alert-warning">
-                No enabled community to post to. Ask a resident
-                (or, via <code>/admin</code>, a global admin) to enable one
-                under the components list — the seeded defaults are
-                <code>safety</code>, <code>maintenance</code>,
-                <code>social</code>, <code>governance</code>.
+                No community feed is currently available to post to. Ask
+                a resident (or a global admin, if you have one) to enable
+                one — the common ones are <code>safety</code>,
+                <code>maintenance</code>, <code>social</code>, and
+                <code>governance</code>.
             </div>
         }
 
@@ -44,7 +45,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="component" style="font-weight:600;">
-                        Community (the feed this post lands in)
+                        Community (the feed this post will appear in)
                     </label>
                     <select class="form-control" id="component" name="ComponentId" required>
                         @foreach (var (id, name) in Model.Components)
@@ -55,9 +56,9 @@
                         }
                     </select>
                     <div class="text-muted small mt-2">
-                        The community is the *feed label* — it is never a
-                        privacy decision (invariant C-M3·2). Only the
-                        audience below decides who can see the post.
+                        The community only chooses which feed your post appears
+                        in — it does not decide who can see it. Only the
+                        audience you pick below does.
                     </div>
                 </div>
             </div>
@@ -73,9 +74,9 @@
                                    maxlength="120"
                                    placeholder="optional" />
                             <div class="text-muted small mt-1">
-                                A short headline (≤ 120 chars). Leave blank for a
-                                body-only post — the list will show your first
-                                line of the body instead.
+                                A short headline (up to 120 characters). Leave
+                                blank for a body-only post — the list will show
+                                your first line of the body instead.
                             </div>
                         </div>
                     </div>
@@ -98,7 +99,7 @@
                         Audience — who can see this post
                     </h6>
 
-                    <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
+                    <div class="form-label mt-2" style="font-weight:600;">How the picks combine</div>
                     @foreach (var m in modes)
                     {
                         var checkedMark =
@@ -111,8 +112,8 @@
                                    value="@m" @checkedMark required />
                             <label class="form-check-label" for="@($"aud-mode-{m}")">
                                 @m @(" — " + (m == "Any"
-                                    ? "any matching grant is enough"
-                                    : "every matching grant must apply (an empty grant list with \"All\" denies everyone, per C1)"))
+                                    ? "a viewer matches if they're on any of the picks"
+                                    : "a viewer must be on every pick — an empty list denies everyone"))
                             </label>
                         </div>
                     }
@@ -148,31 +149,25 @@
                             <b>Empty audience.</b>
                             @if (string.Equals(Model.Audience.Mode, "All", StringComparison.OrdinalIgnoreCase))
                             {
-                                <text>With <b>All</b> mode + an empty grant list,
-                                <b>zero</b> grants must all apply — vacuously <b>no
-                                one</b> matches, so this denies everyone. Only
-                                you (the author) will see your own post, via the
-                                owner branch of C1.</text>
+                                <text>With <b>All</b> mode and no picks, no one
+                                matches, so no one else can see your post — only
+                                you (the author) can.
+                                </text>
                             }
                             else
                             {
-                                <text>With <b>Any</b> mode + an empty grant list,
-                                <b>no</b> grant matches, so this denies everyone.
-                                Only you (the author) will see your own post, via
-                                the owner branch of C1.</text>
+                                <text>With <b>Any</b> mode and no picks, no one
+                                matches, so no one else can see your post — only
+                                you (the author) can.
+                                </text>
                             }
                         </div>
                     }
 
                     <small class="text-muted d-block mt-2">
-                        Whatever you pick here is written <b>verbatim</b>
-                        as the post's <b>only</b> audience — never
-                        auto-augmented by any logic above or below this
-                        form (ADR 0001-B; the
-                        <c>Post</c> document's
-                        <c>Audience</c> field is
-                        written exactly to what you post — and an empty
-                        pick denies everyone but you, as warned above).
+                        Whatever you pick here becomes the post's <b>only</b>
+                        audience — nothing above or below this form is added to
+                        it. An empty pick means only you can see the post.
                     </small>
                 </div>
             </div>
