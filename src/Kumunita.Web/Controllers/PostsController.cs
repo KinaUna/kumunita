@@ -331,7 +331,8 @@ public sealed class PostsController(
                 replyAuthorProfile?.DisplayName ?? reply.AuthorId,
                 reply.AuthorId,
                 reply.Body,
-                reply.Created));
+                reply.Created,
+                reply.AuthorId == actor));
         }
 
         return View(new PostDetailViewModel

@@ -62,4 +62,12 @@ public sealed record ReplyItem(
     /// "a read, not a decision" pin as <see cref="AuthorDisplayName"/>).</summary>
     string AuthorSubjectId,
     string Body,
-    DateTimeOffset Created);
+    DateTimeOffset Created,
+    /// <summary>Whether the signed-in actor authored **this reply** (a
+    /// display pin, not a gate — ADR 0016's reply-edit lane renders the
+    /// per-reply "Edit" affordance on this row). Mirrors the parent
+    /// <see cref="PostDetailViewModel.IsAuthor"/> / the group lane's
+    /// <see cref="Kumunita.Web.Models.GroupViewModel.GroupPostDetailViewModel.IsAuthor"/>
+    /// post-level analog; computed per-reply from the reply's own
+    /// <c>AuthorId</c>, not the parent post's author.</summary>
+    bool IsAuthor);

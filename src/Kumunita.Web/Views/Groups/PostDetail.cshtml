@@ -24,6 +24,20 @@
 
         <div class="card mt-2 mb-4">
             <div class="card-body">
+                @* Author-only edit entry point (ADR 0016 — the edit lane is
+                   author-only at the Web layer, so a non-author never sees
+                   the button and there is no 404/403 surface to reach from
+                   the detail page; the paired POST's gate is the
+                   authoritative deny). *@
+                @if (Model.IsAuthor)
+                {
+                    <div class="d-flex justify-content-end mb-2">
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="@($"/groups/{Model.GroupId}/posts/{postId}/edit")">
+                            Edit
+                        </a>
+                    </div>
+                }
                 <h4>
                     @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                         ? Model.Post.Title
@@ -84,6 +98,22 @@
                                         <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
+                                    @* Author-only reply edit (ADR 0016) — the
+                                       native <details> disclosure needs no JS;
+                                       a non-author never sees it (r.IsAuthor). *@
+                                    @if (r.IsAuthor)
+                                    {
+                                        <details class="d-inline-block">
+                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">Edit</summary>
+                                            <form class="mt-2 text-start" method="post"
+                                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/edit")">
+                                                @Html.AntiForgeryToken()
+                                                <textarea class="form-control mb-2" name="body" rows="3"
+                                                          required placeholder="…">@r.Body</textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                            </form>
+                                        </details>
+                                    }
                                 </div>
                                 <div>@r.Created.LocalDateTime.ToString("d")</div>
                             </div>

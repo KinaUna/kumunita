@@ -113,6 +113,9 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
   change, not an access decision, so it writes **no** `AccessAudit` row (the
   seam touches only the `Post` document, unlike ADR 0009's group lane which
   appends a `group.update` row).
-- Component re-targeting (moving a post between feed buckets) and group-post
-  editing remain **out of scope** — each is a separate lane + decision if
-  ever wanted.
+- Component re-targeting (moving a post between feed buckets) remains
+  **out of scope** — a separate lane + decision if ever wanted. Group-post
+  editing has since been **settled** by **ADR 0016** (author-only,
+  `Title` + `Body` editable, `Modified` stamped, group-lane 404 failure
+  shape), with the component *reply*-edit lane left open as a separate
+  decision.

@@ -365,6 +365,122 @@ public sealed class PostService
         return reply;
     }
 
+    // ─── ADR 0016 — author-only reply-edit lane (body-only) ──────────────
+
+    /// <summary>
+    /// Re-write a reply's body, **author-only** (ADR 0016). The lane is a
+    /// direct mirror of the component-post edit lane (ADR 0014) adapted to a
+    /// reply: only the reply's own <see cref="PostReply.AuthorId"/> may edit;
+    /// there is **no** moderator or GlobalAdmin branch (a moderator's lever
+    /// over a reply is the parent post's Hide/Remove, not re-writing text).
+    /// <para>
+    /// The reply's <see cref="PostReply.Body"/> is the **only** editable
+    /// field — <c>PostId</c>, <c>AuthorId</c>, and <c>Created</c> are
+    /// immutable (a reply cannot be re-parented or re-attributed; the reply
+    /// carries no <c>Audience</c> to re-choose, C-M3·1). The edit stamps
+    /// <see cref="PostReply.Modified"/> forward (null until first edited).
+    /// </para>
+    /// <para>
+    /// Like <see cref="CreateReplyAsync"/>, this method does **not** re-check
+    /// authorization against the parent post and writes **no**
+    /// <c>Authorization.AccessAudit</c> row of its own (C-M3·1 — the parent's
+    /// <c>Read</c> decision governs visibility; the caller's Web layer has
+    /// already scoped the reply's authorship to the requesting actor before
+    /// reaching this seam). One <c>SaveChangesAsync</c> (invariant C3).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The reply id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the reply's author.</exception>
+    public async Task<PostReply> UpdateReplyAsync(
+        string replyId,
+        string actorId,
+        string body,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to edit.");
+
+        // Author-only gate (the sole decision on this lane): only the author may edit.
+        if (!string.Equals(reply.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a reply may edit it.");
+
+        reply.Body = body ?? string.Empty;
+        reply.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(reply);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return reply;
+    }
+
+    // ─── ADR 0016 — author-only group-post edit lane (title + body only) ───
+
+    /// <summary>
+    /// Re-write a **group-lane** post's title and body, **author-only**
+    /// (ADR 0016). A direct mirror of the component-post edit lane (ADR 0014)
+    /// for the group lane (ADR 0013): only the post's own
+    /// <see cref="Post.AuthorId"/> may edit; there is **no** moderator,
+    /// GlobalAdmin, or break-glass branch (G·4 — the group lane has no
+    /// moderator peek; a moderator's lever over a group post is its absence
+    /// from the moderation surface, not re-writing text).
+    /// <para>
+    /// The **only** editable fields are <see cref="Post.Title"/> and
+    /// <see cref="Post.Body"/>. The group lane's identity fields are
+    /// **immutable** — <c>GroupId</c> (the lane itself), <c>ComponentId</c>
+    /// (must stay empty, G·2 lane exclusivity), <c>Audience</c> (non-null
+    /// empty, G·8 — there is no audience to re-choose on the group lane),
+    /// <c>AuthorId</c>, <c>Created</c>, and <c>Status</c> are all untouched.
+    /// The edit stamps <see cref="Post.Modified"/> forward.
+    /// </para>
+    /// <para>
+    /// A missing id is a <see cref="KeyNotFoundException"/>; a non-author is
+    /// the <see cref="UnauthorizedAccessException"/>. The Web layer (the group
+    /// lane's 404 shape) maps both to a 404 to stay non-leaky, unlike the
+    /// component lane's 403. One <c>SaveChangesAsync</c> (invariant C3).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
+    public async Task<Post> UpdateGroupPostAsync(
+        string postId,
+        string actorId,
+        string? title,
+        string body,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to edit.");
+
+        // Group-lane check (G·2): only a group post (non-empty GroupId) is
+        // editable on this lane. A component post (empty GroupId) is the
+        // component edit lane's (ADR 0014) surface, not this one — fail closed.
+        if (string.IsNullOrEmpty(post.GroupId))
+            throw new KeyNotFoundException($"Post '{postId}' is not a group post; nothing to edit here.");
+
+        // Author-only gate (the sole decision on this lane): only the author may edit.
+        if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a post may edit it.");
+
+        post.Title = title;
+        post.Body = body ?? string.Empty;
+        post.Modified = DateTimeOffset.UtcNow;
+        // GroupId / ComponentId / Audience / AuthorId / Created / Status are
+        // deliberately untouched — the group lane's identity is immutable.
+
+        session.Store(post);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return post;
+    }
+
     // ─── M3b C-M3b·3 — the two Moderate-gated write lanes (F3/F4) ─────────────
 
     /// <summary>

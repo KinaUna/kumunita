@@ -673,6 +673,306 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
         Assert.Equal(0, recorder.ModerateCalls);
     }
 
+    // ── ADR 0016 — author-only group-post edit lane ────────────────────────
+    //
+    // A direct mirror of the ADR 0014 component-post edit lane tests
+    // (PostServiceTests' `UpdatePost_*`), adapted to the group lane (ADR
+    // 0013): the author re-writes Title/Body; the group lane's identity
+    // fields (GroupId / ComponentId / Audience / AuthorId / Created / Status)
+    // are immutable and never touched; a non-author is denied even at
+    // GlobalAdmin (G·4 — no moderator / break-glass branch on this lane); a
+    // missing id or a *component* post (empty GroupId) fails closed with
+    // KeyNotFoundException (the lane check is fail-closed, not a 404-vs-403
+    // distinction — that is the Web layer's concern).
+
+    [Fact]
+    public async Task UpdateGroupPost_Author_Allows_TitleBodyUpdated_ModifiedStamped()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-author";
+
+        var group = await userInfo.CreateGroupAsync(author, "GP edit family", null);
+        var p1 = GroupPost("gp-edit-1", group.Id, author);
+        p1.Title = "old title";
+        p1.Modified = DateTimeOffset.UtcNow.AddDays(-1);
+        await Plant(store, p1);
+
+        var beforeModified = (await LoadPostAsync(store, "gp-edit-1")).Modified;
+
+        var updated = await RunInSession(store, s =>
+            svc.UpdateGroupPostAsync("gp-edit-1", author, "new title", "new body", s));
+
+        Assert.Equal("new title", updated.Title);
+        Assert.Equal("new body", updated.Body);
+
+        var persisted = await LoadPostAsync(store, "gp-edit-1");
+        Assert.Equal("new title", persisted.Title);
+        Assert.Equal("new body", persisted.Body);
+        Assert.True(persisted.Modified >= beforeModified);
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_Author_NilTitle_Allows_BodyUpdated()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-titleless";
+
+        var group = await userInfo.CreateGroupAsync(author, "GP titleless family", null);
+        await Plant(store, GroupPost("gp-edit-2", group.Id, author));
+
+        var updated = await RunInSession(store, s =>
+            svc.UpdateGroupPostAsync("gp-edit-2", author, null, "body only", s));
+
+        Assert.Null(updated.Title);
+        Assert.Equal("body only", updated.Body);
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_DoesNotTouchImmutableFields()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-immutable";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        var group = await userInfo.CreateGroupAsync(author, "GP immutable family", null);
+        var planted = GroupPost("gp-edit-3", group.Id, author);
+        planted.Title = "old";
+        planted.Created = created;
+        planted.Modified = created;
+        await Plant(store, planted);
+
+        await RunInSession(store, s =>
+            svc.UpdateGroupPostAsync("gp-edit-3", author, "new", "new body", s));
+
+        var persisted = await LoadPostAsync(store, "gp-edit-3");
+        // The group lane's identity is immutable (G·2 / G·8): the lane itself
+        // (GroupId), the empty component, the non-null empty audience
+        // (G·8 — the audience is written non-null *empty*), the author,
+        // the created stamp, and the active status all survive.
+        Assert.Equal(group.Id, persisted.GroupId);
+        Assert.Equal(string.Empty, persisted.ComponentId);
+        Assert.NotNull(persisted.Audience);
+        Assert.True(persisted.Audience.IsEmpty);
+        Assert.Equal(author, persisted.AuthorId);
+        Assert.Equal(created, persisted.Created);
+        Assert.Equal(PostStatus.Active, persisted.Status);
+        // Only the body moved.
+        Assert.Equal("new", persisted.Title);
+        Assert.Equal("new body", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_NonAuthor_Member_Denies()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-owner";
+        const string member = "u-gp-edit-member";
+
+        var group = await userInfo.CreateGroupAsync(author, "GP member family", null);
+        await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: author);
+        await Plant(store, GroupPost("gp-edit-4", group.Id, author));
+
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, s =>
+                svc.UpdateGroupPostAsync("gp-edit-4", member, "t", "b", s)));
+        Assert.Contains("Only the author", ex.Message);
+
+        var persisted = await LoadPostAsync(store, "gp-edit-4");
+        Assert.Equal("body gp-edit-4", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_NonAuthor_GlobalAdmin_Denies()
+    {
+        // Author-only gate (G·4): even a GlobalAdmin who is not the author
+        // cannot re-write the group post's text — the group lane has no
+        // moderator / break-glass branch at all.
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-owner-admin";
+        const string admin = "u-gp-edit-admin";
+
+        var group = await userInfo.CreateGroupAsync(author, "GP admin family", null);
+        await Plant(store, GroupPost("gp-edit-5", group.Id, author));
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, s =>
+                svc.UpdateGroupPostAsync("gp-edit-5", admin, "t", "b", s)));
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_MissingPostKey_FailsClosed()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gp-edit-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s =>
+                svc.UpdateGroupPostAsync("no-such-post", author, "t", "b", s)));
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_ComponentPost_FailsClosed()
+    {
+        // A *component* post (empty GroupId) is not on the group lane: the
+        // edit is fail-closed (KeyNotFoundException) — this seam never re-lanes
+        // a component post, and vice-versa (the ADR 0014 lane owns that shape).
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-crosslane";
+
+        await Plant(store, new Component { Id = "c-gp-edit", Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "gp-edit-6",
+            ComponentId = "c-gp-edit",
+            GroupId = string.Empty,
+            AuthorId = author,
+            Body = "body",
+            Created = DateTimeOffset.UtcNow,
+            Audience = new(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s =>
+                svc.UpdateGroupPostAsync("gp-edit-6", author, "t", "b", s)));
+    }
+
+    // ── ADR 0016 — author-only reply-edit lane ──────────────────────────────
+
+    [Fact]
+    public async Task UpdateReply_Author_Allows_BodyUpdated_ModifiedStamped()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gp-reply-author";
+        const string replyId = "gp-reply-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Post
+        {
+            Id = "gp-reply-post",
+            GroupId = "g-gp-reply",
+            ComponentId = string.Empty,
+            AuthorId = author,
+            Body = "parent",
+            Created = created,
+            Audience = new Audience(),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId,
+            PostId = "gp-reply-post",
+            AuthorId = author,
+            Body = "old reply",
+            Created = created,
+            Modified = created,
+        });
+
+        var beforeModified = (await LoadReplyAsync(store, replyId)).Modified;
+
+        var updated = await RunInSession(store, s =>
+            svc.UpdateReplyAsync(replyId, author, "new reply", s));
+
+        Assert.Equal("new reply", updated.Body);
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Equal("new reply", persisted.Body);
+        Assert.True(persisted.Modified >= beforeModified);
+    }
+
+    [Fact]
+    public async Task UpdateReply_DoesNotTouchImmutableFields()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gp-reply-immutable";
+        const string replyId = "gp-reply-2";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Post
+        {
+            Id = "gp-reply-post2",
+            GroupId = "g-gp-reply2",
+            ComponentId = string.Empty,
+            AuthorId = author,
+            Body = "parent",
+            Created = created,
+            Audience = new Audience(),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId,
+            PostId = "gp-reply-post2",
+            AuthorId = author,
+            Body = "old",
+            Created = created,
+        });
+
+        await RunInSession(store, s =>
+            svc.UpdateReplyAsync(replyId, author, "new", s));
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Equal("gp-reply-post2", persisted.PostId);
+        Assert.Equal(author, persisted.AuthorId);
+        Assert.Equal(created, persisted.Created);
+        Assert.Equal("new", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdateReply_NonAuthor_Denies()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gp-reply-owner";
+        const string stranger = "u-gp-reply-stranger";
+        const string replyId = "gp-reply-3";
+
+        await Plant(store, new Post
+        {
+            Id = "gp-reply-post3",
+            GroupId = "g-gp-reply3",
+            ComponentId = string.Empty,
+            AuthorId = author,
+            Body = "parent",
+            Created = DateTimeOffset.UtcNow,
+            Audience = new Audience(),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId,
+            PostId = "gp-reply-post3",
+            AuthorId = author,
+            Body = "old",
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, s =>
+                svc.UpdateReplyAsync(replyId, stranger, "t", s)));
+        Assert.Contains("Only the author", ex.Message);
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Equal("old", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdateReply_MissingReplyKey_FailsClosed()
+    {
+        var (store, _) = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-gp-reply-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, s =>
+                svc.UpdateReplyAsync("no-such-reply", author, "b", s)));
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<(IDocumentStore store, string conn)> BootStoreAsync()
@@ -730,6 +1030,25 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
     private static Audience AudienceOf(string userId)
         => new(AudienceMode.Any, [new AudienceGrant(GrantKind.User, userId)]);
+
+    /// <summary>Load a <see cref="Post"/> row back (the ADR 0016 edit-lane
+    /// assertions read the persisted shape — the M3 <c>LoadPostAsync</c>
+    /// precedent, verbatim).</summary>
+    private static async Task<Post> LoadPostAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        return (await r.LoadAsync<Post>(id, ct))!;
+    }
+
+    /// <summary>Load a <see cref="PostReply"/> row back (the ADR 0016
+    /// reply-edit assertions read the persisted shape).</summary>
+    private static async Task<PostReply> LoadReplyAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        return (await r.LoadAsync<PostReply>(id, ct))!;
+    }
 
     /// <summary>Plant a document row directly (fixture seeding, not a
     /// service write seam — the M3 <c>Plant</c> precedent).</summary>

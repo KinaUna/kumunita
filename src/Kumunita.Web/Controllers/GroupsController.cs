@@ -803,7 +803,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 replyAuthorProfile?.DisplayName ?? reply.AuthorId,
                 reply.AuthorId,
                 reply.Body,
-                reply.Created));
+                reply.Created,
+                reply.AuthorId == actor));
         }
 
         return View("PostDetail", new GroupPostDetailViewModel
@@ -923,6 +924,133 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         return Redirect($"/groups/{id}/posts/{post.Id}");
     }
 
+    // ── Group-post edit (ADR 0016, author-only) ──────────────────────────────
+
+    /// <summary>
+    /// The group-post <b>editor's page</b> (ADR 0016):
+    /// <c>GET /groups/{id}/posts/{postId}/edit</c>. The author-only edit
+    /// lane's GET — a mirror of the M3 <see cref="PostsController.Edit"/>
+    /// (ADR 0014) adapted to the group lane: the actor must be the post's
+    /// own author, and the post must be a **group** post of this group
+    /// (the group-lane identity check, G·2). A non-author, a non-group
+    /// post, a missing group, or a missing post all return a 404 (the group
+    /// lane's fail-closed shape — G·3/G·4, this file's "a non-visible group
+    /// 404s" precedent; deliberately **not** a 403, which would advertise a
+    /// gate the UI doesn't offer). <para>
+    /// The form is title + body only — the group lane has no audience slot
+    /// (G·8: the audience is non-null empty, the membership is the audience
+    /// proxy) and no component picker (G·2 lane exclusivity: the post's
+    /// <c>ComponentId</c> is empty and stays empty). The edit reuses the
+    /// <see cref="GroupPostComposeViewModel"/> shape verbatim (title + body,
+    /// the same "mirror, minus the audience slot" as the composer).
+    /// </para>
+    /// </summary>
+    [HttpGet("{id}/posts/{postId}/edit")]
+    public async Task<IActionResult> EditGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        // Load the post in a lightweight read (the group-lane identity check
+        // + the author gate are the pre-render decisions; the POST's gate is
+        // the authoritative deny, mirroring the create lane's shape).
+        await using var read = store.LightweightSession();
+        var post = await read.LoadAsync<Post>(postId);
+        if (post is null || string.IsNullOrEmpty(post.GroupId) || post.GroupId != id)
+            return NotFound();
+
+        if (post.AuthorId != actor)
+            return NotFound();
+
+        return View("Edit", new GroupPostComposeViewModel
+        {
+            Title = post.Title,
+            Body = post.Body,
+        });
+    }
+
+    /// <summary>
+    /// The group-post <b>editor's POST</b> (ADR 0016, author-only):
+    /// <c>POST /groups/{id}/posts/{postId}/edit</c>. Re-writes the post's
+    /// title and body via <see cref="PostService.UpdateGroupPostAsync"/> —
+    /// the service is the decision: a non-author (even a GlobalAdmin, even a
+    /// member who is the post's *replier*) is denied with
+    /// <see cref="UnauthorizedAccessException"/>, and a non-group post or a
+    /// missing id is a <see cref="KeyNotFoundException"/> — both mapped to
+    /// the 404 fail-closed shape (G·3/G·4, the group lane's register pin).
+    /// The post's <c>GroupId</c> / <c>ComponentId</c> / <c>Audience</c> /
+    /// <c>AuthorId</c> / <c>Created</c> / <c>Status</c> are untouched (the
+    /// group lane's identity is immutable); the edit stamps
+    /// <c>Post.Modified</c> forward. One <c>SaveChangesAsync</c> (C3).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroupPost(
+        string id, string postId, [FromForm] GroupPostComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to edit.");
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        if (!model.IsValid)
+        {
+            // Re-render the editor, prefilled with what the actor typed (the
+            // GET /groups/{id}/posts/{postId}/edit shape).
+            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            return View("Edit", model);
+        }
+
+        // C3 same-transaction lane: the controller opens the
+        // <c>IDocumentStore.LightweightSession()</c>, the service's
+        // <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>Edit</c> POST precedent) — the author gate and
+        // the write commit atomically.
+        await using var session = store.LightweightSession();
+
+        Post post;
+        try
+        {
+            post = await posts.UpdateGroupPostAsync(
+                postId, actor,
+                string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+                model.Body.Trim(), session);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Missing id or a non-group post (G·2 lane check failed): the
+            // 404 fail-closed shape (non-leaky about which ids are real).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author: the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — the group lane's
+            // register pin, G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post updated.";
+        return Redirect($"/groups/{id}/posts/{post.Id}");
+    }
+
     /// <summary>
     /// A group-post <b>reply</b> (ADR 0013, G11 FACES):
     /// <c>POST /groups/{id}/posts/{postId}/replies</c>. Exactly the M3
@@ -976,6 +1104,80 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         await posts.CreateReplyAsync(postId, actor, body, session);
 
         TempData["info"] = "Reply added.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Group-reply edit (ADR 0016, author-only) ─────────────────────────────
+
+    /// <summary>
+    /// A group-post <b>reply's edit</b> (ADR 0016, author-only):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/edit</c>. A
+    /// body-only re-write (a reply carries no <c>Audience</c>, C-M3·1, and no
+    /// title) via <see cref="PostService.UpdateReplyAsync"/> — the service is
+    /// the decision: only the reply's own author may edit it (no moderator or
+    /// GlobalAdmin branch). Before writing, the parent's group-lane decision
+    /// is re-run via <see cref="PostService.GetGroupPostAsync"/> (the same
+    /// <c>Post = null</c> fail-closed shape as <see cref="GroupPostReply"/>,
+    /// mapped to a 404) and the reply must be **under this post** — both are
+    /// the group lane's non-leaky 404 posture (G·3/G·4; a non-member or a
+    /// reply not on this post 404s). A non-author is the
+    /// <see cref="UnauthorizedAccessException"/> wall, also mapped to the 404
+    /// fail-closed shape. The edit stamps <c>PostReply.Modified</c> forward
+    /// (null until first edited); <c>PostId</c> / <c>AuthorId</c> /
+    /// <c>Created</c> are untouched. One <c>SaveChangesAsync</c> (C3).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroupPostReply(
+        string id, string postId, string replyId, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // The parent's single group-lane decision (G·7 — the reply inherits
+        // it) is the pre-write gate: a non-member, a missing post, or a lane
+        // mismatch all return Post = null → 404 (the group lane's non-leaky
+        // fail-closed shape, the register's non-member-404 pin).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // The reply must be **under this post** (a replyId on a different
+        // post is not reachable through this group lane — the 404 shape).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the
+        // <see cref="GroupPostReply"/> precedent).
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyAsync(replyId, actor, body, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Reply id not found → the 404 fail-closed shape.
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply updated.";
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 }
