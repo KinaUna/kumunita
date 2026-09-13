@@ -123,13 +123,16 @@ converts a *stored instant* to a *wall-clock string* in the effective zone.
   to **409** + a surfaced error (the optimistic-concurrency story, the
   `Remove` precedent).
 
-- **Resident surface (`/settings/timezone`, `[Authorize]`):** a new dedicated
-  controller (`TimezoneController`), the exact shape of the
-  `/settings/language` (`LocaleController`) page — the resident's own
-  override, self-scoped (the `[Authorize]` gate + the actor being the subject),
-  a `clear=1` action that sets the override to `null` (fall back to the
-  platform default), and a `KeyNotFoundException` fail-closed catch. The
-  account nav gets a `Time zone` link next to the existing `Language` link.
+- **Resident surface (the settings page, `[Authorize]`):** originally shipped
+  as a dedicated `TimezoneController` at `/settings/timezone` with its own
+  nav link. Folded into the settings page on 2026-09-13: the resident's own
+  override now lives as a **section of `/settings/language`** (the
+  `LocaleController`), self-scoped (the `[Authorize]` gate + the actor being
+  the subject), with a `clear=1` action that sets the override to `null`
+  (fall back to the platform default) and a `KeyNotFoundException` fail-closed
+  catch — `POST /settings/timezone` keeps its route (only the view's home
+  changed). The standalone `Time zone` nav link is removed; one `Settings`
+  link now carries both sections.
 
 - **Seed (first boot):** `FirstBootSeeder.SeedLanguageCatalogAsync` sets
   `LocaleSettings.DefaultTimezone = "UTC"` on the fresh singleton (explicit,

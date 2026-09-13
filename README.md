@@ -83,7 +83,8 @@ pick a language at `/language`, and `/about` is a static page.
   **signed-out** visitor can pick a language at `/language`, and `/about` renders
   an admin-authored page or the product story.- **Timezone** — the platform carries a **default time zone** the admin sets
   once (`/admin/timezone`, audited); each resident can override it in their
-  own settings (`/settings/timezone`). Every timestamp renders in the
+  own settings page (the time-zone section of `/settings/language`). Every
+  timestamp renders in the
   effective zone (resident override → platform default → `UTC` floor) via the
   `kw-dt` TagHelper — the same per-request resolution shape as multilingual,
   data-driven, no rebuild (ADR 0019).
