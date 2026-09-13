@@ -4,11 +4,12 @@
     // The group's id and the post's id are the route's {id}/{postId} — this
     // view is reached via GET /groups/{id}/posts/{postId}/edit (ADR 0016,
     // the author-only group-post edit lane) and by the paired POST's failure
-    // re-render. The form carries **only** title + body (the group lane has
-    // no audience slot — G·8: the membership is the audience proxy — and no
-    // component picker — G·2 lane exclusivity); the group's id is never a
-    // form field (a form-bound group id would be a lane-bypass hole; the
-    // controller reads it from the route).
+    // re-render. The form carries title + body + the authored-in language
+    // tag (ADR 0018, amended 2026-09-13 — ADR 0016's editable surface
+    // extended); the group lane has no audience slot (G·8: the membership is
+    // the audience proxy) and no component picker (G·2 lane exclusivity); the
+    // group's id is never a form field (a form-bound group id would be a
+    // lane-bypass hole; the controller reads it from the route).
     string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
     string editPostId = (string?)ViewContext.RouteData.Values["postId"] ?? string.Empty;
 }
@@ -19,7 +20,7 @@
 
         <h1><kw-l key="groups.edit_title">Edit your post</kw-l></h1>
         <p class="text-muted">
-            <kw-l key="groups.edit_lede">You are editing your own post. Only you can edit it — the group membership decides who can see it, but only its author can change it. The group this post appears in is fixed; only the title and body below are editable.</kw-l>
+            <kw-l key="groups.edit_lede">You are editing your own post. Only you can edit it — the group membership decides who can see it, but only its author can change it. The group this post appears in is fixed; only the title, body, and language below are editable.</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -60,6 +61,25 @@
                         </label>
                         <textarea class="form-control" id="body" name="Body" rows="6" required
                                   placeholder="…">@Model.Body</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;">
+                        <kw-l key="groups.edit_language_label">Language</kw-l>
+                    </label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="groups.edit_language_hint">The language you're writing this post in. This is only a tag — it is not translated — and it keeps the text findable later and lets a reader add their own language version if they want.</kw-l>
                     </div>
                 </div>
             </div>

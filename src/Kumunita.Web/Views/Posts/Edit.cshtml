@@ -14,8 +14,8 @@
         <p class="text-muted">
             You are editing your own post. Only you can edit it. The
             <b>community</b> this post appears in is fixed — it cannot be
-            changed after you post; only the title, body, and audience
-            below are editable.
+            changed after you post; only the title, body, language, and
+            audience below are editable.
         </p>
 
         @if (TempData["info"] is string info)
@@ -93,6 +93,28 @@
                             <textarea class="form-control" id="body" name="Body" rows="6" required
                                       placeholder="…">@Model.Body</textarea>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;">
+                        Language
+                    </label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        The language you're writing this post in. This is only a
+                        tag — it is not translated — and it keeps the text
+                        findable later and lets a reader add their own language
+                        version if they want.
                     </div>
                 </div>
             </div>

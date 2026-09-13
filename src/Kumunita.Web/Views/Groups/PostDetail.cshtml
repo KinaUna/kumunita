@@ -53,7 +53,7 @@
                         @Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")
                         @if (Model.Post.Modified is not null)
                         {
-                            <span> — edited @Model.Post.Modified.Value.LocalDateTime.ToString("g")</span>
+                            <span> — <kw-l key="posts.edited">edited</kw-l> @Model.Post.Modified.Value.LocalDateTime.ToString("g")</span>
                         }
                     </span>
                 </div>
@@ -125,7 +125,7 @@
                                     @r.Created.LocalDateTime.ToString("d")
                                     @if (r.Modified is not null)
                                     {
-                                        <span> — edited @r.Modified.Value.LocalDateTime.ToString("g")</span>
+                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> @r.Modified.Value.LocalDateTime.ToString("g")</span>
                                     }
                                 </div>
                             </div>

@@ -37,7 +37,8 @@ no `Audience` slot and no `ComponentId`) and the Web **failure shape**
 
 - **Group-post editing is author-only, with no moderator or admin branch.**
   The new seam `PostService.UpdateGroupPostAsync(postId, actorId, title,
-  body, session)` is the **single** write lane. Its gates are, in order:
+  body, languageCode, session)` is the **single** write lane. Its gates are,
+  in order:
   a missing id is a `KeyNotFoundException`; the post must be a **group**
   post (non-empty `GroupId`) — a component post (empty `GroupId`) is the
   ADR 0014 lane's shape and is fail-closed here with the same
@@ -51,15 +52,21 @@ no `Audience` slot and no `ComponentId`) and the Web **failure shape**
   to a **write** lane — the author's voice is exclusive, and the platform
   has no other lever over group-post text than the absence itself.
 
-- **The editable surface on the group lane is `Title` and `Body` — and only
-  those.** The group lane's identity fields are **immutable** on the edit
-  lane: `GroupId` (the lane itself, G·2), `ComponentId` (must stay empty,
-  G·2 lane exclusivity), `Audience` (non-null empty, G·8 — there is no
-  audience to re-choose on this lane; the membership is the audience
-  proxy), `AuthorId`, `Created`, and `Status` are all untouched. `Modified`
-  is stamped forward (null until first edited). Strong consistency (C4):
-  the new values are live on the **very next** `GetGroupPostAsync` /
-  `ListGroupFeedAsync` render.
+- **The editable surface on the group lane is `Title`, `Body`, and
+  `LanguageCode` — and only those.** The group lane's identity fields are
+  **immutable** on the edit lane: `GroupId` (the lane itself, G·2),
+  `ComponentId` (must stay empty, G·2 lane exclusivity), `Audience`
+  (non-null empty, G·8 — there is no audience to re-choose on this lane; the
+  membership is the audience proxy), `AuthorId`, `Created`, and `Status` are
+  all untouched. `Modified` is stamped forward (null until first edited).
+  Strong consistency (C4): the new values are live on the **very next**
+  `GetGroupPostAsync` / `ListGroupFeedAsync` render.
+  **Amended 2026-09-13:** the authored-in `LanguageCode` (ADR 0018) is now
+  also editable on this lane — a non-empty submitted code is written
+  verbatim; a blank submission re-materializes through the shared resolver
+  (instance default, `en` floor, never blanking a stored tag), mirroring
+  the ADR 0017 announcement-edit precedent. The **reply** edit lane
+  (body-only, below) is unchanged — replies keep their create-time tag.
 
 - **Reply editing is author-only, body-only.** The new seam
   `PostService.UpdateReplyAsync(replyId, actorId, body, session)` is the
@@ -110,8 +117,10 @@ no `Audience` slot and no `ComponentId`) and the Web **failure shape**
 ## Consequences
 
 - A group post is finally a **live, correctable** artifact: a member can
-  fix a typo, refine the body, or adjust the title after publishing, without
-  deleting (and orphaning replies to) and re-posting. A reply likewise.
+  fix a typo, refine the body, adjust the title, or — as amended 2026-09-13
+  (ADR 0018) — correct the authored-in language tag, after publishing,
+  without deleting (and orphaning replies to) and re-posting. A reply
+  likewise (body-only, its tag stays the create-time one).
 - `PostReply.Modified` becomes a live field (it was `null`-only before this
   lane) — the first surface that reads it is the reply-edit round-trip; any
   future "edited" badge on a reply has a field to read. `Post.Modified` on
@@ -129,10 +138,12 @@ no `Audience` slot and no `ComponentId`) and the Web **failure shape**
   standing — G·4, not a deferral). Editing a group post's text is *not* a
   moderation action and gains no moderator branch here.
 - Two new Core seams (`PostService.UpdateGroupPostAsync`,
-  `PostService.UpdateReplyAsync`) and ten new `GroupPostServiceTests`
+  `PostService.UpdateReplyAsync`) and a battery of `GroupPostServiceTests`
   (group-post: author-allows + `Modified`-stamped, title-nil-allows,
   immutable-fields-untouched, non-author Member / GlobalAdmin all denied,
-  missing id, cross-lane fail-closed; reply: author-allows +
+  missing id, cross-lane fail-closed, and — as the editable surface was
+  amended 2026-09-13 — author-changes-language-tag-persists-new-code and
+  author-blank-language-resolves-instance-default; reply: author-allows +
   `Modified`-stamped, immutable-fields-untouched, non-author denied,
   missing id) pin the lane. No new verb enters the audit vocabulary: an
   author-edit on either lane is the author's own content change, not an

@@ -271,13 +271,19 @@ public static class KnownTranslationKeys
                 "You are editing your own post. Only you can edit it — the group " +
                 "membership decides who can see it, but only its author can " +
                 "change it. The group this post appears in is fixed; only the " +
-                "title and body below are editable.",
+                "title, body, and language below are editable.",
             ["groups.edit_title_label"] = "Title",
             ["groups.edit_title_hint"] =
                 "A short headline (≤ 120 chars). Leave blank for a " +
                 "body-only post — the list will show your first line " +
                 "of the body instead.",
             ["groups.edit_body_label"] = "Body",
+            ["groups.edit_language_label"] = "Language",
+            ["groups.edit_language_hint"] =
+                "The language you're writing this post in. This is only a " +
+                "tag — it is not translated — and it keeps the text " +
+                "findable later and lets a reader add their own language " +
+                "version if they want.",
             ["groups.edit_submit"] = "Save changes",
             ["groups.edit_cancel"] = "Cancel",
 

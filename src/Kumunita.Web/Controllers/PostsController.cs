@@ -752,6 +752,12 @@ public sealed class PostsController(
             // touch ComponentId); seed it with the single current component so
             // the read-only display is well-formed.
             Components = await SeedEditableComponentListAsync(post.ComponentId),
+            // ADR 0018 (amended 2026-09-13) — the authored-in language tag is
+            // editable on this lane: seed the picker from the enabled catalog
+            // and pre-select the post's stored tag (the ADR 0017 edit-lane
+            // precedent — pre-select the stored value, not the instance default).
+            Languages = await SeedLanguagePickerAsync(),
+            LanguageCode = post.LanguageCode,
         };
         await SeedGrantPickerOptionsAsync();
         return View(model);
@@ -798,6 +804,7 @@ public sealed class PostsController(
 
         model.ComponentId = post.ComponentId;
         model.Components = await SeedEditableComponentListAsync(post.ComponentId);
+        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
         await SeedGrantPickerOptionsAsync();
 
         if (string.IsNullOrWhiteSpace(model.Body))
@@ -825,6 +832,7 @@ public sealed class PostsController(
                 string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
                 model.Body,
                 audience,
+                string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
                 session);
             TempData["info"] = "Post updated.";
             return Redirect($"/posts/{id}");

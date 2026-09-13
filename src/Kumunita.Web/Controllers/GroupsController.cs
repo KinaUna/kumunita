@@ -976,12 +976,14 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
     /// lane's fail-closed shape — G·3/G·4, this file's "a non-visible group
     /// 404s" precedent; deliberately **not** a 403, which would advertise a
     /// gate the UI doesn't offer). <para>
-    /// The form is title + body only — the group lane has no audience slot
-    /// (G·8: the audience is non-null empty, the membership is the audience
-    /// proxy) and no component picker (G·2 lane exclusivity: the post's
-    /// <c>ComponentId</c> is empty and stays empty). The edit reuses the
-    /// <see cref="GroupPostComposeViewModel"/> shape verbatim (title + body,
-    /// the same "mirror, minus the audience slot" as the composer).
+    /// The form is title + body + the authored-in language tag (ADR 0018,
+    /// amended 2026-09-13 — ADR 0016's editable surface extended) — the
+    /// group lane has no audience slot (G·8: the audience is non-null empty,
+    /// the membership is the audience proxy) and no component picker (G·2 lane
+    /// exclusivity: the post's <c>ComponentId</c> is empty and stays empty).
+    /// The edit reuses the <see cref="GroupPostComposeViewModel"/> shape
+    /// (title + body + language picker, the same "mirror, minus the audience
+    /// slot" as the composer).
     /// </para>
     /// </summary>
     [HttpGet("{id}/posts/{postId}/edit")]
@@ -1013,13 +1015,20 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         {
             Title = post.Title,
             Body = post.Body,
+            // ADR 0018 (amended 2026-09-13) — the authored-in language tag is
+            // editable on this lane (ADR 0016 surface extended): seed the
+            // picker from the enabled catalog and pre-select the post's
+            // stored tag (the ADR 0017 edit-lane precedent).
+            Languages = await SeedLanguagePickerAsync(),
+            LanguageCode = post.LanguageCode,
         });
     }
 
     /// <summary>
     /// The group-post <b>editor's POST</b> (ADR 0016, author-only):
     /// <c>POST /groups/{id}/posts/{postId}/edit</c>. Re-writes the post's
-    /// title and body via <see cref="PostService.UpdateGroupPostAsync"/> —
+    /// title, body, and authored-in language tag (ADR 0018, amended
+    /// 2026-09-13) via <see cref="PostService.UpdateGroupPostAsync"/> —
     /// the service is the decision: a non-author (even a GlobalAdmin, even a
     /// member who is the post's *replier*) is denied with
     /// <see cref="UnauthorizedAccessException"/>, and a non-group post or a
@@ -1053,6 +1062,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         {
             // Re-render the editor, prefilled with what the actor typed (the
             // GET /groups/{id}/posts/{postId}/edit shape).
+            model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
             ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
             return View("Edit", model);
         }
@@ -1070,7 +1080,9 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             post = await posts.UpdateGroupPostAsync(
                 postId, actor,
                 string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
-                model.Body.Trim(), session);
+                model.Body.Trim(),
+                string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
+                session);
         }
         catch (KeyNotFoundException)
         {

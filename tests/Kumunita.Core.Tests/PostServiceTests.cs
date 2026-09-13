@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -1450,7 +1451,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var beforeModified = loadedBefore.Modified;
 
         var updated = await RunInSession(store, async s =>
-            await svc.UpdatePostAsync(postId, author, "new title", "new body", newAudience, s));
+            await svc.UpdatePostAsync(postId, author, "new title", "new body", newAudience, null, s));
 
         Assert.Equal("new title", updated.Title);
         Assert.Equal("new body", updated.Body);
@@ -1492,7 +1493,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             ]);
 
         await RunInSession(store, async s =>
-            await svc.UpdatePostAsync(postId, author, "t", "b", newAudience, s));
+            await svc.UpdatePostAsync(postId, author, "t", "b", newAudience, null, s));
 
         var persisted = await LoadPostAsync(store, postId);
         Assert.Equal(AudienceMode.All, persisted.Audience.Mode);
@@ -1520,7 +1521,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
         await RunInSession(store, async s =>
             await svc.UpdatePostAsync(postId, author, "new title", "new body",
-                Audience(GrantKind.User, author), s));
+                Audience(GrantKind.User, author), null, s));
 
         var persisted = await LoadPostAsync(store, postId);
         Assert.Equal(ComponentId, persisted.ComponentId);
@@ -1528,6 +1529,62 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.Equal(created, persisted.Created);
         Assert.Equal(groupId, persisted.GroupId);
         Assert.Equal(PostStatus.Active, persisted.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_ChangesLanguageTag_PersistsNewCode()
+    {
+        // ADR 0018 (amended 2026-09-13, ADR 0014) — the authored-in language
+        // tag is editable on this lane: a non-empty code is written verbatim
+        // (the author can correct the language the post was written in).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang";
+        const string postId = "edit-post-lang";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), "pl", s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_BlankLanguage_ResolvesInstanceDefault()
+    {
+        // ADR 0018 (amended) — a blank submission on the edit lane is
+        // re-materialized through the shared resolver: it never blanks a
+        // stored tag, it falls back to the instance default (here "pl",
+        // planted as the LocaleSettings singleton).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang-blank";
+        const string postId = "edit-post-lang-blank";
+
+        await Plant(store, new LocaleSettings { Id = LocaleSettings.SingletonId, DefaultLanguageCode = "pl" });
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), null, s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
     }
 
     [Fact]
@@ -1550,7 +1607,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, async s =>
                 await svc.UpdatePostAsync(postId, stranger, "t", "b",
-                    Audience(GrantKind.User, stranger), s)));
+                    Audience(GrantKind.User, stranger), null, s)));
         Assert.Contains("Only the author", ex.Message);
 
         // The post is unchanged.
@@ -1581,7 +1638,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, async s =>
                 await svc.UpdatePostAsync(postId, admin, "t", "b",
-                    Audience(GrantKind.User, admin), s)));
+                    Audience(GrantKind.User, admin), null, s)));
     }
 
     [Fact]
@@ -1614,7 +1671,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, async s =>
                 await svc.UpdatePostAsync(postId, moderator, "t", "b",
-                    Audience(GrantKind.User, moderator), s)));
+                    Audience(GrantKind.User, moderator), null, s)));
     }
 
     [Fact]
@@ -1629,7 +1686,7 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => RunInSession(store, async s =>
                 await svc.UpdatePostAsync("no-such-post", author, "t", "b",
-                    Audience(GrantKind.User, author), s)));
+                    Audience(GrantKind.User, author), null, s)));
     }
 
     // ── Post-edit shared helpers ───────────────────────────────────────

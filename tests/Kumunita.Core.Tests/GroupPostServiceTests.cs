@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -701,7 +702,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
         var beforeModified = (await LoadPostAsync(store, "gp-edit-1")).Modified;
 
         var updated = await RunInSession(store, s =>
-            svc.UpdateGroupPostAsync("gp-edit-1", author, "new title", "new body", s));
+            svc.UpdateGroupPostAsync("gp-edit-1", author, "new title", "new body", null, s));
 
         Assert.Equal("new title", updated.Title);
         Assert.Equal("new body", updated.Body);
@@ -723,7 +724,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await Plant(store, GroupPost("gp-edit-2", group.Id, author));
 
         var updated = await RunInSession(store, s =>
-            svc.UpdateGroupPostAsync("gp-edit-2", author, null, "body only", s));
+            svc.UpdateGroupPostAsync("gp-edit-2", author, null, "body only", null, s));
 
         Assert.Null(updated.Title);
         Assert.Equal("body only", updated.Body);
@@ -745,7 +746,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
         await Plant(store, planted);
 
         await RunInSession(store, s =>
-            svc.UpdateGroupPostAsync("gp-edit-3", author, "new", "new body", s));
+            svc.UpdateGroupPostAsync("gp-edit-3", author, "new", "new body", null, s));
 
         var persisted = await LoadPostAsync(store, "gp-edit-3");
         // The group lane's identity is immutable (G·2 / G·8): the lane itself
@@ -765,6 +766,50 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
     }
 
     [Fact]
+    public async Task UpdateGroupPost_Author_ChangesLanguageTag_PersistsNewCode()
+    {
+        // ADR 0018 (amended 2026-09-13, ADR 0016) — the authored-in language
+        // tag is editable on this lane: a non-empty code is written verbatim
+        // (the author can correct the language the post was written in).
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-lang";
+
+        var group = await userInfo.CreateGroupAsync(author, "GP language family", null);
+        var planted = GroupPost("gp-edit-lang", group.Id, author);
+        planted.LanguageCode = "en";
+        await Plant(store, planted);
+
+        await RunInSession(store, s =>
+            svc.UpdateGroupPostAsync("gp-edit-lang", author, "t", "b", "pl", s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, "gp-edit-lang")).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdateGroupPost_Author_BlankLanguage_ResolvesInstanceDefault()
+    {
+        // ADR 0018 (amended) — a blank submission on the edit lane is
+        // re-materialized through the shared resolver: it never blanks a
+        // stored tag, it falls back to the instance default (here "pl",
+        // planted as the LocaleSettings singleton).
+        var (store, _) = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-gp-edit-lang-blank";
+
+        await Plant(store, new LocaleSettings { Id = LocaleSettings.SingletonId, DefaultLanguageCode = "pl" });
+        var group = await userInfo.CreateGroupAsync(author, "GP language-blank family", null);
+        var planted = GroupPost("gp-edit-lang-blank", group.Id, author);
+        planted.LanguageCode = "en";
+        await Plant(store, planted);
+
+        await RunInSession(store, s =>
+            svc.UpdateGroupPostAsync("gp-edit-lang-blank", author, "t", "b", null, s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, "gp-edit-lang-blank")).LanguageCode);
+    }
+
+    [Fact]
     public async Task UpdateGroupPost_NonAuthor_Member_Denies()
     {
         var (store, _) = await BootStoreAsync();
@@ -778,7 +823,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
         var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, s =>
-                svc.UpdateGroupPostAsync("gp-edit-4", member, "t", "b", s)));
+                svc.UpdateGroupPostAsync("gp-edit-4", member, "t", "b", null, s)));
         Assert.Contains("Only the author", ex.Message);
 
         var persisted = await LoadPostAsync(store, "gp-edit-4");
@@ -801,7 +846,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, s =>
-                svc.UpdateGroupPostAsync("gp-edit-5", admin, "t", "b", s)));
+                svc.UpdateGroupPostAsync("gp-edit-5", admin, "t", "b", null, s)));
     }
 
     [Fact]
@@ -813,7 +858,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => RunInSession(store, s =>
-                svc.UpdateGroupPostAsync("no-such-post", author, "t", "b", s)));
+                svc.UpdateGroupPostAsync("no-such-post", author, "t", "b", null, s)));
     }
 
     [Fact]
@@ -840,7 +885,7 @@ public class GroupPostServiceTests(PostgresFixture fixture) : IClassFixture<Post
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
             () => RunInSession(store, s =>
-                svc.UpdateGroupPostAsync("gp-edit-6", author, "t", "b", s)));
+                svc.UpdateGroupPostAsync("gp-edit-6", author, "t", "b", null, s)));
     }
 
     // ── ADR 0016 — author-only reply-edit lane ──────────────────────────────

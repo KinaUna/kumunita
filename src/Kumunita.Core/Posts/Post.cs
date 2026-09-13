@@ -66,10 +66,13 @@ public sealed class Post
     // additive Post field after M3b's Status and ADR 0013's GroupId):
     /// <summary>
     /// The BCP-47 code of the language this post was **authored in** (ADR 0018,
-    /// ADR 0005 B). Written **only** at create time
+    /// ADR 0005 B). Written at create time
     /// (<see cref="PostService.CreatePostAsync"/> /
-    /// <see cref="PostService.CreateGroupPostAsync"/>) — the edit lane
-    /// (ADR 0014) deliberately does **not** touch it. Materialized from the
+    /// <see cref="PostService.CreateGroupPostAsync"/>) and, as the ADR 0014 /
+    /// 0016 edit lanes were amended in 2026-09-13, also on the author-only edit
+    /// lane (<see cref="PostService.UpdatePostAsync"/> /
+    /// <see cref="PostService.UpdateGroupPostAsync"/>) so an author can correct
+    /// the language the post was written in. Materialized from the
     /// instance default (<see cref="Kumunita.Core.Localization.LocaleSettings.DefaultLanguageCode"/>,
     /// with <c>en</c> as the floor) when the author leaves it unchosen, so no
     /// stored row is empty. **Not a translation mechanism** (ADR 0005 C is

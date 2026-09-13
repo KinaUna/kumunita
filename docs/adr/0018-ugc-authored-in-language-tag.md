@@ -49,11 +49,21 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
   positional-construction test sites keep compiling). A null/empty draft value
   means "use the instance default."
 - **Set at authoring time. Immutability splits by lane:**
-  - **Posts and replies: create-time only.** The ADR 0014 (post edit) and ADR
-    0016 (group-post + reply edit) lanes are frozen to title/body (and, for the
-    post edit lane, audience) — the `LanguageCode` tag is **not** editable on
-    those lanes, consistent with the lane's existing "body/audience only" rule
-    (like `ComponentId` / `GroupId`).
+  - **Posts: create-time tag, corrected on the author-only edit lanes
+    (amended 2026-09-13, per owner request).** The ADR 0014 (community post
+    edit) and ADR 0016 (group-post edit) seams now accept a
+    `languageCode` argument and re-resolve it through the same
+    `PostService.ResolveLanguageCodeAsync` helper — a non-empty submission is
+    written verbatim (the author can correct the language the post was
+    written in), and a blank submission re-materializes the instance default
+    (never blanking a stored tag). The Web edit lanes
+    (`PostsController.Edit`, `GroupsController.EditGroupPost`) seed the
+    picker from the enabled catalog pre-selected to the post's stored tag,
+    exactly like the announcement edit lane (ADR 0017).
+  - **Replies: create-time only.** The ADR 0016 reply-edit seam
+    (`UpdateReplyAsync`) stays body-only — the reply's tag is **not**
+    editable there, consistent with the lane's existing "body only" rule
+    (like the reply's `PostId` / `AuthorId`).
   - **Announcements: editable on the edit lane.** The announcement edit
     surface (ADR 0017) is *not* ADR-frozen to a narrower field set, so the tag
     is editable there. `AnnouncementService.UpdateAsync` re-resolves the value
@@ -61,14 +71,15 @@ POCO field is delta-detected and idempotent, and no re-seed is required.
     the picker at the instance default does not blank a previously-stored
     concrete code) and includes it in the changed-detection.
 - **Display / picker (Web layer):** the three compose surfaces
-  (`Posts/New`, `Groups/New`, `Announcement/New` + `Announcement/Edit`) and
-  the two reply forms (`Posts/Detail`, `Groups/PostDetail`) each get a
+  (`Posts/New`, `Groups/New`, `Announcement/New` + `Announcement/Edit`), the
+  two post edit surfaces (`Posts/Edit`, `Groups/Edit` — amended 2026-09-13),
+  and the two reply forms (`Posts/Detail`, `Groups/PostDetail`) each get a
   `Language` `<select>` posting the author's choice. The options are the
   instance's **enabled** `LanguageCatalog` (ADR 0005 B), ordered by
   `SortOrder`. The picker is pre-selected to the instance default (create
-  lane) or the stored row's tag (announcement edit lane) so the highlighted
-  option is the one that will be submitted. This is a **tag picker, not a
-  translation** — the form help text says so explicitly.
+  lane) or the stored row's tag (announcement + post edit lanes) so the
+  highlighted option is the one that will be submitted. This is a **tag
+  picker, not a translation** — the form help text says so explicitly.
 - **New read seam:** `ILocalizationService.GetDefaultLanguageCodeAsync()`
   (a read, no audit row — same shape as `ListLanguagesAsync`) returns the
   instance default with the `en` floor, so the Web compose handlers can
@@ -110,5 +121,7 @@ Negative / accepted risks
   translated" is *unchanged* by this ADR).
 - **ADR 0004 §B.1** — additive schema-evolution pattern this field follows.
 - **ADR 0013** — group posts (the `Post` document this tag rides on).
-- **ADR 0014 / 0016** — post/reply edit lanes this tag is **frozen** on.
+- **ADR 0014 / 0016** — post edit lanes this tag is **editable** on
+  (amended 2026-09-13) and the reply edit lane it stays **frozen** on
+  (body-only, create-time tag).
 - **ADR 0017** — announcement edit lane this tag is **editable** on.

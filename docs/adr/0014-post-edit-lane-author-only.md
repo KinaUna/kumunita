@@ -37,7 +37,7 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
 
 - **Post editing is author-only, with no moderator or admin branch.** The new
   seam `PostService.UpdatePostAsync(postId, actorId, title, body, audience,
-  session)` is the **single** write lane. Its one hard gate is
+  languageCode, session)` is the **single** write lane. Its one hard gate is
   `post.AuthorId == actorId` (ordinal); anything else throws
   `UnauthorizedAccessException`. There is deliberately **no** role check on
   this lane: a component moderator, a `Moderator`, and a `GlobalAdmin` who is
@@ -45,14 +45,19 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
   words is exclusive; the platform's lever over a post is moderation
   (Hide/Remove), not rewriting.
 
-- **The editable surface is `Title`, `Body`, and `Audience` — and only those.**
-  `ComponentId` is **immutable on the edit lane**: the feed organizer
-  (Safety / Maintenance / Social / …) is a **creation-time** choice, and a
-  re-targeting edit (moving a post between components) is out of scope for an
-  author-edit. `AuthorId`, `Created`, `Status`, and `GroupId` are likewise
-  never touched by this lane. A `GroupId`-non-empty post is a **group-lane**
-  post (ADR 0013), whose create lane is the only authoring path and whose
-  access unit is membership — it has no component feed organizer to edit.
+- **The editable surface is `Title`, `Body`, `Audience`, and `LanguageCode` —
+  and only those.** `ComponentId` is **immutable on the edit lane**: the feed
+  organizer (Safety / Maintenance / Social / …) is a **creation-time** choice,
+  and a re-targeting edit (moving a post between components) is out of scope
+  for an author-edit. `AuthorId`, `Created`, `Status`, and `GroupId` are
+  likewise never touched by this lane. A `GroupId`-non-empty post is a
+  **group-lane** post (ADR 0013), whose create lane is the only authoring path
+  and whose access unit is membership — it has no component feed organizer to
+  edit. <b>Amended 2026-09-13:</b> the authored-in `LanguageCode` (ADR 0018)
+  is now also editable on this lane — a non-empty submitted code is written
+  verbatim; a blank submission re-materializes through the shared resolver
+  (instance default, `en` floor, never blanking a stored tag), mirroring the
+  ADR 0017 announcement-edit precedent where the tag was already editable.
 
 - **The audience is written verbatim (ADR 0001-B).** The author re-chooses
   the audience on edit exactly as on create; the seam stores the `Audience`
@@ -105,10 +110,12 @@ a component moderator, not even a `GlobalAdmin` who is not the author.
 - The **moderator's lever over a post is unchanged**: it is still
   Hide/Remove (a `Moderate` action, M3b). Editing a post's text is *not* a
   moderation action and gains no moderator branch here.
-- A new Core seam `PostService.UpdatePostAsync` and seven `PostServiceTests`
-  (author-allows + `Modified`-stamped, audience-verbatim round-trip,
-  immutable-fields-untouched, non-author Member / GlobalAdmin /
-  component-moderator all denied, missing id) pin the lane. No new verb
+- A new Core seam `PostService.UpdatePostAsync` and a battery of
+  `PostServiceTests` (author-allows + `Modified`-stamped, audience-verbatim
+  round-trip, immutable-fields-untouched, non-author Member / GlobalAdmin /
+  component-moderator all denied, missing id, and — as the editable surface
+  was amended 2026-09-13 — author-changes-language-tag-persists-new-code and
+  author-blank-language-resolves-instance-default) pin the lane. No new verb
   enters the audit vocabulary: an author-edit is the author's own content
   change, not an access decision, so it writes **no** `AccessAudit` row (the
   seam touches only the `Post` document, unlike ADR 0009's group lane which

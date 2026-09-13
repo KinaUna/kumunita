@@ -316,25 +316,27 @@ public sealed class PostService
     /// re-write of its text).
     /// <para>
     /// Applies the edit fields (<paramref name="title"/> /
-    /// <paramref name="body"/> / <paramref name="audience"/>) and stamps
+    /// <paramref name="body"/> / <paramref name="audience"/> /
+    /// <paramref name="languageCode"/>) and stamps
     /// <see cref="Post.Modified"/> — the <c>AuthorId</c>,
     /// <c>ComponentId</c>, <c>Created</c>, <see cref="PostStatus"/>,
-    /// <see cref="Post.GroupId"/>, and <see cref="Post.LanguageCode"/> (ADR 0018 —
-    /// authored-in tag, create-time only) fields are deliberately
-    /// **not** touched (a post's authoring identity, feed organizer, moderation
-    /// state, group-lane membership, and authored-in language are immutable
-    /// after creation). The
+    /// <see cref="Post.GroupId"/> fields are deliberately
+    /// **not** touched (a post's authoring identity, feed organizer, and
+    /// moderation state are immutable after creation). The
     /// <paramref name="audience"/> is written **verbatim** (ADR 0001-B) — the
     /// author re-chooses the audience on edit exactly as on create; there is
     /// no auto-augmentation. A missing id is a <see cref="KeyNotFoundException"/>
     /// (the Web layer maps that to a 404); a non-author is the
     /// <see cref="UnauthorizedAccessException"/> above.
     /// <para>
-    /// <see cref="Post.LanguageCode"/> (ADR 0018) is **not** touched by this
-    /// lane — the authored-in tag is written at create time only (the ADR 0014
-    /// edit surface is title/body/audience, and the tag is immutable with the
-    /// other create-time identity fields), consistent with
-    /// <see cref="PostReply.LanguageCode"/> on the ADR 0016 reply lane.
+    /// <see cref="Post.LanguageCode"/> (ADR 0018) **is** re-resolved by this
+    /// lane (ADR 0014, as amended): an author who wrote the post in the wrong
+    /// language can correct it after publishing — the
+    /// <paramref name="languageCode"/> is materialized through the shared
+    /// <see cref="ResolveLanguageCodeAsync"/> helper, so a non-empty code is
+    /// written verbatim and a blank submission falls back to the instance
+    /// default (never blanking a stored tag). This mirrors the ADR 0017
+    /// announcement edit lane, where the tag was already editable.
     /// </para>
     /// </summary>
     /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
@@ -345,6 +347,7 @@ public sealed class PostService
         string? title,
         string body,
         Authorization.Audience audience,
+        string? languageCode,
         IDocumentSession session)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
@@ -363,6 +366,11 @@ public sealed class PostService
         post.Title = title;
         post.Body = body ?? string.Empty;
         post.Audience = audience; // ADR 0001-B — written verbatim; never auto-augmented.
+        // ADR 0018 (ADR 0014 amended) — the authored-in tag is editable on this lane:
+        // the author can correct the language the post was written in. Re-resolved
+        // through the shared helper so a blank submission falls back to the
+        // instance default (it never blanks a stored tag).
+        post.LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false);
         post.Modified = DateTimeOffset.UtcNow;
 
         session.Store(post);
@@ -471,8 +479,13 @@ public sealed class PostService
     /// moderator peek; a moderator's lever over a group post is its absence
     /// from the moderation surface, not re-writing text).
     /// <para>
-    /// The **only** editable fields are <see cref="Post.Title"/> and
-    /// <see cref="Post.Body"/>. The group lane's identity fields are
+    /// The editable fields are <see cref="Post.Title"/>,
+    /// <see cref="Post.Body"/>, and <see cref="Post.LanguageCode"/> (ADR 0018,
+    /// ADR 0016 as amended — the authored-in tag is editable on this lane too, so
+    /// an author can correct the language a group post was written in; it is
+    /// re-resolved through the shared <see cref="ResolveLanguageCodeAsync"/> helper,
+    /// mirroring the ADR 0014 community-post lane and the ADR 0017 announcement
+    /// edit lane). The group lane's identity fields are
     /// **immutable** — <c>GroupId</c> (the lane itself), <c>ComponentId</c>
     /// (must stay empty, G·2 lane exclusivity), <c>Audience</c> (non-null
     /// empty, G·8 — there is no audience to re-choose on the group lane),
@@ -493,6 +506,7 @@ public sealed class PostService
         string actorId,
         string? title,
         string body,
+        string? languageCode,
         IDocumentSession session)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
@@ -515,6 +529,11 @@ public sealed class PostService
 
         post.Title = title;
         post.Body = body ?? string.Empty;
+        // ADR 0018 (ADR 0016 amended) — the authored-in tag is editable on this lane:
+        // the author can correct the language the post was written in. Re-resolved
+        // through the shared helper so a blank submission falls back to the
+        // instance default (it never blanks a stored tag).
+        post.LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false);
         post.Modified = DateTimeOffset.UtcNow;
         // GroupId / ComponentId / Audience / AuthorId / Created / Status are
         // deliberately untouched — the group lane's identity is immutable.
