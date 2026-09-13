@@ -826,6 +826,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 reply.AuthorId,
                 reply.Body,
                 reply.Created,
+                reply.Modified,
                 reply.AuthorId == actor));
         }
 

@@ -123,8 +123,30 @@
                                         <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
+                                    @* Author-only reply edit (ADR 0016) — the
+                                       native <details> disclosure needs no JS;
+                                       a non-author never sees it (r.IsAuthor). *@
+                                    @if (r.IsAuthor)
+                                    {
+                                        <details class="d-inline-block">
+                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none"><kw-l key="posts.reply_edit">Edit</kw-l></summary>
+                                            <form class="mt-2 text-start" method="post"
+                                                  action="@($"/posts/{postId}/replies/{r.Id}/edit")">
+                                                @Html.AntiForgeryToken()
+                                                <textarea class="form-control mb-2" name="body" rows="3"
+                                                          required placeholder="…">@r.Body</textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="posts.reply_save">Save</kw-l></button>
+                                            </form>
+                                        </details>
+                                    }
                                 </div>
-                                <div>@r.Created.LocalDateTime.ToString("d")</div>
+                                <div>
+                                    @r.Created.LocalDateTime.ToString("d")
+                                    @if (r.Modified is not null)
+                                    {
+                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> @r.Modified.Value.LocalDateTime.ToString("g")</span>
+                                    }
+                                </div>
                             </div>
                         </div>
                     </li>

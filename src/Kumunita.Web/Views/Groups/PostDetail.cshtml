@@ -121,7 +121,13 @@
                                         </details>
                                     }
                                 </div>
-                                <div>@r.Created.LocalDateTime.ToString("d")</div>
+                                <div>
+                                    @r.Created.LocalDateTime.ToString("d")
+                                    @if (r.Modified is not null)
+                                    {
+                                        <span> — edited @r.Modified.Value.LocalDateTime.ToString("g")</span>
+                                    }
+                                </div>
                             </div>
                         </div>
                     </li>

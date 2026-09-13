@@ -244,6 +244,9 @@ public static class KnownTranslationKeys
                 "\"reply-inherits\" rule). You are replying only where " +
                 "the post itself is visible.",
             ["posts.reply_submit"] = "Reply",
+            ["posts.reply_edit"] = "Edit",
+            ["posts.reply_save"] = "Save",
+            ["posts.reply_edited"] = "edited",
 
             // ── groups (Create page) ─────────────────────────────────────────
             ["groups.create_back"] = "← Back to groups",

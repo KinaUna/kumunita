@@ -63,6 +63,13 @@ public sealed record ReplyItem(
     string AuthorSubjectId,
     string Body,
     DateTimeOffset Created,
+    /// <summary>The reply's last edit time (ADR 0016) — a display pin, not a
+    /// gate. <c>null</c> until the reply is first edited (the reply's
+    /// <c>Created</c> is the initial timestamp); after an edit it carries the
+    /// last-edit time and drives the "edited" badge on the row. Written only
+    /// by the author-only <c>PostService.UpdateReplyAsync</c> lane, mirroring
+    /// <c>Post.Modified</c>.</summary>
+    DateTimeOffset? Modified,
     /// <summary>Whether the signed-in actor authored **this reply** (a
     /// display pin, not a gate — ADR 0016's reply-edit lane renders the
     /// per-reply "Edit" affordance on this row). Mirrors the parent

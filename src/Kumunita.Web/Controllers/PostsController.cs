@@ -334,6 +334,7 @@ public sealed class PostsController(
                 reply.AuthorId,
                 reply.Body,
                 reply.Created,
+                reply.Modified,
                 reply.AuthorId == actor));
         }
 
@@ -938,6 +939,85 @@ public sealed class PostsController(
         await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
 
         TempData["info"] = "Reply added.";
+        return Redirect($"/posts/{id}");
+    }
+
+    // ── Reply edit (POST /posts/{id}/replies/{replyId}/edit) — author-only ──
+
+    /// <summary>
+    /// A one-level reply <b>edit</b> (ADR 0016, author-only):
+    /// <c>POST /posts/{id}/replies/{replyId}/edit</c>. A body-only re-write via
+    /// <see cref="PostService.UpdateReplyAsync"/> — the service is the decision:
+    /// only the reply's own author may edit it (no moderator or GlobalAdmin
+    /// branch; a moderator's lever over a reply is the parent post's Hide/Remove,
+    /// not re-writing text). Before writing, the parent's single <c>Read</c>
+    /// decision is re-run via <see cref="PostService.GetPostAsync"/> (the same
+    /// fail-closed shape as <see cref="Replies"/>: <c>Post = null</c> for both
+    /// "does not exist" and "audience denied", mapped to the 403 shape) and the
+    /// reply must be **under this post** (a replyId on a different post 403s —
+    /// the component lane's non-leaky posture). A non-author is the
+    /// <see cref="UnauthorizedAccessException"/> wall, mapped to the 403 shape.
+    /// The edit stamps <c>PostReply.Modified</c> forward (null until first
+    /// edited); <c>PostId</c> / <c>AuthorId</c> / <c>Created</c> are untouched.
+    /// One <c>SaveChangesAsync</c> (C3 same-transaction lane).
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditReply(
+        [FromRoute] string id, [FromRoute] string replyId, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to edit this reply.");
+            return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            // A reply is a body-only write (C-M3·1: no own audience, no title).
+            // Fail-closed to the detail page — the form is re-presented there.
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        // The parent's single Read decision (C-M3·1; the reply inherits it) is
+        // the pre-write gate: GetPostAsync returns Post = null for **both**
+        // "missing" and "denied" (Core doesn't distinguish — the audit row does),
+        // so both map to the Forbid() 403 shape — the component lane's non-leaky
+        // posture (the Replies / Detail-GET precedent; a 404 leaks which ids are
+        // real).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+
+        // The reply must be **under this post** (a replyId on a different post is
+        // not reachable through this lane — the 403 shape, non-leaky).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return Forbid();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's SaveChangesAsync is the single write (the Replies() precedent).
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyAsync(replyId, actor, body, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Not the author — the 403 shape (the component lane's non-leaky
+            // posture; a re-render would leak the reply's content to a non-author).
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply updated.";
         return Redirect($"/posts/{id}");
     }
 
