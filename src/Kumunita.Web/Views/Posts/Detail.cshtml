@@ -289,6 +289,30 @@
                                 </div>
                             </div>
                         </div>
+                        @* ADR 0023 — the reply-report-target lane (resident-facing
+                           intake, mirroring the post-report form above). A native
+                           <details> (the ADR 0016 per-reply-edit precedent) — one
+                           per reply, no JS dependency, no id collision. *@
+                        <details class="mt-2">
+                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                <kw-l key="posts.reply_report_button">Report this reply</kw-l>
+                            </summary>
+                            <form class="mt-2 text-start" method="post"
+                                  action="@($"/posts/{postId}/replies/{r.Id}/report")">
+                                @Html.AntiForgeryToken()
+                                <label class="form-label small mb-1" style="font-weight:600;">
+                                    <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
+                                </label>
+                                <textarea class="form-control mb-2" name="reason" rows="2"
+                                          placeholder="Optionally add a reason for a moderator…"></textarea>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small">
+                                        <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger ms-2"><kw-l key="posts.report_submit">Report</kw-l></button>
+                                </div>
+                            </form>
+                        </details>
                     </li>
                 }
             </ul>

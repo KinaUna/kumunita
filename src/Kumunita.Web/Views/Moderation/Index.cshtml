@@ -55,6 +55,18 @@ else
                         </td>
                         <td>
                             <div class="fw-semibold">@(r.PostTitle ?? $"Post {r.PostId}")</div>
+                            @* ADR 0023 — the reply-report-target lane: when the
+                               report targets a specific reply, show the
+                               "reply by X" line under the post title. The
+                               UGC author name renders as-is (M·3); only the
+                               "reply by" platform label is translated. *@
+                            @if (r.ReplyId is not null)
+                            {
+                                <div class="text-muted small">
+                                    <kw-l key="moderation.queue_reply_by">reply by</kw-l>
+                                    @(r.ReplyAuthorName ?? "—")
+                                </div>
+                            }
                             @if (!string.IsNullOrEmpty(r.Reason))
                             {
                                 <div class="text-muted small">@r.Reason</div>

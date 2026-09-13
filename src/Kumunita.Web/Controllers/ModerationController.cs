@@ -244,6 +244,21 @@ public sealed class ModerationController(
             var post     = await session.LoadAsync<Post>(r.PostId).ConfigureAwait(false);
             var reporter = await userInfo.GetProfileAsync(r.ReporterId).ConfigureAwait(false);
 
+            // ADR 0023 — the reply-report-target lane: when the report's
+            // target discriminator (Report.ReplyId) is set, load the reply +
+            // its author's display name (a read, not a decision — the UGC
+            // name renders as-is, never translated, M·3). A missing reply is
+            // rendered with a null author (defensive; the queue row still
+            // shows the post + the "reply" discriminator).
+            string? replyAuthorName = null;
+            if (r.ReplyId is not null)
+            {
+                var reply = await session.LoadAsync<PostReply>(r.ReplyId).ConfigureAwait(false);
+                if (reply is not null)
+                    replyAuthorName =
+                        (await userInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
+            }
+
             var statusKey = r.Status ?? "filed";   // "filed" as the M3-registered POCO default
             if (!byStatus.ContainsKey(statusKey))
                 byStatus[statusKey] = 0;
@@ -257,7 +272,9 @@ public sealed class ModerationController(
                 reporter?.DisplayName,
                 r.Reason,
                 statusKey,
-                r.At));
+                r.At,
+                r.ReplyId,
+                replyAuthorName));
         }
 
         return View(new ModerationQueueViewModel
@@ -325,6 +342,26 @@ public sealed class ModerationController(
         var postAuthor = await userInfo.GetProfileAsync(post.AuthorId).ConfigureAwait(false);
         var componentNames = await BuildComponentNameLookupAsync(session).ConfigureAwait(false);
 
+        // ADR 0023 — the reply-report-target lane: when the report's target
+        // discriminator (Report.ReplyId) is set, load the reply + its
+        // author's display name + the reply body (a read, not a decision —
+        // the UGC body / name render as-is, never translated — M·3). A
+        // missing reply leaves the three fields null (defensive; the view
+        // then simply omits the reply block).
+        string? replyId = report.ReplyId;
+        string? replyBody = null;
+        string? replyAuthorName = null;
+        if (replyId is not null)
+        {
+            var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+            if (reply is not null)
+            {
+                replyBody       = reply.Body;
+                replyAuthorName =
+                    (await userInfo.GetProfileAsync(reply.AuthorId).ConfigureAwait(false))?.DisplayName;
+            }
+        }
+
         // The standing-moderator list for the assign form
         // (GlobalAdmin-only render shape: a standing-moderator
         // never sees the assign form; the moderator list is the
@@ -361,6 +398,9 @@ public sealed class ModerationController(
             PostBody        = post.Body,
             ComponentName   = report.ComponentId is not null ? componentNames.GetValueOrDefault(report.ComponentId) : null,
             PostAuthorName  = postAuthor?.DisplayName,
+            ReplyId         = replyId,
+            ReplyBody       = replyBody,
+            ReplyAuthorName = replyAuthorName,
             Moderators      = moderators,
 
             // Display-level predicates (the §2.3 item-2 four

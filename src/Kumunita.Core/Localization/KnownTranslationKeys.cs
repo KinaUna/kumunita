@@ -276,6 +276,7 @@ public static class KnownTranslationKeys
                 "(a grant of yours, or you are the author — the \"owner branch\" " +
                 "of the C1 empty-audience deny rule).",
             ["posts.report_button"] = "Report this post",
+            ["posts.reply_report_button"] = "Report this reply",
             ["posts.report_reason_label"] = "What's wrong?",
             ["posts.report_optional"] = "optional",
             ["posts.report_note"] =
@@ -419,6 +420,16 @@ public static class KnownTranslationKeys
             ["moderation.resolve_header"] = "Resolve (close this report)",
             ["moderation.resolve_submit"] = "Resolve",
             ["moderation.back_to_queue"] = "← Back to queue",
+            // ── reply-report-target lane (ADR 0023) ─────────────────────────
+            // A report's target is either a post (ReplyId null — the
+            // original M3b shape) or a specific reply (ReplyId non-null).
+            // These keys render the reply-target discriminator in the queue
+            // ("reply by X") and the resolve view (the reply blockquote
+            // preview) — UGC body / author name are never translated (M·3),
+            // only these platform labels are.
+            ["moderation.queue_reply_by"] = "reply by",
+            ["moderation.resolve_reply_label"] = "Reply (target of this report)",
+            ["moderation.resolve_reply_by"] = "Reply by",
 
             // ── account (Verify / Resend / AccessDenied) ─────────────────────
             ["account.verify_title"] = "Verify your account",

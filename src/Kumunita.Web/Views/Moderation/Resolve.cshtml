@@ -59,6 +59,26 @@
                     </blockquote>
                 </dd>
             }
+
+            @* ADR 0023 — the reply-report-target lane: when this report's
+               target is a specific reply (Model.ReplyId non-null), show the
+               reply's body as a blockquote preview under the post body. The
+               UGC body / author name render as-is (M·3); only the platform
+               labels around them are translated. A null ReplyId (the
+               original M3b post-target shape) omits this block entirely. *@
+            @if (Model.ReplyId is not null && !string.IsNullOrEmpty(Model.ReplyBody))
+            {
+                <dt class="col-sm-3"><kw-l key="moderation.resolve_reply_label">Reply (target of this report)</kw-l></dt>
+                <dd class="col-sm-9">
+                    <blockquote class="blockquote mb-0">
+                        <div>@Model.ReplyBody</div>
+                        <footer class="blockquote-footer">
+                            <kw-l key="moderation.resolve_reply_by">Reply by</kw-l>
+                            @(Model.ReplyAuthorName ?? "—")
+                        </footer>
+                    </blockquote>
+                </dd>
+            }
         </dl>
     </div>
 </div>

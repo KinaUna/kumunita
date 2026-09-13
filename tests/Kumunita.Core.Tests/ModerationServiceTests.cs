@@ -109,6 +109,129 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         }
     }
 
+    // ── R1 — FileReplyReportAsync_Filing_WritesReportWithReplyId ────────
+    //
+    // ADR 0023 (the reply-report-target lane): the reply-targeted report
+    // carries Report.ReplyId = the reply's id (the target discriminator),
+    // Report.PostId = the parent post's id (C-M3·1 reply-inherits — the
+    // reply's own PostId), Report.Status = "filed" (the same §2.3 item-2
+    // literal pin as the post-report filing lane), and
+    // Report.ComponentId = the parent post's ComponentId.
+
+    [Fact]
+    public async Task FileReplyReportAsync_Filing_WritesReportWithReplyId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string reporter = "u-adr0023-r1-reporter";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "r1-post", ComponentId = ComponentId, AuthorId = "u-adr0023-r1-owner",
+            Body = "body r1", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = "r1-reply", PostId = "r1-post", AuthorId = "u-adr0023-r1-replier",
+            Body = "reply body r1", Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+
+        string? createdReportId = null;
+        await RunInSession(store, async session =>
+        {
+            await svc.FileReplyReportAsync("r1-reply", reporter, "abuse in reply", session);
+            var filed = await session.Query<Report>()
+                .Where(r => r.ReplyId == "r1-reply")
+                .ToListAsync(TestContext.Current.CancellationToken);
+            createdReportId = Assert.Single(filed).Id;
+        });
+
+        // Re-load in a fresh session — the target discriminator + parent
+        // post id + "filed" literal must all be there (the ADR 0023 shape).
+        await using (var s2 = store.QuerySession())
+        {
+            var report = await s2.LoadAsync<Report>(createdReportId!, TestContext.Current.CancellationToken);
+            Assert.NotNull(report);
+            Assert.Equal("r1-reply", report!.ReplyId);     // the target discriminator
+            Assert.Equal("r1-post", report.PostId);        // the parent post (C-M3·1)
+            Assert.Equal(ComponentId, report.ComponentId); // carried from the parent
+            Assert.Equal("filed", report.Status);          // the §2.3 item-2 literal pin
+            Assert.Equal("abuse in reply", report.Reason);
+        }
+    }
+
+    // ── R2 — FileReplyReportAsync_Filing_ViaTagIsAdmin_NotReport_NotOwner ─
+    //
+    // ADR 0023 — the filing lane's audit row carries the same pinned
+    // AccessVia.Admin literal as the post-report lane (C-M3b·1; two
+    // negatives: NOT AccessVia.Report — reserved for the read branch,
+    // C-M3b·2; NOT AccessVia.Owner — C1 owner-branch). The action +
+    // target-kind distinguish the reply lane from the post lane
+    // ("report.reply.file" / "reply" vs "report.file" / "post").
+
+    [Fact]
+    public async Task FileReplyReportAsync_Filing_ViaTagIsAdmin_NotReport_NotOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string reporter = "u-adr0023-r2-reporter";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "r2-post", ComponentId = ComponentId, AuthorId = "u-adr0023-r2-owner",
+            Body = "body r2", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = "r2-reply", PostId = "r2-post", AuthorId = "u-adr0023-r2-replier",
+            Body = "reply body r2", Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+
+        await RunInSession(store, async session =>
+            await svc.FileReplyReportAsync("r2-reply", reporter, "harassment in reply", session));
+
+        var rows = await ReplyAudits(store, actor: reporter);
+        var filingRow = Assert.Single(rows, a => a.Action == "report.reply.file");
+        Assert.Equal(AccessVia.Admin, filingRow.Via);
+        Assert.NotEqual(AccessVia.Report, filingRow.Via);
+        Assert.NotEqual(AccessVia.Owner, filingRow.Via);
+        Assert.Equal(AccessOutcome.Allow, filingRow.Outcome);
+        Assert.Equal("r2-reply", filingRow.TargetId);
+        Assert.Equal(reporter, filingRow.ActorId);
+    }
+
+    // ── R3 — FileReplyReportAsync_MissingReply_ThrowsKeyNotFound ─────────
+    //
+    // ADR 0023 — the reply-targeted lane's fail-closed shape: a missing
+    // reply is a failed call (no report row, no audit row — no partial
+    // write). Mirrors the post-report lane's "missing post" branch, but
+    // keyed on the reply id.
+
+    [Fact]
+    public async Task FileReplyReportAsync_MissingReply_ThrowsKeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string reporter = "u-adr0023-r3-reporter";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        // A parent post exists — but the reply id we pass does not.
+        await Plant(store, new Post
+        {
+            Id = "r3-post", ComponentId = ComponentId, AuthorId = "u-adr0023-r3-owner",
+            Body = "body r3", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, reporter),
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.FileReplyReportAsync("r3-missing-reply", reporter, "x", s)));
+    }
+
     // ── 3 — CanReadWithReportAsync_ModeratorWithReport_Allowed_ViaTagIsReport ─
     //
     // C-M3b·2 (F2) — the filed report is the gate for a standing
@@ -545,6 +668,22 @@ public class ModerationServiceTests(PostgresFixture fixture) : IClassFixture<Pos
         var ct = TestContext.Current.CancellationToken;
         await using var s = store.QuerySession();
         var q = s.Query<AccessAudit>().Where(a => a.TargetKind == "post");
+        if (actor is not null) q = q.Where(a => a.ActorId == actor);
+        return await q.ToListAsync(ct);
+    }
+
+    /// <summary>
+    /// ADR 0023 — the reply-report-target lane's own audit rows, scoped to
+    /// the reply lane's <c>TargetKind = "reply"</c> (the
+    /// <see cref="ModerationService.FileReplyReportAsync"/> filing lane's
+    /// hand-written row, mirroring <see cref="PostAudits"/> for the
+    /// post-lane's <c>TargetKind = "post"</c> rows).
+    /// </summary>
+    private static async Task<IReadOnlyList<AccessAudit>> ReplyAudits(IDocumentStore store, string? actor = null)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        var q = s.Query<AccessAudit>().Where(a => a.TargetKind == "reply");
         if (actor is not null) q = q.Where(a => a.ActorId == actor);
         return await q.ToListAsync(ct);
     }

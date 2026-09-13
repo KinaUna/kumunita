@@ -1294,4 +1294,79 @@ public sealed class PostsController(
         return Redirect($"/posts/{id}");
     }
 
+    // ── Reply report (POST /posts/{id}/replies/{replyId}/report) ──────────
+    // ADR 0023 — the reply-report-target lane. The Web-layer gate is
+    // identical to the post-report lane: C-M3·1 "reply-inherits" says a
+    // reply has no own audience / no own audit row — its visibility is the
+    // parent post's single Read decision. So "can see the post" is exactly
+    // the precondition to be able to see (and therefore report) its reply.
+
+    /// <summary>
+    /// A resident-facing **reply-report intake** action (ADR 0023). The
+    /// Web-layer shape mirrors <see cref="Report"/> exactly — the only
+    /// difference is the write target: it delegates to
+    /// <see cref="ModerationService.FileReplyReportAsync"/> (the Core lane
+    /// loads the reply + its parent post, sets
+    /// <see cref="Kumunita.Core.Posts.Report.ReplyId"/> on the
+    /// <see cref="Kumunita.Core.Posts.Report"/> row, and writes the filing
+    /// audit row with the pinned <c>AccessVia.Admin</c> tag).
+    /// <para>
+    /// <b>Authz shape (C-M3·1 reply-inherits):</b> the precondition "the
+    /// resident can see the post" is the same
+    /// <see cref="PostService.GetPostAsync"/> single-Read-decision gate
+    /// <see cref="Report"/> uses — a reply has no own audience, so seeing
+    /// the post is what makes its reply reportable. A
+    /// <see cref="PostDetailResult"/> with <c>Post = null</c> covers both
+    /// "does not exist" and "audience denied" and maps to the
+    /// <c>Forbid()</c> 403 shape (the same fail-closed pin).
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3 / ADR 0006-C):</b> the controller opens its own
+    /// <see cref="IDocumentStore.LightweightSession"/> and passes it to
+    /// <see cref="ModerationService.FileReplyReportAsync"/>; that service
+    /// performs the single <c>SaveChangesAsync</c>, so the
+    /// <c>Report</c> row and the filing <c>AccessAudit</c> row commit or
+    /// roll back atomically — no partial write, one <c>SaveChangesAsync</c>.
+    /// </para>
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/report")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReportReply(
+        [FromRoute] string id,
+        [FromRoute] string replyId,
+        [FromForm] string? reason)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+        if (string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        // C-M3·1 reply-inherits: the resident must be able to *see* the
+        // parent post. GetPostAsync returns Post = null for **both**
+        // "missing" and "denied" (Core doesn't distinguish; the audit row
+        // does), so both map to the Forbid() 403 shape — the same
+        // fail-closed gate the Report lane uses.
+        var existing = await posts.GetPostAsync(id, actor);
+        if (existing.Post is null)
+            return Forbid();
+
+        // The reply's PostId must match the route's post id — a reply
+        // belonging to a different post is not reportable under this
+        // route (defensive; the Core lane would load it by replyId alone
+        // and could file a report whose PostId disagrees with the route).
+        await using var session = store.LightweightSession();
+        var reply = await session.LoadAsync<Kumunita.Core.Posts.PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null || reply.PostId != id)
+            return NotFound();
+
+        await moderation.FileReplyReportAsync(replyId, actor, reason, session);
+
+        TempData["info"] = "Report submitted. A moderator may review it.";
+        return Redirect($"/posts/{id}");
+    }
+
     }
