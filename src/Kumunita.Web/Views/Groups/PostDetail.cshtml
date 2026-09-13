@@ -5,6 +5,14 @@
     string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
         ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
         : string.Empty;
+
+    // ADR 0022 (group lane) — translation helpers (in scope for both the post
+    // block and the per-reply block): the enabled-catalog language set with its
+    // HasTranslation flag, the set the "add a translation" form offers, and a
+    // code→native-name resolver (never blank — falls back to the code).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
 <div class="row justify-content-center">
@@ -62,6 +70,76 @@
                     @Model.Post.Body
                 </div>
 
+                @* ADR 0022 (group lane) — available translations (chips) +
+                   the "add a translation" lane (offered only when CanTranslate;
+                   on the group lane that is author ∪ GlobalAdmin, ADR 0007). *@
+                @if (Model.PostTranslations.Count > 0 || Model.CanTranslate)
+                {
+                    <div class="mb-3 border-top pt-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <span class="text-muted small fw-semibold">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </span>
+                            @if (Model.PostTranslations.Count == 0)
+                            {
+                                <span class="text-muted small"><kw-l key="posts.translations_none">None yet</kw-l></span>
+                            }
+                            else
+                            {
+                                @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
+                                }
+                            }
+                        </div>
+
+                        @foreach (var t in Model.PostTranslations)
+                        {
+                            <details class="mb-1">
+                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
+                                <div class="ms-2">
+                                    @if (!string.IsNullOrWhiteSpace(t.Title))
+                                    {
+                                        <h5 class="mt-1">@t.Title</h5>
+                                    }
+                                    <div style="white-space:pre-wrap;">@t.Body</div>
+                                </div>
+                            </details>
+                        }
+
+                        @if (Model.CanTranslate)
+                        {
+                            @foreach (var lang in missingLanguages)
+                            {
+                                <details class="mb-1">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
+                                    </summary>
+                                    <form class="ms-2" method="post"
+                                          action="@($"/groups/{Model.GroupId}/posts/{postId}/translations")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@lang.Code" />
+                                        <label class="form-label small" for="post-t-title">
+                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" id="post-t-title"
+                                               name="title" value="@Model.Post.Title" />
+                                        <label class="form-label small" for="post-t-body">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <textarea class="form-control form-control-sm mb-2" id="post-t-body"
+                                                  name="body" rows="3" required placeholder="…"></textarea>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                </details>
+                            }
+                        }
+                    </div>
+                }
+
                 @*
                     ADR 0013 — the group lane's "why you can see this" line.
                     No moderation actions here (Scope Out: the M3b component-
@@ -94,6 +172,63 @@
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
                     <li class="list-group-item">
+                        @* ADR 0022 (group lane) — the reply's available
+                           translations + the "add a translation" lane (offered
+                           only when r.CanTranslate; author ∪ GlobalAdmin, ADR 0007). *@
+                        @if (r.Translations.Count > 0 || r.CanTranslate)
+                        {
+                            <div class="mb-2 pe-3">
+                                <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
+                                    @if (r.Translations.Count == 0)
+                                    {
+                                        <span class="text-muted small">
+                                            <kw-l key="posts.translations_label">Translations</kw-l>: <kw-l key="posts.translations_none">none yet</kw-l>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">
+                                            <kw-l key="posts.translations_label">Translations</kw-l>:
+                                        </span>
+                                        @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
+                                        }
+                                    }
+                                </div>
+                                @foreach (var t in r.Translations)
+                                {
+                                    <details class="mb-1">
+                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
+                                        <div class="ms-2" style="white-space:pre-wrap;">@t.Body</div>
+                                    </details>
+                                }
+                                @if (r.CanTranslate)
+                                {
+                                    @foreach (var lang in missingLanguages)
+                                    {
+                                        <details class="mb-1">
+                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                                <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
+                                            </summary>
+                                            <form class="ms-2" method="post"
+                                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations")">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                                <label class="form-label small" for="reply-t-body">
+                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                </label>
+                                                <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
+                                                          name="body" rows="3" required placeholder="…"></textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary">
+                                                    <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                </button>
+                                            </form>
+                                        </details>
+                                    }
+                                }
+                            </div>
+                        }
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
                             <div class="text-end text-muted small">

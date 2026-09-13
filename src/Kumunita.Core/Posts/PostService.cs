@@ -801,4 +801,288 @@ public sealed class PostService
         await session.SaveChangesAsync().ConfigureAwait(false);
         return post;
     }
+
+    // ─── ADR 0022 — user-added post/reply translations lane ────────────────
+
+    /// <summary>
+    /// The **read** seam for a post's user-added translations (ADR 0022): the
+    /// <see cref="PostTranslation"/> rows under <paramref name="postId"/>.
+    /// Opens its own <c>QuerySession</c> (the C3 read-lane shape, mirroring
+    /// <see cref="ListFeedAsync"/> — reads never touch the caller's write
+    /// session).
+    /// <para>
+    /// <b>Not an authorization surface (C-M3·1 carried over):</b> a translation
+    /// has no own audience — its visibility inherits the parent post's single
+    /// <c>Read</c> decision, which the caller has already made (the Web reads
+    /// this only after <see cref="GetPostAsync"/> returned the post). So this
+    /// method does **not** call <see cref="IAuthorizationService"/> and writes
+    /// **no** <c>AccessAudit</c> row — the same "a read, not a decision" pin as
+    /// the reply list's as-is return.
+    /// </para>
+    /// </summary>
+    public async Task<IReadOnlyList<PostTranslation>> GetPostTranslationsAsync(string postId)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<PostTranslation>()
+            .Where(t => t.PostId == postId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The **read** seam for a set of replies' user-added translations (ADR
+    /// 0022): every <see cref="ReplyTranslation"/> whose
+    /// <see cref="ReplyTranslation.ReplyId"/> is in <paramref name="replyIds"/>.
+    /// Batching here keeps the post-detail view to a single query for its whole
+    /// reply list (the M2 read-lane "one query per surface" preference). Owns
+    /// its <c>QuerySession</c> (C3 read lane); **not** an authorization surface
+    /// and writes **no** audit row (C-M3·1 — inherits the parent post's single
+    /// <c>Read</c> decision, already made by the caller).
+    /// </summary>
+    public async Task<IReadOnlyList<ReplyTranslation>> GetReplyTranslationsAsync(IReadOnlyCollection<string> replyIds)
+    {
+        ArgumentNullException.ThrowIfNull(replyIds);
+        if (replyIds.Count == 0)
+            return [];
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<ReplyTranslation>()
+            .Where(t => replyIds.Contains(t.ReplyId))
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a post in the **caller's** in-flight
+    /// session (invariant C3 — the same-transaction lane; the
+    /// <see cref="IDocumentSession"/> is the caller's, so the write and the
+    /// in-session <c>AccessAudit</c> row commit or roll back atomically).
+    /// <para>
+    /// <b>Standing (ADR 0022, the approved default):</b> the post's
+    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
+    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
+    /// and — on the **community** lane only — a
+    /// <c>Moderator</c> scoped to the post's component
+    /// (<see cref="AccessVia.Moderator"/>). On the **group** lane (
+    /// <see cref="Post.GroupId"/> non-empty, ADR 0013) the component-moderator
+    /// standing does **not** apply (ADR 0007 — no component-moderator scope
+    /// exists for a group; GlobalAdmin is the only non-author standing). A
+    /// denied actor throws <see cref="UnauthorizedAccessException"/> **before**
+    /// anything is stored.
+    /// </para>
+    /// <para>
+    /// <paramref name="languageCode"/> is the **target** language (a
+    /// <see cref="Kumunita.Core.Localization.LanguageCatalog.Id"/> the Web offers
+    /// from the enabled catalog); it is written **verbatim** (never floored to
+    /// the instance default — a blank target is a caller error). One
+    /// <c>SaveChangesAsync</c>.
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
+    public async Task<PostTranslation> AddPostTranslationAsync(
+        string postId,
+        string languageCode,
+        string? title,
+        string body,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveTranslationStanding(
+            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the post's author (or a moderator of the community, or an admin) " +
+                "may add a translation of it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new PostTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            PostId = postId,
+            LanguageCode = languageCode,
+            Title = title,
+            Body = body,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        // Audit row (ADR 0022 write-lane, the ModerationService.FileReportAsync
+        // precedent — a hand-written audit row with no CanAsync decision call):
+        // the Via tag records the standing the actor used (Owner / Moderator /
+        // Admin).
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "posttranslation.add",
+            TargetKind = "post",
+            TargetId = postId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a reply in the **caller's** in-flight
+    /// session (invariant C3; the <see cref="IDocumentSession"/> is the caller's).
+    /// <para>
+    /// <b>Standing (ADR 0022, mirroring the parent post's):</b> the reply's
+    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
+    /// <see cref="Identity.Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>);
+    /// and — on the **community** lane only — a <c>Moderator</c> scoped to the
+    /// parent post's component (<see cref="AccessVia.Moderator"/>). On the
+    /// **group** lane the component-moderator standing does not apply (ADR 0007).
+    /// A denied actor throws <see cref="UnauthorizedAccessException"/> before
+    /// anything is stored.
+    /// </para>
+    /// <para>
+    /// <paramref name="languageCode"/> is the target language (written verbatim;
+    /// a blank target is a caller error); the translation is body-only (a reply
+    /// has no title — C-M3·1). One <c>SaveChangesAsync</c>.
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The reply id (or its parent post)
+    /// is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// author / GlobalAdmin / (community) component-moderator standings.</exception>
+    public async Task<ReplyTranslation> AddReplyTranslationAsync(
+        string replyId,
+        string languageCode,
+        string body,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to translate.");
+
+        // Standing mirrors the parent post's lane (community vs group) and the
+        // parent post's component scope — the reply itself has no component
+        // (C-M3·1), so the scope comes from the parent.
+        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
+        if (parent is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to translate.");
+
+        var via = ResolveTranslationStanding(
+            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the reply's author (or a moderator of the community, or an admin) " +
+                "may add a translation of it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new ReplyTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            ReplyId = replyId,
+            LanguageCode = languageCode,
+            Body = body,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "replytranslation.add",
+            TargetKind = "reply",
+            TargetId = replyId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <summary>
+    /// The public ADR 0022 standing probe the Web layer calls to decide whether
+    /// to render the "add a translation" affordance (a <b>display</b> pin, not a
+    /// gate — the real deny is the <see cref="AddPostTranslationAsync"/> /
+    /// <see cref="AddReplyTranslationAsync"/> standing check, which re-runs the
+    /// same rule server-side). Keeping this in Core — not duplicated in the two
+    /// detail controllers — is the ADR 0006-D "the service owns the decision,
+    /// not the Web" shape; it delegates to the same
+    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the
+    /// display and the gate can never drift apart.
+    /// </summary>
+    public static bool CanAddTranslation(
+        bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveTranslationStanding(isGroupLane, componentId, rowAuthorId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0022 translation standing resolver (shared by
+    /// <see cref="AddPostTranslationAsync"/> /
+    /// <see cref="AddReplyTranslationAsync"/> /
+    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/>
+    /// the actor qualifies under, or <c>null</c> to deny. Precedence (most
+    /// specific standing first, so the audit row records the narrowest right
+    /// that applied): the row's **author** (
+    /// <see cref="AccessVia.Owner"/>); a **GlobalAdmin**
+    /// (<see cref="AccessVia.Admin"/>); and, on the **community** lane only
+    /// (a <see cref="Kumunita.Core.Identity.Roles.ModeratorComponent"/> claim
+    /// scoped to the post's component) — a **Moderator**
+    /// (<see cref="AccessVia.Moderator"/>). The group lane has no
+    /// component-moderator standing (ADR 0007).
+    /// </summary>
+    private static AccessVia? ResolveTranslationStanding(
+        bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(rowAuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
+        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            return AccessVia.Admin;
+
+        if (!isGroupLane
+            && !string.IsNullOrEmpty(componentId)
+            && actorRoles.Contains(Identity.Roles.ModeratorComponent(componentId)))
+            return AccessVia.Moderator;
+
+        return null;
+    }
 }

@@ -26,6 +26,16 @@ public static class M3DocTypes
         opts.Schema.For<Post>();
         opts.Schema.For<PostReply>();
 
+        // User-added translations (ADR 0022; the "separate, later feature" ADR
+        // 0018 deferred). Each is one row per (parent, language) pair — the
+        // (PostId|ReplyId, LanguageCode) unique index enforces that at the DB
+        // layer (the M1 ComponentMembership / GroupMembership business-key
+        // convention; the surrogate Id is the document identity).
+        opts.Schema.For<PostTranslation>()
+               .UniqueIndex(t => t.PostId, t => t.LanguageCode);
+        opts.Schema.For<ReplyTranslation>()
+               .UniqueIndex(t => t.ReplyId, t => t.LanguageCode);
+
         // Report: table-in-M3 / flow-in-M3b (design doc §2.2 + §2.6 flag). The
         // table is registered now for forward compatibility; the workflow
         // (file / assign / unlock / resolve) is M3b's, and M3b will add the

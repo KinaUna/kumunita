@@ -324,10 +324,36 @@ public sealed class PostsController(
         // <see cref="Kumunita.Web.Models.ReplyItem.AuthorDisplayName"/>
         // is a <c>GetProfileAsync</c> read (the N+1 acceptable — the
         // reply count is small by design; one-level).
+        // ADR 0022 — the post's user-added translations (a "a read, not a
+        // decision" surface; the parent's single Read decision already ran in
+        // GetPostAsync) and the enabled-catalog language set the chips /
+        // "add a translation" candidate list render from.
+        var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
+        var enabledLanguages = await SeedLanguagePickerAsync();
+        var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var languages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
+            .ToList();
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        var canTranslate = PostService.CanAddTranslation(
+            result.Post.GroupId.Length > 0, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
+
+        // Batch-load every reply's translations up front (one query for the
+        // whole reply list — the M2 read-lane "one query per surface" preference).
+        var replyIds = result.Replies.Select(r => r.Id).ToList();
+        var allReplyTranslations = await posts.GetReplyTranslationsAsync(replyIds);
+        var translationsByReply = allReplyTranslations
+            .GroupBy(t => t.ReplyId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Kumunita.Core.Posts.ReplyTranslation>)g.ToList());
+
         var replyItems = new List<ReplyItem>(result.Replies.Count);
         foreach (var reply in result.Replies)
         {
             var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
+            // ADR 0022 — the reply's standing is its parent's (community lane,
+            // same component scope); the reply's own author is the Owner branch.
+            var canTranslateReply = PostService.CanAddTranslation(
+                result.Post.GroupId.Length > 0, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
             replyItems.Add(new ReplyItem(
                 reply.Id,
                 replyAuthorProfile?.DisplayName ?? reply.AuthorId,
@@ -335,7 +361,9 @@ public sealed class PostsController(
                 reply.Body,
                 reply.Created,
                 reply.Modified,
-                reply.AuthorId == actor));
+                reply.AuthorId == actor,
+                translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
+                canTranslateReply));
         }
 
         // ADR 0018 — the reply form's authored-in language picker options
@@ -343,7 +371,7 @@ public sealed class PostsController(
         // on ViewData (the same read-only channel the composer's grant
         // picker uses — the detail VM is a projection, not a form-bound
         // model, so it does not carry picker option lists).
-        ViewData["Reply_Languages"] = await SeedLanguagePickerAsync();
+        ViewData["Reply_Languages"] = enabledLanguages;
 
         return View(new PostDetailViewModel
         {
@@ -352,6 +380,9 @@ public sealed class PostsController(
             AuthorSubjectId = result.Post.AuthorId,
             Replies = replyItems,
             IsAuthor = result.Post.AuthorId == actor,
+            PostTranslations = postTranslations,
+            Languages = languages,
+            CanTranslate = canTranslate,
         });
     }
 
@@ -1027,6 +1058,172 @@ public sealed class PostsController(
 
         TempData["info"] = "Reply updated.";
         return Redirect($"/posts/{id}");
+    }
+
+    // ── Translations (ADR 0022) — user-added post / reply translations ────
+
+    /// <summary>
+    /// Adds a **user-added translation** of the post into
+    /// <paramref name="languageCode"/> (ADR 0022):
+    /// <c>POST /posts/{id}/translations</c>. A thin Web lane (ADR 0006-D:
+    /// routes + shape) that delegates the write + standing decision to
+    /// <see cref="PostService.AddPostTranslationAsync"/> (the standing
+    /// — author / community moderator / GlobalAdmin — is re-pinned
+    /// server-side; the detail page's <see cref="PostDetailViewModel
+    /// .CanTranslate"/> is only the display affordance).
+    /// <para>
+    /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the post
+    /// (re-run the parent's single <c>Read</c> decision via
+    /// <see cref="PostService.GetPostAsync"/> — the exact <c>Replies</c> /
+    /// <c>EditReply</c> precedent; a <c>Post = null</c> shape is a 403). A
+    /// denied standing actor is a 403 (<see cref="UnauthorizedAccessException"/>
+    /// → <c>Forbid()</c>; a re-render would leak content to a non-qualifying
+    /// actor); a missing post is a 404.
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3):</b> the controller owns the
+    /// <see cref="IDocumentStore.LightweightSession()"/>; the service's
+    /// <c>SaveChangesAsync</c> is the single write — the
+    /// <see cref="PostTranslation"/> row and its <c>AccessAudit</c> row commit
+    /// atomically.
+    /// </para>
+    /// </summary>
+    [HttpPost("/posts/{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        // C-M3·1 precondition: the viewer must be able to see the post.
+        var existing = await posts.GetPostAsync(id, actor);
+        if (existing.Post is null)
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddPostTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a reply into
+    /// <paramref name="languageCode"/> (ADR 0022):
+    /// <c>POST /posts/{id}/replies/{replyId}/translations</c>. A thin Web lane
+    /// (ADR 0006-D) delegating to <see cref="PostService
+    /// .AddReplyTranslationAsync"/> (standing re-pinned server-side). Body-only
+    /// (a reply has no title — C-M3·1). Precondition + session shape mirror
+    /// <see cref="AddTranslation"/>; a denied standing actor is a 403, a missing
+    /// post/reply a 404 / 403 (the component lane's non-leaky posture).
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddReplyTranslation(
+        [FromRoute] string id, [FromRoute] string replyId, [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        // C-M3·1 precondition + the reply must be under this post (the EditReply
+        // precedent — a replyId on a different post is not reachable here).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddReplyTranslationAsync(
+                replyId,
+                languageCode,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
+    /// <c>TempData</c> confirmation message (a display convenience — a
+    /// <see cref="Kumunita.Core.Localization.ILocalizationService
+    /// .ListLanguagesAsync"/> read, not a decision). Falls back to the raw
+    /// code when the language is not in the catalog (a never-blank shape).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync();
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 
     // ── Report (POST /posts/{id}/report) — M3b U8 resident-facing intake ────

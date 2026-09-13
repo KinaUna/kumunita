@@ -26,3 +26,4 @@ Decision / Consequences. New decisions take the next number.
 | 0019 | Timezone: platform default (admin) + per-resident override | Accepted |
 | 0020 | Date & time format: platform default (admin) + per-resident override + custom | Accepted |
 | 0021 | Translator role: delegate translation editing to non-admin residents | Accepted |
+| 0022 | User-added post & reply translations (the lane ADR 0018 deferred) | Accepted |

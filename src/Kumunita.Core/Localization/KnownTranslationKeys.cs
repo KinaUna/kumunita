@@ -302,6 +302,15 @@ public static class KnownTranslationKeys
             ["posts.reply_save"] = "Save",
             ["posts.reply_edited"] = "edited",
 
+            // ── posts (Detail page) — user-added translations (ADR 0022) ──
+            ["posts.translations_label"] = "Translations",
+            ["posts.translations_none"] = "none yet",
+            ["posts.translation_add"] = "Add a",
+            ["posts.translation_title_label"] = "title",
+            ["posts.translation_body_label"] = "Body",
+            ["posts.translation_optional"] = "optional",
+            ["posts.translation_save"] = "Save translation",
+
             // ── groups (Create page) ─────────────────────────────────────────
             ["groups.create_back"] = "← Back to groups",
             ["groups.create_title"] = "Create a group",

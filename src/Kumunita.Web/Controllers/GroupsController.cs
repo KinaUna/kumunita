@@ -816,10 +816,35 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
 
         var authorProfile = await userInfo.GetProfileAsync(result.Post.AuthorId);
 
+        // ADR 0022 (group lane) — the post's user-added translations, the
+        // enabled-catalog language set the chips / "add a translation"
+        // candidate list render from, and the standing flag. On the group lane
+        // the standing is author ∪ GlobalAdmin only (the component-moderator
+        // branch is excluded by CanAddTranslation's isGroupLane flag — ADR 0007).
+        var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
+        var enabledLanguages = await SeedLanguagePickerAsync();
+        var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var languages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
+            .ToList();
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        var canTranslate = PostService.CanAddTranslation(
+            isGroupLane: true, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
+
+        var replyIds = result.Replies.Select(r => r.Id).ToList();
+        var allReplyTranslations = await posts.GetReplyTranslationsAsync(replyIds);
+        var translationsByReply = allReplyTranslations
+            .GroupBy(t => t.ReplyId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Kumunita.Core.Posts.ReplyTranslation>)g.ToList());
+
         var replyItems = new List<ReplyItem>(result.Replies.Count);
         foreach (var reply in result.Replies)
         {
             var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
+            // ADR 0022 (group lane) — the reply's standing is its parent's:
+            // author ∪ GlobalAdmin (no component-moderator branch, ADR 0007).
+            var canTranslateReply = PostService.CanAddTranslation(
+                isGroupLane: true, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
             replyItems.Add(new ReplyItem(
                 reply.Id,
                 replyAuthorProfile?.DisplayName ?? reply.AuthorId,
@@ -827,14 +852,16 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 reply.Body,
                 reply.Created,
                 reply.Modified,
-                reply.AuthorId == actor));
+                reply.AuthorId == actor,
+                translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
+                canTranslateReply));
         }
 
         // ADR 0018 — the reply form's authored-in language picker options
         // (the enabled catalog), stored on ViewData (the same read-only
         // channel the post detail page uses — the detail VM is a projection,
         // not a form-bound model).
-        ViewData["Reply_Languages"] = await SeedLanguagePickerAsync();
+        ViewData["Reply_Languages"] = enabledLanguages;
 
         return View("PostDetail", new GroupPostDetailViewModel
         {
@@ -844,6 +871,9 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             AuthorSubjectId = result.Post.AuthorId,
             Replies = replyItems,
             IsAuthor = result.Post.AuthorId == actor,
+            PostTranslations = postTranslations,
+            Languages = languages,
+            CanTranslate = canTranslate,
         });
     }
 
@@ -1230,5 +1260,152 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
 
         TempData["info"] = "Reply updated.";
         return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Translations (ADR 0022, group lane) ────────────────────────────────
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group post into
+    /// <paramref name="languageCode"/> (ADR 0022, group lane):
+    /// <c>POST /groups/{id}/posts/{postId}/translations</c>. A thin Web lane
+    /// (ADR 0006-D) delegating the write + standing decision to
+    /// <see cref="PostService.AddPostTranslationAsync"/>. On the group lane the
+    /// standing is **author ∪ GlobalAdmin only** (the component-moderator
+    /// branch is excluded by the service's <c>isGroupLane</c> flag — ADR 0007:
+    /// a group has no component-moderator scope). A denied standing actor is a
+    /// 404 (the group lane's non-leaky fail-closed shape — a 403 on a POST would
+    /// advertise a gate; the register's non-member-404 pin).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddPostTranslation(
+        string id, string postId, [FromForm] string? languageCode, [FromForm] string? title, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // The parent's single group-lane decision (G·7) is the precondition:
+        // non-member, missing post, or lane mismatch all return Post = null → 404.
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddPostTranslationAsync(
+                postId,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Denied standing → the group lane's 404 fail-closed shape (the
+            // EditGroupPostReply precedent; a 403 would advertise a gate).
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group post's reply into
+    /// <paramref name="languageCode"/> (ADR 0022, group lane):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations</c>.
+    /// Standing (author ∪ GlobalAdmin, no component-moderator branch — ADR 0007)
+    /// + fail-closed-404 shape mirror <see cref="AddPostTranslation"/>; the
+    /// reply must be under this post (the <see cref="EditGroupPostReply"/>
+    /// precedent).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddReplyTranslationAsync(
+                replyId,
+                languageCode,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
+    /// <c>TempData</c> confirmation message (a display convenience — a
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> read, not a
+    /// decision). Falls back to the raw code when the language is not in the
+    /// catalog (a never-blank shape).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync();
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 }

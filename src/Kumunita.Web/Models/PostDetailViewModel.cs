@@ -27,6 +27,18 @@ namespace Kumunita.Web.Models;
 /// §9 analog: the view has *no channel* to render a denied post).
 /// </para>
 /// </summary>
+/// <summary>
+/// One <b>supported language</b> on the detail surface (ADR 0022): a
+/// <see cref="Kumunita.Core.Localization.LanguageCatalog"/> enabled row
+/// (ordered by <c>SortOrder</c>) plus whether the item already
+/// <b>has</b> a user-added translation into it. <see cref="HasTranslation"/>
+/// true ⇒ the language renders as an "available" chip and offers the
+/// translation's title/body for selection; false ⇒ the language is a
+/// candidate for the "add a translation" lane (offered only when
+/// <see cref="PostDetailViewModel.CanTranslate"/> is set).
+/// </summary>
+public sealed record LanguageOption(string Code, string NativeName, bool HasTranslation);
+
 public sealed class PostDetailViewModel
 {
     public Post Post { get; set; } = null!;
@@ -39,6 +51,27 @@ public sealed class PostDetailViewModel
     public string AuthorSubjectId { get; set; } = string.Empty;
     public IReadOnlyList<ReplyItem> Replies { get; set; } = [];
     public bool IsAuthor { get; set; }
+
+    // ── ADR 0022 — user-added post translations ──
+
+    /// <summary>The post's user-added translations, keyed by their target
+    /// language code (an <see cref="IReadOnlyList{Kumunita.Core.Posts.PostTranslation}"/>
+    /// projection — a "a read, not a decision" surface; visibility already
+    /// inherited the post's single <c>Read</c> decision).</summary>
+    public IReadOnlyList<Kumunita.Core.Posts.PostTranslation> PostTranslations { get; set; } = [];
+
+    /// <summary>Every enabled <see cref="LanguageCatalog"/> language (in
+    /// <c>SortOrder</c>) with its <see cref="LanguageOption.HasTranslation"/>
+    /// flag — the set the "available translations" chips and the
+    /// "add a translation" candidate list render from.</summary>
+    public IReadOnlyList<LanguageOption> Languages { get; set; } = [];
+
+    /// <summary>Whether the signed-in actor holds standing to
+    /// <b>add</b> a translation of this post (ADR 0022 — the author, a
+    /// community moderator, or a GlobalAdmin). A display pin, not a gate: the
+    /// real deny is the <c>PostService.AddPostTranslationAsync</c> standing
+    /// check. When false, no "add a translation" affordance renders.</summary>
+    public bool CanTranslate { get; set; }
 }
 
 /// <summary>
@@ -77,4 +110,13 @@ public sealed record ReplyItem(
     /// <see cref="Kumunita.Web.Models.GroupViewModel.GroupPostDetailViewModel.IsAuthor"/>
     /// post-level analog; computed per-reply from the reply's own
     /// <c>AuthorId</c>, not the parent post's author.</summary>
-    bool IsAuthor);
+    bool IsAuthor,
+    /// <summary>The reply's user-added translations (ADR 0022; a "a read, not a
+    /// decision" surface — inherits the reply's visibility from the parent
+    /// post's single <c>Read</c> decision). Empty when none have been added.</summary>
+    IReadOnlyList<Kumunita.Core.Posts.ReplyTranslation> Translations,
+    /// <summary>Whether the signed-in actor holds standing to
+    /// <b>add</b> a translation of this reply (ADR 0022 — the author, a
+    /// community moderator, or a GlobalAdmin). A display pin, not a gate; the
+    /// real deny is <c>PostService.AddReplyTranslationAsync</c>.</summary>
+    bool CanTranslate);

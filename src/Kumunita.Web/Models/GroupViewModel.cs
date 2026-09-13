@@ -327,6 +327,27 @@ public sealed class GroupPostDetailViewModel
     /// pin, not a gate — the M3 <see cref="PostDetailViewModel.IsAuthor"/>
     /// analog).</summary>
     public bool IsAuthor { get; set; }
+
+    // ── ADR 0022 — user-added post translations (group lane) ──
+
+    /// <summary>The post's user-added translations, keyed by their target
+    /// language code (a "a read, not a decision" surface; visibility already
+    /// inherited the post's single group-lane decision).</summary>
+    public IReadOnlyList<Kumunita.Core.Posts.PostTranslation> PostTranslations { get; set; } = [];
+
+    /// <summary>Every enabled <see cref="Kumunita.Core.Localization.LanguageCatalog"/>
+    /// language (in <c>SortOrder</c>) with its
+    /// <see cref="LanguageOption.HasTranslation"/> flag — the set the
+    /// "available translations" chips and the "add a translation" candidate
+    /// list render from.</summary>
+    public IReadOnlyList<LanguageOption> Languages { get; set; } = [];
+
+    /// <summary>Whether the signed-in actor holds standing to
+    /// <b>add</b> a translation of this group post (ADR 0022 — on the group
+    /// lane that is the author or a GlobalAdmin only; the component-moderator
+    /// standing does not reach a group lane, ADR 0007). A display pin, not a
+    /// gate.</summary>
+    public bool CanTranslate { get; set; }
 }
 
 /// <summary>
