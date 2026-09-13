@@ -1,0 +1,57 @@
+@model Kumunita.Web.Controllers.AdminDateFormatController.DateFormatAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Platform default date & time format";
+    bool showCustom = !Model.CurrentIsPreset;
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.dateformat_title">Platform default date &amp; time format</kw-l></h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+<p class="text-muted">
+    <kw-l key="admin.dateformat_lede">The date &amp; time format residents' timestamps fall back to when they have set no personal preference of their own.</kw-l>
+</p>
+
+<form method="post" action="/admin/dateformat">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="dateFormat" class="form-label"><kw-l key="admin.dateformat_label">Default date &amp; time format</kw-l></label>
+            <select class="form-select" name="format" id="dateFormat">
+                @foreach (var (label, format) in Model.Presets)
+                {
+                    <option value="@format" selected="@(format == Model.CurrentFormat ? "selected" : null)">@label — @format</option>
+                }
+                @if (showCustom)
+                {
+                    <option value="custom" selected="selected"><kw-l key="admin.dateformat_custom_label">Custom…</kw-l></option>
+                }
+            </select>
+            @if (showCustom)
+            {
+                <input type="text" class="form-control mt-2" name="customFormat" id="customFormat"
+                       value="@Model.CurrentFormat" placeholder="yyyy-MM-dd HH:mm" />
+                <div class="form-text small"><kw-l key="admin.dateformat_custom_hint">A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.</kw-l></div>
+            }
+            else
+            {
+                <input type="hidden" name="customFormat" value="" />
+            }
+            <div class="form-text small">
+                <kw-l key="settings.dateformat_default_note">The platform default is </kw-l><strong>@Model.CurrentFormat</strong><kw-l key="settings.dateformat_default_tail">. If a resident resets their preference, this value is used.</kw-l>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.dateformat_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

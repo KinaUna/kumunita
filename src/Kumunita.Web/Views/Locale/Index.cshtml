@@ -93,3 +93,53 @@
         <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.timezone_reset">Reset to platform default</kw-l></button>
     </form>
 }
+
+@if (Model.DateFormat is var df && df is not null)
+{
+    <h2 class="mt-4"><kw-l key="settings.dateformat_title">Date &amp; time format</kw-l></h2>
+    <p class="text-muted">
+        <kw-l key="settings.dateformat_lede">Pick how dates and times are shown to you. Your choice is saved on your account — it takes effect the next time you load a page, and never affects other residents.</kw-l>
+    </p>
+
+    <form method="post" action="/settings/dateformat">
+        @Html.AntiForgeryToken()
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-8">
+                <label for="dateFormat" class="form-label"><kw-l key="settings.dateformat_label">Your date &amp; time format</kw-l></label>
+                <select class="form-select" name="format" id="dateFormat">
+                    @foreach (var (label, format) in df.Presets)
+                    {
+                        <option value="@format" selected="@(format == df.SelectedFormat ? "selected" : null)">@label — @format</option>
+                    }
+                    @if (!df.CurrentIsPreset)
+                    {
+                        <option value="custom" selected="selected"><kw-l key="settings.dateformat_custom_label">Custom…</kw-l></option>
+                    }
+                </select>
+                @if (!df.CurrentIsPreset)
+                {
+                    <input type="text" class="form-control mt-2" name="customFormat" id="customFormat"
+                           value="@df.SelectedFormat" placeholder="yyyy-MM-dd HH:mm" />
+                    <div class="form-text small"><kw-l key="settings.dateformat_custom_hint">A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.</kw-l></div>
+                }
+                else
+                {
+                    <input type="hidden" name="customFormat" value="" />
+                }
+                <div class="form-text small">
+                    <kw-l key="settings.dateformat_default_note">The platform default is </kw-l><strong>@df.DefaultFormat</strong><kw-l key="settings.dateformat_default_tail">. If you reset your preference, the platform default is used.</kw-l>
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <button type="submit" class="btn btn-primary"><kw-l key="settings.dateformat_save">Save</kw-l></button>
+            </div>
+        </div>
+    </form>
+
+    <form method="post" action="/settings/dateformat" class="mt-3"
+          onsubmit="return confirm('Reset your date &amp; time format to the platform default?');">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="clear" value="1" />
+        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.dateformat_reset">Reset to platform default</kw-l></button>
+    </form>
+}

@@ -110,6 +110,23 @@ public static class KnownTranslationKeys
             ["settings.timezone_save"]         = "Save",
             ["settings.timezone_unknown"]      = "Unknown time zone",
 
+            // ── settings — date format (ADR 0020: the user-override section +
+            // the admin platform-default surface) ──────────────────────────
+            ["settings.dateformat_title"]        = "Date & time format",
+            ["settings.dateformat_lede"]         =
+                "Pick how dates and times are shown to you. Your choice is saved on your account — " +
+                "it takes effect the next time you load a page, and never affects other residents.",
+            ["settings.dateformat_label"]        = "Your date & time format",
+            ["settings.dateformat_default_marker"] = "— platform default",
+            ["settings.dateformat_default_note"] = "The platform default is ",
+            ["settings.dateformat_default_tail"] =
+                ". If you reset your preference, the platform default is used.",
+            ["settings.dateformat_custom_label"] = "Custom format",
+            ["settings.dateformat_custom_hint"]  =
+                "A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.",
+            ["settings.dateformat_reset"]        = "Reset to platform default",
+            ["settings.dateformat_save"]         = "Save",
+
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
             ["admin.timezone_title"]    = "Platform default time zone",
@@ -118,6 +135,18 @@ public static class KnownTranslationKeys
                 "preference of their own.",
             ["admin.timezone_label"]    = "Default time zone",
             ["admin.timezone_save"]     = "Save",
+
+            // ── admin — the platform-default date format (the /admin/dateformat
+            // surface, the global-admin control plane; ADR 0020) ────────────
+            ["admin.dateformat_title"]    = "Platform default date & time format",
+            ["admin.dateformat_lede"]     =
+                "The date & time format residents' timestamps fall back to when they have set no " +
+                "personal preference of their own.",
+            ["admin.dateformat_label"]    = "Default date & time format",
+            ["admin.dateformat_custom_label"] = "Custom format",
+            ["admin.dateformat_custom_hint"]  =
+                "A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.",
+            ["admin.dateformat_save"]     = "Save",
 
             // ── home (the hero + section lead; _Layout-independent) ─────────
             ["home.eyebrow"] = "Where this project stands",

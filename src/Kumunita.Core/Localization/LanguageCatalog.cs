@@ -44,4 +44,16 @@ public sealed class LocaleSettings
     /// (ADR 0004 §B.1); the first-boot seeder materializes it to <c>UTC</c>.
     /// </summary>
     public string DefaultTimezone { get; set; } = "UTC";
+
+    /// <summary>
+    /// The instance's <b>default</b> date-time <i>format</i> — a .NET custom
+    /// datetime format string (ADR 0020) — the fallback a resident's
+    /// timestamps are <b>formatted</b> in when they have set no
+    /// <c>Profile.DateFormat</c> override (the same "preference if present →
+    /// instance default → floor" resolution order as
+    /// <see cref="DefaultTimezone"/>). An *additive* field on the singleton
+    /// (ADR 0004 §B.1); the first-boot seeder materializes it to the floor
+    /// (the "Long" preset, <see cref="DateFormat.FloorFormat"/>).
+    /// </summary>
+    public string DefaultDateFormat { get; set; } = DateFormat.FloorFormat;
 }

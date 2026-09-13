@@ -264,7 +264,15 @@ public static class FirstBootSeeder
             // `UTC` is the neutral, unambiguous default for a fresh instance (the
             // POCO initializer also defaults to `UTC`; set here explicitly for parity
             // with DefaultLanguageCode and to make the seed's intent visible).
-            DefaultTimezone = "UTC"
+            DefaultTimezone = "UTC",
+            // ADR 0020 — the platform default date-time format (the fallback a
+            // resident's timestamps are formatted in when they have set no
+            // Profile.DateFormat override). The floor (DateFormat.FloorFormat =
+            // the "Long" preset) is the least-ambiguous of the presets (the month
+            // spelled out, day/_year never confused); the POCO initializer also
+            // defaults to it — set here explicitly for parity with the other two
+            // seeded defaults and to make the seed's intent visible.
+            DefaultDateFormat = Localization.DateFormat.FloorFormat
         });
 
         await session.SaveChangesAsync();

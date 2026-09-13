@@ -644,6 +644,66 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("UTC", await svc.GetDefaultTimezoneAsync());
     }
 
+    // 22 — Admin_SetDefaultDateFormat_AuditRowShape_ViaAdmin (ADR 0020)
+    // Mirrors test 20 (the timezone audit-row-shape pin), but for the date-format
+    // seam: one `dateformat.set-default` row, Via = Admin, TargetKind
+    // "dateformat", TargetId = the format string.
+    [Fact]
+    public async Task Admin_SetDefaultDateFormat_AuditRowShape_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+
+        const string actor = "admin-a22";
+        var svc = new LocalizationService(store);
+
+        // A known-good format string (a curated preset — the invariant is that
+        // the audit row shape is driven by the format string, not by a preset).
+        const string fmt = DateFormat.IsoFormat;
+        await svc.SetDefaultDateFormatAsync(fmt, actor);
+
+        var audits = await AuditRows(store, action: "dateformat.set-default");
+        Assert.Single(audits);
+        var row = audits[0];
+        Assert.Equal("dateformat.set-default", row.Action);
+        Assert.Equal("dateformat", row.TargetKind);
+        Assert.Equal(fmt, row.TargetId);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(actor, row.ActorId);
+
+        // And the value is live on the very next read (M·4: data, not config).
+        Assert.Equal(fmt, await svc.GetDefaultDateFormatAsync());
+    }
+
+    // 23 — Admin_SetDefaultDateFormat_FailClosed_NoAuditRow (ADR 0020)
+    // Mirrors test 21 (the timezone fail-closed pin): a blank / unusable format
+    // string must fail closed — the throw happens before any write, so no
+    // `dateformat.set-default` row is committed (and no *other* row either).
+    [Fact]
+    public async Task Admin_SetDefaultDateFormat_FailClosed_NoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+
+        const string actor = "admin-a23";
+        var svc = new LocalizationService(store);
+
+        // A blank string is unambiguously invalid (DateFormat.IsValid(false)).
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.SetDefaultDateFormatAsync("   ", actor));
+
+        // The fail-closed **absence**: no audit row at all (not just no
+        // dateformat.set-default row — the throw happens before the session's
+        // write lane is entered).
+        var audits = await AuditRows(store);
+        Assert.Empty(audits);
+
+        // And the pre-seed default (the floor) is unchanged — a read through
+        // the service's own read lane proves the state did not shift.
+        Assert.Equal(DateFormat.FloorFormat, await svc.GetDefaultDateFormatAsync());
+    }
+
     // ── Shared helpers ───────────────────────────────────────────────────────
 
     /// <summary>

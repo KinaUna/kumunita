@@ -91,6 +91,44 @@ public interface ILocalizationService
     /// <paramref name="timezoneId"/> is not a valid IANA time zone id.</exception>
     Task SetDefaultTimezoneAsync(string timezoneId, string actorId);
 
+    // ── Date format — the instance default (ADR 0020; the admin platform-
+    // default write lane + read seam, mirroring the timezone pair exactly) ─
+
+    /// <summary>
+    /// The instance's <b>default</b> date-time format string (ADR 0020 read
+    /// seam) — the <see cref="LocaleSettings.DefaultDateFormat"/> with the
+    /// <see cref="DateFormat.FloorFormat"/> floor (a missing singleton or blank
+    /// stored value yields the floor). A read: **no audit row** (matching
+    /// <see cref="GetDefaultTimezoneAsync"/>). The <b>fallback</b> a resident's
+    /// timestamps are formatted in when they have set no
+    /// <c>Profile.DateFormat</c> override; the Web resolution helper (the
+    /// <c>kw-dt</c> TagHelper) prefers the signed-in actor's
+    /// <c>Profile.DateFormat</c> and falls through to this value, then to the
+    /// floor.
+    /// </summary>
+    Task<string> GetDefaultDateFormatAsync();
+
+    /// <summary>
+    /// Sets the instance's <b>default</b> date-time format string (the fallback
+    /// a resident's timestamps are formatted in when they have set no personal
+    /// override — ADR 0020). <paramref name="formatString"/> is a .NET custom
+    /// datetime format string (e.g. <c>yyyy-MM-dd HH:mm</c>); it is validated
+    /// (via <see cref="DateFormat.IsValid"/>) and a blank or unusable string
+    /// throws <see cref="System.InvalidOperationException"/> **before** any
+    /// write (fail-closed, the <see cref="RemoveLanguageAsync"/> pin — **no
+    /// audit row** for the blocked attempt). On success appends **exactly one**
+    /// <c>AccessAudit</c> row — action <c>dateformat.set-default</c>,
+    /// <c>TargetKind</c> "dateformat", <c>TargetId</c> = the format string,
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in the same session as the singleton write
+    /// (invariant C3). Live on the very next
+    /// <see cref="GetDefaultDateFormatAsync"/> call (M·4: data, not config).
+    /// </summary>
+    /// <exception cref="System.InvalidOperationException">
+    /// <paramref name="formatString"/> is blank or not a usable .NET custom
+    /// datetime format string.</exception>
+    Task SetDefaultDateFormatAsync(string formatString, string actorId);
+
     // ── UI strings — TargetKind "translation" ───────────────────────
     Task<TranslationResource?> GetTranslationAsync(string key, string languageCode);
 

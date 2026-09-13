@@ -58,9 +58,9 @@ public sealed class LocaleController(
         // The time-zone section's actor + current override (null-safe: an
         // unauthenticated request has no subject and no profile read).
         string? subject = SubjectId(User);
-        string? currentTz = subject is null
-            ? null
-            : (await userInfo.GetProfileAsync(subject))?.TimeZone;
+        Profile? profile = subject is null ? null : await userInfo.GetProfileAsync(subject);
+        string? currentTz = profile?.TimeZone;
+        string? currentDf = profile?.DateFormat;
 
         // The instance default (M·1: preference → default → "en").
         // ILocalizationService does not expose a GetDefaultLanguageAsync;
@@ -87,6 +87,8 @@ public sealed class LocaleController(
             // the platform default), and the platform default for the marker.
             Timezone = BuildTimezoneSection(subject, currentTz,
                 defaultTz: await localization.GetDefaultTimezoneAsync()),
+            DateFormat = BuildDateFormatSection(subject, currentDf,
+                defaultFmt: await localization.GetDefaultDateFormatAsync()),
         };
 
         return View(model);
@@ -111,6 +113,34 @@ public sealed class LocaleController(
             CurrentId = currentTz,
             SelectedId = selected,
             DefaultId = defaultTz,
+        };
+    }
+
+    /// <summary>Seeds the date-time format section of
+    /// <see cref="LocaleSettingsViewModel"/>. Extracted (static) so the tests
+    /// can target the shaping directly, without an HTTP action round-trip —
+    /// the same shape as <see cref="BuildTimezoneSection"/></summary>
+    private static LocaleSettingsViewModel.DateFormatSettings? BuildDateFormatSection(
+        string? subject, string? currentFmt, string defaultFmt)
+    {
+        if (subject is null) return null;
+
+        // The "current" marker is always a concrete format string: the
+        // override if set, else the platform default (the timezone section's
+        // same "default marker" shape).
+        string selected = string.IsNullOrWhiteSpace(currentFmt) ? defaultFmt : currentFmt;
+
+        return new LocaleSettingsViewModel.DateFormatSettings
+        {
+            Presets = Kumunita.Core.Localization.DateFormat.Presets
+                .Select(p => (p.Label, p.Format))
+                .ToList(),
+            CurrentFormat = currentFmt,
+            SelectedFormat = selected,
+            DefaultFormat = defaultFmt,
+            // A preset (Match returns the preset) → no custom box; a custom
+            // format string (Match returns null) → the view reveals the box.
+            CurrentIsPreset = Kumunita.Core.Localization.DateFormat.Match(selected) is not null,
         };
     }
 
@@ -189,6 +219,62 @@ public sealed class LocaleController(
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// <c>POST /settings/dateformat</c> — the date-time format section save
+    /// (ADR 0020). With a <c>format</c> (a preset) or <c>customFormat</c> (a
+    /// free-text .NET custom datetime format string) form value:
+    /// <see cref="IUserInfoService.SetProfileDateFormatAsync"/> (sets the
+    /// override; the self-scope check is this page's <c>[Authorize]</c> gate +
+    /// the actor being the subject). With <c>clear=1</c>: the same lane with a
+    /// <c>null</c> value (the "reset to platform default" action — the next
+    /// request resolves to the instance default). A missing profile (an
+    /// edge-case pre-bootstrap account) fails closed: the lane throws
+    /// <c>KeyNotFoundException</c> and we surface the error + redirect (the
+    /// <c>SetProfileTimezoneAsync</c> pin).
+    /// </summary>
+    [HttpPost("/settings/dateformat")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveDateFormat(string? format, string? customFormat, string? clear)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+            return RedirectToAction(nameof(Index));
+
+        // The select posts the preset's format string as `format`; when "Custom…"
+        // is chosen it posts `customFormat` = the free-text value (and `format`
+        // = "custom"). A blank/`"custom"` `customFormat` means "use the preset".
+        // The user lane stores whatever it's given (no validation — the resolver
+        // degrades a bad value to the default / floor, the ADR 0019 posture);
+        // the admin lane is the one that fail-closes with a 409.
+        bool hasCustom = !string.IsNullOrWhiteSpace(customFormat) && customFormat != "custom";
+        string? chosen = hasCustom ? customFormat : format;
+
+        try
+        {
+            if (clear == "1")
+            {
+                // null ⇒ clear (the lane stores + saves, so the clear persists
+                // — the next request resolves to the instance default).
+                await userInfo.SetProfileDateFormatAsync(subject, null, subject);
+                TempData["info"] = "Date & time format reset — the platform default will be used.";
+            }
+            else if (!string.IsNullOrWhiteSpace(chosen))
+            {
+                await userInfo.SetProfileDateFormatAsync(subject, chosen, subject);
+                TempData["info"] = "Date & time format set — it takes effect on the next request.";
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            // A pre-bootstrap edge (no profile row). Fail closed + surface the
+            // error; the lane never load-or-creates (the SetProfileTimezoneAsync
+            // pin), so nothing is half-written.
+            TempData["error"] = "Your profile is not available — sign out and back in.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── View model (public nested type so the Razor view can bind to it) ──
 
     public sealed class LocaleSettingsViewModel
@@ -201,6 +287,11 @@ public sealed class LocaleController(
         /// caller has no subject (a signed-out visitor — the <c>/language</c>
         /// quick picker renders the language section only).</summary>
         public TimezoneSettings? Timezone { get; init; }
+
+        /// <summary>The date-time format section (ADR 0020), or <c>null</c>
+        /// when the caller has no subject (the public quick picker renders the
+        /// language section only).</summary>
+        public DateFormatSettings? DateFormat { get; init; }
 
         /// <summary>The time-zone section of the settings page (ADR 0019) —
         /// the former <c>TimezoneController.TimezoneSettingsViewModel</c>,
@@ -222,6 +313,36 @@ public sealed class LocaleController(
             /// <summary>The platform default (the "default" marker in the
             /// picker).</summary>
             public string DefaultId { get; init; } = "UTC";
+        }
+
+        /// <summary>The date-time format section of the settings page (ADR
+        /// 0020) — the same shape as <see cref="TimezoneSettings"/>, but the
+        /// picker offers the curated
+        /// <see cref="Kumunita.Core.Localization.DateFormat.Presets"/> (a
+        /// (label, format-string) list) plus a "Custom…" text box (the
+        /// resident's power-user path). The public quick picker leaves it
+        /// <c>null</c>.</summary>
+        public sealed class DateFormatSettings
+        {
+            public List<(string Label, string Format)> Presets { get; init; } = new();
+
+            /// <summary>The resident's saved override (a format string), or
+            /// <c>null</c> (no override — the platform default applies).</summary>
+            public string? CurrentFormat { get; init; }
+
+            /// <summary>The format string pre-selected in the picker (the
+            /// override if set, else the platform default).</summary>
+            public string SelectedFormat { get; init; } = Kumunita.Core.Localization.DateFormat.FloorFormat;
+
+            /// <summary>The platform default (the "default" marker in the
+            /// picker).</summary>
+            public string DefaultFormat { get; init; } = Kumunita.Core.Localization.DateFormat.FloorFormat;
+
+            /// <summary>Whether <see cref="SelectedFormat"/> is one of the
+            /// presets (true) or a custom format string (false) — the view uses
+            /// this to reveal the "Custom…" text box instead of a lambda in the
+            /// Razor markup.</summary>
+            public bool CurrentIsPreset { get; init; } = true;
         }
     }
 

@@ -117,6 +117,18 @@ builder.Services.AddScoped<
     Kumunita.Web.Localization.EffectiveTimezoneResolver,
     Kumunita.Web.Localization.EffectiveTimezoneResolver>();
 
+// ADR 0020 — the per-request effective date-time format resolver (scoped: one
+// instance per request, the first GetAsync call resolves the actor's
+// Profile.DateFormat override → the instance default → the floor and caches
+// it; the kw-dt TagHelper and the /settings + /admin date-format surfaces
+// resolve through it, so a page's many timestamps are one profile read + one
+// default read, not N of each). Web-layer, the exact companion to
+// EffectiveTimezoneResolver above (zone + format are independent resident
+// choices: ADR 0019 + ADR 0020).
+builder.Services.AddScoped<
+    Kumunita.Web.Localization.EffectiveDateFormatResolver,
+    Kumunita.Web.Localization.EffectiveDateFormatResolver>();
+
 // Identity (the only EF Core in the tree, ADR 0004): same Postgres, `identity` schema.
 builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));
 

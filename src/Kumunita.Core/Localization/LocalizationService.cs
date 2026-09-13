@@ -418,6 +418,78 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
+    public async Task<string> GetDefaultDateFormatAsync()
+    {
+        // ADR 0020 read seam: the instance default (LocaleSettings.DefaultDateFormat)
+        // with the floor (DateFormat.FloorFormat) — a missing singleton or a blank
+        // stored value both yield the floor. A read (no audit row), like
+        // GetDefaultTimezoneAsync.
+        await using var session = _store.QuerySession();
+        var ct = System.Threading.CancellationToken.None;
+
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultDateFormat))
+            return settings.DefaultDateFormat;
+
+        return DateFormat.FloorFormat;
+    }
+
+    /// <inheritdoc />
+    public async Task SetDefaultDateFormatAsync(string formatString, string actorId)
+    {
+        // ADR 0020 — the instance-default write lane (mirrors
+        // SetDefaultTimezoneAsync's audited shape; the M·6 single audit row).
+        //
+        // Fail-closed (the M·7 / RemoveLanguageAsync pin): validate the .NET
+        // format string *before* any write (DateFormat.IsValid — a blank or a
+        // string .NET cannot apply throws here). **No audit row** is committed
+        // for the blocked attempt.
+        if (!DateFormat.IsValid(formatString))
+            throw new InvalidOperationException($"Unknown date format: {formatString}");
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = _store.OpenSession(new SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetDefaultTimezoneAsync shape) and
+        // set the default; the resident override (Profile.DateFormat) is
+        // untouched — this is the *platform default* only.
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new LocaleSettings { DefaultDateFormat = formatString };
+        }
+        else
+        {
+            settings.DefaultDateFormat = formatString;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "dateformat.set-default",
+            TargetKind = "dateformat",
+            TargetId = formatString,
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SetDefaultTimezoneAsync(string timezoneId, string actorId)
     {
         // ADR 0019 — the instance-default write lane (mirrors

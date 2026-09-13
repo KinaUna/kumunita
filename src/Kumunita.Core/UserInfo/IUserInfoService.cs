@@ -141,6 +141,30 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileAvatarAsync"/> pin).</exception>
     Task SetProfileTimezoneAsync(string subjectId, string? timezone, string actorBy);
 
+    // ── Date format addition (ADR 0020; the *single* user-override write
+    // lane for the resident's personal date-time format — the exact shape of
+    // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's <see cref="Profile.DateFormat"/>
+    /// .NET custom datetime format string — the user's <b>override</b> of the
+    /// platform default (ADR 0020; the fallback is <see
+    /// cref="Localization.LocaleSettings.DefaultDateFormat"/> / the
+    /// <see cref="Localization.DateFormat.FloorFormat"/> floor). Mirrors
+    /// <see cref="SetProfileTimezoneAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary (the
+    /// owner is the actor); this lane writes <c>Profile.DateFormat</c> only. One
+    /// session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// Strong consistency (invariant C4): the new value is live on the very
+    /// next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

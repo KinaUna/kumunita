@@ -88,6 +88,15 @@ pick a language at `/language`, and `/about` is a static page.
   effective zone (resident override → platform default → `UTC` floor) via the
   `kw-dt` TagHelper — the same per-request resolution shape as multilingual,
   data-driven, no rebuild (ADR 0019).
+- **Date & time format** — the platform carries a **default date-time format**
+  the admin sets once (`/admin/dateformat`, audited) and each resident can
+  override in their own settings page (the date-format section of
+  `/settings/language`). A short preset list (Long / Short / ISO / Day-first)
+  plus a free-text **custom** format; the unambiguous Long format is the floor.
+  Every timestamp renders in the effective format (resident override → platform
+  default → Long floor) via the `kw-dt` TagHelper — the same per-request
+  resolution shape as timezone and multilingual, data-driven, no rebuild
+  (ADR 0020).
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered
@@ -144,6 +153,7 @@ stays trivial and the authorization rules can grow freely.
   surface + `/terms`/`/help` static pages. **Done.**
 - **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
 - **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
+- **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

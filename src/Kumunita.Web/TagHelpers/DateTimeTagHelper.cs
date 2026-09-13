@@ -43,13 +43,24 @@ namespace Kumunita.Web.TagHelpers;
 public sealed class DateTimeTagHelper : TagHelper
 {
     private readonly EffectiveTimezoneResolver _resolver;
+    private readonly EffectiveDateFormatResolver _formatResolver;
 
     /// <param name="resolver">The per-request effective-time-zone resolver
     /// (DI — scoped, one instance per request, the resolver caches its
     /// first <c>GetAsync</c> result for the request's lifetime).</param>
-    public DateTimeTagHelper(EffectiveTimezoneResolver resolver)
+    /// <param name="formatResolver">The per-request effective date-time format
+    /// resolver (ADR 0020 — scoped, one instance per request, the resolver
+    /// caches its first <c>GetAsync</c> result for the request's lifetime). The
+    /// TagHelper applies the **effective format** (override → platform
+    /// default → the <see cref="Kumunita.Core.Localization.DateFormat.FloorFormat"/>
+    /// floor); the <c>format</c> attribute is the fallback when no setting
+    /// resolves (it always does in practice, so the attribute is superseded).</param>
+    public DateTimeTagHelper(
+        EffectiveTimezoneResolver resolver,
+        EffectiveDateFormatResolver formatResolver)
     {
         _resolver = resolver;
+        _formatResolver = formatResolver;
     }
 
     /// <summary>The instant to render (a <see cref="DateTimeOffset"/> — the
@@ -79,18 +90,23 @@ public sealed class DateTimeTagHelper : TagHelper
         }
 
         var tz = await _resolver.GetAsync();
-        // The format contract is the same .NET custom format string the views
-        // were already passing to ToString — applied **after** the conversion,
-        // so the conversion (UTC instant → the effective zone) is the only
-        // change the TagHelper makes over the previous `.LocalDateTime` /
-        // `.ToLocalTime()` calls it replaces.
-        // Convert the UTC instant to the effective zone's wall-clock time by adding the zone's
-        // offset for that instant (the plain-DateTime result carries no Kind, so the format
-        // string below is authoritative), then render with the invariant culture — the zone,
-        // not the culture, is what the resident chose.
+        // ADR 0020 — the **effective format** (override → platform default →
+        // the DateFormat.FloorFormat floor) is what renders; the `format`
+        // attribute is the documented fallback when nothing resolves (it
+        // always does in practice, so the attribute is superseded by the
+        // setting). Resolved per request (cached by the resolver) so a page's
+        // many timestamps are one profile read + one default read, not N of
+        // each — the same shape as the zone resolution above.
+        var fmt = await _formatResolver.GetAsync();
+        // The conversion is applied **first** (UTC instant → the effective
+        // zone's wall-clock time), then the effective format is applied to the
+        // result. The zone and the format are independent choices (ADR 0019
+        // zone, ADR 0020 format) and both are resident-controlled — neither is
+        // the culture (render with the invariant culture, so the zone/format,
+        // not the host's locale, are what the resident sees).
         var utc = Dt.Value.UtcDateTime;
         var wallTime = utc + tz.GetUtcOffset(utc);
-        var rendered = wallTime.ToString(Format, System.Globalization.CultureInfo.InvariantCulture);
+        var rendered = wallTime.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
 
         // SetContent auto-escapes (the safer choice — the kw-l TagHelper uses
         // the same idiom); the element's inner reference is the pre-conversion

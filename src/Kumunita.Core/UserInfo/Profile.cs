@@ -109,6 +109,20 @@ public sealed class Profile
     /// field (ADR 0004 §B.1), like <see cref="AvatarId"/>.
     /// </summary>
     public string? TimeZone { get; set; }
+
+    /// <summary>
+    /// The resident's date-time <i>format</i> — a .NET custom datetime format
+    /// string (e.g. <c>yyyy-MM-dd HH:mm</c>) — the user's <b>override</b> of
+    /// the platform default (ADR 0020; <see
+    /// cref="Localization.LocaleSettings.DefaultDateFormat"/> is the fallback
+    /// when this is null). Stored as the format string itself (not a preset id)
+    /// so a resident may pick a curated preset <i>or</i> a custom format; a
+    /// preset is simply a well-known format string. Nullable: <c>null</c> means
+    /// the resident uses the instance default (the "preference if present"
+    /// shape, the same resolution order as <see cref="TimeZone"/>). An
+    /// *additive* field (ADR 0004 §B.1), like <see cref="TimeZone"/>.
+    /// </summary>
+    public string? DateFormat { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
