@@ -105,6 +105,18 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// ADR 0019 — the per-request effective-time-zone resolver (scoped: one instance
+// per request, the first GetAsync call resolves the actor's Profile.TimeZone
+// override → the instance default → the UTC floor and caches it; the kw-dt
+// TagHelper and the /settings + /admin timezone surfaces resolve through it, so
+// a page's many timestamps are one profile read + one default read, not N of
+// each). Web-layer (it reads the request principal — ADR 0006-D holds: the two
+// Core seams it composes, IUserInfoService + ILocalizationService, stay
+// HTTP-free; the actor's subject id is minted from the signed-in claim here).
+builder.Services.AddScoped<
+    Kumunita.Web.Localization.EffectiveTimezoneResolver,
+    Kumunita.Web.Localization.EffectiveTimezoneResolver>();
+
 // Identity (the only EF Core in the tree, ADR 0004): same Postgres, `identity` schema.
 builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));
 

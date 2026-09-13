@@ -27,6 +27,7 @@ public static class Milestones
         new("GP", "Group posts — the membership-scoped post channel inside a group (ADR 0013)", StatusDone),
         new("ML", "Multilingual — UI & platform texts (terms, about, help) translatable; admin manages languages (ADR 0005)", StatusDone),
         new("ML-UI", "Multilingual — live UI: every in-scope view resolves per request; seeded en floor; key-managed admin editor; public language picker (ADR 0015)", StatusDone),
+        new("TZ", "Timezone — platform default (admin) + per-resident override; timestamps rendered in the effective zone (ADR 0019)", StatusDone),
         new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),

@@ -95,6 +95,30 @@ public static class KnownTranslationKeys
             ["settings.settings"]       = "Settings",
             ["settings.choose_language"] = "Choose your language",
 
+            // ── settings — timezone (ADR 0019: the user-override page + the
+            // admin platform-default surface) ───────────────────────────────
+            ["settings.timezone_title"]        = "Time zone",
+            ["settings.timezone_lede"]         =
+                "Pick the time zone the platform shows you. Your choice is saved on your account — " +
+                "it takes effect the next time you load a page, and never affects other residents.",
+            ["settings.timezone_label"]        = "Your time zone",
+            ["settings.timezone_default_marker"] = "— platform default",
+            ["settings.timezone_default_note"] = "The platform default is ",
+            ["settings.timezone_default_tail"] =
+                ". If you reset your preference, the platform default is used.",
+            ["settings.timezone_reset"]        = "Reset to platform default",
+            ["settings.timezone_save"]         = "Save",
+            ["settings.timezone_unknown"]      = "Unknown time zone",
+
+            // ── admin — the platform-default timezone (the /admin/timezone
+            // surface, the global-admin control plane) ─────────────────────
+            ["admin.timezone_title"]    = "Platform default time zone",
+            ["admin.timezone_lede"]     =
+                "The time zone residents' timestamps fall back to when they have set no personal " +
+                "preference of their own.",
+            ["admin.timezone_label"]    = "Default time zone",
+            ["admin.timezone_save"]     = "Save",
+
             // ── home (the hero + section lead; _Layout-independent) ─────────
             ["home.eyebrow"] = "Where this project stands",
             ["home.lead"] =

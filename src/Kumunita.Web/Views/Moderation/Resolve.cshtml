@@ -35,7 +35,7 @@
             <dd class="col-sm-9">@(Model.PostAuthorName ?? "—")</dd>
 
             <dt class="col-sm-3"><kw-l key="moderation.th_filed_label">Filed</kw-l></dt>
-            <dd class="col-sm-9">@Model.At.ToLocalTime().ToString("g")</dd>
+            <dd class="col-sm-9"><kw-dt dt="@Model.At" format="g"></kw-dt></dd>
 
             <dt class="col-sm-3"><kw-l key="moderation.th_reason_label">Reason</kw-l></dt>
             <dd class="col-sm-9">

@@ -83,10 +83,10 @@
                     <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
                 </span>
                 <span>
-                    <kw-l key="announcements.by">by</kw-l> @Model.AuthorDisplayName — @Model.Created.DateTime.ToString("ddd, MMM d yyyy")
+                    <kw-l key="announcements.by">by</kw-l> @Model.AuthorDisplayName — <kw-dt dt="@Model.Created" format="ddd, MMM d yyyy"></kw-dt>
                     @if (Model.Modified is not null)
                     {
-                        <span> — <kw-l key="announcements.edited">edited</kw-l> @Model.Modified.Value.DateTime.ToString("ddd, MMM d yyyy")</span>
+                        <span> — <kw-l key="announcements.edited">edited</kw-l> <kw-dt dt="@Model.Modified.Value" format="ddd, MMM d yyyy"></kw-dt></span>
                     }
                 </span>
             </div>

@@ -258,7 +258,13 @@ public static class FirstBootSeeder
         session.Store(existingSettings ?? new LocaleSettings
         {
             Id = LocaleSettings.SingletonId,
-            DefaultLanguageCode = SourceLanguage
+            DefaultLanguageCode = SourceLanguage,
+            // ADR 0019 — the platform default timezone (the fallback a resident's
+            // timestamps render in when they have set no Profile.TimeZone override).
+            // `UTC` is the neutral, unambiguous default for a fresh instance (the
+            // POCO initializer also defaults to `UTC`; set here explicitly for parity
+            // with DefaultLanguageCode and to make the seed's intent visible).
+            DefaultTimezone = "UTC"
         });
 
         await session.SaveChangesAsync();

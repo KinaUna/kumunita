@@ -23,3 +23,4 @@ Decision / Consequences. New decisions take the next number.
 | 0016 | Group-post + reply edit lane: author-only (no moderator/admin branch) | Accepted |
 | 0017 | Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane) | Accepted |
 | 0018 | UGC authored-in language tag (posts, replies, announcements) | Accepted |
+| 0019 | Timezone: platform default (admin) + per-resident override | Accepted |

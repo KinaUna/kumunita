@@ -67,7 +67,7 @@ else
                             @(r.ReporterName ?? $"Resident {r.PostId[..Math.Min(8, r.PostId.Length)]}…")
                         </td>
                         <td>
-                            @r.At.ToLocalTime().ToString("g")
+                            <kw-dt dt="@r.At" format="g"></kw-dt>
                         </td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-primary" href="/moderation/@r.Id">

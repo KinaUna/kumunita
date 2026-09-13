@@ -81,8 +81,12 @@ pick a language at `/language`, and `/about` is a static page.
   resolves per request, with a seeded `en` floor that is always present), the
   admin edits the **closed** key list per language (no hand-typed key), a
   **signed-out** visitor can pick a language at `/language`, and `/about` renders
-  an admin-authored page or the product story.
-
+  an admin-authored page or the product story.- **Timezone** — the platform carries a **default time zone** the admin sets
+  once (`/admin/timezone`, audited); each resident can override it in their
+  own settings (`/settings/timezone`). Every timestamp renders in the
+  effective zone (resident override → platform default → `UTC` floor) via the
+  `kw-dt` TagHelper — the same per-request resolution shape as multilingual,
+  data-driven, no rebuild (ADR 0019).
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered
@@ -138,6 +142,7 @@ stays trivial and the authorization rules can grow freely.
   translatable; admin-managed language catalog & default; `/admin/languages`
   surface + `/terms`/`/help` static pages. **Done.**
 - **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
+- **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
@@ -197,5 +202,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0015)
+- `docs/adr/` — architecture decision records (0001–0019)
 - `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)

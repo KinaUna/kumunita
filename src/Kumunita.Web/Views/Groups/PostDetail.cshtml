@@ -50,10 +50,10 @@
                         <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
                     </span>
                     <span>
-                        @Model.AuthorDisplayName &middot; @Model.Post.Created.LocalDateTime.ToString("g")
+                        @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
                         @if (Model.Post.Modified is not null)
                         {
-                            <span> — <kw-l key="posts.edited">edited</kw-l> @Model.Post.Modified.Value.LocalDateTime.ToString("g")</span>
+                            <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
                         }
                     </span>
                 </div>
@@ -122,10 +122,10 @@
                                     }
                                 </div>
                                 <div>
-                                    @r.Created.LocalDateTime.ToString("d")
+                                    <kw-dt dt="@r.Created" format="d"></kw-dt>
                                     @if (r.Modified is not null)
                                     {
-                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> @r.Modified.Value.LocalDateTime.ToString("g")</span>
+                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> <kw-dt dt="@r.Modified.Value" format="g"></kw-dt></span>
                                     }
                                 </div>
                             </div>

@@ -21,6 +21,14 @@ namespace Kumunita.Core.Tests;
 /// the three-test acceptance gate (U8) runs them together with the inherited
 /// M1/M2/M3/M3b/media/group-posts anchors (no per-name isolation).
 /// </para>
+/// <para>
+/// Tests 20–21 (ADR 0019, time zone) are **additions on the same service**,
+/// not part of the ML-lane U7 pinned set — they drive the new
+/// <see cref="LocalizationService.SetDefaultTimezoneAsync"/> /
+/// <see cref="LocalizationService.GetDefaultTimezoneAsync"/> seam, pinned the
+/// same way the six ML audit-row-shape tests are (via <c>AccessAudit</c>
+/// shape, fail-closed absence on the throw path).
+/// </para>
 /// </summary>
 public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
@@ -581,6 +589,59 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         // language.remove row — the throw happens before any write).
         var audits = await AuditRows(store);
         Assert.Empty(audits);
+    }
+
+    // 20 — Admin_SetDefaultTimezone_AuditRowShape_ViaAdmin
+    [Fact]
+    public async Task Admin_SetDefaultTimezone_AuditRowShape_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+
+        const string actor = "admin-a20";
+        var svc = new LocalizationService(store);
+
+        // A known-good id (UTC exists on every OS; the invariant is that the
+        // audit row shape is driven by the id, not by a zone-family detail).
+        await svc.SetDefaultTimezoneAsync("UTC", actor);
+
+        var audits = await AuditRows(store, action: "timezone.set-default");
+        Assert.Single(audits);
+        var row = audits[0];
+        Assert.Equal("timezone.set-default", row.Action);
+        Assert.Equal("timezone", row.TargetKind);
+        Assert.Equal("UTC", row.TargetId);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(actor, row.ActorId);
+    }
+
+    // 21 — Admin_SetDefaultTimezone_FailClosed_NoAuditRow
+    // An id the OS does not have data for must fail closed: the throw
+    // happens before any write, so no `timezone.set-default` row is
+    // committed — and no *other* row is either (the lane is a single
+    // write).
+    [Fact]
+    public async Task Admin_SetDefaultTimezone_FailClosed_NoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+
+        const string actor = "admin-a21";
+        var svc = new LocalizationService(store);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.SetDefaultTimezoneAsync("Not/AZone", actor));
+
+        // The fail-closed **absence**: no audit row at all (not just no
+        // `timezone.set-default` row — the throw happens before the
+        // session's write lane is entered).
+        var audits = await AuditRows(store);
+        Assert.Empty(audits);
+
+        // And the pre-seed default (UTC) is unchanged — a read through the
+        // service's own read lane proves the state did not shift.
+        Assert.Equal("UTC", await svc.GetDefaultTimezoneAsync());
     }
 
     // ── Shared helpers ───────────────────────────────────────────────────────

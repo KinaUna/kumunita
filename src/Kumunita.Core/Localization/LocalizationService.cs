@@ -75,6 +75,25 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
+    public async Task<string> GetDefaultTimezoneAsync()
+    {
+        // ADR 0019 read seam: the instance default (LocaleSettings.DefaultTimezone)
+        // with the `UTC` floor — a missing singleton or a blank id both yield `UTC`.
+        // A read (no audit row), like GetDefaultLanguageCodeAsync.
+        await using var session = _store.QuerySession();
+        var ct = System.Threading.CancellationToken.None;
+
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultTimezone))
+            return settings.DefaultTimezone;
+
+        return "UTC";
+    }
+
+    /// <inheritdoc />
     public async Task<TranslationResource?> GetTranslationAsync(string key, string languageCode)
     {
         await using var session = _store.QuerySession();
@@ -391,6 +410,58 @@ public sealed class LocalizationService : ILocalizationService
             Action = "language.set-default",
             TargetKind = "language",
             TargetId = code,
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetDefaultTimezoneAsync(string timezoneId, string actorId)
+    {
+        // ADR 0019 — the instance-default write lane (mirrors
+        // SetDefaultLanguageAsync's audited shape; the M·6 single audit row).
+        //
+        // Fail-closed (the M·7 / RemoveLanguageAsync pin): validate the IANA id
+        // against System.TimeZoneInfo *before* any write. A blank or unknown id
+        // throws here — **no audit row** is committed for the blocked attempt.
+        if (string.IsNullOrWhiteSpace(timezoneId) ||
+            !System.TimeZoneInfo.TryFindSystemTimeZoneById(timezoneId, out _))
+            throw new InvalidOperationException($"Unknown time zone: {timezoneId}");
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = _store.OpenSession(new SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetDefaultLanguageAsync shape) and
+        // set the default; the resident override (Profile.TimeZone) is untouched
+        // — this is the *platform default* only.
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new LocaleSettings { DefaultTimezone = timezoneId };
+        }
+        else
+        {
+            settings.DefaultTimezone = timezoneId;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "timezone.set-default",
+            TargetKind = "timezone",
+            TargetId = timezoneId,
             Via = Authorization.AccessVia.Admin,
             Outcome = Authorization.AccessOutcome.Allow
         });

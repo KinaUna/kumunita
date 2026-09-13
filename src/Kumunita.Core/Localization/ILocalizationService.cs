@@ -29,6 +29,19 @@ public interface ILocalizationService
     /// </summary>
     Task<string> GetDefaultLanguageCodeAsync();
 
+    /// <summary>
+    /// The instance's <b>default</b> IANA time zone id (ADR 0019 read seam) —
+    /// the <see cref="LocaleSettings.DefaultTimezone"/> with the <c>UTC</c>
+    /// floor (a missing singleton or blank id yields <c>UTC</c>). A read:
+    /// **no audit row** (matching <see cref="GetDefaultLanguageCodeAsync"/>).
+    /// The <b>fallback</b> a resident's timestamps render in when they have
+    /// set no <c>Profile.TimeZone</c> override; the Web resolution helper (the
+    /// <c>kw-dt</c> TagHelper) prefers the signed-in actor's
+    /// <c>Profile.TimeZone</c> and falls through to this value, then to
+    /// <c>UTC</c>.
+    /// </summary>
+    Task<string> GetDefaultTimezoneAsync();
+
     /// <summary>Adds a language (BCP-47 code + native name) — audited
     /// <c>language.add</c>, TargetKind "language", TargetId = code (M·6).</summary>
     Task AddLanguageAsync(string code, string nativeName, string actorId);
@@ -54,6 +67,29 @@ public interface ILocalizationService
     /// <summary>Sets the instance default — audited <c>language.set-default</c>,
     /// TargetId = code (M·6; M10 FACES).</summary>
     Task SetDefaultLanguageAsync(string code, string actorId);
+
+    // ── Timezone — the instance default (ADR 0019; the admin platform-default
+    // write lane, mirroring SetDefaultLanguageAsync's audited shape) ──────
+
+    /// <summary>
+    /// Sets the instance's <b>default</b> time zone (the fallback a resident's
+    /// timestamps render in when they have set no personal override — ADR
+    /// 0019). <paramref name="timezoneId"/> is an IANA id (e.g.
+    /// <c>Europe/Warsaw</c>); it is validated against
+    /// <see cref="System.TimeZoneInfo"/> and a missing/unknown id throws
+    /// <see cref="System.InvalidOperationException"/> **before** any write
+    /// (fail-closed, the <see cref="RemoveLanguageAsync"/> pin — **no audit
+    /// row** for the blocked attempt). On success appends **exactly one**
+    /// <c>AccessAudit</c> row — action <c>timezone.set-default</c>,
+    /// <c>TargetKind</c> "timezone", <c>TargetId</c> = the id,
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>,
+    /// <c>Outcome = Allow</c> — in the same session as the singleton write
+    /// (invariant C3). Live on the very next
+    /// <see cref="GetDefaultTimezoneAsync"/> call (M·4: data, not config).
+    /// </summary>
+    /// <exception cref="System.InvalidOperationException">
+    /// <paramref name="timezoneId"/> is not a valid IANA time zone id.</exception>
+    Task SetDefaultTimezoneAsync(string timezoneId, string actorId);
 
     // ── UI strings — TargetKind "translation" ───────────────────────
     Task<TranslationResource?> GetTranslationAsync(string key, string languageCode);

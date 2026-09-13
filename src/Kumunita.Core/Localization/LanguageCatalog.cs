@@ -34,4 +34,14 @@ public sealed class LocaleSettings
     /// <summary>The BCP-47 code of the instance's default language (a
     /// <see cref="LanguageCatalog.Id"/> that exists and is enabled).</summary>
     public string DefaultLanguageCode { get; set; } = "en";
+
+    /// <summary>
+    /// The instance's <b>default</b> IANA time zone id (ADR 0019) — the
+    /// fallback a resident's timestamps render in when they have set no
+    /// <c>Profile.TimeZone</c> override (the "preference if present → instance
+    /// default → <c>UTC</c> floor" resolution order, the same shape as
+    /// <see cref="DefaultLanguageCode"/>). An *additive* field on the singleton
+    /// (ADR 0004 §B.1); the first-boot seeder materializes it to <c>UTC</c>.
+    /// </summary>
+    public string DefaultTimezone { get; set; } = "UTC";
 }

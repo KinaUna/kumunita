@@ -97,6 +97,18 @@ public sealed class Profile
     /// an *additive* field (ADR 0004 §B.1), like M3's `Post.Status`.
     /// </summary>
     public string? AvatarId { get; set; }
+
+    /// <summary>
+    /// The resident's IANA time zone id (e.g. <c>Europe/Warsaw</c>) — the user's
+    /// <b>override</b> of the platform default (ADR 0019; <see
+    /// cref="Localization.LocaleSettings.DefaultTimezone"/> is the fallback when
+    /// this is null). Stored as an IANA id so it is unambiguous and round-trips
+    /// with <see cref="System.TimeZoneInfo"/>. Nullable: <c>null</c> means the
+    /// resident uses the instance default (the "preference if present" shape,
+    /// the same resolution order as the language preference). An *additive*
+    /// field (ADR 0004 §B.1), like <see cref="AvatarId"/>.
+    /// </summary>
+    public string? TimeZone { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
