@@ -84,11 +84,15 @@ public interface IAnnouncementService
 
     /// <summary>
     /// Edits an existing <see cref="Announcement"/> in the <b>caller's</b>
-    /// in-flight session (invariant C3). Applies the same scope-vs-role split
-    /// as <see cref="CreateAsync"/>, but against the edited (new) scope — a
-    /// <see cref="Roles.GlobalAdmin"/> may edit either scope; a
-    /// <see cref="Roles.Moderator"/> may edit
-    /// <see cref="AnnouncementScope.Community"/> only. A denied split is a hard
+    /// in-flight session (invariant C3). The edit gate is <em>distinct</em>
+    /// from <see cref="CreateAsync"/>'s scope-vs-role split and is evaluated
+    /// against the <em>stored</em> row: a <see cref="Roles.GlobalAdmin"/> may
+    /// edit any row; a community moderator may edit a
+    /// <em>community-targeted</em> row they moderate; but a flat "all
+    /// residents" row (Community scope, no <c>CommunityId</c>) is editable
+    /// only by its <see cref="Announcement.AuthorId"/> or a
+    /// <see cref="Roles.GlobalAdmin"/> — a moderator who did not author it is
+    /// denied (ADR 0017). A denied actor is a hard
     /// <see cref="UnauthorizedAccessException"/> (the Web layer maps that to a
     /// 403); a missing id is a <see cref="KeyNotFoundException"/> (the Web
     /// layer maps that to a 404). <c>AuthorId</c>/<c>Created</c> are preserved

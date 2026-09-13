@@ -170,7 +170,7 @@ public sealed class AnnouncementService : IAnnouncementService
         ArgumentNullException.ThrowIfNull(authorRoles);
         ArgumentNullException.ThrowIfNull(session);
 
-        await EnsureWritePermissionAsync(announcement, authorRoles).ConfigureAwait(false);
+        await EnsureCreatePermissionAsync(announcement, authorRoles).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(announcement.Id))
             announcement.Id = Guid.NewGuid().ToString("N");
@@ -185,17 +185,22 @@ public sealed class AnnouncementService : IAnnouncementService
     /// <summary>
     /// Edits an existing <see cref="Announcement"/> in the <b>caller's</b>
     /// in-flight session (invariant C3, mirroring <see cref="CreateAsync"/>
-    /// and <see cref="DeleteAsync"/>'s write lane). Applies the same
-    /// scope-vs-role split as <see cref="CreateAsync"/>, but against the
-    /// <see cref="Announcement.Scope"/> of the edited document (the new
-    /// scope, if the caller is changing it — not the previously stored one,
-    /// since a scope change is itself the edit in question):
+    /// and <see cref="DeleteAsync"/>'s write lane). The edit gate is
+    /// <em>distinct</em> from the create gate (see
+    /// <see cref="EnsureEditPermissionAsync"/>) and is evaluated against the
+    /// <em>stored</em> announcement (loaded first — a missing id is a
+    /// <see cref="KeyNotFoundException"/>, the Web layer's 404):
     /// <list type="bullet">
-    /// <item><see cref="AnnouncementScope.Public"/> — the actor must hold <see cref="Roles.GlobalAdmin"/>;</item>
-    /// <item><see cref="AnnouncementScope.Community"/> — the actor must hold <see cref="Roles.GlobalAdmin"/>
-    /// <b>or</b> <see cref="Roles.Moderator"/>.</item>
+    /// <item><see cref="AnnouncementScope.Public"/> — the actor must hold <see cref="Roles.GlobalAdmin"/></item>
+    /// <item><see cref="AnnouncementScope.Community"/> with no <see cref="Announcement.CommunityId"/>
+    /// (the flat "all residents" target) — the actor must be the stored
+    /// <see cref="Announcement.AuthorId"/> or hold <see cref="Roles.GlobalAdmin"/>; a community
+    /// moderator who did not author it is <b>denied</b> (ADR 0017).</item>
+    /// <item><see cref="AnnouncementScope.Community"/> with a <see cref="Announcement.CommunityId"/>
+    /// — the actor must hold <see cref="Roles.GlobalAdmin"/> or the
+    /// <c>moderator:{CommunityId}</c> standing claim.</item>
     /// </list>
-    /// A denied split is a hard <see cref="UnauthorizedAccessException"/>
+    /// A denied actor is a hard <see cref="UnauthorizedAccessException"/>
     /// (the Web layer maps that to a 403); a missing id is a
     /// <see cref="KeyNotFoundException"/> (the Web layer maps that to a 404).
     /// <see cref="Announcement.AuthorId"/> and <see cref="Announcement.Created"/>
@@ -218,11 +223,15 @@ public sealed class AnnouncementService : IAnnouncementService
         ArgumentNullException.ThrowIfNull(actorRoles);
         ArgumentNullException.ThrowIfNull(session);
 
-        await EnsureWritePermissionAsync(updated, actorRoles).ConfigureAwait(false);
-
+        // Load the stored doc first: a missing id is a 404 (KeyNotFound), not a 403 —
+        // the same contract the delete lane and the Update_ToPublic pin pin for a
+        // nonexistent id. The edit gate (EnsureEditPermissionAsync) needs the stored
+        // AuthorId, so it runs against the stored row after the load.
         var existing = await session.LoadAsync<Announcement>(updated.Id).ConfigureAwait(false);
         if (existing is null)
             throw new KeyNotFoundException($"Announcement '{updated.Id}' was not found in the session; nothing to edit.");
+
+        await EnsureEditPermissionAsync(existing, actorId, actorRoles);
 
         var changed = existing.Title != updated.Title
             || existing.Body != updated.Body
@@ -306,16 +315,17 @@ public sealed class AnnouncementService : IAnnouncementService
     }
 
     /// <summary>
-    /// The write gate shared by <see cref="CreateAsync"/> and <see cref="UpdateAsync"/>. A
-    /// <see cref="AnnouncementScope.Public"/> announcement is always platform-wide so it cannot
-    /// carry a <c>CommunityId</c>; a <see cref="AnnouncementScope.Community"/> announcement with
-    /// no <c>CommunityId</c> is the flat "all residents" target (a GlobalAdmin or Moderator);
-    /// one with a <c>CommunityId</c> targets that community and requires a GlobalAdmin or the
-    /// <c>moderator:{CommunityId}</c> standing claim, and the target must name a real component.
-    /// A denied author is <see cref="UnauthorizedAccessException"/> (mapped to a 403); an invalid
-    /// shape or unknown target is an <see cref="ArgumentException"/> (mapped to a 400).
+    /// The <b>create</b> write gate (<see cref="CreateAsync"/> only — the edit lane has its own
+    /// <see cref="EnsureEditPermissionAsync"/>). A <see cref="AnnouncementScope.Public"/>
+    /// announcement is always platform-wide so it cannot carry a <c>CommunityId</c>; a
+    /// <see cref="AnnouncementScope.Community"/> announcement with no <c>CommunityId</c> is the
+    /// flat "all residents" target (a GlobalAdmin or Moderator); one with a <c>CommunityId</c>
+    /// targets that community and requires a GlobalAdmin or the <c>moderator:{CommunityId}</c>
+    /// standing claim, and the target must name a real component. A denied author is
+    /// <see cref="UnauthorizedAccessException"/> (mapped to a 403); an invalid shape or unknown
+    /// target is an <see cref="ArgumentException"/> (mapped to a 400).
     /// </summary>
-    private async Task EnsureWritePermissionAsync(Announcement announcement, IReadOnlySet<string> authorRoles)
+    private async Task EnsureCreatePermissionAsync(Announcement announcement, IReadOnlySet<string> authorRoles)
     {
         ArgumentNullException.ThrowIfNull(announcement);
         ArgumentNullException.ThrowIfNull(authorRoles);
@@ -355,5 +365,64 @@ public sealed class AnnouncementService : IAnnouncementService
             throw new ArgumentException(
                 $"Unknown community '{target}' for the announcement target.",
                 nameof(announcement));
+    }
+
+    /// <summary>
+    /// The <b>edit</b> write gate (<see cref="UpdateAsync"/> only — distinct from
+    /// <see cref="EnsureCreatePermissionAsync"/>). Evaluated against the <em>stored</em>
+    /// announcement (loaded before the gate, so its <see cref="Announcement.AuthorId"/>
+    /// is available):
+    /// <list type="bullet">
+    /// <item><see cref="AnnouncementScope.Public"/> — the actor must hold
+    /// <see cref="Roles.GlobalAdmin"/> (a public notice is platform-wide; no moderator,
+    /// however scoped, rewrites one);</item>
+    /// <item><see cref="AnnouncementScope.Community"/> with no
+    /// <see cref="Announcement.CommunityId"/> (the flat "all residents" target) — the actor
+    /// must be the stored <see cref="Announcement.AuthorId"/> or hold
+    /// <see cref="Roles.GlobalAdmin"/>. A community moderator who did not author it is
+    /// <b>denied</b> — their lever over an announcement they did not write for all
+    /// residents is moderation (the delete lane), not rewriting the author's words
+    /// (ADR 0017);</item>
+    /// <item><see cref="AnnouncementScope.Community"/> with a
+    /// <see cref="Announcement.CommunityId"/> — the actor must hold
+    /// <see cref="Roles.GlobalAdmin"/> or the <c>moderator:{CommunityId}</c> standing
+    /// claim (a community moderator may edit that community's announcement even if a
+    /// GlobalAdmin authored it; the author-of-record rule applies to the all-residents
+    /// lane only).</item>
+    /// </list>
+    /// A denied actor is <see cref="UnauthorizedAccessException"/> (mapped to a 403).
+    /// Deliberately <em>narrower</em> than the create gate: the base <see cref="Roles.Moderator"/>
+    /// claim grants the flat all-residents <em>create</em> lane but never the flat
+    /// all-residents <em>edit</em> lane.
+    /// </summary>
+    private static Task EnsureEditPermissionAsync(Announcement existing, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        ArgumentNullException.ThrowIfNull(existing);
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        var isGlobalAdmin = actorRoles.Contains(Roles.GlobalAdmin);
+
+        if (existing.CommunityId is null)
+        {
+            // Flat "all residents": Public → GlobalAdmin only; Community → author ∪ GlobalAdmin.
+            if (existing.Scope == AnnouncementScope.Public)
+            {
+                if (!isGlobalAdmin)
+                    throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a public-scope announcement.");
+            }
+            else if (!isGlobalAdmin && existing.AuthorId != actorId)
+            {
+                throw new UnauthorizedAccessException(
+                    "Only the author or a GlobalAdmin may edit an announcement for all residents.");
+            }
+            return Task.CompletedTask;
+        }
+
+        // Community-targeted: GlobalAdmin or that community's moderator.
+        if (!isGlobalAdmin && !actorRoles.Contains(Roles.ModeratorComponent(existing.CommunityId)))
+            throw new UnauthorizedAccessException(
+                $"Only a GlobalAdmin or a moderator of community '{existing.CommunityId}' may edit that community's announcement.");
+        return Task.CompletedTask;
     }
 }

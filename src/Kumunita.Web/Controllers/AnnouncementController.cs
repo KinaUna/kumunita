@@ -40,14 +40,17 @@ namespace Kumunita.Web.Controllers;
 /// narrows the scope, together they pin the two-way split).</item>
 /// <item><c>GET /announcements/{id}/edit</c> + <c>POST
 /// /announcements/{id}/edit</c> — the edit write lane,
-/// <b>[Authorize(Roles = GlobalAdmin, Moderator)]</b>. A GlobalAdmin may edit
-/// either scope; a Moderator may edit
-/// <see cref="AnnouncementScope.Community"/> only — the same split
-/// <see cref="AnnouncementService.CreateAsync"/> /
-/// <see cref="AnnouncementService.UpdateAsync"/> re-check server-side at
-/// POST, against the <em>edited</em> scope (defense-in-depth: a Moderator
-/// could GET any seeded form regardless of the row's actual scope, so the
-/// service is what guarantees the split is real on the write).</item>
+/// <b>[Authorize(Roles = GlobalAdmin, Moderator)]</b>. The edit gate is
+/// <em>distinct</em> from the create split and is re-checked by
+/// <see cref="AnnouncementService.UpdateAsync"/> server-side at POST,
+/// against the <em>stored</em> row: a GlobalAdmin may edit any row; a
+/// community moderator may edit a <em>community-targeted</em> row they
+/// moderate; but the flat "all residents" lane (Community scope, no target)
+/// is editable only by its <em>author</em> or a GlobalAdmin — a moderator
+/// who did not author it is denied (ADR 0017). Defense-in-depth: the ASP.NET
+/// gate narrows the role, the service pins the per-row rule, and the
+/// <c>CanEdit</c> affordance on the index/detail surfaces keeps the button's
+/// rule in step with both.</item>
 /// <item><c>POST /announcements/{id}/delete</c> — <b>[Authorize(Roles =
 /// GlobalAdmin)]</b> (delete the lane is GlobalAdmin-only by design; the
 /// <see cref="AnnouncementService"/> delete lane is the single write surface).</item>
@@ -182,13 +185,13 @@ public sealed class AnnouncementController(
             communityName = components.FirstOrDefault(c => c.Id == a.CommunityId)?.Name;
         }
 
-        // The Edit button's affordance flag — the same scope-vs-role split the
-        // service's EnsureWritePermissionAsync re-checks server-side at POST,
-        // evaluated against the *stored* row (the /announcements index's canEdit
-        // rule, carried to the detail page). A shape convenience only: the
-        // real gate is the service, so a non-authorized viewer never sees the
-        // button and never has to hit the 403.
-        bool canEdit = CanEditAnnouncement(a, RoleSet(User));
+        // The Edit button's affordance flag — the same edit rule the service's
+        // EnsureEditPermissionAsync re-checks server-side at POST, evaluated
+        // against the *stored* row (the /announcements index's canEdit rule,
+        // carried to the detail page). A shape convenience only: the real gate
+        // is the service, so a non-authorized viewer never sees the button and
+        // never has to hit the 403.
+        bool canEdit = CanEditAnnouncement(a, RoleSet(User), SubjectId(User));
 
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
@@ -196,29 +199,31 @@ public sealed class AnnouncementController(
     }
 
     /// <summary>
-    /// The scope-vs-role write split for a **stored** announcement (the
-    /// <c>CanEdit</c> affordance flag on the index + detail surfaces): a
+    /// The edit rule for a **stored** announcement (the <c>CanEdit</c>
+    /// affordance flag on the index + detail surfaces): a
     /// <see cref="AnnouncementScope.Public"/> row requires GlobalAdmin; a
-    /// <see cref="AnnouncementScope.Community"/> row with no target requires
-    /// GlobalAdmin or Moderator; a <c>Community</c> row with a target requires
-    /// GlobalAdmin or the <c>moderator:{CommunityId}</c> standing claim. This
-    /// mirrors the service's
+    /// <see cref="AnnouncementScope.Community"/> row with no target (the flat
+    /// "all residents" audience) requires the row's author
+    /// (<paramref name="actorId"/> == <c>AuthorId</c>) or GlobalAdmin — a
+    /// community moderator who did not author it is <em>denied</em> (ADR 0017);
+    /// a <c>Community</c> row with a target requires GlobalAdmin or the
+    /// <c>moderator:{CommunityId}</c> standing claim. This mirrors the service's
     /// <see cref="Kumunita.Core.Announcements.AnnouncementService"/>
-    /// <c>EnsureWritePermissionAsync</c> split exactly (the service is the real
+    /// <c>EnsureEditPermissionAsync</c> gate exactly (the service is the real
     /// gate at POST; this is only the button's visibility decision).
     /// </summary>
-    private static bool CanEditAnnouncement(Announcement a, IReadOnlySet<string> roles)
+    private static bool CanEditAnnouncement(Announcement a, IReadOnlySet<string> roles, string? actorId)
     {
         var isGlobalAdmin = roles.Contains(Roles.GlobalAdmin);
-        var isModerator = roles.Contains(Roles.Moderator);
+        var isAuthor = !string.IsNullOrEmpty(actorId) && a.AuthorId == actorId;
 
         if (a.Scope == AnnouncementScope.Public)
             return isGlobalAdmin;
 
-        // Community scope: flat (no target) needs a Moderator; targeted needs
-        // that community's moderator.
+        // Community scope: flat (no target) needs the author or a GlobalAdmin;
+        // targeted needs that community's moderator (or a GlobalAdmin).
         if (a.CommunityId is null)
-            return isGlobalAdmin || isModerator;
+            return isGlobalAdmin || isAuthor;
 
         return isGlobalAdmin || roles.Contains(Roles.ModeratorComponent(a.CommunityId));
     }
@@ -306,11 +311,14 @@ public sealed class AnnouncementController(
     /// <c>GET /announcements/{id}/edit</c> — the edit write lane's shape,
     /// seeded from the existing announcement (Title/Body/Scope preserved).
     /// The scope picker options are the caller's role-dependent set (a
-    /// GlobalAdmin: both scopes; a Moderator: community only); a Moderator
-    /// viewing a public-scope announcement gets a 403 here already (the GET
-    /// is a shape convenience, the service's <see cref="IAnnouncementService.UpdateAsync"/>
-    /// split re-check is the real gate — but a form a user can't submit
-    /// shouldn't be rendered in the first place).
+    /// GlobalAdmin: both scopes; a Moderator: community only). The edit
+    /// affordance gate — the same rule the service's
+    /// <see cref="IAnnouncementService.UpdateAsync"/> re-checks server-side
+    /// at POST — is applied up front (a form a user can't submit shouldn't be
+    /// rendered in the first place): a Moderator viewing a public-scope
+    /// announcement, or a flat all-residents announcement they did not author,
+    /// gets a 403 here (the service's re-check is still the real gate at
+    /// POST; this only keeps the button's rule and the form's rule in step).
     /// </summary>
     [HttpGet("/announcements/{id}/edit")]
     [Authorize(Roles = "GlobalAdmin,Moderator")]
@@ -325,9 +333,8 @@ public sealed class AnnouncementController(
             return NotFound();
 
         var roles = RoleSet(User);
-        if (existing.Scope == AnnouncementScope.Public && !roles.Contains(Roles.GlobalAdmin))
+        if (!CanEditAnnouncement(existing, roles, SubjectId(User)))
         {
-            TempData["error"] = "Only a GlobalAdmin may edit a public-scope announcement.";
             return new ForbidResult();
         }
 

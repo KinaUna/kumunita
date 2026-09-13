@@ -21,3 +21,4 @@ Decision / Consequences. New decisions take the next number.
 | 0014 | Post edit lane: author-only (no moderator/admin branch) | Accepted |
 | 0015 | UI view-localization mechanics (TagHelper + curated registry) | Accepted |
 | 0016 | Group-post + reply edit lane: author-only (no moderator/admin branch) | Accepted |
+| 0017 | Announcement edit lane: author-of-record ∪ GlobalAdmin (flat lane) | Accepted |

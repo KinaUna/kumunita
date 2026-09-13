@@ -591,13 +591,17 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     }
 
     /// <summary>
-    /// The happy pin, community scope: a Moderator may edit a
-    /// <see cref="AnnouncementScope.Community"/> announcement (the split's
-    /// community-side lane — the same split <see cref="CreateAsync"/>
-    /// enforces for a community-scope create).
+    /// ADR 0017 — the flat "all residents" lane (Community scope, no
+    /// <c>CommunityId</c>) is editable only by its author or a GlobalAdmin.
+    /// A community moderator who did NOT author it — even one holding the
+    /// base <c>Moderator</c> role that still lets them <em>create</em> a
+    /// flat all-residents announcement — is <b>denied</b> the edit:
+    /// <see cref="UnauthorizedAccessException"/> and NOTHING is written
+    /// (the gate runs before the write, same "not persisted" shape as the
+    /// create-denied pins).
     /// </summary>
     [Fact]
-    public async Task Update_Community_AsModerator_Persists()
+    public async Task Update_Community_Flat_AsNonAuthorModerator_Denied_NotPersisted()
     {
         var store = await BootStoreAsync();
         var userInfo = new UserInfoService(store);
@@ -612,21 +616,93 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         });
 
         await using var session = newSession(store);
-        var updated = await svc.UpdateAsync(
-            new Announcement { Id = "edit-comm", Scope = AnnouncementScope.Community, Title = "Updated", Body = "New body" },
-            actorId: "u-moderator-editor-community",
-            actorRoles: new HashSet<string> { Roles.Moderator },
-            session);
-
-        Assert.Equal("Updated", updated.Title);
-        Assert.Equal("New body", updated.Body);
-        Assert.Equal(AnnouncementScope.Community, updated.Scope);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateAsync(
+                new Announcement { Id = "edit-comm", Scope = AnnouncementScope.Community, Title = "Hijacked", Body = "New body" },
+                actorId: "u-moderator-editor-community",
+                actorRoles: new HashSet<string> { Roles.Moderator },
+                session));
 
         await using var q = store.QuerySession();
         var stored = await q.LoadAsync<Announcement>("edit-comm", TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
+        Assert.Equal("Old", stored!.Title);
+        Assert.Null(stored.Modified);
+    }
+
+    /// <summary>
+    /// The author-of-record may edit their own flat "all residents"
+    /// announcement (the <c>AuthorId == actorId</c> branch of the ADR 0017
+    /// edit gate — the standing the base <c>Moderator</c> role grants for
+    /// create is the <em>author</em> rule here, not a role bypass).
+    /// </summary>
+    [Fact]
+    public async Task Update_Community_Flat_AsAuthor_Persists()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        const string author = "u-author-flat";
+        await Plant(store, new Announcement
+        {
+            Id = "edit-flat-author", Scope = AnnouncementScope.Community,
+            Title = "Old", Body = "Old body", AuthorId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-flat-author", Scope = AnnouncementScope.Community, Title = "Updated", Body = "New body" },
+            actorId: author,
+            actorRoles: new HashSet<string> { Roles.Member },
+            session);
+
+        Assert.Equal("Updated", updated.Title);
+        Assert.NotNull(updated.Modified);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-flat-author", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
         Assert.Equal("Updated", stored!.Title);
-        Assert.Equal(AnnouncementScope.Community, stored.Scope);
+        Assert.Equal(author, stored.AuthorId);
+    }
+
+    /// <summary>
+    /// A GlobalAdmin may edit a flat "all residents" announcement even when
+    /// they did not author it (the admin branch of the ADR 0017 edit gate —
+    /// the one role that edits the flat lane regardless of authorship).
+    /// </summary>
+    [Fact]
+    public async Task Update_Community_Flat_AsGlobalAdmin_Persists()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        const string author = "u-author-flat-admin";
+        await Plant(store, new Announcement
+        {
+            Id = "edit-flat-admin", Scope = AnnouncementScope.Community,
+            Title = "Old", Body = "Old body", AuthorId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateAsync(
+            new Announcement { Id = "edit-flat-admin", Scope = AnnouncementScope.Community, Title = "Updated", Body = "New body" },
+            actorId: "u-admin-flat",
+            actorRoles: new HashSet<string> { Roles.GlobalAdmin },
+            session);
+
+        Assert.Equal("Updated", updated.Title);
+        Assert.NotNull(updated.Modified);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Announcement>("edit-flat-admin", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.Equal("Updated", stored!.Title);
+        Assert.Equal(author, stored.AuthorId);
     }
 
     /// <summary>
@@ -1192,7 +1268,10 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// The edit lane re-validates the <em>edited</em> target: a
     /// target-<c>community-A</c> announcement stays editable by that
     /// community's moderator (the same standing pin as create, applied to
-    /// the target shape) …
+    /// the target shape). Note the ADR 0017 author-of-record rule does
+    /// <em>not</em> apply to the targeted lane — that community's moderator
+    /// may edit it even when a GlobalAdmin authored it; the author rule is
+    /// the flat all-residents lane only. …
     /// </summary>
     [Fact]
     public async Task Update_Targeted_ByModeratorOfTarget_Persists()

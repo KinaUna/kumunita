@@ -4,6 +4,7 @@
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
     bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
+    string? subjectId = (User?.Identity?.IsAuthenticated == true) ? Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User) : null;
 }
 
 <div class="row justify-content-center">
@@ -53,7 +54,15 @@
                         var badgeClass = a.Scope == AnnouncementScope.Public
                             ? "text-bg-secondary"
                             : "text-bg-primary";
-                        bool canEdit = isGlobalAdmin || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && isModerator) || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false));
+                        // Edit affordance — mirrors the controller's CanEditAnnouncement
+                        // (and the service's EnsureEditPermissionAsync gate at POST):
+                        // Public → GlobalAdmin; flat "all residents" (Community, no
+                        // target) → the author or a GlobalAdmin (a community moderator
+                        // who did not author it is denied, ADR 0017); community-
+                        // targeted → that community's moderator or a GlobalAdmin.
+                        bool canEdit = (a.Scope == AnnouncementScope.Public && isGlobalAdmin)
+                            || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && (isGlobalAdmin || (subjectId is not null && a.AuthorSubjectId == subjectId)))
+                            || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (isGlobalAdmin || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false)));
                         // Author avatar monogram fallback (the Directory pattern —
                         // avatar.ts hides the <img> on the 404 the serving lane
                         // fails closed to; see site.css).

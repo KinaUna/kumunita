@@ -366,14 +366,12 @@ public class AnnouncementControllerTests
     /// GET /announcements/{id}/edit, Moderator on a public-scope
     /// announcement: the shape gate refuses up front (403) — a form a user
     /// cannot submit is not rendered in the first place (the service's
-    /// re-check is still the sole real gate at POST). The assertion lives
-    /// on the <em>view model shape</em> — that the form is NOT seeded —
-    /// since the controller's <c>TempData["error"]</c> write on this
-    /// <c>ForbidResult</c> branch NREs in this harness (no <c>ISessionStore</c>),
-    /// exactly per the <see cref="AdminControllerBlockTests"/> "NRE lands
-    /// *after* the Core lane" convention: the pin is that the <c>View</c>
-    /// return path is NOT hit, which is observable via the <c>ViewResult</c>
-    /// assertion below.
+    /// re-check is still the sole real gate at POST). The denied branch
+    /// returns <see cref="ForbidResult"/> directly (no <c>TempData</c>
+    /// write in this harness), so the pin is the result type — not a
+    /// <c>ViewResult</c>. The ADR 0017 edit gate: the Public lane is
+    /// GlobalAdmin-only, so a Moderator (no admin, not the author's lane)
+    /// is refused.
     /// </summary>
     [Fact]
     public async Task Edit_When_Moderator_PublicScope_Returns_Forbid_NotView()
@@ -404,12 +402,108 @@ public class AnnouncementControllerTests
             }),
         };
 
-        // The NRE on the TempData["error"] write is expected here (established
-        // harness convention — see AdminControllerBlockTests). The pin is
-        // that the controller did NOT fall into the View(...) branch (which
-        // would have returned a view before the write) — observable via the
-        // NRE being thrown at all. The shape-gate pin.
-        await Assert.ThrowsAsync<NullReferenceException>(() => controller.Edit(id));
+        // The shape gate refuses up front: a Moderator is NOT in the
+        // Public-scope edit standing (GlobalAdmin-only), so the controller
+        // returns ForbidResult without seeding a form. (The service's
+        // re-check at POST is still the sole real gate. The ADR 0017 edit
+        // gate is the same rule re-expressed: Public lane = admin only.)
+        var result = await controller.Edit(id);
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, ADR 0017 flat "all residents" lane:
+    /// a community moderator who did NOT author the flat Community-scope
+    /// announcement is refused the edit form up front (403) — the base
+    /// Moderator role that still lets them CREATE a flat all-residents
+    /// announcement does NOT let them EDIT one they didn't author. The
+    /// non-author branch of the edit standing is denied before any form is
+    /// seeded, so the pin is the ForbidResult (not a ViewResult).
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_NonAuthorModerator_FlatCommunityScope_Returns_Forbid()
+    {
+        const string id = "ann-edit-flat-mod";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Community, CommunityId = null,
+            Title = "t", Body = "b", AuthorId = "subj-author-001",
+            Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-mod-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Moderator),
+            }),
+        };
+
+        var result = await controller.Edit(id);
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, ADR 0017 flat "all residents" lane
+    /// positive pin: the AUTHOR-of-record opens their own flat
+    /// Community-scope announcement's edit form — the AuthorId==actorId
+    /// branch of the edit standing is honored even though the actor holds
+    /// only the Member role (not a role bypass, the author rule). The
+    /// GlobalAdmin Public happy-path test is the same assertion shape;
+    /// here the standing comes from authorship, not the admin role.
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_Author_FlatCommunityScope_Returns_View()
+    {
+        const string id = "ann-edit-flat-author";
+        const string author = "subj-author-flat";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Community, CommunityId = null,
+            Title = "Old title", Body = "Old body", AuthorId = author,
+            Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                    new[]
+                    {
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, author),
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Member),
+                    },
+                    authenticationType: "test")) },
+        };
+
+        var result = (await controller.Edit(id)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = result!.ViewData.Model as AnnouncementComposeViewModel;
+        Assert.NotNull(model);
+        Assert.Equal(id, model!.Id);
+        Assert.Equal("Old title", model.Title);
+        Assert.Equal("Old body", model.Body);
+        Assert.Equal(AnnouncementScope.Community.ToString(), model.Scope);
     }
 
     /// <summary>
