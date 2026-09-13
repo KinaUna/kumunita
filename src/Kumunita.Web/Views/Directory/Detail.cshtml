@@ -26,7 +26,7 @@
     <div class="col-md-8 col-lg-7">
         <p>
             <a href="@Url.Action("Index", "Directory")" class="btn btn-link p-0">
-                &larr; Back to the directory
+                <kw-l key="directory.detail_back">&larr; Back to the directory</kw-l>
             </a>
         </p>
         <div class="d-flex align-items-center gap-3">
@@ -47,7 +47,7 @@
             </h1>
             @if (Model.Verified)
             {
-                <span class="badge text-bg-success">Verified</span>
+                <span class="badge text-bg-success"><kw-l key="directory.detail_verified">Verified</kw-l></span>
             }
         </div>
 
@@ -67,19 +67,19 @@
             <dl class="row mt-4">
                 @if (!string.IsNullOrEmpty(Model.Address))
                 {
-                    <dt class="col-sm-3">Address</dt>
+                    <dt class="col-sm-3"><kw-l key="directory.detail_contact_address">Address</kw-l></dt>
                     <dd class="col-sm-9">@Model.Address</dd>
                 }
                 @if (!string.IsNullOrEmpty(Model.Email))
                 {
-                    <dt class="col-sm-3">Email</dt>
+                    <dt class="col-sm-3"><kw-l key="directory.detail_contact_email">Email</kw-l></dt>
                     <dd class="col-sm-9">
                         <a href="mailto:@Model.Email">@Model.Email</a>
                     </dd>
                 }
                 @if (!string.IsNullOrEmpty(Model.Phone))
                 {
-                    <dt class="col-sm-3">Phone</dt>
+                    <dt class="col-sm-3"><kw-l key="directory.detail_contact_phone">Phone</kw-l></dt>
                     <dd class="col-sm-9">@Model.Phone</dd>
                 }
             </dl>
@@ -87,8 +87,7 @@
         else
         {
             <p class="text-muted mt-3">
-                This resident hasn't shared a contact method with you (yet). You can
-                still see their profile page.
+                <kw-l key="directory.detail_no_contact">This resident hasn't shared a contact method with you (yet). You can still see their profile page.</kw-l>
             </p>
         }
     </div>

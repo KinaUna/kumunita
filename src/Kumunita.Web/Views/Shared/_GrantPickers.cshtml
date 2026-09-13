@@ -83,11 +83,10 @@
 }
 
 <div class="form-label mt-3" style="font-weight:600;">
-    Who to grant to
+    <kw-l key="grant.heading">Who to grant to</kw-l>
 </div>
 <div class="small text-muted" style="margin-left:0.25rem;">
-    Check one or many — or use the "Select all" row above each
-    list as a shortcut.
+    <kw-l key="grant.hint">Check one or many — or use the “Select all” row above each list as a shortcut.</kw-l>
 </div>
 
 @if (userCount > 0)
@@ -99,8 +98,7 @@
 else
 {
     <p class="mb-1 text-muted small ms-1">
-        You're the only verified resident, so there's no one else
-        to grant to yet.
+        <kw-l key="grant.empty_users">You're the only verified resident, so there's no one else to grant to yet.</kw-l>
     </p>
 }
 
@@ -113,8 +111,7 @@ else
 else
 {
     <p class="mb-1 mt-2 text-muted small ms-1">
-        No groups exist on the platform yet — create one under
-        "Groups" to add group-scoped visibility.
+        <kw-l key="grant.empty_groups">No groups exist on the platform yet — create one under “Groups” to add group-scoped visibility.</kw-l>
     </p>
 }
 

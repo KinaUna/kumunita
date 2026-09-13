@@ -4,7 +4,7 @@
     ViewData["Title"] = "Moderation";
 }
 
-<h1>Moderation</h1>
+<h1><kw-l key="moderation.title">Moderation</kw-l></h1>
 
 @if (TempData["info"] is string info)
 {
@@ -25,7 +25,7 @@
 @if (Model.TotalCount == 0)
 {
     <div class="alert alert-secondary">
-        No reports yet. The queue is empty.
+        <kw-l key="moderation.empty">No reports yet. The queue is empty.</kw-l>
     </div>
 }
 else
@@ -34,12 +34,12 @@ else
         <table class="table table-sm align-middle">
             <thead>
                 <tr>
-                    <th>Status</th>
-                    <th>Post</th>
-                    <th>Component</th>
-                    <th>Reporter</th>
-                    <th>Filmed</th>
-                    <th class="text-end">Action</th>
+                    <th><kw-l key="moderation.th_status">Status</kw-l></th>
+                    <th><kw-l key="moderation.th_post">Post</kw-l></th>
+                    <th><kw-l key="moderation.th_component">Component</kw-l></th>
+                    <th><kw-l key="moderation.th_reporter">Reporter</kw-l></th>
+                    <th><kw-l key="moderation.th_filed">Filed</kw-l></th>
+                    <th class="text-end"><kw-l key="moderation.th_action">Action</kw-l></th>
                 </tr>
             </thead>
             <tbody>
@@ -71,7 +71,7 @@ else
                         </td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-primary" href="/moderation/@r.Id">
-                                Review →
+                                <kw-l key="moderation.review">Review →</kw-l>
                             </a>
                         </td>
                     </tr>

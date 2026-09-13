@@ -5,8 +5,9 @@ namespace Kumunita.Core.Localization;
 /// (Key, LanguageCode) — the unique index in M1DocTypes enforces one text per key
 /// per language (the GroupMembership / ComponentMembership pair idiom). A resident
 /// never sees a blank label (M·1): a missing (Key, preferred) falls back to
-/// (Key, default) → (Key, "en") → the Key itself (M·9's floor is "en", always
-/// seeded by the first-run seeder).
+/// (Key, default) → (Key, "en") → the Key's registry <c>en</c> source text
+/// (the provider floor, ADR 0015 D1 — code is the floor; the first-run
+/// seeder's <c>en</c> rows remain the stored copy).
 /// </summary>
 public sealed class TranslationResource
 {

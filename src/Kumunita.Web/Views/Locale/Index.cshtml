@@ -4,25 +4,23 @@
     ViewData["Title"] = "Settings — Language";
 }
 
-<h1>Your settings</h1>
+<h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
 
 @if (TempData["info"] is string info)
 {
     <div class="alert alert-success" role="alert">@info</div>
 }
 
-<h2 class="mt-4">Language</h2>
+<h2 class="mt-4"><kw-l key="locale.language_heading">Language</kw-l></h2>
 <p class="text-muted">
-    Pick the language the platform shows you. Your choice is saved in a
-    browser cookie — it takes effect on the next request, and never
-    affects other residents.
+    <kw-l key="locale.lede">Pick the language the platform shows you. Your choice is saved in a browser cookie — it takes effect on the next request, and never affects other residents.</kw-l>
 </p>
 
 <form method="post" action="/settings/language">
     @Html.AntiForgeryToken()
     <div class="row g-2 align-items-end">
         <div class="col-sm-8">
-            <label for="languageCode" class="form-label">Preferred language</label>
+            <label for="languageCode" class="form-label"><kw-l key="locale.preferred_label">Preferred language</kw-l></label>
             <select class="form-select" name="code" id="languageCode">
                 @foreach (var lang in Model.Languages)
                 {
@@ -31,19 +29,17 @@
                         @lang.NativeName (@lang.Code)
                         @if (lang.Code == Model.DefaultCode)
                         {
-                            <span class="text-muted small">— instance default</span>
+                            <span class="text-muted small"><kw-l key="locale.instance_default">— instance default</kw-l></span>
                         }
                     </option>
                 }
             </select>
             <div class="form-text small">
-                The instance default is <strong>@Model.DefaultCode</strong>.
-                If your preferred language is later removed by the admin,
-                the platform silently falls back to the instance default.
+                <kw-l key="locale.default_note">The instance default is </kw-l><strong>@Model.DefaultCode</strong><kw-l key="locale.default_note_tail">. If your preferred language is later removed by the admin, the platform silently falls back to the instance default.</kw-l>
             </div>
         </div>
         <div class="col-sm-4">
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="locale.save">Save</kw-l></button>
         </div>
     </div>
 </form>
@@ -52,5 +48,5 @@
       onsubmit="return confirm('Reset your language preference to the instance default?');">
     @Html.AntiForgeryToken()
     <input type="hidden" name="clear" value="1" />
-    <button type="submit" class="btn btn-outline-secondary">Reset to instance default</button>
+    <button type="submit" class="btn btn-outline-secondary"><kw-l key="locale.reset">Reset to instance default</kw-l></button>
 </form>

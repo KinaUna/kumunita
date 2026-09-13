@@ -19,10 +19,7 @@
 
         <h1><kw-l key="groups.edit_title">Edit your post</kw-l></h1>
         <p class="text-muted">
-            You are editing your own post. Only you can edit it — the group
-            membership decides who can <i>see</i> it, but only its author can
-            change it. The group this post appears in is fixed; only the
-            title and body below are editable.
+            <kw-l key="groups.edit_lede">You are editing your own post. Only you can edit it — the group membership decides who can see it, but only its author can change it. The group this post appears in is fixed; only the title and body below are editable.</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -47,21 +44,19 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label" for="title" style="font-weight:600;">
-                            Title
+                            <kw-l key="groups.edit_title_label">Title</kw-l>
                         </label>
                         <input class="form-control" type="text" id="title" name="Title"
                                maxlength="120" value="@Model.Title"
                                placeholder="optional" />
                         <div class="text-muted small mt-1">
-                            A short headline (≤ 120 chars). Leave blank for a
-                            body-only post — the list will show your first line
-                            of the body instead.
+                            <kw-l key="groups.edit_title_hint">A short headline (≤ 120 chars). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
                         </div>
                     </div>
 
                     <div>
                         <label class="form-label" for="body" style="font-weight:600;">
-                            Body
+                            <kw-l key="groups.edit_body_label">Body</kw-l>
                         </label>
                         <textarea class="form-control" id="body" name="Body" rows="6" required
                                   placeholder="…">@Model.Body</textarea>
@@ -71,7 +66,7 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="groups.edit_submit">Save changes</kw-l></button>
-                <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}/posts/{editPostId}")">Cancel</a>
+                <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}/posts/{editPostId}")"><kw-l key="groups.edit_cancel">Cancel</kw-l></a>
             </div>
         </form>
     </div>

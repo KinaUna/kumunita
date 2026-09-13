@@ -42,8 +42,11 @@ mechanics.
   `TagHelper` (`<kw-l key="nav.home">`, `LocalizeTagHelper` in
   `Kumunita.Web/TagHelpers`) reads the request's preference via
   `LocaleCookie` (M·5 — the cookie is never a claim; M·8 — the read is
-  HTTP-free) and resolves it against `ITranslationProvider.GetAsync`, with the
-  **key itself** as the last-resort floor (M·1 — never a blank). Chosen over
+  HTTP-free) and resolves it against `ITranslationProvider.GetAsync`, whose
+  last-resort floor is the key's `en` source text from the
+  `KnownTranslationKeys` registry (the **provider floor** — code is the
+  floor, M·1 — never a blank; an unregistered key falls back to the raw key).
+  Chosen over
   an `HtmlHelper` extension because it is the idiomatic Razor fit: it reads
   the cookie from the `HttpContext` cleanly, composes directly in the view,
   and degrades safely to the key if the provider is ever absent.
@@ -51,10 +54,12 @@ mechanics.
   `KnownTranslationKeys` (in `Kumunita.Core/Localization`) is the closed,
   single source of truth: a **key → `en` source text** dictionary. The
   first-boot seeder materializes it `en`-only (upsert, **code-wins** for
-  `en`, never touches non-`en` rows), so the `en` floor and the M·12
-  completeness universe are real from first boot. The **same** registry is
-  read by the seeder, the key-managed admin editor (a closed list, no
-  hand-typed key), and the completeness view.
+  `en`, never touches non-`en` rows), so the M·12 completeness universe is
+  real from first boot. The **same** registry is read by the seeder, the
+  key-managed admin editor (a closed list, no hand-typed key), the
+  completeness view, and — as of the full-sweep amendment below — the
+  `TranslationProvider` itself, which is the `en` floor for every registered
+  key (D1).
 
 ## Consequences
 
@@ -69,10 +74,14 @@ mechanics.
   writes the `LocaleCookie` (M·11) — a harmless cookie write, not an
   authorization decision — so a choice is available whether or not the
   resident is signed in.
-- **Cost — the registry is curated, not exhaustive.** A new in-scope view
-  string is a registry change plus a reseed (upgrade-safe: re-running the
-  seeder adds new keys and refreshes `en` to the code's current values). The
-  registry is the curated platform surface, not "every string in every view".
+- **Cost — the registry is curated, not exhaustive.** A new view string is a
+  registry entry plus a `<kw-l>` wrap — a **code change only**. The seeder is
+  first-boot-only (pristine-DB gate, `DbBootstrap.IsPristineAsync`) and has no
+  warm-reseed path; the upgrade safety instead comes from the **provider
+  floor** (D1) resolving every registered key to the registry's `en` source
+  text from code, so a newly wrapped string renders its English on *every*
+  instance immediately — no database reseed. The registry remains the
+  curated platform surface, not "every string in every view".
 - **Recorded deviation (D1, U2):** the TagHelper emits the resolved text via
   `SetContent` (auto-escaping), not the plan's `SetHtmlContent` sketch. The
   resolved value is platform copy, and escaping it is the safer path against
@@ -89,3 +98,56 @@ mechanics.
 - **Cross-references:** ADR 0005 (the seam this ADR completes — the seam now
   reaches the primary UI surface), and ADR 0013 (the named-lane-with-a-short-
   ID precedent that `ML-UI` follows rather than renumbering M4/M5/M6).
+
+## Amendments
+
+### 2026-09-12 — full-sweep + provider floor (the upgrade path)
+
+**Full sweep.** The registry is no longer a pilot surface: it now covers the
+*entire* platform UI (251 keys — every key is emitted by a `<kw-l>` in a view,
+and every registered key is emitted, so the M·12 completeness universe equals
+the view surface exactly). The wrapped surface spans the shared layout,
+Home, Posts, Groups (create/edit), Directory/Detail, Community/Manage,
+Moderation (queue + resolve), Account (verify / resend / denied), Admin
+(audit log + break-glass), Locale (settings + public picker), static pages,
+and the announcements lane (index / new / edit / detail + the two shared
+announcement partials). Deliberate exclusions, all recorded so they are not
+read as drift:
+
+- **The setup flow** (`AdminSetup/Setup`) — first-boot, single-admin,
+  pre-community; ADR 0005's seam never claimed it.
+- **The product-story landing** (`StaticPages/About`) and the **FAQ
+  placeholder** accordion — not platform UI yet (the FAQ content is still
+  `TODO(faq)`).
+- **HTML attributes** (`placeholder`, `aria-label`, `title`) — the TagHelper
+  emits element *content*; attributes are out of its reach by design and are
+  left hardcoded.
+- **JS `confirm()` strings** — same reason; the dialog text is hardcoded.
+- **C#-built markup** (e.g. the grant-picker "select all" rows in
+  `Html.Raw`, and strings embedding inline `<code>` API identifiers or
+  inlined data values between words) — the `<kw-l>` element cannot wrap a
+  fragment inside a C# string, and registering a key whose rendered value
+  would drift from the actual output would make the registry a lie.
+- **`[Display(Name)]` model labels** — editor-internal, not platform copy.
+
+**Provider floor (the real upgrade mechanism).** The original design's
+"reseed to pick up new keys" premise turned out to be false in practice: the
+seeder runs **only** on a pristine DB (the `DbBootstrap.IsPristineAsync`
+gate), so a running instance whose code added keys would have kept rendering
+**raw keys** as the floor — which is exactly the regression this lane's
+first user-visible bug was. The floor was therefore tightened in code:
+`TranslationProvider.GetAsync` / `GetManyAsync` now resolve any
+registered-but-unseeded key to its `en` source text from
+`KnownTranslationKeys.EnValues`, with the raw key as the last resort for
+unregistered keys. Consequences:
+
+- **Code is the floor.** A registered key renders its English on *every*
+  instance — first-boot (seeder's rows present) or existing (floor from code)
+  — so upgrading the code is the entire upgrade path. **No reseed step
+  exists and none is needed.**
+- The seeder remains first-boot-only; its `en` rows are now a *stored copy*
+  of the registry, not the source of the floor.
+- The registry honesty invariant is now load-bearing: a key registered in
+  code but emitted by no view is dead weight, and a view emitting a key
+  missing from the registry renders a raw key. The final sweep holds the
+  invariant at 251 emitted = 251 registered, zero dead.

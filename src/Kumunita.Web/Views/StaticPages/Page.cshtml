@@ -10,6 +10,6 @@
     @Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))
     <hr class="my-4" />
     <p class="text-muted small mb-0">
-        Last updated: @Model.Updated.ToString("yyyy-MM-dd")
+        <kw-l key="static.last_updated">Last updated:</kw-l> @Model.Updated.ToString("yyyy-MM-dd")
     </p>
 </div>

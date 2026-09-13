@@ -26,8 +26,12 @@ namespace Kumunita.Core.Localization;
 /// <b>Per-string / per-page fallback (M·2):</b> a partially translated language
 /// degrades gracefully per key (UI strings) and per slug (static pages) —
 /// never as a whole view flipping to <c>"en"</c>. The last-resort floor for a
-/// UI string is the key itself (a resident never sees a blank label); for a
-/// static page it is <c>null</c> (the Web renders a 404).
+/// UI string is the key's <c>en</c> source text from the
+/// <see cref="KnownTranslationKeys"/> registry (the provider floor, ADR 0015
+/// D1 — code is the floor, so a newly wrapped string renders its English on
+/// every instance without a reseed); an unregistered key falls back to the
+/// raw key itself. A resident never sees a blank label either way; for a
+/// static page the floor is <c>null</c> (the Web renders a 404).
 /// </para>
 /// </summary>
 public sealed class TranslationProvider : ITranslationProvider
@@ -109,7 +113,12 @@ public sealed class TranslationProvider : ITranslationProvider
             if (match != null)
                 return match.Text;
         }
-        return key; // M·1: the key itself is the floor — a resident never sees a blank label.
+        // M·1 floor: the registry's `en` source text if this key is a known platform
+        // string (code is the floor — a registered key renders its English even on an
+        // instance whose `en` row was never seeded; the seeder is first-boot-only, so
+        // this makes the floor upgrade-safe), else the key itself. A resident never
+        // sees a blank label.
+        return KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key;
     }
 
     /// <inheritdoc />
@@ -145,7 +154,9 @@ public sealed class TranslationProvider : ITranslationProvider
                     break;
                 }
             }
-            result[key] = text ?? key; // M·1: the key itself is the floor.
+            // M·1 floor: the registry's `en` source text if registered (code is the
+            // floor — upgrade-safe, see GetAsync), else the key itself.
+            result[key] = text ?? (KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key);
         }
         return result;
     }

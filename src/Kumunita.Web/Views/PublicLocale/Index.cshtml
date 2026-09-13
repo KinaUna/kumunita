@@ -4,11 +4,9 @@
     ViewData["Title"] = "Choose your language";
 }
 
-<h1>Choose your language</h1>
+<h1><kw-l key="locale.public_title">Choose your language</kw-l></h1>
 <p class="text-muted">
-    Pick the language the platform shows you. Your choice is saved in a
-    browser cookie — it takes effect on the next request, and never
-    affects other residents.
+    <kw-l key="locale.lede">Pick the language the platform shows you. Your choice is saved in a browser cookie — it takes effect on the next request, and never affects other residents.</kw-l>
 </p>
 
 @if (TempData["info"] is string info)
@@ -24,7 +22,7 @@
     @Html.AntiForgeryToken()
     <div class="row g-2 align-items-end">
         <div class="col-sm-8">
-            <label for="languageCode" class="form-label">Preferred language</label>
+            <label for="languageCode" class="form-label"><kw-l key="locale.preferred_label">Preferred language</kw-l></label>
             <select class="form-select" name="code" id="languageCode">
                 @foreach (var lang in Model.Languages)
                 {
@@ -36,7 +34,7 @@
             </select>
         </div>
         <div class="col-sm-4">
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="locale.save">Save</kw-l></button>
         </div>
     </div>
 </form>
@@ -45,5 +43,5 @@
       onsubmit="return confirm('Reset your language preference to the instance default?');">
     @Html.AntiForgeryToken()
     <input type="hidden" name="clear" value="1" />
-    <button type="submit" class="btn btn-outline-secondary">Reset to instance default</button>
+    <button type="submit" class="btn btn-outline-secondary"><kw-l key="locale.reset">Reset to instance default</kw-l></button>
 </form>

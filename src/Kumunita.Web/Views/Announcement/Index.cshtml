@@ -9,11 +9,9 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
-        <h1>Announcements</h1>
+        <h1><kw-l key="announcements.index_title">Announcements</kw-l></h1>
         <p class="text-muted">
-            Platform notices: public ones are visible to everyone (e.g.
-            scheduled maintenance); resident-only ones are visible to all
-            signed-in users (e.g. "help us with X" calls).
+            <kw-l key="announcements.index_lede">Platform notices: public ones are visible to everyone (e.g. scheduled maintenance); resident-only ones are visible to all signed-in users (e.g. "help us with X" calls).</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -33,11 +31,11 @@
 
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">All announcements</span>
+                <span class="fw-semibold"><kw-l key="announcements.all">All announcements</kw-l></span>
                 @if (isGlobalAdmin || isModerator || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value.StartsWith("moderator:")) ?? false))
                 {
                     <a class="btn btn-sm btn-outline-primary" href="/announcements/new">
-                        New announcement
+                        <kw-l key="announcements.new_button">New announcement</kw-l>
                     </a>
                 }
             </div>
@@ -46,7 +44,7 @@
                     @if (Model.Announcements.Count == 0)
                     {
                         <li class="list-group-item text-muted">
-                            No announcements yet.
+                            <kw-l key="announcements.empty">No announcements yet.</kw-l>
                         </li>
                     }
                     @foreach (var a in Model.Announcements)
@@ -82,7 +80,7 @@
                                     </h5>
                                     <div class="text-body">
                                         @(a.Body.Length > 250 ? a.Body[..250].TrimEnd() + "…" : a.Body)
-                                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">Read more…</a>
+                                        <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
                                     </div>
                                     <div class="d-flex align-items-center gap-2 text-muted small mt-1">
                                         <span class="d-inline-flex align-items-center">
@@ -95,18 +93,29 @@
                                 </div>
                                 <div class="d-flex flex-column align-items-end gap-2">
                                     <span class="badge @badgeClass">
-                                        @(a.Scope == AnnouncementScope.Public ? "everyone" : (a.CommunityDisplayName is not null ? a.CommunityDisplayName : "residents"))
+                                        @if (a.Scope == AnnouncementScope.Public)
+                                        {
+                                            <kw-l key="announcements.scope_everyone">everyone</kw-l>
+                                        }
+                                        else if (a.CommunityDisplayName is not null)
+                                        {
+                                            @a.CommunityDisplayName
+                                        }
+                                        else
+                                        {
+                                            <kw-l key="announcements.scope_residents">residents</kw-l>
+                                        }
                                     </span>
                                     @if (a.Pinned)
                                     {
                                         <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
-                                            pinned
+                                            <kw-l key="announcements.pinned_badge">pinned</kw-l>
                                         </span>
                                     }
                                     @if (canEdit)
                                     {
                                         <a class="btn btn-sm btn-link p-0" href="/announcements/@a.Id/edit">
-                                            Edit
+                                            <kw-l key="announcements.edit_button">Edit</kw-l>
                                         </a>
                                     }
                                     @if (isGlobalAdmin)
@@ -116,7 +125,7 @@
                                               style="margin:0; display:inline;">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="btn btn-sm btn-link text-danger p-0">
-                                                Delete
+                                                <kw-l key="announcements.delete">Delete</kw-l>
                                             </button>
                                         </form>
                                     }

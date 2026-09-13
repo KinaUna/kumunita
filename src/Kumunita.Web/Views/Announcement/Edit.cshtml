@@ -6,13 +6,9 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <h1>Edit announcement</h1>
+        <h1><kw-l key="announcements.edit_title">Edit announcement</kw-l></h1>
         <p class="text-muted">
-            Update this announcement's title, body, and visibility. A
-            <b>public</b> announcement is visible to everyone, including
-            people who are not signed in (e.g. a maintenance window). A
-            <b>resident</b> announcement is only visible to signed-in
-            residents (e.g. a "help us with X" call).
+            <kw-l key="announcements.edit_lede">Update this announcement's title, body, and visibility. A public announcement is visible to everyone, including people who are not signed in (e.g. a maintenance window). A resident announcement is only visible to signed-in residents (e.g. a "help us with X" call).</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -50,7 +46,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="scope" style="font-weight:600;">
-                        Who sees this?
+                        <kw-l key="announcements.scope_label">Who sees this?</kw-l>
                     </label>
                     <select class="form-control" id="scope" name="Scope" required>
                         @foreach (var s in Model.AllowedScopes)
@@ -58,14 +54,19 @@
                             string scopeValue = s.ToString();
                             bool isSelected = scopeValue == (Model.Scope ?? "Community");
                             <option value="@scopeValue" selected="@(isSelected ? "selected" : null)">
-                                @(s == AnnouncementScope.Public
-                                    ? "Everyone (public) — visible to visitors and residents"
-                                    : "Residents — visible only when signed in")
+                                @if (s == AnnouncementScope.Public)
+                                {
+                                    <kw-l key="announcements.scope_public">Everyone (public) — visible to visitors and residents</kw-l>
+                                }
+                                else
+                                {
+                                    <kw-l key="announcements.scope_resident">Residents — visible only when signed in</kw-l>
+                                }
                             </option>
                         }
                     </select>
                     <div class="text-muted small mt-2">
-                        Changing who sees this applies immediately for the next reader.
+                        <kw-l key="announcements.edit_scope_hint">Changing who sees this applies immediately for the next reader.</kw-l>
                     </div>
                 </div>
             </div>
@@ -74,28 +75,28 @@
 @if (Model.TargetCommunities.Count > 0)
 {
 <div class="card mb-4"><div class="card-body">
-<label class="form-label" for="community" style="font-weight:600;">Send to a specific community (optional)</label>
+<label class="form-label" for="community" style="font-weight:600;"><kw-l key="announcements.community_label">Send to a specific community (optional)</kw-l></label>
 <select class="form-control" id="community" name="CommunityId">
-<option value="" selected="@(Model.CommunityId is null ? "selected" : null)">All residents</option>
+<option value="" selected="@(Model.CommunityId is null ? "selected" : null)"><kw-l key="announcements.all_residents">All residents</kw-l></option>
 @foreach (var t in Model.TargetCommunities)
 {
 <option value="@t.Id" selected="@(Model.CommunityId == t.Id ? "selected" : null)">@t.Name</option>
 }
 </select>
-<div class="text-muted small mt-2">Leave as All residents to send to everyone, or pick a community to limit who sees it.</div>
+<div class="text-muted small mt-2"><kw-l key="announcements.community_hint">Leave as All residents to send to everyone, or pick a community to limit who sees it.</kw-l></div>
 </div></div>
 }
 
 <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="title" style="font-weight:600;">
-                        Title
+                        <kw-l key="announcements.title_label">Title</kw-l>
                     </label>
                     <input class="form-control" type="text" id="title" name="Title"
                            maxlength="120" placeholder="optional"
                            value="@Model.Title" />
                     <div class="text-muted small mt-1">
-                        A short headline (up to 120 characters).
+                        <kw-l key="announcements.title_hint">A short headline (up to 120 characters).</kw-l>
                     </div>
                 </div>
             </div>
@@ -103,7 +104,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="body" style="font-weight:600;">
-                        Body
+                        <kw-l key="announcements.body_label">Body</kw-l>
                     </label>
                     <textarea class="form-control" id="body" name="Body"
                               rows="6" required>@Model.Body</textarea>
@@ -121,26 +122,18 @@
                                value="true" checked="@(Model.Pinned ? "checked" : null)" />
                         <input type="hidden" name="Pinned" value="false" />
                         <label class="form-check-label" for="pinned" style="font-weight:600;">
-                            Pin to the top of all pages
+                            <kw-l key="announcements.pin_label">Pin to the top of all pages</kw-l>
                         </label>
                         <div class="text-muted small mt-1">
-                            A pinned announcement also appears as a banner at the
-                            very top of every page (including Home), in addition
-                            to the usual <b>Announcements</b> list.
-                            Its visibility still follows the audience you picked
-                            above: a <b>public</b> pin shows to every visitor;
-                            a <b>resident</b> pin shows only when a user is signed
-                            in.
-                            If more than one is pinned, the most recently pinned
-                            one wins.
+                            <kw-l key="announcements.pin_hint">A pinned announcement also appears as a banner at the very top of every page (including Home), in addition to the usual Announcements list. Its visibility still follows the audience you picked above: a public pin shows to every visitor; a resident pin shows only when a user is signed in. If more than one is pinned, the most recently pinned one wins.</kw-l>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Save changes</button>
-                <a href="/announcements" class="btn btn-link p-0">Cancel</a>
+                <button type="submit" class="btn btn-primary"><kw-l key="announcements.edit_submit">Save changes</kw-l></button>
+                <a href="/announcements" class="btn btn-link p-0"><kw-l key="announcements.cancel">Cancel</kw-l></a>
             </div>
         </form>
     </div>

@@ -16,8 +16,11 @@ namespace Kumunita.Web.TagHelpers;
 /// <c>kumunita.locale</c> cookie via <see cref="LocaleCookie.Read"/> (M·5) and
 /// passed to the provider as a plain BCP-47 string — Core stays HTTP-free
 /// (M·8). Resolution order is the provider's per-string chain (M·1/M·2):
-/// (key, effective) → (key, default) → (key, <c>en</c>) → **the key itself** —
-/// a resident never sees a blank label.
+/// (key, effective) → (key, default) → (key, <c>en</c>) → **the key's
+/// <c>en</c> source text from the registry** (the provider floor, ADR 0015
+/// D1 — code is the floor, so a newly wrapped string renders its English
+/// without a reseed); an unregistered key falls back to the raw key.
+/// A resident never sees a blank label either way.
 /// </para>
 /// <para>
 /// <b>Platform text only (M·3).</b> The TagHelper is used in the in-scope

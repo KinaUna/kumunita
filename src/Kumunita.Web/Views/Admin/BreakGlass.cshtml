@@ -4,7 +4,7 @@
     ViewData["Title"] = "Admin — Break glass";
 }
 
-<h1>Break-glass</h1>
+<h1><kw-l key="admin.breakglass_title">Break-glass</kw-l></h1>
 <p class="text-muted">
     A break-glass elevation is written by the <strong>operator, in psql</strong> (OPS §9),
     directly into the <code>mt."AdminOverride"</code> table — never by any in-app endpoint.
@@ -32,19 +32,19 @@
 else
 {
     <dl class="row">
-        <dt class="col-sm-3">Granted at (UTC)</dt>
+        <dt class="col-sm-3"><kw-l key="admin.breakglass_granted">Granted at (UTC)</kw-l></dt>
         <dd class="col-sm-9">@(Model.GrantedAt?.ToString("u") ?? "—")</dd>
-        <dt class="col-sm-3">Expires at (UTC)</dt>
+        <dt class="col-sm-3"><kw-l key="admin.breakglass_expires">Expires at (UTC)</kw-l></dt>
         <dd class="col-sm-9">@(Model.ExpiresAt?.ToString("u") ?? "—")</dd>
-        <dt class="col-sm-3">Status</dt>
+        <dt class="col-sm-3"><kw-l key="admin.breakglass_status">Status</kw-l></dt>
         <dd class="col-sm-9">
             @if (Model.Consumed)
             {
-                <span class="badge text-bg-success">consumed — elevation active until expiry</span>
+                <span class="badge text-bg-success"><kw-l key="admin.breakglass_consumed">consumed — elevation active until expiry</kw-l></span>
             }
             else
             {
-                <span class="badge text-bg-warning">presented but not yet consumed</span>
+                <span class="badge text-bg-warning"><kw-l key="admin.breakglass_presented">presented but not yet consumed</kw-l></span>
             }
         </dd>
     </dl>
@@ -54,14 +54,13 @@ else
         <form method="post" asp-action="BreakGlass">
             @Html.AntiForgeryToken()
             <div class="mb-3">
-                <label class="form-label" for="token">One-time token (from the operator)</label>
+                <label class="form-label" for="token"><kw-l key="admin.breakglass_token_label">One-time token (from the operator)</kw-l></label>
                 <input type="text" class="form-control" id="token" name="token" autocomplete="off" required />
                 <div class="form-text">
-                    Consuming this token is a one-time action. It activates the elevation
-                    until its expiry.
+                    <kw-l key="admin.breakglass_token_hint">Consuming this token is a one-time action. It activates the elevation until its expiry.</kw-l>
                 </div>
             </div>
-            <button type="submit" class="btn btn-danger">Consume token</button>
+            <button type="submit" class="btn btn-danger"><kw-l key="admin.breakglass_consume">Consume token</kw-l></button>
         </form>
     }
     else

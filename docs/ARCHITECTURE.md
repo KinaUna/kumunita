@@ -545,12 +545,14 @@ Design and rationale in ADR 0005; this is the operating shape. **Current state: 
 `LocalizedPage`), the `ITranslationProvider` read seam, the `ILocalizationService`
 admin seam, the `LocaleCookie` preference, and the `/admin/languages` + settings +
 `/terms`/`/help` Web surface are all live. **`ML-UI` (ADR 0015, 2026-09-12) then
-wired that seam into the in-scope views** — every in-scope view resolves per
-request through a `<kw-l>` TagHelper against the provider, the `en` floor is
-seeded from the `KnownTranslationKeys` registry, the admin editor is
-key-managed (a closed list, no hand-typed key), and the picker is public
-(signed-out residents can choose a language) — closing the `/about` follow-on
-the `ML` record had left open.
+wired that seam into the views** — the full platform UI surface (251 keys,
+the registry's completeness universe equals exactly what the views emit)
+resolves per request through a `<kw-l>` TagHelper against the provider, the
+`en` floor is the `KnownTranslationKeys` registry's own source text (code is
+the floor — the first-boot seeder's `en` rows are a stored copy, no reseed is
+ever needed), the admin editor is key-managed (a closed list, no hand-typed
+key), and the picker is public (signed-out residents can choose a language) —
+closing the `/about` follow-on the `ML` record had left open.
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine

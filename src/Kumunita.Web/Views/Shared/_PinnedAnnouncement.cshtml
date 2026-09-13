@@ -22,7 +22,14 @@
             <div class="container-fluid py-2">
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge @badgeClass">
-                        @(pinned.Scope == AnnouncementScope.Public ? "everyone" : "residents")
+                        @if (pinned.Scope == AnnouncementScope.Public)
+                        {
+                            <kw-l key="announcements.scope_everyone">everyone</kw-l>
+                        }
+                        else
+                        {
+                            <kw-l key="announcements.scope_residents">residents</kw-l>
+                        }
                     </span>
                     @* The banner shows only the first 150 characters of the
                        body (a pinned announcement can run to pages) — the
@@ -36,9 +43,9 @@
                     </span>
                     <a class="btn btn-sm btn-link text-nowrap p-0"
                        href="/announcements/@pinned.Id"
-                       aria-label="Read this announcement in full">Read more</a>
+                       aria-label="Read this announcement in full"><kw-l key="announcements.banner_read_more">Read more</kw-l></a>
                     <a class="btn btn-sm btn-link text-nowrap p-0" href="/announcements"
-                       aria-label="See all announcements">All announcements</a>
+                       aria-label="See all announcements"><kw-l key="announcements.banner_all">All announcements</kw-l></a>
                     <button type="button" class="btn-close"
                             data-bs-dismiss="alert"
                             data-dismiss-key="@dismissKey"

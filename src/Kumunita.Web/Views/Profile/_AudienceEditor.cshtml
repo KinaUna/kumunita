@@ -49,24 +49,23 @@
         <h6 class="card-title" style="font-weight:600;">
             @if (string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase))
             {
-                <text>Who can see your profile</text>
+                <text><kw-l key="profile.audience_visibility">Who can see your profile</kw-l></text>
             }
             else
             {
-                <text>Who can see your contact details</text>
+                <text><kw-l key="profile.audience_contact">Who can see your contact details</kw-l></text>
             }
         </h6>
 
         @if (visuallyOff && string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
         {
             <p class="text-muted" style="margin-bottom:0;">
-                Your contact details are currently hidden from everyone.
-                To change this, switch on “Share my contact info” above.
+                <kw-l key="profile.audience_off_note">Your contact details are currently hidden from everyone. To change this, switch on “Share my contact info” above.</kw-l>
             </p>
         }
 
         <div class="@(visuallyOff ? "opacity-75" : null)">
-            <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
+            <div class="form-label mt-2" style="font-weight:600;"><kw-l key="profile.audience_match_mode">Match mode</kw-l></div>
             @foreach (var m in modes)
             {
                 var checkedMark = string.Equals(activeEditor.Mode, m, StringComparison.OrdinalIgnoreCase)
@@ -77,9 +76,15 @@
                        name="@modePrefix" id="@($"{modePrefix}-{m}")"
                        value="@m" @checkedMark />
                 <label class="form-check-label" for="@($"{modePrefix}-{m}")">
-                    @m @(" — " + (m == "Any"
-                        ? "a person is allowed if they meet any of the people/groups you picked"
-                        : "a person is allowed only if they meet all of the people/groups you picked"))
+                    @m 
+                    @if (m == "Any")
+                    {
+                        <text> — <kw-l key="profile.audience_mode_any">a person is allowed if they meet any of the people/groups you picked</kw-l></text>
+                    }
+                    else
+                    {
+                        <text> — <kw-l key="profile.audience_mode_all">a person is allowed only if they meet all of the people/groups you picked</kw-l></text>
+                    }
                 </label>
             </div>
             }

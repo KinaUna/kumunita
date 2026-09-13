@@ -23,8 +23,11 @@ public interface ITranslationProvider
 
     /// <summary>
     /// One UI string with **per-string** fallback (M·2, M·1): (key, effective) →
-    /// (key, default) → (key, "en") → **the key itself** (the last-resort — a
-    /// resident never sees a blank label).
+    /// (key, default) → (key, "en") → **the <c>en</c> floor**. The floor is the
+    /// key's <see cref="KnownTranslationKeys.EnValues"/> source text when the key
+    /// is a registered platform string (code is the floor — a registered key
+    /// renders its English even where the <c>en</c> row was never seeded), and
+    /// the key itself otherwise. A resident never sees a blank label.
     /// </summary>
     Task<string> GetAsync(string key, string? preferredLanguageCode);
 
@@ -40,7 +43,8 @@ public interface ITranslationProvider
     /// One static page with **per-page** fallback (M·2): (slug, effective) →
     /// (slug, default) → (slug, "en") → <c>null</c>. A <c>null</c> result means the
     /// page truly does not exist in **any** language (the Web renders a 404) —
-    /// contrast the string path, whose floor is the key itself (M·1).
+    /// contrast the string path, whose floor is the registry's <c>en</c> source
+    /// text (ADR 0015 D1; M·1).
     /// </summary>
     Task<LocalizedPage?> GetPageAsync(string slug, string? preferredLanguageCode);
 }
