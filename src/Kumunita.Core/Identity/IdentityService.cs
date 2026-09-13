@@ -431,21 +431,26 @@ public sealed class IdentityService(
         var targetRoles = (await userManager.GetRolesAsync(target)).ToList();
         var wantsGlobalAdmin = role == Roles.GlobalAdmin;
         var wantsModerator = role == Roles.Moderator;
+        var wantsTranslator = role == Roles.Translator;
 
         bool rolesChanged =
             (wantsGlobalAdmin && !targetRoles.Contains(Roles.GlobalAdmin)) ||
             (!wantsGlobalAdmin && targetRoles.Contains(Roles.GlobalAdmin)) ||
             (wantsModerator && !targetRoles.Contains(Roles.Moderator)) ||
-            (!wantsModerator && targetRoles.Contains(Roles.Moderator));
+            (!wantsModerator && targetRoles.Contains(Roles.Moderator)) ||
+            (wantsTranslator && !targetRoles.Contains(Roles.Translator)) ||
+            (!wantsTranslator && targetRoles.Contains(Roles.Translator));
 
-        // Apply the GlobalAdmin/Moderator identity roles (Member is the implicit verified
-        // standing — no EF role for it). AddTo/RemoveFromRole manage the role membership;
-        // the role row itself is created by the host's seed (FirstBootSeeder) when the
-        // account is granted the role for the first time.
+        // Apply the GlobalAdmin/Moderator/Translator identity roles (Member is the implicit
+        // verified standing — no EF role for it). AddTo/RemoveFromRole manage the role
+        // membership; the role row itself is created by the host's seed (FirstBootSeeder)
+        // when the account is granted the role for the first time.
         if (wantsGlobalAdmin)  await userManager.AddToRoleAsync(target, Roles.GlobalAdmin);
         else                   await userManager.RemoveFromRoleAsync(target, Roles.GlobalAdmin);
         if (wantsModerator)    await userManager.AddToRoleAsync(target, Roles.Moderator);
         else                   await userManager.RemoveFromRoleAsync(target, Roles.Moderator);
+        if (wantsTranslator)   await userManager.AddToRoleAsync(target, Roles.Translator);
+        else                   await userManager.RemoveFromRoleAsync(target, Roles.Translator);
 
         // Security stamp: demoted accounts lose elevated access on the NEXT request, not at
         // cookie expiry (OPS §10). Rotate regardless to be safe (a re-signin is required to

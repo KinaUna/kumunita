@@ -25,3 +25,4 @@ Decision / Consequences. New decisions take the next number.
 | 0018 | UGC authored-in language tag (posts, replies, announcements) | Accepted |
 | 0019 | Timezone: platform default (admin) + per-resident override | Accepted |
 | 0020 | Date & time format: platform default (admin) + per-resident override + custom | Accepted |
+| 0021 | Translator role: delegate translation editing to non-admin residents | Accepted |

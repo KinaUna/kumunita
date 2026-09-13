@@ -9,6 +9,10 @@
     // KumunitaPrincipal.IsGlobalAdmin reads the Kumunita.Role claim type (not the BCL
     // default) — see the helper's doc; ClaimsPrincipal.IsInRole would not match this shape.
     bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+    // ADR 0021 — the Translator lane: a delegated translation editor gets a direct link
+    // to the languages surface (the translation editors are open to them). GlobalAdmins
+    // already reach it through the Admin shell, so this link is Translator-only.
+    bool isTranslator = KumunitaPrincipal.IsTranslator(User);
 }
 
 <ul class="navbar-nav">
@@ -30,6 +34,14 @@
         {
             <li class="nav-item">
                 <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
+            </li>
+        }
+        @* ADR 0021 — the Translator's home: the language catalog + translation editors.
+           Shown to Translators only (a GlobalAdmin reaches it via the Admin shell link). *@
+        @if (isTranslator && !isGlobalAdmin)
+        {
+            <li class="nav-item">
+                <a class="nav-link text-dark" href="/admin/languages"><kw-l key="nav.translations">Translations</kw-l></a>
             </li>
         }
         <li class="nav-item">

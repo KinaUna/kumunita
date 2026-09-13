@@ -28,8 +28,8 @@ platform's source language. Requirements:
 
 | Text kind | Owner | Stored | Translated by |
 |-----------|-------|--------|---------------|
-| UI strings (labels, buttons, toasts, flash) | platform (code keys) | `mt` — `TranslationResource` | admin / community, in-app |
-| Static pages (terms, about, help) | platform + admin | `mt` — `LocalizedPage` per slug+language | admin / community, in-app |
+| UI strings (labels, buttons, toasts, flash) | platform (code keys) | `mt` — `TranslationResource` | GlobalAdmin / **Translator** (ADR 0021), in-app |
+| Static pages (terms, about, help) | platform + admin | `mt` — `LocalizedPage` per slug+language | GlobalAdmin / **Translator** (ADR 0021), in-app |
 | User-generated content | residents | `mt` — domain documents | **never by default**; opt-in MT is deferred (C) |
 
 ### B. Languages and translations are data, not config
@@ -65,21 +65,30 @@ it is *not* a claim, per the thin-token rule (ADR 0001-B).
   boundary** in SECURITY.md (like B4) — audience-restricted content is
   **never** sent to it. Default: off.
 
-### D. Admin management (in-app, audited)
+### D. Management (in-app, audited)
 
-GlobalAdmin manages languages under `/admin/languages`:
+The `/admin/languages` surface is split by standing (ADR 0021):
+
+**GlobalAdmin** manages the catalog under `/admin/languages`:
 
 - add a language (BCP-47 code + native name), enable/disable, reorder;
 - set the default language;
-- edit and preview static-page translations per language, with a
-  per-language completeness view (which UI keys / pages are missing);
 - remove a language — **blocked while it is the default** (set a different
   default first). A user preference pointing at a removed language silently
   falls back to the default; `LocalizedPage` rows for it are retained, so
   re-adding the language restores the work.
 
-Adding/removing languages and changing the default are admin actions and are
-**audited** like every other admin action (ARCHITECTURE.md §5).
+**GlobalAdmin or Translator** edits the translatable text (ADR 0021):
+
+- edit and preview static-page translations per language, and edit the UI
+  strings; both with the per-language completeness view (which UI keys /
+  pages are missing).
+
+Adding/removing languages, reordering, and changing the default are
+GlobalAdmin actions and are **audited** like every other admin action
+(ARCHITECTURE.md §5). Translation saves are audited the same way, with the
+actor's account recorded on the row (ADR 0021 — `Via: Admin`, `ActorId` =
+the GlobalAdmin *or* Translator).
 
 ## Consequences
 

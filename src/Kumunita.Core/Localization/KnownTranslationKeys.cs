@@ -77,6 +77,7 @@ public static class KnownTranslationKeys
             ["nav.sign_up"]       = "Sign up",
             ["nav.profile"]       = "Profile",
             ["nav.admin"]         = "Admin",
+            ["nav.translations"]  = "Translations",
             ["nav.sign_out"]      = "Sign out",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────

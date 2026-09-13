@@ -86,7 +86,7 @@ renumbering an existing one is a breaking change and is not allowed mid-lane.
 | **M·3** | **UGC is never translated:** the provider resolves **platform** text only (UI keys + `LocalizedPage` slugs); it never touches a `Post` / `PostReply` / `Group` body (ADR 0005 C — machine translation is deferred). | **U2** (provider reads only the two content docs) · **U7** (M6 test) |
 | **M·4** | **Languages are data, not config** (ADR 0005 B): `LanguageCatalog` / `LocaleSettings` / `TranslationResource` / `LocalizedPage` are Marten docs in `mt`; an admin edit takes effect on the **next request** (no env var, no rebuild, no satellite assemblies). | **U1** (docs + registration) · **U3** (admin seam) |
 | **M·5** | **The preference is a cookie, not a claim** (thin-token rule, ADR 0001-B): the per-request preferred language comes from the `kumunita.locale` cookie (Web layer) and is passed to the provider as a plain BCP-47 string — **never** an identity claim, **never** part of the authorization decision. | **U4** (cookie helper) · **U7** (M8 test) |
-| **M·6** | **The admin surface is GlobalAdmin-gated and audited:** every `/admin/languages` mutation (add / remove / enable / reorder / set-default / save-string / save-page) appends **exactly one** `AccessAudit` row (`Via = Admin`, `Outcome = Allow`, `TargetKind` = `"language"` / `"translation"` / `"localized_page"`) — the `UserInfoService` admin-action idiom (ARCHITECTURE.md §5). | **U3** (audit rows) · **U7** (the six audit-row-shape tests) |
+| **M·6** | **The admin surface is standing-gated (ADR 0021) and audited:** every `/admin/languages` mutation (add / remove / enable / reorder / set-default / save-string / save-page) appends **exactly one** `AccessAudit` row (`Via = Admin`, `Outcome = Allow`, `TargetKind` = `"language"` / `"translation"` / `"localized_page"`) — the `UserInfoService` admin-action idiom (ARCHITECTURE.md §5). Catalog mutations are `GlobalAdmin`-only; save-string / save-page are `GlobalAdmin` *or* `Translator` (ADR 0021), with the actor's account on the row (`ActorId`). | **U3** (audit rows) · **U7** (the six audit-row-shape tests) |
 | **M·7** | **Removing the default is blocked; removed-language rows are retained:** `RemoveLanguageAsync` on the current default **throws** (fail-closed — no audit row on the blocked attempt); a preference pointing at a removed language **falls back to the default** (M·1); `LocalizedPage` rows for a removed language are **retained** so re-adding restores them. | **U3** (guard + retain) · **U7** (M11/M13 tests) |
 | **M·8** | **Core stays HTTP-free** (ADR 0006-D): `ITranslationProvider` / `ILocalizationService` reference no ASP.NET/HTTP types; the cookie is read/written only in the Web layer and passed down as a BCP-47 string. | **U2/U3** (no `System.Web`/`HttpRequest` in Core) · **U4** (the one Web cookie seam) |
 | **M·9** | **The source language `en` is the guaranteed floor:** its catalog row and every UI string are materialized by the first-run seeder (M1, already shipped); `en` is **always resolvable** and is the last fallback in M·1. | **U2** (the `en` floor) · **U7** (M4 test) |
@@ -379,12 +379,17 @@ public static class LocaleCookie
 
 ### 5. The admin-surface actions (Web — thin over `ILocalizationService`)
 
-`src/Kumunita.Web/Controllers/LanguagesController.cs` — **GlobalAdmin-gated**
-(the `AdminController` `[Authorize(Roles = GlobalAdmin)]` precedent), a thin
-surface: each action calls the **one** matching `ILocalizationService` method and
-maps a service exception to the Web status (M·7's blocked removal ⇒ **400/409** —
-the optimistic-concurrency story, ARCHITECTURE.md §5; the audit row is the
-service's, M·6). The actions:
+`src/Kumunita.Web/Controllers/LanguagesController.cs` — **GlobalAdmin- and
+Translator-gated** (ADR 0021 split the surface: catalog mutations remain
+`GlobalAdmin`-only via a per-action `[Authorize(Roles = "GlobalAdmin")]`,
+while the translation editors — `SaveTranslation`, `SavePage`, `PreviewPage`,
+`Translations` — are open to both. The class-level gate is
+`[Authorize(Roles = "GlobalAdmin,Translator")]`), a thin surface: each action
+calls the **one** matching `ILocalizationService` method and maps a service
+exception to the Web status (M·7's blocked removal ⇒ **400/409** — the
+optimistic-concurrency story, ARCHITECTURE.md §5; the audit row is the
+service's, M·6 — `Via = Admin`, `ActorId` = the GlobalAdmin *or* Translator).
+The actions:
 
 | Action | Method | Route | Delegates to |
 |---|---|---|---|

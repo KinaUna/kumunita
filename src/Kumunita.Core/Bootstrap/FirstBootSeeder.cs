@@ -170,14 +170,16 @@ public static class FirstBootSeeder
             return;
         }
 
-        // Ensure the GlobalAdmin + Moderator role rows exist. On a pristine DB the
-        // Identity role catalog is empty; IdentityService.SetRoleAsync's
+        // Ensure the GlobalAdmin + Moderator + Translator role rows exist. On a pristine
+        // DB the Identity role catalog is empty; IdentityService.SetRoleAsync's
         // "host's seed (FirstBootSeeder)" comment expects the role rows to be here.
         // Idempotent: FindByNameAsync then CreateAsync only when absent.
         if (await roleManager.FindByNameAsync(Roles.GlobalAdmin) is null)
             await roleManager.CreateAsync(new IdentityRole(Roles.GlobalAdmin));
         if (await roleManager.FindByNameAsync(Roles.Moderator) is null)
             await roleManager.CreateAsync(new IdentityRole(Roles.Moderator));
+        if (await roleManager.FindByNameAsync(Roles.Translator) is null)
+            await roleManager.CreateAsync(new IdentityRole(Roles.Translator));
 
         // The account — no initial password. The setup token IS the credential: the
         // admin's first sign-in is CompleteSeedAdminSetupAsync, where the token is

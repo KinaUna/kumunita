@@ -136,6 +136,7 @@
                             <select name="role" class="form-select form-select-sm me-2">
                                 <option value="@Roles.Member" selected="@(a.Roles.Count == 0 ? "selected" : null)">Member (no elevated role)</option>
                                 <option value="@Roles.Moderator" selected="@(a.Roles.Contains(Roles.Moderator) ? "selected" : null)">Moderator</option>
+                                <option value="@Roles.Translator" selected="@(a.Roles.Contains(Roles.Translator) ? "selected" : null)">Translator</option>
                                 <option value="@Roles.GlobalAdmin" selected="@(a.Roles.Contains(Roles.GlobalAdmin) ? "selected" : null)">GlobalAdmin</option>
                             </select>
 

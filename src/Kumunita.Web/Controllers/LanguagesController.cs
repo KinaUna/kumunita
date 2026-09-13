@@ -7,17 +7,34 @@ using Microsoft.AspNetCore.Mvc;
 namespace Kumunita.Web.Controllers;
 
 /// <summary>
-/// The <c>/admin/languages</c> surface (ADR 0005 D; ML lane U5) — the
-/// GlobalAdmin's thin control plane over the multilingual lane, <see
-/// cref="Roles.GlobalAdmin"/>-gated (the <c>AdminController</c> precedent).
+/// The <c>/admin/languages</c> surface (ADR 0005 D; ML lane U5; the
+/// <see cref="Roles.Translator"/> split is ADR 0021). Two lanes share this
+/// controller:
+/// <para>
+/// The **translation editors** — <see cref="Translations"/>,
+/// <see cref="SaveTranslation"/>, <see cref="PreviewPage"/>, <see cref="SavePage"/>
+/// — are open to both <see cref="Roles.GlobalAdmin"/> and <see
+/// cref="Roles.Translator"/> (ADR 0021): a delegated Translator may update and add
+/// the UI strings and static pages but holds no catalog standing.
+/// </para>
+/// <para>
+/// The **catalog mutations** — <see cref="Add"/>, <see cref="Enable"/>,
+/// <see cref="Disable"/>, <see cref="Reorder"/>, <see cref="Remove"/>,
+/// <see cref="SetDefault"/> — and the <see cref="Index"/> shell's admin controls
+/// remain <see cref="Roles.GlobalAdmin"/>-only (the <c>AdminController</c>
+/// precedent). The class-level gate therefore admits both roles; each catalog
+/// mutation carries its own <c>[Authorize(Roles = GlobalAdmin)]</c>.
+/// </para>
 ///
 /// Every action delegates to the **one** matching
 /// <see cref="ILocalizationService"/> method — the **only** Core seam this
 /// controller consumes. The audit rows are the **service's** (M·6: exactly one
-/// <c>AccessAudit</c> row, <c>Via = Admin</c>, per mutation); this controller
-/// never touches an <c>AccessAudit</c> row and never reads
-/// <c>IDocumentStore</c> directly (ADR 0006-D — Core stays HTTP-free, the Web is
-/// a thin wrapper).
+/// <c>AccessAudit</c> row, <c>Via = Admin</c>, per mutation — the standing slot
+/// the codebase documents for this lane, regardless of whether the actor is a
+/// GlobalAdmin or a Translator; <see cref="Roles.Translator"/> saves are attributed
+/// to the account via <c>ActorId</c>, ADR 0021); this controller never touches an
+/// <c>AccessAudit</c> row and never reads <c>IDocumentStore</c> directly (ADR 0006-D
+/// — Core stays HTTP-free, the Web is a thin wrapper).
 ///
 /// The thin-token rule (ADR 0001-B) holds: the actor is read per action from
 /// the <c>Kumunita.Sub</c> claim (<see cref="KumunitaPrincipal.SubjectId"/>,
@@ -42,7 +59,11 @@ namespace Kumunita.Web.Controllers;
 // documented URL real. [HttpGet]/[HttpPost] with no template inherit this base
 // (Index → /admin/languages, Add → POST /admin/languages).
 [Route("admin/languages")]
-[Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
+// ADR 0021 — the class-level gate admits both standing lanes; the Roles property is a
+// comma-separated string (a named attribute arg, so the two roles join here rather
+// than as two separate arguments). Each catalog mutation carries its own
+// [Authorize(Roles = "GlobalAdmin")] to keep the editors open but the catalog admin-only.
+[Authorize(Roles = "GlobalAdmin,Translator")]
 public sealed class LanguagesController(
     ILocalizationService localization) : Controller
 {
@@ -85,6 +106,7 @@ public sealed class LanguagesController(
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     public async Task<IActionResult> Add(string code, string nativeName)
     {
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(nativeName))
@@ -105,6 +127,7 @@ public sealed class LanguagesController(
 
     [HttpPost("{code}/enable")]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     public async Task<IActionResult> Enable(string code)
     {
         var actor = ActorId(User) ?? string.Empty;
@@ -115,6 +138,7 @@ public sealed class LanguagesController(
 
     [HttpPost("{code}/disable")]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     public async Task<IActionResult> Disable(string code)
     {
         var actor = ActorId(User) ?? string.Empty;
@@ -124,6 +148,7 @@ public sealed class LanguagesController(
     }
 
     [HttpPost("reorder")]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reorder(string[] codesInOrder)
     {
@@ -139,6 +164,7 @@ public sealed class LanguagesController(
     // optimistic-concurrency story, design doc §5).
     [HttpPost("{code}")]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     public async Task<IActionResult> Remove(string code)
     {
         var actor = ActorId(User) ?? string.Empty;
@@ -157,6 +183,7 @@ public sealed class LanguagesController(
 
     [HttpPost("{code}/default")]
     [ValidateAntiForgeryToken]
+    [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
     public async Task<IActionResult> SetDefault(string code)
     {
         var actor = ActorId(User) ?? string.Empty;

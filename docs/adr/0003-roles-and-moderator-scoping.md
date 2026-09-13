@@ -15,11 +15,14 @@ Date: 2026-08-25
 
 ## Decision
 
-- **Three roles**: Member, Moderator, GlobalAdmin.
+- **Roles**: Member, Moderator, GlobalAdmin, and (ADR 0021) Translator.
   - **Member** — verified resident; participates within audiences that grant access.
   - **Moderator** — scoped to one or more functional components.
   - **GlobalAdmin** — full control; the only role that can manage roles, set moderator
     scope, toggle scope-level `moderatorAccess`, and read the audit log.
+  - **Translator** (ADR 0021, added later) — may edit the multilingual lane's
+    translatable text (UI strings + static pages); holds none of the other
+    standing.
 - **Component scoping.** A `ModeratorAssignment { id, userId, componentId, grantedBy, at }`
   maps a moderator to specific components. Moderation actions (hide, pin, remove) are
   permitted only within assigned components. A moderator is not a GlobalAdmin and cannot

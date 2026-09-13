@@ -28,12 +28,16 @@ public sealed record ThinPrincipal(
 }
 
 /// <summary>
-/// The three roles (ADR 0003). Roles are simple claim strings on the thin principal.
+/// The roles (ADR 0003; the fourth — <see cref="Translator"/> — is ADR 0021). Roles
+/// are simple claim strings on the thin principal.
 /// <para>
 /// **Member** — verified resident; participates within audiences that grant access.
 /// **Moderator** — scoped to one or more functional components.
 /// **GlobalAdmin** — full control; the only role that can manage roles, set moderator
 /// scope, toggle scope-level <c>moderatorAccess</c>, and read the audit log.
+/// **Translator** — the multilingual lane's delegated editor (ADR 0021): may update
+/// and add the translatable platform text (the UI strings and static pages) but holds
+/// none of the GlobalAdmin's catalog / audit / role-management standing.
 /// </para>
 /// </summary>
 public static class Roles
@@ -41,6 +45,13 @@ public static class Roles
     public const string Member = "Member";
     public const string Moderator = "Moderator";
     public const string GlobalAdmin = "GlobalAdmin";
+
+    /// <summary>
+    /// The multilingual lane's delegated editor (ADR 0021) — may save UI-string and
+    /// static-page translations, but not manage the language catalog, read the audit
+    /// log, or assign roles (those remain <see cref="GlobalAdmin"/>).
+    /// </summary>
+    public const string Translator = "Translator";
 
     /// <summary>A component-scope claim: a Moderator governs <paramref name="componentId"/>.</summary>
     public static string ModeratorComponent(string componentId) => $"moderator:{componentId}";

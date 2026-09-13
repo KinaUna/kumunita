@@ -81,7 +81,11 @@ pick a language at `/language`, and `/about` is a static page.
   resolves per request, with a seeded `en` floor that is always present), the
   admin edits the **closed** key list per language (no hand-typed key), a
   **signed-out** visitor can pick a language at `/language`, and `/about` renders
-  an admin-authored page or the product story.- **Timezone** — the platform carries a **default time zone** the admin sets
+  an admin-authored page or the product story. The `TR` lane (ADR 0021) then
+  delegates the editing: a GlobalAdmin can grant a **`Translator`** role to a
+  resident, who may update and add the UI strings and static pages but holds
+  none of the GlobalAdmin's other standing (the catalog — add / enable /
+  reorder / set-default / remove — stays GlobalAdmin-only).- **Timezone** — the platform carries a **default time zone** the admin sets
   once (`/admin/timezone`, audited); each resident can override it in their
   own settings page (the time-zone section of `/settings/language`). Every
   timestamp renders in the
@@ -131,8 +135,9 @@ stays trivial and the authorization rules can grow freely.
 
 ### Roles
 
-- **GlobalAdmin** — full control; manages moderators and their component scope.
+- **GlobalAdmin** — full control; manages moderators, the language catalog, and every other control-plane action.
 - **Moderator** — scoped to one or more functional components.
+- **Translator** (ADR 0021) — may edit the platform's UI strings and static pages; holds none of the GlobalAdmin's other standing.
 - **Member** — verified resident.
 
 ## Deployment
@@ -154,6 +159,7 @@ stays trivial and the authorization rules can grow freely.
 - **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
 - **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
 - **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
+- **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

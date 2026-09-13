@@ -1,12 +1,31 @@
 @model IReadOnlyList<Kumunita.Web.Controllers.LanguagesController.LanguageRowViewModel>
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = "Languages";
+    // ADR 0021 — the split surface: a GlobalAdmin sees the full catalog
+    // (add / enable / reorder / set-default / remove) *and* the translation
+    // editors; a Translator sees only the completeness view + the per-language
+    // "UI strings" and "Edit pages" editors. isGlobalAdmin gates the catalog
+    // controls below (the controller gates the same actions with [Authorize]).
+    bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
 }
 
 <h1>Languages</h1>
 <p class="text-muted">
-    Manage the languages this instance supports. Changes take effect on the
-    next request — no rebuild, no restart.
+    @if (isGlobalAdmin)
+    {
+        <text>
+            Manage the languages this instance supports. Changes take effect on the
+            next request — no rebuild, no restart.
+        </text>
+    }
+    else
+    {
+        <text>
+            Review the platform's translation coverage and update the UI strings and
+            static pages. Changes take effect on the next request.
+        </text>
+    }
 </p>
 
 @if (TempData["info"] is string info)
@@ -18,45 +37,51 @@
     <div class="alert alert-danger" role="alert">@err</div>
 }
 
-<!-- ── Add a language ───────────────────────────────────────────────────── -->
-<h2 class="mt-4">Add a language</h2>
-<form method="post" action="/admin/languages" class="row g-2 align-items-end mb-4">
-    @Html.AntiForgeryToken()
-    <div class="col-sm-3">
-        <label for="code" class="form-label">BCP-47 code</label>
-        <input type="text" class="form-control" name="code" id="code"
-               required placeholder="pl" maxlength="16" />
-    </div>
-    <div class="col-sm-4">
-        <label for="nativeName" class="form-label">Native name</label>
-        <input type="text" class="form-control" name="nativeName" id="nativeName"
-               required placeholder="Polski" maxlength="64" />
-    </div>
-    <div class="col-sm-3">
-        <button type="submit" class="btn btn-primary">Add</button>
-    </div>
-</form>
+@if (isGlobalAdmin)
+{
+    <!-- ── Add a language (GlobalAdmin-only, ADR 0021) ─────────────────────── -->
+    <h2 class="mt-4">Add a language</h2>
+    <form method="post" action="/admin/languages" class="row g-2 align-items-end mb-4">
+        @Html.AntiForgeryToken()
+        <div class="col-sm-3">
+            <label for="code" class="form-label">BCP-47 code</label>
+            <input type="text" class="form-control" name="code" id="code"
+                   required placeholder="pl" maxlength="16" />
+        </div>
+        <div class="col-sm-4">
+            <label for="nativeName" class="form-label">Native name</label>
+            <input type="text" class="form-control" name="nativeName" id="nativeName"
+                   required placeholder="Polski" maxlength="64" />
+        </div>
+        <div class="col-sm-3">
+            <button type="submit" class="btn btn-primary">Add</button>
+        </div>
+    </form>
+}
 
 <!-- ── Existing languages ───────────────────────────────────────────────── -->
 <h2>Supported languages</h2>
 
-@* Reorder form — all current codes in display order. *@
-<form method="post" action="/admin/languages/reorder" class="mb-3">
-    @Html.AntiForgeryToken()
-    @for (var i = 0; i < Model.Count; i++)
-    {
-        <input type="hidden" name="codesInOrder" value="@Model[i].Code" />
-    }
-    <button type="submit" class="btn btn-outline-secondary btn-sm"
-            title="Submit the current order (as shown below) as the new sort order">
-        Reorder (confirm current order)
-    </button>
-    <span class="text-muted small ms-2">
-        Drag-and-drop reordering is not available; the reorder form accepts the
-        codes in the order they appear here. To change the order, the admin
-        should submit the list in the desired sequence.
-    </span>
-</form>
+@if (isGlobalAdmin)
+{
+    @* Reorder form — all current codes in display order. (GlobalAdmin-only, ADR 0021) *@
+    <form method="post" action="/admin/languages/reorder" class="mb-3">
+        @Html.AntiForgeryToken()
+        @for (var i = 0; i < Model.Count; i++)
+        {
+            <input type="hidden" name="codesInOrder" value="@Model[i].Code" />
+        }
+        <button type="submit" class="btn btn-outline-secondary btn-sm"
+                title="Submit the current order (as shown below) as the new sort order">
+            Reorder (confirm current order)
+        </button>
+        <span class="text-muted small ms-2">
+            Drag-and-drop reordering is not available; the reorder form accepts the
+            codes in the order they appear here. To change the order, the admin
+            should submit the list in the desired sequence.
+        </span>
+    </form>
+}
 
 <div class="table-responsive">
     <table class="table table-sm align-middle">
@@ -102,37 +127,44 @@
                     </td>
                     <td class="text-nowrap">
                         <div class="btn-group btn-group-sm" role="group">
-                            @if (row.Enabled)
+                            @if (isGlobalAdmin)
                             {
-                                <form method="post" action="/admin/languages/@row.Code/disable" class="d-inline">
+                                @if (row.Enabled)
+                                {
+                                    <form method="post" action="/admin/languages/@row.Code/disable" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-secondary">Disable</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" action="/admin/languages/@row.Code/enable" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-outline-secondary">Enable</button>
+                                    </form>
+                                }
+
+                                <form method="post" action="/admin/languages/@row.Code/default" class="d-inline">
                                     @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-secondary">Disable</button>
-                                </form>
-                            }
-                            else
-                            {
-                                <form method="post" action="/admin/languages/@row.Code/enable" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-outline-secondary">Enable</button>
+                                    <button type="submit" class="btn btn-outline-primary">Set default</button>
                                 </form>
                             }
 
-                            <form method="post" action="/admin/languages/@row.Code/default" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-outline-primary">Set default</button>
-                            </form>
-
+                            @* Translation editors — open to both GlobalAdmin and Translator (ADR 0021). *@
                             <a href="/admin/languages/@row.Code/pages/terms"
                                class="btn btn-outline-info">Edit pages</a>
 
                             <a href="/admin/languages/@row.Code/translations"
                                class="btn btn-outline-info">UI strings</a>
 
-                            <form method="post" action="/admin/languages/@row.Code" class="d-inline"
-                                  onsubmit="return confirm('Remove @row.Code? Its translation and page rows are retained and will be restored if the language is re-added.');">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-outline-danger">Remove</button>
-                            </form>
+                            @if (isGlobalAdmin)
+                            {
+                                <form method="post" action="/admin/languages/@row.Code" class="d-inline"
+                                      onsubmit="return confirm('Remove @row.Code? Its translation and page rows are retained and will be restored if the language is re-added.');">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger">Remove</button>
+                                </form>
+                            }
                         </div>
                     </td>
                 </tr>

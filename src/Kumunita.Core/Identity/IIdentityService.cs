@@ -120,13 +120,16 @@ public interface IIdentityService
     Task ConsumeBreakGlassAsync(string subjectId, string token);
 
     /// <summary>
-    /// Role promote/demote + component-scope assignment (ADR 0003): a GlobalAdmin promotes
-    /// to / demotes from <c>GlobalAdmin</c> or <c>Moderator</c>; for a <c>Moderator</c>,
+    /// Role promote/demote + component-scope assignment (ADR 0003; the <c>Translator</c>
+    /// lane is ADR 0021): a GlobalAdmin promotes to / demotes from <c>GlobalAdmin</c>,
+    /// <c>Moderator</c>, or <c>Translator</c>; for a <c>Moderator</c>,
     /// <paramref name="componentIds"/> is the complete scope (null/empty clears it — the
-    /// only standing-moderator path is <c>moderatorAccess</c>, invariant C5). Rotates the
-    /// security stamp (invalidates existing sessions — a demoted account loses the
-    /// elevated access immediately, not at cookie expiry, OPS §10). Appends an audit row
-    /// <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call this.
+    /// only standing-moderator path is <c>moderatorAccess</c>, invariant C5). A
+    /// <c>Translator</c> holds no component scope — <paramref name="componentIds"/> is
+    /// ignored for that role (the assignment rows are cleared, as for any non-Moderator).
+    /// Rotates the security stamp (invalidates existing sessions — a demoted account
+    /// loses the standing immediately, not at cookie expiry, OPS §10). Appends an audit
+    /// row <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call this.
     /// </summary>
     Task SetRoleAsync(string targetSubjectId, string adminSubjectId, string role,
         IReadOnlyList<string>? componentIds);
