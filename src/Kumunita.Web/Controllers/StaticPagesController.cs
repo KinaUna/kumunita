@@ -18,10 +18,10 @@ namespace Kumunita.Web.Controllers;
 /// <c>/about</c> is wired here (ML-UI U7, D7-4 — **shipped**), not in
 /// <c>HomeController.About</c>: one route, one owner. A <c>null</c> page (the
 /// <c>about</c> page truly absent in any language) renders the **existing**
-/// product-story view (<c>Views/Home/About</c>) rather than a 404 — a fresh
-/// instance's <c>/about</c> is the product pitch; an admin can create a real
-/// <c>about</c> <see cref="LocalizedPage"/> (M·4 — data, not config) and it then
-/// renders.
+/// product-story view (<c>Views/StaticPages/About</c>) rather than a 404 — a
+/// fresh instance's <c>/about</c> is the product pitch; an admin can create a
+/// real <c>about</c> <see cref="LocalizedPage"/> (M·4 — data, not config) and it
+/// then renders.
 /// </summary>
 public sealed class StaticPagesController(
     ITranslationProvider provider,
@@ -52,8 +52,8 @@ public sealed class StaticPagesController(
     /// Resolves an admin-created <c>about</c> <see cref="LocalizedPage"/> in the
     /// preferred language (per-page fallback, M·2). When the page is **truly
     /// absent** (null — no <c>about</c> row in any language), it renders the
-    /// existing product-story view (<c>Views/Home/About</c>) instead of a 404 —
-    /// a fresh instance's <c>/about</c> is the product pitch. This route
+    /// existing product-story view (<c>Views/StaticPages/About</c>) instead of a
+    /// 404 — a fresh instance's <c>/about</c> is the product pitch. This route
     /// replaced the former <c>HomeController.About</c> (deleted in U7).
     /// </summary>
     [HttpGet("/about")]
@@ -73,7 +73,7 @@ public sealed class StaticPagesController(
             // product-story view (a fresh instance's about page). Other slugs
             // keep the 404 floor (M·2's page floor).
             if (fallBackToProductStory)
-                return View("~/Views/Home/About",
+                return View("About",
                     new Models.HomeViewModel(community.Value.Name, community.Value.SupportEmail));
             return NotFound();
         }

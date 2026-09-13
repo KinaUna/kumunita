@@ -17,4 +17,9 @@ namespace Kumunita.Core.Posts;
 /// <see cref="PostDraft.Audience"/>).
 /// </para>
 /// </summary>
-public sealed record GroupPostDraft(string GroupId, string? Title, string Body);
+// ADR 0018 authored-in-language tag (ADR 0005 B) is the optional trailing
+// parameter: a null/empty code is materialized from the instance default at
+// write time (see PostService.CreateGroupPostAsync), so the existing
+// positional call sites (5 in GroupPostServiceTests) keep compiling unchanged
+// and post the instance default.
+public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null);

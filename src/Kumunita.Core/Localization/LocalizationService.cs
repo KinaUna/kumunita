@@ -56,6 +56,25 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
+    public async Task<string> GetDefaultLanguageCodeAsync()
+    {
+        // ADR 0018 read seam: the instance default (LocaleSettings.DefaultLanguageCode)
+        // with the `en` floor — a missing singleton or a blank code both yield `en`.
+        // A read (no audit row), like ListLanguagesAsync.
+        await using var session = _store.QuerySession();
+        var ct = System.Threading.CancellationToken.None;
+
+        var settings = await session
+            .LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultLanguageCode))
+            return settings.DefaultLanguageCode;
+
+        return "en";
+    }
+
+    /// <inheritdoc />
     public async Task<TranslationResource?> GetTranslationAsync(string key, string languageCode)
     {
         await using var session = _store.QuerySession();

@@ -64,6 +64,28 @@
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;">
+                        Language
+                    </label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        The language you're writing this post in. This is only a
+                        tag — it is not translated — and it keeps the text
+                        findable later and lets a reader add their own language
+                        version if they want.
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="groups.new_submit">Post to group</kw-l></button>
                 <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}")">Cancel</a>

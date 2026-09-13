@@ -110,6 +110,10 @@
                 </div>
             </div>
 
+            @* ADR 0018 — the authored-in language picker (shared New/Edit partial).
+               Pre-selected from the stored row's tag (AnnouncementController.Edit GET). *@
+            <partial name="_AnnouncementLanguagePicker" model="Model" />
+
             <div class="card mb-4">
                 <div class="card-body">
                     <div class="form-check">

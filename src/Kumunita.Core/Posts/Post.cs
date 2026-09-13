@@ -61,4 +61,20 @@ public sealed class Post
     /// via <c>PostService.CreateGroupPostAsync</c>.
     /// </summary>
     public string GroupId { get; set; } = string.Empty;
+
+    // ADR 0018 authored-in-language ADD (ADR 0004 §B.1 additive — the third
+    // additive Post field after M3b's Status and ADR 0013's GroupId):
+    /// <summary>
+    /// The BCP-47 code of the language this post was **authored in** (ADR 0018,
+    /// ADR 0005 B). Written **only** at create time
+    /// (<see cref="PostService.CreatePostAsync"/> /
+    /// <see cref="PostService.CreateGroupPostAsync"/>) — the edit lane
+    /// (ADR 0014) deliberately does **not** touch it. Materialized from the
+    /// instance default (<see cref="Kumunita.Core.Localization.LocaleSettings.DefaultLanguageCode"/>,
+    /// with <c>en</c> as the floor) when the author leaves it unchosen, so no
+    /// stored row is empty. **Not a translation mechanism** (ADR 0005 C is
+    /// unchanged — the body is never machine-translated by the platform); it is
+    /// the tag a future search surface and any user-added translations key off.
+    /// </summary>
+    public string LanguageCode { get; set; } = string.Empty;
 }

@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
@@ -75,6 +76,7 @@ public sealed class PostsController(
     PostService posts,
     ModerationService moderation,
     IUserInfoService userInfo,
+    ILocalizationService localization,
     IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -335,6 +337,13 @@ public sealed class PostsController(
                 reply.AuthorId == actor));
         }
 
+        // ADR 0018 — the reply form's authored-in language picker options
+        // (the enabled catalog, the SeedLanguagePickerAsync source), stored
+        // on ViewData (the same read-only channel the composer's grant
+        // picker uses — the detail VM is a projection, not a form-bound
+        // model, so it does not carry picker option lists).
+        ViewData["Reply_Languages"] = await SeedLanguagePickerAsync();
+
         return View(new PostDetailViewModel
         {
             Post = result.Post,
@@ -472,6 +481,30 @@ public sealed class PostsController(
         ViewData["Audience_Groups"] = groupOptions;
     }
 
+    /// <summary>
+    /// Seeds the composer's <b>authored-in language</b> picker (ADR 0018,
+    /// ADR 0005 B) — the instance's **enabled** <see
+    /// cref="Kumunita.Core.Localization.LanguageCatalog"/>, ordered by
+    /// <c>SortOrder</c>. Read through <see cref="ILocalizationService.ListLanguagesAsync"/>
+    /// (the HTTP-free seam, ADR 0005 D) — the exact catalog read the
+    /// <see cref="LocaleController.Index"/> page uses, so this composer
+    /// dependency mirrors an established lane rather than re-deriving the
+    /// catalog from the store. The composer leaves the selection empty by
+    /// default so the *instance default* is what the service materializes
+    /// server-side at write time — the picker is the set of choices, not the
+    /// choice. Stored on <see cref="PostComposeViewModel.Languages"/>
+    /// ([BindNever]).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => (l.Id, l.NativeName))
+            .ToList();
+    }
+
     [HttpGet("/posts/new")]
     public async Task<IActionResult> New()
     {
@@ -493,6 +526,11 @@ public sealed class PostsController(
         {
             Components = components.Select(c => (c.Id, c.Name)).ToList(),
             ComponentId = first is null ? string.Empty : first.Id, // empty when zero reachable components
+            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            // ADR 0018 — pre-select the instance default so the picker
+            // highlights the right option and a no-change submit is a
+            // concrete BCP-47 code (never an empty row).
+            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
             // ADR 0001-B — the composer's choice is absolute: the
             // editor's <b>default</b> shape is the *bootstrap* self-only
             // audience (invariant C1: an empty audience is the
@@ -575,6 +613,7 @@ public sealed class PostsController(
         // admissible component (the §2.3 row 2 shape).
         var components = await AccessibleComponentsAsync(User);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
+        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
 
         // Re-seed the picker option lists so a failed-shape re-render
         // below still shows the "Who to grant to" options (the
@@ -619,7 +658,8 @@ public sealed class PostsController(
             ComponentId: model.ComponentId,
             Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
             Body: model.Body,
-            Audience: model.Audience.BuildAudience());
+            Audience: model.Audience.BuildAudience(),
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode); // ADR 0018 — null/empty ⇒ instance default materialized server-side.
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -860,7 +900,7 @@ public sealed class PostsController(
     /// </para>
     /// </summary>
     [HttpPost("/posts/{id}/replies")]
-    public async Task<IActionResult> Replies([FromRoute] string id, [FromForm] string? body)
+    public async Task<IActionResult> Replies([FromRoute] string id, [FromForm] string? body, [FromForm] string? languageCode)
     {
         if (string.IsNullOrEmpty(id))
             return NotFound();
@@ -895,7 +935,7 @@ public sealed class PostsController(
         // service's SaveChangesAsync is the single write (the M3 U6 precedent
         // in this file — cf. New()'s CreatePostAsync).
         await using var session = store.LightweightSession();
-        await posts.CreateReplyAsync(id, actor, body, session);
+        await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
 
         TempData["info"] = "Reply added.";
         return Redirect($"/posts/{id}");

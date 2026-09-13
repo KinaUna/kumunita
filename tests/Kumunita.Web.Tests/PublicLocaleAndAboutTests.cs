@@ -101,9 +101,9 @@ public class PublicLocaleAndAboutTests
         var result = await controller.About();
 
         // L9's "truly absent" branch: a fresh instance's /about is the product
-        // pitch (Views/Home/About), not a 404.
+        // pitch (Views/StaticPages/About), not a 404.
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/Home/About", view.ViewName);
+        Assert.Equal("About", view.ViewName);
         var vm = Assert.IsType<Models.HomeViewModel>(view.ViewData.Model);
         Assert.Equal("Maplewood", vm.CommunityName);
     }

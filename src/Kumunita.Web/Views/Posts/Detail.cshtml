@@ -151,6 +151,26 @@
                     <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
                               required
                               placeholder="…"></textarea>
+                    @{
+                        var replyLanguages =
+                            (ViewData["Reply_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
+                            ?? new List<(string Code, string NativeName)>();
+                    }
+                    <div class="mb-3">
+                        <label class="form-label" for="reply-language" style="font-weight:600;">
+                            Language
+                        </label>
+                        <select class="form-control" id="reply-language" name="languageCode">
+                            @foreach (var (languageCode, nativeName) in replyLanguages)
+                            {
+                                <option value="@languageCode">@nativeName</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-1">
+                            The language you're replying in — a tag, not a
+                            translation.
+                        </div>
+                    </div>
                     <div class="text-muted small mb-3">
                         Replies have no own audience — they are visible under
                         this post's single audience decision (the C-M3·1

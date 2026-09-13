@@ -18,6 +18,17 @@ public interface ILocalizationService
     // ── Catalog — TargetKind "language" ─────────────────────────────
     Task<IReadOnlyList<LanguageCatalog>> ListLanguagesAsync();
 
+    /// <summary>
+    /// The instance default authored-in language (ADR 0018 read seam) — the
+    /// <see cref="LocaleSettings.DefaultLanguageCode"/> with the <c>en</c>
+    /// floor (a missing singleton or blank code yields <c>en</c>). A read:
+    /// **no audit row** (it is not a mutating call, matching
+    /// <see cref="ListLanguagesAsync"/>). Used to pre-select a compose form's
+    /// language picker so the "no change" submit is a concrete BCP-47 code,
+    /// never an empty row.
+    /// </summary>
+    Task<string> GetDefaultLanguageCodeAsync();
+
     /// <summary>Adds a language (BCP-47 code + native name) — audited
     /// <c>language.add</c>, TargetKind "language", TargetId = code (M·6).</summary>
     Task AddLanguageAsync(string code, string nativeName, string actorId);

@@ -40,7 +40,7 @@ namespace Kumunita.Web.Tests;
 ///
 /// <para>
 /// <b>L9 (M·2, M·7) — <c>/about</c>, three branches:</b> (a) no <c>about</c> row in
-/// any language → the product-story view (<c>~/Views/Home/About</c> + a
+/// any language → the product-story view (<c>~/Views/StaticPages/About</c> + a
 /// <c>HomeViewModel</c>); (b) an <c>en</c> <c>about</c> row present, <c>pl</c>
 /// preference, no <c>pl</c> row → the <c>Page</c> view with the <b>en</b> page
 /// (per-page fallback, the provider's job); (c) a <c>pl</c> row present → the
@@ -224,7 +224,7 @@ public class MLUI_FacesTests
 
         // L9's "truly absent" branch: a fresh instance's /about is the product pitch.
         var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/Home/About", view.ViewName);
+        Assert.Equal("About", view.ViewName);
         var vm = Assert.IsType<Models.HomeViewModel>(view.ViewData.Model);
         Assert.Equal("Maplewood", vm.CommunityName);
     }

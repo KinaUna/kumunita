@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Kumunita.Web.Models;
 
@@ -348,6 +350,26 @@ public sealed class GroupPostComposeViewModel
     public string? Title { get; set; }
 
     public string Body { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The composer's <b>authored-in language</b> picker (ADR 0018, ADR 0005 B)
+    /// — the BCP-47 code the author is writing this group post in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time
+    /// (<see cref="Kumunita.Core.Posts.PostService.CreateGroupPostAsync"/>).
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The composer's language *picker* options — the instance's **enabled**
+    /// language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>.
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="LanguageCode"/>, not a
+    /// catalog-list shape (the <see cref="PostComposeViewModel.Components"/>
+    /// single-source pin at the language layer).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
 
     /// <summary>The composer's shape is well-formed for a <c>POST</c>:
     /// <see cref="Body"/> must be non-empty (a bodyless post is a dead row;

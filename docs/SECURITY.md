@@ -205,7 +205,10 @@ and never leave the box. If a machine-translation feature is ever enabled: the
 provider is a third-party boundary like B4 — **audience-restricted content is never
 sent to it** — translation is per-item, user-initiated, and always labeled
 "machine translation", and this decision is re-recorded here before shipping
-(ADR 0005 C).
+(ADR 0005 C). The **authored-in language tag** on `Post` / `PostReply` /
+`Announcement` (ADR 0018) is **not** a translation step — it is a BCP-47
+metadata field (for future search and reader-added language versions), carries
+no content to a third party, and changes none of this posture.
 
 ### Open items (decide before shipping the surface they protect)
 

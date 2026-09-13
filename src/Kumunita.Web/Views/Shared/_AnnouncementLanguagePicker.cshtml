@@ -1,0 +1,30 @@
+@model Kumunita.Web.Models.AnnouncementComposeViewModel
+@*
+    ADR 0018 — the announcement compose form's <b>authored-in language</b>
+    picker (shared by the New + Edit compose views). The <b>Language</b> card:
+    a <c>select</c> posting <c>LanguageCode</c>, pre-selected from
+    <c>Model.LanguageCode</c> (the GET compose handlers pre-select the
+    instance default on the create lane, the stored row's tag on the edit
+    lane). A tag, never a translation (ADR 0005 C unchanged) — it keeps the
+    text findable later and lets a reader add their own language version.
+*@
+<div class="card mb-4">
+    <div class="card-body">
+        <label class="form-label" for="language" style="font-weight:600;">
+            Language
+        </label>
+        <select class="form-control" id="language" name="LanguageCode">
+            @foreach (var (languageCode, nativeName) in Model.Languages)
+            {
+                <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                    @nativeName
+                </option>
+            }
+        </select>
+        <div class="text-muted small mt-2">
+            The language you're writing this announcement in. This is only a
+            tag — it is not translated — and it keeps the text findable later
+            and lets a reader add their own language version if they want.
+        </div>
+    </div>
+</div>

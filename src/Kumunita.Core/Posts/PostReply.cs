@@ -28,4 +28,18 @@ public sealed class PostReply
     /// <see cref="Created"/> is the initial timestamp).
     /// </summary>
     public DateTimeOffset? Modified { get; set; }
+
+    // ADR 0018 authored-in-language ADD (ADR 0004 §B.1 additive — the second
+    // additive PostReply field after ADR 0016's Modified):
+    /// <summary>
+    /// The BCP-47 code of the language this reply was **authored in** (ADR 0018,
+    /// ADR 0005 B) — its **own** tag, independent of the parent post's. Written
+    /// **only** at create time (<see cref="PostService.CreateReplyAsync"/>); the
+    /// ADR 0016 reply-edit lane (body-only) deliberately does **not** touch it.
+    /// Materialized from the instance default when the replier leaves it
+    /// unchosen, so no stored row is empty. **Not a translation mechanism**
+    /// (ADR 0005 C unchanged); it is the tag a future search surface and any
+    /// user-added translations key off.
+    /// </summary>
+    public string LanguageCode { get; set; } = string.Empty;
 }

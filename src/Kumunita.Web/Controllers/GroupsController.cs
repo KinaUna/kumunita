@@ -1,3 +1,4 @@
+using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
@@ -34,10 +35,31 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("groups")]
-public sealed class GroupsController(IUserInfoService userInfo, PostService posts, IDocumentStore store) : Controller
+public sealed class GroupsController(IUserInfoService userInfo, PostService posts, ILocalizationService localization, IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// The group-post composer's + reply form's <b>authored-in language</b>
+    /// picker options (ADR 0018, ADR 0005 B) — the instance's **enabled**
+    /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>. Read through
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
+    /// seam, ADR 0005 D) — the exact catalog read the
+    /// <see cref="LocaleController.Index"/> page uses. The composer/reply form
+    /// leaves the selection empty by default so the *instance default* is what
+    /// the service materializes server-side at write time — the picker is the
+    /// set of choices, not the choice.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => (l.Id, l.NativeName))
+            .ToList();
+    }
 
     /// <summary>
     /// The group list (F14): the groups the actor owns or is a member of, projected
@@ -807,6 +829,12 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 reply.AuthorId == actor));
         }
 
+        // ADR 0018 — the reply form's authored-in language picker options
+        // (the enabled catalog), stored on ViewData (the same read-only
+        // channel the post detail page uses — the detail VM is a projection,
+        // not a form-bound model).
+        ViewData["Reply_Languages"] = await SeedLanguagePickerAsync();
+
         return View("PostDetail", new GroupPostDetailViewModel
         {
             GroupId = id,
@@ -843,7 +871,14 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         if (group is null)
             return NotFound();
 
-        return View("New", new GroupPostComposeViewModel());
+        return View("New", new GroupPostComposeViewModel
+        {
+            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            // ADR 0018 — pre-select the instance default so the picker
+            // highlights the right option and a no-change submit is a
+            // concrete BCP-47 code (never an empty row).
+            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+        });
     }
 
     /// <summary>
@@ -886,6 +921,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         if (group is null)
             return NotFound();
 
+        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+
         if (!model.IsValid)
         {
             // Re-render the standalone compose page, prefilled with what
@@ -897,7 +934,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         var draft = new GroupPostDraft(
             GroupId: id,
             Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
-            Body: model.Body.Trim());
+            Body: model.Body.Trim(),
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode); // ADR 0018 — null/empty ⇒ instance default.
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the service's
@@ -1069,7 +1107,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
     /// </summary>
     [HttpPost("{id}/posts/{postId}/replies")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> GroupPostReply(string id, string postId, [FromForm] string? body)
+    public async Task<IActionResult> GroupPostReply(string id, string postId, [FromForm] string? body, [FromForm] string? languageCode)
     {
         if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
             return NotFound();
@@ -1101,7 +1139,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         // service's <c>SaveChangesAsync</c> is the single write (the M3
         // PostsController <c>Replies</c> precedent).
         await using var session = store.LightweightSession();
-        await posts.CreateReplyAsync(postId, actor, body, session);
+        await posts.CreateReplyAsync(postId, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
 
         TempData["info"] = "Reply added.";
         return Redirect($"/groups/{id}/posts/{postId}");

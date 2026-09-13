@@ -1,5 +1,7 @@
 using Kumunita.Core.Announcements;
 using Kumunita.Core.UserInfo;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Kumunita.Web.Models;
 
@@ -79,6 +81,26 @@ public sealed class AnnouncementComposeViewModel
     public string? Title { get; set; }
     public string Body { get; set; } = string.Empty;
     public string? Scope { get; set; }
+
+    /// <summary>
+    /// The announcement's <b>authored-in language</b> (ADR 0018, ADR 0005 B) —
+    /// the BCP-47 code the author is writing this announcement in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time
+    /// (<see cref="Kumunita.Core.Announcements.AnnouncementService.CreateAsync"/>).
+    /// Editable on the edit lane (unlike the post/reply edit lanes — ADR 0018).
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The compose form's language *picker* options — the instance's
+    /// **enabled** language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>,
+    /// reseeded by the controller on every render. <b>[BindNever]</b> — the form
+    /// POSTs a <see cref="LanguageCode"/>, not a catalog-list shape.
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
 
     /// <summary>The community this announcement targets (bound from a
     /// <c>&lt;select&gt;</c> in <c>New</c>/<c>Edit</c>). Empty → null = the flat

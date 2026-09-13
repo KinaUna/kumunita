@@ -16,4 +16,10 @@ public sealed record PostDraft(
     string ComponentId,
     string? Title,
     string Body,
-    Authorization.Audience Audience);
+    Authorization.Audience Audience,
+    // ADR 0018 authored-in-language tag (ADR 0005 B). Optional trailing
+    // parameter: a null/empty code is materialized from the instance default
+    // at write time (see PostService.CreatePostAsync), so the existing
+    // positional call sites (7 in PostServiceTests) keep compiling unchanged
+    // and post the instance default.
+    string? LanguageCode = null);

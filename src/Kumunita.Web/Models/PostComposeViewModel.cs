@@ -50,6 +50,28 @@ public sealed class PostComposeViewModel
     public string Body { get; set; } = string.Empty;
 
     /// <summary>
+    /// The composer's <b>authored-in language</b> picker (ADR 0018, ADR 0005 B)
+    /// — the BCP-47 code the author is writing this post in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time
+    /// (<see cref="Kumunita.Core.Posts.PostService.CreatePostAsync"/>) — the
+    /// composer therefore does not need to pre-seed a concrete default.
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The composer's language *picker* options — the instance's **enabled**
+    /// language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>,
+    /// read at <c>GET</c> and re-read at <c>POST</c> re-render. <b>[BindNever]</b>
+    /// — the form POSTs a <see cref="LanguageCode"/> (the single selected
+    /// code), not a catalog-list shape (the <see cref="Components"/>
+    /// single-source pin at the language layer).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
+
+    /// <summary>
     /// The composer's component *picker* options — the
     /// <see cref="Kumunita.Core.UserInfo.Component"/> candidate set, read
     /// from <see cref="IUserInfoService.GetComponentsAsync(bool)"/> at

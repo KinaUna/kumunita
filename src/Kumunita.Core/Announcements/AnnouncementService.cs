@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -176,10 +177,33 @@ public sealed class AnnouncementService : IAnnouncementService
             announcement.Id = Guid.NewGuid().ToString("N");
         announcement.AuthorId = actorId;
         announcement.Created  = DateTimeOffset.UtcNow;
+        announcement.LanguageCode = await ResolveLanguageCodeAsync(announcement.LanguageCode, session).ConfigureAwait(false); // ADR 0018
 
         session.Store(announcement);
         await session.SaveChangesAsync().ConfigureAwait(false);
         return announcement;
+    }
+
+    /// <summary>
+    /// ADR 0018 — resolves the authored-in <c>LanguageCode</c> for a new
+    /// announcement: a non-empty authored code is used verbatim (BCP-47 tag,
+    /// ADR 0005 B); a null/empty code is materialized from the instance
+    /// default (<see cref="LocaleSettings.DefaultLanguageCode"/>, loaded from
+    /// the caller's in-flight session) with <c>en</c> as the floor when the
+    /// singleton row is absent. The result is **always** a concrete BCP-47
+    /// code — no stored row is left empty. A tag, not a translation (ADR 0005 C
+    /// unchanged).
+    /// </summary>
+    private async Task<string> ResolveLanguageCodeAsync(string? languageCode, IDocumentSession session)
+    {
+        if (!string.IsNullOrWhiteSpace(languageCode))
+            return languageCode;
+
+        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None).ConfigureAwait(false);
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultLanguageCode))
+            return settings.DefaultLanguageCode;
+
+        return "en";
     }
 
     /// <summary>
@@ -208,7 +232,8 @@ public sealed class AnnouncementService : IAnnouncementService
     /// <see cref="CreateAsync"/>, which mints a brand-new doc): the author of
     /// record is whoever created it, not whoever last edited it, and
     /// <see cref="Announcement.Modified"/> is stamped — <see cref="DateTimeOffset.UtcNow"/>
-    /// — only when at least one of Title/Body/Scope/Pinned actually changed,
+    /// — only when at least one of Title/Body/Scope/Pinned/CommunityId/
+    /// <see cref="Announcement.LanguageCode"/> (ADR 0018) actually changed,
     /// so a no-op re-save of an unchanged doc does not bump the stamp.
     /// </summary>
     public async Task<Announcement> UpdateAsync(
@@ -233,17 +258,32 @@ public sealed class AnnouncementService : IAnnouncementService
 
         await EnsureEditPermissionAsync(existing, actorId, actorRoles);
 
+        // ADR 0018 — materialize the authored-in tag the same way CreateAsync
+        // does (a null/empty value ⇒ the instance default, <c>en</c> floor) on
+        // BOTH sides before comparing. The stored side is normalized too: a
+        // pre-ADR-0018 row has an empty <c>LanguageCode</c>, and a no-op
+        // re-save that leaves the picker at the instance default must compare
+        // as "unchanged" (resolving <c>""</c> → the default on the stored side
+        // and the default → the default on the updated side makes the two
+        // equal) — otherwise every no-op edit would falsely stamp
+        // <c>Modified</c>. A genuine language change (e.g. default → <c>pl</c>)
+        // still registers as changed.
+        var existingLanguageCode = await ResolveLanguageCodeAsync(existing.LanguageCode, session).ConfigureAwait(false);
+        var updatedLanguageCode  = await ResolveLanguageCodeAsync(updated.LanguageCode,  session).ConfigureAwait(false);
+
         var changed = existing.Title != updated.Title
             || existing.Body != updated.Body
             || existing.Scope != updated.Scope
             || existing.Pinned != updated.Pinned
-            || existing.CommunityId != updated.CommunityId;
+            || existing.CommunityId != updated.CommunityId
+            || existingLanguageCode != updatedLanguageCode; // ADR 0018 — the announcement edit surface is not ADR-frozen (unlike the post/reply edit lanes), so the authored-in tag is editable here too.
 
         existing.Title = updated.Title;
         existing.Body  = updated.Body;
         existing.Scope = updated.Scope;
         existing.Pinned = updated.Pinned;
         existing.CommunityId = updated.CommunityId;
+        existing.LanguageCode = updatedLanguageCode; // ADR 0018
         if (changed)
             existing.Modified = DateTimeOffset.UtcNow;
 

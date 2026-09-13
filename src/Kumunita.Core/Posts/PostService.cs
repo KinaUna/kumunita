@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -270,12 +271,36 @@ public sealed class PostService
             Title = draft.Title,
             Body = draft.Body,
             Audience = draft.Audience, // ADR 0001-B — written verbatim; never mutated here.
+            LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };
 
         session.Store(post);
         await session.SaveChangesAsync().ConfigureAwait(false);
         return post;
+    }
+
+    /// <summary>
+    /// ADR 0018 — resolves the authored-in <c>LanguageCode</c> for a new
+    /// post/reply: a non-empty authored code is used verbatim (BCP-47 tag,
+    /// ADR 0005 B); a null/empty code is materialized from the instance
+    /// default (<see cref="LocaleSettings.DefaultLanguageCode"/>, loaded from
+    /// the caller's in-flight session so no second round-trip is needed when
+    /// it is already loaded) with <c>en</c> as the floor when the singleton
+    /// row is absent. The result is **always** a concrete BCP-47 code — no
+    /// stored row is left empty — which is what a future search surface keys
+    /// off. This is a tag, not a translation (ADR 0005 C unchanged).
+    /// </summary>
+    private async Task<string> ResolveLanguageCodeAsync(string? languageCode, IDocumentSession session)
+    {
+        if (!string.IsNullOrWhiteSpace(languageCode))
+            return languageCode;
+
+        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, CancellationToken.None).ConfigureAwait(false);
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultLanguageCode))
+            return settings.DefaultLanguageCode;
+
+        return "en";
     }
 
     /// <summary>
@@ -293,15 +318,23 @@ public sealed class PostService
     /// Applies the edit fields (<paramref name="title"/> /
     /// <paramref name="body"/> / <paramref name="audience"/>) and stamps
     /// <see cref="Post.Modified"/> — the <c>AuthorId</c>,
-    /// <c>ComponentId</c>, <c>Created</c>, <see cref="PostStatus"/>, and
-    /// <see cref="Post.GroupId"/> fields are deliberately **not** touched (a
-    /// post's authoring identity, feed organizer, moderation state, and
-    /// group-lane membership are immutable after creation). The
+    /// <c>ComponentId</c>, <c>Created</c>, <see cref="PostStatus"/>,
+    /// <see cref="Post.GroupId"/>, and <see cref="Post.LanguageCode"/> (ADR 0018 —
+    /// authored-in tag, create-time only) fields are deliberately
+    /// **not** touched (a post's authoring identity, feed organizer, moderation
+    /// state, group-lane membership, and authored-in language are immutable
+    /// after creation). The
     /// <paramref name="audience"/> is written **verbatim** (ADR 0001-B) — the
     /// author re-chooses the audience on edit exactly as on create; there is
     /// no auto-augmentation. A missing id is a <see cref="KeyNotFoundException"/>
     /// (the Web layer maps that to a 404); a non-author is the
     /// <see cref="UnauthorizedAccessException"/> above.
+    /// <para>
+    /// <see cref="Post.LanguageCode"/> (ADR 0018) is **not** touched by this
+    /// lane — the authored-in tag is written at create time only (the ADR 0014
+    /// edit surface is title/body/audience, and the tag is immutable with the
+    /// other create-time identity fields), consistent with
+    /// <see cref="PostReply.LanguageCode"/> on the ADR 0016 reply lane.
     /// </para>
     /// </summary>
     /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
@@ -344,8 +377,15 @@ public sealed class PostService
     /// detail path / <see cref="GetPostAsync"/>) — this method does **not**
     /// re-check and does **not** write an audit row of its own. One
     /// <c>SaveChangesAsync</c>.
+    /// <para>
+    /// <paramref name="languageCode"/> (ADR 0018) is the reply's **own**
+    /// authored-in tag; null/empty is materialized from the instance default
+    /// (the <c>en</c> floor applies when the singleton row is absent), so the
+    /// stored row always carries a concrete BCP-47 code. Optional trailing
+    /// parameter — the two existing controller call sites keep compiling.
+    /// </para>
     /// </summary>
-    public async Task<PostReply> CreateReplyAsync(string postId, string actorId, string body, IDocumentSession session)
+    public async Task<PostReply> CreateReplyAsync(string postId, string actorId, string body, IDocumentSession session, string? languageCode = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A parent post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A reply author is required.", nameof(actorId));
@@ -357,6 +397,7 @@ public sealed class PostService
             PostId = postId,
             AuthorId = actorId,
             Body = body ?? string.Empty,
+            LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };
 
@@ -375,7 +416,9 @@ public sealed class PostService
     /// over a reply is the parent post's Hide/Remove, not re-writing text).
     /// <para>
     /// The reply's <see cref="PostReply.Body"/> is the **only** editable
-    /// field — <c>PostId</c>, <c>AuthorId</c>, and <c>Created</c> are
+    /// field — <c>PostId</c>, <c>AuthorId</c>, <c>Created</c>, and
+    /// <see cref="PostReply.LanguageCode"/> (ADR 0018 — the authored-in tag is
+    /// written at create time only) are
     /// immutable (a reply cannot be re-parented or re-attributed; the reply
     /// carries no <c>Audience</c> to re-choose, C-M3·1). The edit stamps
     /// <see cref="PostReply.Modified"/> forward (null until first edited).
@@ -729,6 +772,7 @@ public sealed class PostService
             Title = draft.Title,
             Body = draft.Body,
             Audience = new Audience(),  // G·8 — written non-null **empty**; never authored here.
+            LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };
 

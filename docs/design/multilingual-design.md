@@ -63,7 +63,10 @@ Events / Projects / Portability**; this lane consumes no letter.
 
 - **Machine translation of UGC** (ADR 0005 C, README → *Deferred*) — if it ever
   ships, per-item opt-in with a third-party-boundary review (a new trust
-  boundary in `SECURITY.md`, not a feature flag).
+  boundary in `SECURITY.md`, not a feature flag). (The *authored-in language
+  tag* on `Post` / `PostReply` / `Announcement` — **ADR 0018** — is *not* this:
+  it is a BCP-47 metadata field for future search and reader-added language
+  versions, and it translates nothing. M·3 is unchanged.)
 - **Federation** (ADR 0001-B) — may move the platform language catalog with the
   IdP, but **per-instance languages stay local**.
 - **Any renumbering of M4/M5/M6** — multilingual is `ML`, a named lane; the

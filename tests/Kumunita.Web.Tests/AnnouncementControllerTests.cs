@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -263,6 +264,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             announcements,
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -301,6 +303,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
@@ -334,6 +337,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -392,6 +396,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -439,6 +444,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -482,6 +488,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -539,7 +546,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -587,7 +594,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -626,7 +633,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -859,6 +866,22 @@ public class AnnouncementControllerTests
     /// controller's <c>User.Identity.IsAuthenticated</c> is the right value
     /// for the read-gate pin.
     /// </summary>
+    /// <summary>
+    /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
+    /// the compose form's language picker: an empty enabled catalog + the
+    /// <c>en</c> instance-default floor (a valid shape — the view renders an
+    /// empty language picker). Used by the direct-construction test sites (and
+    /// the <see cref="Build"/> helper) so the new constructor dependency has a
+    /// plain substitute to read from.
+    /// </summary>
+    private static ILocalizationService DefaultLocalization()
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
+        localization.GetDefaultLanguageCodeAsync().Returns("en");
+        return localization;
+    }
+
     private static AnnouncementController Build(
         IAnnouncementService announcements,
         IUserInfoService? userInfo = null,
@@ -877,7 +900,11 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, userInfoImpl, store);
+        // ADR 0018 — the compose form's language picker reads the catalog +
+        // instance default through the HTTP-free ILocalizationService seam.
+        var localization = DefaultLocalization();
+
+        var controller = new AnnouncementController(announcements, userInfoImpl, localization, store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext(),

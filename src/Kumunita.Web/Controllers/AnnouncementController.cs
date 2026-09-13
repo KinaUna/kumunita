@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -69,6 +70,7 @@ namespace Kumunita.Web.Controllers;
 public sealed class AnnouncementController(
     IAnnouncementService announcements,
     IUserInfoService userInfo,
+    ILocalizationService localization,
     IDocumentStore store) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
@@ -92,10 +94,22 @@ public sealed class AnnouncementController(
     }
 
     /// <summary>
-    /// Seeds a compose form's <c>AllowedScopes</c> and <c>TargetCommunities</c> —
-    /// a GlobalAdmin may target any community, a Moderator only the ones they
-    /// moderate (read from their <c>moderator:{id}</c> standing claims). A shape
-    /// convenience only; the service pins the whole split server-side at POST.
+    /// Seeds a compose form's <c>AllowedScopes</c>, <c>TargetCommunities</c>,
+    /// and <c>Languages</c> (ADR 0018) — a GlobalAdmin may target any
+    /// community, a Moderator only the ones they moderate (read from their
+    /// <c>moderator:{id}</c> standing claims). A shape convenience only; the
+    /// service pins the whole split server-side at POST.
+    /// <para>
+    /// <b>Languages (ADR 0018, ADR 0005 B):</b> the instance's **enabled**
+    /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>, read via
+    /// the controller's existing <c>IDocumentStore</c> (the
+    /// <see cref="LocaleController.Index"/> catalog read pattern) — no new
+    /// constructor dependency (the 10 test-construction sites of this
+    /// controller stay untouched). The form leaves the selection empty by
+    /// default so the *instance default* is what the service materializes
+    /// server-side at write time; on the edit lane the stored row's
+    /// <c>LanguageCode</c> pre-selects it.
+    /// </para>
     /// </summary>
     private async Task SeedComposeOptionsAsync(AnnouncementComposeViewModel model, IReadOnlySet<string> roles)
     {
@@ -104,6 +118,26 @@ public sealed class AnnouncementController(
         model.TargetCommunities = components
             .Where(c => roles.Contains(Roles.GlobalAdmin) || roles.Contains(Roles.ModeratorComponent(c.Id)))
             .ToList();
+
+        // ADR 0018 — the authored-in language picker options (the enabled
+        // catalog, the SeedComposeOptionsAsync single seed site for both the
+        // create and edit compose forms). Read through the HTTP-free
+        // ILocalizationService seam (the same seam the Posts/Groups controllers
+        // use) rather than the raw store — a plain substitute in the unit tests.
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        model.Languages = catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => (l.Id, l.NativeName))
+            .ToList();
+
+        // ADR 0018 — pre-select the instance default so the picker highlights
+        // the right option and a no-change submit is a concrete BCP-47 code
+        // (never an empty row). The edit lane sets model.LanguageCode from the
+        // stored row *before* calling this, and that value is preserved here
+        // (the guard only fills an unset/blank selection).
+        if (string.IsNullOrWhiteSpace(model.LanguageCode))
+            model.LanguageCode = await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
     }
 
     // ── Read (GET /announcements) ─
@@ -290,6 +324,8 @@ public sealed class AnnouncementController(
                     Scope  = scope,
                     Pinned = model.Pinned,
                     CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
+                    // ADR 0018 — empty ⇒ the service's ResolveLanguageCodeAsync materializes the instance default at write time (Announcement.LanguageCode is a non-nullable string).
+                    LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -338,6 +374,11 @@ public sealed class AnnouncementController(
             return new ForbidResult();
         }
 
+        // ADR 0018 — pre-select the stored authored-in tag (the announcement
+        // edit lane is not ADR-frozen, so the tag is editable here). A blank
+        // value on a pre-ADR-0018 row is left as-is; the SeedComposeOptionsAsync
+        // ?? guard fills it with the instance default so the picker still
+        // highlights a concrete option.
         var model = new AnnouncementComposeViewModel
         {
             Id = id,
@@ -346,6 +387,7 @@ public sealed class AnnouncementController(
             Scope = existing.Scope.ToString(),
             Pinned = existing.Pinned,
             CommunityId = existing.CommunityId,
+            LanguageCode = existing.LanguageCode,
         };
         await SeedComposeOptionsAsync(model, roles);
         return View(model);
@@ -400,6 +442,8 @@ public sealed class AnnouncementController(
                     Scope  = scope,
                     Pinned = model.Pinned,
                     CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
+                    // ADR 0018 — empty ⇒ the service's ResolveLanguageCodeAsync materializes the instance default; the announcement edit lane is not ADR-frozen, so the tag is editable here.
+                    LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
                 },
                 actorId:    actorId,
                 actorRoles: RoleSet(User),

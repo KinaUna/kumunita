@@ -555,7 +555,11 @@ the `ML` record had left open.
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine
   translation is deferred and, if it ever ships, per-item opt-in with a
-  third-party-boundary review (ADR 0005 C, SECURITY.md §6).
+  third-party-boundary review (ADR 0005 C, SECURITY.md §6). Separately, each UGC
+  document carries an **authored-in language tag** (`LanguageCode` on `Post` /
+  `PostReply` / `Announcement`, ADR 0018) — a BCP-47 metadata field for future
+  search and reader-added language versions, resolved to a concrete code at
+  write time (instance default → `en`); it translates nothing.
 - **Storage:** languages, the default, and all translations are data in `mt` —
   not env, not image config. Admins add/remove languages and set the default
   in-app; the change is effective on the next request, no redeploy.

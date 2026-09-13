@@ -68,6 +68,23 @@ public sealed class Announcement
     /// (see <see cref="IAnnouncementService.PinnedAsync"/>).</summary>
     public bool Pinned { get; set; } = false;
 
+    // ADR 0018 authored-in-language ADD (ADR 0004 §B.1 additive — the first
+    // additive Announcement field on this POCO):
+    /// <summary>
+    /// The BCP-47 code of the language this announcement was **authored in**
+    /// (ADR 0018, ADR 0005 B). Written at create time by
+    /// <see cref="AnnouncementService.CreateAsync"/> and editable on the edit
+    /// lane (<see cref="AnnouncementService.UpdateAsync"/> extends its
+    /// changed-detection to this field) — the announcement edit surface is not
+    /// ADR-frozen the way the post/reply edit lanes are. Materialized from the
+    /// instance default (<see cref="Kumunita.Core.Localization.LocaleSettings.DefaultLanguageCode"/>,
+    /// <c>en</c> floor) when the author leaves it unchosen, so no stored row is
+    /// empty. **Not a translation mechanism** (ADR 0005 C unchanged — the body
+    /// is never machine-translated by the platform); it is the tag a future
+    /// search surface and any user-added translations key off.
+    /// </summary>
+    public string LanguageCode { get; set; } = string.Empty;
+
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }
 }
