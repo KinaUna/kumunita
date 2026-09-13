@@ -216,6 +216,7 @@ public static class KnownTranslationKeys
             // ── posts (Detail page) ──────────────────────────────────────────
             ["posts.back_to"] = "back to",
             ["posts.detail_edit"] = "Edit",
+            ["posts.edited"] = "edited",
             ["posts.detail_why"] =
                 "You can see this post because you matched its audience " +
                 "(a grant of yours, or you are the author — the \"owner branch\" " +
