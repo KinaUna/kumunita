@@ -129,18 +129,23 @@ public sealed class EffectiveTimezoneResolver
 
     /// <summary>
     /// The IANA time zone ids available on this OS, as (id, display-name)
-    /// pairs sorted by id — the <c>&lt;select&gt;</c> option source for both
-    /// the user-override page (<c>/settings/timezone</c>) and the admin
-    /// platform-default surface (<c>/admin/timezone</c>). Excludes the
-    /// OS-internal pseudo-zones (their ids start with <c>*</c>, e.g.
-    /// <c>*Dynamic</c>). A shared source so the two pickers and the resolver's
-    /// own validation all see the same universe.
+    /// pairs sorted by **current UTC offset** (ascending, so the most
+    /// western / negative-offset zones come first) then by id — the
+    /// <c>&lt;select&gt;</c> option source for both the user-override page
+    /// (<c>/settings/timezone</c>) and the admin platform-default surface
+    /// (<c>/admin/timezone</c>). Excludes the OS-internal pseudo-zones (their
+    /// ids start with <c>*</c>, e.g. <c>*Dynamic</c>). A shared source so the
+    /// two pickers and the resolver's own validation all see the same
+    /// universe. The offset is taken "now" so groups of zones share the same
+    /// order regardless of DST (their ids break the tie deterministically).
     /// </summary>
     public static List<(string Id, string DisplayName)> Zones()
     {
+        var now = DateTime.UtcNow.Date;
         return System.TimeZoneInfo.GetSystemTimeZones()
             .Where(z => !z.Id.StartsWith("*"))
-            .OrderBy(z => z.Id, StringComparer.Ordinal)
+            .OrderBy(z => z.GetUtcOffset(now).TotalHours)
+            .ThenBy(z => z.Id, StringComparer.Ordinal)
             .Select(z => (z.Id, z.DisplayName))
             .ToList();
     }
