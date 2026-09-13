@@ -15,6 +15,18 @@
     <div class="alert alert-danger">@err</div>
 }
 
+<h2>Platform</h2>
+<p class="text-muted">
+    Instance-wide management — the languages the platform supports (add / enable /
+    set the default, and edit the translated UI strings and static pages), the
+    access audit log, and the break-glass elevation path.
+</p>
+<div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="/admin/languages" class="btn btn-outline-primary">Manage languages</a>
+    <a asp-action="Audit" class="btn btn-outline-secondary">Access audit log</a>
+    <a asp-action="BreakGlass" class="btn btn-outline-secondary">Break-glass</a>
+</div>
+
 <h2>Accounts</h2>
 <p class="text-muted">
     @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.

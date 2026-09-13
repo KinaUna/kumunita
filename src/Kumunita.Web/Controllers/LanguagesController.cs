@@ -33,6 +33,15 @@ namespace Kumunita.Web.Controllers;
 /// surface (<see cref="SaveTranslation"/> / <see cref="SavePage"/>), which it
 /// reused rather than reshaped.
 /// </summary>
+// Attribute routing: the documented URL is /admin/languages (ADR 0005 D, design
+// doc §5, README, ARCHITECTURE.md, and every hardcoded view form action). The
+// controller is named LanguagesController, so under the conventional
+// {controller}/{action}/{id?} route it would instead serve at /languages — which
+// is why /admin/languages 404'd and the surface was unreachable. Pinning an
+// explicit route template (with per-action sub-paths, per the §5 table) makes the
+// documented URL real. [HttpGet]/[HttpPost] with no template inherit this base
+// (Index → /admin/languages, Add → POST /admin/languages).
+[Route("admin/languages")]
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class LanguagesController(
     ILocalizationService localization) : Controller
@@ -94,7 +103,7 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost]
+    [HttpPost("{code}/enable")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Enable(string code)
     {
@@ -104,7 +113,7 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost]
+    [HttpPost("{code}/disable")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Disable(string code)
     {
@@ -114,7 +123,7 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost]
+    [HttpPost("reorder")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Reorder(string[] codesInOrder)
     {
@@ -128,7 +137,7 @@ public sealed class LanguagesController(
     // M·7: removing the current **default** is blocked — the service throws
     // (fail-closed, no audit row) and the controller maps it to 409 (the
     // optimistic-concurrency story, design doc §5).
-    [HttpPost]
+    [HttpPost("{code}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Remove(string code)
     {
@@ -146,7 +155,7 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
-    [HttpPost]
+    [HttpPost("{code}/default")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetDefault(string code)
     {
@@ -166,7 +175,7 @@ public sealed class LanguagesController(
     // through the existing <see cref="SaveTranslation"/> below (D6-3) — no new
     // save path, no re-shape of UpsertTranslationAsync (M·6 audit row semantics
     // stay byte-identical).
-    [HttpGet]
+    [HttpGet("{code}/translations")]
     public async Task<IActionResult> Translations(string code)
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -191,7 +200,7 @@ public sealed class LanguagesController(
         });
     }
 
-    [HttpPost]
+    [HttpPost("{code}/translations")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SaveTranslation(string code, string key, string text)
     {
@@ -206,7 +215,7 @@ public sealed class LanguagesController(
 
     // ── /admin/languages/{code}/pages/{slug} — static-page editor/preview (M5/M13) ──
 
-    [HttpGet]
+    [HttpGet("{code}/pages/{slug}")]
     public async Task<IActionResult> PreviewPage(string code, string slug)
     {
         var page = await localization.GetPageAsync(slug, code);
@@ -220,7 +229,7 @@ public sealed class LanguagesController(
         });
     }
 
-    [HttpPost]
+    [HttpPost("{code}/pages/{slug}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SavePage(string code, string slug, string title, string body)
     {
