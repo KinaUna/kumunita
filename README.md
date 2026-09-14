@@ -36,6 +36,13 @@ static-page routes. `ML-UI` (ADR 0015) then wired the **live UI**: every in-scop
 view resolves per request, a seeded `en` floor is always present, the admin
 edits the **closed** key list at `/admin/languages`, a signed-out visitor can
 pick a language at `/language`, and `/about` is a static page.
+**Rich content** (`RC`, ADR 0025) has landed — Markdown bodies + in-content
+images on posts, replies, announcements & static pages: one escape-first
+renderer extension (`![alt](src)` under a stricter `src` allowlist), the
+`GET /content-image/{id}` serving route (decision-deferred to the owning
+resource, Deny → 404 not 403, one `Read` audit row), the `POST /content-image`
+upload lane (ADR 0011's boundary verbatim), and the composer control on all
+four surfaces.
 **Next is M4** — events, RSVPs, reminders (per the roadmap table in
 `docs/ARCHITECTURE.md`); **M5**: projects.
 
@@ -160,6 +167,7 @@ stays trivial and the authorization rules can grow freely.
 - **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
 - **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
 - **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**
+- **Rich content** (`RC`, ADR 0025) — Markdown bodies + in-content images on posts, replies, announcements & static pages. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

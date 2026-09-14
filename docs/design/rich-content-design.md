@@ -355,6 +355,42 @@ The three-test shape:
   pre-existing `PostServiceTests` / announcement / multilingual suites pass
   **unmodified** (the R·7 zero-migration pin made executable).
 
+### Run result (2026-09-14)
+
+U08 executed all three tests live against a running app (the `run` task,
+`http://localhost:5123`, dev Postgres) — evidence below, in the plan's
+order.
+
+1. **closed loop — PASS.** A resident (dev signup
+   `rc-u08-member@dev.local`, verified) created post
+   `c12e98640d63407186eba377b6bcc917` with body `**Bold line in the post**`
+   + a two-item list + an `![rc-u08-test-img](/content-image/43c81585…f9a2)`
+   link. The detail page renders the `<strong>`, the `<ul><li>` items, and
+   the `<img class="rc-image">` — which **loads** (in-page `fetch` with
+   credentials → **200**, `Content-Type: image/png`,
+   `X-Content-Type-Options: nosniff`). The member's audit trail for this post
+   is 3 `read` rows, all `Outcome=Allow` (Owner branch — the owner sees own
+   draft, empty-audience).
+2. **handoff — PASS.** The **same** image URL, requested **anonymous**
+   (no cookie — a non-member of the post's empty-grant audience; the actor
+   pair is *owner `78e5d0…` vs anonymous `""`*, the plan's "simplest
+   faithful setup") → **`HTTP/1.1 404 Not Found`** (not 403 — R·4's no-leak
+   rule) + **exactly one** new `mt_doc_accessaudit` row for this target:
+   `Action=read`, `ActorId=""`, `Outcome=Deny` (`1`), `Via=Audience`
+   (`1`). Deny-row count for the target went 0 → 1; total rows 3 → 4.
+3. **part-vs-whole — PASS.** `dotnet build Kumunita.slnx -c Debug` green
+   (all 4 projects). `dotnet exec …Kumunita.Web.Tests.dll` → **122 passed,
+   0 failed** (includes the 7 `MarkdownRendererTests` + 8
+   `ContentImageUpload*Tests` + the 4-name drift-pause record in
+   `ContentImageServingTests` + the unmodified pre-existing suite, including
+   `MilestonesTests`). `dotnet exec …Kumunita.Core.Tests.dll` → **353
+   passed, 0 failed** (includes the 5 `ContentImageOwnershipTests` + the
+   unmodified `PostServiceTests` / announcement / multilingual suites — the
+   R·7 zero-migration pin).
+
+**Gate pass — the RC lane is accepted.** (Recorded per this section's
+`(U08 records)` designation — the drift guard's one sanctioned U08 edit.)
+
 ## Drift guard
 
 The 7 invariants (R·1–R·7), the 8 FACES (R1–R8), every pinned C# shape

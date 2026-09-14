@@ -10,8 +10,8 @@
 Run the lane's **acceptance gate** (the three-test shape from the
 design doc: closed loop / handoff / part-vs-whole), **record** it in
 the design doc, **close the lane** in the durable docs (the
-`Milestones.cs` ↔ README Roadmap pair, `ARCHITECTURE.md`'s RC
-mention if the design doc's Context named it, the ADR's status), and
+`Milestones.cs` ↔ README Roadmap pair, the `ARCHITECTURE.md`
+§2 context-table flip, the ADR's status), and
 **move every RC unit plan** from `in-progress/` to `done/`. This unit
 **changes no production code** — if the gate fails, the fix belongs
 to the unit whose drift caused it (record a `## U08 — Gate failure`
@@ -19,7 +19,7 @@ section naming the failing test + the suspected unit, and **stop** —
 do not patch production code here; the next agent picks up from the
 handoff note).
 
-## Entry reads (≤ 5 items)
+## Entry reads (≤ 6 items)
 
 1. `docs/design/rich-content-design.md` — §Acceptance gate (the
    three-test shape), §Invariants (the 7 invariants the gate
@@ -48,8 +48,14 @@ handoff note).
    change is **in scope for this unit** — it is a test, not
    production code, and the gate unit is where doc↔test parity is
    closed out; record the before/after).
+6. `docs/ARCHITECTURE.md` — **§2** (the context table: the exact
+   current lines for `Posts/`, `Announcements/`, `Localization/`
+   — deliverable 4 appends one line each, so read the surrounding
+   table rows to match the voice/format and find the insertion
+   point) + the ADR-index section (§7/§8 — confirm the exact
+   section numbering here) where the ADR 0025 row is added.
 
-## Deliverables (4 files modified, 0 new, 8 files moved)
+## Deliverables (6 files modified, 0 new, 8 files moved)
 
 ### 1. The acceptance gate — run + record
 
@@ -145,7 +151,7 @@ Move-Item docs\plans-milestones\in-progress\rich-content-u08-plan.md docs\plans-
 **This is the last action of the lane** — `in-progress/` contains no
 RC file; `done/` contains all 8 + the handoff notes with the Summary.
 
-### 4. The durable-doc flips (3 files — **only** if the design doc's
+### 4. The durable-doc flips (4 files — **only** if the design doc's
 §Drift guard + the handoff note's Summary say the lane is accepted,
 i.e. after step 1's gate pass; a failed gate stops before this step)
 
@@ -186,11 +192,19 @@ i.e. after step 1's gate pass; a failed gate stops before this step)
   which assembly it ran in).
 - ADR 0025's `Status:` line reads `Accepted` (record the before
   value).
-- **No production code modified by this unit** (the 4 modified files
+- **`docs/ARCHITECTURE.md` §2** — the context table: `Posts/` gains
+  "RC: `ImageIds` (R·7) + the serving route's owner-branch" (one
+  line); `Announcements/` the same (one line); `Localization/`
+  gains "RC: `LocalizedPage.ImageIds` (R·7)" (one line); the ADR
+  index section (§7/§8 — confirm by entry-read of the exact section
+  numbering) gains the ADR 0025 row (one line). **No other line
+  moved.** (The register's U08 entry mandates this flip; it is a
+  numbered deliverable here, not a conditional.)
+- **No production code modified by this unit** (the 6 modified files
   are: the design doc, the handoff note, `Milestones.cs`
   [+`MilestonesTests` only if the entry shape forced it], the
-  README, the ADR's status line — verify with `git --no-pager
-  status` and record the file list; any production file in the diff
-  is a `## U08 — Gate failure` alarm + stop).
+  README, the ADR's status line, `ARCHITECTURE.md` §2 — verify with
+  `git --no-pager status` and record the file list; any production
+  file in the diff is a `## U08 — Gate failure` alarm + stop).
 - The last action is the 8-file `in-progress/` → `done/` state,
   verified by listing — **the lane is closed.**

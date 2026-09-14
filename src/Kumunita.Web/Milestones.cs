@@ -30,6 +30,7 @@ public static class Milestones
         new("TZ", "Timezone — platform default (admin) + per-resident override; timestamps rendered in the effective zone (ADR 0019)", StatusDone),
         new("DF", "Date & time format — platform default (admin) + per-resident override + custom; timestamps rendered in the effective format (ADR 0020)", StatusDone),
         new("TR", "Translator role — delegate translation editing to non-admin residents; UI strings + static pages open to GlobalAdmin ∪ Translator (ADR 0021)", StatusDone),
+        new("RC", "Rich content — Markdown bodies + in-content images on posts, replies, announcements & static pages (ADR 0025)", StatusDone),
         new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),
