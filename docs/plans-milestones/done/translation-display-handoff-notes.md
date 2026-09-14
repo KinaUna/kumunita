@@ -37,3 +37,22 @@
 
 <!-- U01 appends its section below this line. One `##` section per unit, in
      order (U01, U02, … U06). Never rewrite a prior section. -->
+
+## U01 — design doc + ADR 0027
+
+- **Design doc** `docs/design/translation-display-design.md` (primary tier) and **ADR 0027**
+  `docs/adr/0027-post-reply-translation-display-and-swap.md` both authored; **no code, no build.**
+- **Invariants (8):** TD·1 authored-in is always a variant · TD·2 chip row is a selector ·
+  TD·3 server-rendered variants, client-toggled · TD·4 authored-in never offered to add ·
+  TD·5 one source of truth per variant · TD·6 shared `LanguageOption` untouched · TD·7 zero
+  Core/schema change · TD·8 progressive enhancement.
+- **FACES (8):** TD1 no "None yet" · TD2 add-lane excludes authored-in · TD3 post swap to/from ·
+  TD4 reply first chip · TD5 reply swap to/from · TD6 group-lane parity · TD7 soft-delete gating ·
+  TD8 JS-off degradation.
+- **3 VM ADDs:** `PostDetailViewModel.OriginalLanguageCode` · `GroupPostDetailViewModel.
+  OriginalLanguageCode` · `ReplyItem.OriginalLanguageCode` (11th positional, after `DeletedAt?`).
+- **4 pinned tests:** `PostDetail_OriginalLanguageCode_EqualsPostAuthoredIn` ·
+  `Reply_OriginalLanguageCode_EqualsReplyAuthoredIn` · `GroupPostDetail_OriginalLanguageCode_
+  EqualsPostAuthoredIn` · `PostDetail_OriginalNotAmongAddedTranslationCodes`.
+- **ADR decisions:** (a) authored-in = first-class variant + explicit-click swap (ADR 0005 §C);
+  (b) `LanguageOption` untouched, code carried additively. **Amends: 0018.** No drift pause.
