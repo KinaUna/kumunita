@@ -854,7 +854,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 reply.Modified,
                 reply.AuthorId == actor,
                 translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
-                canTranslateReply));
+                canTranslateReply,
+                reply.DeletedAt));
         }
 
         // ADR 0018 — the reply form's authored-in language picker options
@@ -1259,6 +1260,112 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         }
 
         TempData["info"] = "Reply updated.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Author soft-delete (ADR 0024, group lane — 404 fail-closed shape) ──
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a group post (ADR 0024):
+    /// <c>POST /groups/{id}/posts/{postId}/delete</c>. A thin Web lane
+    /// (ADR 0006-D) delegating the write + author-stand decision to
+    /// <see cref="PostService.DeletePostAsync"/> — the record is kept
+    /// (<see cref="Post.DeletedAt"/> stamped), never hard-deleted. The group
+    /// lane's non-leaky posture (G·3/G·4) maps both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// to a 404 (a 403 on a POST would advertise a gate the UI doesn't
+    /// offer). The parent's single group-lane decision is the pre-write gate
+    /// (the <see cref="EditGroupPostReply"/> precedent): a non-member / missing
+    /// post / lane mismatch 404s, and the reply/post must be on this group.
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7) is the pre-write gate:
+        // a non-member, a missing post, or a lane mismatch all return Post =
+        // null → 404 (the group lane's non-leaky fail-closed shape).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the
+        // <see cref="EditGroupPost"/> precedent).
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeletePostAsync(postId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post deleted.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a group-post reply (ADR 0024):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/delete</c>. The
+    /// record is kept (<see cref="PostReply.DeletedAt"/> stamped) — the detail
+    /// view renders a placeholder in its place and the reply still counts
+    /// toward the parent's count. Same group-lane 404 fail-closed shape as
+    /// <see cref="EditGroupPostReply"/> (both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// map to a 404; the parent's single decision is the pre-write gate).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroupPostReply(string id, string postId, string replyId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7 — the reply inherits it)
+        // is the pre-write gate (the <see cref="EditGroupPostReply"/> precedent).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // The reply must be **under this post** (a replyId on a different post
+        // is not reachable through this group lane — the 404 shape).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeleteReplyAsync(replyId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply deleted.";
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 

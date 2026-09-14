@@ -119,4 +119,9 @@ public sealed record ReplyItem(
     /// <b>add</b> a translation of this reply (ADR 0022 — the author, a
     /// community moderator, or a GlobalAdmin). A display pin, not a gate; the
     /// real deny is <c>PostService.AddReplyTranslationAsync</c>.</summary>
-    bool CanTranslate);
+    bool CanTranslate,
+    /// <summary>When the author soft-deleted this reply (ADR 0024); <c>null</c>
+    /// while it is live. A display pin: the detail view renders a placeholder
+    /// in place of the body when set, hides the per-reply Edit/translate
+    /// affordances, but still counts the reply toward the parent's reply count.</summary>
+    DateTimeOffset? DeletedAt);

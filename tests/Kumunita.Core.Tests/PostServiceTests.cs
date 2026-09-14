@@ -1689,6 +1689,202 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                     Audience(GrantKind.User, author), null, s)));
     }
 
+    // ── ADR 0024 — author soft-delete lanes (component lane) ──────────────
+    //
+    // A sibling of the ADR 0014 edit-lane tests above, adapted to soft-delete:
+    // only the post's / reply's own author may delete; a non-author is denied
+    // even at GlobalAdmin (no moderator / break-glass branch — the M3b
+    // Hide/Remove surface is a separate concern); a missing id is
+    // KeyNotFoundException. The record is **kept** (DeletedAt stamped,
+    // Modified moved forward, never hard-deleted), and the feeds now exclude
+    // the deleted post while GetPostAsync still returns it (the placeholder
+    // shape — replies remain visible).
+
+    [Fact]
+    public async Task DeletePost_Author_Allows_DeletedAtStamped_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-author";
+        const string postId = "del-post-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = created, Modified = created,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var loadedBefore = await LoadPostAsync(store, postId);
+        var beforeModified = loadedBefore.Modified;
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeletePostAsync(postId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.NotNull(persisted.DeletedAt);
+        Assert.True(persisted.Modified >= beforeModified);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old body", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeletePost_NonAuthor_Denies_EvenAtGlobalAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-owner";
+        const string admin = "u-del-admin";
+        const string postId = "del-post-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync(postId, admin, s)));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeletePost_MissingPostKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync("no-such-post", author, s)));
+    }
+
+    [Fact]
+    public async Task DeletePost_ThenFeed_ExcludesPost_ButDetailStillReturnsIt()
+    {
+        // ADR 0024 — the two-halves shape on the component lane: the feed
+        // hides a deleted post, but the detail lane still returns it (the
+        // placeholder shape — replies remain visible).
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-del-feed";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-live", ComponentId = ComponentId, AuthorId = author,
+            Body = "live", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new Post
+        {
+            Id = "del-gone", ComponentId = ComponentId, AuthorId = author,
+            Body = "gone", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var before = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.Equal(2, before.Visible.Count(p => p.Id is "del-live" or "del-gone"));
+
+        await RunInSession(store, async s =>
+            await svc.DeletePostAsync("del-gone", author, s));
+
+        var after = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(after.Visible, p => p.Id == "del-gone");
+        Assert.Contains(after.Visible, p => p.Id == "del-live");
+
+        // … but the detail lane still returns it (the placeholder shape).
+        var detail = await svc.GetPostAsync("del-gone", author);
+        Assert.NotNull(detail.Post);
+        Assert.NotNull(detail.Post.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_Author_Allows_DeletedAtStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-author";
+        const string replyId = "del-reply-1";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post", AuthorId = author,
+            Body = "old reply", Created = DateTimeOffset.UtcNow,
+        });
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeleteReplyAsync(replyId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.NotNull(persisted.DeletedAt);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old reply", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeleteReply_NonAuthor_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-owner";
+        const string stranger = "u-del-reply-stranger";
+        const string replyId = "del-reply-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post2", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post2", AuthorId = author,
+            Body = "old", Created = DateTimeOffset.UtcNow,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync(replyId, stranger, s)));
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_MissingReplyKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync("no-such-reply", author, s)));
+    }
+
     // ── Post-edit shared helpers ───────────────────────────────────────
 
     private static async Task<Post> LoadPostAsync(IDocumentStore store, string id)
@@ -1696,6 +1892,15 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var ct = TestContext.Current.CancellationToken;
         await using var r = store.QuerySession();
         var loaded = await r.LoadAsync<Post>(id, ct);
+        Assert.NotNull(loaded);
+        return loaded!;
+    }
+
+    private static async Task<PostReply> LoadReplyAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<PostReply>(id, ct);
         Assert.NotNull(loaded);
         return loaded!;
     }

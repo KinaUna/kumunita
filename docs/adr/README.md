@@ -28,3 +28,4 @@ Decision / Consequences. New decisions take the next number.
 | 0021 | Translator role: delegate translation editing to non-admin residents | Accepted |
 | 0022 | User-added post & reply translations (the lane ADR 0018 deferred) | Accepted |
 | 0023 | Reply as a report target (extending the M3b report lane) | Accepted |
+| 0024 | Author soft-delete lane (posts + replies, community + group) | Accepted |

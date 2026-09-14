@@ -42,4 +42,21 @@ public sealed class PostReply
     /// user-added translations key off.
     /// </summary>
     public string LanguageCode { get; set; } = string.Empty;
+
+    // ADR 0024 author soft-delete ADD (ADR 0004 §B.1 additive — the third
+    // additive PostReply field after ADR 0016's Modified and ADR 0018's
+    // LanguageCode):
+    /// <summary>
+    /// Set when the <b>author</b> soft-deletes this reply (ADR 0024);
+    /// <c>null</c> while it is live. The record is kept (never hard-deleted)
+    /// and the detail view shows a placeholder in place of the body — but it
+    /// still counts as a reply (the parent's "reply count" stays honest). A
+    /// reply soft-deleted under a live post stays visible (it is its own
+    /// document, inheriting the parent's <c>Read</c> decision); when its
+    /// parent post is soft-deleted the whole thread leaves the feeds, and
+    /// this field is the author's own action on the reply. Additive — Marten's
+    /// schema builder picks up the new field on the existing doc-type surface
+    /// (ADR 0004 §B.1); no seed reset, no schema-file change.
+    /// </summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 }

@@ -35,41 +35,71 @@
 
         <div class="card mt-2 mb-4">
             <div class="card-body">
-                @* Author-only edit entry point (the edit lane is author-only at
-                   the Web layer — the non-author never sees the button, so there
-                   is no 403 surface to reach from the detail page). *@
+                @* Author-only edit + delete entry points (both lanes are
+                   author-only at the Web layer — the non-author never sees the
+                   buttons, so there is no 403 surface to reach from the
+                   detail page). Delete (ADR 0024) is offered only while the
+                   post is live — once deleted there is nothing left to edit. *@
                 @if (Model.IsAuthor)
                 {
                     <div class="d-flex justify-content-end mb-2">
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="@($"/posts/{postId}/edit")">
-                            <kw-l key="posts.detail_edit">Edit</kw-l>
-                        </a>
+                        @if (Model.Post.DeletedAt is null)
+                        {
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="@($"/posts/{postId}/edit")">
+                                <kw-l key="posts.detail_edit">Edit</kw-l>
+                            </a>
+                            <form class="d-inline ms-1" method="post"
+                                  action="@($"/posts/{postId}/delete")"
+                                  onsubmit="return confirm('Delete this post? Your replies will remain visible.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <kw-l key="posts.delete">Delete</kw-l>
+                                </button>
+                            </form>
+                        }
                     </div>
                 }
-                <h4>
-                    @(!string.IsNullOrWhiteSpace(Model.Post.Title)
-                        ? Model.Post.Title
-                        : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
-                </h4>
-                <div class="d-flex align-items-center gap-2 text-muted small mb-3">
-                    <span class="d-inline-flex align-items-center">
-                        <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
-                             data-avatar-fallback>
-                        <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
-                    </span>
-                    <span>
-                        @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
-                        @if (Model.Post.Modified is not null)
-                        {
-                            <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
-                        }
-                    </span>
-                </div>
+                @if (Model.Post.DeletedAt is null)
+                {
+                    <h4>
+                        @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                            ? Model.Post.Title
+                            : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
+                    </h4>
+                    <div class="d-flex align-items-center gap-2 text-muted small mb-3">
+                        <span class="d-inline-flex align-items-center">
+                            <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                        </span>
+                        <span>
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                            @if (Model.Post.Modified is not null)
+                            {
+                                <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
+                            }
+                        </span>
+                    </div>
 
-                <div class="mb-3">
-                    @Model.Post.Body
-                </div>
+                    <div class="mb-3">
+                        @Model.Post.Body
+                    </div>
+                }
+                else
+                {
+                    @* ADR 0024 — the post is soft-deleted: the record is kept
+                       (replies below remain visible), but the body is
+                       replaced by a placeholder (author sees the same thing). *@
+                    <div class="mb-3">
+                        <div class="alert alert-secondary mb-2" role="alert">
+                            <kw-l key="posts.deleted_placeholder">This post has been deleted by its author.</kw-l>
+                        </div>
+                        <span class="text-muted small">
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                        </span>
+                    </div>
+                }
 
                 @* ADR 0022 — available translations (chips) + the "add a
                    translation" lane (offered only when CanTranslate). The
@@ -254,7 +284,22 @@
                             </div>
                         }
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
+                            @if (r.DeletedAt is null)
+                            {
+                                <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
+                            }
+                            else
+                            {
+                                @* ADR 0024 — the reply is soft-deleted: the
+                                   record is kept (it still counts toward the
+                                   parent's reply count), but the body is
+                                   replaced by a placeholder. *@
+                                <div class="pe-3">
+                                    <span class="text-muted fst-italic">
+                                        <kw-l key="posts.reply_deleted_placeholder">This reply has been deleted by its author.</kw-l>
+                                    </span>
+                                </div>
+                            }
                             <div class="text-end text-muted small">
                                 <div class="d-flex align-items-center justify-content-end gap-1">
                                     <span class="d-inline-flex align-items-center">
@@ -263,10 +308,11 @@
                                         <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
-                                    @* Author-only reply edit (ADR 0016) — the
-                                       native <details> disclosure needs no JS;
-                                       a non-author never sees it (r.IsAuthor). *@
-                                    @if (r.IsAuthor)
+                                    @* Author-only reply edit (ADR 0016) + delete
+                                       (ADR 0024) — offered only while the reply is
+                                       live; a non-author never sees either
+                                       (r.IsAuthor). *@
+                                    @if (r.IsAuthor && r.DeletedAt is null)
                                     {
                                         <details class="d-inline-block">
                                             <summary class="btn btn-sm btn-link p-0 text-decoration-none"><kw-l key="posts.reply_edit">Edit</kw-l></summary>
@@ -278,6 +324,14 @@
                                                 <button type="submit" class="btn btn-sm btn-primary"><kw-l key="posts.reply_save">Save</kw-l></button>
                                             </form>
                                         </details>
+                                        <form class="d-inline" method="post"
+                                              action="@($"/posts/{postId}/replies/{r.Id}/delete")"
+                                              onsubmit="return confirm('Delete this reply? It will be replaced by a note. The record is kept.');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">
+                                                <kw-l key="posts.reply_delete">Delete</kw-l>
+                                            </button>
+                                        </form>
                                     }
                                 </div>
                                 <div>

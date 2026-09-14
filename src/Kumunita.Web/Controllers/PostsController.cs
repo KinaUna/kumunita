@@ -363,7 +363,8 @@ public sealed class PostsController(
                 reply.Modified,
                 reply.AuthorId == actor,
                 translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
-                canTranslateReply));
+                canTranslateReply,
+                reply.DeletedAt));
         }
 
         // ADR 0018 — the reply form's authored-in language picker options
@@ -1057,6 +1058,114 @@ public sealed class PostsController(
         }
 
         TempData["info"] = "Reply updated.";
+        return Redirect($"/posts/{id}");
+    }
+
+    // ── Author soft-delete (ADR 0024, component lane — 403 shape) ──────────
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a community post (ADR 0024):
+    /// <c>POST /posts/{id}/delete</c>. A thin Web lane (ADR 0006-D) delegating
+    /// the write + author-stand decision to
+    /// <see cref="PostService.DeletePostAsync"/> — the record is kept
+    /// (<see cref="Post.DeletedAt"/> stamped), never hard-deleted. The
+    /// component lane's non-leaky posture: a non-author is a 403 (<see
+    /// cref="Forbid"/>) and a missing post a 404 (<see cref="NotFound"/>) —
+    /// the <see cref="EditReply"/> precedent. The parent's single <c>Read</c>
+    /// decision (C-M3·1) is re-run as the pre-write gate (a <c>Post = null</c>
+    /// shape is a 403).
+    /// </summary>
+    [HttpPost("/posts/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeletePost([FromRoute] string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to delete this post.");
+            return Forbid();
+        }
+
+        // The parent's single Read decision (C-M3·1) is the pre-write gate —
+        // GetPostAsync returns Post = null for **both** "missing" and "denied"
+        // (the EditReply precedent), so both map to the 403 shape (non-leaky).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeletePostAsync(id, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author — the 403 shape (a re-render would leak the post's
+            // content to a non-author).
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Post deleted.";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a community-post reply (ADR 0024):
+    /// <c>POST /posts/{id}/replies/{replyId}/delete</c>. The record is kept
+    /// (<see cref="PostReply.DeletedAt"/> stamped) — the detail view renders a
+    /// placeholder in its place and the reply still counts toward the parent's
+    /// count. Same component-lane 403 shape as <see cref="EditReply"/>: the
+    /// parent's single <c>Read</c> decision is the pre-write gate, the reply
+    /// must be under this post, a non-author is a 403 and a missing reply a
+    /// 404.
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteReply([FromRoute] string id, [FromRoute] string replyId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to delete this reply.");
+            return Forbid();
+        }
+
+        // The parent's single Read decision (C-M3·1) is the pre-write gate
+        // (the EditReply precedent: Post = null → 403, non-leaky).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+
+        // The reply must be **under this post** (a replyId on a different post
+        // is not reachable through this lane — the 403 shape, non-leaky).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return Forbid();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeleteReplyAsync(replyId, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply deleted.";
         return Redirect($"/posts/{id}");
     }
 

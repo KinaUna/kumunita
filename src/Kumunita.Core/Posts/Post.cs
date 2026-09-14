@@ -80,4 +80,20 @@ public sealed class Post
     /// the tag a future search surface and any user-added translations key off.
     /// </summary>
     public string LanguageCode { get; set; } = string.Empty;
+
+    // ADR 0024 author soft-delete ADD (ADR 0004 §B.1 additive — the fourth
+    // additive Post field after M3b's Status, ADR 0013's GroupId, ADR 0018's
+    // LanguageCode):
+    /// <summary>
+    /// Set when the <b>author</b> soft-deletes this post (ADR 0024);
+    /// <c>null</c> while it is live. Distinct from
+    /// <see cref="PostStatus.Hidden"/> / <see cref="PostStatus.Removed"/>
+    /// (the M3b <b>moderator</b> surface) — this is the author's own
+    /// "take it down" action. The record is kept (never hard-deleted) and
+    /// read lanes (feeds) hide it, but the replies it parents are their own
+    /// documents and remain visible (ADR 0024). Additive — Marten's schema
+    /// builder picks up the new field on the existing doc-type surface
+    /// (ADR 0004 §B.1); no seed reset, no schema-file change.
+    /// </summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 }

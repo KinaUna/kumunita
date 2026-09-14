@@ -68,7 +68,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId)
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
@@ -133,7 +133,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId))
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
@@ -543,6 +543,104 @@ public sealed class PostService
         return post;
     }
 
+    // ─── ADR 0024 — author soft-delete lanes (post + reply) ─────────────────
+
+    /// <summary>
+    /// Soft-delete a post — **author-only** (ADR 0024). A direct sibling of the
+    /// ADR 0014 / ADR 0016 edit lanes: only the post's own
+    /// <see cref="Post.AuthorId"/> may delete; there is **no** moderator,
+    /// GlobalAdmin, or break-glass branch (the author's "take it down" is a
+    /// distinct concern from the M3b <b>moderator</b> hide/remove surface,
+    /// <see cref="HidePostAsync"/> / <see cref="RemovePostAsync"/> — it does not
+    /// touch <see cref="Post.Status"/> at all).
+    /// <para>
+    /// Lane-neutral (like <see cref="UpdateReplyAsync"/>): it works for a
+    /// component post (empty <see cref="Post.GroupId"/>) and a group-lane post
+    /// (non-empty <see cref="Post.GroupId"/>) alike — the delete is the same
+    /// field write either way, so there is no per-lane split (contrast
+    /// <see cref="UpdatePostAsync"/> / <see cref="UpdateGroupPostAsync"/>, which
+    /// differ only in editable surface). The Web layer's 403 (component) / 404
+    /// (group) failure shape is decided there, not here.
+    /// </para>
+    /// <para>
+    /// The record is **kept** (never hard-deleted): <see cref="Post.DeletedAt"/>
+    /// is stamped and <see cref="Post.Modified"/> moves forward. Read lanes hide
+    /// it — the feeds (<see cref="ListFeedAsync"/>, <see cref="ListAllFeedAsync"/>,
+    /// <see cref="ListGroupFeedAsync"/>) filter on
+    /// <c>DeletedAt is null</c> — but the **detail** lanes
+    /// (<see cref="GetPostAsync"/>, <see cref="GetGroupPostAsync"/>) still return
+    /// the post so the author can see a placeholder, and its replies (their own
+    /// documents) remain visible. One <c>SaveChangesAsync</c> (invariant C3).
+    /// No <see cref="Kumunita.Core.Authorization.AccessAudit"/> row: the author is
+    /// acting on their own content (the ADR 0014 / 0016 edit-lane precedent —
+    /// content changes by the author are not audited).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
+    public async Task<Post> DeletePostAsync(string postId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to delete.");
+
+        // Author-only gate (the sole decision on this lane): only the author may
+        // delete. A non-author is a denial — the Web layer maps it to its lane's
+        // 403/404 shape (the ADR 0014/0016 edit-lane precedent).
+        if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a post may delete it.");
+
+        // Idempotent: a second delete just moves the timestamp forward.
+        post.DeletedAt = DateTimeOffset.UtcNow;
+        post.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(post);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return post;
+    }
+
+    /// <summary>
+    /// Soft-delete a reply — **author-only** (ADR 0024). A sibling of the ADR 0016
+    /// reply-edit lane: only the reply's own <see cref="PostReply.AuthorId"/> may
+    /// delete. Lane-neutral (a reply's visibility is always the parent post's
+    /// single <c>Read</c> decision, C-M3·1, whether the parent is a component or
+    /// group post) — no per-lane split.
+    /// <para>
+    /// The record is **kept**: <see cref="PostReply.DeletedAt"/> is stamped (and
+    /// <see cref="PostReply.Modified"/> moves forward); the detail view renders a
+    /// placeholder in place of the body, and the reply still counts toward the
+    /// parent's reply count. One <c>SaveChangesAsync</c> (invariant C3). No
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row (the author
+    /// acting on their own content — the ADR 0016 edit-lane precedent).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The reply id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the reply's author.</exception>
+    public async Task<PostReply> DeleteReplyAsync(string replyId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to delete.");
+
+        if (!string.Equals(reply.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a reply may delete it.");
+
+        reply.DeletedAt = DateTimeOffset.UtcNow;
+        reply.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(reply);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return reply;
+    }
+
     // ─── M3b C-M3b·3 — the two Moderate-gated write lanes (F3/F4) ─────────────
 
     /// <summary>
@@ -648,7 +746,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => p.GroupId == groupId)
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)

@@ -303,6 +303,14 @@ public static class KnownTranslationKeys
             ["posts.reply_save"] = "Save",
             ["posts.reply_edited"] = "edited",
 
+            // ── posts (Detail page) — author soft-delete (ADR 0024) ──
+            ["posts.delete"] = "Delete",
+            ["posts.reply_delete"] = "Delete",
+            ["posts.deleted_placeholder"] =
+                "This post has been deleted by its author.",
+            ["posts.reply_deleted_placeholder"] =
+                "This reply has been deleted by its author.",
+
             // ── posts (Detail page) — user-added translations (ADR 0022) ──
             ["posts.translations_label"] = "Translations",
             ["posts.translations_none"] = "none yet",
