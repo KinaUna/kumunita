@@ -28,7 +28,17 @@ public enum AccessVia
     /// precedent, the least-distortion slot: an additive enum value, the seven
     /// frozen values untouched.
     /// </summary>
-    Group
+    Group,
+    /// <summary>
+    /// The GU standing (guardian controls, ADR 0028): action-scoped to the
+    /// five supervisory actions (suspend, community/group membership curation,
+    /// invitation approval — G·3), exercised only on the IUserInfoService
+    /// management lanes — **never** on a CanAsync / CanSeeAsync content
+    /// decision (G·1). The M1 <see cref="Admin"/> / ADR 0013 <see cref="Group"/>
+    /// append precedent: an additive enum value, the eight frozen values
+    /// untouched.
+    /// </summary>
+    Guardian
 }
 
 /// <summary>The outcome an audited decision produced.</summary>

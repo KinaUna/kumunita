@@ -58,3 +58,12 @@
 - **(c) Unique-index fields:** `(GuardianId, ChildId)` (the business-key pair, per the `GroupInvitation` convention; the surrogate `Id` is the Marten identity).
 - **(d) Confirmed:** **no** doc-side `IsActive` boolean and **no** `Scope` field (G·2 — the service is the resolver; the guardian does not act *as* the child).
 - **(e) Compile warnings:** none.
+
+## U03 — AccessVia.Guardian
+
+- **Date:** 2026-09-14. Appended `Guardian` as the **9th** value on `AccessVia` (after `Group`) in `src/Kumunita.Core/Authorization/Decision.cs`. **`dotnet build Kumunita.slnx -c Debug` green.** No new test (U09's tests exercise it indirectly via the audit rows).
+- **(a) Enum now has 9 values:** `Owner, Audience, Delegation, Moderator, Report, BreakGlass, Admin, Group, Guardian`.
+- **(b) `Guardian` is the 9th / last** (index 8), appended after `Group` (trailing comma added to `Group`).
+- **(c) G·1 doc-comment line (verbatim):** "exercised only on the IUserInfoService management lanes — **never** on a CanAsync / CanSeeAsync content decision (G·1)".
+- **(d) No renumber:** no existing value's position or name changed — `Owner`..`Group` (indices 0–7) are byte-identical; `Guardian` is purely additive.
+- **(e) Compile warnings:** none.
