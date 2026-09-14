@@ -17,6 +17,9 @@ Date: 2026-08-25
 
 - **Roles**: Member, Moderator, GlobalAdmin, and (ADR 0021) Translator.
   - **Member** — verified resident; participates within audiences that grant access.
+  - **Independent & composable** (ADR 0030) — a resident may hold any combination of the
+    elevated roles (e.g. GlobalAdmin + Translator) so someone can stand in temporarily and
+    it can be toggled off later without losing their other standing.
   - **Moderator** — scoped to one or more functional components.
   - **GlobalAdmin** — full control; the only role that can manage roles, set moderator
     scope, toggle scope-level `moderatorAccess`, and read the audit log.

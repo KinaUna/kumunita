@@ -420,26 +420,30 @@ public sealed class IdentityService(
     // ── Role promote/demote + component scope (ADR 0003) ──────────────────
 
     /// <inheritdoc />
-    public async Task SetRoleAsync(string targetSubjectId, string adminSubjectId, string role,
-        IReadOnlyList<string>? componentIds)
+    public async Task SetRoleAsync(string targetSubjectId, string adminSubjectId,
+        IReadOnlyCollection<string> roles, IReadOnlyList<string>? componentIds)
     {
         var admin = await RequireGlobalAdminAsync(adminSubjectId);
         _ = admin;
         var target = await userManager.FindByIdAsync(targetSubjectId)
             ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
 
-        var targetRoles = (await userManager.GetRolesAsync(target)).ToList();
-        var wantsGlobalAdmin = role == Roles.GlobalAdmin;
-        var wantsModerator = role == Roles.Moderator;
-        var wantsTranslator = role == Roles.Translator;
+        // ADR 0030 — roles are independent: `roles` is the *set* of elevated roles the
+        // target should hold (any subset of the three). `Member` is the implicit
+        // verified-resident standing and never appears here, so it is filtered out
+        // defensively (a stray "Member" in the set is a no-op either way).
+        var wants = (roles ?? [])
+            .Where(r => r is Roles.Moderator or Roles.Translator or Roles.GlobalAdmin)
+            .ToHashSet();
+        var wantsGlobalAdmin = wants.Contains(Roles.GlobalAdmin);
+        var wantsModerator = wants.Contains(Roles.Moderator);
+        var wantsTranslator = wants.Contains(Roles.Translator);
 
+        var targetRoles = (await userManager.GetRolesAsync(target)).ToHashSet();
         bool rolesChanged =
-            (wantsGlobalAdmin && !targetRoles.Contains(Roles.GlobalAdmin)) ||
-            (!wantsGlobalAdmin && targetRoles.Contains(Roles.GlobalAdmin)) ||
-            (wantsModerator && !targetRoles.Contains(Roles.Moderator)) ||
-            (!wantsModerator && targetRoles.Contains(Roles.Moderator)) ||
-            (wantsTranslator && !targetRoles.Contains(Roles.Translator)) ||
-            (!wantsTranslator && targetRoles.Contains(Roles.Translator));
+            wantsGlobalAdmin != targetRoles.Contains(Roles.GlobalAdmin) ||
+            wantsModerator   != targetRoles.Contains(Roles.Moderator) ||
+            wantsTranslator  != targetRoles.Contains(Roles.Translator);
 
         // Apply the GlobalAdmin/Moderator/Translator identity roles (Member is the implicit
         // verified standing — no EF role for it). AddTo/RemoveFromRole manage the role
@@ -491,8 +495,8 @@ public sealed class IdentityService(
             "role", "role", targetSubjectId, Authorization.AccessVia.Admin, Authorization.AccessOutcome.Allow));
         await session.SaveChangesAsync();
 
-        logger.LogInformation("Admin {Admin} set {Target}'s role to {Role}/{Components}.",
-            adminSubjectId, targetSubjectId, role, string.Join(",", componentIds ?? []));
+        logger.LogInformation("Admin {Admin} set {Target}'s roles to {Roles}/{Components}.",
+            adminSubjectId, targetSubjectId, string.Join(",", wants), string.Join(",", componentIds ?? []));
     }
 
     // ── Password (self-serve or admin reset) ───────────────────────────────

@@ -132,13 +132,26 @@
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
 
-                            <label class="visually-hidden">Role</label>
-                            <select name="role" class="form-select form-select-sm me-2">
-                                <option value="@Roles.Member" selected="@(a.Roles.Count == 0 ? "selected" : null)">Member (no elevated role)</option>
-                                <option value="@Roles.Moderator" selected="@(a.Roles.Contains(Roles.Moderator) ? "selected" : null)">Moderator</option>
-                                <option value="@Roles.Translator" selected="@(a.Roles.Contains(Roles.Translator) ? "selected" : null)">Translator</option>
-                                <option value="@Roles.GlobalAdmin" selected="@(a.Roles.Contains(Roles.GlobalAdmin) ? "selected" : null)">GlobalAdmin</option>
-                            </select>
+                            <label class="visually-hidden">Roles</label>
+                            @* ADR 0030 — roles are independent/composable: three checkboxes
+                               (any combination), not a single-select. Nothing checked = a
+                               plain Member (the implicit verified-resident standing). *@
+                            <span class="text-muted small me-1" title="Nothing checked = plain Member">roles:</span>
+                            <label title="GlobalAdmin" aria-label="GlobalAdmin" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.GlobalAdmin"
+                                       checked="@(a.Roles.Contains(Roles.GlobalAdmin) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">GlobalAdmin</span>
+                            </label>
+                            <label title="Moderator" aria-label="Moderator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.Moderator"
+                                       checked="@(a.Roles.Contains(Roles.Moderator) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">Moderator</span>
+                            </label>
+                            <label title="Translator" aria-label="Translator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.Translator"
+                                       checked="@(a.Roles.Contains(Roles.Translator) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">Translator</span>
+                            </label>
 
                             @if (Model.Components.Any())
                             {
@@ -223,8 +236,9 @@
     </table>
 </div>
 
-@* The "scope" checkbox set is only meaningful when the selected role is Moderator; the
-   Core SetRoleAsync ignores componentIds for non-Moderator targets (deletes them). *@
+@* ADR 0030 — roles are independent checkboxes (any combination). The "scope" checkbox
+   set is meaningful only when the Moderator checkbox is checked; the Core SetRoleAsync
+   clears component scope for a non-Moderator target (deletes the assignment rows). *@
 
 <h2 class="mt-5">Communities</h2>
 <p class="text-muted">

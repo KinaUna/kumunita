@@ -292,6 +292,18 @@ public sealed class AdminController(
             return RedirectToAction(nameof(Index));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // ADR 0030 — roles are independent: the form submits the *set* of elevated roles
+        // to grant. `Member` is the "nothing selected" state (the implicit
+        // verified-resident standing) and is never a real role, so it is filtered out
+        // (Core also guards this — only the three elevated roles are AddTo/RemoveFrom'd).
+        // An empty set means "no elevated role" (a plain Member).
+        var roles = model.RoleNames
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Where(r => r is Roles.Moderator or Roles.Translator or Roles.GlobalAdmin)
+            .Distinct()
+            .ToList();
+
         var componentIds = model.ComponentIds
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct()
@@ -299,15 +311,10 @@ public sealed class AdminController(
 
         try
         {
-            // "Member" is the "no elevated role" value (Core's SetRoleAsync removes any
-            // GlobalAdmin/Moderator when the role string is neither of those).
-            var role = string.IsNullOrWhiteSpace(model.Role) || model.Role == Kumunita.Core.Identity.Roles.Member
-                ? Kumunita.Core.Identity.Roles.Member
-                : model.Role;
             await identity.SetRoleAsync(
                 targetSubjectId: model.TargetSubjectId,
                 adminSubjectId: admin,
-                role: role,
+                roles: roles,
                 componentIds: componentIds);
         }
         catch (UnauthorizedAccessException)
@@ -323,7 +330,7 @@ public sealed class AdminController(
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Role updated.";
+        TempData["info"] = "Roles updated.";
         return RedirectToAction(nameof(Index));
     }
 

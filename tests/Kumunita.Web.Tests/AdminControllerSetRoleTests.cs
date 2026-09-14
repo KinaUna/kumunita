@@ -14,14 +14,14 @@ using KumunitaClaimTypes = Kumunita.Core.Identity.ClaimTypes;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
-/// ADR 0021 — the <see cref="AdminController.SetRole"/> lane hands the
-/// <see cref="Roles.Translator"/> string through to
-/// <see cref="IIdentityService.SetRoleAsync"/> unchanged (the Web is a thin
-/// wrapper; the Core lane decides whether the role is add-able / remove-able).
-/// The existing <see cref="AdminControllerMandatoryTests"/> /
-/// <see cref="AdminControllerBlockTests"/> harness is reused: NSubstitute seam,
-/// principal from raw claims, and the assertion lives on the substitute's
-/// call log.
+/// ADR 0030 — the <see cref="AdminController.SetRole"/> lane hands the **set** of
+/// elevated roles through to <see cref="IIdentityService.SetRoleAsync"/> unchanged
+/// (the Web is a thin wrapper; the Core lane decides which roles are add-able /
+/// remove-able). Roles are independent/composable: a resident may hold any subset of
+/// GlobalAdmin / Moderator / Translator. The existing
+/// <see cref="AdminControllerMandatoryTests"/> / <see cref="AdminControllerBlockTests"/>
+/// harness is reused: NSubstitute seam, principal from raw claims, and the assertion
+/// lives on the substitute's call log.
 /// </summary>
 public class AdminControllerSetRoleTests
 {
@@ -29,7 +29,7 @@ public class AdminControllerSetRoleTests
     private const string TargetSubject = "subj-target-001";
 
     [Fact]
-    public async Task SetRole_Translator_PassesThrough_ToCoreSeam()
+    public async Task SetRole_SingleRole_Translator_PassesThrough_ToCoreSeam()
     {
         var identity = Substitute.For<IIdentityService>();
         var controller = Build(identity);
@@ -37,36 +37,36 @@ public class AdminControllerSetRoleTests
         var model = new SetRoleViewModel
         {
             TargetSubjectId = TargetSubject,
-            Role = Roles.Translator,
+            RoleNames = [Roles.Translator],
             ComponentIds = [],
         };
 
-        // The controller maps "Member" to the no-elevated-role sentinel; any
-        // other string (including "Translator") passes through unchanged.
-        // TempData / redirect NRE is swallowed — the assertion is on the log.
+        // ADR 0030 — the seam carries the *set* of elevated roles. A single Translator
+        // is a one-element set. TempData / redirect NRE is swallowed — the assertion is
+        // on the log.
         try { await controller.SetRole(model); }
         catch { /* expected: TempData/redirect NRE */ }
 
         await identity.Received(1).SetRoleAsync(
             targetSubjectId: TargetSubject,
             adminSubjectId:  AdminSubject,
-            role:            Roles.Translator,
+            roles:           Arg.Is<IReadOnlyCollection<string>>(s => s.Count == 1 && s.Contains(Roles.Translator)),
             componentIds:    Arg.Is<IReadOnlyList<string>>(l => l.Count == 0));
     }
 
     [Fact]
-    public async Task SetRole_Member_Resets_NoElevatedRole()
+    public async Task SetRole_NoRoles_EmptySet_Means_Member()
     {
-        // The "Member" sentinel: the controller maps it to Roles.Member,
-        // which Core interprets as "remove every elevated role". The seam
-        // call carries Roles.Member — the pin holds that mapping.
+        // ADR 0030 — "Member (no elevated role)" is the *empty set* (Member is the
+        // implicit verified-resident standing, never a carried role). The seam call
+        // carries an empty set — the pin holds that mapping.
         var identity = Substitute.For<IIdentityService>();
         var controller = Build(identity);
 
         var model = new SetRoleViewModel
         {
             TargetSubjectId = TargetSubject,
-            Role = Roles.Member,
+            RoleNames = [],
             ComponentIds = [],
         };
 
@@ -76,7 +76,34 @@ public class AdminControllerSetRoleTests
         await identity.Received(1).SetRoleAsync(
             targetSubjectId: TargetSubject,
             adminSubjectId:  AdminSubject,
-            role:            Roles.Member,
+            roles:           Arg.Is<IReadOnlyCollection<string>>(s => s.Count == 0),
+            componentIds:    Arg.Is<IReadOnlyList<string>>(l => l.Count == 0));
+    }
+
+    [Fact]
+    public async Task SetRole_MultipleRoles_AreIndependent_AndAllPassThrough()
+    {
+        // ADR 0030 — roles are independent/composable: a GlobalAdmin may also hold
+        // Translator (e.g. to stand in for the community's translators). Both must reach
+        // the seam in the same set.
+        var identity = Substitute.For<IIdentityService>();
+        var controller = Build(identity);
+
+        var model = new SetRoleViewModel
+        {
+            TargetSubjectId = TargetSubject,
+            RoleNames = [Roles.GlobalAdmin, Roles.Translator],
+            ComponentIds = [],
+        };
+
+        try { await controller.SetRole(model); }
+        catch { /* expected */ }
+
+        await identity.Received(1).SetRoleAsync(
+            targetSubjectId: TargetSubject,
+            adminSubjectId:  AdminSubject,
+            roles:           Arg.Is<IReadOnlyCollection<string>>(s =>
+                s.Count == 2 && s.Contains(Roles.GlobalAdmin) && s.Contains(Roles.Translator)),
             componentIds:    Arg.Is<IReadOnlyList<string>>(l => l.Count == 0));
     }
 

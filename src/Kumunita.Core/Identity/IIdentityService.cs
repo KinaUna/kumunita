@@ -121,18 +121,24 @@ public interface IIdentityService
 
     /// <summary>
     /// Role promote/demote + component-scope assignment (ADR 0003; the <c>Translator</c>
-    /// lane is ADR 0021): a GlobalAdmin promotes to / demotes from <c>GlobalAdmin</c>,
-    /// <c>Moderator</c>, or <c>Translator</c>; for a <c>Moderator</c>,
-    /// <paramref name="componentIds"/> is the complete scope (null/empty clears it — the
-    /// only standing-moderator path is <c>moderatorAccess</c>, invariant C5). A
-    /// <c>Translator</c> holds no component scope — <paramref name="componentIds"/> is
-    /// ignored for that role (the assignment rows are cleared, as for any non-Moderator).
-    /// Rotates the security stamp (invalidates existing sessions — a demoted account
-    /// loses the standing immediately, not at cookie expiry, OPS §10). Appends an audit
-    /// row <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call this.
+    /// lane is ADR 0021; **role independence** — any combination of elevated roles — is
+    /// ADR 0030): a GlobalAdmin sets the target's **set** of elevated roles, <paramref
+    /// name="roles"/> — any subset of <c>GlobalAdmin</c>, <c>Moderator</c>, and
+    /// <c>Translator</c> (an account may hold more than one at once; e.g. a GlobalAdmin
+    /// who also holds <c>Translator</c> to stand in for the community's translators).
+    /// <c>Member</c> is the implicit verified-resident standing and is never carried in
+    /// the set; an **empty** set means "no elevated role" (a plain Member). For a
+    /// <c>Moderator</c>, <paramref name="componentIds"/> is the complete scope
+    /// (null/empty clears it — the only standing-moderator path is
+    /// <c>moderatorAccess</c>, invariant C5); a <c>Translator</c> holds no component
+    /// scope, so <paramref name="componentIds"/> applies only when <c>Moderator</c> is
+    /// in the set. Rotates the security stamp (invalidates existing sessions — a demoted
+    /// account loses the standing immediately, not at cookie expiry, OPS §10). Appends
+    /// an audit row <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call
+    /// this.
     /// </summary>
-    Task SetRoleAsync(string targetSubjectId, string adminSubjectId, string role,
-        IReadOnlyList<string>? componentIds);
+    Task SetRoleAsync(string targetSubjectId, string adminSubjectId,
+        IReadOnlyCollection<string> roles, IReadOnlyList<string>? componentIds);
 
     /// <summary>
     /// Change password (self-serve, or a GlobalAdmin reset): rotates the security stamp
