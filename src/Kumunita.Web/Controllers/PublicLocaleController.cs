@@ -66,10 +66,12 @@ public sealed class PublicLocaleController(
     /// a <c>code</c> form value → <see cref="LocaleCookie.Write"/>; <c>clear=1</c> →
     /// <see cref="LocaleCookie.Clear"/> (reset to the instance default). The change
     /// takes effect on the <strong>next</strong> request (M·4 — data, not config).
+    /// A <c>returnUrl</c> (the nav-bar language switcher) redirects back to the
+    /// page the resident was on; without it the picker page is the destination.
     /// </summary>
     [HttpPost("/language")]
     [ValidateAntiForgeryToken]
-    public IActionResult Save(string? code, string? clear)
+    public IActionResult Save(string? code, string? clear, string? returnUrl = null)
     {
         if (clear == "1")
         {
@@ -82,6 +84,11 @@ public sealed class PublicLocaleController(
             TempData["info"] = $"Language preference set to \"{code}\" — it takes effect on the next request.";
         }
 
+        // The nav switcher carries the page it came from; the compact picker does
+        // not — fall back to the picker's Index view. A relative URL only (no
+        // open redirect — a scheme/rooted target is rejected by IsUrlRelative).
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+            return Redirect(returnUrl);
         return RedirectToAction(nameof(Index));
     }
 }
