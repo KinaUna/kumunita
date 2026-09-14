@@ -561,7 +561,16 @@ closing the `/about` follow-on the `ML` record had left open.
   document carries an **authored-in language tag** (`LanguageCode` on `Post` /
   `PostReply` / `Announcement`, ADR 0018) — a BCP-47 metadata field for future
   search and reader-added language versions, resolved to a concrete code at
-  write time (instance default → `en`); it translates nothing.
+  write time (instance default → `en`); it translates nothing. The **TD lane**
+  (ADR 0027) builds on that tag at the **display** layer only: on the
+  post/reply detail surface the authored-in code is surfaced **additively**
+  (as `OriginalLanguageCode` on `PostDetailViewModel` /
+  `GroupPostDetailViewModel` / `ReplyItem`, read from the ADR 0018 field) and
+  rendered as the first, default-visible variant chip, toggled by a small
+  server-rendered / client-`display`-toggle swap. It adds **no** document and
+  **no** migration (ADR 0004 §B.1 is not engaged — the field already exists)
+  and leaves the ADR 0022 add-translation write lane untouched; the swap is a
+  presentation concern, not a data, schema, or authorization one (TD·7).
 - **Storage:** languages, the default, and all translations are data in `mt` —
   not env, not image config. Admins add/remove languages and set the default
   in-app; the change is effective on the next request, no redeploy.

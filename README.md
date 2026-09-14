@@ -168,6 +168,7 @@ stays trivial and the authorization rules can grow freely.
 - **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
 - **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**
 - **Rich content** (`RC`, ADR 0025) — Markdown bodies + in-content images on posts, replies, announcements & static pages. **Done.**
+- **Translation display** (`TD`, ADR 0027) — the authored-in language (ADR 0018) is the first, default-visible variant chip on the post/reply detail surface (both lanes); added translations are clickable chips that swap the title+body / body in place; the "add a …" lane excludes the authored-in language; soft-deleted rows show no swap. Display-only — no data, schema, or auto-translation change. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

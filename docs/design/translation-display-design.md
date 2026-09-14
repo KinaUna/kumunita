@@ -147,11 +147,24 @@ and no swap.
 
 `client/lib/translation-swap.ts`, `tsc`-only ES module, no imports,
 ~40–70 LOC: for each `[data-translation-chip]`, on `click`:
-`g = chip.closest('[data-td-group]')`; `v = chip.dataset.tdVariant`; then
-`g.querySelectorAll('[data-td-variant]').forEach(c => { c.style.display =
+`g = chip.closest('div[data-td-group]')`; `v = chip.dataset.tdVariant`; then
+`g.querySelectorAll('.td-variant').forEach(c => { c.style.display =
 (c.dataset.tdVariant === v) ? '' : 'none'; })`. No `innerHTML`, no `fetch`,
 no navigation. Loaded in `_Layout.cshtml` as
 `<script type="module" src="~/js/lib/translation-swap.js"></script>`.
+
+**Two selector lines are the exact shipped form (U05 reconciliation,
+2026-09-14):** `chip.closest('div[data-td-group]')` — not
+`[data-td-group]` — because `closest` starts at the element itself and the
+chip is a `<button data-td-group>` *inside* the wrapper, so the bare
+attribute would resolve to the chip and find no variant containers (the swap
+would no-op); and `querySelectorAll('.td-variant')` — not
+`[data-td-variant]` — because the chips also carry `data-td-variant` and sit
+inside the same wrapper, so the bare attribute would hide the non-active chip
+and break the click-back (FACES TD3/TD5). Both are the more-specific realizations
+of the pinned markup above (the wrapper is the pinned `<div data-td-group>`;
+the containers are the pinned `class="td-variant"` + `data-td-variant`); no
+frozen pin (attribute set, container structure, FACES) is reshaped.
 
 ### pinned tests (exact names)
 

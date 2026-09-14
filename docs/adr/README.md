@@ -31,3 +31,4 @@ Decision / Consequences. New decisions take the next number.
 | 0024 | Author soft-delete lane (posts + replies, community + group) | Accepted |
 | 0025 | Rich content: Markdown + content images | Accepted |
 | 0026 | Group & community name/description translations | Accepted |
+| 0027 | Post & reply translation display & swap: authored-in as a first-class variant + click-to-swap | Accepted |

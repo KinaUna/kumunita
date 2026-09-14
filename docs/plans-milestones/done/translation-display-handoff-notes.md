@@ -151,3 +151,78 @@
   `.td-variant`; clicking the original chip returns to it, on **both** lanes
   (same module, same selectors); with JS disabled the original is
   default-visible and every added `.td-variant` remains in the DOM.
+
+## U06 — tests + doc sync
+
+- **4 pinned tests (all 4 pass):**
+  `PostDetail_OriginalLanguageCode_EqualsPostAuthoredIn` ·
+  `Reply_OriginalLanguageCode_EqualsReplyAuthoredIn` ·
+  `GroupPostDetail_OriginalLanguageCode_EqualsPostAuthoredIn` ·
+  `PostDetail_OriginalNotAmongAddedTranslationCodes` — in
+  `tests/Kumunita.Web.Tests/TranslationDisplayTests.cs`.
+- **Test realization (VM data-shape, not an e2e controller drive):** the four
+  names are pinned verbatim; the two detail controllers source the ADDs from
+  the **sealed** `PostService.GetPostAsync` / `GetGroupPostAsync`, which open a
+  real Marten `QuerySession` — undrivable in the NSubstitute-only Web harness
+  (the exact seam wall `ContentImageServingTests` records for the RC lane; a
+  proxy-able seam or a Testcontainers fixture would be a forbidden production /
+  infra edit). The tests therefore pin the U02 projection at the faithful
+  seam available: the three `OriginalLanguageCode` ADDs exist, carry the
+  authored-in code read from the ADR 0018 field (`Post.LanguageCode` /
+  `PostReply.LanguageCode`), and the original is distinct from the added
+  `PostTranslation` codes (TD·5). FACES TD1–TD8 remain the visual acceptance
+  (the codebase unit-tests VM data shape, not Razor markup). **TD·7 held:** no
+  Core / schema change exercised — the POCOs are used verbatim; only the three
+  additive VM ADDs are under test.
+- **TD1–TD8 acceptance verdicts (observed against the server-rendered markup
+  of `Views/Posts/Detail.cshtml` + `Views/Groups/PostDetail.cshtml` and the
+  shipped `translation-swap.ts`):**
+  - **TD1** (no "None yet" when the original is present) — **PASS**: the
+    original chip + default-visible `.td-variant` render from
+    `Model.OriginalLanguageCode`; the "None yet" empty state was dropped in U03/U04.
+  - **TD2** (add-lane excludes authored-in) — **PASS**: `missingLanguages` is
+    `Where(l => !l.HasTranslation && l.Code != originalCode)`; the reply lane
+    inlines `l.Code != r.OriginalLanguageCode`.
+  - **TD3** (post swap to/from) — **PASS**: the `div[data-td-group]` wrapper
+    holds the original + one `.td-variant` per translation; a chip click
+    toggles `display` to the clicked code, the original chip returns to it.
+  - **TD4** (reply first chip) — **PASS**: each reply's group wrapper
+    (`reply-@r.Id`) renders the original chip first, default-visible body.
+  - **TD5** (reply swap to/from) — **PASS**: same `.td-variant` toggle within
+    the reply wrapper; the pinned test also pins the original ≠ added codes.
+  - **TD6** (group-lane parity) — **PASS**: the group view mirrors the
+    community view byte-for-byte (same `data-*` set, same container shape,
+    same exclusion); only the group route actions + `Model.GroupId` differ.
+  - **TD7** (soft-delete → placeholder, no swap) — **PASS**: the translation
+    section renders only when `DeletedAt is null` (post + reply); a soft-deleted
+    row shows its ADR 0024 placeholder with no chips/swap.
+  - **TD8** (JS-off degradation) — **PASS**: the original `.td-variant`
+    carries no `style="display:none"` (default-visible); every added
+    `.td-variant` is present in the DOM as static text when JS is off.
+- **Design-doc TS reconciliation (U05 flag resolved):** the "TS module
+  contract (exact)" section now matches the shipped `translation-swap.ts` —
+  `chip.closest('div[data-td-group]')` (not `[data-td-group]`, which would
+  resolve to the chip itself and no-op the swap) and
+  `querySelectorAll('.td-variant')` (not `[data-td-variant]`, which would also
+  match the chips and hide the non-active chip, breaking the click-back
+  TD3/TD5). Both are the more-specific realizations of the pinned markup; a
+  one-line why is recorded there. **No frozen pin reshaped** (attribute set,
+  container structure, FACES all unchanged).
+- **Doc edits:** (a) `docs/design/translation-display-design.md` — TS module
+  contract reconciled (above); (b) `docs/adr/README.md` — ADR **0027** row
+  appended after 0026 (Accepted); (c) `docs/ARCHITECTURE.md` — one short note
+  on the ADR 0018 authored-in-tag bullet: TD adds no document / no migration
+  (ADR 0004 §B.1 not engaged), the authored-in code is surfaced additively on
+  the two detail VMs + `ReplyItem` from the ADR 0018 field, and the swap is a
+  server-rendered / client-toggled display concern (ref ADR 0027, TD·7);
+  (d) `README.md` §Roadmap — **TD** (ADR 0027) added as a named (non-M-letter)
+  **Done** entry after `RC` (ADR 0025), mirroring ML / RC; **M4/M5/M6
+  untouched.**
+- **Housekeeping (RC-close precedent):** `translation-display-u01…u06-plan.md`
+  moved from `docs/plans-milestones/in-progress/` to `done/` (`in-progress/`
+  is now empty for this lane).
+- **Build / test gate:** `dotnet build Kumunita.slnx -c Debug` green (4/4).
+  Both suites green via the repo's xunit.v3 in-process runner (`dotnet exec`
+  on each `*.dll`): `Kumunita.Web.Tests` (the 4 pinned tests pass) and
+  `Kumunita.Core.Tests`. `npm build` not-applicable (no TS in this unit).
+- **Lane complete — TD (ADR 0027) is closed.**
