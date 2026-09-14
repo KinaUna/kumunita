@@ -1805,4 +1805,227 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         var suffix = Guid.NewGuid().ToString("N")[..4];
         return $"{sb.ToString()}-{suffix}";
     }
+
+    // ── GU guardian lanes (ADR 0028) — additive, beside the membership lanes ──
+    // Account-scope supervision of a child's account. Standing is the 9th
+    // <c>AccessVia.Guardian</c> value, resolved **live** off the active
+    // <see cref="GuardianLink"/> row (G·2) and **deny-by-default** (G·3). These
+    // are management lanes — **never** on a CanAsync / CanSeeAsync content
+    // decision path (G·1, the load-bearing honesty). Exception vocabulary:
+    // <c>UnauthorizedAccessException</c> = the actor has no standing (no active
+    // link, or not the GuardianId); <c>InvalidOperationException</c> = a row is
+    // missing or in a bad state.
+
+    /// <inheritdoc />
+    public async Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // G·4 idempotent formation: a duplicate (GuardianId, ChildId) Active row
+        // is a no-op — the row is left as-is and returned (not a throw).
+        var existing = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            // No mutation, no audit (a no-op is a no-op — the contract, not an
+            // error). Return the existing row as-is.
+            return existing;
+        }
+
+        var link = new GuardianLink
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GuardianId = guardianId,
+            ChildId = childId,
+            Status = GuardianLinkStatus.Active,
+            CreatedAt = now
+        };
+        session.Store(link);
+
+        // Formation audit: the guardian's own standing (all three identities the
+        // guardian; the target is the guardian-link row itself, keyed to the
+        // child). One SaveChangesAsync (invariant C3).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.create",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
+    public async Task SuspendChildAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // Load the child's profile (missing → bad state, not a no-op).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Set the SAME flag BlockedAccountMiddleware + the directory already read
+        // (enforcement parity — the U01 pin).
+        profile.Blocked = true;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.suspend",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task UnsuspendChildAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Restore standing — live on the next read (G·2).
+        profile.Blocked = false;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.unsuspend",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin)
+    {
+        if (string.IsNullOrWhiteSpace(linkId))
+            throw new ArgumentException("Link id is required.", nameof(linkId));
+        if (string.IsNullOrWhiteSpace(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var link = await session.LoadAsync<GuardianLink>(linkId).ConfigureAwait(false);
+        if (link is null)
+            throw new InvalidOperationException($"No guardian link: {linkId}");
+
+        // G·4: on the guardian's own lane the actor must BE the GuardianId
+        // (deny-by-default). The G·5 safety valve (viaAdmin) skips the check.
+        if (!viaAdmin && link.GuardianId != actorId)
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} is not the guardian on link {linkId}.");
+
+        link.Status = GuardianLinkStatus.Dissolved;
+        link.DissolvedAt = now;
+        link.DissolvedBy = actorId;
+        session.Store(link);
+
+        // A dissolve writes NOTHING to membership and does NOT set
+        // Profile.Blocked — the self-lanes restore on the next read (G·2/C4);
+        // un-suspend is a separate act (the G·5 valve or UnsuspendChildAsync).
+        var via = viaAdmin ? Authorization.AccessVia.Admin : Authorization.AccessVia.Guardian;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "guardian.dissolve",
+            TargetKind = "guardian-link",
+            TargetId = linkId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The GU standing gate (G·2 live / G·3 deny-by-default): an <b>active</b>
+    /// <see cref="GuardianLink"/> with <see cref="GuardianLink.GuardianId"/>
+    /// equal to <paramref name="guardianId"/> and <see cref="GuardianLink
+    /// .ChildId"/> equal to <paramref name="childId"/> must exist — else
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404). The row is
+    /// resolved **live** off <see cref="GuardianLinkStatus"/> (the service is
+    /// the resolver — the POCO carries state, not an <c>IsActive</c> boolean).
+    /// </summary>
+    private static async Task GuardActiveLinkAsync(
+        IDocumentSession session, string guardianId, string childId)
+    {
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (link is null)
+            throw new UnauthorizedAccessException(
+                $"No active guardian link for ({guardianId}, {childId}).");
+    }
 }

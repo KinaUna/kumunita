@@ -725,4 +725,104 @@ public interface IUserInfoService
     /// live on the very next call.
     /// </summary>
     Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForGroupAsync(string groupId);
+
+    // ── GU guardian lanes (ADR 0028) — additive, beside the membership lanes ──
+    // Account-scope supervision of a child's account (ADR 0028 §C). The standing
+    // is <c>AccessVia.Guardian</c> (the 9th value), resolved **live** off the
+    // active <see cref="GuardianLink"/> row (G·2) and **deny-by-default** (G·3).
+    // These lanes are **management** lanes on this surface — they are *not* on
+    // a <c>CanAsync</c> / <c>CanSeeAsync</c> content-decision path (G·1, the
+    // load-bearing honesty: a guardian has no standing to read the child's
+    // private content). ADR 0006-E compatible — appended to the owning
+    // module's public surface, additive; the frozen 4-method
+    // <c>IAuthorizationService</c> surface is byte-identical.
+
+    /// <summary>
+    /// Formation (ADR 0028 §C action 1; G·4 — creation is the standing basis).
+    /// Upserts the <c>(GuardianId, ChildId)</c> <see cref="GuardianLinkStatus
+    /// .Active"/> row: a duplicate pair is an <b>idempotent no-op</b> (the row is
+    /// left as-is and returned; not a throw). The Web's add-a-child form pairs
+    /// this with <c>IIdentityService.RegisterAsync</c> so account + link + audit
+    /// commit together (C3) — a created-but-unlinked account can never exist.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>guardian.create</c>, <c>TargetKind</c> "guardian-link",
+    /// <see cref="Authorization.AccessVia.Guardian"/>) in the same session
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// Suspend the child (ADR 0028 §C action 2; G·2 — live standing off
+    /// <see cref="Profile.Blocked"/>). The **standing gate** runs first: an
+    /// <b>active</b> <see cref="GuardianLink"/> with
+    /// <see cref="GuardianLink.GuardianId"/> equal to <paramref name="guardianId"/>
+    /// must exist, else an <see cref="UnauthorizedAccessException"/> (the Web's
+    /// 404; G·2/G·3 deny-by-default). Then loads the child's <see cref="Profile"/>
+    /// by <see cref="Profile.SubjectId"/> (missing → <see
+    /// cref="InvalidOperationException"/>) and sets
+    /// <see cref="Profile.Blocked"/> = <c>true</c> — the <b>same flag</b>
+    /// <c>BlockedAccountMiddleware</c> + the directory already read (enforcement
+    /// parity). The GlobalAdmin <c>BlockAsync</c> / <c>UnblockAsync</c> are
+    /// **unchanged** (G·5). Appends an audit row (action <c>guardian.suspend</c>,
+    /// <c>TargetKind</c> "profile", <see cref="Authorization.AccessVia
+    /// .Guardian"/>) in the same session (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair — the actor has no standing.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="Profile"/> with that
+    /// <see cref="Profile.SubjectId"/> exists.</exception>
+    Task SuspendChildAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// Un-suspend the child (ADR 0028 §C action 2). Same <b>standing gate</b> as
+    /// <see cref="SuspendChildAsync"/> (an active link for the pair, else
+    /// <see cref="UnauthorizedAccessException"/>); loads the <see cref="Profile"/>
+    /// by <see cref="Profile.SubjectId"/> (missing → <see
+    /// cref="InvalidOperationException"/>) and sets
+    /// <see cref="Profile.Blocked"/> = <c>false</c> — standing restored live on
+    /// the next read (G·2). Appends an audit row (action
+    /// <c>guardian.unsuspend</c>, <c>TargetKind</c> "profile", <see
+    /// cref="Authorization.AccessVia.Guardian"/>) in the same session
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair — the actor has no standing.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="Profile"/> with that
+    /// <see cref="Profile.SubjectId"/> exists.</exception>
+    Task UnsuspendChildAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// Independence — dissolve the link (ADR 0028 §C action 6). Loads the
+    /// <see cref="GuardianLink"/> by <paramref name="linkId"/> (missing → <see
+    /// cref="InvalidOperationException"/>). When <paramref name="viaAdmin"/> is
+    /// <c>false</c>, the actor <b>must be</b> the row's
+    /// <see cref="GuardianLink.GuardianId"/> (else <see
+    /// cref="UnauthorizedAccessException"/> — G·4, the guardian's own lane); when
+    /// <c>true</c>, no actor-identity check (the G·5 GlobalAdmin safety valve).
+    /// Moves the row <see cref="GuardianLinkStatus.Active"/> → <see
+    /// cref="GuardianLinkStatus.Dissolved"/> (<see cref="GuardianLink
+    /// .DissolvedAt"/>/<see cref="GuardianLink.DissolvedBy"/> stamped). The
+    /// child's memberships are **preserved** — a dissolve writes nothing to
+    /// membership and does <b>not</b> set <see cref="Profile.Blocked"/> (the
+    /// self-lanes restore on the next read, G·2/C4; un-suspend is a <b>separate</b>
+    /// act, the G·5 valve or <see cref="UnsuspendChildAsync"/>). Appends an
+    /// audit row (action <c>guardian.dissolve</c>, <c>TargetKind</c>
+    /// "guardian-link", <see cref="Authorization.AccessVia.Guardian"/> when
+    /// <paramref name="viaAdmin"/> is false else <see cref="Authorization
+    /// .AccessVia.Admin"/>) in the same session (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="linkId"/> or
+    /// <paramref name="actorId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="GuardianLink"/> with
+    /// that id exists.</exception>
+    /// <exception cref="UnauthorizedAccessException"><paramref name="viaAdmin"/> is
+    /// false and <paramref name="actorId"/> is not the row's
+    /// <see cref="GuardianLink.GuardianId"/>.</exception>
+    Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
 }
