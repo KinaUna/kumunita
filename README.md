@@ -228,5 +228,5 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify
-- `docs/adr/` — architecture decision records (0001–0019)
+- `docs/adr/` — architecture decision records (0001–0027)
 - `docs/design/` — per-milestone design docs (M1: [`docs/design/m1-identity-access.md`](docs/design/m1-identity-access.md) — identity, groups, delegation, authorization; media: [`docs/design/media-file-storage-design.md`](docs/design/media-file-storage-design.md) — the media & file-storage lane, ADR 0011, profile avatar as the reference lane)
