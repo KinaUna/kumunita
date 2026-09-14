@@ -59,6 +59,8 @@ public static class M1DocTypes
         opts.Schema.For<GroupInvitation>()
                .UniqueIndex(i => i.GroupId, i => i.UserId);   // business key
         opts.Schema.For<DelegationGrant>();
+        // GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)
+        opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);
         opts.Schema.For<Component>();
         opts.Schema.For<ModeratorAssignment>();
         // Posting right: one row per (component, user) pair, the same business-key

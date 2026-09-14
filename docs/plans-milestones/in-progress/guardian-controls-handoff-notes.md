@@ -49,3 +49,12 @@
 - **(c) 11 pinned test names** (`tests/Kumunita.Core.Tests/GuardianControlsTests.cs`): `G1_GuardianCannotReadChildContent`, `G2_SuspendIsLiveAndBlocksStanding`, `G2_DissolveRestoresSelfLanesOnNextRead`, `G3_NonChildTargetIsRefused`, `G3_ContentReadIsNeverGuardian`, `G4_FormationCommitsAccountLinkAndAuditTogether`, `G5_GlobalAdminDissolvesAndUnSuspends`, `Invitation_GatedForSupervisedChild`, `Invitation_GuardianApproveLandsMembership_ViaGuardian`, `Membership_AddRemoveChild_ViaGuardian`, `SuspendSetsProfileBlocked_EnforcementIdentical`.
 - **(d) G·1 pin:** `AccessVia.Guardian` appears on **no** `CanAsync` / `CanSeeAsync` content decision — the lane's load-bearing honesty; a unit that puts it on the content path is a drift pause, not a deviation (unit-series rule §5).
 - **(e) Drift pause:** none — the design doc's prose was consistent with ADR 0028 and the frozen `IUserInfoService` surface; nothing to resolve or carry forward.
+
+## U02 — GuardianLink + M1DocTypes
+
+- **Date:** 2026-09-14. Created `src/Kumunita.Core/UserInfo/GuardianLink.cs` (POCO + `GuardianLinkStatus` enum, matching the §Pinned contract verbatim) and added one additive line to `src/Kumunita.Core/M1DocTypes.cs`. **`dotnet build Kumunita.slnx -c Debug` green.** No new test (U09 pins the lane's tests).
+- **(a) POCO fields (verbatim):** `string Id` (surrogate PK), `string GuardianId` (the creator — G·4), `string ChildId` (the target), `GuardianLinkStatus Status` (the two-state machine), `DateTimeOffset CreatedAt`, `DateTimeOffset? DissolvedAt`, `string? DissolvedBy`. Enum: `GuardianLinkStatus { Active, Dissolved }` (file-scoped, like `InvitationStatus`).
+- **(b) `M1DocTypes` line:** `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);` — placed **immediately after** `opts.Schema.For<DelegationGrant>();`, with the one-line comment `// GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)`. No other line in `Configure` changed.
+- **(c) Unique-index fields:** `(GuardianId, ChildId)` (the business-key pair, per the `GroupInvitation` convention; the surrogate `Id` is the Marten identity).
+- **(d) Confirmed:** **no** doc-side `IsActive` boolean and **no** `Scope` field (G·2 — the service is the resolver; the guardian does not act *as* the child).
+- **(e) Compile warnings:** none.
