@@ -70,3 +70,25 @@
   documents (TD·7) — no Core edits, no migration, no view/TS/test changes.
 - **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4 projects), no
   compile warnings. No drift pause.
+
+## U03 — community view swap
+
+- **`data-td-group` targets:** `"post"` (post variants) and `"reply-@r.Id"`
+  (each reply) — the post chip/variants wrap in `<div data-td-group="post">`,
+  the reply's in `<div data-td-group="reply-@r.Id" class="pe-3">`.
+- **`missingLanguages` exclusion (verbatim):**
+  `var missingLanguages = Model.Languages.Where(l => !l.HasTranslation && l.Code != originalCode).ToList();`
+  (post); the reply lane inlines `Model.Languages.Where(l => !l.HasTranslation && l.Code != r.OriginalLanguageCode)`.
+- **Soft-delete gating (TD7):** the post/reply translation section (chips +
+  variant containers + add-lane) renders **only** when live
+  (`Model.Post.DeletedAt is null` / `r.DeletedAt is null`); a soft-deleted
+  row shows its ADR 0024 placeholder and no swap.
+- **Unchanged confirmed:** the add-lane **form** markup (post title+body,
+  reply body-only) and the ADR 0022 route actions
+  (`/posts/{id}/translations`, `/posts/{id}/replies/{id}/translations`) are
+  verbatim — only the candidate **list** changed.
+- **For U04 (group view):** mirror the same `data-td-group` /
+  `data-td-variant` / `td-variant` container set and the original-chip-first
+  + hidden-variant shape; only the group-lane form-action routes + `Model.GroupId`
+  differ.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4). No drift pause.

@@ -15,7 +15,10 @@
     // code→native-name resolver for the chips (never blank — falls back to the
     // code itself).
     var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
-    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    // TD (ADR 0027) — the authored-in language (TD·1) is a first-class variant,
+    // so the post's "Add a …" candidate list excludes it (TD·4 / TD2).
+    var originalCode = Model.OriginalLanguageCode;
+    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
@@ -63,11 +66,6 @@
                 }
                 @if (Model.Post.DeletedAt is null)
                 {
-                    <h4>
-                        @(!string.IsNullOrWhiteSpace(Model.Post.Title)
-                            ? Model.Post.Title
-                            : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
-                    </h4>
                     <div class="d-flex align-items-center gap-2 text-muted small mb-3">
                         <span class="d-inline-flex align-items-center">
                             <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
@@ -83,15 +81,103 @@
                         </span>
                     </div>
 
-                    <div class="mb-3 rc-body">
-                        @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                    @* TD (ADR 0027) — the authored-in language is the first,
+                       default-visible variant; each added translation is a
+                       hidden variant; the chip row is a selector that swaps
+                       them. This group wrapper is the post's toggle scope. *@
+                    <div data-td-group="post">
+                        @* Original variant (default-visible — no display:none). *@
+                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                            <h4>
+                                @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                                    ? Model.Post.Title
+                                    : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
+                            </h4>
+                            <div class="mb-3 rc-body">
+                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                            </div>
+                        </div>
+
+                        @* One hidden variant per user-added translation. *@
+                        @foreach (var t in Model.PostTranslations)
+                        {
+                            <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                                @if (!string.IsNullOrWhiteSpace(t.Title))
+                                {
+                                    <h4>@t.Title</h4>
+                                }
+                                <div class="mb-3 rc-body">
+                                    @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
+                                </div>
+                            </div>
+                        }
+
+                        @* The chip row — a selector. The original chip is always
+                           present (TD·1); one chip per added translation (TD·2).
+                           No "None yet" (TD1). *@
+                        <div class="mb-3 border-top pt-3">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="text-muted small fw-semibold">
+                                    <kw-l key="posts.translations_label">Translations</kw-l>
+                                </span>
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="post"
+                                        data-td-variant="@Model.OriginalLanguageCode">
+                                    @LangName(Model.OriginalLanguageCode)
+                                </button>
+                                @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <button type="button" class="badge text-bg-light border"
+                                            data-translation-chip data-td-group="post"
+                                            data-td-variant="@t.LanguageCode">
+                                        @LangName(t.LanguageCode)
+                                    </button>
+                                }
+                            </div>
+
+                            @* The "add a translation" lane — one form per supported
+                               language that has no translation yet. The authored-in
+                               language is excluded (missingLanguages). The form
+                               markup and the ADR 0022 route action are unchanged. *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var lang in missingLanguages)
+                                {
+                                    <details class="mb-1">
+                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                            <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
+                                        </summary>
+                                        <form class="ms-2" method="post"
+                                              action="@($"/posts/{postId}/translations")">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@lang.Code" />
+                                            <label class="form-label small" for="post-t-title">
+                                                @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" id="post-t-title"
+                                                   name="title" value="@Model.Post.Title" />
+                                            <label class="form-label small" for="post-t-body">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <textarea class="form-control form-control-sm mb-2" id="post-t-body"
+                                                      name="body" rows="3" required placeholder="…"></textarea>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                                            </button>
+                                        </form>
+                                    </details>
+                                }
+                            }
+                        </div>
                     </div>
                 }
                 else
                 {
                     @* ADR 0024 — the post is soft-deleted: the record is kept
                        (replies below remain visible), but the body is
-                       replaced by a placeholder (author sees the same thing). *@
+                       replaced by a placeholder (author sees the same thing).
+                       No chip row / swap on a deleted post (TD7). *@
                     <div class="mb-3">
                         <div class="alert alert-secondary mb-2" role="alert">
                             <kw-l key="posts.deleted_placeholder">This post has been deleted by its author.</kw-l>
@@ -99,81 +185,6 @@
                         <span class="text-muted small">
                             @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
                         </span>
-                    </div>
-                }
-
-                @* ADR 0022 — available translations (chips) + the "add a
-                   translation" lane (offered only when CanTranslate). The
-                   native <details> disclosure needs no JS (the reply-edit
-                   precedent); selecting a language's chip expands its
-                   title/body. *@
-                @if (Model.PostTranslations.Count > 0 || Model.CanTranslate)
-                {
-                    <div class="mb-3 border-top pt-3">
-                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                            <span class="text-muted small fw-semibold">
-                                <kw-l key="posts.translations_label">Translations</kw-l>
-                            </span>
-                            @if (Model.PostTranslations.Count == 0)
-                            {
-                                <span class="text-muted small"><kw-l key="posts.translations_none">None yet</kw-l></span>
-                            }
-                            else
-                            {
-                                @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
-                                {
-                                    <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
-                                }
-                            }
-                        </div>
-
-                        @* Each available translation, expandable. *@
-                        @foreach (var t in Model.PostTranslations)
-                        {
-                            <details class="mb-1">
-                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
-                                <div class="ms-2">
-                                    @if (!string.IsNullOrWhiteSpace(t.Title))
-                                    {
-                                        <h5 class="mt-1">@t.Title</h5>
-                                    }
-                                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
-                                </div>
-                            </details>
-                        }
-
-                        @* The "add a translation" lane — one form per supported
-                           language that has no translation yet. *@
-                        @if (Model.CanTranslate)
-                        {
-                            @foreach (var lang in missingLanguages)
-                            {
-                                <details class="mb-1">
-                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                        <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
-                                    </summary>
-                                    <form class="ms-2" method="post"
-                                          action="@($"/posts/{postId}/translations")">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="languageCode" value="@lang.Code" />
-                                        <label class="form-label small" for="post-t-title">
-                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
-                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                        </label>
-                                        <input class="form-control form-control-sm mb-2" id="post-t-title"
-                                               name="title" value="@Model.Post.Title" />
-                                        <label class="form-label small" for="post-t-body">
-                                            <kw-l key="posts.translation_body_label">Body</kw-l>
-                                        </label>
-                                        <textarea class="form-control form-control-sm mb-2" id="post-t-body"
-                                                  name="body" rows="3" required placeholder="…"></textarea>
-                                        <button type="submit" class="btn btn-sm btn-primary">
-                                            <kw-l key="posts.translation_save">Save translation</kw-l>
-                                        </button>
-                                    </form>
-                                </details>
-                            }
-                        }
                     </div>
                 }
 
@@ -228,73 +239,86 @@
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
                     <li class="list-group-item">
-                        @* ADR 0022 — the reply's available translations + the
-                           "add a translation" lane (offered only when r.CanTranslate). *@
-                        @if (r.Translations.Count > 0 || r.CanTranslate)
-                        {
-                            <div class="mb-2 pe-3">
-                                <div class="d-flex flex-wrap align-items-center gap-1 mb-1">
-                                    @if (r.Translations.Count == 0)
-                                    {
-                                        <span class="text-muted small">
-                                            <kw-l key="posts.translations_label">Translations</kw-l>: <kw-l key="posts.translations_none">none yet</kw-l>
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted small">
-                                            <kw-l key="posts.translations_label">Translations</kw-l>:
-                                        </span>
-                                        @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
-                                        {
-                                            <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
-                                        }
-                                    }
-                                </div>
-                                @foreach (var t in r.Translations)
-                                {
-                                    <details class="mb-1">
-                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
-                                        <div class="ms-2 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
-                                    </details>
-                                }
-                                @if (r.CanTranslate)
-                                {
-                                    @foreach (var lang in missingLanguages)
-                                    {
-                                        <details class="mb-1">
-                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                                <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
-                                            </summary>
-                                            <form class="ms-2" method="post"
-                                                  action="@($"/posts/{postId}/replies/{r.Id}/translations")">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="languageCode" value="@lang.Code" />
-                                                <label class="form-label small" for="reply-t-body">
-                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                </label>
-                                                <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
-                                                          name="body" rows="3" required placeholder="…"></textarea>
-                                                <button type="submit" class="btn btn-sm btn-primary">
-                                                    <kw-l key="posts.translation_save">Save translation</kw-l>
-                                                </button>
-                                            </form>
-                                        </details>
-                                    }
-                                }
-                            </div>
-                        }
+                        @* TD (ADR 0027) — the reply's authored-in language is the
+                           first, default-visible variant; each added translation
+                           is a hidden variant; the chip row is a selector that
+                           swaps them. Scope: this reply (data-td-group). *@
                         <div class="d-flex justify-content-between align-items-start">
                             @if (r.DeletedAt is null)
                             {
-                                <div class="pe-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
+                                <div data-td-group="reply-@r.Id" class="pe-3">
+                                    @* Original variant (default-visible). *@
+                                    <div class="td-variant" data-td-variant="@r.OriginalLanguageCode">
+                                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
+                                    </div>
+
+                                    @* One hidden variant per user-added translation. *@
+                                    @foreach (var t in r.Translations)
+                                    {
+                                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                                        </div>
+                                    }
+
+                                    @* Chip row — a selector. Original chip always
+                                       present (TD·1); one chip per added
+                                       translation (TD·2); no "none yet" (TD4). *@
+                                    <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                                        <span class="text-muted small">
+                                            <kw-l key="posts.translations_label">Translations</kw-l>:
+                                        </span>
+                                        <button type="button" class="badge text-bg-light border"
+                                                data-translation-chip data-td-group="reply-@r.Id"
+                                                data-td-variant="@r.OriginalLanguageCode">
+                                            @LangName(r.OriginalLanguageCode)
+                                        </button>
+                                        @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <button type="button" class="badge text-bg-light border"
+                                                    data-translation-chip data-td-group="reply-@r.Id"
+                                                    data-td-variant="@t.LanguageCode">
+                                                @LangName(t.LanguageCode)
+                                            </button>
+                                        }
+                                    </div>
+
+                                    @* The "add a translation" lane — the
+                                       authored-in language is excluded
+                                       (l.Code != r.OriginalLanguageCode). The form
+                                       markup and the ADR 0022 route action are
+                                       unchanged. *@
+                                    @if (r.CanTranslate)
+                                    {
+                                        @foreach (var lang in Model.Languages.Where(l => !l.HasTranslation && l.Code != r.OriginalLanguageCode))
+                                        {
+                                            <details class="mb-1">
+                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                                    <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
+                                                </summary>
+                                                <form class="ms-2" method="post"
+                                                      action="@($"/posts/{postId}/replies/{r.Id}/translations")">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                                                    <label class="form-label small" for="reply-t-body">
+                                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                    </label>
+                                                    <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
+                                                              name="body" rows="3" required placeholder="…"></textarea>
+                                                    <button type="submit" class="btn btn-sm btn-primary">
+                                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                    </button>
+                                                </form>
+                                            </details>
+                                        }
+                                    }
+                                </div>
                             }
                             else
                             {
                                 @* ADR 0024 — the reply is soft-deleted: the
                                    record is kept (it still counts toward the
                                    parent's reply count), but the body is
-                                   replaced by a placeholder. *@
+                                   replaced by a placeholder (no swap, TD7). *@
                                 <div class="pe-3">
                                     <span class="text-muted fst-italic">
                                         <kw-l key="posts.reply_deleted_placeholder">This reply has been deleted by its author.</kw-l>
