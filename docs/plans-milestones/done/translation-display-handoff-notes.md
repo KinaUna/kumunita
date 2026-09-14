@@ -92,3 +92,22 @@
   + hidden-variant shape; only the group-lane form-action routes + `Model.GroupId`
   differ.
 - **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4). No drift pause.
+
+## U04 — group view parity
+
+- **Structure identical to U03 (TD6):** the group post/reply markup mirrors the
+  community view byte-for-byte — same `data-td-group` targets (`"post"` /
+  `"reply-@r.Id"`), same `td-variant` container shape (original default-visible +
+  hidden per-translation), same original-chip-first row, same exclusion
+  (`missingLanguages` post / inline reply), and the same TD7 soft-delete gating.
+- **Group-lane routes preserved:** the add-lane forms post to
+  `/groups/{Model.GroupId}/posts/{postId}/translations` and
+  `/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations` — the
+  group route actions and `Model.GroupId` are the **only** divergence from U03.
+- **No deliberate divergence** beyond those routes / `GroupId` (the community
+  view's `<h4>`-first order and "None yet" states were dropped here, exactly as
+  in U03 — no other drift).
+- **Shared contract confirmed:** both lanes now render the identical
+  `data-translation-chip` + `data-td-group` + `data-td-variant` set U05's
+  `translation-swap.ts` toggles against.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4). No drift pause.
