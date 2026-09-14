@@ -890,6 +890,7 @@ public sealed class PostService
             Title = draft.Title,
             Body = draft.Body,
             Audience = new Audience(),  // G·8 — written non-null **empty**; never authored here.
+            ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer (the U05 group-post create wiring); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };

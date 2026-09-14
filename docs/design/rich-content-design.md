@@ -147,6 +147,45 @@ be confirmed from the code, the unit that touches it records it here in a
 `§Pinned contract amendment (U<m>)` sub-line — an **append-only** amendment,
 the only permitted post-U01 edit to this section.
 
+> **`§Pinned contract amendment (U05)`** — the three composer write-path
+> binding points, confirmed by U05's entry reads (append-only; the only
+> permitted post-U01 edit to this section):
+>
+> 1. **Announcement draft shape = the `Announcement` POCO itself (no
+>    `*Draft` record).** Both the create and edit write actions in
+>    `Kumunita.Web/Controllers/AnnouncementController.cs` —
+>    `New` (`POST /announcements/new`) and `Edit` (`POST
+>    /announcements/{id}/edit`) — build the `new Announcement { … }` POCO
+>    directly and pass it to `IAnnouncementService.CreateAsync` /
+>    `UpdateAsync`. R·3 population is the single shared seam in both:
+>    `ImageIds = ContentImageIds.ExtractContentImageIds(model.Body)`. There
+>    is **no** `AnnouncementDraft` record — the announcement lane (ADR 0018)
+>    writes the POCO verbatim.
+> 2. **`LocalizedPage` (static-page) write path = `ILocalizationService.
+>    UpsertPageAsync` (impl `Kumunita.Core.Localization.LocalizationService`),
+>    reached through `Kumunita.Web/Controllers/LanguagesController.SavePage`
+>    (`POST /admin/languages/{code}/pages/{slug}`).** This **corrects** the
+>    design doc's earlier assumption that the static-page write service is
+>    `ITranslationProvider` — that type is the **serving-route read seam**
+>    (`FindPageByImageIdAsync`, confirmed by U03); the **write** seam is the
+>    discrete-field `ILocalizationService.UpsertPageAsync`, which U05
+>    extended with a trailing source-compatible `IReadOnlyList<string>?
+>    imageIds = null` (coalesced to `[]` in both the create and update
+>    branches). `LanguagesController.SavePage` supplies
+>    `ContentImageIds.ExtractContentImageIds(body)`.
+> 3. **Group-post create wiring confirmed (U05's surface, was U04 (b) inert).**
+>    `Kumunita.Web/Controllers/GroupsController.CreateGroupPost` builds
+>    `new GroupPostDraft( … , ImageIds: ContentImageIds.
+>    ExtractContentImageIds(model.Body) )`, and
+>    `Kumunita.Core.Posts.PostService.CreateGroupPostAsync`'s `new Post { … }`
+>    gained `ImageIds = draft.ImageIds ?? []` — the `GroupPostDraft.ImageIds`
+>    record field U04 added (source-compatible, inert) is now populated on the
+>    write. **The group-post *edit* lane is deferred** (see the U05 drift
+>    pause — `UpdateGroupPostAsync` takes discrete fields, not a draft).
+>
+> `Announcement.ImageIds` is **present from U03** (the 2nd additive field,
+> after ADR 0018's `LanguageCode`) — **not** added here.
+
 ### The serving route (U03)
 
 ```csharp

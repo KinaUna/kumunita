@@ -150,8 +150,17 @@ public interface ILocalizationService
     Task<LocalizedPage?> GetPageAsync(string slug, string languageCode);
 
     /// <summary>Upserts one static page — audited <c>page.save</c>, TargetId =
-    /// slug (M·6). <see cref="LocalizedPage.Updated"/> is set to server time.</summary>
-    Task UpsertPageAsync(string slug, string languageCode, string title, string body, string actorId);
+    /// slug (M·6). <see cref="LocalizedPage.Updated"/> is set to server time.
+    /// <para>
+    /// <b>RC U05 (R·3):</b> <paramref name="imageIds"/> is the content-image ids
+    /// parsed server-side by the Web save action from the page body's
+    /// <c>/content-image/{id}</c> links (the body is the source of truth — the
+    /// client never sends the ids). A <c>null</c> value is coalesced to the
+    /// doc's non-null empty list, so the pre-RC positional call sites keep
+    /// compiling unchanged (source-compatible trailing parameter).
+    /// </para>
+    /// </summary>
+    Task UpsertPageAsync(string slug, string languageCode, string title, string body, string actorId, IReadOnlyList<string>? imageIds = null);
 
     // ── Completeness — read ─────────────────────────────────────────
     /// <summary>The per-language completeness view (M·12 FACES) — which UI keys and

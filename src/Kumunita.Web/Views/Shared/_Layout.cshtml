@@ -1,9 +1,19 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1c4532" />
+    @* RC U05 (drift pause e, resolved): the anti-forgery token for the fetch-based
+       page modules (client/lib/api.ts). api.ts reads <meta name="anti-forgery-token">
+       and sends it in the RequestVerificationToken header — the header [ValidateAntiForgeryToken]
+       accepts by convention. The value is the RequestToken from the same IAntiforgery
+       that @Html.AntiForgeryToken() on every existing form draws on, so the upload fetch
+       (POST /content-image) is CSRF-aware. (GetAndStoreTokens is the canonical way to get the
+       bare token string in a model-less layout; the avatar lane never needed this because it
+       form-POSTs, but the content-image upload is the first fetch-based consumer.) *@
+    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
     <title>@ViewData["Title"] - Kumunita</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

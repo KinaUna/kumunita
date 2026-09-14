@@ -40,12 +40,29 @@
     <div class="mb-3">
         <label for="body" class="form-label">Body (Markdown)</label>
         <textarea class="form-control font-monospace" name="body" id="body"
-                  rows="16" style="min-height: 12rem;">@Model.Body</textarea>
+                  rows="16" style="min-height: 12rem;" data-image-target>@Model.Body</textarea>
+        <div class="rc-insert-image mt-2">
+            <input type="file"
+                   accept="image/jpeg,image/png,image/webp,image/gif"
+                   data-insert-image />
+            <span data-insert-image-error class="text-danger small d-block mt-1" style="min-height:1em;"></span>
+        </div>
         <div class="form-text small">
             Supports: headings (#), paragraphs, lists (-), **bold**, *italic*,
-            `code`, [links](url), fenced code blocks. Raw HTML is escaped.
+            `code`, [links](url), ![image](/content-image/…), fenced code blocks.
+            Raw HTML is escaped. Pick a photo to embed it in the body as a
+            Markdown image link.
         </div>
     </div>
 
     <button type="submit" class="btn btn-primary">Save page</button>
 </form>
+
+@section Scripts {
+    @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
+       SECURITY.md §6: no inline <script>; self-wires the
+       input[data-insert-image] + textarea[data-image-target] pair above.
+       Upload is CSRF-aware via client/lib/api.ts + the layout's
+       <meta name="anti-forgery-token"> (drift pause e, resolved U05). *@
+    <script type="module" src="~/js/lib/insert-image.js"></script>
+}

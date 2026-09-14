@@ -326,6 +326,8 @@ public sealed class AnnouncementController(
                     CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
                     // ADR 0018 — empty ⇒ the service's ResolveLanguageCodeAsync materializes the instance default at write time (Announcement.LanguageCode is a non-nullable string).
                     LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
+                    // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
+                    ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -444,6 +446,8 @@ public sealed class AnnouncementController(
                     CommunityId = string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId,
                     // ADR 0018 — empty ⇒ the service's ResolveLanguageCodeAsync materializes the instance default; the announcement edit lane is not ADR-frozen, so the tag is editable here.
                     LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
+                    // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids.
+                    ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
                 },
                 actorId:    actorId,
                 actorRoles: RoleSet(User),

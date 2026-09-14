@@ -967,7 +967,9 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             GroupId: id,
             Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
             Body: model.Body.Trim(),
-            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode); // ADR 0018 — null/empty ⇒ instance default.
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body) // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (drift pause b: the U04 field was inert, now wired).
+        );
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the service's

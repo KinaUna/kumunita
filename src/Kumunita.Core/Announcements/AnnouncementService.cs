@@ -284,6 +284,7 @@ public sealed class AnnouncementService : IAnnouncementService
         existing.Pinned = updated.Pinned;
         existing.CommunityId = updated.CommunityId;
         existing.LanguageCode = updatedLanguageCode; // ADR 0018
+        existing.ImageIds = updated.ImageIds ?? []; // RC U05 (R·3) — the announcement edit lane persists the server-side-parsed content-image ids (POCO-direct: the Web layer parses the body, Core writes it verbatim — the same field-copy shape as the six above; null-coalesce to the POCO's non-null empty list).
         if (changed)
             existing.Modified = DateTimeOffset.UtcNow;
 

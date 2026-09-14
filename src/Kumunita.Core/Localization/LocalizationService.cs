@@ -592,7 +592,7 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
-    public async Task UpsertPageAsync(string slug, string languageCode, string title, string body, string actorId)
+    public async Task UpsertPageAsync(string slug, string languageCode, string title, string body, string actorId, IReadOnlyList<string>? imageIds = null)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -616,6 +616,7 @@ public sealed class LocalizationService : ILocalizationService
                 LanguageCode = languageCode,
                 Title = title,
                 Body = body,
+                ImageIds = imageIds ?? [], // RC U05 (R·3) — the static-page write lane persists the server-side-parsed content-image ids (null-coalesce to the doc's non-null empty list).
                 Updated = now
             });
         }
@@ -623,6 +624,7 @@ public sealed class LocalizationService : ILocalizationService
         {
             existing.Title = title;
             existing.Body = body;
+            existing.ImageIds = imageIds ?? []; // RC U05 (R·3) — re-parsed from the (re-)edited body on every save; a body with no image links resets to empty.
             existing.Updated = now; // server time (design doc §Pinned contract §3)
             session.Store(existing);
         }

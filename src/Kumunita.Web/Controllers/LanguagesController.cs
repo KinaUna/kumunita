@@ -264,7 +264,12 @@ public sealed class LanguagesController(
             return RedirectToAction(nameof(Index));
 
         var actor = ActorId(User) ?? string.Empty;
-        await localization.UpsertPageAsync(slug, code, title ?? string.Empty, body ?? string.Empty, actor);
+        // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links
+        // into the LocalizedPage.ImageIds the service persists; the client never
+        // sends the ids (a form field would be spoofable). Same shared helper the
+        // announcement + group-post write lanes use (one seam, no copy-paste).
+        var imageIds = ContentImageIds.ExtractContentImageIds(body);
+        await localization.UpsertPageAsync(slug, code, title ?? string.Empty, body ?? string.Empty, actor, imageIds);
         TempData["info"] = $"Page “{slug}” in “{code}” saved (visible on the next request).";
         return RedirectToAction(nameof(PreviewPage), new { code, slug });
     }
