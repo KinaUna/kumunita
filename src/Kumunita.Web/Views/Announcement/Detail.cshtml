@@ -1,5 +1,6 @@
 @model Kumunita.Web.Models.AnnouncementDetailViewModel
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Announcement" : Model.Title;
 
@@ -64,9 +65,9 @@
         <div class="card">
             <div class="card-body">
                 @* The full body (the /announcements list shows the first 250
-                   characters and links here). Plain text — same treatment as
-                   the list rows; preserve the author's line breaks. *@
-                <div class="text-body whitespace-pre-line">@Model.Body</div>
+                   characters and links here). Rendered through the one
+                   MarkdownRenderer (R·1) — the raw-text treatment is retired. *@
+                <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
             </div>
             @* Author avatar (the Directory pattern): the <img> links the audited
                serving lane (GET /profile/avatar/{subjectId}) and on its

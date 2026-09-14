@@ -1,5 +1,6 @@
 @model Kumunita.Web.Models.AnnouncementIndexViewModel
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
@@ -79,7 +80,7 @@
                                         <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })" class="text-body">@a.Title</a>
                                     </h5>
                                     <div class="text-body">
-                                        @(a.Body.Length > 250 ? a.Body[..250].TrimEnd() + "…" : a.Body)
+                                        @MarkdownRenderer.PlainTextPreview(a.Body, 250)
                                         <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
                                     </div>
                                     <div class="d-flex align-items-center gap-2 text-muted small mt-1">

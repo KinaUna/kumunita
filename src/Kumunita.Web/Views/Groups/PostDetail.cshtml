@@ -1,4 +1,5 @@
 @model Kumunita.Web.Models.GroupPostDetailViewModel
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = Model.Post.Title ?? "Post";
     string postId = Model.Post.Id;
@@ -60,7 +61,7 @@
                     <h4>
                         @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                             ? Model.Post.Title
-                            : (Model.Post.Body.Length <= 80 ? Model.Post.Body : Model.Post.Body[..80] + "…"))
+                            : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
                     </h4>
                     <div class="d-flex align-items-center gap-2 text-muted small mb-3">
                         <span class="d-inline-flex align-items-center">
@@ -77,8 +78,8 @@
                         </span>
                     </div>
 
-                    <div class="mb-3">
-                        @Model.Post.Body
+                    <div class="mb-3 rc-body">
+                        @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
                     </div>
                 }
                 else
@@ -128,7 +129,7 @@
                                     {
                                         <h5 class="mt-1">@t.Title</h5>
                                     }
-                                    <div style="white-space:pre-wrap;">@t.Body</div>
+                                    <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
                                 </div>
                             </details>
                         }
@@ -226,7 +227,7 @@
                                 {
                                     <details class="mb-1">
                                         <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
-                                        <div class="ms-2" style="white-space:pre-wrap;">@t.Body</div>
+                                        <div class="ms-2 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
                                     </details>
                                 }
                                 @if (r.CanTranslate)
@@ -258,7 +259,7 @@
                         <div class="d-flex justify-content-between align-items-start">
                             @if (r.DeletedAt is null)
                             {
-                                <div class="pe-3" style="white-space:pre-wrap;">@r.Body</div>
+                                <div class="pe-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
                             }
                             else
                             {

@@ -264,10 +264,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         foreach (var post in feed.Visible)
         {
             var profile = await userInfo.GetProfileAsync(post.AuthorId);
-            const int previewLength = 200;
-            var preview = post.Body.Length <= previewLength
-                ? post.Body
-                : post.Body[..previewLength].TrimEnd() + "…";
+            var preview = MarkdownRenderer.PlainTextPreview(post.Body, 200);
             groupPosts.Add(new PostListItem(
                 post.Id,
                 post.Title,

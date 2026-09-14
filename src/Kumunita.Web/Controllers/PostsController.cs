@@ -154,10 +154,7 @@ public sealed class PostsController(
             // feed's <c>Post</c> count is small by design — a
             // neighborhood, not a firehose).
             var profile = await userInfo.GetProfileAsync(post.AuthorId);
-            const int previewLength = 200;
-            var preview = post.Body.Length <= previewLength
-                ? post.Body
-                : post.Body[..previewLength].TrimEnd() + "…";
+            var preview = MarkdownRenderer.PlainTextPreview(post.Body, 200);
             items.Add(new PostListItem(
                 post.Id,
                 post.Title,
@@ -242,10 +239,7 @@ public sealed class PostsController(
         foreach (var post in feed.Visible)
         {
             var profile = await userInfo.GetProfileAsync(post.AuthorId);
-            const int previewLength = 200;
-            var preview = post.Body.Length <= previewLength
-                ? post.Body
-                : post.Body[..previewLength].TrimEnd() + "…";
+            var preview = MarkdownRenderer.PlainTextPreview(post.Body, 200);
             items.Add(new PostListItem(
                 post.Id,
                 post.Title,

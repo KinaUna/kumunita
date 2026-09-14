@@ -722,3 +722,68 @@ body.kmb-page-fullbleed {
   height: 72px;
   font-size: 1.5rem;
 }
+
+/* --- Rich-content bodies (RC U06) ------------------------------------------
+   Every UGC body (post / group-post / announcement + replies + translations)
+   renders through the one MarkdownRenderer (R·1) into this container. The
+   .markdown static-page wrapper carries no rules of its own, so this block
+   gives the UGC bodies the site's base typography (Lora body serif, the site's
+   type scale, the ink-tinted neutrals + radius tokens) plus the RC image
+   sizing. Boring: no shadows, no new palette. */
+.rc-body {
+  line-height: var(--bs-body-line-height);
+  overflow-wrap: break-word;
+}
+.rc-body > * + * {
+  margin-top: 0.75em;
+}
+.rc-body h1,
+.rc-body h2,
+.rc-body h3,
+.rc-body h4,
+.rc-body h5,
+.rc-body h6 {
+  font-family: var(--bs-heading-font-family);
+  font-weight: var(--bs-heading-font-weight);
+  line-height: var(--bs-heading-line-height);
+  margin-top: 1.25em;
+  margin-bottom: 0.375em;
+}
+.rc-body ul,
+.rc-body ol {
+  padding-left: 1.5rem;
+}
+.rc-body li + li {
+  margin-top: 0.25em;
+}
+.rc-body code {
+  font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  background-color: rgba(31, 42, 37, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: var(--bs-border-radius-sm);
+}
+.rc-body pre {
+  background-color: rgba(31, 42, 37, 0.05);
+  border: 1px solid var(--kmb-border);
+  padding: 0.625em 0.875em;
+  border-radius: var(--bs-border-radius);
+  overflow-x: auto;
+}
+.rc-body pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.rc-body a {
+  text-underline-offset: 2px;
+}
+
+/* RC image (the U02 emission <img … class="rc-image" loading="lazy" /> carries
+   no width/height — CSS owns sizing). Register-pinned values. */
+.rc-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5rem 0;
+  display: block;
+}

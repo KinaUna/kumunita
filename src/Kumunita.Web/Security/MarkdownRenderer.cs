@@ -34,6 +34,16 @@ namespace Kumunita.Web.Security;
 public static class MarkdownRenderer
 {
     /// <summary>
+    /// The single image/link pattern the renderer uses to extract
+    /// <c>![alt](src)</c> and <c>[label](url)</c> in one document-order pass.
+    /// Group 1 is the optional <c>!</c> (image), group 2 the alt/label, group
+    /// 3 the src/url. <b>One pattern, two consumers</b> — <see cref="Inline"/>
+    /// (the HTML pass) and <see cref="PlainTextPreview"/> (the text pass) both
+    /// reference this constant so the two can never drift apart.
+    /// </summary>
+    private const string ImageOrLinkPattern = @"(!?)\[([^\]]*)\]\(([^)\s]+)\)";
+
+    /// <summary>
     /// Renders a Markdown string to an HTML fragment. Safe to embed in a
     /// <c>&lt;div class="markdown"&gt;</c> container (the U6 static-page view
     /// wraps the output this way). Returns an empty string for null/empty
@@ -149,6 +159,75 @@ public static class MarkdownRenderer
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Strips a Markdown body to a single-line plain-text preview — the
+    /// <c>BodyPreview</c> feed/list surface ("what's it about"). This is
+    /// <see cref="RenderHtml"/>'s <b>text inverse</b>: the same seven-step
+    /// strip order (the RC pinned contract) the renderer uses, so a preview
+    /// never leaks a <c>**</c> / <c>#</c> / <c>![alt]</c> artifact — a body
+    /// that is valid Markdown still previews as clean prose.
+    /// <para>
+    /// <b>Strip order (pinned; each step before the next):</b>
+    /// <list type="number">
+    /// <item><c>![alt](src)</c> → <c>alt</c> (the shared <see cref="ImageOrLinkPattern"/>)</item>
+    /// <item><c>[label](url)</c> → <c>label</c> (the shared <see cref="ImageOrLinkPattern"/>)</item>
+    /// <item>inline markers <c>**</c> / <c>*</c> / <c>`</c> stripped (the text between stays)</item>
+    /// <item>heading <c>#</c>s stripped</item>
+    /// <item>list markers (<c>- </c> / <c>* </c> / <c>N. </c>) stripped</item>
+    /// <item>all whitespace (incl. newlines) collapsed to a single space; trimmed</item>
+    /// <item>truncated to <paramref name="maxLen"/> on a space boundary + <c>…</c></item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Returns <b>text</b>, not HTML — the Razor <c>@</c> interpolation
+    /// encodes it. The helper does <b>not</b> HTML-escape (a call site must
+    /// not <c>Html.Raw</c> the result — that is a drift pause, not a silent
+    /// choice). <c>null</c> / empty input → <c>""</c>.
+    /// </para>
+    /// </summary>
+    public static string PlainTextPreview(string? markdown, int maxLen = 200)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+            return string.Empty;
+
+        var s = markdown;
+
+        // Steps 1 + 2 — a single document-order pass on the renderer's own
+        // image/link pattern (the shared ImageOrLinkPattern constant, so the
+        // preview and the HTML pass can never drift): image → alt, link →
+        // label. Both forms carry the desired text in group 2. The one-pass
+        // shape mirrors Inline()'s so an image's [alt](src) is never
+        // double-consumed as a link.
+        s = System.Text.RegularExpressions.Regex.Replace(s, ImageOrLinkPattern,
+            m => m.Groups[2].Value);
+
+        // Step 3 — inline markers only; the text between them stays.
+        s = s.Replace("**", string.Empty);
+        s = s.Replace("*", string.Empty);
+        s = s.Replace("`", string.Empty);
+
+        // Step 4 — heading #s (per line).
+        s = System.Text.RegularExpressions.Regex.Replace(s,
+            @"^#{1,6}\s*", string.Empty, System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Step 5 — list markers (per line); indentation is preserved.
+        s = System.Text.RegularExpressions.Regex.Replace(s,
+            @"^(\s*)([-*]|\d+\.)(\s+)", "$1", System.Text.RegularExpressions.RegexOptions.Multiline);
+
+        // Step 6 — collapse all whitespace (incl. newlines) to a single space.
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ").Trim();
+
+        // Step 7 — truncate to maxLen on a space boundary + … (never mid-word).
+        if (s.Length <= maxLen)
+            return s;
+
+        var cut = s[..maxLen];
+        var lastSpace = cut.LastIndexOf(' ');
+        if (lastSpace > 0)
+            cut = cut[..lastSpace];
+        return cut.TrimEnd() + "…";
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────
 
     private static (int level, string content)? MatchHeading(string line)
@@ -180,8 +259,7 @@ public static class MarkdownRenderer
     {
         var result = new System.Text.StringBuilder();
         var lastEnd = 0;
-        var refRe = new System.Text.RegularExpressions.Regex(
-            @"(!?)\[([^\]]*)\]\(([^)\s]+)\)");
+        var refRe = new System.Text.RegularExpressions.Regex(ImageOrLinkPattern);
 
         foreach (System.Text.RegularExpressions.Match m in refRe.Matches(input))
         {
