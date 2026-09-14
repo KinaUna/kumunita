@@ -659,6 +659,17 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await using var session = store.OpenSession(new SessionOptions());
 
+        // GU gate (ADR 0028 §C / G·2): a supervised child — one with an active
+        // GuardianLink — may NOT self-accept. Read-only (no mutation); the
+        // approval must come from their guardian via ApproveGroupInvitationAsync.
+        var supervised = await session.Query<GuardianLink>()
+            .Where(l => l.ChildId == actorId && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (supervised is not null)
+            throw new InvalidOperationException(
+                $"Account {actorId} is supervised; a group invitation must be approved by their guardian (see ApproveGroupInvitationAsync).");
+
         var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
         if (group is null)
             throw new InvalidOperationException($"Group not found: {groupId}");
@@ -728,6 +739,95 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await session.SaveChangesAsync().ConfigureAwait(false);
         return;
+    }
+
+    /// <inheritdoc />
+    public async Task<GroupInvitation> ApproveGroupInvitationAsync(string groupId, string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new ArgumentException("Group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate (G·2 live / G·3 deny-by-default): an ACTIVE link for
+        // this exact (guardian, child) pair — the G3_NonChildTargetIsRefused
+        // precondition. No link ⇒ refused (the Web's 404).
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // Precondition: a PENDING invitation on the CHILD (keyed on childId —
+        // distinct from the no-standing gate above).
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No group invitation for {childId} in group {groupId}");
+
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be approved.");
+
+        // The accept write path, reused verbatim — the membership lands exactly
+        // as AcceptGroupInvitationAsync writes it; the only differences are the
+        // child-keyed row, ResolvedBy = the guardian, and the audit verb/Via.
+        row.Status = InvitationStatus.Accepted;
+        row.ResolvedAt = now;
+        row.ResolvedBy = guardianId;
+        session.Store(row);
+
+        var membership = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId && m.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            membership = new GroupMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = childId,
+                AddedBy = guardianId,
+                At = now
+            };
+        }
+        else
+        {
+            membership.AddedBy = guardianId;
+            membership.At = now;
+        }
+
+        session.Store(membership);
+
+        // Guardian approval audit: the guardian's standing (all three
+        // identities the guardian; the target is the group).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "group.invite.approve",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
     }
 
     /// <inheritdoc />

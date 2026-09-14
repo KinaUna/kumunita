@@ -692,15 +692,30 @@ public interface IUserInfoService
     /// <c>TargetKind</c> "group", <see cref="Authorization.AccessVia.Owner"/> —
     /// the invitee's own standing; effective principal = the invitee).
     /// </summary>
-    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3), or the invitee is a supervised child with an active <see cref="GuardianLink"/> (GU gate — ADR 0028 §C / invariant G·2: their guardian must call <see cref="ApproveGroupInvitationAsync"/> instead).</exception>
     Task AcceptGroupInvitationAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// GU (ADR 0028): a **guardian** approves a **supervised child's** pending
+    /// group invitation — the accept write path (the membership lands) with the
+    /// **guardian** recorded as <c>ResolvedBy</c> and the audit row
+    /// <c>group.invite.approve</c> <c>Via: Guardian</c> (G·2). Precondition: an
+    /// **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> invitation on the child; a child with no active link is
+    /// refused (they use the self-lane
+    /// <see cref="AcceptGroupInvitationAsync"/> instead).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/> for this (guardian, child) pair (G·3 deny-by-default — the Web surfaces a 404).</exception>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, child) pair, or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    Task<GroupInvitation> ApproveGroupInvitationAsync(string groupId, string childId, string guardianId);
 
     /// <summary>
     /// Resolve a pending invitation as <b>Declined</b> — the same self-lane and
     /// audit shape as <see cref="AcceptGroupInvitationAsync"/> (action
     /// <c>group.invite.decline</c>, <see cref="Authorization.AccessVia.Owner"/>),
     /// but <b>no</b> <see cref="GroupMembership"/> row is written — the invitee
-    /// simply never becomes a member.
+    /// simply never becomes a member. A supervised child may <b>always</b> say
+    /// no — this lane gets no GU gate (ADR 0028 §C).
     /// </summary>
     /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
     Task DeclineGroupInvitationAsync(string groupId, string actorId);
