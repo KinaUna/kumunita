@@ -644,10 +644,10 @@ content (G·1).
   deployable. Restore: `pg_dump` of the single Postgres captures the
   `GuardianLink` rows with the rest (OPS.md).
 - **The trio moves together** (AGENTS.md contract): `README.md` Features +
-  Roadmap gains the `GU` named lane; `Milestones.cs` gains the `GU` entry
-  (`StatusNext`, with `M4` moving to `StatusPlanned` — the single-in-progress
-  invariant preserved); `MilestonesTests.cs` is updated in the same commit so
-  the build catches a forgotten sync.
+  Roadmap carries `GU` as **Done**; `Milestones.cs` has `GU` as `StatusDone`
+  with `M4` now the single `StatusNext` (the single-in-progress invariant
+  preserved); `MilestonesTests.cs` is updated in the same commit so the build
+  catches a forgotten sync.
 
 ## Risks
 

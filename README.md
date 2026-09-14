@@ -43,8 +43,8 @@ renderer extension (`![alt](src)` under a stricter `src` allowlist), the
 resource, Deny → 404 not 403, one `Read` audit row), the `POST /content-image`
 upload lane (ADR 0011's boundary verbatim), and the composer control on all
 four surfaces.
-**Next is GU** — guardian controls, the account-scope supervision of a child's
-account (ADR 0028); **then M4** — events, RSVPs, reminders (per the roadmap
+**GU is done** — guardian controls, the account-scope supervision of a child's
+account (ADR 0028); **next is M4** — events, RSVPs, reminders (per the roadmap
 table in `docs/ARCHITECTURE.md`); **M5**: projects.
 
 ## Principles
@@ -175,8 +175,8 @@ stays trivial and the authorization rules can grow freely.
 - **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**
 - **Rich content** (`RC`, ADR 0025) — Markdown bodies + in-content images on posts, replies, announcements & static pages. **Done.**
 - **Translation display** (`TD`, ADR 0027) — the authored-in language (ADR 0018) is the first, default-visible variant chip on the post/reply detail surface (both lanes); added translations are clickable chips that swap the title+body / body in place; the "add a …" lane excludes the authored-in language; soft-deleted rows show no swap. Display-only — no data, schema, or auto-translation change. **Done.**
-- **Guardian controls** (`GU`, ADR 0028) — a parent adds an account for a child and supervises it at the account level: suspend/lock, curate the child's community & group memberships, and approve a group invitation sent to the child — with **no standing to read the child's private content**; the child's account is handed over to independence when the child comes of age. **Next.**
-- **M4** — Events, RSVPs, reminders. *(planned)*
+- **Guardian controls** (`GU`, ADR 0028) — a parent adds an account for a child and supervises it at the account level: suspend/lock, curate the child's community & group memberships, and approve a group invitation sent to the child — with **no standing to read the child's private content**; the child's account is handed over to independence when the child comes of age. **Done.**
+- **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
 

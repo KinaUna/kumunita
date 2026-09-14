@@ -31,8 +31,8 @@ public static class Milestones
         new("DF", "Date & time format — platform default (admin) + per-resident override + custom; timestamps rendered in the effective format (ADR 0020)", StatusDone),
         new("TR", "Translator role — delegate translation editing to non-admin residents; UI strings + static pages open to GlobalAdmin ∪ Translator (ADR 0021)", StatusDone),
         new("RC", "Rich content — Markdown bodies + in-content images on posts, replies, announcements & static pages (ADR 0025)", StatusDone),
-        new("GU", "Guardian controls — a parent adds a child's account and supervises it at the account level (suspend, communities/groups, invitation approval); no standing to read the child's private content (ADR 0028)", StatusNext),
-        new("M4", "Events, RSVPs & reminders", StatusPlanned),
+        new("GU", "Guardian controls — a parent adds a child's account and supervises it at the account level (suspend, communities/groups, invitation approval); no standing to read the child's private content (ADR 0028)", StatusDone),
+        new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),
     };
