@@ -265,7 +265,11 @@
                                        unchanged. *@
                                     @if (r.CanTranslate)
                                     {
-                                        @foreach (var lang in Model.Languages.Where(l => !l.HasTranslation && l.Code != r.OriginalLanguageCode))
+                                        @* Drive "has a translation yet" from the reply's own
+                                           r.Translations rows (not the post's l.HasTranslation),
+                                           so a post's translation never suppresses a reply's
+                                           add-lane. The authored-in language stays excluded. *@
+                                        @foreach (var lang in Model.Languages.Where(l => l.Code != r.OriginalLanguageCode && !r.Translations.Any(t => t.LanguageCode == l.Code)))
                                         {
                                             <details class="mb-1">
                                                 <summary class="btn btn-sm btn-link p-0 text-decoration-none">
