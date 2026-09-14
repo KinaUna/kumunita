@@ -193,6 +193,19 @@ response `Json(new { id = stored.Id })`.
 | Announcement owner | `Task<Announcement?> IAnnouncementService.FindByImageIdAsync(string mediaId)` (added to the interface — a read seam, ADR 0006-E lane) |
 | `LocalizedPage` owner | **Not pinned here** — the owning service is confirmed by U03's entry reads (which type owns `GetPageAsync`); recorded in a `§Pinned contract amendment (U03)` sub-line if the name differs from the obvious candidate |
 
+> **`§Pinned contract amendment (U03)`** — the `LocalizedPage`-owning service
+> read seam is **`ITranslationProvider`** (impl `TranslationProvider`,
+> `Kumunita.Core.Localization`), confirmed by U03's entry reads:
+> `StaticPagesController`'s ctor (the plan's tie-break) injects
+> `ITranslationProvider` and reads pages through
+> `ITranslationProvider.GetPageAsync`. The `LocalizedPage` reverse-lookup seam
+> is therefore `Task<LocalizedPage?>
+> ITranslationProvider.FindPageByImageIdAsync(string mediaId)` (added to the
+> interface + its implementation). This **matches** the obvious candidate the
+> design doc's own `ContentImageController` signature names (`ITranslationProvider
+> pages`) — recorded here to close the "Not pinned here" row per the
+> append-only amendment mechanism (the only permitted post-U01 edit).
+
 ### The renderer image rule (U02)
 
 The `src` predicate's **pinned name**: `IsSafeImageSrc(string src)`.

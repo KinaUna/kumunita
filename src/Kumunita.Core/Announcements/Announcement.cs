@@ -87,4 +87,21 @@ public sealed class Announcement
 
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }
+
+    // RC U03 content-image ADD (ADR 0004 §B.1 additive — the 2nd additive
+    // Announcement field after ADR 0018's LanguageCode; the design doc's
+    // "1st additive" ordinal is corrected to 2nd per the actual field order —
+    // ADR 0018's LanguageCode is the 1st additive on this POCO, so this is the
+    // 2nd; the ordinal is documentation, not behavior):
+    /// <summary>
+    /// The content images referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/content-image/{id}</c> links in
+    /// the rendered body (RC R·3). Populated server-side by the owning write
+    /// lane (RC U04/U05); the serving route's reverse lookup
+    /// (<see cref="IAnnouncementService.FindByImageIdAsync"/>) reads this
+    /// (RC R·4). The 2nd additive field after <see cref="LanguageCode"/>
+    /// (ADR 0018) (ADR 0004 §B.1 — additive, delta-detected, idempotent, no
+    /// seed reset; RC R·7).
+    /// </summary>
+    public IReadOnlyList<string> ImageIds { get; set; } = [];
 }

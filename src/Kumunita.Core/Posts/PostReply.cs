@@ -59,4 +59,20 @@ public sealed class PostReply
     /// (ADR 0004 §B.1); no seed reset, no schema-file change.
     /// </summary>
     public DateTimeOffset? DeletedAt { get; set; }
+
+    // RC U03 content-image ADD (ADR 0004 §B.1 additive — the 4th additive
+    // PostReply field after ADR 0016's Modified, ADR 0018's LanguageCode,
+    // ADR 0024's DeletedAt):
+    /// <summary>
+    /// The content images referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/content-image/{id}</c> links in
+    /// the rendered body (RC R·3). Populated server-side by the owning write
+    /// lane (RC U04/U05); the serving route's reverse lookup
+    /// (<see cref="PostService.FindReplyByImageIdAsync"/>) reads this (RC R·4).
+    /// The 4th additive field after <see cref="Modified"/> (ADR 0016),
+    /// <see cref="LanguageCode"/> (ADR 0018), <see cref="DeletedAt"/> (ADR 0024)
+    /// (ADR 0004 §B.1 — additive, delta-detected, idempotent, no seed reset;
+    /// RC R·7).
+    /// </summary>
+    public IReadOnlyList<string> ImageIds { get; set; } = [];
 }

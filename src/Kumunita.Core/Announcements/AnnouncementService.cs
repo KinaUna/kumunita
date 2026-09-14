@@ -465,4 +465,28 @@ public sealed class AnnouncementService : IAnnouncementService
                 $"Only a GlobalAdmin or a moderator of community '{existing.CommunityId}' may edit that community's announcement.");
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first announcement
+    /// (by <c>Created</c> ascending) whose <see cref="Announcement.ImageIds"/>
+    /// contains <paramref name="mediaId"/> — the serving route's owner
+    /// resolution. **Un-audited** (RC R·5); announcements are not
+    /// audience-restricted, so there is no <c>AccessAudit</c> lane on this
+    /// bounded context (the same "no audit row" reasoning as
+    /// <see cref="ListVisibleAsync"/>). Null when no announcement references
+    /// the id (the route 404s). Read-only — no write lane, no <c>actorId</c>.
+    /// </summary>
+    public async Task<Announcement?> FindByImageIdAsync(string mediaId)
+    {
+        ArgumentNullException.ThrowIfNull(mediaId);
+        if (mediaId.Length == 0) return null;
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Announcement>()
+            .Where(a => a.ImageIds.Contains(mediaId))
+            .OrderBy(a => a.Created)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
 }

@@ -15,4 +15,19 @@ public sealed class LocalizedPage
     public string Title { get; set; } = string.Empty;         // the page's rendered title
     public string Body { get; set; } = string.Empty;          // Markdown (the single page engine)
     public DateTimeOffset Updated { get; set; }               // last admin edit
+
+    // RC U03 content-image ADD (ADR 0004 §B.1 additive — the 1st additive
+    // LocalizedPage field; the existing set is Id/Slug/LanguageCode/Title/
+    // Body/Updated — note LanguageCode here is a base business-key field, not
+    // an additive):
+    /// <summary>
+    /// The content images referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/content-image/{id}</c> links in
+    /// the rendered body (RC R·3). Populated server-side by the owning write
+    /// lane (RC U05); the serving route's reverse lookup
+    /// (<see cref="ITranslationProvider.FindPageByImageIdAsync"/>) reads this
+    /// (RC R·4). The 1st additive field (ADR 0004 §B.1 — additive,
+    /// delta-detected, idempotent, no seed reset; RC R·7).
+    /// </summary>
+    public IReadOnlyList<string> ImageIds { get; set; } = [];
 }

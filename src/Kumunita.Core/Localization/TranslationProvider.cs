@@ -183,4 +183,19 @@ public sealed class TranslationProvider : ITranslationProvider
         }
         return null; // M·2: truly absent in every language → the Web renders a 404.
     }
+
+    /// <inheritdoc />
+    public async Task<LocalizedPage?> FindPageByImageIdAsync(string mediaId)
+    {
+        if (string.IsNullOrEmpty(mediaId))
+            throw new ArgumentException("A media id is required.", nameof(mediaId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<LocalizedPage>()
+            .Where(p => p.ImageIds.Contains(mediaId))
+            .OrderBy(p => p.Updated)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
 }

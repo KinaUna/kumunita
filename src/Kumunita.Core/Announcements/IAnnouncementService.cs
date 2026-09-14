@@ -106,7 +106,16 @@ public interface IAnnouncementService
         string actorId,
         IReadOnlySet<string> actorRoles,
         IDocumentSession session);
-
+    /// <summary>
+    /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first
+    /// <see cref="Announcement"/> (by <c>Created</c> ascending) whose
+    /// <see cref="Announcement.ImageIds"/> contains <paramref name="mediaId"/>
+    /// — the serving route's owner resolution. **Un-audited** (RC R·5); null
+    /// when no announcement references the id (the route 404s). See
+    /// <see cref="AnnouncementService.FindByImageIdAsync"/> for the full
+    /// contract.
+    /// </summary>
+    Task<Announcement?> FindByImageIdAsync(string mediaId);
     /// <summary>
     /// Deletes an <see cref="Announcement"/> in the <b>caller's</b> in-flight
     /// session (invariant C3). Hard delete (no soft-hidden state). A missing id
