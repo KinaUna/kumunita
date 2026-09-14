@@ -56,3 +56,17 @@
   EqualsPostAuthoredIn` · `PostDetail_OriginalNotAmongAddedTranslationCodes`.
 - **ADR decisions:** (a) authored-in = first-class variant + explicit-click swap (ADR 0005 §C);
   (b) `LanguageOption` untouched, code carried additively. **Amends: 0018.** No drift pause.
+
+## U02 — projection ADDs
+
+- **3 ADDs:** `PostDetailViewModel.OriginalLanguageCode` (additive property) ·
+  `GroupPostDetailViewModel.OriginalLanguageCode` (additive property) ·
+  `ReplyItem.OriginalLanguageCode` (**11th positional**, after `DeletedAt?`).
+- **Call sites:** `PostsController.Detail` — `PostDetailViewModel` initializer +
+  `ReplyItem` ctor (both sourced from `result.Post.LanguageCode` /
+  `reply.LanguageCode`, the ADR 0018 fields); `GroupsController.GroupPostDetail` —
+  the parallel pair.
+- **Untouched confirmed:** the shared `LanguageOption` record (TD·6) and all Core
+  documents (TD·7) — no Core edits, no migration, no view/TS/test changes.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4 projects), no
+  compile warnings. No drift pause.

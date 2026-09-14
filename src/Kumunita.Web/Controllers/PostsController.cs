@@ -358,7 +358,8 @@ public sealed class PostsController(
                 reply.AuthorId == actor,
                 translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
                 canTranslateReply,
-                reply.DeletedAt));
+                reply.DeletedAt,
+                reply.LanguageCode));
         }
 
         // ADR 0018 — the reply form's authored-in language picker options
@@ -378,6 +379,7 @@ public sealed class PostsController(
             PostTranslations = postTranslations,
             Languages = languages,
             CanTranslate = canTranslate,
+            OriginalLanguageCode = result.Post.LanguageCode, // TD·1/TD·4 (ADR 0027) — the authored-in code, read from the ADR 0018 field.
         });
     }
 

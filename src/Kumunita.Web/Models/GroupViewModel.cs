@@ -364,6 +364,18 @@ public sealed class GroupPostDetailViewModel
     /// standing does not reach a group lane, ADR 0007). A display pin, not a
     /// gate.</summary>
     public bool CanTranslate { get; set; }
+
+    // ── TD lane (ADR 0027) — the authored-in language as a first-class variant ──
+
+    /// <summary>The language the group post was **authored in** (ADR 0018,
+    /// <see cref="Post"/>'s <c>LanguageCode</c>) — carried **additively** on
+    /// this model (TD·6: the shared <see cref="LanguageOption"/> record is
+    /// untouched). TD·1: the detail surface renders this code as the
+    /// **first, default-visible** variant chip, and TD·4: the "Add a …"
+    /// candidate list excludes it. Populated by the detail controller from
+    /// <c>Post.LanguageCode</c> — a read, never a write (TD·7: no Core or
+    /// schema change).</summary>
+    public string OriginalLanguageCode { get; set; } = string.Empty;
 }
 
 /// <summary>
