@@ -712,3 +712,26 @@ account out, without leaving the platform. It is the *linkage* (parent ↔ child
   (the content path has no guardian branch) and capped by G·5 (the safety
   valve). The only cost is the child's temporary account autonomy, which is the
   deliberate, named, bounded trade. **Whole not traded for a part.**
+
+## GU — Closed (recorded) (2026-09-14)
+
+The GU lane (guardian controls, ADR 0028) is **shipped**. The five actions
+(suspend/unsuspend, community + group membership curation, invitation
+approval) + formation (add-a-child, the usual verify-email flow) + the
+independence handover (dissolve, the GlobalAdmin safety valve) are live.
+Standing is **account-scope only** — invariant **G·1** held: the guardian
+standing (`AccessVia.Guardian`, the 9th value) **never** resolves a content
+read; it is exercised only on the `IUserInfoService` management lanes.
+
+- **Decision record:** ADR 0028 (account-scope supervision; amends 0006,
+  0003, 0012, m2b).
+- **Gate:** the 11 pinned seam tests + the 4 Web VM tests — see the
+  `### Run result (GU acceptance gate — 2026-09-14)` section above (U10).
+- **Layout:** `GuardianLink` rides the existing `M1DocTypes` surface (ADR
+  0004 §B.1, additive); `docs/ARCHITECTURE.md`'s `UserInfo/` line + doc-map
+  carry the surface (U11).
+- **Non-decision (carried forward):** the GlobalAdmin `viaAdmin: true`
+  dissolve shell (the admin surface) is **out of scope** here — it is a
+  separate admin-shell lane, not a GU one (ADR 0028 §C, the §D G·5 valve).
+- **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane
+  discipline: GU is not a renumber).

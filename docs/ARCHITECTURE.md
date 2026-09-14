@@ -82,7 +82,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── MediaDocTypes.cs    # M4-adjacent Marten-native doc registration (MediaObject) — ADR 0011
     │   │   ├── Bootstrap/          # SchemaBootstrap, FirstBootSeeder
     │   │   ├── Identity/           # IdentityModule (M1) + DbBootstrap (first-boot pristine gate); also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
-    │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService
+    │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService; GU ✓ (ADR 0028) — GuardianLink (account-scope supervision: suspend / membership curation / invitation approval; **no content read**, G·1) + the `AccessVia.Guardian` standing (the 9th value) + the IUserInfoService guardian seams (formation / suspend / dissolve); see design/guardian-controls-design.md § GU — Closed (recorded) (2026-09-14)
     │   │   ├── Authorization/      # AuthorizationModule (M1) — audiences, policy, audit; AuditPurgeService (Wolverine-free tiering); AdminOverride (break-glass read path)
     │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); the "platform announcements" lane
@@ -327,6 +327,7 @@ UserInfoModule
   // (Deliberate vocabulary: in ASP.NET a "principal" is the *actor*, so the grant
   // fields avoid that word — see §4.2.)
   DelegationGrant  { id, ownerId, delegateId, scope: [action], from, to?, revokedBy? }
+  GuardianLink     { id, guardianId, childId, status: Active|Dissolved, createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR 0028): the account-scope supervision link (standing off an Active row, G·2); dissolve one-way (G·5)
 
   // `householdId` is display/metadata ONLY (future group-helper: "family from
   // household", §10). The authorization path never reads it — household-based
