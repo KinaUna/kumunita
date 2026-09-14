@@ -111,3 +111,43 @@
   `data-translation-chip` + `data-td-group` + `data-td-variant` set U05's
   `translation-swap.ts` toggles against.
 - **Build:** `dotnet build Kumunita.slnx -c Debug` green (4/4). No drift pause.
+
+## U05 — TS swap module
+
+- **Deliverables:** `client/lib/translation-swap.ts` (new, ~46 LOC, no imports,
+  `tsc`-only) + one line added to `Views/Shared/_Layout.cshtml` (the
+  module-load block). No C#, no Razor view markup, no Core touched.
+- **Layout line added (verbatim):** `Views/Shared/_Layout.cshtml`, in the
+  `<script>` module block after `avatar-upload.js` —
+  `<script type="module" src="~/js/lib/translation-swap.js"></script>`
+  (comment above it: "Translation display swap … TD / ADR 0027: click-to-swap
+  toggles the pre-rendered .td-variant containers; display-only, no fetch").
+- **Selectors (verbatim):** iterate `[data-translation-chip]`; on click,
+  `chip.dataset.tdVariant`; scope `chip.closest('div[data-td-group]')`; toggle
+  `querySelectorAll('.td-variant')` on `container.style.display` by
+  `container.dataset.tdVariant === code ? '' : 'none'`; also set
+  `aria-pressed` on the `[data-translation-chip]` set. **No `innerHTML`, no
+  `fetch`, no navigation** (TD·3 / TD·4 / TD·8).
+- **⚠ Two deviations from the design doc's literal TS line — flagged for U06 to
+  reconcile the design doc's "TS module contract (exact)":**
+  (1) The doc's `g.querySelectorAll('[data-td-variant]')` would **also match
+  the chips** (the chips carry `data-td-variant` and sit *inside* the
+  `div[data-td-group]` wrapper per the doc's own pinned markup), so the literal
+  line would hide the non-active chip and break FACES TD3/TD5 (can't click
+  back). Implemented as `.td-variant` — the doc's *variant-container
+  structure* section defines the containers as `class="td-variant"` +
+  `data-td-variant`, so this honors the more-specific pin, not a contradiction.
+  (2) The doc's `chip.closest('[data-td-group]')` resolves to **the chip itself**
+  (closest starts at the element; the chip is a `<button data-td-group>`
+  inside the wrapper), so it would find no containers and the swap would no-op.
+  Implemented as `chip.closest('div[data-td-group]')` — the wrapper is the
+  pinned `<div data-td-group>`, so this still matches the doc's pinned markup.
+  Both changes are DOM-correct realizations of the same intent; **no frozen
+  pin (attribute set, container structure, FACES) is reshaped** — only the two
+  pseudocode lines are corrected so the FACES are actually reachable.
+- **Build:** `npm run build` green (emits `wwwroot/js/lib/translation-swap.js`,
+  2544 B) **and** `dotnet build Kumunita.slnx -c Debug` green (4/4).
+- **Acceptance (FACES TD3/TD5/TD8):** clicking a chip swaps the visible
+  `.td-variant`; clicking the original chip returns to it, on **both** lanes
+  (same module, same selectors); with JS disabled the original is
+  default-visible and every added `.td-variant` remains in the DOM.

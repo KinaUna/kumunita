@@ -118,6 +118,9 @@
     <!-- Avatar upload gating (client/lib/avatar-upload.ts, tsc-built — SECURITY.md §6:
          no inline on*/<script> in Razor views; disables "Save avatar" until a file is chosen) -->
     <script type="module" src="~/js/lib/avatar-upload.js"></script>
+    <!-- Translation display swap (client/lib/translation-swap.ts, tsc-built — TD / ADR 0027:
+         click-to-swap toggles the pre-rendered .td-variant containers; display-only, no fetch) -->
+    <script type="module" src="~/js/lib/translation-swap.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
