@@ -125,7 +125,7 @@ a TS file is touched, **`npm run build` green**.
 
 ## Workflow — handoff protocol for fresh-context agents
 
-This lane is executed as a sequence of **sealed units** (U01–U09 below),
+This lane is executed as a sequence of **sealed units** (U01–U08 below),
 one unit per fresh agent with a ~32K context window (smaller than M3's
 ~64K — the unit budgets below are sized accordingly: **≤ ~4 files /
 ~500 LOC each, entry reads ≤ 5 files / < ~300 lines each**).
@@ -159,7 +159,7 @@ the "this is finished" signal the next agent checks).
 
 ---
 
-## Units (9 total)
+## Units (8 total)
 
 ### U01 — Design doc + ADR 0025
 - **Goal:** author `docs/design/rich-content-design.md` (the full design doc
@@ -677,7 +677,7 @@ the "this is finished" signal the next agent checks).
   through `MarkdownRenderer.RenderHtml` inside `.rc-body` (a grep for
   `whitespace-pre-line` + `@Model.Body` / `@r.Body` / `@t.Body` on a
   render line — not a textarea — returns **zero** hits; a drift guard
-  check U09 re-runs). **Every** preview site goes through
+  check U08 re-runs). **Every** preview site goes through
   `PlainTextPreview`. The edit textareas are untouched (source
   surface). Handoff note: 7 lines starting `## U06 — render switch` —
   (a) the full list of render sites switched (view + line purpose,

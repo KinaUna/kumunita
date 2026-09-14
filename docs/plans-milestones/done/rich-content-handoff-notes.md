@@ -33,3 +33,13 @@
 
 <!-- U01 appends its section below this line. One `##` section per unit, in
      order (U01, U02, … U08). Never rewrite a prior section. -->
+
+## U01 — design doc + ADR 0025
+
+- **Invariants (7):** R·1 one renderer · R·2 escape-first stands · R·3 references are data, not URLs-in-prose · R·4 the serving route defers to the owning resource's decision · R·5 Core stays HTTP-free · R·6 upload boundary is ADR 0011's verbatim · R·7 zero schema migrations.
+- **FACES (8):** R1 bold+list+image render · R2 remote `src` → plain text · R3 non-member → 404 + one Deny row · R4 member → 200 + one Allow row · R5 orphan → 404 for everyone including GlobalAdmin, zero rows · R6 about-page image public, zero `CanAsync` · R7 6 MiB → 413, no write · R8 pre-existing plain text renders.
+- **`ImageIds` owners (4):** `Post`, `PostReply`, `LocalizedPage`, `Announcement` — all `public IReadOnlyList<string> ImageIds { get; set; } = [];` (ADR 0004 §B.1 additive; zero migrations, R·7).
+- **Routes:** serving `GET /content-image/{id}` (5-step: store-miss → 404; owner-miss → 404; UGC one `CanAsync`, Deny → 404; platform direct; `File` + `nosniff`) · upload `POST /content-image` (`[Authorize]`, guards 400→413→415, one `PutAsync`, `Json(new { id })`).
+- **20 pinned tests, 4 files:** `tests/Kumunita.Web.Tests/MarkdownRendererTests.cs` (7, U02) · `tests/Kumunita.Core.Tests/ContentImageOwnershipTests.cs` (5, U07) · `tests/Kumunita.Web.Tests/ContentImageServingTests.cs` (4, U07) · `tests/Kumunita.Web.Tests/ContentImageUploadTests.cs` (4, U07).
+- **ADR 0025 (Amends: 0011), two decisions:** (a) `MarkdownRenderer` is the one body renderer — extended with `![alt](src)` under the stricter `IsSafeImageSrc` allowlist (platform route shape only), no second library · (b) content images are `MediaObject` docs referenced by `ImageIds` on the owning doc, served by `GET /content-image/{id}` through the owner's single `Read` decision (UGC) or directly (platform), 404 on every miss, no new `AccessAction` / `IMediaStore` seam.
+- **Drift pause:** none — all entry reads matched the pinned shapes (`Post`/`PostReply` additive-field ordinals confirmed; `MarkdownRenderer`'s "intentionally out of scope" line confirmed to list images, which U02 will amend).
