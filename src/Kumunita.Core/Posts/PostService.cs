@@ -271,6 +271,7 @@ public sealed class PostService
             Title = draft.Title,
             Body = draft.Body,
             Audience = draft.Audience, // ADR 0001-B — written verbatim; never mutated here.
+            ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer; null-coalesce to the POCO's non-null empty list.
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };

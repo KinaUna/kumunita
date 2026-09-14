@@ -5,6 +5,7 @@ using Kumunita.Core.Media;
 using Kumunita.Core.Posts;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace Kumunita.Web.Controllers;
 
@@ -43,7 +44,8 @@ public sealed class ContentImageController(
     IAuthorizationService authz,
     PostService posts,
     IAnnouncementService announcements,
-    ITranslationProvider pages) : Controller
+    ITranslationProvider pages,
+    IOptions<MediaOptions> mediaOpts) : Controller
 {
     /// <summary>
     /// <c>GET /content-image/{id}</c> — the single serving action. The id
@@ -106,6 +108,49 @@ public sealed class ContentImageController(
 
         // ── All null → orphan → 404 (zero audit rows, R·4) ─────────────
         return NotFound();
+    }
+
+    /// <summary>
+    /// <c>POST /content-image</c> — the content-image upload lane (RC R·6 —
+    /// ADR 0011's boundary, **verbatim**: the same allowlist
+    /// <c>image/jpeg|png|webp|gif</c> (SVG excluded), the same
+    /// <see cref="MediaOptions.MaxBytes"/> cap (5 MiB default), the same
+    /// guards-before-write ordering — empty → <b>400</b>, oversize →
+    /// <b>413</b>, disallowed type → <b>415</b> — **no file written on any
+    /// guard** — then one <see cref="IMediaStore.PutAsync"/> write. The
+    /// <c>IFormFile</c> boundary is Web-only (R·5 — Core stays HTTP-free).
+    /// **No audit call**: the write is authenticated, not an
+    /// audience-restricted read (the avatar lane makes the same choice).
+    /// </summary>
+    [HttpPost("/content-image")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Upload([FromForm] IFormFile? file)
+    {
+        var subject = KumunitaPrincipal.SubjectId(User);
+        if (subject is null)
+            return Unauthorized(); // defensive (the [Authorize] already gates)
+
+        // The three guards run BEFORE any Put (R·6, verbatim from the avatar
+        // lane — a Put with a disallowed type or an oversize payload would
+        // write a volume file that must not exist):
+        if (file is null || file.Length == 0)
+            return BadRequest("Choose an image.");                          // empty → 400
+        if (mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes)
+            return StatusCode(StatusCodes.Status413RequestEntityTooLarge);  // oversize → 413
+        if (!mediaOpts.Value.IsAllowed(file.ContentType))
+            return StatusCode(StatusCodes.Status415UnsupportedMediaType);   // disallowed type (incl. SVG) → 415
+
+        // R·5: the IFormFile never crosses into Core — copy to bytes, then
+        // store-first (orphan-safe order, C-MED·7):
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var stored = await media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject);
+
+        // The id is a content hash, not secret; the route 404s until a
+        // referencing doc exists (R·4). No audit row (the write is
+        // authenticated, not an audience-restricted read).
+        return Json(new { id = stored.Id });
     }
 
     /// <summary>

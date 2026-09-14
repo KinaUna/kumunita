@@ -22,4 +22,18 @@ namespace Kumunita.Core.Posts;
 // write time (see PostService.CreateGroupPostAsync), so the existing
 // positional call sites (5 in GroupPostServiceTests) keep compiling unchanged
 // and post the instance default.
-public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null);
+// RC R·3/R·7 (ADR 0025) — the content-image references, **server-side**
+// (the Web layer parses the body's /content-image/{id} links via
+// ContentImageIds.ExtractContentImageIds before calling the service — Core
+// stays body-parse-free, R·5). Written onto the Post doc (ADR 0004 §B.1
+// additive field) with a null-coalesce to an empty list (the POCO field is
+// non-null, `= []`).
+//
+// §Pinned contract amendment (U04) — the design doc pins this as
+// `IReadOnlyList<string> ImageIds = []`, but a collection expression is
+// **not** a legal C# default parameter value (CS1736: default values must be
+// compile-time constants). The closest source-compatible shape is a
+// **nullable** default: the existing positional call sites (5 in
+// GroupPostServiceTests) keep compiling unchanged (they omit it ⇒ null), and
+// PostService coalesces null → []. See the U04 handoff note.
+public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null, IReadOnlyList<string>? ImageIds = null);

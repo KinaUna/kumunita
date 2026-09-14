@@ -692,7 +692,8 @@ public sealed class PostsController(
             Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
             Body: model.Body,
             Audience: model.Audience.BuildAudience(),
-            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode); // ADR 0018 — null/empty ⇒ instance default materialized server-side.
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 — null/empty ⇒ instance default materialized server-side.
+            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body)); // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
