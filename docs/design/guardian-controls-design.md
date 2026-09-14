@@ -272,6 +272,269 @@ M1, heavier than a single-lane ADR.
     an adult on the child's behalf) can always reach it. No guardian may hold a
     child's account with no recourse.
 
+## Pinned contract (U01 — finalizes for U02–U11)
+
+> **U01 finalizes this section; U02–U11 match it verbatim.** It turns the
+> `## Seams & contracts (mandatory)` prose above into machine-pinnable exact
+> C#: the `GuardianLink` POCO, the `AccessVia.Guardian` value, the five
+> `IUserInfoService` guardian seams (three new methods, two branches on
+> existing lanes) + the invitation gate, the pinned seam-test names, and the
+> acceptance gate. ADR 0028 (already accepted) is the authority every pin
+> traces back to; this section is where the *exact* shape is frozen. **No code
+> is authored here** — the C# below is the contract U02–U06 will write; it is
+> pinned so the shape cannot drift between units.
+
+### GuardianLink POCO (exact C#)
+
+New file `src/Kumunita.Core/UserInfo/GuardianLink.cs` (U02 authors). One row
+per (guardian, child) pair — the `DelegationGrant` / `GroupInvitation` shape;
+the `GroupMembership` business-key convention (surrogate `Id` is the Marten
+identity; `(GuardianId, ChildId)` is the business key, unique-indexed on the
+`M1DocTypes` surface in U02):
+
+```csharp
+namespace Kumunita.Core.UserInfo;
+
+/// <summary>
+/// One row per (guardian, child) pair — the GU standing's relationship document
+/// (ADR 0028 §B). A child may have one or two guardians (each an active row);
+/// the child has guardian standing iff <b>any</b> active row exists.
+/// <see cref="GuardianId"/> is the creator: G·4 (formation is creation-based)
+/// is anchored here — the standing basis is that this guardian <i>created</i>
+/// the child's account, so there is no self-serve "claim guardianship" lane.
+/// <para>
+/// G·2 — the service is the resolver, not this document. Whether a row is
+/// "active" is decided by <c>IUserInfoService</c> off <see cref="Status"/> at
+/// decision time, exactly like <c>DelegationGrant.IsActiveAt</c> (the "service
+/// is the resolver" rule): this POCO carries the state, it does not carry an
+/// <c>IsActive</c> boolean. A dissolve is live on the very next lane read (C4).
+/// </para>
+/// <para>
+/// G·5 — the safety valve is anchored by <see cref="DissolvedBy"/> (the
+/// GlobalAdmin who dissolved, on the <c>viaAdmin</c> branch) and the
+/// <c>DissolveGuardianLinkAsync(viaAdmin: true)</c> audit row — a GlobalAdmin
+/// may always dissolve an active link or un-suspend an account, audited
+/// <c>Via: Admin</c>.
+/// </para>
+/// </summary>
+public sealed class GuardianLink
+{
+    /// <summary>Surrogate PK; (GuardianId, ChildId) remains the business key.</summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>The guardian account (the creator — G·4).</summary>
+    public string GuardianId { get; set; } = string.Empty;
+
+    /// <summary>The supervised child account (the target of every GU action).</summary>
+    public string ChildId { get; set; } = string.Empty;
+
+    /// <summary>The two-state machine (ADR 0028 §B): Active → Dissolved.</summary>
+    public GuardianLinkStatus Status { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>Set when the row moves Active → Dissolved (the independence lane);
+    /// null while Active.</summary>
+    public DateTimeOffset? DissolvedAt { get; set; }
+
+    /// <summary>The account that dissolved the row (the guardian, or a GlobalAdmin
+    /// on the G·5 safety valve); null while Active. The <c>DelegationGrant.
+    /// RevokedBy</c> / <c>GroupInvitation.ResolvedBy</c> precedent.</summary>
+    public string? DissolvedBy { get; set; }
+}
+
+/// <summary>
+/// The <see cref="GuardianLink"/> state machine (ADR 0028 §B).
+/// <c>Active → Dissolved</c>; dissolve is effectively one-way in practice
+/// (re-attaching is a fresh <c>Active</c> row — a deliberate new act, not an
+/// undo).
+/// </summary>
+public enum GuardianLinkStatus
+{
+    Active,
+    Dissolved
+}
+```
+
+- **No** doc-side `IsActive` boolean (the `DelegationGrant.IsActiveAt` "service
+  is the resolver" rule — G·2).
+- Registered (U02) on the **existing `M1DocTypes`** surface, a neighbor of
+  `opts.Schema.For<DelegationGrant>();`:
+  `opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);`
+  (the `GroupInvitation` business-key convention; the surrogate `Id` is the
+  Marten identity).
+
+### AccessVia.Guardian (exact C#)
+
+The **9th** value, appended **after `Group`** in
+`src/Kumunita.Core/Authorization/Decision.cs` (U03 authors). A value-addition,
+never a renumbering (the M1 `Admin` 7th / ADR 0013 `Group` 8th append
+precedent, ADR 0006-E):
+
+```csharp
+public enum AccessVia
+{
+    Owner,
+    Audience,
+    Delegation,
+    Moderator,
+    Report,
+    BreakGlass,
+    Admin,
+    Group,
+    /// <summary>
+    /// The GU standing (ADR 0028): action-scoped to the five supervisory
+    /// actions (G·3); **never** on a <c>CanAsync</c> / <c>CanSeeAsync</c>
+    /// content decision (G·1). The M1 <see cref="Admin"/> / ADR 0013
+    /// <see cref="Group"/> append precedent.
+    /// </summary>
+    Guardian
+}
+```
+
+**G·1 pin (load-bearing):** `AccessVia.Guardian` appears on **no** `CanAsync` /
+`CanSeeAsync` decision. A unit that adds it to the content path is a drift
+pause, not a deviation (unit-series rule §5).
+
+### IUserInfoService guardian seams (exact C#)
+
+The **five** supervisory actions (ADR 0028 §C) — **three add new methods, two
+are branches on existing lanes** — each pinned to its exact signature, the
+standing gate (= active link), the audit verb + `Via`, the invariant, and the
+exceptions. **No new method is added for the two branch actions; the
+signatures below for them are unchanged.**
+
+**1. Formation — `CreateGuardianLinkAsync`** (new method, U04). Upserts the
+`(GuardianId, ChildId)` `Active` row (idempotent no-op on re-attach). Audit
+`guardian.create`, `Via: Guardian`, target the child account. G·4 (creation
+basis). The Web's add-a-child form pairs it with
+`IIdentityService.RegisterAsync` so account + link + audit commit together (C3)
+— a created-but-unlinked account can never exist.
+
+```csharp
+Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
+```
+
+**2. Suspend / un-suspend — `SuspendChildAsync` / `UnsuspendChildAsync`** (new
+methods, U04). Verify the active link (else `UnauthorizedAccessException` → the
+Web's 404). Set `Profile.Blocked` true/false — the **same flag**
+`BlockedAccountMiddleware` + the directory already read, so enforcement is
+identical. Audit `guardian.suspend` / `guardian.unsuspend`, `Via: Guardian`,
+target the child account. G·2 (live on the next read). The GlobalAdmin
+`BlockAsync` / `UnblockAsync` are **unchanged**.
+
+```csharp
+Task SuspendChildAsync(string childId, string guardianId);
+Task UnsuspendChildAsync(string childId, string guardianId);
+```
+
+**3. Membership curation — a branch on the existing four lanes** (U05). The
+existing `AddCommunityMemberAsync(componentId, userId, actorId, actorRoles)` /
+`RemoveCommunityMemberAsync(…)` (ADR 0012) **and**
+`AddGroupMemberAsync(groupId, userId, addedBy)` /
+`RemoveGroupMemberAsync(groupId, userId, removedBy)` **grow a `Via: Guardian`
+branch**: when the actor has an **active link over the target `userId`** (the
+child), the standing gate is satisfied and the audit row records the
+**narrower** standing `Via: Guardian` (the ADR 0012 "record the narrower
+standing" rule). **No new method; a branch. The four signatures are unchanged.**
+The ADR 0012 mandatory-community `InvalidOperationException` and the ADR 0008
+group-owner-row exception are **preserved** (the branch adds a path, never
+removes one).
+
+```csharp
+// unchanged signatures — a Via: Guardian branch is added to each standing gate:
+Task AddCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+Task AddGroupMemberAsync(string groupId, string userId, string addedBy);
+Task RemoveGroupMemberAsync(string groupId, string userId, string removedBy);
+```
+
+**4. Invitation approval — `ApproveGroupInvitationAsync`** (new method, U06).
+Resolves the child's `Pending` row as `Accepted` (the
+`AcceptGroupInvitationAsync` membership write + `ResolvedAt`/`ResolvedBy =
+guardianId`). Audit `group.invite.approve`, `Via: Guardian`, targetKind
+"group".
+
+```csharp
+Task<GroupInvitation> ApproveGroupInvitationAsync(string groupId, string childId, string guardianId);
+```
+
+**5. Independence — `DissolveGuardianLinkAsync`** (new method, U04). Moves the
+row `Active → Dissolved` (`DissolvedAt`/`DissolvedBy = actorId`). Audit
+`guardian.dissolve`, `Via: Admin` when `viaAdmin` else `Via: Guardian` (G·5
+safety valve). The child's memberships are **preserved**; the self-lanes
+restore on the next read (G·2/C4).
+
+```csharp
+Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
+```
+
+**6. The invitation gate** (U06) — `AcceptGroupInvitationAsync(groupId, actorId)`
+**gates**: if the invitee (the child) has an active `GuardianLink`, the
+self-accept is refused (`InvalidOperationException` → the Web's error, never a
+500). `DeclineGroupInvitationAsync` **stays open** (a child may always say
+no). This is the C-M2b·2 self-lane's one recorded exception (the ADR 0008
+owner-row-exception shape, carried to the supervised-child row).
+
+### Pinned seam tests (exact names)
+
+File `tests/Kumunita.Core.Tests/GuardianControlsTests.cs` (U09 authors) —
+exactly these **11**, the load-bearing one first:
+
+1. `G1_GuardianCannotReadChildContent` — **the lane's honesty**: a guardian,
+   given the child's id, is **denied** a post the child authored for a
+   non-guardian audience; the `CanAsync` decision carries no `Via: Guardian`
+   branch.
+2. `G2_SuspendIsLiveAndBlocksStanding` — suspend → the account is standing-less
+   + directory-excluded (`Profile.Blocked`); un-suspend → standing restored on
+   the next read.
+3. `G2_DissolveRestoresSelfLanesOnNextRead` — dissolve → the child's self-accept
+   lane is live on the very next attempt (C4).
+4. `G3_NonChildTargetIsRefused` — a guardian acting on a *non-child* target is
+   refused (`UnauthorizedAccessException`).
+5. `G3_ContentReadIsNeverGuardian` — a guardian attempting a content read is
+   refused; no `Via: Guardian` on the path (the G·1 unit-level twin).
+6. `G4_FormationCommitsAccountLinkAndAuditTogether` — account + link + audit
+   land in one commit; a duplicate `(guardian, child)` is an idempotent no-op.
+7. `G5_GlobalAdminDissolvesAndUnSuspends` — the safety valve: GlobalAdmin
+   dissolves an active link (`Via: Admin`) and un-suspends; the child's
+   self-lanes restore.
+8. `Invitation_GatedForSupervisedChild` — a child with an active link
+   **cannot** self-accept a group invitation (refused) but **can** self-decline.
+9. `Invitation_GuardianApproveLandsMembership_ViaGuardian` —
+   `ApproveGroupInvitationAsync` lands the membership, audit
+   `group.invite.approve`, `Via: Guardian`.
+10. `Membership_AddRemoveChild_ViaGuardian` — the guardian adds/removes the
+    child from a component **and** a group; the audit rows record `Via:
+    Guardian`; the ADR 0012 posting/feed gate reflects it on the next read.
+11. `SuspendSetsProfileBlocked_EnforcementIdentical` — the flag the existing
+    `BlockedAccountMiddleware` / directory already read is the one set
+    (enforcement parity).
+
+### Acceptance gate (U10 records)
+
+The lane's three tests (the `## Three tests (run before "ready")` shape, pinned
+here so U10 records the run against these):
+
+- **closed loop** — a parent forms a child account, suspends it, curates a
+  membership, approves an invitation, then dissolves; each lands its audit row +
+  effect on the next read.
+- **handoff** — dissolve hands the account to the child: the child's self-lanes
+  restore live, memberships preserved — the "come of age" handoff.
+- **part-vs-whole** — the 11-test list is the **whole**; closed-loop + handoff
+  are the **parts**; all must pass together (the child's private content is
+  structurally never paid for — G·1).
+
+### Drift-guard (frozen once written)
+
+Frozen pins — any mismatch is a `## U<m> — Drift pause` (unit-series rules
+§2/§8), never a silent change: the `GuardianLink` POCO (fields +
+`GuardianLinkStatus` enum), the `AccessVia.Guardian` value + its position (9th,
+after `Group`), the five seam signatures + the two membership-lane branches +
+the invitation gate, the 11 pinned test names, the G·1–G·5 invariants, and the
+acceptance gate. A unit that wants to change any of these pauses and records
+the drift; it does not reshape the pin.
+
 ## Feedback loops
 
 - **Seam tests** (each cites the invariant above):

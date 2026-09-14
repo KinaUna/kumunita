@@ -40,3 +40,12 @@
 
 <!-- U01 appends its section below this line. One `##` section per unit, in
      order (U01, U02, … U11). Never rewrite a prior section. -->
+
+## U01 — pinned contract
+
+- **Date:** 2026-09-14. Appended `## Pinned contract (U01 — finalizes for U02–U11)` to `docs/design/guardian-controls-design.md` (between `## Seams & contracts (mandatory)` and `## Feedback loops`). **Docs-only: no code, no build.**
+- **(a) Five seam names (verbatim):** new methods — `CreateGuardianLinkAsync(childId, guardianId)`, `SuspendChildAsync(childId, guardianId)` / `UnsuspendChildAsync(childId, guardianId)`, `ApproveGroupInvitationAsync(groupId, childId, guardianId)`, `DissolveGuardianLinkAsync(linkId, actorId, viaAdmin)`; the two **branches** (signatures unchanged, a `Via: Guardian` branch added to each standing gate) — `AddCommunityMemberAsync` / `RemoveCommunityMemberAsync` and `AddGroupMemberAsync` / `RemoveGroupMemberAsync`; the **gate** on `AcceptGroupInvitationAsync` (self-accept refused for a supervised child); `DeclineGroupInvitationAsync` stays open.
+- **(b) `AccessVia.Guardian`:** the **9th** value, appended after `Group` in `src/Kumunita.Core/Authorization/Decision.cs` (value-addition, no renumber; M1 `Admin` 7th / ADR 0013 `Group` 8th precedent).
+- **(c) 11 pinned test names** (`tests/Kumunita.Core.Tests/GuardianControlsTests.cs`): `G1_GuardianCannotReadChildContent`, `G2_SuspendIsLiveAndBlocksStanding`, `G2_DissolveRestoresSelfLanesOnNextRead`, `G3_NonChildTargetIsRefused`, `G3_ContentReadIsNeverGuardian`, `G4_FormationCommitsAccountLinkAndAuditTogether`, `G5_GlobalAdminDissolvesAndUnSuspends`, `Invitation_GatedForSupervisedChild`, `Invitation_GuardianApproveLandsMembership_ViaGuardian`, `Membership_AddRemoveChild_ViaGuardian`, `SuspendSetsProfileBlocked_EnforcementIdentical`.
+- **(d) G·1 pin:** `AccessVia.Guardian` appears on **no** `CanAsync` / `CanSeeAsync` content decision — the lane's load-bearing honesty; a unit that puts it on the content path is a drift pause, not a deviation (unit-series rule §5).
+- **(e) Drift pause:** none — the design doc's prose was consistent with ADR 0028 and the frozen `IUserInfoService` surface; nothing to resolve or carry forward.
