@@ -1,0 +1,100 @@
+@model IReadOnlyList<Kumunita.Web.Models.ChildAccountItem>
+@{
+    ViewData["Title"] = "Your children";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <h1><kw-l key="guardian.title">Your children</kw-l></h1>
+        <p class="text-muted"><kw-l key="guardian.lead">The accounts you set up for a child, and the controls you hold over each one.</kw-l></p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        @*
+            GU (ADR 0028) — the child list: each row is the child's display name
+            + the Blocked badge only (G·1 — never the child's posts or profile
+            body). The Blocked state picks the action button (the m2b
+            accept/decline "state picks the card" shape): a blocked child
+            carries Un-suspend, an active child carries Suspend. The list is
+            the standing itself — a non-guardian sees an empty card, nothing else.
+        *@
+        @if (Model.Count == 0)
+        {
+            <div class="alert alert-info">
+                <kw-l key="guardian.empty">No children yet.</kw-l>
+            </div>
+        }
+        else
+        {
+            <ul class="list-group mb-3">
+                @foreach (var item in Model)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <span>
+                            <a href="@Url.Action("Detail", "Guardian", new { childId = item.ChildId })">@item.DisplayName</a>
+                            @if (item.Blocked)
+                            {
+                                <span class="badge bg-secondary ms-1">Suspended</span>
+                            }
+                        </span>
+                        @if (item.Blocked)
+                        {
+                            <form method="post" action="@Url.Action("Unsuspend", "Guardian", new { childId = item.ChildId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Un-suspend</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form method="post"
+                                  action="@Url.Action("Suspend", "Guardian", new { childId = item.ChildId })"
+                                  onsubmit="return confirm('Suspend this child account? They will be blocked until you un-suspend them.');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Suspend</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            GU (G·4) — the add-a-child form, rendered inline on the Index page
+            (U07 exposes POST me/children -> AddChild only; the form is its
+            one-commit write: RegisterAsync then CreateGuardianLinkAsync, the
+            verification email staged by M1's lane). A created-but-unlinked
+            account can never exist. The child's content never reaches this
+            form (G·1).
+        *@
+        <h2>Add a child account</h2>
+        <form method="post" action="@Url.Action("AddChild", "Guardian")">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label for="DisplayName" class="form-label">Display name</label>
+                <input id="DisplayName" name="DisplayName" class="form-control" maxlength="100" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="Email" class="form-label">Email address</label>
+                <input id="Email" name="Email" type="email" class="form-control" maxlength="255" required />
+            </div>
+
+            <div class="mb-3">
+                <label for="Password" class="form-label">Password</label>
+                <input id="Password" name="Password" type="password" class="form-control" minlength="8" required />
+            </div>
+
+            <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>
+            <div class="form-text mt-1">The child verifies their own email to sign in — the usual sign-up flow.</div>
+        </form>
+    </div>
+</div>

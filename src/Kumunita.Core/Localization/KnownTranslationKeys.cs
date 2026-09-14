@@ -79,6 +79,14 @@ public static class KnownTranslationKeys
             ["nav.admin"]         = "Admin",
             ["nav.translations"]  = "Translations",
             ["nav.sign_out"]      = "Sign out",
+            ["nav.children"]      = "Children",
+
+            // ── guardian (the /me/children child-accounts surface, GU ADR 0028) ──
+            ["guardian.title"]        = "Your children",
+            ["guardian.lead"]         = "The accounts you set up for a child, and the controls you hold over each one.",
+            ["guardian.empty"]        = "No children yet.",
+            ["guardian.add"]          = "Add a child account",
+            ["guardian.manage_title"] = "Manage a child account",
 
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =

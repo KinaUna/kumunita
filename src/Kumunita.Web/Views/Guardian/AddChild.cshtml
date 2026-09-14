@@ -1,0 +1,52 @@
+@model Kumunita.Web.Models.AddChildForm
+@{
+    ViewData["Title"] = "Add a child account";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; Back to your children</a></p>
+
+        <h1><kw-l key="guardian.add">Add a child account</kw-l></h1>
+        <p class="text-muted">The child verifies their own email to sign in — the usual sign-up flow.</p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+
+        @*
+            GU (G·4) — the add-a-child form re-rendered after a validation or
+            signup-lane failure (U07's AddChild returns View(form) on the
+            error paths). This is the failure landing surface, not a separate
+            navigation page: the success path redirects to Index, where the
+            form also renders inline. The guardian is never form-bound — it is
+            minted by the controller from the signed-in principal (G·4, one
+            commit). The child's content never reaches this form (G·1).
+        *@
+        <form asp-action="AddChild" method="post">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="DisplayName" class="form-label"></label>
+                <input asp-for="DisplayName" class="form-control" maxlength="100" required />
+                <span asp-validation-for="DisplayName" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label"></label>
+                <input asp-for="Email" class="form-control" maxlength="255" required />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Password" class="form-label"></label>
+                <input asp-for="Password" class="form-control" minlength="8" required />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+
+            <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>
+        </form>
+    </div>
+</div>

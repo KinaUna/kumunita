@@ -71,6 +71,12 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
         </li>
+        @* GU (ADR 0028) — the guardian's child-accounts surface. Every signed-in
+           resident can reach their own /me/children; the list is empty for a
+           non-guardian (the Index view handles that empty state), so no is… flag. *@
+        <li class="nav-item">
+            <a class="nav-link text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
+        </li>
         <li class="nav-item">
             <a class="nav-link text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
         </li>

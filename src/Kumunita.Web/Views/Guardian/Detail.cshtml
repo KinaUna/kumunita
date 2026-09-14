@@ -1,0 +1,132 @@
+@model Kumunita.Web.Models.MembershipEditorModel
+@{
+    ViewData["Title"] = "Manage a child account";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; Back to your children</a></p>
+
+        <h1><kw-l key="guardian.manage_title">Manage a child account</kw-l></h1>
+        <p class="text-muted">Account: <code>@Model.ChildId</code></p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        @*
+            GU (ADR 0028) — the per-child curation surface. Every section is
+            membership ids/names only (G·1 — the child's posts, profile body, or
+            any audience-restricted content never appears here, and there is no
+            link to them). Groups + communities are curatable (U07 exposed
+            POST .../memberships/group and .../memberships/community); the
+            guardian's standing + the Via: Guardian audit row are minted in the
+            Core seam, not here. The actor is the signed-in principal (the U07
+            route), never a form field.
+        *@
+        <h2>Group memberships</h2>
+        @if (Model.GroupIds.Count == 0)
+        {
+            <p class="text-muted">No group memberships.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-2">
+                @foreach (var groupId in Model.GroupIds)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <code>@groupId</code>
+                        <form method="post" action="@Url.Action("CurateGroup", "Guardian", new { childId = Model.ChildId })">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="groupId" value="@groupId" />
+                            <input type="hidden" name="add" value="false" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+        <form method="post" action="@Url.Action("CurateGroup", "Guardian", new { childId = Model.ChildId })"
+              class="input-group justify-content-start">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="add" value="true" />
+            <input type="text" name="groupId" class="form-control" style="max-width: 260px;" placeholder="Group id" required />
+            <button type="submit" class="btn btn-outline-primary">Add</button>
+        </form>
+
+        <h2 class="mt-4">Community memberships</h2>
+        @if (Model.CommunityIds.Count == 0)
+        {
+            <p class="text-muted">No community memberships.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-2">
+                @foreach (var communityId in Model.CommunityIds)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <code>@communityId</code>
+                        <form method="post" action="@Url.Action("CurateCommunity", "Guardian", new { childId = Model.ChildId })">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="communityId" value="@communityId" />
+                            <input type="hidden" name="add" value="false" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+        <form method="post" action="@Url.Action("CurateCommunity", "Guardian", new { childId = Model.ChildId })"
+              class="input-group justify-content-start">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="add" value="true" />
+            <input type="text" name="communityId" class="form-control" style="max-width: 260px;" placeholder="Community id" required />
+            <button type="submit" class="btn btn-outline-primary">Add</button>
+        </form>
+
+        <h2 class="mt-4">Pending group invitations</h2>
+        @if (Model.PendingInvitations.Count == 0)
+        {
+            <p class="text-muted">No pending invitations.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-2">
+                @foreach (var inv in Model.PendingInvitations)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <strong>@inv.GroupName</strong>
+                            <div class="text-muted small">Invited @inv.InvitedAt</div>
+                        </div>
+                        <form method="post"
+                              action="@Url.Action("ApproveInvitation", "Guardian", new { childId = Model.ChildId, groupId = inv.GroupId })">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-primary">Approve</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            GU (independence lane) — dissolve the link. The child's
+            memberships are preserved; their self-serve lanes restore on the
+            next read (G·2/C4). The destructive POST is confirm-guarded
+            client-side (a UX nicety — the server gate is the U07 route + the
+            Core seam's standing check).
+        *@
+        <h2 class="mt-4">Hand over the account</h2>
+        <p class="text-muted">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</p>
+        <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
+              onsubmit="return confirm('Hand over this account to the child? This dissolves your guardianship over it.');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger">Dissolve guardianship</button>
+        </form>
+    </div>
+</div>
