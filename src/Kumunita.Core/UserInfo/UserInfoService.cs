@@ -304,7 +304,11 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         session.Store(existing);
 
-        var via = addedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        // GU (ADR 0028): the guardian base is the narrowest — an active link
+        // over <paramref name="userId"/> (the child) wins and records
+        // <c>Via: Guardian</c>; otherwise the existing Owner / Admin base applies.
+        var via = await GateGuardianStandingAsync(addedBy, userId)
+            ?? (addedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin);
         var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : addedBy;
 
         var audit = new Authorization.AccessAudit
@@ -349,7 +353,11 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             session.Delete<GroupMembership>(membership.Id);
         }
 
-        var via = removedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        // GU (ADR 0028): the guardian base is the narrowest — an active link
+        // over <paramref name="userId"/> (the child) wins and records
+        // <c>Via: Guardian</c>; otherwise the existing Owner / Admin base applies.
+        var via = await GateGuardianStandingAsync(removedBy, userId)
+            ?? (removedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin);
         var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : removedBy;
 
         var audit = new Authorization.AccessAudit
@@ -1595,7 +1603,13 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("User id is required.", nameof(userId));
 
-        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        // GU (ADR 0028): the guardian base is the narrowest and **bypasses** the
+        // community standing gate — a guardian holds neither GlobalAdmin nor a
+        // moderator scope by definition, so it must resolve before the gate is
+        // called. An active link over <paramref name="userId"/> (the child)
+        // records <c>Via: Guardian</c>; otherwise the existing gate applies.
+        var via = await GateGuardianStandingAsync(actorId, userId)
+            ?? GateCommunityStanding(componentId, actorId, actorRoles);
         var now = DateTimeOffset.UtcNow;
 
         await using var session = store.OpenSession(new SessionOptions());
@@ -1659,7 +1673,15 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("User id is required.", nameof(userId));
 
-        var via = GateCommunityStanding(componentId, actorId, actorRoles);
+        // GU (ADR 0028): the guardian base is the narrowest and **bypasses** the
+        // community standing gate — a guardian holds neither GlobalAdmin nor a
+        // moderator scope by definition, so it must resolve before the gate is
+        // called. An active link over <paramref name="userId"/> (the child)
+        // records <c>Via: Guardian</c>; otherwise the existing gate applies.
+        // The mandatory-community refusal below still fires after the <c>via</c>
+        // resolution (unchanged order — the branch adds a path, never removes one).
+        var via = await GateGuardianStandingAsync(actorId, userId)
+            ?? GateCommunityStanding(componentId, actorId, actorRoles);
         var now = DateTimeOffset.UtcNow;
 
         await using var session = store.OpenSession(new SessionOptions());
@@ -1753,6 +1775,33 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         return isComponentModerator
             ? Authorization.AccessVia.Moderator
             : Authorization.AccessVia.Admin;
+    }
+
+    /// <summary>
+    /// The GU (ADR 0028) standing basis for the membership-curation lanes:
+    /// the actor holds an <b>active</b> <see cref="GuardianLink"/> with
+    /// <c>GuardianId == actor</c> and <c>ChildId == child</c> — i.e. the
+    /// actor is curating their own child's membership. Returns
+    /// <see cref="Authorization.AccessVia.Guardian"/> when that holds, else
+    /// <c>null</c> (the lane's existing base — Owner / Moderator / Admin —
+    /// then applies). Narrower-standing record (G·3): a guardian acting for
+    /// their child records <c>Guardian</c>, not a broader role they also hold.
+    /// Read-only — no session mutation.
+    /// </summary>
+    private async Task<Authorization.AccessVia?> GateGuardianStandingAsync(
+        string actorId, string childId)
+    {
+        if (string.IsNullOrEmpty(actorId) || string.IsNullOrEmpty(childId))
+            return null;
+
+        await using var session = store.QuerySession();
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == actorId && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        return link is not null ? Authorization.AccessVia.Guardian : null;
     }
 
     /// <summary>

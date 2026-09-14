@@ -47,11 +47,19 @@ public interface IUserInfoService
     Task<Group> CreateGroupAsync(string ownerId, string name, string? description, bool isPrivate = false);
 
     /// <summary>Add a user to a group (strong-consistency: the new membership is
-    /// live on the next <see cref="GetGroupIdsAsync"/> call).</summary>
+    /// live on the next <see cref="GetGroupIdsAsync"/> call).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>; otherwise the Owner/Admin base applies.</summary>
     Task AddGroupMemberAsync(string groupId, string userId, string addedBy);
 
     /// <summary>Remove a user from a group (strong-consistency: the loss of access is
-    /// live on the next <see cref="GetGroupIdsAsync"/> call — invariant C4).</summary>
+    /// live on the next <see cref="GetGroupIdsAsync"/> call — invariant C4).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>; otherwise the Owner/Admin base applies.</summary>
     Task RemoveGroupMemberAsync(string groupId, string userId, string removedBy);
 
     /// <summary>
@@ -464,6 +472,11 @@ public interface IUserInfoService
     /// "community.add-member", targetKind "component", via <b>Moderator</b>
     /// when the actor holds the component's scope claim else Admin,
     /// outcome Allow) in the same transaction (invariant C3).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>, bypassing the GlobalAdmin/moderator gate; the
+    /// existing standing applies otherwise.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/>,
     /// <paramref name="userId"/> or <paramref name="actorId"/> is
@@ -494,6 +507,12 @@ public interface IUserInfoService
     /// "community.remove-member", targetKind "component", via <b>Moderator</b>
     /// when the actor holds the component's scope claim else Admin,
     /// outcome Allow) in the same transaction (invariant C3).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>, bypassing the GlobalAdmin/moderator gate; the
+    /// existing standing applies otherwise. The ADR 0012 mandatory-community
+    /// refusal is **preserved** (it fires regardless of standing).
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/>,
     /// <paramref name="userId"/> or <paramref name="actorId"/> is
