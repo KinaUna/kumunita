@@ -535,6 +535,13 @@ the invitation gate, the 11 pinned test names, the G·1–G·5 invariants, and t
 acceptance gate. A unit that wants to change any of these pauses and records
 the drift; it does not reshape the pin.
 
+### Run result (GU acceptance gate — 2026-09-14)
+
+- **Core (11 pinned seam tests):** all **PASS** — `G1_GuardianCannotReadChildContent` ✅ · `G2_SuspendIsLiveAndBlocksStanding` ✅ · `G2_DissolveRestoresSelfLanesOnNextRead` ✅ · `G3_NonChildTargetIsRefused` ✅ · `G3_ContentReadIsNeverGuardian` ✅ · `G4_FormationCommitsAccountLinkAndAuditTogether` ✅ · `G5_GlobalAdminDissolvesAndUnSuspends` ✅ · `Invitation_GatedForSupervisedChild` ✅ · `Invitation_GuardianApproveLandsMembership_ViaGuardian` ✅ · `Membership_AddRemoveChild_ViaGuardian` ✅ · `SuspendSetsProfileBlocked_EnforcementIdentical` ✅ (11/11, 0 errors, 0 failed).
+- **Web (4 VM data-shape tests):** all **PASS** — `ChildAccountItem_Is_Exact_Three_Field_Projection` ✅ · `MembershipEditorModel_Is_Exact_Four_Field_Projection` ✅ · `PendingInvitationItem_Is_Exact_Three_Field_Projection` ✅ · `AddChildForm_Is_Form_Model_With_Three_Required_Fields` ✅ (4/4, 0 errors, 0 failed).
+- **Build:** `dotnet build Kumunita.slnx -c Debug` — **green** (0 warnings, 0 errors).
+- **Gate verdict:** **GREEN — GU is accepted.** Closed-loop + handoff + part-vs-whole all hold: the 11 Core seam tests (the part-vs-whole *whole*) and the 4 Web VM projection pins (the part-vs-whole *parts*) are green together; the load-bearing G·1 test confirms no `Via: Guardian` branch on the content path. No drift pause; no seam implicated.
+
 ## Feedback loops
 
 - **Seam tests** (each cites the invariant above):
