@@ -449,6 +449,113 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         return;
     }
 
+    // ── ADR 0026 — group name/description translations ─────────────────────
+    // Mirrors the ADR 0022 post-translation lane (PostService), in this context:
+    // a GroupTranslation row (at most one per language, the M1DocTypes unique
+    // index) added by the group's owner (Via: Owner) or a GlobalAdmin /
+    // Translator (Via: Admin), a hand-written AccessAudit row in the same
+    // session (C3), and a plain read seam (no decision, no audit — inherits the
+    // group's owner∪member reach). Add-only (no edit/delete seam).
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupTranslation>> GetGroupTranslationsAsync(string groupId)
+    {
+        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group id is required.", nameof(groupId));
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<GroupTranslation> AddGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group's owner (or a translator, or an admin) " +
+                "may add a translation of its name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new GroupTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GroupId = groupId,
+            LanguageCode = languageCode,
+            Name = string.IsNullOrWhiteSpace(name) ? null : name,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.add",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc />
+    public bool CanTranslateGroup(string ownerId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveGroupTranslationStanding(ownerId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0026 group-translation standing resolver (shared by
+    /// <see cref="AddGroupTranslationAsync"/> and <see
+    /// cref="CanTranslateGroup"/>). Returns the <see cref="Authorization
+    /// .AccessVia"/> the actor qualifies under, or <c>null</c> to deny.
+    /// Precedence (most specific standing first, so the audit row records the
+    /// narrowest right that applied): the group's <b>owner</b>
+    /// (<see cref="Authorization.AccessVia.Owner"/>); a <b>GlobalAdmin</b> or a
+    /// <b>Translator</b> (both <see cref="Authorization.AccessVia.Admin"/>).
+    /// A group **member** is not a standing (membership is not the right to
+    /// rename the group for others); a component-moderator claim does not
+    /// qualify (the group lane has no component-moderator standing, ADR 0007).
+    /// </summary>
+    private static Authorization.AccessVia? ResolveGroupTranslationStanding(
+        string ownerId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(ownerId, actorId, StringComparison.Ordinal))
+            return Authorization.AccessVia.Owner;
+        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            return Authorization.AccessVia.Admin;
+        if (actorRoles.Contains(Identity.Roles.Translator))
+            return Authorization.AccessVia.Admin;
+        return null;
+    }
+
     // ── M2b: group invitations (docs/design/m2b-group-invitations.md;
     // one session + one SaveChangesAsync per call, mirroring the M1 group
     // lifecycle shape above — invariants C-M2b·1..3) ──────────────────
@@ -1372,6 +1479,112 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         });
 
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ── ADR 0026 — community name/description translations ─────────────────
+    // Mirrors the group lane above, in the community shape: a
+    // CommunityTranslation row (at most one per language, the M1DocTypes unique
+    // index) added by a GlobalAdmin or a Translator (both Via: Admin — a
+    // community has no owner, so no AccessVia.Owner branch; a component
+    // moderator governs its members, ADR 0012, not its name), a hand-written
+    // AccessAudit row in the same session (C3), a plain read seam (no decision,
+    // no audit — inherits the community's enabled visibility). Add-only.
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CommunityTranslation>> GetCommunityTranslationsAsync(string componentId)
+    {
+        if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component id is required.", nameof(componentId));
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may add a translation of " +
+                "the community's name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new CommunityTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            ComponentId = componentId,
+            LanguageCode = languageCode,
+            Name = string.IsNullOrWhiteSpace(name) ? null : name,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.add",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc />
+    public bool CanTranslateCommunity(string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveCommunityTranslationStanding(actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0026 community-translation standing resolver (shared by
+    /// <see cref="AddCommunityTranslationAsync"/> and <see
+    /// cref="CanTranslateCommunity"/>). Returns the <see cref="Authorization
+    /// .AccessVia"/> the actor qualifies under, or <c>null</c> to deny. A
+    /// community has **no owner** (no <see cref="Authorization.AccessVia
+    /// .Owner"/> branch) — its name is a GlobalAdmin artifact (the
+    /// <c>/admin</c> create/update lane, <c>Via: Admin</c>) — so the admitted
+    /// standings are a <b>GlobalAdmin</b> or a <b>Translator</b> (both
+    /// <see cref="Authorization.AccessVia.Admin"/>). A component-moderator is
+    /// not (a moderator governs a community's *members*, ADR 0012, not its
+    /// name).
+    /// </summary>
+    private static Authorization.AccessVia? ResolveCommunityTranslationStanding(
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            return Authorization.AccessVia.Admin;
+        if (actorRoles.Contains(Identity.Roles.Translator))
+            return Authorization.AccessVia.Admin;
+        return null;
     }
 
     /// <inheritdoc />

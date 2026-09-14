@@ -245,6 +245,22 @@ public sealed record GroupDetailViewModel(
     public int GroupPostsTotal { get; init; }
 
     public bool CanPost { get; init; }
+
+    // ── ADR 0026 — group name/description translations ─────────────────────
+    // The same three properties the ADR 0022 post-detail surface carries
+    // (PostDetailViewModel): the row set (a "a read, not a decision" surface —
+    // visibility already inherited the group's owner∪member reach), the enabled
+    // catalog language set (with its HasTranslation flag) the chips / "add a
+    // translation" candidate list render from, and the standing pin (a display
+    // convenience, not a gate — the real deny is UserInfoService's
+    // AddGroupTranslationAsync standing check, which re-runs the same rule
+    // server-side). Reusing the ADR 0022 LanguageOption record (PostDetailViewModel
+    // file) — the same (code, native name, has translation) shape.
+    public IReadOnlyList<Kumunita.Core.UserInfo.GroupTranslation> GroupTranslations { get; init; } = [];
+
+    public IReadOnlyList<LanguageOption> Languages { get; init; } = [];
+
+    public bool CanTranslate { get; init; }
 }
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route

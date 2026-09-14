@@ -274,7 +274,19 @@ public class CommunityControllerTests
 
     private static CommunityController Build(IUserInfoService userInfo, string[] roles, string subjectId)
     {
-        var controller = new CommunityController(userInfo);
+        // ADR 0026: the Manage lane now also reads the enabled language catalog
+        // (ListLanguagesAsync) + the community's translation rows to seed the
+        // chips / "add a translation" candidate list. Substitute both; default
+        // to an empty catalog + no translation rows so the existing
+        // view-shape assertions (which predate the translation surface) keep
+        // holding. The GetCommunityTranslationsAsync substitute returns an
+        // empty list (its default would be null and NRE the .Select above).
+        var localization = Substitute.For<Kumunita.Core.Localization.ILocalizationService>();
+        localization.ListLanguagesAsync().Returns(new List<Kumunita.Core.Localization.LanguageCatalog>());
+        userInfo.GetCommunityTranslationsAsync(CompId).Returns(new List<Kumunita.Core.UserInfo.CommunityTranslation>());
+        var store = Substitute.For<Marten.IDocumentStore>();
+
+        var controller = new CommunityController(userInfo, localization, store);
 
         // TempData writes need a Session — substitute (the /leave lane and the
         // form-refusal branches both touch TempData).

@@ -311,6 +311,27 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             })
             .ToList();
 
+        // ── ADR 0026 — group name/description translations ────────────────
+        // Rendered as a "a read, not a decision" surface (the same standing the
+        // ADR 0022 post-detail surface uses for PostTranslation rows): the
+        // group is already an authorized read for this actor (404 above if not
+        // visible), so the translation rows inherit that reach. The enabled
+        // catalog (ListLanguagesAsync, Enabled + SortOrder — the same read the
+        // ADR 0022 post surface uses) seeds the chips / "add a translation"
+        // candidate list. CanTranslate is the display convenience mirroring
+        // UserInfoService's AddGroupTranslationAsync standing check — the POST
+        // re-checks server-side, so this is not the gate.
+        var groupTranslations = await userInfo.GetGroupTranslationsAsync(group.Id);
+        var translationCodes = groupTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var catalog = await localization.ListLanguagesAsync();
+        var groupLanguages = catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new LanguageOption(l.Id, l.NativeName, translationCodes.Contains(l.Id)))
+            .ToList();
+        var canTranslate = userInfo.CanTranslateGroup(
+            group.OwnerId, actor, KumunitaPrincipal.RoleSet(User));
+
         return View(new GroupDetailViewModel(
             group.Id,
             group.Name,
@@ -326,6 +347,9 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             GroupPosts = groupPosts,
             GroupPostsTotal = feed.Total,
             CanPost = canPost,
+            GroupTranslations = groupTranslations,
+            Languages = groupLanguages,
+            CanTranslate = canTranslate,
         });
     }
 
@@ -500,6 +524,97 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
 
         TempData["info"] = $"You have left “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ── ADR 0026: group name/description translations ──────────────────────
+
+    /// <summary>
+    /// Adds a **user-added translation** of the group's name and/or
+    /// description into <paramref name="languageCode"/> (ADR 0026):
+    /// <c>POST /groups/{id}/translations</c>. A thin Web lane (ADR 0006-D:
+    /// routes + shape) that delegates the write + standing decision to
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .AddGroupTranslationAsync"/> (the standing — owner / GlobalAdmin /
+    /// Translator — is re-pinned server-side; the detail page's
+    /// <see cref="Kumunita.Web.Models.GroupDetailViewModel.CanTranslate"/> is
+    /// only the display affordance).
+    /// <para>
+    /// <b>Precondition:</b> the actor must be in the group's owner ∪ member
+    /// reachability projection (the <see cref="TryResolveWriteSurface"/> gate,
+    /// the same consistent 404 shape every other group write lane uses); the
+    /// group is already an authorized read for the actor, so the translation
+    /// write inherits that reach. A denied standing actor (a plain member)
+    /// is a 403 (<see cref="UnauthorizedAccessException"/> →
+    /// <see cref="Microsoft.AspNetCore.Mvc.Controller.Forbid"/>); a missing
+    /// group is a 404. At least one of name/description must be non-blank
+    /// (re-checked server-side by the seam).
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3):</b> the controller owns the
+    /// <see cref="Marten.IDocumentStore.LightweightSession()"/>; the service's
+    /// <c>SaveChangesAsync</c> is the single write — the
+    /// <see cref="Kumunita.Core.UserInfo.GroupTranslation"/> row and its
+    /// <c>AccessAudit</c> row commit atomically.
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? name,
+        [FromForm] string? description)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+        {
+            TempData["error"] = "A translation needs a name and/or description.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        // Reachability gate (owner ∪ member projection) — the consistent 404
+        // shape every other group write lane uses.
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.AddGroupTranslationAsync(
+                resolved.Group.Id,
+                languageCode,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(description) ? null : description,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var catalog = await localization.ListLanguagesAsync();
+        var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
+        TempData["info"] = $"Translation added ({langName}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
     // ── ADR 0009: the group's description (resident-facing display + the

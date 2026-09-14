@@ -191,6 +191,16 @@ public static class KnownTranslationKeys
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
 
+            // ── ADR 0026 — group name/description translations ───────────
+            ["groups.translations_label"] = "Translations",
+            ["groups.translations_none"] = "None yet",
+            ["groups.translation_add"] = "Add a",
+            ["groups.translation_name_label"] = "Name",
+            ["groups.translation_desc_label"] = "Description",
+            ["groups.translation_optional"] = "optional",
+            ["groups.translation_min_one"] = "At least one of name or description is required.",
+            ["groups.translation_save"] = "Save translation",
+
             // ── directory (page heading + lead) ─────────────────────────────
             ["directory.title"] = "Directory",
             ["directory.lead"]  = "Everyone in the neighborhood — every resident on the platform.",
@@ -394,6 +404,16 @@ public static class KnownTranslationKeys
             ["community.manage_all_members"] =
                 "Everyone in the neighborhood is already a member here.",
             ["community.manage_pick_resident"] = "Pick a resident to add…",
+
+            // ── ADR 0026 — community name/description translations ────────
+            ["community.translations_label"] = "Translations",
+            ["community.translations_none"] = "None yet",
+            ["community.translation_add"] = "Add a",
+            ["community.translation_name_label"] = "Name",
+            ["community.translation_desc_label"] = "Description",
+            ["community.translation_optional"] = "optional",
+            ["community.translation_min_one"] = "At least one of name or description is required.",
+            ["community.translation_save"] = "Save translation",
 
             // ── moderation (Index page) ──────────────────────────────────────
             ["moderation.title"] = "Moderation",

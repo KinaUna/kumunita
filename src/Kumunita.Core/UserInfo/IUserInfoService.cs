@@ -504,6 +504,111 @@ public interface IUserInfoService
     /// exists, or the community is <see cref="Component.Mandatory"/>.</exception>
     Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
 
+    // ── ADR 0026 — group & community name/description translations ─────────
+    // The "separate feature" ADR 0021's scope boundary deferred (and ADR 0022
+    // shipped for posts/replies). Two documents in this context
+    // (GroupTranslation / CommunityTranslation, registered in M1DocTypes), an
+    // add-only write lane each (a hand-written AccessAudit row, C3), a plain
+    // read seam each (no decision, no audit — inherits the parent's reach),
+    // and a public standing probe each the Web uses to decide whether to show
+    // the "add a translation" form. ADR 0006-E compatible — additive to the
+    // owning module's public surface.
+
+    /// <summary>
+    /// The <b>read</b> seam for a group's user-added name/description
+    /// translations (ADR 0026): the <see cref="GroupTranslation"/> rows under
+    /// <paramref name="groupId"/>. Owns its <c>QuerySession</c> (the C3
+    /// read-lane shape). **Not an authorization surface** (the ADR 0022
+    /// "a read, not a decision" pin carried over): the row has no own audience
+    /// — its visibility inherits the group's owner∪member reach, which the
+    /// caller has already made — so this writes **no** audit row.
+    /// </summary>
+    Task<IReadOnlyList<GroupTranslation>> GetGroupTranslationsAsync(string groupId);
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group's name and/or description
+    /// into <paramref name="languageCode"/> (ADR 0026). In the caller's
+    /// in-flight session (C3 — the write + its <see cref="Authorization
+    /// .AccessAudit"/> row commit or roll back atomically). **At least one** of
+    /// <paramref name="name"/> / <paramref name="description"/> must be
+    /// non-blank (a translation with nothing in it is not a translation — an
+    /// <see cref="ArgumentException"/> otherwise). <paramref
+    /// name="languageCode"/> is the target language, written verbatim (a blank
+    /// target is a caller error). <b>Standing:</b> the group's <b>owner</b>
+    /// (<see cref="Authorization.AccessVia.Owner"/>), a <b>GlobalAdmin</b>, or
+    /// a <b>Translator</b> (both <see cref="Authorization.AccessVia.Admin"/>);
+    /// a group member and a component-moderator are denied. A denied actor
+    /// throws <see cref="UnauthorizedAccessException"/> before anything is
+    /// stored. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A blank target language, a blank
+    /// actor, or both name and description blank.</exception>
+    /// <exception cref="KeyNotFoundException">The group id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// owner / GlobalAdmin / Translator standings.</exception>
+    Task<GroupTranslation> AddGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// The public ADR 0026 standing probe the Web layer calls to decide
+    /// whether to render the group "add a translation" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is
+    /// <see cref="AddGroupTranslationAsync"/> standing check, which re-runs the
+    /// same rule server-side). Delegates to the same resolver the write lane
+    /// uses, so the display and the gate can never drift (ADR 0006-D).
+    /// <b>Standing:</b> the group's owner, a GlobalAdmin, or a Translator —
+    /// a group member and a component-moderator are not.
+    /// </summary>
+    bool CanTranslateGroup(string ownerId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// The <b>read</b> seam for a community's user-added name/description
+    /// translations (ADR 0026): the <see cref="CommunityTranslation"/> rows
+    /// under <paramref name="componentId"/>. Owns its <c>QuerySession</c> (the
+    /// C3 read-lane shape). **Not an authorization surface** (the ADR 0022
+    /// "a read, not a decision" pin carried over): the row has no own audience
+    /// — its visibility inherits the community's enabled visibility, which the
+    /// caller has already made — so this writes **no** audit row.
+    /// </summary>
+    Task<IReadOnlyList<CommunityTranslation>> GetCommunityTranslationsAsync(string componentId);
+
+    /// <summary>
+    /// Adds a **user-added translation** of a community's name and/or
+    /// description into <paramref name="languageCode"/> (ADR 0026). In the
+    /// caller's in-flight session (C3). **At least one** of
+    /// <paramref name="name"/> / <paramref name="description"/> must be
+    /// non-blank (an <see cref="ArgumentException"/> otherwise).
+    /// <paramref name="languageCode"/> is the target language, written verbatim.
+    /// <b>Standing:</b> a <b>GlobalAdmin</b> or a <b>Translator</b> (both
+    /// <see cref="Authorization.AccessVia.Admin"/>); a community has no owner,
+    /// so no <see cref="Authorization.AccessVia.Owner"/> branch, and a
+    /// component-moderator is denied (a moderator governs a community's
+    /// *members*, ADR 0012, not its name). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is stored.
+    /// One <c>SaveChangesAsync</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A blank target language, a blank
+    /// actor, or both name and description blank.</exception>
+    /// <exception cref="KeyNotFoundException">The component id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds neither
+    /// the GlobalAdmin nor the Translator standing.</exception>
+    Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// The public ADR 0026 standing probe the Web layer calls to decide
+    /// whether to render the community "add a translation" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is
+    /// <see cref="AddCommunityTranslationAsync"/> standing check, which re-runs
+    /// the same rule server-side). Delegates to the same resolver the write
+    /// lane uses, so the display and the gate can never drift (ADR 0006-D).
+    /// <b>Standing:</b> a GlobalAdmin or a Translator — a community has no
+    /// owner, so no Owner branch, and a component-moderator is not.
+    /// </summary>
+    bool CanTranslateCommunity(string actorId, IReadOnlySet<string> actorRoles);
+
     /// <summary>
     /// The <b>membership rows</b> of a single community (a
     /// <see cref="Component"/> row) — the manage-page member list (ADR

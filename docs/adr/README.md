@@ -29,3 +29,5 @@ Decision / Consequences. New decisions take the next number.
 | 0022 | User-added post & reply translations (the lane ADR 0018 deferred) | Accepted |
 | 0023 | Reply as a report target (extending the M3b report lane) | Accepted |
 | 0024 | Author soft-delete lane (posts + replies, community + group) | Accepted |
+| 0025 | Rich content: Markdown + content images | Accepted |
+| 0026 | Group & community name/description translations | Accepted |

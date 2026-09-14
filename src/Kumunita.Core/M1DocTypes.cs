@@ -95,6 +95,18 @@ public static class M1DocTypes
         opts.Schema.For<LocalizedPage>()
                .UniqueIndex(p => p.Slug, p => p.LanguageCode);  // business key (one page per slug per language)
 
+        // Group / community name+description translations (ADR 0026; the
+        // "separate feature" ADR 0021's scope boundary deferred, the same
+        // user-authored lane ADR 0022 shipped for posts/replies). Each is one
+        // row per (parent, language) pair — the (GroupId|ComponentId,
+        // LanguageCode) unique index enforces that at the DB layer (the
+        // GroupMembership / ComponentMembership business-key convention; the
+        // surrogate Id is the document identity).
+        opts.Schema.For<GroupTranslation>()
+               .UniqueIndex(t => t.GroupId, t => t.LanguageCode);
+        opts.Schema.For<CommunityTranslation>()
+               .UniqueIndex(t => t.ComponentId, t => t.LanguageCode);
+
         // Authorization (audit only — AdminOverride is hand-rolled, see AuthorizationFeature)
         opts.Schema.For<AccessAudit>();
         opts.Schema.For<AuditPurgeSummary>();

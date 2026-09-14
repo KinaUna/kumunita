@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Thirteen_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_Sixteen_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -72,19 +72,27 @@ public sealed class GroupsDetailViewModelTests
         // loaded by the Detail action from ListGroupFeedAsync), GroupPostsTotal
         // (the channel's total count, the "N shown to you" hint) and CanPost
         // (the live GetGroupIdsAsync read that drives the composer's
-        // visibility — the POST gate remains the authoritative deny, G·3). No
+        // visibility — the POST gate remains the authoritative deny, G·3) +
+        // the ADR 0026 name/description translation surface —
+        // GroupTranslations (the "a read, not a decision" row set), Languages
+        // (the enabled-catalog chips / "add a translation" candidate list,
+        // with its HasTranslation flag) and CanTranslate (the display pin
+        // mirroring the write gate — owner ∪ GlobalAdmin ∪ Translator). No
         // Status / InvitedBy / InvitedAt: "who invited, when" lives on the
         // GroupInvitation row's audit lane, not the UI.
         Assert.Equal(
             new[]
             {
                 "CanPost",
+                "CanTranslate",
                 "Description",
                 "GroupId",
                 "GroupPosts",
                 "GroupPostsTotal",
+                "GroupTranslations",
                 "IsOwner",
                 "IsPrivate",
+                "Languages",
                 "Members",
                 "Name",
                 "OwnerDisplayName",
