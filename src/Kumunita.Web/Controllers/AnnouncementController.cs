@@ -227,9 +227,134 @@ public sealed class AnnouncementController(
         // never has to hit the 403.
         bool canEdit = CanEditAnnouncement(a, RoleSet(User), SubjectId(User));
 
+        // ADR 0029 — the announcement's user-added translations (a "a read,
+        // not a decision" surface; the announcement's flat scope gate already
+        // ran in GetAsync above) and the enabled-catalog language set the
+        // chips / "add a translation" candidate list render from (the
+        // ADR 0022 post-detail shape).
+        var translations = await announcements.GetAnnouncementTranslationsAsync(a.Id) ?? [];
+        var enabledLanguages = await SeedLanguagePickerAsync();
+        var translationCodes = translations.Select(t => t.LanguageCode).ToHashSet();
+        var languages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
+            .ToList();
+        var actor = SubjectId(User) ?? string.Empty;
+        var canTranslate = AnnouncementService.CanTranslateAnnouncement(
+            a.Scope, a.CommunityId, actor, RoleSet(User));
+
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
-            authorName, a.AuthorId, a.Pinned, communityName, canEdit));
+            authorName, a.AuthorId, a.Pinned, communityName, canEdit,
+            translations, languages, canTranslate, a.LanguageCode));
+    }
+
+    // ── Add a translation (POST /announcements/{id}/translations) ───────────
+
+    /// <summary>
+    /// A **user-added-translation intake** action (ADR 0029) — the
+    /// ADR 0022 post-translation lane carried to the Announcements bounded
+    /// context. The standing rule (re-checked server-side by
+    /// <see cref="AnnouncementService.AddAnnouncementTranslationAsync"/>): a
+    /// <c>GlobalAdmin</c> or a <c>Translator</c> for any announcement, plus a
+    /// community <c>Moderator</c> of an announcement targeted at a community
+    /// they moderate (a flat community announcement has no such moderator
+    /// lane). The <c>[Authorize(Roles)]</c> gate is coarse — it keeps
+    /// anonymous / plain residents off the route and lets any of the three
+    /// standing-holder roles reach the service; the service is the authority.
+    ///
+    /// The add is **add-only**: a (announcement, language) already translated
+    /// is a shape error (the unique index is the DB-layer backstop) — there is
+    /// no edit / replace lane (the ADR 0022 contract).
+    /// </summary>
+    [HttpPost("{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+
+        // The viewer must be able to see the announcement (re-run the flat
+        // scope gate — a null row is a 404, the announcement lane's non-leaky
+        // posture, unlike the audience-restricted posts lane's 403).
+        var a = await announcements.GetAsync(id, actorId, RoleSet(User));
+        if (a is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.AddAnnouncementTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                RoleSet(User),
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return RedirectToAction("Detail", "Announcement", new { id });
+    }
+
+    /// <summary>
+    /// Seeds the detail page's language chip / "add a translation" candidate
+    /// list (ADR 0005 B) — the instance's **enabled**
+    /// <see cref="Kumunita.Core.Localization.LanguageCatalog"/>, ordered by
+    /// <c>SortOrder</c>. Read through the HTTP-free
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> seam (the exact
+    /// catalog read the <see cref="PostsController"/>'s detail lane uses), so
+    /// the announcement surface mirrors an established lane rather than
+    /// re-deriving the catalog from the store.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => (l.Id, l.NativeName))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Resolves a language code to its native name for a confirmation banner
+    /// (the <see cref="PostsController.SeedLanguageName"/> pattern). A
+    /// "a read, not a decision" catalog lookup; falls back to the raw code
+    /// when the language is not in the catalog (a never-blank shape).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 
     /// <summary>

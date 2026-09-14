@@ -318,6 +318,186 @@ public sealed class AnnouncementService : IAnnouncementService
         session.Delete(announcement);
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
+
+    // ─── ADR 0029 — user-added announcement translations lane ───────────────
+
+    /// <summary>
+    /// The **read** seam for an announcement's user-added translations (ADR
+    /// 0029, mirroring the ADR 0022
+    /// <see cref="Kumunita.Core.Posts.PostService.GetPostTranslationsAsync"/>
+    /// shape): the <see cref="AnnouncementTranslation"/> rows under
+    /// <paramref name="announcementId"/>. Opens its own <c>QuerySession</c>
+    /// (the C3 read-lane shape — reads never touch the caller's write
+    /// session).
+    /// <para>
+    /// <b>Not an authorization surface (the ADR 0022 read-pin carried over):</b>
+    /// a translation has no own audience — its visibility inherits the
+    /// announcement's flat two-way <see cref="AnnouncementScope"/> split,
+    /// which the caller has already made (the Web reads this only after
+    /// <see cref="GetAsync"/> returned the announcement). So this method does
+    /// <b>not</b> gate and writes <b>no</b> <c>AccessAudit</c> row — the same
+    /// "a read, not a decision" pin as the list's as-is return.
+    /// </para>
+    /// </summary>
+    public async Task<IReadOnlyList<AnnouncementTranslation>> GetAnnouncementTranslationsAsync(string announcementId)
+    {
+        if (string.IsNullOrEmpty(announcementId))
+            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<AnnouncementTranslation>()
+            .Where(t => t.AnnouncementId == announcementId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of an announcement in the
+    /// <b>caller's</b> in-flight session (invariant C3 — the
+    /// <see cref="IDocumentSession"/> is the caller's, so the write and the
+    /// in-session <c>AccessAudit</c> row commit or roll back atomically).
+    /// <para>
+    /// <b>Standing (ADR 0029):</b> a <see cref="Roles.GlobalAdmin"/> or a
+    /// <see cref="Roles.Translator"/> (both <see cref="AccessVia.Admin"/> —
+    /// instance-wide, the ADR 0021/0026 Translator standing); and — for a
+    /// <see cref="AnnouncementScope.Community"/> announcement
+    /// <em>targeted</em> at one community — a
+    /// <see cref="Roles.Moderator"/> scoped to that community
+    /// (<see cref="AccessVia.Moderator"/>). A flat community-scope
+    /// announcement (no <c>CommunityId</c>) and a
+    /// <see cref="AnnouncementScope.Public"/> announcement have no community
+    /// to moderate, so the component-moderator standing does not qualify for
+    /// them. A denied actor throws <see cref="UnauthorizedAccessException"/>
+    /// <b>before</b> anything is stored.
+    /// </para>
+    /// <para>
+    /// <paramref name="languageCode"/> is the **target** language (a
+    /// <see cref="Kumunita.Core.Localization.LanguageCatalog.Id"/> the Web
+    /// offers from the enabled catalog); it is written **verbatim** (never
+    /// floored to the instance default — a blank target is a caller error).
+    /// One <c>SaveChangesAsync</c>.
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The announcement id is not
+    /// found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of
+    /// the GlobalAdmin / Translator / (targeted community) component-moderator
+    /// standings.</exception>
+    public async Task<AnnouncementTranslation> AddAnnouncementTranslationAsync(
+        string announcementId,
+        string languageCode,
+        string? title,
+        string body,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(announcementId))
+            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only an admin, a translator, or a moderator of the targeted community " +
+                "may add a translation of this announcement.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new AnnouncementTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            AnnouncementId = announcementId,
+            LanguageCode = languageCode,
+            Title = title,
+            Body = body,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        // Audit row (the ADR 0022 write-lane precedent — a hand-written audit
+        // row with no CanAsync decision call): the Via tag records the
+        // standing the actor used (Admin for GlobalAdmin/Translator,
+        // Moderator for a targeted community's moderator).
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementtranslation.add",
+            TargetKind = "announcement",
+            TargetId = announcementId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <summary>
+    /// The public ADR 0029 standing probe the Web layer calls to decide
+    /// whether to render the "add a translation" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is the
+    /// <see cref="AddAnnouncementTranslationAsync"/> standing check, which
+    /// re-runs the same rule server-side). It delegates to the same
+    /// <see cref="ResolveTranslationStanding"/> the write lane uses, so the
+    /// display and the gate can never drift apart (the
+    /// <see cref="Kumunita.Core.Posts.PostService.CanAddTranslation"/> shape).
+    /// </summary>
+    public static bool CanTranslateAnnouncement(
+        AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveTranslationStanding(scope, communityId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0029 announcement-translation standing resolver (shared by
+    /// <see cref="AddAnnouncementTranslationAsync"/> and
+    /// <see cref="CanTranslateAnnouncement"/>). Returns the
+    /// <see cref="Authorization.AccessVia"/> the actor qualifies under, or
+    /// <c>null</c> to deny. Precedence (most specific standing first, so the
+    /// audit row records the narrowest right that applied): a
+    /// <see cref="Roles.Translator"/> / <see cref="Roles.GlobalAdmin"/>
+    /// (<see cref="Authorization.AccessVia.Admin"/> — instance-wide, the ADR
+    /// 0021/0026 standing), and — only when the announcement is
+    /// <see cref="AnnouncementScope.Community"/> <em>targeted</em> at one
+    /// community — a <see cref="Roles.Moderator"/> scoped to that community
+    /// (<see cref="Authorization.AccessVia.Moderator"/>). A flat community
+    /// (no target) or a <see cref="AnnouncementScope.Public"/> announcement
+    /// has no community to moderate, so the component-moderator branch is
+    /// excluded for it.
+    /// </summary>
+    private static Authorization.AccessVia? ResolveTranslationStanding(
+        AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (actorRoles.Contains(Roles.Translator))
+            return Authorization.AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return Authorization.AccessVia.Admin;
+
+        if (scope == AnnouncementScope.Community
+            && communityId is not null
+            && actorRoles.Contains(Roles.ModeratorComponent(communityId)))
+            return Authorization.AccessVia.Moderator;
+
+        return null;
+    }
+
     /// <summary>
     /// Resolves the actor's read-visibility for announcements: whether they are signed in
     /// (<c>authed</c>), a GlobalAdmin (<c>admin</c> — sees every target), and the set of

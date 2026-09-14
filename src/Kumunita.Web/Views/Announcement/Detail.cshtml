@@ -7,6 +7,17 @@
     string badgeClass = Model.Scope == AnnouncementScope.Public
         ? "text-bg-secondary"
         : "text-bg-primary";
+
+    // ADR 0029 — translation display (TD / ADR 0027, carried to announcements):
+    // the authored-in language is the first, default-visible variant, each
+    // user-added translation is a hidden variant, and the chip row is a
+    // selector that swaps them. The "add a translation" candidate list
+    // excludes the authored-in language (missingLanguages).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    var originalCode = Model.OriginalLanguageCode;
+    var missingLanguages = Model.Languages
+        .Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
 <div class="row justify-content-center">
@@ -16,17 +27,6 @@
                 <kw-l key="announcements.detail_back">&larr; Back to the announcements</kw-l>
             </a>
         </p>
-
-        <h1 class="mb-1">
-            @if (string.IsNullOrWhiteSpace(Model.Title))
-            {
-                <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
-            }
-            else
-            {
-                @Model.Title
-            }
-        </h1>
 
         <div class="d-flex align-items-center gap-2 mb-3">
             <span class="badge @badgeClass">
@@ -64,10 +64,101 @@
 
         <div class="card">
             <div class="card-body">
-                @* The full body (the /announcements list shows the first 250
-                   characters and links here). Rendered through the one
-                   MarkdownRenderer (R·1) — the raw-text treatment is retired. *@
-                <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                @* TD (ADR 0027) — the authored-in language is the first,
+                   default-visible variant; each added translation is a hidden
+                   variant; the chip row is a selector that swaps them. The
+                   title + body are the announcement's toggle scope. *@
+                <div data-td-group="announcement">
+                    @* Original variant (default-visible — no display:none). *@
+                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                        <h1 class="mb-1">
+                            @if (string.IsNullOrWhiteSpace(Model.Title))
+                            {
+                                <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
+                            }
+                            else
+                            {
+                                @Model.Title
+                            }
+                        </h1>
+                        @* The full body (the /announcements list shows the
+                           first 250 characters and links here). Rendered
+                           through the one MarkdownRenderer (R·1). *@
+                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                    </div>
+
+                    @* One hidden variant per user-added translation. *@
+                    @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                    {
+                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                            @if (!string.IsNullOrWhiteSpace(t.Title))
+                            {
+                                <h1 class="mb-1">@t.Title</h1>
+                            }
+                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                        </div>
+                    }
+
+                    @* The chip row — a selector. The original chip is always
+                       present (TD·1); one chip per added translation (TD·2). *@
+                    <div class="mb-3 border-top pt-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="text-muted small fw-semibold">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </span>
+                            <button type="button" class="badge text-bg-light border"
+                                    data-translation-chip data-td-group="announcement"
+                                    data-td-variant="@Model.OriginalLanguageCode">
+                                @LangName(Model.OriginalLanguageCode)
+                            </button>
+                            @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="announcement"
+                                        data-td-variant="@t.LanguageCode">
+                                    @LangName(t.LanguageCode)
+                                </button>
+                            }
+                        </div>
+
+                        @* The "add a translation" lane — one form per supported
+                           language that has no translation yet, offered only to
+                           a standing-holder (GlobalAdmin / Translator / a
+                           community Moderator of a targeted community). The
+                           authored-in language is excluded. The ADR 0029 route
+                           action is the service's write seam. *@
+                        @if (Model.CanTranslate)
+                        {
+                            @foreach (var lang in missingLanguages)
+                            {
+                                <details class="mb-1">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_add">Add a</kw-l> <b>@LangName(lang.Code)</b>
+                                    </summary>
+                                    <form class="ms-2" method="post"
+                                          action="@($"/announcements/{Model.Id}/translations")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@lang.Code" />
+                                        <label class="form-label small" for="ann-t-title">
+                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" id="ann-t-title"
+                                               name="title" value="@Model.Title" />
+                                        <label class="form-label small" for="ann-t-body">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <textarea class="form-control form-control-sm mb-2" id="ann-t-body"
+                                                  name="body" rows="3" required placeholder="…"></textarea>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                </details>
+                            }
+                        }
+                    </div>
+                </div>
             </div>
             @* Author avatar (the Directory pattern): the <img> links the audited
                serving lane (GET /profile/avatar/{subjectId}) and on its

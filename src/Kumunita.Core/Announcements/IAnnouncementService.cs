@@ -123,4 +123,44 @@ public interface IAnnouncementService
     /// See <see cref="AnnouncementService.DeleteAsync"/> for the full contract.
     /// </summary>
     Task DeleteAsync(string announcementId, IDocumentSession session);
+
+    /// <summary>
+    /// The announcement's user-added translations (ADR 0029): the
+    /// <see cref="AnnouncementTranslation"/> rows under
+    /// <paramref name="announcementId"/>, ordered by <c>LanguageCode</c>.
+    /// A "a read, not a decision" surface — no
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> row (the
+    /// visibility gate already ran in <see cref="GetAsync"/>). See
+    /// <see cref="AnnouncementService.GetAnnouncementTranslationsAsync"/>
+    /// for the full contract.
+    /// </summary>
+    Task<IReadOnlyList<AnnouncementTranslation>> GetAnnouncementTranslationsAsync(string announcementId);
+
+    /// <summary>
+    /// Adds a **user-added translation** of an announcement in the
+    /// <b>caller's</b> in-flight session (invariant C3). Standing
+    /// (ADR 0029): a <see cref="Roles.GlobalAdmin"/> or
+    /// <see cref="Roles.Translator"/> (both
+    /// <see cref="Kumunita.Core.Authorization.AccessVia.Admin"/>); and —
+    /// for a <see cref="AnnouncementScope.Community"/> announcement
+    /// <em>targeted</em> at one community — a <see cref="Roles.Moderator"/>
+    /// scoped to that community
+    /// (<see cref="Kumunita.Core.Authorization.AccessVia.Moderator"/>). A
+    /// flat community or a <see cref="AnnouncementScope.Public"/>
+    /// announcement has no community to moderate, so the component-moderator
+    /// standing does not qualify. A denied actor is a hard
+    /// <see cref="UnauthorizedAccessException"/> (the Web layer maps that to a
+    /// 403); a missing id is a <see cref="KeyNotFoundException"/> (mapped to
+    /// a 404). The new row + its <c>AccessAudit</c> row commit atomically.
+    /// See <see cref="AnnouncementService.AddAnnouncementTranslationAsync"/>
+    /// for the full contract.
+    /// </summary>
+    Task<AnnouncementTranslation> AddAnnouncementTranslationAsync(
+        string announcementId,
+        string languageCode,
+        string? title,
+        string body,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session);
 }

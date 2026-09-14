@@ -1340,6 +1340,224 @@ public class AnnouncementServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("Still A's", stored!.Title);
     }
 
+    // ── ADR 0029 — user-added announcement translations ────────────────────
+
+    // The standing matrix — the ADR 0029 rule pinned in isolation, so the
+    // write lane's deny (the real gate) and the display probe can never
+    // drift from this table. A GlobalAdmin / Translator may translate any
+    // announcement; a community Moderator may translate only an announcement
+    // targeted at a community they moderate (a flat community / Public scope
+    // has no such lane); a plain member may never.
+
+    [Theory]
+    [InlineData("public",         "GlobalAdmin")]
+    [InlineData("flat-community", "GlobalAdmin")]
+    [InlineData("targeted-community", "GlobalAdmin")]
+    [InlineData("public",         "Translator")]
+    [InlineData("flat-community", "Translator")]
+    [InlineData("targeted-community", "Translator")]
+    [InlineData("targeted-community", "Moderator")]
+    [InlineData("public",         "Member")]
+    [InlineData("flat-community", "Member")]
+    [InlineData("targeted-community", "Member")]
+    public async Task CanTranslate_StandingMatrix(string lane, string role)
+    {
+        // Map (lane, role) → the announcement shape + actor role set, then run
+        // the public display probe (the same rule the write gate uses) and
+        // assert the expected allow/deny. A Moderator role only carries the
+        // targeted community's standing (moderator:community-A) — a plain
+        // Member role is a bare resident (no standing claims at all).
+        (AnnouncementScope scope, string? communityId) shape = lane switch
+        {
+            "public"             => (AnnouncementScope.Public, null),
+            "flat-community"     => (AnnouncementScope.Community, null),
+            "targeted-community" => (AnnouncementScope.Community, "community-A"),
+            _ => throw new InvalidOperationException(lane),
+        };
+
+        var roles = new HashSet<string>(role switch
+        {
+            "GlobalAdmin" => new[] { Roles.GlobalAdmin },
+            "Translator"  => new[] { Roles.Translator },
+            "Moderator"   => new[] { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+            "Member"      => new string[0],
+            _ => throw new InvalidOperationException(role),
+        });
+
+        var expectedAllow = role is "GlobalAdmin" or "Translator"
+            || (role == "Moderator" && lane == "targeted-community");
+
+        var actual = AnnouncementService.CanTranslateAnnouncement(
+            shape.scope, shape.communityId, "u-actor", roles);
+
+        Assert.Equal(expectedAllow, actual);
+    }
+
+    /// <summary>
+    /// A GlobalAdmin adds a translation of a <see cref="AnnouncementScope.Public"/>
+    /// announcement (the most restrictive lane — no community to moderate): the
+    /// <see cref="AnnouncementTranslation"/> row persists under the (announcement,
+    /// language) key and an <see cref="AccessAudit"/> row records the
+    /// <see cref="Authorization.AccessVia.Admin"/> standing (the ADR 0021/0026
+    /// instance-wide standing, not a new Via member).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_Public_ByGlobalAdmin_Persists_WithAudit()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-t", Scope = AnnouncementScope.Public,
+            Title = "Original title", Body = "Original body",
+            AuthorId = "u-author", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+        });
+
+        await using var session = newSession(store);
+        var saved = await svc.AddAnnouncementTranslationAsync(
+            "pub-t", "fr", "Titre traduit", "Corps traduit",
+            "u-admin", new HashSet<string> { Roles.GlobalAdmin }, session);
+
+        Assert.Equal("pub-t", saved.AnnouncementId);
+        Assert.Equal("fr", saved.LanguageCode);
+        Assert.Equal("Titre traduit", saved.Title);
+        Assert.Equal("Corps traduit", saved.Body);
+
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<AnnouncementTranslation>(saved.Id, TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pub-t" && a.Action == "announcementtranslation.add");
+        Assert.Equal(Authorization.AccessVia.Admin, row.Via);
+        Assert.Equal(Authorization.AccessOutcome.Allow, row.Outcome);
+        Assert.Equal("u-admin", row.ActorId);
+    }
+
+    /// <summary>
+    /// A community Moderator of the <em>targeted</em> community adds a
+    /// translation (the community-moderator lane — the ADR 0029 case that only
+    /// exists for a targeted <c>Community</c> scope): the row persists under the
+    /// Moderator standing, not the Admin standing (the narrowest right that
+    /// applied is the one the audit row records).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_TargetedByCommunityModerator_Persists_ModeratorVia()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "comm-t", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Original", Body = "Body", AuthorId = "u-admin",
+            Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+
+        await using var session = newSession(store);
+        await svc.AddAnnouncementTranslationAsync(
+            "comm-t", "es", "Título", "Cuerpo",
+            "u-mod-A", new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-A") }, session);
+
+        await using var q = store.QuerySession();
+        var row = (await q.Query<AccessAudit>()
+            .Where(a => a.TargetId == "comm-t" && a.Action == "announcementtranslation.add")
+            .ToListAsync(TestContext.Current.CancellationToken)).Single();
+        Assert.Equal(Authorization.AccessVia.Moderator, row.Via);
+    }
+
+    /// <summary>
+    /// A community Moderator of a <em>different</em> community is denied a
+    /// target-<c>community-A</c> announcement: the standing is scoped to the
+    /// announcement's <see cref="Announcement.CommunityId"/> (the ADR 0029
+    /// pin — a moderator's standing is not instance-wide like an admin's),
+    /// and nothing is written (the deny precedes the <c>SaveChangesAsync</c>).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_TargetedByOtherCommunityModerator_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Component { Id = "community-A", Name = "Community A", Enabled = true });
+        await Plant(store, new Component { Id = "community-B", Name = "Community B", Enabled = true });
+        await Plant(store, new Announcement
+        {
+            Id = "comm-deny", Scope = AnnouncementScope.Community, CommunityId = "community-A",
+            Title = "Original", Body = "Body", AuthorId = "u-admin",
+            Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddAnnouncementTranslationAsync(
+                "comm-deny", "fr", "Titre", "Corps",
+                "u-mod-B", new HashSet<string> { Roles.Moderator, Roles.ModeratorComponent("community-B") }, session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<AnnouncementTranslation>()
+            .Where(t => t.AnnouncementId == "comm-deny")
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// A plain Member is denied every lane (the standing matrix's deny pin,
+    /// exercised through the write gate — a <see cref="UnauthorizedAccessException"/>
+    /// and no row).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_ByPlainMember_Denied_NotPersisted()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await Plant(store, new Announcement
+        {
+            Id = "pub-deny", Scope = AnnouncementScope.Public,
+            Title = "Original", Body = "Body", AuthorId = "u-admin",
+            Created = DateTimeOffset.UtcNow, LanguageCode = "en",
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddAnnouncementTranslationAsync(
+                "pub-deny", "fr", "Titre", "Corps",
+                "u-member", new HashSet<string>(), session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<AnnouncementTranslation>()
+            .Where(t => t.AnnouncementId == "pub-deny")
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+    }
+
+    /// <summary>
+    /// A missing announcement id is a <see cref="KeyNotFoundException"/>
+    /// (mapped to a 404 by the Web layer — the write lane does not silently
+    /// succeed on a dangling reference).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_MissingAnnouncement_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var svc = new AnnouncementService(store, userInfo);
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.AddAnnouncementTranslationAsync(
+                "no-such-announcement", "fr", "Titre", "Corps",
+                "u-admin", new HashSet<string> { Roles.GlobalAdmin }, session));
+    }
+
     // ── Shared helpers ─────────────────────────────────────────────────────
 
     private async Task<IDocumentStore> BootStoreAsync()

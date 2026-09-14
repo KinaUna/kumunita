@@ -33,3 +33,4 @@ Decision / Consequences. New decisions take the next number.
 | 0026 | Group & community name/description translations | Accepted |
 | 0027 | Post & reply translation display & swap: authored-in as a first-class variant + click-to-swap | Accepted |
 | 0028 | Guardian controls: account-scope supervision of a child's account (suspend, communities/groups, invitation approval; no content reads) | Accepted |
+| 0029 | Announcement user-added translations (GlobalAdmin/Translator any; community-Moderator their community's; add-only) | Accepted |

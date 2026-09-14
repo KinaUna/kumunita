@@ -8,6 +8,7 @@ using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using NSubstitute;
 
 namespace Kumunita.Web.Tests;
@@ -867,6 +868,221 @@ public class AnnouncementControllerTests
     /// for the read-gate pin.
     /// </summary>
     /// <summary>
+    // ── ADR 0029 — AddTranslation (POST /announcements/{id}/translations) ──
+
+    /// <summary>
+    /// The happy path: a standing-holder (GlobalAdmin) adds a translation.
+    /// The controller validates the form shape (language code + non-empty
+    /// body), confirms the viewer can see the announcement (the flat scope
+    /// gate re-run via <see cref="IAnnouncementService.GetAsync"/>), and then
+    /// delegates the write + standing decision to
+    /// <see cref="IAnnouncementService.AddAnnouncementTranslationAsync"/>
+    /// (the service is the authority — the controller never re-derives the
+    /// standing split itself, ADR 0006-D). On success, a <c>TempData["info"]</c>
+    /// confirmation and a redirect back to the detail page.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-t-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, "fr", "Titre", "Corps", "subj-admin-001",
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(new AnnouncementTranslation
+            {
+                Id = "tr-001", AnnouncementId = id, LanguageCode = "fr",
+                Title = "Titre", Body = "Corps", AuthorId = "subj-admin-001",
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation(id, "fr", "Titre", "Corps");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        Assert.Equal("Announcement", redirect.ControllerName);
+
+        await announcements.Received(1).AddAnnouncementTranslationAsync(
+            id, "fr", "Titre", "Corps", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A community Moderator of the targeted community adds a translation —
+    /// the ADR 0029 community-moderator lane, exercised through the Web
+    /// surface (the service's standing re-check is the real gate; the
+    /// controller only pins the route + shape + the flat-scope precondition).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_TargetedByCommunityModerator_HappyPath_Redirects()
+    {
+        const string id = "ann-t-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-mod-A", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Community, CommunityId = "community-A",
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, "es", "Título", "Cuerpo", "subj-mod-A",
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(new AnnouncementTranslation
+            {
+                Id = "tr-002", AnnouncementId = id, LanguageCode = "es",
+                Title = "Título", Body = "Cuerpo", AuthorId = "subj-mod-A",
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+            IsAuthenticated: true, subjectId: "subj-mod-A");
+
+        var result = await controller.AddTranslation(id, "es", "Título", "Cuerpo");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).AddAnnouncementTranslationAsync(
+            id, "es", "Título", "Cuerpo", "subj-mod-A",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.ModeratorComponent("community-A"))), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A standing-denied actor (the service's <see
+    /// cref="UnauthorizedAccessException"/>) maps to a clean <see
+    /// cref="ForbidResult"/> — the controller does not swallow the exception
+    /// into a 500, and the write lane never persists on a deny (the service
+    /// throws before its <c>SaveChangesAsync</c>).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_Denied_Forbid_NoWrite()
+    {
+        const string id = "ann-t-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<AnnouncementTranslation>(
+                new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.AddTranslation(id, "fr", "Titre", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// A missing (or not-visible) announcement: the service's
+    /// <see cref="IAnnouncementService.GetAsync"/> returns <c>null</c> (the
+    /// gate already ran) and the controller maps that to a clean
+    /// <see cref="NotFoundResult"/> — the write lane never touches a dangling
+    /// reference.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-t-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-missing", "fr", "Titre", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A blank <c>languageCode</c> is a shape error — the controller
+    /// short-circuits with a redirect back to the detail page (the form
+    /// re-renders with the error) and never calls the service's write seam.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_BlankLanguageCode_RedirectsBack_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-001", "   ", "Titre", "Corps");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A blank <c>body</c> is a shape error (the same short-circuit as
+    /// <see cref="AddTranslation_BlankLanguageCode_RedirectsBack_NoWrite"/>):
+    /// a translation needs some text, and the write seam is never called.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_BlankBody_RedirectsBack_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-001", "fr", "Titre", "");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// An anonymous caller (no authenticated principal): the controller's
+    /// <c>SubjectId(User)</c> is <c>null</c> and the lane short-circuits to a
+    /// <see cref="ForbidResult"/> before touching the service — the write seam
+    /// is never called and no write is persisted.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.AddTranslation("ann-t-001", "fr", "Titre", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
     /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
     /// the compose form's language picker: an empty enabled catalog + the
     /// <c>en</c> instance-default floor (a valid shape — the view renders an
@@ -905,9 +1121,10 @@ public class AnnouncementControllerTests
         var localization = DefaultLocalization();
 
         var controller = new AnnouncementController(announcements, userInfoImpl, localization, store);
+        var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext(),
+            HttpContext = httpContext,
         };
 
         if (IsAuthenticated || (roles is { Length: > 0 }))
@@ -922,6 +1139,23 @@ public class AnnouncementControllerTests
                 new ClaimsIdentity(claims, authenticationType: "test"));
         }
 
+        // The write lanes (AddTranslation / Edit / Delete) all touch TempData on
+        // the way out — the harness has no ITempDataProvider by default, so the
+        // controller's TempData property NREs on first access. A no-op fake
+        // (the AdminDateFormatControllerTests / MLUI_FacesTests pattern) closes
+        // it without requiring a real ISession.
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+
         return controller;
+    }
+
+    private sealed class NoOpTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object?> LoadTempData(HttpContext context) =>
+            new Dictionary<string, object?>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
+        {
+            // no-op — the assertion target is the redirect / the call log, not the bag
+        }
     }
 }

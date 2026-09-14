@@ -67,7 +67,39 @@ public sealed record AnnouncementDetailViewModel(
     /// <c>EnsureWritePermissionAsync</c> split is the real gate — the button
     /// is just the affordance, so a non-authorized viewer never sees it).
     /// </summary>
-    bool CanEdit);
+    bool CanEdit,
+
+    // ── ADR 0029 — user-added announcement translations ──
+
+    /// <summary>The announcement's user-added translations (a "a read, not a
+    /// decision" surface; the announcement's flat
+    /// <see cref="AnnouncementScope"/> gate already ran in
+    /// <see cref="Kumunita.Core.Announcements.AnnouncementService.GetAsync"/>).
+    /// Renders as the hidden chip-swappable variants on the detail page.</summary>
+    IReadOnlyList<Kumunita.Core.Announcements.AnnouncementTranslation> Translations,
+
+    /// <summary>Every enabled <see cref="Kumunita.Core.Localization
+    /// .LanguageCatalog"/> language (in <c>SortOrder</c>) with its
+    /// <see cref="LanguageOption.HasTranslation"/> flag — the set the
+    /// "available translations" chips and the "add a translation" candidate
+    /// list render from (the shared <see cref="PostDetailViewModel"/>
+    /// record, the ADR 0022 shape).</summary>
+    IReadOnlyList<LanguageOption> Languages,
+
+    /// <summary>Whether the signed-in actor holds standing to <b>add</b> a
+    /// translation of this announcement (ADR 0029 — a GlobalAdmin, a
+    /// Translator, and — for a targeted <c>Community</c> scope — that
+    /// community's moderator). A display pin, not a gate: the real deny is
+    /// <see cref="Kumunita.Core.Announcements.AnnouncementService
+    /// .AddAnnouncementTranslationAsync"/>'s standing check. When false, no
+    /// "add a translation" affordance renders.</summary>
+    bool CanTranslate,
+
+    /// <summary>The language the announcement was **authored in** (ADR
+    /// 0018, <see cref="Announcement.LanguageCode"/>) — the detail surface
+    /// renders this code as the **first, default-visible** variant chip, and
+    /// the "Add a …" candidate list excludes it (the ADR 0027 / TD shape).</summary>
+    string OriginalLanguageCode);
 
 /// <summary>The /announcements/new create form (the write lane) — also reused for the
 /// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share
