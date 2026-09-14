@@ -93,6 +93,11 @@ log an accountability mechanism ("prove what happened", OPS.md §9) — but it m
 - Do not "fix" it by dropping `targetId` or denials — that removes the accountability
   the community is promised.
 
+**"Minor" is not a stored data class.** A child's status as a supervised account is
+carried by the `GuardianLink` row (ADR 0028), not by a stored age or birthdate — so the
+guardian lane adds a *control* without adding a sensitive PII field. This keeps rule 5
+(minimize: "what we don't store, we can't leak") intact even as the feature lands.
+
 ## 4. Assumed adversaries
 
 Ranked by realism at this scale. Each maps to the controls that answer it.
@@ -105,6 +110,7 @@ Ranked by realism at this scale. Each maps to the controls that answer it.
 | A4 | **Malicious / hostile GlobalAdmin** | read everything, suppress others, extend their power | two-admin standing practice; no in-app `AdminOverride` creation; operator-only break-glass; `BreakGlass`-tagged audit (ADR 0003, ARCHITECTURE.md §4.5) |
 | A5 | **Third parties & operator path** (SMTP provider, object store, VPS host, operator mistake) | leak data at B4/B5, misconfigure | encryption at rest + at source, scoped keys, SPF/DKIM/DMARC, least-privilege DB user, backups-verified (OPS.md §4, §7, §10) |
 | A6 | **Supply chain** (base image, NuGet/npm) | malicious or stale dependency | pinned image + package versions; rebuild on base updates (OPS.md §10); two-project solution with no heavy runtime deps (ADR 0001) |
+| A7 | **The hostile or over-reaching guardian** (a parent supervising a child's account) | over a minor who may not contest it out-of-platform, use the supervision lane to silence the child (suspend without cause), or try to grow the lane beyond account-level control into reading the child's private content | standing comes from *creating* the account, no self-serve claim over a stranger (ADR 0028 G·4); the lane is **account-scope only** — the content path has no guardian branch, so the exposure is never the child's private life (ADR 0028 G·1); the **safety valve**: a GlobalAdmin dissolves any link or un-suspends any account, audited `Via: Admin` (ADR 0028 G·5) |
 
 **Not assumed (documented, not designed for):** nation-state actors; VPS-level physical
 access; a compromised Coolify platform. If the deployment context changes, add them.
@@ -132,6 +138,7 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Non-superuser DB, internal-only | A1, A5 | OPS.md §10 |
 | Encrypted offsite backups + verified restores | A5, disaster | OPS.md §4–5 |
 | Pinned image + packages | A6 | OPS.md §10 |
+| Guardian standing is creation-based, account-scope (no content read), and community-reversible | A7 | ADR 0028 G·4/G·1/G·5; the content path has no `Via: Guardian` branch; GlobalAdmin dissolve/un-suspend audited `Via: Admin` |
 | SPF / DKIM / DMARC, stable From: | phishing-as-us (A3 impersonation) | OPS.md §7 |
 | Audit log (always-on, tiered retention) | accountability for A3, A4 | ARCHITECTURE.md §5 |
 | Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |

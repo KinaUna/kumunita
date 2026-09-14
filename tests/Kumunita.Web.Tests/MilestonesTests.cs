@@ -16,7 +16,7 @@ public class MilestonesTests
     public void Roadmap_Covers_M0_Through_M6_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "TZ", "DF", "TR", "RC", "M4", "M5", "M6" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "TZ", "DF", "TR", "RC", "GU", "M4", "M5", "M6" },
             Ids.ToList());
     }
 
@@ -31,11 +31,11 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void Events_Is_The_Single_InProgress_Milestone()
+    public void GuardianControls_Is_The_Single_InProgress_Milestone()
     {
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Single(next);
-        Assert.Equal("M4", next[0].Id);
+        Assert.Equal("GU", next[0].Id);
     }
 
     [Fact]
