@@ -506,6 +506,37 @@ export function bindRichEditor(root: HTMLElement): void {
   textarea.addEventListener('input', renderPane);
   renderPane(); // initial render (so the preview is populated on load)
 
+  // IE·1, D1/D2 — the view toggle (additive; the existing wiring is
+  // untouched). Finds the data-ie-toggle button, sets the initial
+  // state (source hidden, pane visible), and wires the click to
+  // toggle the source visibility + swap the button's label.
+  // If the button is absent (a view not yet updated), this block is a
+  // no-op — the editor works exactly as it did before IE.
+  const toggle = root.querySelector<HTMLButtonElement>('button[data-ie-toggle]');
+  if (toggle) {
+    const srcHidden = 'rc-editor-source-hidden';
+    const paneActive = 'rc-editor-pane-active';
+    const setView = (showSource: boolean): void => {
+      textarea.classList.toggle(srcHidden, !showSource);
+      if (previewPane) previewPane.classList.toggle(paneActive, showSource);
+      // Label swap: the <kw-l> is server-rendered (LocalizeTagHelper);
+      // a client-side key attribute change does NOT live-update the
+      // label. The key swap is the pin (HTML-source correctness + a11y);
+      // the <kw-l> element's textContent swap is the load-bearing live
+      // path (the button may have whitespace text nodes around the
+      // <kw-l>, so target the element directly, not lastChild).
+      const kw = toggle.querySelector('kw-l');
+      if (kw) {
+        kw.setAttribute('key', showSource ? 'rc.editor.showPreview' : 'rc.editor.source');
+        kw.textContent = showSource ? 'Preview' : '</>';
+      }
+    };
+    setView(false); // IE·1: the rendered pane is the default view (source hidden).
+    toggle.addEventListener('click', () => {
+      setView(!textarea.classList.contains(srcHidden));
+    });
+  }
+
   // Wire each toolbar button to the right pure splice function.
   const buttons = Array.from(
     toolbar.querySelectorAll<HTMLButtonElement>('button[data-md]'),

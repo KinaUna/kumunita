@@ -843,3 +843,11 @@ body.kmb-page-fullbleed {
   font-size: 0.875rem;
   line-height: 1.5;
 }
+/* --- Inline editor (IE U1) — the source is hidden by default (IE·1) ---
+   Hiding is a CSS class (display: none), never `disabled` (which would
+   break form binding) and never the `hidden` attribute (which would
+   remove it from tab order + the form-submit set). RE·1 unchanged: the
+   textarea is still the single source of truth the server binds. */
+.rc-editor textarea.rc-editor-source-hidden {
+  display: none;
+}
