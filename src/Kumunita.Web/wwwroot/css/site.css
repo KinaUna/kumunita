@@ -789,20 +789,16 @@ body.kmb-page-fullbleed {
 }
 
 /* --- Rich editor (RE U03) -------------------------------------------------
-   The split-view authoring surface (D1): a source textarea beside a
-   read-only rendered preview pane. The preview wraps its output in
-   <div class="rc-body rc-editor-pane"> so it inherits the RC body
-   typography (.rc-body) — **no** re-definition of .rc-body or .rc-image.
-   Boring: no shadows, no new palette, no grid framework. */
+   The authoring surface (D1): a toolbar row, a source textarea row, then a
+   read-only rendered preview row — each on its own row, full width. The
+   preview wraps its output in <div class="rc-body rc-editor-pane"> so it
+   inherits the RC body typography (.rc-body) — **no** re-definition of
+   .rc-body or .rc-image. Boring: no shadows, no new palette, no grid
+   framework. */
 .rc-editor {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.75rem;
-}
-@media (min-width: 768px) {
-  .rc-editor {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 .rc-editor-toolbar {
   display: flex;

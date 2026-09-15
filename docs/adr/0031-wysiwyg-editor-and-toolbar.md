@@ -52,10 +52,13 @@ dependency) would (a) break the `tsc`-only constraint, (b) introduce an
 HTML → Markdown *round-trip* the codebase has no engine for, and (c) fight
 RC's `ImageIds` parse (which reads the *source* text, not a DOM). The boring,
 correct choice is a **split view**: the existing `<textarea>` (the *source*,
-the form field the server binds) beside a **read-only rendered pane** that
+the form field the server binds) above a **read-only rendered pane** that
 re-renders on every `input`. **No second renderer, no HTML round-trip, no
 dependency.** This is the "live preview pane" ADR 0025's composer line
-promised and never shipped.
+promised and never shipped. (Layout: the toolbar, the source textarea, and
+the preview each sit on their own full-width row — toolbar on top, then
+source, then preview — a change to the CSS arrangement only; the D1–D3
+decisions above are unaffected by how the rows are laid out.)
 
 **D2 — Toolbar = Markdown text splicing, in one shared `tsc`-only TS
 module.** `client/lib/rich-editor.ts` renders a toolbar above any
