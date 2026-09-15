@@ -496,3 +496,160 @@ present (functional); removed where it is absent (inert). The
 `rich-editor.js` include is per-view in `@section Scripts` (not
 layout-level). The `rc.editor.*` `<kw-l>` keys are **referenced** but
 **not yet registered** in `KnownTranslationKeys` (U08 lands them).
+
+## U5 — Group-post + announcement composers wired
+
+**Date:** 2026-09-15
+
+**Deliverables shipped (exactly 4 files, the closed set):**
+
+1. `src/Kumunita.Web/Views/Groups/New.cshtml` (modified) — the body
+   `<textarea name="Body">` is now wrapped in **U04's canonical**
+   `.rc-editor` split-view pattern:
+   - `<div class="rc-editor">` → `<div class="rc-editor-toolbar"
+     data-rich-editor>` with the **full 10-button** toolbar (bold,
+     italic, code, h1, h2, h3, ul, ol, link, image — **no**
+     `quote`/blockquote, the U1 drift pause holds).
+   - The original `<textarea>` preserved (`name="Body"`, `id="body"`,
+     `class="form-control"`, `rows="6"`, `required`, `placeholder="…"`,
+     **plus** `data-rich-editor` **and** `data-image-target`), with
+     `@Model.Body` value binding kept.
+   - `<div class="rc-editor-pane rc-body" aria-live="polite"
+     data-rich-editor-preview></div>`.
+   - The RC `rc-insert-image` file-input block + the "Pick a photo"
+     hint are **kept** (mirrors U04's Post New — a functional secondary
+     image affordance, the `insert-image.ts` module self-wires it via
+     `data-image-target`).
+   - `<script type="module" src="~/js/lib/rich-editor.js"></script>`
+     added to `@section Scripts` (per-view, not layout-level — U04's
+     include decision).
+   - **Image button ON** (full 10-button toolbar + `data-image-target`).
+     The RC group-new write lane is wired (`GroupsController:1085`
+     `CreateGroupPostAsync` → `ImageIds: ExtractContentImageIds(...)`);
+     serve works via the post branch of `ContentImageController`.
+
+2. `src/Kumunita.Web/Views/Groups/Edit.cshtml` (modified) — the **same**
+   pattern, **except**:
+   - The toolbar carries `data-rich-editor-no-image` (the U03 module
+     removes the `data-md="image"` button from the DOM at bind time).
+   - The textarea **drops** `data-image-target` (keeps
+     `data-rich-editor`).
+   - The `rc-insert-image` block **and** the "Pick a photo" hint are
+     **removed** (dead UI — the file-input is inert without
+     `data-image-target`; mirrors U04's Post Edit choice).
+   - **Image button OFF.** **Why:** `UpdateGroupPostAsync` (RC drift
+     pause (c) analog) sets `post.Body` / `post.Title` /
+     `post.LanguageCode` / `post.Modified` but **never** `post.ImageIds`
+     — a new image would store in `Body` but the post's `ImageIds`
+     collection stays stale → the read path 404s. **No**
+     `ImageIds = ExtractContentImageIds(...)` line added (that is an RC
+     follow-up, not RE scope — RE·3).
+   - The `@Model.Body` value binding is **preserved**. The
+     `rich-editor.js` include added (per-view); the RC
+     `insert-image.js` include is **left in place** (inert without
+     `data-image-target`, but removing it is out of RE scope — RE·3;
+     recorded in the view's comment).
+
+3. `src/Kumunita.Web/Views/Announcement/New.cshtml` (modified) — same
+   pattern, **except**:
+   - Toolbar carries `data-rich-editor-no-image`; the textarea **drops**
+     `data-image-target`.
+   - The `rc-insert-image` block **and** the "Pick a photo" hint are
+     **removed** (dead UI).
+   - The textarea's original attributes are preserved as-is — **note**
+     the announcement body textarea has **no** `placeholder` attribute
+     (unlike the post/group ones), and that is preserved (no
+     `placeholder` added; the copy keeps each view's exact textarea
+     shape).
+   - **Image button OFF.** **Why:** RC U03 drift pause — the write lane
+     **does** populate `ImageIds` (verified: `AnnouncementController:455`
+     New → `ImageIds = ContentImageIds.ExtractContentImageIds(model.Body)`),
+     but `ContentImageController.Serve` has **no** announcement branch
+     (inert-404: returns `NotFound()` for an `Announcement` resource — no
+     `AnnouncementToAuditableResource` adapter). An image would store in
+     `ImageIds` but 404 on serve.
+   - The `rich-editor.js` include added (per-view); the RC
+     `insert-image.js` include left in place (inert, RE·3).
+
+4. `src/Kumunita.Web/Views/Announcement/Edit.cshtml` (modified) — **same**
+   as #3 (the announcement **edit** write lane also populates `ImageIds`
+   (`AnnouncementController:575` → `ImageIds =
+   ContentImageIds.ExtractContentImageIds(model.Body)`), but the serve
+   branch is the **same** inert-404 gap). Image button OFF;
+   `rc-insert-image` block + hint removed; textarea shape preserved
+   (no `placeholder`).
+
+**Copy-verify (RE·2 — one pattern):** the text toolbar (10 buttons, **no**
+`quote`) + the `.rc-editor-pane rc-body` preview pane + the
+`aria-live="polite"` + the `data-rich-editor` / `data-rich-editor-preview`
+attribute contract are **byte-identical** to U04's `Posts/New` +
+`Posts/Edit` across all four views. The **only** expected delta is the
+image-button gate:
+
+| View | Image button | Toolbar | `data-image-target` | `rc-insert-image` |
+|---|---|---|---|---|
+| `Groups/New` | **ON** | full 10 (incl. `data-md="image"`) | **kept** | **kept** (mirrors U04 Post New) |
+| `Groups/Edit` | **OFF** | `data-rich-editor-no-image` | **dropped** | **removed** (dead UI) |
+| `Announcement/New` | **OFF** | `data-rich-editor-no-image` | **dropped** | **removed** (dead UI) |
+| `Announcement/Edit` | **OFF** | `data-rich-editor-no-image` | **dropped** | **removed** (dead UI) |
+
+The drift guard checks this **expected** delta (the image-button gate +
+`rc-insert-image` presence), not byte-identity — exactly as U04 recorded.
+
+**Announcement save-action parity (recorded, not re-shaped):** both
+announcement save lanes bind `Body` **identically** to the post save
+convention — `AnnouncementController` New (`:448`) and Edit (`:568`) both
+set `Body = model.Body!` **and** `ImageIds =
+ContentImageIds.ExtractContentImageIds(model.Body)`. So the announcement
+`Body` binding is **not** a drift from the post save — the **only** gap on
+the announcement surfaces is the RC U03 **serve** branch (inert-404),
+which is what gates the image button. **No** save action was re-shaped (RC
+R·1 holds).
+
+**The `insert-image.js` include (RC's, not RE's):** found **present** in
+all four views (pre-existing RC U05 include in each `@section Scripts`). On
+the three image-OFF views it is **inert** (no `data-image-target` + no
+`rc-insert-image` file-input), but it is **left in place** per U04's
+reasoning — removing RC's include is out of RE scope (RE·3 forbids touching
+frozen RC seams). Each image-OFF view's comment now records *why* it is
+inert on that surface (the named RC drift pause).
+
+**The `rc.editor.*` `<kw-l>` keys:** referenced in all four views' button
+labels; **not** registered in `KnownTranslationKeys` (U08 owns that — the
+TagHelper `en` fallback renders the key string until then, per U04).
+
+**Build status (both green):**
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded in 7.3s**
+  (the 4 Razor views compile; no C# touched).
+- `npm run build --prefix src/Kumunita.Web` — **tsc green** (the U03
+  module still compiles; this unit adds only Razor markup, no TS change).
+
+**Drift pause: none.** All four views' body fields are plain
+`<textarea name="Body">` bound to `@Model.Body` as expected (the
+announcement ones simply lack a `placeholder`, which was preserved). The
+U03 module's `bindRichEditor` contract
+(`textarea[data-rich-editor]` + `.rc-editor-toolbar` +
+`[data-rich-editor-preview]` under `root`) is satisfied by all four
+markups. The `data-rich-editor-no-image` gate works as pinned (the module
+removes the image button from the DOM at bind time). No frozen RC seam is
+re-shaped; no C# touched.
+
+**Scope check (hard constraints honored):** no new dependency, no
+`.csproj` change, no `package.json` change (RE·3); **no**
+`quote`/blockquote button (U1 drift pause); `rc.editor.*` keys **not**
+registered (U08); `Milestones.cs` / `README` / `MilestonesTests.cs` / ADR
+index untouched (U08); the reply composers (`Posts/Detail`,
+`Groups/PostDetail`, `Announcement/Detail`) **not** wired (U06's surface);
+the `UpdateGroupPostAsync` / `AnnouncementController` save lanes left
+frozen (no `ImageIds` line added on the group-edit gap).
+
+**Git status (expected, before move):**
+- `src/Kumunita.Web/Views/Groups/New.cshtml` (modified)
+- `src/Kumunita.Web/Views/Groups/Edit.cshtml` (modified)
+- `src/Kumunita.Web/Views/Announcement/New.cshtml` (modified)
+- `src/Kumunita.Web/Views/Announcement/Edit.cshtml` (modified)
+- `docs/plans-milestones/in-progress/rich-editor-handoff-notes.md`
+  (modified — the U5 section appended)
+- `docs/plans-milestones/in-progress/rich-editor-u05-plan.md` →
+  `docs/plans-milestones/done/rich-editor-u05-plan.md` (moved last)
