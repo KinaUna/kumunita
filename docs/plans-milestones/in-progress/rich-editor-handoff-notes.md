@@ -225,3 +225,163 @@ value, **re-rendered on every `input`**. `renderPreview` is pure (no hidden
 state, no `contenteditable` mirror, no `body.innerHTML` as a source) — a
 toolbar button is a pure text splice **into the textarea**, and the form still
 submits the textarea's `value` exactly as RC does.
+
+## U3 — Editor module + CSS
+
+**Date:** 2026-09-15
+
+**Deliverables shipped (exactly 2 files, the closed set):**
+
+1. `src/Kumunita.Web/client/lib/rich-editor.ts` (new) — a `tsc`-only,
+   self-wiring ES module (the `insert-image.ts` pattern) exporting
+   **exactly** the register's pinned contract:
+   - `renderPreview(markdown: string): string` — RE·2, D3. Escapes HTML
+     first (the 5 HTML-significant chars, the `MarkdownRenderer.HtmlEscape`
+     set), then maps **only** the RC-pinned subset (headings 1–6,
+     paragraphs, `- `/`* ` lists, `1. ` lists, fenced code, `**bold**` →
+     `<strong>`, `*italic*` → `<em>`, `` `code` `` → `<code>`,
+     `[label](url)` → `<a>` under the client `IsSafeUrl` mirror,
+     `![alt](src)` → `<img class="rc-image" loading="lazy" />` under the
+     client `isSafeImageSrc` mirror). Emits **only** that set. **No**
+     blockquote (`> `), tables, footnotes, or raw HTML (the U2 mirror
+     checklist ceiling).
+   - `applyToggle(md, sel, kind:'bold'|'italic'|'code') → {value, sel}` —
+     RE·1. Wraps the selection in the kind's markers, or **removes** them
+     if the selection is already wrapped (the RE2 toggle-off FACES —
+     implemented as **two** toggle-off cases: (A) the selection **is** the
+     markers + content; (B) the selection is **inside** the markers).
+     Preserves/returns the caret (the selection lands on the content,
+     shifted by the marker length on each side).
+   - `applyBlock(md, caret, kind:'h1'|'h2'|'h3'|'ul'|'ol') → {value, caret}`
+     — RE·1. Inserts the block marker + trailing space at the start of the
+     caret's line. **No** `'quote'` (U1 drift pause: `MarkdownRenderer`
+     has no blockquote branch; RE·2 forbids a marker the server renderer
+     lacks). The register's `applyBlock` signature includes `'quote'` —
+     **deviation from the register, in favor of the primary tier (the
+     design doc) + the U2 mirror checklist**, which both set the union to
+     `'h1'|'h2'|'h3'|'ul'|'ol'`.
+   - `applyLink(md, sel, url) → {value, sel}` — RE·2. Wraps the selection
+     as `[label](url)`; the selection is preserved on the label.
+   - `imageLink(alt, id): string` — RC R·3 byte-identical. Returns exactly
+     `![alt](/content-image/{id})` — `ContentImageIds.FullSrcRe` picks it
+     up unchanged.
+   - `isSafeImageSrc(src): boolean` — **exported** (the design doc pins
+     this as a separate export for U07's parity tests). Verbatim mirror of
+     `MarkdownRenderer.IsSafeImageSrc`: (a) `/content-image/` + 1–128
+     lowercase hex, or (b) schemeless relative (no `:`, no `//`, no
+     whitespace). Every scheme + every malformed id **rejects**.
+   - `bindRichEditor(root: HTMLElement): void` — RE·1, D1/D2. Finds the
+     `textarea[data-rich-editor]` + the `.rc-editor-toolbar` + the
+     `[data-rich-editor-preview]` pane under `root`. **Omits the image
+     button** (removes `button[data-md="image"]` from the DOM) if the
+     toolbar or `root` carries `data-rich-editor-no-image`. Renders the
+     preview on every `input` (RE·1: the preview is a pure render of the
+     textarea's current value). Wires each `button[data-md]` to the right
+     `apply*` splice (re-focus + restore selection — the
+     `insert-image.ts` `selectionStart`/`selectionEnd` idiom). The
+     `data-md="image"` button reuses the **RC upload lane**
+     (`POST /content-image` via `apiFetch`, the `insert-image.ts`
+     convention — **no** new `api.ts` method, **no** second upload seam)
+     and splices `imageLink(alt, id)` at the cursor on success. **No**
+     `document.write`, **no** untrusted user HTML, **no** package import.
+     The preview output is set via `innerHTML` on the
+     `data-rich-editor-preview` element — the content is the
+     **escaped-first** output of `renderPreview` (the same construction
+     as `MarkdownRenderer`), never raw user HTML.
+   - The pure functions (`renderPreview`, `apply*`, `imageLink`,
+     `isSafeImageSrc`) are **exported** and **side-effect-free**. The
+     self-wire at module load is **guarded** by
+     `typeof document !== 'undefined'` so the pure functions remain
+     importable in a non-DOM test environment (the `insert-image.ts`
+     module does not guard its self-wire; this is the **one deliberate
+     deviation**, a pre-planned seam for RE·2's testability precondition,
+     **not** a drift pause).
+   - **`rich-editor-core.ts` split was NOT needed.** The module is a
+     single file; the `typeof document` guard on the self-wire is
+     sufficient for the pure functions to be importable in a test.
+     Recorded as a pre-planned seam, not a drift pause.
+2. `src/Kumunita.Web/wwwroot/css/site.css` (appended one block after the
+   `.rc-image` rule, ~line 791+) — the `.rc-editor` (grid split: source
+   | preview, responsive — 1 column on mobile, 2 columns on
+   `min-width: 768px`) / `.rc-editor-toolbar` + `.rc-editor-toolbar
+   .rc-btn` (button reset, hover, `:focus-visible`) /
+   `.rc-editor-pane` (the read-only preview wrapper — **reuses** the
+   existing `.rc-body` for body copy; the existing `.rc-image` styles
+   the preview's `<img>` — **no** re-definition of either). The textarea
+   gets a monospace font (the source pane). Boring: no shadows, no new
+   palette.
+
+**Build status (both green):**
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded in 12.8s**
+  (no C# touched — this re-verifies the build is unbroken).
+- `npm run build --prefix src/Kumunita.Web` — **tsc green** (the new
+  module type-checks under `tsc`; the compiled artifact
+  `wwwroot/js/lib/rich-editor.js` is emitted, 25.7 KB).
+
+**Pin typo recorded (for U07):** the register's pinned seam test
+`ApplyToggle_Bold_WrapsSelection_AndPreservesCaret` asserts
+`applyToggle("hello world",[6,11],"bold")` →
+`{value:"hello **world**", sel:[7,12]}`. With a **2-char** marker
+(`**`), the content `world` (5 chars) is at indices `[8,13]` in the
+result `hello **world**` — **not** `[7,12]`. `[7,12]` matches a **1-char**
+marker. The implementation is semantically correct (the selection lands
+on the content, shifted by the marker length on each side — the RE2 FACES
+"the selection is preserved on the content"). **U07 should use `[8,13]`**
+for the 2-char bold marker (or `[6+1, 6+1+5] = [7,12]` for a 1-char
+italic/code marker). The pin's value + selection are **inconsistent** —
+this is a **pin typo**, not a feature deviation.
+
+**Drift pause: none.** Both gaps hold as pinned in U2's mirror checklist.
+The `applyBlock` union deviates from the register **in favor of the
+primary tier (the design doc) + U2's mirror checklist** (no `'quote'`) —
+this is the U1 drift pause carried forward, not a new one. The
+`typeof document` guard on the self-wire is a pre-planned seam for
+testability, not a drift pause.
+
+**Drift-pause rule (not triggered):** the RC upload surface
+(`POST /content-image`) is intact and unchanged; the U2 mirror checklist
+still matches `MarkdownRenderer`.
+
+**For U04 (include decision):** `_Layout.cshtml` does **not** include
+`insert-image.js` (verified by grep — the `client/lib` convention is a
+**per-view** `<script type="module" src="~/js/lib/insert-image.js"></script>`
+include, not a layout-wide include). The `rich-editor.js` include is
+therefore a **per-view** concern for **U04** to add to the post composer
+(`<script type="module" src="~/js/lib/rich-editor.js"></script>`). This
+module is dependency-free + self-wiring, so it needs **no** layout change
+on its own. The self-wire loops over
+`document.querySelectorAll('.rc-editor')` at load, so each view that
+includes the module gets its editor wired automatically.
+
+**For U05/U06 (image-button gating):** the `data-rich-editor-no-image`
+attribute on the toolbar or the `root` causes `bindRichEditor` to **remove
+the `button[data-md="image"]`** from the DOM at bind time (the text toolbar
++ preview are **unaffected**). U05 (Post Edit, Group Edit, both
+Announcement composers) and U06 (all reply composers) should carry
+`data-rich-editor-no-image` on their toolbar markup. The
+`textarea[data-rich-editor]` keeps its `data-rich-editor` attribute on
+**every** surface (the text toolbar + preview are on everywhere); the
+`data-image-target` attribute is a **RC** attribute (the
+`insert-image.ts` module's contract) and is **not** used by
+`rich-editor.ts` — U04–U06 should drop `data-image-target` on the
+image-gated surfaces (the RC image lane is incomplete there) and keep it
+on the image-ON surfaces (Post New, Group New, static page) so the RC
+`insert-image.ts` module still works on those surfaces.
+
+**Git status (expected, before move):**
+- `src/Kumunita.Web/client/lib/rich-editor.ts` (new, untracked)
+- `src/Kumunita.Web/wwwroot/css/site.css` (modified)
+- `docs/plans-milestones/in-progress/rich-editor-handoff-notes.md`
+  (modified — the U3 section appended)
+
+  (`wwwroot/js/lib/rich-editor.js` is the `tsc` build artifact —
+  gitignored, not part of the tree.)
+
+**Note for U08:** the `wwwroot/js/` folder is gitignored
+(`.gitignore:20` → `src/Kumunita.Web/wwwroot/js/`) — the compiled
+artifacts are **not** tracked (the other `client/lib` modules' compiled
+`.js` files are present locally but are build output, not source).
+`rich-editor.js` should **not** be committed; only `rich-editor.ts` is
+the source. The `npm run build` step regenerates `rich-editor.js` on
+demand.

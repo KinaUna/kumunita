@@ -787,3 +787,63 @@ body.kmb-page-fullbleed {
   margin: 0.5rem 0;
   display: block;
 }
+
+/* --- Rich editor (RE U03) -------------------------------------------------
+   The split-view authoring surface (D1): a source textarea beside a
+   read-only rendered preview pane. The preview wraps its output in
+   <div class="rc-body rc-editor-pane"> so it inherits the RC body
+   typography (.rc-body) — **no** re-definition of .rc-body or .rc-image.
+   Boring: no shadows, no new palette, no grid framework. */
+.rc-editor {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .rc-editor {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.rc-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--kmb-border, rgba(31, 42, 37, 0.15));
+  border-radius: var(--bs-border-radius);
+  background-color: rgba(31, 42, 37, 0.03);
+}
+.rc-editor-toolbar .rc-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  border-radius: var(--bs-border-radius-sm);
+  cursor: pointer;
+  color: inherit;
+}
+.rc-editor-toolbar .rc-btn:hover {
+  background-color: rgba(31, 42, 37, 0.08);
+  border-color: var(--kmb-border, rgba(31, 42, 37, 0.15));
+}
+.rc-editor-toolbar .rc-btn:focus-visible {
+  outline: 2px solid var(--bs-primary, #0d6efd);
+  outline-offset: 1px;
+}
+.rc-editor-pane {
+  min-height: 6rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--kmb-border, rgba(31, 42, 37, 0.15));
+  border-radius: var(--bs-border-radius);
+  background-color: rgba(31, 42, 37, 0.02);
+}
+.rc-editor textarea[data-rich-editor] {
+  min-height: 6rem;
+  font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
