@@ -36,3 +36,4 @@ Decision / Consequences. New decisions take the next number.
 | 0029 | Announcement user-added translations (GlobalAdmin/Translator any; community-Moderator their community's; add-only) | Accepted |
 | 0030 | Role independence: elevated roles (GlobalAdmin / Moderator / Translator) are composable per resident, not mutually exclusive | Accepted |
 | 0031 | WYSIWYG editor + toolbar over the RC Markdown lane (split-view live preview + Markdown-splice toolbar, `tsc`-only; Amends 0025) | Accepted |
+| 0032 | Inline editor: the rendered pane is the default view (source hidden behind one toolbar toggle; pane stays visible as a split view when revealed, `tsc`-only, additive; Amends 0031) | Accepted |

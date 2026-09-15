@@ -72,11 +72,11 @@ payload, ADR 0032):**
   form validation round-trip), the source `<textarea>` is **hidden**
   (`.rc-editor-source-hidden`, `display: none`) and the rendered pane is
   the **visible, interactive** composition surface. The toggle button
-  (far right of the toolbar) shows the source and hides the pane;
-  clicking it again restores the default. This is **not** a mode switch
-  with two editing engines — it is a **visibility toggle** over the
-  single existing source of truth (the textarea) and its single existing
-  render (the pane). D1 (ADR 0031) still binds: no `contenteditable`, no
+  (far right of the toolbar) shows the source (the pane stays visible
+  as a live reference — a split view); clicking it again restores the
+  default (the source hides again). This is **not** a mode switch with
+  two editing engines — it is a **visibility toggle** over the single
+  existing source of truth (the textarea); the pane is always visible. D1 (ADR 0031) still binds: no `contenteditable`, no
   round-trip engine, the textarea is still the form field the server
   binds.
 - **D2 — One button, one attribute, one binder extension.** The toggle is

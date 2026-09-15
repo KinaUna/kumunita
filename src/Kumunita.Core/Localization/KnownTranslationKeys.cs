@@ -632,6 +632,8 @@ public static class KnownTranslationKeys
             // <kw-l>. No `rc.editor.quote` — U1's drift pause removed the
             // blockquote button (MarkdownRenderer has no blockquote branch),
             // so there is no button and no key for it. en floor only.) ──────
+            // + IE (ADR 0032): rc.editor.source + rc.editor.showPreview —
+            // the toggle button's two label states (source hidden / visible).
             ["rc.editor.bold"]    = "B",
             ["rc.editor.italic"]  = "I",
             ["rc.editor.code"]    = "C",
@@ -643,6 +645,8 @@ public static class KnownTranslationKeys
             ["rc.editor.link"]    = "Link",
             ["rc.editor.image"]   = "Image",
             ["rc.editor.preview"] = "Preview",
+            ["rc.editor.source"]      = "</>",
+            ["rc.editor.showPreview"] = "Preview",
         };
 
     /// <summary>
