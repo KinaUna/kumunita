@@ -127,3 +127,101 @@ The register (`plan-rich-editor.md`) and U0's work order named a **`quote` toolb
 This directly collides with **RE·2** ("*do not add a marker to the preview subset the server renderer lacks*") and the unit's hard constraint ("*the marker set is a ceiling, not a wishlist*"). **Resolution (per the constraint, a `cut the button` outcome, not a silent feature):** blockquote is **removed from both sides** in the design doc — **no `quote` button** in the toolbar marker set and **no `> `** in the `renderPreview` subset. `applyBlock`'s `kind` union is therefore `'h1'|'h2'|'h3'|'ul'|'ol'` (no `'quote'`). Adding blockquote is a **future lane** that must extend `MarkdownRenderer` **and** the client `renderPreview` **in the same commit** (RE·2's parity holds only if both move together) — recorded in the design doc's §Named deferrals and ADR 0031's "Not decided here."
 
 **Carried to:** U08 (the close — keep blockquote out of the `rc.editor.*` key set and out of any roadmap/README copy of the marker list). No U03/U04/U05/U06 action is blocked by this pause; the remaining 9-button toolbar + preview mirror are fully codeable from the design doc.
+
+## U2 — Mirror checklist (pinned)
+
+**Date:** 2026-09-15
+
+**Purpose (RE·2 made checkable before any TS exists):** this is the verbatim
+pin U03's `renderPreview` implements *from this section alone* — the exact
+marker ceiling, the exact `src` allowlist predicate, and the exact CSS
+classes the preview output must carry. Every line below was read directly
+against the frozen base on 2026-09-15 (`MarkdownRenderer.cs` full read;
+`site.css` `.rc-body`/`.rc-image`; `ContentImageIds.cs`; the 7 pinned
+`MarkdownRendererTests`). **Drift pause: none** — all seams intact and
+matching RC's close + U1's design doc. The one carried constraint: **no
+blockquote** (`> `) on either side (U1 drift pause; `MarkdownRenderer` has no
+blockquote branch — see below).
+
+**1. The marker set `MarkdownRenderer` renders (the CEILING).** `renderPreview`
+must render **exactly** this set and **nothing more** — a toolbar button that
+emits a marker outside this set is a drift pause (RE·2). Source:
+`MarkdownRenderer.RenderHtml` block dispatch + `Inline`/`InlineText`.
+
+- Headings **1–6** — `#` through `######` (a space after the `#`s, non-empty
+  content) → `<h1>`…`<h6>` (`MatchHeading`).
+- **Paragraph** — consecutive non-blank, non-special lines collapse into one
+  `<p>…</p>`.
+- **Unordered list** — `- ` / `* ` lines → `<ul><li>…</li></ul>`.
+- **Ordered list** — `1. ` / `2. ` … (`\d+\. `) → `<ol><li>…</li></ol>`.
+- **Fenced code block** — ` ``` ` … ` ``` ` → `<pre><code …>…</code></pre>`
+  (content escaped verbatim, no inline rules; optional `language-{lang}` class).
+- `**bold**` → `<strong>…</strong>`.
+- `*italic*` → `<em>…</em>`.
+- `` `code` `` → `<code>…</code>` (applied first, so a backtick inside bold is
+  not re-processed).
+- `[label](url)` → `<a href="…">label</a>` (under the link-URL allowlist).
+- `![alt](src)` → `<img src="…" alt="…" class="rc-image" loading="lazy" />`
+  (under the image `src` allowlist below).
+
+**Out on both toolbar and preview (the ceiling is a cap, not a wishlist):**
+blockquote / `> `, tables, footnotes, raw HTML. `MarkdownRenderer` has **no
+blockquote branch** (block dispatch = fenced code, headings, ul, ol, paragraph
+only; `PlainTextPreview` has no blockquote strip step) — a resident-typed
+`> ` renders as a plain paragraph on the read path, so RE·2 forbids adding it
+to either side (U1 drift pause; carried to U08).
+
+**2. The client `IsSafeImageSrc` mirror (verbatim predicate).** `renderPreview`'s
+image branch accepts **only** these two shapes and rejects everything else — a
+rejected `src` renders the **whole** `![alt](src)` as plain escaped text (no
+`<img>`, no `src=`). This is a verbatim copy of
+`MarkdownRenderer.IsSafeImageSrc` (RC R·2):
+
+- **Branch 1 — the platform route shape:** `src` starts with the literal
+  `/content-image/`, and the remainder (the `{id}`) is **1–128 lowercase hex**
+  chars, `[0-9a-f]{1,128}` (exact — a query string or trailing slash is a
+  malformed id → reject, **not** a fallback to branch 2).
+- **Branch 2 — a schemeless relative path:** no `:` anywhere, **no** leading
+  `//` (protocol-relative), and **no** whitespace.
+- **Rejected (always):** every URL scheme — `http:`, `https:`, `data:`,
+  `blob:`, `javascript:` (i.e. any `://` or bare `scheme:` form) — and any
+  empty/malformed id. (`data:` URIs are the XSS vector the 7 pinned tests pin
+  to plain-text.)
+- The `alt` is HTML-escaped **verbatim** (no inline rules inside the attribute).
+
+(The client **link-URL** predicate mirrors `IsSafeUrl`, not `IsSafeImageSrc`:
+accept `http`/`https`/`mailto`/relative, reject `javascript:`/`data:`/any
+other scheme. Keep the two distinct — images are strictly route/relative; links
+are the broader scheme whitelist.)
+
+**3. The CSS classes the preview output must carry (so it looks like the
+read path).** The preview pane is the renderer's output wrapped so it inherits
+the RC body typography:
+
+- A wrapper `<div class="rc-body rc-editor-pane">` around the whole
+  `renderPreview` output — `.rc-body` (site.css, the RC U06 block: Lora body
+  serif, type scale, `h1`–`h6` / `ul` / `ol` / `code` / `pre` / `a` rules)
+  gives the preview body copy identical styling to the read path.
+- Every accepted image carries `class="rc-image"` (the RC rule: `max-width:
+  100%; height: auto; border-radius: 6px;` block) — the same `<img>` attribute
+  set the read path emits (`src`, `alt`, `class="rc-image"`,
+  `loading="lazy"`).
+
+**4. The escape-first stance (client-side R·2).** `renderPreview` **escapes
+HTML entities before** applying the marker→HTML map — every input character is
+entity-escaped (`&` `<` `>` `"` `'`) **first**, and the inline rules
+(code, then bold, then italic) run on the **already-escaped** result, exactly
+as `MarkdownRenderer.HtmlEscape` + `InlineText` do. A hostile `<script>` /
+`onerror=` typed in the textarea must therefore appear in the preview as
+escaped text, never as a live tag/attribute. The one ordering nuance to keep:
+images/links are extracted **before** the surrounding text is escaped, so their
+`src`/`url` values survive the allowlist check intact (the
+`ImageOrLinkPattern` single document-order pass), while the *text around* them
+is escaped-first.
+
+**5. The preview is a *function of* the textarea value (RE·1).** The textarea
+is the **single source of truth**; the preview is a pure render of its current
+value, **re-rendered on every `input`**. `renderPreview` is pure (no hidden
+state, no `contenteditable` mirror, no `body.innerHTML` as a source) — a
+toolbar button is a pure text splice **into the textarea**, and the form still
+submits the textarea's `value` exactly as RC does.
