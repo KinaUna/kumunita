@@ -139,3 +139,37 @@
 
 **No drift pause.** All assumptions verified. U1 authors the design doc
 Part 1 against the 16-block / 10-file list and the RC subset above.
+
+## U1 — design doc Part 1
+
+- **Date:** 2026-09-15
+- **Authored:** `docs/design/wysiwyg-editor-design.md` Part 1 (value chain,
+  context + the ADR 0033 reversal, scope in/out, the **9 invariants**
+  WY·1–WY·9, the **10 FACES** WY1–WY10, assumptions, frozen base re-anchor).
+  Mirrors the `inline-editor-design.md` / `rich-editor-design.md` shape.
+  **No code, no build.**
+- **9 invariants (by id, for U2 to pin by id):** WY·1 (pane is the editing
+  surface / `contenteditable`), WY·2 (textarea is the read-only sink),
+  WY·3 (serializer emits exactly the RC-pinned subset — the WY·3 ceiling,
+  the inverse of `renderPreview`), WY·4 (toolbar splices DOM, not Markdown),
+  WY·5 (saved body byte-identical), WY·6 (paste sanitized to the WY·3
+  subset), WY·7 (code view is a read-only mirror), WY·8 (`tsc`-only stands
+  unchanged), WY·9 (a11y: keyboard-operable, `role="textbox"` +
+  `aria-multiline`, `<button type="button">` + `<kw-l>`).
+- **10 FACES (by id):** WY1 (pane is the editing surface — WY·1, WY·9),
+  WY2 (typing keeps the textarea in sync — WY·2), WY3 (toolbar splices DOM
+  — WY·4), WY4 (image insert via the RC upload lane — WY·3, WY·4),
+  WY5 (saved body byte-identical — WY·5, RC R·3, RC R·1), WY6 (paste
+  sanitized — WY·6), WY7 (code view read-only mirror — WY·7), WY8
+  (image-gating unchanged — the RE `data-rich-editor-no-image` precedent),
+  WY9 (a11y — WY·9), WY10 (round-trip property
+  `toMarkdown(renderPreview(md)) === md` — WY·3, WY·5).
+- **ADR 0033 reversal (load-bearing):** the "hard non-negotiable" in ADR
+  0031 D1 / ADR 0032 is **reversed** by user approval **2026-09-15**; ADR
+  0033 (U2 drafts, U9 accepts) records the reversal + what still binds
+  (RC R·1–R·7, RE·1–RE·3, IE·1, `tsc`-only, no editor dependency, one
+  renderer on the read path, `Body` as a Markdown `string`).
+- **Frozen base (unchanged):** RC R·1–R·7 + RE·1–RE·3 + IE·1 +
+  `tsc`-only + no editor dependency + `Body` as a Markdown `string`.
+- **No drift pause.** U2 authors Part 2 (seams & contracts + ADR 0033
+  draft) against the invariant + FACES ids above.
