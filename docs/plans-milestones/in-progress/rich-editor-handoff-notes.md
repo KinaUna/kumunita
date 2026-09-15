@@ -771,6 +771,70 @@ This matches U04's rule: **keep** the RC `rc-insert-image` block only
 where `data-image-target` is present (functional); **omit** it where
 `data-image-target` is absent (dead UI). The three reply views had no
 pre-RE `rc-insert-image` block at all, so RE does not add one — it
+
+## U7 — Seam tests + gate
+
+- **Date:** 2026-09-15
+- **Shipped:** `tests/Kumunita.Web.Tests/RichEditorTests.cs` (new) — the
+  lane's acceptance gate: the **10 pinned RE behaviors** (design doc
+  §Pinned seam tests, exact names) as a small **C# spec mirror**
+  (`RichEditorSpec`, verbatim-encoding the U03 `rich-editor.ts` pure
+  functions) + **one artifact pin** (`CompiledRichEditorJs_Exists_And_Exports`).
+  No product code changed — the only new file is the test file.
+
+### Drift pause (non-blocking — a doc off-by-one, not a module bug)
+
+- **`ApplyToggle_Bold_WrapsSelection_AndPreservesCaret` selection pin.**
+  The design doc (§Pinned seam tests #6) pins the result selection as
+  **`[7,12]`**, but the frozen `rich-editor.ts` `applyToggle` (and the RE2
+  FACES' "selection preserved" intent) produce **`[8,13]`** — the
+  arithmetically correct selection of `world` in `"hello **world**"` (the
+  toggle-on branch returns `sel = [start + mLen, start + mLen +
+  selectedText.length]` = `[6+2, 6+2+5]` = `[8,13]`). I verified this by
+  running the module's `applyToggle` verbatim in node before writing the
+  mirror. Per RE·2 the **design doc is the record of truth**, and the
+  record is *the behavior* ("selection preserved on the content"), not the
+  literal `[7,12]` digits — so I asserted the **module-faithful `[8,13]`**
+  and did **not** bend the mirror to a buggy `[7,12]`. This is a **doc
+  typo in the register + design doc**, not a U03 module defect and not a
+  test I was forbidden from writing — the *name* and the *value*
+  (`"hello **world**"`) both hold; only the selection-pair digits in the
+  doc are off by one. **Action for U08 (close):** correct the `[7,12]` →
+  `[8,13]` digit pin in `plan-rich-editor.md` §Pinned seam tests #6 and
+  `rich-editor-design.md` §Pinned seam tests #6 (a one-line doc fix, no
+  code change). If a future lane disputes this, the module + the RE2
+  FACES both agree on `[8,13]`.
+
+### Acceptance gate (recorded — register §Acceptance gate)
+
+- **Closed loop (RE1/RE2):** the toolbar splices (`applyToggle` /
+  `applyBlock` / `applyLink`) + `renderPreview` — a sequence of toolbar
+  operations on a body produces a Markdown string whose `renderPreview`
+  output contains the expected rendered tags (`<strong>` / `<h1>` / `<a>`).
+  Held: tests #1–#2 render the inline + block markers the toolbar emits;
+  #6–#9 are the splices. **Green.**
+- **Handoff (RE3/RE4):** `imageLink("fence","deadbeef")` ===
+  `"![fence](/content-image/deadbeef)"` — byte-identical to a hand-typed
+  link, and RC's server-side `ContentImageIds.ExtractContentImageIds` picks
+  up `["deadbeef"]` unchanged (RC R·3 enforcement point untouched). Held in
+  test #10, asserted against the real `ContentImageIds` type. **Green.**
+- **Part-vs-whole:** the 10 RE behaviors + the artifact pin pass
+  **together** with the inherited RC `MarkdownRendererTests` (7) +
+  `ContentImageUploadTests` (4) + `ContentImageServingTests` (4) — the RE
+  lane **regresses nothing** RC shipped. **Green.**
+
+### Verify run (per AGENTS.md — `dotnet build` + `npm run build` + `dotnet exec`)
+
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Warning(s),
+  0 Error(s).**
+- `npm run build --prefix src/Kumunita.Web` (i.e. `tsc`) → **green** (no
+  emit errors; `wwwroot/js/lib/rich-editor.js` is a fresh ES2022 module).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **`Total: 149, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0, Time:
+  1.052s`** — all-green. (The 149 = the 11 RE tests in
+  `RichEditorTests` + the 138 inherited RC/ML-UI tests. Not the "Zero tests
+  ran / Exit code: 5" discovery quirk — the in-process runner discovered and
+  ran the full assembly.)
 would be dead UI without `data-image-target`.
 
 **The `name="body"` enumeration (per view, pre-RE → post-RE):**

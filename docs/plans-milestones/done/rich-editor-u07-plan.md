@@ -21,8 +21,9 @@ run via `dotnet exec`); there is **no TS test runner** (no `vitest`/`jest`/
 `node --test` in `package.json` — the `tsc`-only constraint, RE·3). So the
 10 pinned RE behavior tests are implemented as a **C# spec mirror** of the
 pure functions in the test file (the mirror *is* the executable pin of the
-behavior the JS `rich-editor-core.ts` implements — the C# mirror and the TS
-core encode the **same** pinned contract from the design doc, so the tests
+behavior the JS `rich-editor.ts` pure functions implement — the C# mirror
+and the TS module encode the **same** pinned contract from the design doc,
+so the tests
 anchor the client behavior without a JS runner). The client artifact itself
 is pinned by a **file-existence + export-presence** test on the compiled
 `wwwroot/js/lib/rich-editor.js`. **This is a test-harness choice, not a
@@ -32,9 +33,10 @@ second renderer** (RE·2's "one renderer" stance refers to the *read* path
 
 ## Entry reads (≤ 5 files, each < ~300 lines)
 
-1. `src/Kumunita.Web/client/lib/rich-editor.ts` + `rich-editor-core.ts`
-   (U03) — the pure functions the C# mirror encodes + the `data-md` /
-   `apply*` signatures the tests assert against.
+1. `src/Kumunita.Web/client/lib/rich-editor.ts` (U03) — the pure functions
+   (`renderPreview`, `applyToggle`, `applyBlock`, `applyLink`, `imageLink`,
+   `isSafeImageSrc`) + the `bindRichEditor` binder — the signatures the C#
+   mirror encodes and the artifact pin asserts.
 2. `tests/Kumunita.Web.Tests/MarkdownRendererTests.cs` — the **7 pinned RC
    tests** (the parity baseline the RE tests assert against) + the test-file
    convention (xunit.v3, `[Fact]` / `[Theory]`, the assertion style).
@@ -114,11 +116,11 @@ second renderer** (RE·2's "one renderer" stance refers to the *read* path
 
 - **The 10 test names are pinned** (the design doc + this file name them
   exactly) — a rename is a `## U7 — Drift pause`, not a local edit.
-- **The C# mirror must match the TS core.** If U03's `rich-editor-core.ts`
-  and the C# mirror disagree on any marker/caret/allowlist detail, the
-  **design doc is the record of truth** (RE·2) — fix whichever side drifted,
-  and if the *TS core* was wrong, that's a U03 re-visit (`## U7 — Drift
-  pause` naming the marker), not a silent mirror edit.
+- **The C# mirror must match the TS module.** If U03's `rich-editor.ts`
+  pure functions and the C# mirror disagree on any marker/caret/allowlist
+  detail, the **design doc is the record of truth** (RE·2) — fix whichever
+  side drifted, and if the *TS module* was wrong, that's a U03 re-visit
+  (`## U7 — Drift pause` naming the marker), not a silent mirror edit.
 - **The artifact-pin test reads a build artifact** (`wwwroot/js/lib/
   rich-editor.js`) — it requires `npm run build` to have run (the Exit
   criterion orders it before the `dotnet exec` run). If the artifact is
@@ -126,7 +128,7 @@ second renderer** (RE·2's "one renderer" stance refers to the *read* path
   exported" pin) — do **not** soften the assertion to a try/catch.
 - **The image-gated surfaces** (U04 Post Edit, U05 Group Edit + both
   Announcement composers, U06 reply composers) are covered by these same
-  **pattern** tests — they use the identical `rich-editor-core.ts` pure
+  **pattern** tests — they use the identical `rich-editor.ts` pure
   functions; the one difference (the **image button is gated off** via
   `data-rich-editor-no-image`) is a view/attribute concern, not a
   pure-function behavior, so it needs no extra test here.

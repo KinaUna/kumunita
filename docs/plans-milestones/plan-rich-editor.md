@@ -473,7 +473,7 @@ All in `tests/Kumunita.Web.Tests/RichEditorTests.cs` (new), **pure-function**
 tests (no browser, no Postgres — the module's exports are the unit of test).
 **Harness reality (RE·3's `tsc`-only + no TS test runner):** the repo has no
 `vitest`/`jest`/`node --test`, so U07 implements the 10 behaviors as a small
-**C# spec mirror** of `rich-editor-core.ts`'s pure functions (the mirror
+**C# spec mirror** of `rich-editor.ts`'s pure functions (the mirror
 encodes the *same* pinned contract from the design doc — it is the executable
 spec, not a second product renderer) plus **one artifact pin** asserting the
 `npm run build` output (`wwwroot/js/lib/rich-editor.js`) exists and exports
