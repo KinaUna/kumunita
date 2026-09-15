@@ -173,3 +173,76 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
   `tsc`-only + no editor dependency + `Body` as a Markdown `string`.
 - **No drift pause.** U2 authors Part 2 (seams & contracts + ADR 0033
   draft) against the invariant + FACES ids above.
+
+## U2 — design doc Part 2 + ADR 0033 drafted
+
+- **Date:** 2026-09-15
+- **Authored (2 files):** (1) `docs/design/wysiwyg-editor-design.md` —
+  **appended** `## Seams & contracts (Part 2, written by U2)` with §2.1
+  (frozen base, unchanged), §2.2 (the DOM contract — the pane's
+  `contenteditable` / `role="textbox"` / `aria-multiline`, the textarea's
+  `readOnly` + sink-only binding, the toolbar / `data-ie-toggle` shapes,
+  the initial-population + `input`-sync + toolbar-splice lines), §2.3 (the
+  serializer contract — `toMarkdown(html): string`, the WY·3 element→
+  Markdown mapping table, the escape rule, the 8 edge cases, the WY·10
+  round-trip property), §2.4 (the sanitizer contract — `sanitizeHtml(html):
+  string`, the keep/reject lists, the single-pass regex construction, the
+  output domain), §2.5 (the binder contract — the additive WY block's six
+  sub-steps (a)–(f), the per-button DOM-splice table, the "after every
+  splice" sync line), §2.6 (the CSS contract — the one new focus-ring
+  rule), §2.7 (the **17 pinned seam-test names**), §2.8 (the acceptance
+  gate — closed loop / handoff / part-vs-whole), §2.9 (the drift-guard).
+  (2) `docs/adr/0033-wysiwyg-inline-editing.md` — **new**, **Status:
+  Draft (lands in U9)**, Amends 0031 (reversal) + 0032 (kept, now
+  editable), settles D1 / D2 / D3. **No code, test, CSS, or `.csproj`
+  change in this unit.**
+- **9 invariants (by id — frozen):** WY·1 (pane is the editing surface /
+  `contenteditable`), WY·2 (textarea is the read-only sink), WY·3 (serializer
+  emits exactly the RC-pinned subset — the WY·3 ceiling, the inverse of
+  `renderPreview`), WY·4 (toolbar splices DOM, not Markdown), WY·5 (saved
+  body byte-identical), WY·6 (paste sanitized to the WY·3 subset), WY·7
+  (code view is a read-only mirror), WY·8 (`tsc`-only stands unchanged),
+  WY·9 (a11y: keyboard-operable, `role="textbox"` + `aria-multiline`,
+  `<button type="button">` + `<kw-l>`).
+- **10 FACES (by id — frozen):** WY1 (pane is the editing surface — WY·1,
+  WY·9), WY2 (typing keeps the textarea in sync — WY·2), WY3 (toolbar
+  splices DOM — WY·4), WY4 (image insert via the RC upload lane — WY·3,
+  WY·4), WY5 (saved body byte-identical — WY·5, RC R·3, RC R·1), WY6 (paste
+  sanitized — WY·6), WY7 (code view read-only mirror — WY·7), WY8 (image-
+  gating unchanged — the RE `data-rich-editor-no-image` precedent), WY9
+  (a11y — WY·9), WY10 (round-trip property `toMarkdown(renderPreview(md))
+  === md` — WY·3, WY·5).
+- **17 pinned seam-test names (by id — frozen, §2.7; a unit may never
+  introduce a test outside this list; names are verbatim, no line-breaks):**
+  1. `WY10_RoundTrip_BoldHeadingListLinkImageCode`, 2.
+  `WY3_Serializer_EmitsOnlyThePinnedSubset`, 3.
+  `WY3_Serializer_SkipsBlankElements`, 4.
+  `WY3_Serializer_RejectsUnsafeImageSrc`, 5.
+  `WY3_Serializer_RejectsUnsafeLinkHref`, 6. `WY5_SavedBodyIsByteIdentical`,
+  7. `WY6_Sanitizer_StripsDisallowedElements`, 8.
+  `WY6_Sanitizer_StripsDisallowedAttributes`, 9.
+  `WY6_Sanitizer_StripsUnsafeHrefs` (1–9 are U3's pure-function tests);
+  10. `WY7_CodeViewIsReadOnlyMirror`, 11. `WY8_TscOnly_NoEditorDependency`,
+  12. `WY9_PaneIsKeyboardOperable`, 13.
+  `CompiledRichEditorJs_ContainsContentEditable`, 14.
+  `CompiledRichEditorJs_ContainsToMarkdown`, 15.
+  `CompiledRichEditorJs_ContainsSanitizer` (10–15 are U4–U7's artifact
+  pins), 16. `RichEditorTextarea_IsNotDisabled_OrRemoved` (RE/IE
+  regression pin — unchanged), 17. `RichEditorExports_AreIntact` (RE/IE
+  regression pin — extended with the new `toMarkdown` export).
+- **ADR 0033 (number + status):** **0033** (next after 0032; filename
+  `0033-wysiwyg-inline-editing.md`); **Status: Draft (lands in U9)** —
+  U9 moves it to Accepted + does the ADR-index + `ARCHITECTURE.md` close.
+  Amends 0031 (the "hard non-negotiable" `contenteditable` non-decision
+  **reversed** by user approval **2026-09-15**) + 0032 (rendered-by-
+  default view **kept**, now editable). Settles D1 (pane is the editing
+  surface; textarea is the read-only sink), D2 (one new pure function:
+  `toMarkdown`), D3 (a sanitizer for paste + raw HTML). `tsc`-only stands;
+  no editor dependency, no `.csproj` change, no new route, no new server
+  surface, no second renderer on the read path.
+- **Frozen base (unchanged):** RC R·1–R·7 + RE·1–RE·3 + IE·1 + `tsc`-only
+  + no editor dependency + `Body` as a Markdown `string`.
+- **No drift pause.** U3 implements the load-bearing serializer
+  (`toMarkdown`) + the sanitizer (`sanitizeHtml`) in
+  `client/lib/dom-to-markdown.ts` against §2.3 / §2.4 + the 9 pure-function
+  tests (§2.7, items 1–9).

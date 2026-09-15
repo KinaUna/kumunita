@@ -274,3 +274,366 @@ byte-identical; `package.json` is still `typescript`-only.
 
 *— Part 1 authored by U1 (2026-09-15). Part 2 (seams & contracts) is
 authored by U2.*
+
+---
+
+## Seams & contracts (Part 2, written by U2)
+
+This part pins the **exact** shapes U3–U7 implement against. A fresh agent
+can build U3–U7 from this section alone without re-deriving the RC subset.
+The reference of record for the subset is `Security/MarkdownRenderer.cs`
+(the C# renderer) and `Security/ContentImageIds.cs` (the `ImageIds` parse
+the serializer must stay byte-compatible with); the reference for the
+escape-first / `isSafeImageSrc` / `isSafeUrl` construction is
+`client/lib/rich-editor.ts` (the `renderPreview` function — the **inverse**
+the serializer must be, and the six pure functions the pattern follows).
+Every element/attribute below is either **in** the WY·3 subset (keep) or
+**out** of it (strip). A mismatch between an implementation and these pins
+is a `## U<m> — Drift pause` (unit-series rule 6), not a silent edit.
+
+### 2.1 frozen base (unchanged)
+
+The following keep binding **unchanged**; WY adds **no** re-shape of any of
+them. WY's only new authority is the WY·1–WY·9 invariant table (Part 1).
+
+- **RC R·1–R·7** — one renderer (`MarkdownRenderer`, untouched — the read
+  path is **exactly** this, no second renderer); escape-first (client +
+  server); the source is a `string` (`Body` as a Markdown `string`, RC R·7);
+  `ImageIds` is a **server parse** of the body text (`ContentImageIds`,
+  RC R·3); the `GET`/`POST /content-image` routes (RC R·5/R·6); the
+  `.rc-body` / `.rc-image` CSS (RC R·4).
+- **RE·1–RE·3** — one source of truth = the `<textarea>` (RE·1);
+  preview↔renderer parity (RE·2); `tsc`-only / no new dependency / no new
+  server surface (RE·3).
+- **IE·1** — the source `<textarea>` is hidden via a **CSS class**
+  (`rc-editor-source-hidden`), **never** `disabled` / `hidden`-attributed /
+  removed; the textarea stays the live form field the server binds.
+- **`tsc`-only** (WY·8 / RE·3) — `package.json` stays **`typescript`-only**;
+  no editor dependency; no `.csproj` change.
+- **The six RE pure functions** — `renderPreview`, `applyToggle`,
+  `applyBlock`, `applyLink`, `imageLink`, `isSafeImageSrc` — **byte-
+  identical**; `bindRichEditor` is **extended** (not re-shaped) by the WY
+  block in §2.5.
+- **`Body` as a Markdown `string`** (RC R·7) — zero server change, zero
+  migration; the saved body is **byte-identical** to what a resident could
+  hand-type in the code view (WY·5).
+
+### 2.2 the DOM contract (exact)
+
+The pane element is the **same** `rc-editor-pane` / `[data-rich-editor-
+preview]` element IE made the default view (U0 verified 16 blocks / 10 view
+files). No new element, no re-shape of the `.rc-body` / `.rc-image` CSS
+(RC frozen base), no change to the 10 composer surfaces' markup.
+
+| Aspect | Pinned shape (exact) |
+|--------|----------------------|
+| **Pane (editing surface, WY·1)** | `[data-rich-editor-preview]` carries `contenteditable="true"` — **set by the binder at runtime** (`pane.contentEditable = 'true'`), **not** in the Razor. Also carries `role="textbox"` + `aria-multiline` (WY·9, set by the binder). |
+| **Textarea (read-only sink, WY·2)** | `textarea[data-rich-editor]` is **not** re-shaped, **not** disabled, **not** removed, **not** re-hidden. It stays the live form field the server binds on submit (RC R·3 / RE·1 / IE·1 unchanged). The binder sets `textarea.readOnly = true` (WY·7 — the code view is a **read-only mirror**, the resident never types into it). The binder is the **only** writer to `textarea.value`. |
+| **Toolbar** | `.rc-editor-toolbar` is **not** re-shaped; the buttons stay `<button type="button" data-md="…">` (B/I/C/H1/H2/H3/•/1./Link/Image) + the `data-ie-toggle` button. Only the buttons' **click handlers** change (U5, §2.5e). |
+| **`data-ie-toggle` button** | **Not** re-shaped (the `_RichEditorToggle` partial markup is unchanged — the label swap is kept). Its **click handler's semantics** change (U7, §2.5f): it reveals a **read-only mirror**, not the editable source. |
+| **Pane initial state (on load)** | `pane.innerHTML = renderPreview(textarea.value)` — the binder populates the pane from the textarea's current value (reuses the existing `renderPreview` — **not** a new renderer). |
+| **Pane `input` handler (WY·2)** | `textarea.value = toMarkdown(pane.innerHTML)` — on every pane `input`, the binder serializes the pane's constrained HTML to Markdown and writes it into the textarea. **No bidirectional sync** — the textarea is never typed into. |
+| **Toolbar `click` handlers (WY·4)** | Each splices **DOM** (the Selection / Range API on the `contenteditable` pane), then calls `textarea.value = toMarkdown(pane.innerHTML)` (U5, §2.5e). |
+| **`paste` handler (WY·6)** | Intercepted on the pane; the clipboard HTML is run through `sanitizeHtml` **before** insertion (U6, §2.5d). |
+
+**The pane is authoritative; the textarea is the sink.** The resident types
+in the pane; the binder serializes to the textarea; the server reads the
+textarea on submit. The textarea's `.value` is **always** the serialized
+Markdown of the pane — never hand-typed (WY·2, WY·7).
+
+### 2.3 the serializer contract (exact TS)
+
+The **load-bearing** new artifact. One module: `client/lib/dom-to-
+markdown.ts`, exporting **exactly two** pure functions (`toMarkdown`,
+`sanitizeHtml`) — no other exports. Both are **pure** (no DOM, no side
+effects, importable in a non-DOM environment) so they are unit-testable
+without a browser (the `insert-image.ts` / `rich-editor.ts` pure-function
+pattern; the `typeof document !== 'undefined'` self-wire guard is **not
+needed** here — the module is a library, the **binder** imports it).
+
+**`export function toMarkdown(html: string): string`** — the **inverse of
+`renderPreview`**: it takes the pane's `innerHTML` (a string) and returns a
+Markdown string. It emits **exactly** the WY·3 subset and **nothing more**
+(WY·3). It reuses the `isSafeImageSrc` / `isSafeUrl` semantics already in
+`rich-editor.ts` (re-export or re-derive — same accept/reject set).
+
+**The WY·3 subset (the ceiling) — element → Markdown form (the inverse of
+`renderPreview`):**
+
+| Element (as it appears in the pane) | Markdown emitted (the inverse of `renderPreview`) |
+|-------------------------------------|-----------------------------------------------------|
+| `<p>` (inline content) | the inline content + `\n\n` |
+| `<h1>`–`<h6>` | `#`–`######` + ` ` + the inline content + `\n\n` |
+| `<ul>` (a run of `<li>`) | `- ` + each `<li>`'s inline content on its own line + `\n\n` |
+| `<ol>` (a run of `<li>`) | `1. ` / `2. ` / … per `<li>` + `\n\n` |
+| `<li>` (inline content) | the inline content — **no nesting** (WY·3 is flat) |
+| `<strong>` | `**` + the inline content + `**` |
+| `<em>` | `*` + the inline content + `*` |
+| `<code>` | `` ` `` + the text + `` ` `` |
+| `<a href="…">` | `[` + the inline content + `](` + the href + `)` |
+| `<img src="/content-image/{id}" alt="…">` | `![` + the alt + `](` + the src + `)` (the **exact** `imageLink` / `ContentImageIds.FullSrcRe` form — RC R·3 byte-identity) |
+| `<pre><code class="language-{lang}">` | ` ```{lang}` + `\n` + the text + `\n` + ` ``` ` + `\n\n` |
+| `<pre><code>` (no `class`) | ` ``` ` + `\n` + the text + `\n` + ` ``` ` + `\n\n` |
+
+**The escape rule (the inverse of `htmlEscape`).** `renderPreview`
+HTML-escapes every text character before emitting tags; `toMarkdown` must
+**un-escape** the five HTML entities in the pane's `innerHTML` before
+emitting the Markdown (so a round-tripped body is byte-identical to the
+original):
+
+| Entity in `innerHTML` | Character emitted |
+|-----------------------|-------------------|
+| `&amp;` | `&` |
+| `&lt;` | `<` |
+| `&gt;` | `>` |
+| `&quot;` | `"` |
+| `&#39;` | `'` |
+
+**The edge cases (pinned, WY·3):**
+
+- **(a)** a blank `<p></p>` → **skipped** (no Markdown emitted).
+- **(b)** a heading with no content (`<h1></h1>`) → **skipped**.
+- **(c)** a list with no items (`<ul></ul>` / `<ol></ol>`) → **skipped**.
+- **(d)** a link with no href (`<a>label</a>`) → the **label as plain text**
+  (the inline content, **not** a `[label]()` form).
+- **(e)** an image with an **unsafe** `src` (the `isSafeImageSrc` reject) →
+  the whole image rendered as **plain escaped text** (reusing the
+  `isSafeImageSrc` predicate — the `renderPreview` reject precedent).
+- **(f)** a link with an **unsafe** `href` (the `isSafeUrl` reject) → the
+  **label as plain text** (reusing the `isSafeUrl` predicate).
+- **(g)** a `<pre><code>` with **no** language → the fenced form with **no**
+  language (` ``` ` + `\n` + text + `\n` + ` ``` `).
+- **(h)** a `<li>` with **mixed** inline content (bold + italic + code) → the
+  inline content serialized **in the same order** `renderPreview` emits it
+  (code first, then bold, then italic — the `inlineText` order).
+
+**The round-trip property (WY·10 / WY5, the key invariant).** For **any**
+`md` in the RC-pinned subset:
+
+```
+toMarkdown(renderPreview(md)) === md
+```
+
+The serializer is the **exact inverse** of `renderPreview` — the same
+subset, the same escape-first construction, the same `isSafeImageSrc` /
+`isSafeUrl` semantics. This is pinned as a **pure-function** test
+(`WY10_RoundTrip_BoldHeadingListLinkImageCode`, §2.7) with no browser.
+
+### 2.4 the sanitizer contract (exact TS)
+
+**`export function sanitizeHtml(html: string): string`** — co-located with
+`toMarkdown` in `client/lib/dom-to-markdown.ts`. **Pure** (no DOM, no side
+effects). It is a **DOM-shape normalizer, not a renderer** (WY·6): it strips
+every element/attribute **outside** the WY·3 subset and keeps the WY·3
+subset verbatim, so `toMarkdown` (and the pane) only ever see the
+constrained subset. It reuses the escape-first / `isSafeImageSrc` /
+`isSafeUrl` semantics already in `rich-editor.ts`.
+
+**The rule:** **keep** the WY·3 subset (P, H1–H6, UL/OL, LI, STRONG, EM,
+CODE, A, IMG, PRE/CODE) with **only** the attributes the subset uses
+(`href` on A, `src`/`alt` on IMG, `class="language-{lang}"` on CODE);
+**strip** everything else.
+
+**The reject list (pinned — stripped by the sanitizer):**
+
+- **Elements outside the subset:** `<span>` (esp. `<span style=…>`), `<div>`,
+  `<table>`/`<tr>`/`<td>`/`<th>`/`<thead>`/`<tbody>`, `<script>`, `<iframe>`,
+  `<object>`, `<embed>`, `<form>`, `<input>`, `<button>`, `<select>`,
+  `<textarea>`, `<video>`, `<audio>`, `<canvas>`, and **every other**
+  non-subset tag.
+- **Every `on*` event-handler attribute** (`onerror`, `onclick`, `onload`,
+  `onmouseover`, …).
+- **Every `style` attribute.**
+- **Every `class` attribute** **except** `class="language-{lang}"` on `<code>`
+  (the one subset `class` — kept; every other `class` stripped).
+- **Every `id` attribute.**
+- **Every `href` that is not a safe url** (the `isSafeUrl` reject — the
+  element is kept as plain text, the unsafe `href` is dropped).
+- **Every `src` that is not a safe image src** (the `isSafeImageSrc` reject
+  — the `<img>` is rendered as plain escaped text, the unsafe `src` dropped).
+- **`javascript:` / `data:` / any non-`http(s)`/`mailto`/relative scheme.**
+
+**The construction (pinned):** a **single pass** over the HTML string — a
+regex-based strip, the **same construction** as `htmlEscape` /
+`isSafeImageSrc` / `isSafeUrl` already in `rich-editor.ts` (the escape-first
+/ allowlist semantics). It does **not** use a DOM parser (purity), does not
+add a second renderer, and does not add a dependency (WY·8).
+
+**The output (pinned):** a string of HTML that contains **only** the WY·3
+subset (the serializer's input domain). The `paste` handler (U6) feeds the
+sanitized HTML into the pane, then calls `textarea.value =
+toMarkdown(pane.innerHTML)`.
+
+### 2.5 the binder contract (exact TS)
+
+The `bindRichEditor` function in `client/lib/rich-editor.ts` is **extended**
+(not re-shaped) with a new **WY block**. The existing RE/IE wiring — the six
+pure functions, `renderPreview`, the IE toggle block, the image upload lane,
+the self-wire loop — is **untouched** (the `RichEditorExports_AreIntact`
+regression pin, §2.7, holds). The WY block is **additive** and guarded by
+`if (previewPane) { … }` so a view that has not updated the pane yet still
+works exactly as it did before WY (the IE no-op guard). The WY block:
+
+- **(a)** sets `pane.contentEditable = 'true'` (WY·1 — the pane becomes the
+  editing surface). Also sets `pane.setAttribute('role', 'textbox')` +
+  `pane.setAttribute('aria-multiline', '')` (WY·9 a11y) and
+  `textarea.readOnly = true` (WY·7 — the code view is a read-only sink).
+- **(b)** sets `pane.innerHTML = renderPreview(textarea.value)` (the initial
+  population — reuses `renderPreview`, **not** a new renderer).
+- **(c)** installs the **`input` handler** on the pane:
+  `pane.addEventListener('input', () => { textarea.value =
+  toMarkdown(pane.innerHTML); })` (WY·2 — the binder keeps the textarea in
+  sync; the pane is authoritative).
+- **(d)** installs the **`paste` handler** on the pane (U4 installs the
+  **stub** that calls `sanitizeHtml` + inserts the result; **U6** owns the
+  full internals — §2.4 reject list + the `range.insertNode` insert +
+  `e.preventDefault()` + the `toMarkdown` sync). The handler reads
+  `e.clipboardData.getData('text/html')`, runs `sanitizeHtml`, inserts the
+  sanitized HTML into the pane at the selection, prevents the default paste,
+  then calls `textarea.value = toMarkdown(pane.innerHTML)` (WY·6).
+- **(e)** reworks the **toolbar's `click` handlers** (U5) to splice **DOM**
+  (the Selection / Range API) into the pane instead of Markdown into the
+  textarea — the per-button mappings:
+
+  | Button (`data-md`) | DOM splice into the pane (Selection / Range API) |
+  |--------------------|--------------------------------------------------|
+  | **bold** | wrap the selection in `<strong>` (`range.surroundContents` or the `extractContents` + `appendChild` + `insertNode` fallback for a selection that crosses element boundaries) |
+  | **italic** | wrap the selection in `<em>` (same construction) |
+  | **code** | wrap the selection in `<code>` (same construction) |
+  | **h1** / **h2** / **h3** | change the current block's tag to `<h1>` / `<h2>` / `<h3>` (the caret is placed inside the new heading) |
+  | **ul** (•) | wrap the current block's text in `<ul><li>` |
+  | **ol** (1.) | wrap the current block's text in `<ol><li>` |
+  | **link** | `window.prompt('URL:')` + wrap the selection in `<a href="…">` (with the `isSafeUrl` check — a rejected url splices the label as plain text) |
+  | **image** | the **RC upload lane** (`POST /content-image` via `apiFetch`, the `insert-image.ts` convention — **no** new route, **no** second upload); on success, splice `<img src="/content-image/{id}" alt="…">` into the pane at the caret (the `isSafeImageSrc` check is reused) |
+
+  **After every splice**, the toolbar calls `textarea.value =
+  toMarkdown(pane.innerHTML)` (WY·2 — the binder keeps the textarea in
+  sync).
+- **(f)** reworks the **`data-ie-toggle` button's click handler** (U7) so the
+  code view is a **read-only mirror**: the two states are (1) **pane only**
+  (the default — the textarea is hidden by the `rc-editor-source-hidden`
+  class, **unchanged** from IE) and (2) **pane + code view** (the textarea is
+  revealed by removing `rc-editor-source-hidden`; the textarea is
+  **read-only** — `textarea.readOnly = true`, WY·2 / WY·7). The **label
+  swap** (`rc.editor.source` / `rc.editor.showPreview`) is **kept**
+  (the `_RichEditorToggle` partial resolves them server-side — **unchanged**
+  from IE). The **pane stays editable + visible** in **both** states
+  (WY·1 — the code view is a **mirror**, not a mode switch).
+
+**The existing RE/IE wiring is untouched** — the WY block is **additive**
+(the `if (previewPane) { … }` guard means a view that hasn't updated the pane
+yet still works exactly as it did before WY). The WY block imports
+`toMarkdown` + `sanitizeHtml` from `./dom-to-markdown.js`.
+
+### 2.6 the CSS contract (exact)
+
+The `rc-editor-pane` (the `[data-rich-editor-preview]` element) is **not**
+re-shaped; it stays the same element with the same `.rc-body` / `.rc-image`
+CSS (RC frozen base). The **only** new CSS rule (appended to
+`wwwroot/css/site.css`, WY·9 a11y focus ring):
+
+```css
+.rc-editor-pane[contenteditable="true"] { cursor: text; outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 1px; }
+```
+
+The existing `.rc-editor-pane` rule is **untouched** (the a11y focus ring is
+**added**, not re-shaped). The textarea's CSS is **untouched** (it stays
+hidden in the DOM by the IE `rc-editor-source-hidden` class; the WY lane
+does **not** add a new CSS rule for the textarea).
+
+### 2.7 the pinned seam tests (exact names)
+
+All in `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` (new). **Frozen —
+a unit may never introduce a test whose exact name is not on this list**
+(unit-series rule 3). **Harness reality (WY·8 / RE·3 `tsc`-only + no TS test
+runner):** the repo has no `vitest` / `jest` / `node --test`. The pure-
+function tests (1–9) assert the **contract** at the artifact level (the
+compiled JS contains the function + the round-trip holds against the
+`renderPreview` mirror), and the artifact-string pins (10–17) assert the
+shapes are present in the compiled JS — the same C#-spec-mirror model IE /
+RE use.
+
+**Pure-function tests (U3 authors — the WY3 / WY5 / WY6 / WY10 subset that
+does not need a DOM):**
+
+1. `WY10_RoundTrip_BoldHeadingListLinkImageCode` — `toMarkdown(renderPreview(md)) === md` for a `md` exercising bold + a heading + a list + a link + an image + a code block (WY·3, WY·5).
+2. `WY3_Serializer_EmitsOnlyThePinnedSubset` — `toMarkdown` emits only the WY·3 subset; a non-subset input (e.g. a `<span>` / `<table>`) is skipped or rendered as plain text, **never** re-emitted as a tag (WY·3).
+3. `WY3_Serializer_SkipsBlankElements` — blank `<p>` / `<h1>` / `<ul>` are skipped (§2.3 edge cases a/b/c).
+4. `WY3_Serializer_RejectsUnsafeImageSrc` — an `<img>` with an unsafe `src` (the `isSafeImageSrc` reject) renders as plain escaped text (§2.3 edge case e).
+5. `WY3_Serializer_RejectsUnsafeLinkHref` — an `<a>` with an unsafe `href` (the `isSafeUrl` reject) renders the label as plain text (§2.3 edge case f).
+6. `WY5_SavedBodyIsByteIdentical` — the serialized body for a hand-built pane HTML is byte-identical to the Markdown a resident could hand-type (RC R·3 — the `ContentImageIds` parse + `MarkdownRenderer` render are untouched).
+7. `WY6_Sanitizer_StripsDisallowedElements` — `sanitizeHtml` strips every non-subset element (§2.4 reject list).
+8. `WY6_Sanitizer_StripsDisallowedAttributes` — `sanitizeHtml` strips every `on*` handler, every `style`, every non-`language-{lang}` `class`, every `id` (§2.4 reject list).
+9. `WY6_Sanitizer_StripsUnsafeHrefs` — `sanitizeHtml` drops every unsafe `href` (the `isSafeUrl` reject) + every unsafe `src` (the `isSafeImageSrc` reject).
+
+**Artifact-string pins (U4–U7 author — the compiled JS contains the WY
+surface; the RE/IE regression pins are unchanged):**
+
+10. `WY7_CodeViewIsReadOnlyMirror` — the compiled JS sets `textarea.readOnly` and reveals the textarea via the `rc-editor-source-hidden` class toggle (WY·7 — the code view is a read-only mirror; the textarea is never disabled/removed).
+11. `WY8_TscOnly_NoEditorDependency` — `package.json` is still `typescript`-only (no editor dependency) (WY·8).
+12. `WY9_PaneIsKeyboardOperable` — the compiled JS sets `role="textbox"` + `aria-multiline` on the pane (WY·9).
+13. `CompiledRichEditorJs_ContainsContentEditable` — the compiled `wwwroot/js/lib/rich-editor.js` contains the string `contentEditable` (the U4 WY block is present).
+14. `CompiledRichEditorJs_ContainsToMarkdown` — the compiled JS contains `toMarkdown` (the U3 serializer is imported + called).
+15. `CompiledRichEditorJs_ContainsSanitizer` — the compiled JS contains `sanitizeHtml` (the U3 sanitizer is imported + called).
+16. `RichEditorTextarea_IsNotDisabled_OrRemoved` — the compiled JS does **not** contain `textarea.disabled = true` or `textarea.remove()` (**RE/IE regression pin — unchanged**; WY·2 / IE·1).
+17. `RichEditorExports_AreIntact` — the compiled JS still contains the 6 RE pure function names (`renderPreview`, `applyToggle`, `applyBlock`, `applyLink`, `imageLink`, `isSafeImageSrc`) + `bindRichEditor` + the **new** `toMarkdown` export (RE/IE regression pin, **extended** with the WY serializer export).
+
+**Runner (per AGENTS.md):** `dotnet build Kumunita.slnx -c Debug` green,
+`npm run build` green (in `src/Kumunita.Web`), then `dotnet exec` on
+`Kumunita.Web.Tests.dll` and `Kumunita.Core.Tests.dll` (**not** `dotnet
+test` / VS Test Explorer — the xunit.v3 discovery quirk on this machine).
+
+### 2.8 acceptance gate (U8 records)
+
+The three WY-style tests (the `inline-editor-design.md` / `rich-editor-
+design.md` gate shape). The **closed loop** and **handoff** are **manual**
+(the resident opens a composer, types in the pane, saves; the saved body +
+the read path are verified) — they are recorded in the design doc, not
+automated (the repo has no JS test runner; the 9 pure-function tests,
+§2.7, are the automated floor). U8 records pass/red + the manual status.
+
+- **Closed loop** — a resident opens a composer, types `**bold**` in the
+  pane (or clicks **B** over a selection), saves; the saved body is
+  `**bold**`; the read path renders it as `<strong>bold</strong>`; the
+  round-trip (WY10) holds.
+- **Handoff** — a resident types a heading + a list + a link + an image + a
+  code block in the pane (toolbar splices, WY·4); the saved body is the
+  **exact** Markdown a resident could have hand-typed in the code view
+  (WY·5); the read path (`MarkdownRenderer`) renders it identically; the
+  server parse (`ContentImageIds`) is untouched.
+- **Part-vs-whole** — the 17-test list (§2.7) is the **whole**; closed-loop
+  + handoff are the **parts**; all must pass together (the 9 pure-function
+  tests + the 8 artifact-string pins, run via `dotnet exec`).
+
+**If the manual tests cannot be run** (the dev server is not up, the DB is
+not seeded), the gap is recorded in the design doc + the handoff note, and
+the next unit who lands the runtime records the pass count (the register's
+U8 rule).
+
+### 2.9 drift-guard (frozen once written)
+
+The following are **frozen** once this Part 2 is written; a mismatch found
+by a later unit is a `## U<m> — Drift pause` section in the handoff note
+(unit-series rule 6), **not** a silent edit:
+
+- the **9-invariant table** (WY·1–WY·9, Part 1) and the **10 FACES**
+  (WY1–WY10, Part 1) — pinned by id;
+- the **DOM contract** (§2.2) — the pane's `contenteditable` /
+  `role="textbox"` / `aria-multiline`, the textarea's `readOnly` + the
+  sink-only binding, the toolbar / `data-ie-toggle` shapes, the initial-
+  population + `input`-sync + toolbar-splice lines;
+- the **serializer contract** (§2.3) — `toMarkdown(html): string`, the WY·3
+  subset, the element→Markdown mapping table, the escape rule, the 8 edge
+  cases, the round-trip property;
+- the **sanitizer contract** (§2.4) — `sanitizeHtml(html): string`, the
+  keep/reject lists, the single-pass regex construction, the output domain;
+- the **binder contract** (§2.5) — the WY block's six sub-steps (a)–(f),
+  the per-button DOM-splice table, the "after every splice" sync line;
+- the **CSS contract** (§2.6) — the one new focus-ring rule;
+- the **17 pinned seam-test names** (§2.7) — verbatim, a unit may never
+  introduce a test outside this list;
+- the **frozen base** (§2.1) — RC R·1–R·7 + RE·1–RE·3 + IE·1 + `tsc`-only +
+  no editor dependency + `Body` as a Markdown `string` — **unchanged**.
+
+*— Part 2 (seams & contracts) authored by U2 (2026-09-15). ADR 0033 is
+drafted in the same unit (U9 moves it to Accepted).*
