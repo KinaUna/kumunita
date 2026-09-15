@@ -1,6 +1,6 @@
 # ADR 0031 — WYSIWYG editor + toolbar over the RC Markdown lane
 
-Status: Draft (lands in U08)
+Status: Accepted
 Date: 2026-09-15
 Amends: 0025 (the *"Any WYSIWYG / third-party editor — the `tsc`-only
 constraint stands; the composer is a textarea with a Markdown hint"* non-

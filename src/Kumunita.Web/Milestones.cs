@@ -32,6 +32,7 @@ public static class Milestones
         new("TR", "Translator role — delegate translation editing to non-admin residents; UI strings + static pages open to GlobalAdmin ∪ Translator (ADR 0021)", StatusDone),
         new("RC", "Rich content — Markdown bodies + in-content images on posts, replies, announcements & static pages (ADR 0025)", StatusDone),
         new("GU", "Guardian controls — a parent adds a child's account and supervises it at the account level (suspend, communities/groups, invitation approval); no standing to read the child's private content (ADR 0028)", StatusDone),
+        new("RE", "Rich editor — a WYSIWYG split-view + Markdown-splice toolbar over the RC Markdown lane; tsc-only, no editor dependency (ADR 0031)", StatusDone),
         new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),

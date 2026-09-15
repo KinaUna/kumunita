@@ -625,6 +625,24 @@ public static class KnownTranslationKeys
             // ── admin (page heading + primary action) ───────────────────────
             ["admin.title"]  = "Admin",
             ["admin.verify"] = "Verify",
+
+            // ── rich editor (the RE toolbar button labels, ADR 0031 — RE U08
+            // registers the closed `rc.editor.*` set; the values are the exact
+            // fallback strings the U04–U06 composer views already emit inside
+            // <kw-l>. No `rc.editor.quote` — U1's drift pause removed the
+            // blockquote button (MarkdownRenderer has no blockquote branch),
+            // so there is no button and no key for it. en floor only.) ──────
+            ["rc.editor.bold"]    = "B",
+            ["rc.editor.italic"]  = "I",
+            ["rc.editor.code"]    = "C",
+            ["rc.editor.h1"]      = "H1",
+            ["rc.editor.h2"]      = "H2",
+            ["rc.editor.h3"]      = "H3",
+            ["rc.editor.list"]    = "•",
+            ["rc.editor.olist"]   = "1.",
+            ["rc.editor.link"]    = "Link",
+            ["rc.editor.image"]   = "Image",
+            ["rc.editor.preview"] = "Preview",
         };
 
     /// <summary>

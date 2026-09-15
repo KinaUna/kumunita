@@ -176,6 +176,7 @@ stays trivial and the authorization rules can grow freely.
 - **Rich content** (`RC`, ADR 0025) — Markdown bodies + in-content images on posts, replies, announcements & static pages. **Done.**
 - **Translation display** (`TD`, ADR 0027) — the authored-in language (ADR 0018) is the first, default-visible variant chip on the post/reply detail surface (both lanes); added translations are clickable chips that swap the title+body / body in place; the "add a …" lane excludes the authored-in language; soft-deleted rows show no swap. Display-only — no data, schema, or auto-translation change. **Done.**
 - **Guardian controls** (`GU`, ADR 0028) — a parent adds an account for a child and supervises it at the account level: suspend/lock, curate the child's community & group memberships, and approve a group invitation sent to the child — with **no standing to read the child's private content**; the child's account is handed over to independence when the child comes of age. **Done.**
+- **Rich editor** (`RE`, ADR 0031) — a WYSIWYG authoring surface over the RC Markdown lane: a split-view live preview beside the source `<textarea>` and a Markdown-splice toolbar (bold / italic / code / headings / lists / link / image) in one `tsc`-only module. No editor dependency, no second renderer, no new route — the saved body is byte-identical Markdown the RC read path already renders. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

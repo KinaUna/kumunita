@@ -55,7 +55,9 @@ Events/Projects/Portability), register the **`rc.editor.*`** `<kw-l>` keys
 5. **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — register
    the **`rc.editor.*`** `en` values the U04–U06 views reference via
    `<kw-l>`: `rc.editor.bold`, `.italic`, `.code`, `.h1`, `.h2`, `.h3`,
-   `.list`, `.olist`, `.quote`, `.link`, `.image`, `.preview` (the
+   `.list`, `.olist`, `.link`, `.image`, `.preview` (**no `.quote`** — the
+   `quote`/blockquote button was removed in U1's drift pause; `MarkdownRenderer`
+   has no blockquote branch, so there is no button and no key for it) (the
    ML-UI M·9 precedent — `en` floor only; **no** non-`en` rows). If U06's
    handoff section flagged the RC `rc.markdown_hint` debt, optionally add
    that one key here too (a one-line RC-debt fix, named in the handoff

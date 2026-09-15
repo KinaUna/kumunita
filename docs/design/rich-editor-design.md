@@ -286,8 +286,10 @@ surface. The `dotnet exec` run (not `dotnet test`) is the gate.
 5. `RenderPreview_HostileMarkup_StillEscaped` — `<script>`/`onerror=` →
    escaped, no raw tag survives (client R·2).
 6. `ApplyToggle_Bold_WrapsSelection_AndPreservesCaret` — `applyToggle("hello
-   world",[6,11],"bold")` → `"hello **world**"`, selection now `[7,12]` (the
-   RE1/RE2 FACES — the toggle is a pure, caret-preserving splice).
+   world",[6,11],"bold")` → `"hello **world**"`, selection now `[8,13]` (the
+   RE1/RE2 FACES — the toggle is a pure, caret-preserving splice; the
+   module-faithful selection of `world` in `"hello **world**"`, corrected in
+   U08's close from the register's `[7,12]` digit typo — see U7's handoff).
 7. `ApplyToggle_Bold_TogglesOff_WhenAlreadyBold` — selecting an already-bolded
    word and toggling removes the markers (the RE2 "clicking B again" FACES).
 8. `ApplyBlock_H1_InsertsHeading_AtCaret` — `applyBlock("",0,"h1")` → `"# "`

@@ -35,3 +35,4 @@ Decision / Consequences. New decisions take the next number.
 | 0028 | Guardian controls: account-scope supervision of a child's account (suspend, communities/groups, invitation approval; no content reads) | Accepted |
 | 0029 | Announcement user-added translations (GlobalAdmin/Translator any; community-Moderator their community's; add-only) | Accepted |
 | 0030 | Role independence: elevated roles (GlobalAdmin / Moderator / Translator) are composable per resident, not mutually exclusive | Accepted |
+| 0031 | WYSIWYG editor + toolbar over the RC Markdown lane (split-view live preview + Markdown-splice toolbar, `tsc`-only; Amends 0025) | Accepted |
