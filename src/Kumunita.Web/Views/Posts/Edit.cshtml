@@ -213,12 +213,6 @@
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
 
-    @* The composer image control (client/lib/insert-image.ts, tsc-built —
-       SECURITY.md §6: no inline <script>; loads as an external ES module and
-       self-wires the input[data-insert-image] + textarea[data-image-target]
-       pair above). Upload is CSRF-aware via client/lib/api.ts. *@
-    <script type="module" src="~/js/lib/insert-image.js"></script>
-
     @* The grant-picker sync (shared with Profile/Edit — the
        <c>_GrantPickerScripts</c> partial): keeps the hidden
        <c>Audience.Grants</c> textarea in two-way sync with the

@@ -24,9 +24,10 @@ namespace Kumunita.Web.Controllers;
 /// <li>UGC reply → <b>404</b> (drift pause: no <c>PostReplyToAuditableResource</c>;
 /// C-M3·1 — the reply's decision IS the parent post's, but resolving the parent
 /// is outside U03's scope).</li>
-/// <li>UGC announcement → <b>404</b> (drift pause: no
-/// <c>AnnouncementToAuditableResource</c>; announcements use a flat role/scope
-/// gate, not <c>CanAsync</c>).</li>
+/// <li>UGC announcement → serve when the caller passes the announcement's flat
+/// scope/communities read gate (<see cref="IAnnouncementService.GetAsync"/>),
+/// else <b>404</b> (no <c>CanAsync</c> + no <c>AccessAudit</c> row — announcements
+/// are not audience-restricted; the flat gate is the whole decision).</li>
 /// <li>Platform page → serve directly (public by construction — zero
 /// <c>CanAsync</c>, zero audit rows).</li>
 /// </ul></li>
@@ -90,10 +91,22 @@ public sealed class ContentImageController(
         var announcement = await announcements.FindByImageIdAsync(id);
         if (announcement is not null)
         {
-            // Drift pause: no AnnouncementToAuditableResource exists
-            // (announcements use a flat role/scope gate, not CanAsync).
-            // Fail-closed 404, zero audit rows (no CanAsync called).
-            return NotFound();
+            // UGC announcement — flat scope/communities gate (announcements are
+            // not audience-restricted, so no CanAsync + no AccessAudit row — the
+            // same "no audit row" reasoning as ListVisibleAsync / GetAsync). The
+            // announcement read gate (GetAsync) is the sole serve/deny decision:
+            // public scope always; community scope when signed in; a
+            // community-targeted row when the caller is its GlobalAdmin, a member
+            // of that community, or its moderator. Anonymous → public-scope only.
+            // A null row (not visible to the caller) maps to 404 — not 403 — the
+            // announcement lane's non-leaky posture.
+            var visible = await announcements.GetAsync(
+                announcement.Id, KumunitaPrincipal.SubjectId(User), KumunitaPrincipal.RoleSet(User));
+            if (visible is null) return NotFound(); // not visible → 404 (no-leak)
+            // ── Step 5: serve ─────────────────────────────────────────
+            var stream = await media.OpenReadAsync(id);
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(stream, stored.ContentType);
         }
 
         var page = await pages.FindPageByImageIdAsync(id);

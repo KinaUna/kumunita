@@ -72,18 +72,8 @@
                                 <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
                             </div>
                             <textarea class="form-control" id="body" name="Body" rows="6" required
-                                      placeholder="…" data-rich-editor data-image-target>@Model.Body</textarea>
+                                      placeholder="…" data-rich-editor>@Model.Body</textarea>
                             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                        </div>
-                        <div class="rc-insert-image mt-2">
-                            <input type="file"
-                                   accept="image/jpeg,image/png,image/webp,image/gif"
-                                   data-insert-image />
-                            <span data-insert-image-error class="text-danger small d-block mt-1" style="min-height:1em;"></span>
-                        </div>
-                        <div class="text-muted small mt-1">
-                            Pick a photo to embed it in the body as a Markdown
-                            image link. The image is attached to this post.
                         </div>
                     </div>
                 </div>
@@ -124,11 +114,4 @@
        the toolbar + live preview pane. Self-wires the .rc-editor surface.
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
-
-    @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
-       SECURITY.md §6: no inline <script>; self-wires the
-       input[data-insert-image] + textarea[data-image-target] pair above.
-       Upload is CSRF-aware via client/lib/api.ts + the layout's
-       <meta name="anti-forgery-token"> (drift pause e, resolved U05). *@
-    <script type="module" src="~/js/lib/insert-image.js"></script>
 }

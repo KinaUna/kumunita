@@ -178,17 +178,24 @@ payload):**
   | Post **Edit** (`UpdatePostAsync`) | ❌ RC drift pause (c) | ✅ post branch | **OFF** |
   | Group **New** (`GroupsController:1085`) | ✅ (drift pause (b) resolved) | ✅ post branch | **ON** |
   | Group **Edit** (`UpdateGroupPostAsync`) | ❌ RC drift pause (c) | ✅ post branch | **OFF** |
-  | Announcement **New/Edit** (`AnnouncementController:455,575`) | ✅ | ❌ RC U03 drift pause (inert-404) | **OFF** |
+  | Announcement **New/Edit** (`AnnouncementController:455,575`) | ✅ | ✅ (RC U03 drift pause **resolved**) | **ON** |
   | Static page (`LanguagesController:271`) | ✅ | ✅ page branch (public) | **ON** |
   | Reply **New/Edit** (`Create/UpdateReplyAsync`) | ❌ RC drift pause (a) | ❌ RC U03 drift pause (inert-404) | **OFF** |
 
-  So the image button is **ON** on Post New, Group New, and the static-page
-  editor only; **OFF** (via U03's `data-rich-editor-no-image` option) on Post
-  Edit, Group Edit, both Announcement composers, and all reply composers —
-  each gate names the specific RC drift pause in the handoff note. The text
-  toolbar + preview are **unaffected** (ON everywhere). RE ships a working
-  button only where RC can actually serve the image; it does **not** ship a
-  button that produces 404s.
+  So the image button is **ON** on Post New, Group New, **Announcement
+  New/Edit**, and the static-page editor; **OFF** (via U03's
+  `data-rich-editor-no-image` option) on Post Edit, Group Edit, and all reply
+  composers — each gate names the specific RC drift pause in the handoff note.
+  The **Announcement** lane was un-gated (2026-09-15) once its serve branch
+  shipped: `ContentImageController.Serve` now serves announcement-owned images
+  through the announcement's flat `Scope`/communities read gate
+  (`IAnnouncementService.GetAsync` — public always, community when signed in,
+  targeted to its GlobalAdmin / member / moderator; else 404, not 403 — no
+  `AccessAudit` row, the announcement lane being flat-scope, not
+  audience-restricted); see the ADR 0031 Consequence. The text toolbar +
+  preview are **unaffected** (ON everywhere). RE ships a working button only
+  where RC can actually serve the image; it does **not** ship a button that
+  produces 404s.
 - **Out of scope (named deferrals for a future RE-2 lane, not a renumber):**
   **undo/redo** (the browser's native `Ctrl+Z` on the textarea is the floor;
   a custom history stack is a future lane), **spellcheck / dictionary**
@@ -198,11 +205,13 @@ payload):**
   (D1) is a **hard** non-negotiable, not a deferral, and **tables / footnotes**
   in the toolbar or preview (RC's out-of-scope set, unchanged on both sides).
   The **gated image lanes** (un-gating the image button on Post Edit / Group
-  Edit / Announcement / replies) are **RC follow-ups**, not RE ones: each needs
-  the missing RC write-lane `ImageIds` seam (drift pause (a)/(c)) and/or the
-  missing RC serve-branch adapter (RC U03) — both RC seams RE·3 does not
-  invent. Once an RC lane is complete, that surface's image button un-gates by
-  removing `data-rich-editor-no-image` (a one-attribute change, no RE code).
+  Edit / replies) are **RC follow-ups**, not RE ones: each needs the missing
+  RC write-lane `ImageIds` seam (drift pause (a)/(c)) and/or the missing RC
+  serve-branch (RC U03) — both RC seams RE·3 does not invent. The
+  **Announcement** lane is **off this list** — its serve branch shipped
+  (2026-09-15, ADR 0031) and the button is now ON. Once an RC lane is
+  complete, that surface's image button un-gates by removing
+  `data-rich-editor-no-image` (a one-attribute change, no RE code).
 - **Test / acceptance model (unchanged, RC/ML-UI convention).** `xunit.v3`;
   on this machine the discovery path (VS Test Explorer / `dotnet test`) is the
   known-broken bug — the reliable runner is `dotnet build` + `dotnet exec
@@ -234,7 +243,7 @@ invariants. The seam tests (§Pinned seam tests, U07) cover these 1:1.
 | **RE1** | a resident opens the post composer, sees a **toolbar** (B / I / H / list / link / image) above the body field and a **live preview pane** that renders what they type as they type — `**bold**` shows **bold** in the pane while the textarea still holds `**bold**`. | RE·1, RE·2 |
 | **RE2** | the resident selects the word `hello` and clicks **B** → the textarea now reads `**hello**` with the selection preserved; the preview shows **hello** bold. Clicking **B** again (deselected, cursor after) toggles it back to `hello`. | RE·1 |
 | **RE3** | the resident clicks **Link** with a selection → the selection becomes `[hello](https://…)` (a prompt for the URL, or the existing link rule — pinned in the design doc); the preview renders it as an `<a>`. A **remote image** typed `![x](https://evil/i.png)` renders in the preview **as plain text** (the client allowlist mirrors `IsSafeImageSrc`), not an `<img>`. | RE·2 |
-| **RE4** | on a surface where the image button is available (Post New, Group New, static-page editor), the resident clicks **Image** → the RC upload fires (the existing `POST /content-image`), and on success `![{alt}](/content-image/{id})` is spliced in and the preview renders an `<img class="rc-image">`. Saving populates `ImageIds` **exactly as if the resident had hand-typed the link** (RC R·3 unchanged — the server parse is byte-identical). On a surface where RC's image lane is incomplete (Post Edit / Group Edit / Announcement / replies), the button is **absent** (U03's `data-rich-editor-no-image`) so the resident can never produce a 404'ing image — the text toolbar + preview are unchanged there. | RE·1, RE·3, RC R·3 |
+| **RE4** | on a surface where the image button is available (Post New, Group New, **Announcement New/Edit**, static-page editor), the resident clicks **Image** → the RC upload fires (the existing `POST /content-image`), and on success `![{alt}](/content-image/{id})` is spliced in and the preview renders an `<img class="rc-image">`. Saving populates `ImageIds` **exactly as if the resident had hand-typed the link** (RC R·3 unchanged — the server parse is byte-identical). On a surface where RC's image lane is incomplete (Post Edit / Group Edit / replies), the button is **absent** (U03's `data-rich-editor-no-image`) so the resident can never produce a 404'ing image — the text toolbar + preview are unchanged there. | RE·1, RE·3, RC R·3 |
 | **RE5** | a **signed-in** GlobalAdmin opens the **about** page editor (`/admin/languages/…` static-page surface) → the toolbar + preview are there exactly like a post composer, and saving renders on `/about` for an unauthenticated visitor **unchanged** (RC R6 — the editor is a nicer front to the same `LocalizedPage.Body` RC already serves). | RE·1, RC R6 |
 
 ## Pinned contract (the **new** artifacts this lane adds — additive only)
@@ -280,21 +289,23 @@ export function bindRichEditor(root: HTMLElement): void;      // RE·1, D1/D2
 </div>
 <script type="module" src="~/js/lib/rich-editor.js"></script>
 ```
-**The image-gated variant (U04 Post Edit, U05 Group Edit + both Announcement
-composers, U06 reply composers):** identical block, **except** the toolbar
-carries `data-rich-editor-no-image` (U03's `bindRichEditor` then **omits** the
-`data-md="image"` button) and the textarea drops `data-image-target` (RC's
-image lane is incomplete on that surface — the specific drift pause is named
-per-surface in the register's image-button matrix + the unit plan). The text
-toolbar + preview are byte-identical to the composer pattern on **every**
-surface (gated or not).
+**The image-gated variant (U04 Post Edit, U05 Group Edit, U06 reply
+composers):** identical block, **except** the toolbar carries
+`data-rich-editor-no-image` (U03's `bindRichEditor` then **omits** the
+`data-md="image"` button) — RC's image lane is incomplete on that surface and
+the specific drift pause is named per-surface in the register's image-button
+matrix + the unit plan. (Both Announcement composers were **un-gated** on
+2026-09-15 once the announcement serve branch shipped — they now use the base
+pattern above, not this gated variant.) The text toolbar + preview are
+byte-identical to the composer pattern on **every** surface (gated or not).
 
 **Everything else is frozen** (RC R·1–R·7 + the RC `Pinned contract`). The
-`Body` textarea keeps its `name` and its `value`. Its RC `data-image-target`
-attribute is kept **only on the surfaces where the image button is on** (Post
-New / Group New / static page — RC's write + serve are complete there, so the
-image button + a hand-typed image link both feed the same RC `ImageIds`
-parse); it is dropped on the image-gated surfaces. **No** new view-model
+`Body` textarea keeps its `name` and its `value`. The earlier per-surface
+`data-image-target` attribute — the RC-era hook the standalone `insert-image.ts`
+chooser wired its file input to — is **no longer present on any surface**
+(removed 2026-09-15 with that chooser): the toolbar's Image button (the
+`rich-editor.ts` Image splice) is the single image affordance, so a second
+file-input hook below the preview is dead UI. **No** new view-model
 field, **no** new controller action, **no** new Core type.
 
 ## Approach
@@ -372,7 +383,7 @@ its plan file from `docs/plans-milestones/in-progress/` to
 | U2 | (No code) the **preview render lane**: confirm `MarkdownRenderer` + `ContentImageIds` + `.rc-body`/`.rc-image` are the frozen render baseline the client preview must mirror — a **read-only** verification + a one-paragraph "mirror checklist" in the handoff note (guards against U03 inventing a divergent marker set) | `rich-editor-u02-plan.md` |
 | U3 | The **shared editor module** (`client/lib/rich-editor.ts`: `renderPreview` / `applyToggle` / `applyBlock` / `applyLink` / `imageLink` / `bindRichEditor`) + the `.rc-editor-*` CSS block — the **only** new code, the **only** unit that writes TS | `rich-editor-u03-plan.md` |
 | U4 | Wire the toolbar + preview on the **post** composer (`Posts/{New,Edit}`) — the pattern the rest copy. Image button **on** for Post New (RC write lane wired), **off** for Post Edit (RC drift pause (c): `UpdatePostAsync` doesn't populate `ImageIds`) | `rich-editor-u04-plan.md` |
-| U5 | Spread the toolbar + preview to the **group-post** (`Groups/{New,Edit}`) + **announcement** (`Announcement/{New,Edit}`) composers — copy-verified against U04's pattern. Image button **on** for Group New, **off** for Group Edit (RC drift pause (c) analog) and **off on both Announcement composers** (RC U03 drift pause: serve branch inert-404) | `rich-editor-u05-plan.md` |
+| U5 | Spread the toolbar + preview to the **group-post** (`Groups/{New,Edit}`) + **announcement** (`Announcement/{New,Edit}`) composers — copy-verified against U04's pattern. Image button **on** for Group New and **both Announcement composers** (announcement serve branch resolved 2026-09-15), **off** for Group Edit (RC drift pause (c) analog) | `rich-editor-u05-plan.md` |
 | U6 | Wire the toolbar + preview on the **static-page editor** (`Languages/PreviewPage`, the RC R6 authoring side — image button **on**, RC lane complete) **and** the **reply composers** (`Posts/Detail`, `Groups/PostDetail`, `Announcement/Detail`) — the reply surfaces get the same text toolbar + preview, with the **image button gated off** (RC's reply-image store+serve lane is an unresolved RC drift pause; RE·3 forbids inventing it) | `rich-editor-u06-plan.md` |
 | U7 | The **parity + splice** seam tests (RE1–RE5 as `renderPreview` / `applyToggle` / `applyBlock` / `applyLink` / `imageLink` unit tests in `Kumunita.Web.Tests`) + run + record the acceptance gate | `rich-editor-u07-plan.md` |
 | U8 | Close — **ADR 0031** landing + `Milestones.cs` `RE` roadmap + README + `MilestonesTests.cs` + the `rc.editor.*` `<kw-l>` key registration + folder moves | `rich-editor-u08-plan.md` |
@@ -581,10 +592,14 @@ this machine).
   - **Group Edit** — needs `UpdateGroupPostAsync` to populate
     `post.ImageIds` (RC drift pause (c) analog). Same un-gate on
     `Groups/Edit.cshtml`.
-  - **Announcement New + Edit** — needs `ContentImageController.Serve` to
-    gain an announcement branch (RC U03 drift pause — no
-    `AnnouncementToAuditableResource`). Same un-gate on both
-    `Announcement/{New,Edit}.cshtml`.
+  - **Announcement New + Edit** — **resolved (2026-09-15)**:
+    `ContentImageController.Serve` gained an announcement branch (served
+    through the announcement's flat `Scope`/communities gate —
+    `IAnnouncementService.GetAsync`; the announcement lane is flat-scope,
+    not audience-restricted, so RC's `AnnouncementToAuditableResource` +
+    `AccessAudit` idiom does not map onto it), and the `data-rich-editor-
+    no-image` gate was removed from both `Announcement/{New,Edit}.cshtml`.
+    No further action.
   - **Reply New/Edit (all three Detail views)** — needs both the write seam
     (`CreateReplyAsync`/`UpdateReplyAsync` → `PostReply.ImageIds`, RC drift
     pause (a)) **and** the serve seam (`ContentImageController.Serve` reply

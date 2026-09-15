@@ -44,11 +44,9 @@
            SavePage populates ImageIds; the page serve branch is public).
            name="body" stays LOWERCASE (LanguagesController.SavePage binds
            it lowercase — do not normalize). font-monospace dropped: the
-           split view is the source/preview affordance. The rc-insert-image
-           file-input block is kept (U04 Post New precedent — the image
-           button is the primary path, the file-input a valid secondary
-           affordance; insert-image.ts still self-wires it via
-           data-image-target). *@
+           split view is the source/preview affordance. The Image button
+           (toolbar) is the single image path — the former rc-insert-image
+           file-input block is removed as a redundant secondary affordance. *@
         <div class="rc-editor">
             <div class="rc-editor-toolbar" data-rich-editor>
                 <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
@@ -64,20 +62,13 @@
             </div>
             <textarea class="form-control" name="body" id="body"
                       rows="16" style="min-height: 12rem;"
-                      data-rich-editor data-image-target>@Model.Body</textarea>
+                      data-rich-editor>@Model.Body</textarea>
             <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-        </div>
-        <div class="rc-insert-image mt-2">
-            <input type="file"
-                   accept="image/jpeg,image/png,image/webp,image/gif"
-                   data-insert-image />
-            <span data-insert-image-error class="text-danger small d-block mt-1" style="min-height:1em;"></span>
         </div>
         <div class="form-text small">
             Supports: headings (#), paragraphs, lists (-), **bold**, *italic*,
             `code`, [links](url), ![image](/content-image/…), fenced code blocks.
-            Raw HTML is escaped. Pick a photo to embed it in the body as a
-            Markdown image link.
+            Raw HTML is escaped.
         </div>
     </div>
 
@@ -90,11 +81,4 @@
        surface; the image button reuses RC's CSRF-aware apiFetch upload.
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
-
-    @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
-       SECURITY.md §6: no inline <script>; self-wires the
-       input[data-insert-image] + textarea[data-image-target] pair above.
-       Upload is CSRF-aware via client/lib/api.ts + the layout's
-       <meta name="anti-forgery-token"> (drift pause e, resolved U05). *@
-    <script type="module" src="~/js/lib/insert-image.js"></script>
 }

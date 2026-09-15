@@ -165,12 +165,13 @@ the server renderer would refuse.
 ### The toolbar + preview markup pattern (U04–U06)
 
 One pattern, every composer. The image-gated variant (U04 Post Edit, U05
-Group Edit + both Announcement composers, U06 reply composers) is identical
-**except** the toolbar carries `data-rich-editor-no-image` (U03's
-`bindRichEditor` then **omits** the `data-md="image"` button) and the textarea
-drops `data-image-target` (RC's image lane is incomplete on that surface — the
-specific RC drift pause is named per-surface in the register's image-button
-matrix + the handoff note).
+Group Edit, U06 reply composers) is identical **except** the toolbar carries
+`data-rich-editor-no-image` (U03's `bindRichEditor` then **omits** the
+`data-md="image"` button) — RC's image lane is incomplete on that surface and
+the specific RC drift pause is named per-surface in the register's image-button
+matrix + the handoff note. (Both Announcement composers were **un-gated** on
+2026-09-15 once the announcement serve branch shipped — they now use the base
+pattern below, not this gated variant.)
 
 ```razor
 <div class="rc-editor">
@@ -188,11 +189,13 @@ matrix + the handoff note).
 ```
 
 **Everything else is frozen** (RC R·1–R·7 + the RC Pinned contract). The
-`Body` textarea keeps its `name` and its `value`. Its RC `data-image-target`
-attribute is kept **only on the surfaces where the image button is on** (Post
-New / Group New / static page); it is dropped on the image-gated surfaces.
-**No** new view-model field, **no** new controller action, **no** new Core
-type.
+`Body` textarea keeps its `name` and its `value`. The earlier per-surface
+`data-image-target` attribute — the RC-era hook the standalone `insert-image.ts`
+chooser wired its file input to — is **no longer present on any surface**
+(removed 2026-09-15 with that chooser): the toolbar's Image button is the
+single image affordance, so a second file-input hook below the preview is
+dead UI. **No** new view-model field, **no** new controller action, **no**
+new Core type.
 
 ## Exact toolbar marker set (the *ceiling*)
 
@@ -360,10 +363,14 @@ render it; RE·2 forces it out of both the toolbar and the preview (see
     `Posts/Edit.cshtml` (one attribute, no RE code).
   - **Group Edit** — needs `UpdateGroupPostAsync` to populate `post.ImageIds`
     (RC drift pause (c) analog). Same un-gate on `Groups/Edit.cshtml`.
-  - **Announcement New + Edit** — needs `ContentImageController.Serve` to gain
-    an announcement branch (RC U03 drift pause — no
-    `AnnouncementToAuditableResource`). Same un-gate on both
-    `Announcement/{New,Edit}.cshtml`.
+  - **Announcement New + Edit** — **resolved (2026-09-15)**:
+    `ContentImageController.Serve` gained an announcement branch (served
+    through the announcement's flat `Scope`/communities gate —
+    `IAnnouncementService.GetAsync`; the announcement lane is flat-scope,
+    not audience-restricted, so RC's `AnnouncementToAuditableResource` +
+    `AccessAudit` idiom does not map onto it), and the `data-rich-editor-
+    no-image` gate was removed from both `Announcement/{New,Edit}.cshtml`.
+    No further action.
   - **Reply New/Edit (all three Detail views)** — needs both the write seam
     (`CreateReplyAsync`/`UpdateReplyAsync` → `PostReply.ImageIds`, RC drift
     pause (a)) **and** the serve seam (`ContentImageController.Serve` reply

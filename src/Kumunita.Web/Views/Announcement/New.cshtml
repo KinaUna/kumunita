@@ -107,7 +107,11 @@
                         <kw-l key="announcements.body_label">Body</kw-l>
                     </label>
                     <div class="rc-editor">
-                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                        @* Image button ON — the announcement image lane is complete
+                           (RC U05 persists Announcement.ImageIds on create; the
+                           /content-image/{id} serve branch gates on the announcement's
+                           flat scope/communities visibility). *@
+                        <div class="rc-editor-toolbar" data-rich-editor>
                             <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
                             <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
                             <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
@@ -158,16 +162,4 @@
        the toolbar + live preview pane. Self-wires the .rc-editor surface.
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
-
-    @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
-       SECURITY.md §6: no inline <script>; self-wires the
-       input[data-insert-image] + textarea[data-image-target] pair above.
-       Upload is CSRF-aware via client/lib/api.ts + the layout's
-       <meta name="anti-forgery-token"> (drift pause e, resolved U05).
-       The image button is gated off on this surface (RC U03 drift pause:
-       ContentImageController.Serve has no announcement branch → inert-404)
-       and the rc-insert-image block was removed as dead UI — this include
-       is inert without data-image-target, but removing it is out of RE
-       scope (RE·3). *@
-    <script type="module" src="~/js/lib/insert-image.js"></script>
 }

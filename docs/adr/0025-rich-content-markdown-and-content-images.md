@@ -95,13 +95,21 @@ their own owning resource, as ADR 0011 already said.
   `POST /content-image` lane is the second consumer of the same
   chokepoint (`MediaOptions.AllowedContentTypes` + `Media__MaxBytes`),
   so OPS.md's tunables stay the extension point.
-- **The composer is a textarea + a plain-TS module**
-  (`client/lib/insert-image.ts`, `tsc`-only) — **no editor dependency
-  enters `package.json`**.
+- **The composer is a textarea + a plain-TS module**, `tsc`-only —
+  **no editor dependency enters `package.json`**. The image path is the
+  WYSIWYG toolbar's Image button (`client/lib/rich-editor.ts`, the RE lane
+  — ADR 0031); the earlier standalone `insert-image.ts` chooser was removed
+  once that button became the single image affordance (2026-09-15).
 - **Audit-by-default holds** (SECURITY.md §3): every served UGC image is
   the product of an audited `Read` Allow (or the logged Deny that 404s
-  it); platform-page images are public by construction and emit zero
-  rows; every 404 path (store-miss, owner-miss) emits zero rows.
+  it) — **except the announcement**, whose image is served through the
+  announcement's own flat `Scope`/communities gate
+  (`IAnnouncementService.GetAsync`: public always, community when signed in,
+  targeted to its GlobalAdmin / member / moderator; else 404, not 403). The
+  announcement lane is not audience-restricted, so it emits zero
+  `AccessAudit` rows by design (matching its body); platform-page images are
+  public by construction and emit zero rows; every 404 path (store-miss,
+  owner-miss, not-visible) emits zero rows.
 
 ## Not decided here (explicit non-decisions)
 

@@ -112,15 +112,4 @@
        the toolbar + live preview pane. Self-wires the .rc-editor surface.
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
-
-    @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
-       SECURITY.md §6: no inline <script>; self-wires the
-       input[data-insert-image] + textarea[data-image-target] pair above.
-       Upload is CSRF-aware via client/lib/api.ts + the layout's
-       <meta name="anti-forgery-token"> (drift pause e, resolved U05).
-       The image button is gated off on this surface (RC drift pause (c)
-       analog: UpdateGroupPostAsync never sets post.ImageIds) and the
-       rc-insert-image block was removed as dead UI — this include is inert
-       without data-image-target, but removing it is out of RE scope (RE·3). *@
-    <script type="module" src="~/js/lib/insert-image.js"></script>
 }

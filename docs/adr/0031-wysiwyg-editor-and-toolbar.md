@@ -107,11 +107,29 @@ render are untouched.
   shipped (recorded as a drift pause at U01; a future lane must extend
   `MarkdownRenderer` **and** the client preview in the same commit).
 - **The image button is on only where RC's image lane is complete** (Post
-  New, Group New, static-page editor) and **gated off** (via
-  `data-rich-editor-no-image`) where RC's write-lane or serve-branch seam is
-  still an open RC drift pause (Post Edit, Group Edit, Announcement,
+  New, Group New, the static-page editor, **and Announcement New/Edit**) and
+  **gated off** (via `data-rich-editor-no-image`) where RC's write-lane or
+  serve-branch seam is still an open RC drift pause (Post Edit, Group Edit,
   replies). RE ships a working button only where RC can actually serve the
   image; it does not ship a button that produces 404s.
+  <br>
+  **Announcement New/Edit were un-gated (2026-09-15)** once the announcement
+  serve branch shipped: `ContentImageController.Serve` previously returned a
+  fail-closed 404 for announcement-owned images (the RC U03 drift pause — the
+  announcement lane is flat-scope, not audience-restricted, so RC's
+  auditable-resource + `CanAsync` + `AccessAudit` idiom does not map onto it),
+  so the button was inert. The branch now serves through the announcement's
+  own flat `Scope`/communities read gate
+  (`IAnnouncementService.GetAsync` — public scope always, community scope when
+  signed in, a targeted row to its GlobalAdmin / member / moderator; else 404,
+  not 403 — no `CanAsync`, no `AccessAudit` row, matching how the
+  announcement's own body is gated). With the
+  toolbar image button live on every composer, the **redundant RC file-chooser
+  (`rc-insert-image` block + `insert-image.ts`) was removed** — the toolbar
+  button (the same `POST /content-image` upload + `![alt](/content-image/{id})`
+  splice) is the single image path, so the second file-input affordance below
+  the preview is dead UI. Replies stay gated: their write-lane (`PostReply`
+  `ImageIds`) and serve-branch drift pauses are untouched by this change.
 - **Audit-by-default holds** (SECURITY.md §3): the toolbar's only network
   action is the RC image upload, which is already CSRF-aware and
   audited-by-RC; every other button is a local DOM text edit (zero fetches,
