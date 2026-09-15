@@ -39,8 +39,34 @@
 
     <div class="mb-3">
         <label for="body" class="form-label">Body (Markdown)</label>
-        <textarea class="form-control font-monospace" name="body" id="body"
-                  rows="16" style="min-height: 12rem;" data-image-target>@Model.Body</textarea>
+        @* RE U06 — the toolbar + live preview split view (U04's canonical
+           pattern, image ON — RC's static-page image lane is complete:
+           SavePage populates ImageIds; the page serve branch is public).
+           name="body" stays LOWERCASE (LanguagesController.SavePage binds
+           it lowercase — do not normalize). font-monospace dropped: the
+           split view is the source/preview affordance. The rc-insert-image
+           file-input block is kept (U04 Post New precedent — the image
+           button is the primary path, the file-input a valid secondary
+           affordance; insert-image.ts still self-wires it via
+           data-image-target). *@
+        <div class="rc-editor">
+            <div class="rc-editor-toolbar" data-rich-editor>
+                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                <button type="button" class="rc-btn" data-md="link"><kw-l key="rc.editor.link">Link</kw-l></button>
+                <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
+            </div>
+            <textarea class="form-control" name="body" id="body"
+                      rows="16" style="min-height: 12rem;"
+                      data-rich-editor data-image-target>@Model.Body</textarea>
+            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+        </div>
         <div class="rc-insert-image mt-2">
             <input type="file"
                    accept="image/jpeg,image/png,image/webp,image/gif"
@@ -59,6 +85,12 @@
 </form>
 
 @section Scripts {
+    @* RE U06 — the rich editor (client/lib/rich-editor.ts, tsc-built —
+       the toolbar + live preview pane above. Self-wires the .rc-editor
+       surface; the image button reuses RC's CSRF-aware apiFetch upload.
+       RE·3: no editor dependency. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+
     @* RC U05 composer image control (client/lib/insert-image.ts, tsc-built —
        SECURITY.md §6: no inline <script>; self-wires the
        input[data-insert-image] + textarea[data-image-target] pair above.

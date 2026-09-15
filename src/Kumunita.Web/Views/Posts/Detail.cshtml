@@ -160,8 +160,29 @@
                                             <label class="form-label small" for="post-t-body">
                                                 <kw-l key="posts.translation_body_label">Body</kw-l>
                                             </label>
-                                            <textarea class="form-control form-control-sm mb-2" id="post-t-body"
-                                                      name="body" rows="3" required placeholder="…"></textarea>
+                                            @* RE U06 — toolbar + live preview on the reply body (image
+                                               OFF: RC's reply-image lane is unshipped — CreateReplyAsync/
+                                               UpdateReplyAsync never set PostReply.ImageIds [RC drift pause (a)]
+                                               and ContentImageController.Serve has no reply branch [RC U03
+                                               inert-404]; RE·3 forbids inventing that seam). name="body" and the
+                                               id/value bindings are preserved exactly. *@
+                                            <div class="rc-editor">
+                                                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="link"><kw-l key="rc.editor.link">Link</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
+                                                </div>
+                                                <textarea class="form-control form-control-sm mb-2" id="post-t-body"
+                                                          name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                            </div>
                                             <button type="submit" class="btn btn-sm btn-primary">
                                                 <kw-l key="posts.translation_save">Save translation</kw-l>
                                             </button>
@@ -306,8 +327,25 @@
                                                     <label class="form-label small" for="reply-t-body">
                                                         <kw-l key="posts.translation_body_label">Body</kw-l>
                                                     </label>
-                                                    <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
-                                                              name="body" rows="3" required placeholder="…"></textarea>
+                                                    @* RE U06 — image OFF (same RC reply-image gap as the post
+                                                       translation lane above). *@
+                                                    <div class="rc-editor">
+                                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="link"><kw-l key="rc.editor.link">Link</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
+                                                        </div>
+                                                        <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
+                                                                  name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                    </div>
                                                     <button type="submit" class="btn btn-sm btn-primary">
                                                         <kw-l key="posts.translation_save">Save translation</kw-l>
                                                     </button>
@@ -348,8 +386,24 @@
                                             <form class="mt-2 text-start" method="post"
                                                   action="@($"/posts/{postId}/replies/{r.Id}/edit")">
                                                 @Html.AntiForgeryToken()
-                                                <textarea class="form-control mb-2" name="body" rows="3"
-                                                          required placeholder="…">@r.Body</textarea>
+                                                @* RE U06 — image OFF (same RC reply-image gap). *@
+                                                <div class="rc-editor">
+                                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="link"><kw-l key="rc.editor.link">Link</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
+                                                    </div>
+                                                    <textarea class="form-control mb-2" name="body" rows="3"
+                                                              required placeholder="…" data-rich-editor>@r.Body</textarea>
+                                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                </div>
                                                 <button type="submit" class="btn btn-sm btn-primary"><kw-l key="posts.reply_save">Save</kw-l></button>
                                             </form>
                                         </details>
@@ -420,9 +474,24 @@
                     <label class="form-label" for="reply-body" style="font-weight:600;">
                         <kw-l key="posts.reply_label">Reply</kw-l>
                     </label>
-                    <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
-                              required
-                              placeholder="…"></textarea>
+                    @* RE U06 — image OFF (same RC reply-image gap). *@
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="link"><kw-l key="rc.editor.link">Link</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="image"><kw-l key="rc.editor.image">Image</kw-l></button>
+                        </div>
+                        <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
+                                  required placeholder="…" data-rich-editor></textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
                     @{
                         var replyLanguages =
                             (ViewData["Reply_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
@@ -451,3 +520,13 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    @* RE U06 — the rich editor (client/lib/rich-editor.ts, tsc-built).
+       Self-wires every .rc-editor block on this page (the four
+       name="body" reply textareas); the image button is omitted on all
+       of them (data-rich-editor-no-image — RC's reply-image lane is
+       unshipped; RE·3). RE·3: no editor dependency. One include covers
+       every .rc-editor root the module finds on the page. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

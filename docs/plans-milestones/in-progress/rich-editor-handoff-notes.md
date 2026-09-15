@@ -653,3 +653,228 @@ frozen (no `ImageIds` line added on the group-edit gap).
   (modified — the U5 section appended)
 - `docs/plans-milestones/in-progress/rich-editor-u05-plan.md` →
   `docs/plans-milestones/done/rich-editor-u05-plan.md` (moved last)
+
+## U6 — Static-page editor + reply composers wired
+
+**Date:** 2026-09-15
+
+**Deliverables shipped (exactly 4 files, the closed set):**
+
+1. `src/Kumunita.Web/Views/Languages/PreviewPage.cshtml` (modified) —
+   the **static-page editor** (RC R6 authoring side, the one
+   admin-only, image-ON surface). The body `<textarea name="body">` is
+   wrapped in U04's canonical `.rc-editor` split-view pattern:
+   - `<div class="rc-editor">` → `<div class="rc-editor-toolbar"
+     data-rich-editor>` with the **full 10-button** toolbar (bold,
+     italic, code, h1, h2, h3, ul, ol, link, image — **no**
+     `quote`/blockquote, U1 drift pause holds).
+   - The original `<textarea>` preserved: `name="body"` (**lowercase** —
+     `LanguagesController.SavePage` binds lowercase `body`; do **not**
+     normalize), `id="body"`, `class="form-control"`, `rows="16"`,
+     `style="min-height: 12rem;"`, `@Model.Body` value binding — **plus**
+     `data-rich-editor` **and** `data-image-target`.
+   - The `font-monospace` class is **dropped** (the split view *is* the
+     source/preview affordance; the RC `rc-insert-image` hint block is
+     still present as the secondary affordance — see below).
+   - `<div class="rc-editor-pane rc-body" aria-live="polite"
+     data-rich-editor-preview></div>`.
+   - The RC `rc-insert-image` file-input block + the "Supports: …" hint
+     paragraph are **kept** (mirrors U04's Post New — a functional
+     secondary image affordance; the `insert-image.ts` module still
+     self-wires it via `data-image-target`).
+   - `<script type="module" src="~/js/lib/rich-editor.js"></script>`
+     added to `@section Scripts` (per-view, not layout-level — U04's
+     include decision). The pre-existing RC `insert-image.js` include is
+     **kept** (functional — `data-image-target` is present on the
+     textarea).
+   - **Image button ON** (full 10-button toolbar + `data-image-target`).
+     RC's static-page image lane is complete: `LanguagesController`
+     `SavePage` runs `ContentImageIds.ExtractContentImageIds` →
+     `ImageIds`; serve via the page branch of `ContentImageController`
+     (public, no owner check needed).
+
+2. `src/Kumunita.Web/Views/Posts/Detail.cshtml` (modified) — **all four**
+   `name="body"` reply textareas wrapped in U04's pattern with
+   `data-rich-editor-no-image` on every toolbar. **Every**
+   `<textarea name="reason">` (report-reason) is **untouched** (2
+   instances: the post-report form ~line 232, the per-reply-report form
+   ~line 443). The four `name="body"` reply textareas wired:
+   - `#post-t-body` — the post's "add a translation" body (line ~183
+     after wiring, was ~164 before), inside
+     `action="/posts/{postId}/translations"`.
+   - `#reply-t-body` — the per-reply "add a translation" body (line ~346
+     after wiring, was ~310 before), inside
+     `action="/posts/{postId}/replies/{r.Id}/translations"`.
+   - The unnamed `name="body"` **edit-reply** textarea (line ~403 after
+     wiring, was ~351 before), inside
+     `action="/posts/{postId}/replies/{r.Id}/edit"`, value
+     `@r.Body` preserved.
+   - `#reply-body` — the new-reply textarea (line ~491 after wiring, was
+     ~423 before), inside `action="/posts/{postId}/replies"`.
+
+   Each wrapper: `.rc-editor` → `.rc-editor-toolbar
+   data-rich-editor data-rich-editor-no-image` → **full 10 buttons
+   rendered in markup** (the module removes `data-md="image"` at bind
+   time → 9 visible) → textarea with `data-rich-editor` added and
+   `data-image-target` **absent** (replies have no RC image lane) →
+   `.rc-editor-pane rc-body aria-live="polite"
+   data-rich-editor-preview`. **No** `rc-insert-image` block (none
+   existed pre-RE; RE does not add dead UI).
+   `<script type="module" src="~/js/lib/rich-editor.js"></script>` added
+   to a **new** `@section Scripts` at the end of the view (the view had
+   no `@section Scripts` before — the U03 module's self-wire handles
+   every `.rc-editor` root on the page, so one include covers all four
+   blocks).
+
+3. `src/Kumunita.Web/Views/Groups/PostDetail.cshtml` (modified) — **the
+   identical** reply wiring to #2. **All four** `name="body"` reply
+   textareas wired with `data-rich-editor-no-image`; **zero**
+   `name="reason"` textareas in this view (verified by enumeration —
+   the group-post detail view has no per-reply report intake on the
+   group lane, only on the post lane `Posts/Detail`). The four
+   `name="body"` reply textareas wired:
+   - `#post-t-body` — the post's "add a translation" body (line ~177
+     after wiring, was ~159 before).
+   - `#reply-t-body` — the per-reply "add a translation" body (line ~320
+     after wiring, was ~286 before).
+   - The unnamed `name="body"` **edit-reply** textarea (line ~377 after
+     wiring, was ~327 before), value `@r.Body` preserved.
+   - `#reply-body` — the new-reply textarea (line ~445 after wiring, was
+     ~379 before).
+   `<script type="module" src="~/js/lib/rich-editor.js"></script>` added
+   to a **new** `@section Scripts` at the end of the view.
+
+4. `src/Kumunita.Web/Views/Announcement/Detail.cshtml` (modified) —
+   **the identical** reply wiring to #2. **One** `name="body"` textarea
+   in this view (verified by enumeration — the announcement detail is a
+   public read surface with a single "add a translation" body; no
+   per-reply lane, no report intake, no edit lane):
+   - `#ann-t-body` — the announcement's "add a translation" body (line
+     ~169 after wiring, was ~152 before), inside
+     `action="/announcements/{Model.Id}/translations"`.
+   **Zero** `name="reason"` textareas in this view (verified by
+   enumeration). `data-rich-editor-no-image` on the toolbar; **no**
+   `data-image-target`; **no** `rc-insert-image` block.
+   `<script type="module" src="~/js/lib/rich-editor.js"></script>` added
+   to a **new** `@section Scripts` at the end of the view.
+
+**The `rc-insert-image` block choice (per view):**
+
+| View | `rc-insert-image` | `data-image-target` | Image button |
+|---|---|---|---|
+| `Languages/PreviewPage` | **kept** (functional — RC's static-page image lane is complete) | **kept** | **ON** |
+| `Posts/Detail` | **none added** (none existed pre-RE; would be dead UI without `data-image-target`) | **absent** | **OFF** |
+| `Groups/PostDetail` | **none added** (same) | **absent** | **OFF** |
+| `Announcement/Detail` | **none added** (same) | **absent** | **OFF** |
+
+This matches U04's rule: **keep** the RC `rc-insert-image` block only
+where `data-image-target` is present (functional); **omit** it where
+`data-image-target` is absent (dead UI). The three reply views had no
+pre-RE `rc-insert-image` block at all, so RE does not add one — it
+would be dead UI without `data-image-target`.
+
+**The `name="body"` enumeration (per view, pre-RE → post-RE):**
+
+| View | Pre-RE `name="body"` count | Post-RE wired count | `name="reason"` count (untouched) |
+|---|---|---|---|
+| `Posts/Detail.cshtml` | 4 | 4 | 2 (line ~232, ~443 — **both untouched**) |
+| `Groups/PostDetail.cshtml` | 4 | 4 | 0 (verified — no `name="reason"` in this view) |
+| `Announcement/Detail.cshtml` | 1 | 1 | 0 (verified — no `name="reason"` in this view) |
+| `Languages/PreviewPage.cshtml` | 1 | 1 | 0 (verified — no `name="reason"` in this view) |
+
+**Total:** 10 `name="body"` textareas wired (4 + 4 + 1 + 1);
+**zero** `name="reason"` textareas touched (2 in `Posts/Detail`,
+verified untouched). No `name="body"` textarea missed, no
+`name="reason"` textarea accidentally wired.
+
+**Copy-verify (RE·2 — one pattern):** the text toolbar (10 buttons,
+**no** `quote`) + the `.rc-editor-pane rc-body` preview pane +
+`aria-live="polite"` + the `data-rich-editor` /
+`data-rich-editor-preview` attribute contract are **byte-identical**
+to U04's `Posts/New` + `Posts/Edit` across all four views. The **only**
+expected delta is the image-button gate:
+
+| View | Image button | Toolbar | `data-image-target` | `rc-insert-image` |
+|---|---|---|---|---|
+| `Languages/PreviewPage` | **ON** | full 10 (incl. `data-md="image"`) | **kept** | **kept** (functional) |
+| `Posts/Detail` | **OFF** | `data-rich-editor-no-image` | **absent** | **none** |
+| `Groups/PostDetail` | **OFF** | `data-rich-editor-no-image` | **absent** | **none** |
+| `Announcement/Detail` | **OFF** | `data-rich-editor-no-image` | **absent** | **none** |
+
+The drift guard checks this **expected** delta (the image-button gate +
+`rc-insert-image` presence), not byte-identity — exactly as U04/U05
+recorded.
+
+**The `insert-image.js` include (RC's, not RE's):**
+
+- `Languages/PreviewPage.cshtml` — **present** (pre-existing RC U05
+  include), **functional** (`data-image-target` + `rc-insert-image`
+  file-input both present). Kept.
+- `Posts/Detail.cshtml`, `Groups/PostDetail.cshtml`,
+  `Announcement/Detail.cshtml` — **absent** (none of these views had a
+  pre-RE `insert-image.js` include — the RC reply-image lane is
+  unshipped, so RC never added it). RE does **not** add it (would be
+  dead UI without `data-image-target`). **Zero** new `insert-image.js`
+  includes added in U06.
+
+**The `rc.editor.*` `<kw-l>` keys:** referenced in all four views' button
+labels (the 10-button toolbar); **not** registered in
+`KnownTranslationKeys` (U08 owns that — the TagHelper `en` fallback
+renders the key string until then, per U04). **RC's**
+`rc.markdown_hint` key (RC U05's drift pause — the placeholder never
+registered) is **RC's** debt; U06 **does not** reference it (the
+`PreviewPage.cshtml` "Supports: …" hint paragraph is a static string,
+not a `<kw-l>` key — no RC debt touched).
+
+**Build status (both green):**
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded in 8.8s**
+  (the 4 Razor views compile; no C# touched).
+- `npm run build --prefix src/Kumunita.Web` — **tsc green** (the U03
+  module still compiles; this unit adds only Razor markup, no TS
+  change).
+
+**Drift pause: none.** All four views' body fields are plain
+`<textarea>` as expected (each with the exact attribute set the U03
+module's `bindRichEditor` contract requires: `textarea[data-rich-editor]`
++ `.rc-editor-toolbar` + `[data-rich-editor-preview]` under the
+`.rc-editor` root). The `data-rich-editor-no-image` gate works as pinned
+(the module removes the `data-md="image"` button from the DOM at bind
+time). The `name="body"` lowercase binding is preserved exactly on
+`PreviewPage` (the RC save action binds lowercase `body`) and on all
+three reply views (the RC reply write actions bind lowercase `body`).
+No frozen RC seam is re-shaped; no C# touched.
+
+**Scope check (hard constraints honored):** no new dependency, no
+`.csproj` change, no `package.json` change (RE·3); **no**
+`quote`/blockquote button (U1 drift pause); `rc.editor.*` keys **not**
+registered (U08 owns them); `Milestones.cs` / `README` /
+`MilestonesTests.cs` / ADR index untouched (U08 owns); **no** C# file
+modified (the static-page save action + the reply write actions + the
+serve branch all stay frozen — RE·3); **no** `PostReply.ImageIds`
+change (the reply image lane stays unshipped — RE·3 forbids inventing
+it); **no** other view wired (U4/U5 already wired the post/group-post/
+announcement composers; U7 is the parity tests; U8 is the close).
+
+**Git status (expected, before move):**
+- `src/Kumunita.Web/Views/Languages/PreviewPage.cshtml` (modified)
+- `src/Kumunita.Web/Views/Posts/Detail.cshtml` (modified)
+- `src/Kumunita.Web/Views/Groups/PostDetail.cshtml` (modified)
+- `src/Kumunita.Web/Views/Announcement/Detail.cshtml` (modified)
+- `docs/plans-milestones/in-progress/rich-editor-handoff-notes.md`
+  (modified — the U6 section appended)
+- `docs/plans-milestones/in-progress/rich-editor-u06-plan.md` →
+  `docs/plans-milestones/done/rich-editor-u06-plan.md` (moved last)
+
+**Pre-existing modification on the moved plan file (not made by U06):**
+`docs/plans-milestones/done/rich-editor-u06-plan.md` carries a
+pre-existing content correction (the Deliverables §1 bullet reads
+"**10** `data-md` buttons … **no `quote`/blockquote**, U1 drift pause"
+where the committed version reads "the same **11** `data-md` buttons
+**including image**, the same `rc.editor.*` `<kw-l>` labels"). The
+correction is **correct** — it matches the actual U4/U5/U6 markup
+(10 buttons, no `quote`). It was already present in the working tree
+before U06's edits (file mtime predates U06's first edit). Left
+unstaged per the "do not stage or commit" instruction — the reviewer
+should include it in the U06 commit (it is a content fix to the U06
+plan file, not a new artifact).

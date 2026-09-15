@@ -67,9 +67,11 @@ reference), **then the three reply views** (uniform pattern, image OFF). One
 
 1. **`src/Kumunita.Web/Views/Languages/PreviewPage.cshtml`** — wrap its body
    textarea in U04's pattern: `<div class="rc-editor">` + the
-   `rc-editor-toolbar` (the same 11 `data-md` buttons **including image**, the
-   same `rc.editor.*` `<kw-l>` labels) + the textarea (**kept**: `name="body"`
-   — **lowercase**, the `id`, `data-image-target`, `data-rich-editor`) + the
+   `rc-editor-toolbar` (the same **10** `data-md` buttons **including image** —
+   bold, italic, code, h1, h2, h3, ul, ol, link, image; **no `quote`/blockquote**,
+   U1 drift pause — the same `rc.editor.*` `<kw-l>` labels) + the textarea
+   (**kept**: `name="body"` — **lowercase**, the `id`, `data-image-target`,
+   `data-rich-editor`) + the
    `rc-editor-pane rc-body` preview + the `rich-editor.js` include. **Image
    button ON** (no `data-rich-editor-no-image`). **Drop** the `font-monospace`
    class on the textarea (the split view *is* the source/preview affordance;
