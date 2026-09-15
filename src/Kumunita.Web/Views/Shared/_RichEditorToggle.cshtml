@@ -1,0 +1,29 @@
+@*
+    _RichEditorToggle — the inline-editor view-toggle button (IE, ADR 0032).
+
+    One shared partial replaces 16 inline copies across 10 view files.
+    Resolves both toggle labels server-side (via ITranslationProvider, the
+    same path the <kw-l> TagHelper uses) so the client never carries
+    hardcoded English. The button carries the two resolved labels as
+    data-ie-label-source / data-ie-label-preview; the binder (rich-editor.ts
+    setView) reads them and swaps the <kw-l> element's textContent between
+    them. The <kw-l> key attribute is also swapped (a11y / HTML-source pin).
+
+    Usage:
+        <partial name="_RichEditorToggle" />
+*@
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var pref = HttpContextAccessor?.HttpContext?.Request is var req ? (req is null ? null : LocaleCookie.Read(req)) : null;
+    var labels = await Translation.GetManyAsync(
+        new[] { "rc.editor.source", "rc.editor.showPreview" }, pref);
+    var labelSource   = labels.TryGetValue("rc.editor.source",      out var s) ? s : "</>";
+    var labelPreview  = labels.TryGetValue("rc.editor.showPreview", out var p) ? p : "Preview";
+}
+<button type="button" class="rc-btn" data-ie-toggle
+        data-ie-label-source="@labelSource" data-ie-label-preview="@labelPreview">
+    <kw-l key="rc.editor.source">@labelSource</kw-l>
+</button>

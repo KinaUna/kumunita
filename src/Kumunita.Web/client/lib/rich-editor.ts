@@ -519,16 +519,19 @@ export function bindRichEditor(root: HTMLElement): void {
     const setView = (showSource: boolean): void => {
       textarea.classList.toggle(srcHidden, !showSource);
       if (previewPane) previewPane.classList.toggle(paneActive, showSource);
-      // Label swap: the <kw-l> is server-rendered (LocalizeTagHelper);
-      // a client-side key attribute change does NOT live-update the
-      // label. The key swap is the pin (HTML-source correctness + a11y);
-      // the <kw-l> element's textContent swap is the load-bearing live
-      // path (the button may have whitespace text nodes around the
-      // <kw-l>, so target the element directly, not lastChild).
+      // Label swap: the button carries both labels as data-* attributes
+      // (data-ie-label-source / data-ie-label-preview), resolved server-side
+      // by the _RichEditorToggle partial (ITranslationProvider → en floor).
+      // The <kw-l> element's textContent is the load-bearing live path;
+      // the <kw-l> key attribute swap is the a11y / HTML-source pin.
+      // If the data-* attrs are absent (a legacy button without the
+      // partial), fall back to the known en-floor values.
+      const labelSource   = toggle.dataset.ieLabelSource   ?? '</>';
+      const labelPreview  = toggle.dataset.ieLabelPreview  ?? 'Preview';
       const kw = toggle.querySelector('kw-l');
       if (kw) {
         kw.setAttribute('key', showSource ? 'rc.editor.showPreview' : 'rc.editor.source');
-        kw.textContent = showSource ? 'Preview' : '</>';
+        kw.textContent = showSource ? labelPreview : labelSource;
       }
     };
     setView(false); // IE·1: the rendered pane is the default view (source hidden).

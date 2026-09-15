@@ -103,13 +103,20 @@ if (toggle) {
   const setView = (showSource: boolean): void => {
     textarea.classList.toggle(srcHidden, !showSource);
     if (previewPane) previewPane.classList.toggle(paneActive, showSource);
-    // Label swap: the <kw-l> is server-rendered (LocalizeTagHelper);
-    // a client-side key attribute change does NOT live-update the label.
-    // The key swap is the pin (HTML-source correctness + a11y); the
-    // lastChild.textContent swap is the load-bearing path.
+    // Label swap: the button carries both labels as data-* attributes
+    // (data-ie-label-source / data-ie-label-preview), resolved server-side
+    // by the _RichEditorToggle partial (ITranslationProvider → en floor).
+    // The <kw-l> element's textContent is the load-bearing live path;
+    // the <kw-l> key attribute swap is the a11y / HTML-source pin.
+    // If the data-* attrs are absent (a legacy button without the
+    // partial), fall back to the known en-floor values.
+    const labelSource   = toggle.dataset.ieLabelSource   ?? '</>';
+    const labelPreview  = toggle.dataset.ieLabelPreview  ?? 'Preview';
     const kw = toggle.querySelector('kw-l');
-    if (kw) kw.setAttribute('key', showSource ? 'rc.editor.showPreview' : 'rc.editor.source');
-    toggle.lastChild && (toggle.lastChild.textContent = showSource ? 'Preview' : '</>');
+    if (kw) {
+      kw.setAttribute('key', showSource ? 'rc.editor.showPreview' : 'rc.editor.source');
+      kw.textContent = showSource ? labelPreview : labelSource;
+    }
   };
   setView(false); // IE·1: the rendered pane is the default view (source hidden).
   toggle.addEventListener('click', () => {
@@ -127,12 +134,15 @@ if (toggle) {
 - The toggle is **optional** at the module level: if
   `button[data-ie-toggle]` is absent (a view that hasn't been updated yet),
   the binder returns normally (no error, no change to existing behavior).
-- The **label swap** mechanism: the `<kw-l>` is server-rendered and a
-  `key` attribute change does NOT live-update the label. The load-bearing
-  path is setting the button's `textContent` directly. The
-  `data-ie-preview-label` attribute carries the "show preview" label
-  (the second label) since the initial `<kw-l>` carries the "show source"
-  label. See §The exact toggle contract for the full mechanism.
+- The **label swap** mechanism: the button carries both labels as
+  `data-ie-label-source` / `data-ie-label-preview` data attributes,
+  resolved server-side by the `_RichEditorToggle` partial (the
+  `ITranslationProvider.GetManyAsync` path, en floor). The `<kw-l>`
+  element's `textContent` is the load-bearing live path; the `<kw-l>`
+  `key` attribute is swapped too (the a11y / HTML-source pin). If the
+  `data-*` attributes are absent (a legacy button without the partial),
+  the binder falls back to the known en-floor values (`</>` / `Preview`).
+  See §The exact toggle contract for the full mechanism.
 
 ### The CSS rule (U1) — `wwwroot/css/site.css`
 
@@ -153,14 +163,40 @@ The second rule is **optional** (a no-op marker for future per-state
 styling); U1 adds it only if this doc pins it. **This doc does not pin
 it**, so U1 adds **only the first rule**.
 
-### The Razor button (U2) — appended to each `.rc-editor-toolbar`
+### The shared partial (U2) — `Views/Shared/_RichEditorToggle.cshtml`
 
-The **exact** markup (the pin, verbatim):
+The toggle button is a **single shared partial** (one file) that replaces
+16 inline copies across 10 view files. It resolves both labels
+server-side via `ITranslationProvider.GetManyAsync` (the same path the
+`<kw-l>` TagHelper uses, with the en-floor fallback) and emits the button
+with the two resolved labels as `data-ie-label-source` /
+`data-ie-label-preview` data attributes. The `<kw-l>` element carries
+the initial ("show source") label; its `key` attribute is the a11y pin.
 
 ```html
-<button type="button" class="rc-btn" data-ie-toggle>
-  <kw-l key="rc.editor.source">&lt;/&gt;</kw-l>
+<!-- _RichEditorToggle.cshtml (the partial) -->
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var pref = HttpContextAccessor?.HttpContext?.Request is var req
+        ? (req is null ? null : LocaleCookie.Read(req)) : null;
+    var labels = await Translation.GetManyAsync(
+        new[] { "rc.editor.source", "rc.editor.showPreview" }, pref);
+    var labelSource   = labels.TryGetValue("rc.editor.source",      out var s) ? s : "</>";
+    var labelPreview  = labels.TryGetValue("rc.editor.showPreview", out var p) ? p : "Preview";
+}
+<button type="button" class="rc-btn" data-ie-toggle
+        data-ie-label-source="@labelSource" data-ie-label-preview="@labelPreview">
+    <kw-l key="rc.editor.source">@labelSource</kw-l>
 </button>
+```
+
+Each view file uses:
+
+```html
+<partial name="_RichEditorToggle" />
 ```
 
 - **Appended** after the last existing `data-md` button in each toolbar
@@ -179,17 +215,21 @@ re-order the existing keys):
 ["rc.editor.showPreview"] = "Preview", // the toggle button's label while the source is visible
 ```
 
-Update the closed-set comment (currently at line ~630, naming the RE set)
-to append `+ rc.editor.source + rc.editor.showPreview`.
+The dead `rc.editor.preview` key (RE, ADR 0031 — never emitted through
+`<kw-l>` in any view) is **removed**: IE's `rc.editor.showPreview` is the
+canonical "show preview" label. (2026-09-15.)
+
+Update the closed-set comment to name the two new keys + note the
+removal.
 
 ## The exact toggle contract
 
 | Aspect | Pinned behavior |
 |--------|----------------|
-| **Initial state (on load)** | `setView(false)` is called on init: the textarea has class `rc-editor-source-hidden` (`display: none`), the pane does **not** have `rc-editor-pane-active`. The toggle button's label is the `<kw-l>`'s server-rendered text (the "show source" label, `</>` by default). |
-| **Click → show source** | `setView(true)`: remove `rc-editor-source-hidden` from the textarea, add `rc-editor-pane-active` to the pane. Set the `<kw-l>`'s `key` to `rc.editor.showPreview` + set the button's `lastChild.textContent` to `"Preview"`. |
-| **Click → show pane** | `setView(false)`: add `rc-editor-source-hidden` to the textarea, remove `rc-editor-pane-active` from the pane. Set the `<kw-l>`'s `key` to `rc.editor.source` + set the button's `lastChild.textContent` to `"</>"`. |
-| **Label swap mechanism** | The `<kw-l>` is **server-rendered** (LocalizeTagHelper). A client-side `key` attribute change does **not** live-update the label. The `key` swap is the pin (HTML-source correctness + a11y); the `<kw-l>` element's `textContent` swap is the **load-bearing** live path (the button may have whitespace text nodes around the `<kw-l>`, so target the element directly, not `lastChild`). The two labels are hardcoded in the binder: `"</>"` (show source) and `"Preview"` (show preview). |
+| **Initial state (on load)** | `setView(false)` is called on init: the textarea has class `rc-editor-source-hidden` (`display: none`), the pane does **not** have `rc-editor-pane-active`. The toggle button's label is the `<kw-l>`'s server-rendered text (the "show source" label, resolved via `ITranslationProvider` with en-floor fallback). |
+| **Click → show source** | `setView(true)`: remove `rc-editor-source-hidden` from the textarea, add `rc-editor-pane-active` to the pane. Set the `<kw-l>`'s `key` to `rc.editor.showPreview` + set the `<kw-l>` element's `textContent` to `toggle.dataset.ieLabelPreview` (the server-resolved "Preview" equivalent). |
+| **Click → show pane** | `setView(false)`: add `rc-editor-source-hidden` to the textarea, remove `rc-editor-pane-active` from the pane. Set the `<kw-l>`'s `key` to `rc.editor.source` + set the `<kw-l>` element's `textContent` to `toggle.dataset.ieLabelSource` (the server-resolved `</>`). |
+| **Label swap mechanism** | The button carries both labels as `data-ie-label-source` / `data-ie-label-preview` data attributes, resolved server-side by the `_RichEditorToggle` partial (the `ITranslationProvider.GetManyAsync` path, en floor). The `<kw-l>` element's `textContent` swap is the **load-bearing** live path; the `<kw-l>` `key` attribute swap is the a11y / HTML-source pin. If the `data-*` attributes are absent (a legacy button without the partial), the binder falls back to the known en-floor values (`"</>"` / `"Preview"`). |
 | **`renderPane` reuse** | The existing `textarea.addEventListener('input', renderPane)` wiring is **untouched**. The binder's `renderPane` function is **reused verbatim** (not re-wired, not re-created). The pane's visibility is **not** controlled by the toggle — it stays visible in both states (the split-view behavior, IE2). The `rc-editor-pane-active` class is toggled as a no-op marker for future per-state styling; it has no CSS rule in this lane. |
 | **Toggle absent** | If `button[data-ie-toggle]` is not found in the root, the binder **skips the toggle wiring** (the `if (toggle)` guard). The editor works exactly as it did before IE (split view, all three rows visible). |
 
@@ -244,7 +284,7 @@ The IE·1 invariant, the 5 FACES (IE1–IE5), the binder extension contract
 (the `data-ie-toggle` selector + the initial-state line + the click
 handler + the `renderPane` reuse), the CSS class
 (`rc-editor-source-hidden`), the Razor button markup (the `data-ie-toggle`
-+ `data-ie-preview-label` attributes + the `<kw-l>` key), the two `<kw-l>`
+attribute + the `<kw-l>` key), the two `<kw-l>`
 key names + values (`rc.editor.source` = `</>`, `rc.editor.showPreview` =
 `Preview`), the 3 seam-test names + the artifact pin, and the 10
 view-instance file list (16 blocks) are **frozen** once this file is

@@ -81,7 +81,7 @@ payload, ADR 0032):**
   binds.
 - **D2 — One button, one attribute, one binder extension.** The toggle is
   a `<button type="button" class="rc-btn" data-ie-toggle>` appended to
-  **each** existing `.rc-editor-toolbar` (15 editor blocks across 10
+  **each** existing `.rc-editor-toolbar` (16 editor blocks across 10
   view files — `Posts/Detail` and `Groups/PostDetail` having 4 each).
   `bindRichEditor` extends (does not replace) to
   (a) find the button, (b) set the initial hidden state, (c) wire the
@@ -110,7 +110,7 @@ payload, ADR 0032):**
   artifacts are:** one CSS class, one `<button>` per toolbar, the binder
   extension, and two `<kw-l>` keys. **No `.csproj` change. No
   `package.json` change (still `typescript`-only).**
-- **The 10 view files are the surface set (15 editor blocks).** Post
+- **The 10 view files are the surface set (16 editor blocks).** Post
   New/Edit, Group New/Edit, Announcement New/Edit/Detail (reply), the
   static-page editor (`Languages/PreviewPage`), `Posts/Detail`
   (replies — 4 editor blocks), and `Groups/PostDetail` (replies — 4
@@ -361,7 +361,7 @@ records `## U<m> — Drift pause` in the handoff note.
   these files (the textarea, the pane, the label, the form — all
   unchanged).
 - **Exit:** `dotnet build Kumunita.slnx -c Debug` **green** (the Razor
-  compile). Each of the 10 files (15 buttons total, counting the
+  compile). Each of the 10 files (16 buttons total, counting the
   multi-instance files) has exactly **one** `data-ie-toggle` button per
   toolbar, appended after the last `data-md` button, with the exact
   markup

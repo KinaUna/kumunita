@@ -97,11 +97,19 @@ untouched.
   The Web-test suite pins the artifact: the toggle is present, the
   source-hidden class is present, the textarea is *not* disabled/removed/
   hidden-by-attribute, and all six RE exports still exist.
-- **The label swap is a `<kw-l>` `textContent` write** — the server-rendered
-  label does not live-update on a client `key` change (ADR 0015), so the
-  load-bearing path sets the element's text directly. The `<kw-l key="…">`
-  attribute is updated too, so a re-render of the composer lands on the
-  correct server label.
+- **The label swap is a `<kw-l>` `textContent` write** — the button
+  carries both labels as `data-ie-label-source` / `data-ie-label-preview`
+  data attributes, resolved server-side by the shared `_RichEditorToggle`
+  partial (the `ITranslationProvider.GetManyAsync` path, en floor — the
+  same mechanism the `<kw-l>` TagHelper uses). The `<kw-l>` element's
+  `textContent` is the load-bearing live path; the `<kw-l>` `key`
+  attribute is also swapped (the a11y / HTML-source pin). If the
+  `data-*` attributes are absent (a legacy button), the binder falls
+  back to the known en-floor values (`</>` / `Preview`).
+- **The dead `rc.editor.preview` key is removed** — RE (ADR 0031)
+  registered it but never emitted it through `<kw-l>` in any view. IE's
+  `rc.editor.showPreview` is the canonical "show preview" label.
+  (2026-09-15, post-close amendment.)
 
 ## Not decided here (explicit non-decisions)
 
