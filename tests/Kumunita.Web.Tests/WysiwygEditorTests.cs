@@ -245,6 +245,72 @@ public class WysiwygEditorTests
             WysiwygSpec.SanitizeHtml(
                 "<img src=\"/content-image/deadbeef\" alt=\"x\" class=\"rc-image\" loading=\"lazy\" />"));
     }
+
+    // ── WY U4 — artifact-string pins (§2.7 items 13–14, verbatim names) ──
+
+    /// <summary>
+    /// <b>#13</b> — the compiled <c>wwwroot/js/lib/rich-editor.js</c>
+    /// contains <c>contentEditable</c> (WY·1 — the pane is the editing
+    /// surface, set at runtime by the WY block's
+    /// <c>previewPane.contentEditable = 'true'</c>). Proves the U4 WY
+    /// block shipped in the compiled artifact.
+    /// </summary>
+    [Fact]
+    public void CompiledRichEditorJs_ContainsContentEditable()
+    {
+        var content = ReadCompiledRichEditor();
+        Assert.Contains("contentEditable", content, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <b>#14</b> — the compiled <c>wwwroot/js/lib/rich-editor.js</c>
+    /// contains <c>toMarkdown</c> (WY·3 / WY·5 — the serializer import +
+    /// the <c>input</c> handler's <c>textarea.value = toMarkdown(…)</c>
+    /// call both land in the compiled artifact). Proves the U4 WY block's
+    /// serializer wiring shipped.
+    /// </summary>
+    [Fact]
+    public void CompiledRichEditorJs_ContainsToMarkdown()
+    {
+        var content = ReadCompiledRichEditor();
+        Assert.Contains("toMarkdown", content, StringComparison.Ordinal);
+    }
+
+    // ── Test helpers (mirrors <c>InlineEditorTests</c> idiom) ────────────
+
+    /// <summary>
+    /// Resolve the compiled <c>rich-editor.js</c> artifact and read it,
+    /// failing loud if it is absent.
+    /// </summary>
+    private static string ReadCompiledRichEditor()
+    {
+        var candidates = CandidateArtifactPaths();
+        var artifact = candidates.FirstOrDefault(p => File.Exists(p));
+        Assert.True(
+            artifact is not null,
+            $"rich-editor.js build artifact not found; searched:\n{string.Join("\n", candidates)}");
+        return File.ReadAllText(artifact);
+    }
+
+    /// <summary>
+    /// Candidate paths to the compiled client artifact (walk up ≤ 8 levels
+    /// from both CWD and <see cref="AppContext.BaseDirectory"/>).
+    /// </summary>
+    private static IReadOnlyList<string> CandidateArtifactPaths()
+    {
+        const string rel = "src/Kumunita.Web/wwwroot/js/lib/rich-editor.js";
+        var candidates = new List<string>();
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            var dir = new DirectoryInfo(start);
+            for (int i = 0; i < 8 && dir != null; i++)
+            {
+                candidates.Add(Path.Combine(dir.FullName, rel));
+                dir = dir.Parent;
+            }
+        }
+        return candidates.Distinct().ToArray();
+    }
 }
 
 /// <summary>

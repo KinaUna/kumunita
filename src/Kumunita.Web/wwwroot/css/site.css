@@ -837,6 +837,11 @@ body.kmb-page-fullbleed {
   border-radius: var(--bs-border-radius);
   background-color: rgba(31, 42, 37, 0.02);
 }
+/* WY U4 (design doc §2.6) — the a11y focus ring (WY·9): the pane is
+   keyboard-operable, set `contenteditable="true"` by the binder at
+   runtime (never in the Razor). Added, not re-shaped — the existing
+   `.rc-editor-pane` rule above is untouched. */
+.rc-editor-pane[contenteditable="true"] { cursor: text; outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 1px; }
 .rc-editor textarea[data-rich-editor] {
   min-height: 6rem;
   font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);

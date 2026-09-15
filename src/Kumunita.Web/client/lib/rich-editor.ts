@@ -36,6 +36,7 @@
  * blockquote branch — RE·2 forbids adding a marker the server lacks).
  */
 import { apiFetch } from './api.js';
+import { toMarkdown, sanitizeHtml } from './dom-to-markdown.js';
 
 // ── Private helpers (not exported — internal to the module) ───────────────
 
@@ -540,6 +541,39 @@ export function bindRichEditor(root: HTMLElement): void {
       // currently visible (class absent) → hide it again. The argument is
       // the current "is hidden?" state, so each click inverts it.
       setView(textarea.classList.contains(srcHidden));
+    });
+  }
+
+  // ── WY U4 — the editing loop (design doc §2.5, additive) ──────────────
+  // WY·1: the pane becomes the editing surface (`contenteditable="true"`,
+  // set at runtime — never in the Razor). WY·2: the binder keeps the
+  // textarea in sync on every pane `input` (the pane is authoritative;
+  // the textarea is the read-only sink the server binds). WY·6: the
+  // `paste` handler STUB (U4 installs the listener + `e.preventDefault()`
+  // + the `sanitizeHtml` call; U6 owns the insert + the `toMarkdown` sync).
+  // The existing RE/IE wiring above is untouched — this block is
+  // additive, guarded by `if (previewPane)` so a view that has not
+  // updated the pane yet still works exactly as it did before WY.
+  if (previewPane) {
+    // (b) WY·1 — the pane is the editing surface.
+    previewPane.contentEditable = 'true';
+    // (c) Initial population (reuses `renderPreview` — not a new renderer).
+    previewPane.innerHTML = renderPreview(textarea.value);
+    // (d) WY·2 — the binder keeps the textarea in sync on every pane input.
+    previewPane.addEventListener('input', () => {
+      textarea.value = toMarkdown(previewPane.innerHTML);
+    });
+    // (e) WY·6 — paste handler STUB (U6 replaces the body with the full
+    // sanitize + insert + `toMarkdown` sync; U4 installs the listener +
+    // `e.preventDefault()` + the `sanitizeHtml` call so U6 only swaps the
+    // body, not the wiring).
+    previewPane.addEventListener('paste', (e: ClipboardEvent) => {
+      e.preventDefault();
+      const raw =
+        e.clipboardData?.getData('text/html') ||
+        e.clipboardData?.getData('text/plain') ||
+        '';
+      sanitizeHtml(raw); // U4: sanitize (result discarded — U6 inserts)
     });
   }
 
