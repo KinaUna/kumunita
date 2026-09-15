@@ -54,3 +54,76 @@
 
 <!-- U0 appends its section below this line. One `##` section per unit, in
      order (U0, U1, … U8). Never rewrite a prior section. -->
+
+## U0 — Kickoff verified
+
+**Date:** 2026-09-15
+
+**Gap 1 — every composer shows raw Markdown only (no preview pane, no toolbar):**
+
+| Surface | Body `<textarea>` (file + line) | Preview pane? | Toolbar? |
+|---|---|---|---|
+| Post New | `Views/Posts/New.cshtml:89` | ❌ | ❌ |
+| Post Edit | `Views/Posts/Edit.cshtml:93` | ❌ | ❌ |
+| Group New | `Views/Groups/New.cshtml:61` | ❌ | ❌ |
+| Group Edit | `Views/Groups/Edit.cshtml:62` | ❌ | ❌ |
+| Announcement New | `Views/Announcement/New.cshtml:109` | ❌ | ❌ |
+| Announcement Edit | `Views/Announcement/Edit.cshtml:109` | ❌ | ❌ |
+| Static page | `Views/Languages/PreviewPage.cshtml:42` | ❌ | ❌ |
+| Reply New (Posts) | `Views/Posts/Detail.cshtml:423` | ❌ | ❌ |
+| Reply Edit (Posts) | `Views/Posts/Detail.cshtml:351` | ❌ | ❌ |
+| Reply New (Groups) | `Views/Groups/PostDetail.cshtml:379` | ❌ | ❌ |
+| Reply Edit (Groups) | `Views/Groups/PostDetail.cshtml:327` | ❌ | ❌ |
+
+**Grep proof:** `data-rich-editor\|rc-editor\|rich-editor` in `src/Kumunita.Web/**` → **0 hits**. No `rc-editor-*` CSS block in `site.css`. No `client/lib/rich-editor.ts` file. The only body-adjacent control on any surface is the RC `rc-insert-image` block (a file-input for uploading an image and splicing a Markdown link) — **not** a preview pane or a formatting toolbar.
+
+**Gap 2 — the frozen RC base is intact at its claimed locations:**
+
+| Seam | Confirmed location | Status |
+|---|---|---|
+| `MarkdownRenderer` | `src/Kumunita.Web/Security/MarkdownRenderer.cs` | ✅ present |
+| `ContentImageIds` | `src/Kumunita.Web/Security/ContentImageIds.cs:25` (`public static class ContentImageIds`, same namespace as `MarkdownRenderer`) | ✅ present |
+| `.rc-body` CSS | `src/Kumunita.Web/wwwroot/css/site.css:733` (`.rc-body` through `.rc-body a` at line 782) | ✅ present |
+| `.rc-image` CSS | `src/Kumunita.Web/wwwroot/css/site.css:783` | ✅ present |
+| `insert-image.ts` | `src/Kumunita.Web/client/lib/insert-image.ts` | ✅ present |
+| `package.json` (tsc-only) | `src/Kumunita.Web/package.json` — `devDependencies`: `typescript: ^7.0.2` **only**; `scripts.build`: `tsc`; no bundler, no editor dep | ✅ `typescript`-only (RE·3 holds at lane open) |
+
+**RC drift pauses carried forward (determine per-surface image-button gating via `data-rich-editor-no-image`):**
+
+| Surface | RC drift pause (from RC handoff notes) | Image button (RE) |
+|---|---|---|
+| Post New | — (RC lane complete: write `PostsController:692`, serve post branch) | **ON** |
+| Post Edit | U04 (c): `UpdatePostAsync` never sets `ImageIds` (discrete-field shape) | **OFF** (U04 gates) |
+| Group New | — (RC lane complete: U05 wired `CreateGroupPostAsync`; serve post branch) | **ON** |
+| Group Edit | U05 drift pause: `UpdateGroupPostAsync` never sets `ImageIds` (discrete-field shape) | **OFF** (U05 gates) |
+| Announcement New | U03 drift pause: no `AnnouncementToAuditableResource` → serve branch inert-404 | **OFF** (U05 gates) |
+| Announcement Edit | U03 drift pause (same) | **OFF** (U05 gates) |
+| Static page | — (RC lane complete: write `LanguagesController:271`, serve page branch, public) | **ON** (U06) |
+| Reply New/Edit (all 3 Detail views) | U04 (a): `CreateReplyAsync`/`UpdateReplyAsync` never set `PostReply.ImageIds` + U03: serve branch inert-404 | **OFF** (U06 gates) |
+
+**Known RC debt (flagged, not folded into `rc.editor.*`):** `rc.markdown_hint` is **not registered** in `KnownTranslationKeys` (RC U05's hint deferral — the RC design doc never named the key). U08 will register `rc.editor.*` keys; `rc.markdown_hint` remains an **RC debt** to be resolved by the RC lane owner.
+
+**Drift pause:** none — both gaps hold as stated in the register; the frozen RC base is intact at every claimed location. U03 can build against the base as pinned.
+
+## U1 — Design doc + ADR 0031 drafted
+
+**Date:** 2026-09-15
+
+- **Primary tier authored:** `docs/design/rich-editor-design.md` — the RE·1–RE·3 invariants, the FACES RE1–RE5, the **exact toolbar marker set** (the *ceiling*), the **`renderPreview` subset**, the **client `isSafeImageSrc` mirror** (+ the client link-URL mirror of `IsSafeUrl`), the 5 pure-function + binder export signatures, the 10 pinned seam-test names, the acceptance gate, the drift guard, and the named deferrals. It re-anchors **RC R·1–R·7** as the frozen base (unchanged).
+- **ADR 0031 drafted (status "Draft (lands in U08)"):** `docs/adr/0031-wysiwyg-editor-and-toolbar.md` — settles **D1** (split-view live preview, not `contenteditable`), **D2** (toolbar-as-Markdown-splice in one `tsc`-only TS module), **D3** (client preview mirrors the RC subset + `IsSafeImageSrc` semantics). States the `tsc`-only constraint **stands unchanged**; only the composer surface changes. **Amends** ADR 0025 (does not supersede); numbers after 0030. U08 owns the ADR-accept + ADR-index update.
+- **The two load-bearing pins** (U03 must code against these without re-deriving the RC subset):
+  1. **The exact toolbar marker set (ceiling)** — `bold` `**` · `italic` `*` · `code` `` ` `` · `h1`–`h3` `#`–`###` · `ul` `- ` · `ol` `1. ` · `link` `[label](url)` · `image` `![alt](/content-image/{id})`. **No** blockquote button (see the drift pause below). Every button's marker is a strict subset of what `renderPreview` renders.
+  2. **The client `isSafeImageSrc` mirror** — accept **only** (a) `/content-image/` + 1–128 lowercase hex `[0-9a-f]{1,128}`, or (b) a schemeless relative (no `:`, no leading `//`, no whitespace); **reject every scheme** (`http:`/`https:`/`data:`/`javascript:`/…) and every malformed id — a rejected `src` renders the whole `![alt](src)` as plain escaped text. Verbatim mirror of `MarkdownRenderer.IsSafeImageSrc`; the client link-URL predicate mirrors `IsSafeUrl` (http/https/mailto/relative).
+- **The `renderPreview` subset** (and only that) — headings 1–6, paragraphs, `- `/`* ` lists, `1. ` lists, fenced code blocks, inline code / bold / italic, `[label](url)` links (under the client `IsSafeUrl` mirror), and `![alt](src)` images (under the client `isSafeImageSrc` mirror, `rc-image` class). **Out on both toolbar and preview:** tables, footnotes, raw HTML, **blockquote**.
+- `rc.markdown_hint` left **out** of `rc.editor.*` (it is RC debt, per U0 — U08 registers only the `rc.editor.*` set).
+- **U03 can now build the module from the design doc alone.** The pure-function signatures, the `data-md` kinds, the `data-rich-editor` / `data-image-target` / `data-rich-editor-preview` / `data-rich-editor-no-image` attribute contract, and the two load-bearing pins are all pinned concretely.
+
+## U1 — Drift pause (blockquote / `> `)
+
+**Status: recorded, not resolved — carried to U08 as a named deferral.**
+
+The register (`plan-rich-editor.md`) and U0's work order named a **`quote` toolbar button** and `> ` in the **`renderPreview` subset**. U1's entry read of the frozen base — `src/Kumunita.Web/Security/MarkdownRenderer.cs` — shows **`MarkdownRenderer` has no blockquote branch**: its block dispatch loop handles only fenced code, headings (1–6), unordered lists, ordered lists, and paragraphs, and `PlainTextPreview` has **no blockquote strip step** (its pinned 7-step strip order is image/link → inline markers → heading `#`s → list markers → collapse whitespace → truncate). A resident-typed `> quote` therefore renders on the **read path** as a **plain paragraph** (the leading `> ` left in the text), not a `<blockquote>`.
+
+This directly collides with **RE·2** ("*do not add a marker to the preview subset the server renderer lacks*") and the unit's hard constraint ("*the marker set is a ceiling, not a wishlist*"). **Resolution (per the constraint, a `cut the button` outcome, not a silent feature):** blockquote is **removed from both sides** in the design doc — **no `quote` button** in the toolbar marker set and **no `> `** in the `renderPreview` subset. `applyBlock`'s `kind` union is therefore `'h1'|'h2'|'h3'|'ul'|'ol'` (no `'quote'`). Adding blockquote is a **future lane** that must extend `MarkdownRenderer` **and** the client `renderPreview` **in the same commit** (RE·2's parity holds only if both move together) — recorded in the design doc's §Named deferrals and ADR 0031's "Not decided here."
+
+**Carried to:** U08 (the close — keep blockquote out of the `rc.editor.*` key set and out of any roadmap/README copy of the marker list). No U03/U04/U05/U06 action is blocked by this pause; the remaining 9-button toolbar + preview mirror are fully codeable from the design doc.
