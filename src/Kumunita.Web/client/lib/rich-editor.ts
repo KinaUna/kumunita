@@ -536,7 +536,10 @@ export function bindRichEditor(root: HTMLElement): void {
     };
     setView(false); // IE·1: the rendered pane is the default view (source hidden).
     toggle.addEventListener('click', () => {
-      setView(!textarea.classList.contains(srcHidden));
+      // Flip the view: currently hidden (class present) → show source;
+      // currently visible (class absent) → hide it again. The argument is
+      // the current "is hidden?" state, so each click inverts it.
+      setView(textarea.classList.contains(srcHidden));
     });
   }
 
