@@ -202,7 +202,7 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — group name/description translations ───────────
             ["groups.translations_label"] = "Translations",
             ["groups.translations_none"] = "None yet",
-            ["groups.translation_add"] = "Add a",
+            ["groups.translation_add"] = "Add",
             ["groups.translation_name_label"] = "Name",
             ["groups.translation_desc_label"] = "Description",
             ["groups.translation_optional"] = "optional",
@@ -332,7 +332,7 @@ public static class KnownTranslationKeys
             // ── posts (Detail page) — user-added translations (ADR 0022) ──
             ["posts.translations_label"] = "Translations",
             ["posts.translations_none"] = "none yet",
-            ["posts.translation_add"] = "Add a",
+            ["posts.translation_add"] = "Add",
             ["posts.translation_title_label"] = "title",
             ["posts.translation_body_label"] = "Body",
             ["posts.translation_optional"] = "optional",
@@ -416,7 +416,7 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — community name/description translations ────────
             ["community.translations_label"] = "Translations",
             ["community.translations_none"] = "None yet",
-            ["community.translation_add"] = "Add a",
+            ["community.translation_add"] = "Add",
             ["community.translation_name_label"] = "Name",
             ["community.translation_desc_label"] = "Description",
             ["community.translation_optional"] = "optional",
