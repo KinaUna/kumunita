@@ -385,3 +385,114 @@ artifacts are **not** tracked (the other `client/lib` modules' compiled
 `rich-editor.js` should **not** be committed; only `rich-editor.ts` is
 the source. The `npm run build` step regenerates `rich-editor.js` on
 demand.
+
+## U4 — Post composer wired
+
+**Date:** 2026-09-15
+
+**Deliverables shipped (exactly 2 files, the closed set):**
+
+1. `src/Kumunita.Web/Views/Posts/New.cshtml` (modified) — the body
+   `<textarea name="Body">` is now wrapped in the register's pinned
+   `.rc-editor` split-view pattern:
+   - `<div class="rc-editor">` containing:
+     - `<div class="rc-editor-toolbar" data-rich-editor>` with the
+       **full 10-button** toolbar (bold, italic, code, h1, h2, h3, ul,
+       ol, link, image — **no** `quote`/blockquote, U1 drift pause).
+     - The original `<textarea>` (preserved: `name="Body"`,
+       `id="body"`, `class="form-control"`, `rows="6"`, `required`,
+       `placeholder="…"`, **plus** `data-rich-editor` and
+       `data-image-target`).
+     - `<div class="rc-editor-pane rc-body" aria-live="polite"
+       data-rich-editor-preview></div>`.
+   - The RC `rc-insert-image` file-input block is **kept** (it carries
+     the hand-typed-image hint + the `insert-image.ts` upload path —
+     the toolbar's image button is the primary path, but the file-input
+     is a valid secondary affordance and the RC `insert-image.ts`
+     module still self-wires it).
+   - `<script type="module" src="~/js/lib/rich-editor.js"></script>`
+     added to `@section Scripts` (per-view, **not** layout-level —
+     the U3 handoff note's include decision).
+   - **Image button is ON** (full 10-button toolbar + `data-image-target`
+     on the textarea). Post New's RC image lane is complete:
+     `PostsController:692` populates `ImageIds`; serve via the post
+     branch of `ContentImageController`.
+
+2. `src/Kumunita.Web/Views/Posts/Edit.cshtml` (modified) — the **same**
+   `.rc-editor` split-view pattern around the body textarea, **except**:
+   - The toolbar carries `data-rich-editor-no-image` (the U03 module
+     removes the `data-md="image"` button from the DOM at bind time).
+   - The textarea **drops** `data-image-target` (the RC image lane is
+     incomplete on this surface: `UpdatePostAsync` (RC drift pause (c))
+     never sets `post.ImageIds`).
+   - The `rc-insert-image` block is **removed** (the file-input is
+     inert without `data-image-target` on the textarea — leaving it
+     would be dead UI). The text toolbar + preview are fully functional.
+   - The `@Model.Body` value binding is **preserved** in the textarea.
+   - `<script type="module" src="~/js/lib/rich-editor.js"></script>`
+     added to `@section Scripts` (same per-view include).
+   - The text toolbar (9 visible buttons after the module removes the
+     image button) + live preview are **fully on** (the read path
+     renders `Post.Body` regardless of how it was authored).
+
+**Include decision:** per-view (both `Posts/New` and `Posts/Edit`),
+in `@section Scripts`, **not** moved to `_Layout.cshtml`. The `insert-image.js`
+include is kept in both views (New: the `rc-insert-image` block still
+needs it; Edit: the include is inert without `data-image-target`, but
+removing it is out of scope for this unit — the `insert-image.js`
+include is RC's, not RE's, and RE·3 forbids touching frozen RC seams).
+
+**The `rc-insert-image` block choice:** **kept** on New (functional
+secondary image affordance, the `insert-image.ts` module self-wires it
+via `data-image-target`); **removed** on Edit (inert without
+`data-image-target` — leaving a file input that does nothing is worse
+than removing it). Recorded here for U05/U06's copy-verify: the
+drift-guard checks the **expected** delta (New: `rc-insert-image`
+present + `data-image-target` present; Edit: `rc-insert-image` absent
++ `data-image-target` absent + `data-rich-editor-no-image` on toolbar),
+not byte-identity.
+
+**Toolbar pin (U2/U3 conformance):** exactly **10** buttons (bold,
+italic, code, h1, h2, h3, ul, ol, link, image) — **no** `quote`
+(U1 drift pause: the frozen `MarkdownRenderer` has no blockquote
+branch; RE·2 forbids a button that emits a marker it can't render).
+This matches the U2 mirror checklist + U3's module `applyBlock` union
+(`'h1'|'h2'|'h3'|'ul'|'ol'`, no `'quote'`).
+
+**Build status (both green):**
+
+- `dotnet build Kumunita.slnx -c Debug` — **Build succeeded in 12.3s**
+  (Razor views compile; no C# touched).
+- `npm run build --prefix src/Kumunita.Web` — **tsc green** (the
+  module U03 shipped still compiles; this unit adds only Razor markup,
+  no TS change).
+
+**Drift pause: none.** Both views' body fields are plain
+`<textarea name="Body">` as expected. The U03 module's `bindRichEditor`
+contract (`textarea[data-rich-editor]` + `.rc-editor-toolbar` +
+`[data-rich-editor-preview]` under `root`) is satisfied by the markup.
+The `data-rich-editor-no-image` gate works as pinned (the module
+removes the image button from the DOM at bind time). No frozen RC
+seam is re-shaped.
+
+**Git status (expected, before move):**
+- `src/Kumunita.Web/Views/Posts/New.cshtml` (modified)
+- `src/Kumunita.Web/Views/Posts/Edit.cshtml` (modified)
+- `docs/plans-milestones/in-progress/rich-editor-handoff-notes.md`
+  (modified — the U4 section appended)
+- `docs/plans-milestones/in-progress/rich-editor-u04-plan.md` →
+  `docs/plans-milestones/done/rich-editor-u04-plan.md` (moved last)
+
+**For U05/U06 (pattern to copy):** the markup pattern is the
+`.rc-editor` → `.rc-editor-toolbar[data-rich-editor]` → 10 buttons →
+`textarea[data-rich-editor]` → `[data-rich-editor-preview]` sequence.
+The **only** per-surface variation is the image-button gate: image-ON
+surfaces (Group New, static page) carry the full 10-button toolbar +
+`data-image-target`; image-OFF surfaces (Group Edit, both Announcement
+composers, all reply composers) carry `data-rich-editor-no-image` on
+the toolbar + **no** `data-image-target` on the textarea. The
+`rc-insert-image` block is kept only where `data-image-target` is
+present (functional); removed where it is absent (inert). The
+`rich-editor.js` include is per-view in `@section Scripts` (not
+layout-level). The `rc.editor.*` `<kw-l>` keys are **referenced** but
+**not yet registered** in `KnownTranslationKeys` (U08 lands them).

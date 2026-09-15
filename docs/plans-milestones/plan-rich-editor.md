@@ -7,8 +7,9 @@
 > they still **hand-code the Markdown** in a `<textarea>` and **see only the
 > raw markup** while typing. This lane ships the authoring half: a **WYSIWYG
 > editing surface** (a live rendered preview beside the source) and **toolbar
-> buttons** for **bold, italic, headings, lists, blockquote, inline code,
-> link, and image** — all of it **plain TypeScript** (`tsc`-only, **no editor
+> buttons** for **bold, italic, headings, lists, inline code, link, and
+>
+> image** — all of it **plain TypeScript** (`tsc`-only, **no editor
 > library enters `package.json`** — the RC `tsc`-only constraint stands) and
 > all of it producing **the same Markdown source RC already stores, renders,
 > and serves**.
@@ -42,8 +43,11 @@ assumed.
    registered — see the RC U05 drift pause).
 2. **The renderer and the store are already Markdown.** `MarkdownRenderer`
    (`Kumunita.Web.Security`) renders `**bold**`, `*italic*`, headings, lists,
-   blockquote-able paragraphs, `code`, `[label](url)`, and `![alt](src)` —
-   the *exact* set the toolbar must emit. `Body` is stored as a Markdown
+   paragraphs, `code`, `[label](url)`, and `![alt](src)` —
+>
+   the *exact* set the toolbar must emit (**no blockquote** — `MarkdownRenderer`
+>
+   has no blockquote branch; see the U1 drift pause). `Body` is stored as a Markdown
    `string` (RC R·7, zero migrations) and the RC render switch
    (`rc-body`/`rc-image` CSS, `PlainTextPreview`) already turns that source
    into rendered HTML on every read surface. So a WYSIWYG surface that emits
@@ -131,7 +135,7 @@ payload):**
   `.csproj` change. No `package.json` change (still `typescript` only).**
 - **The toolbar emits only the RC-pinned marker set.** Bold `**`, italic `*`,
   inline code `` ` ``, headings `#`–`###`, unordered list `- `, ordered list
-  `1. `, blockquote `> `, link `[label](url)`, and the **RC image link**
+  `1. `, link `[label](url)`, and the **RC image link**
   `![alt](/content-image/{id})` (the image button reuses RC's *existing*
   upload lane — `insert-image.ts` / `POST /content-image` — it does **not**
   invent a second upload). Every marker the toolbar can emit must be one
@@ -244,8 +248,8 @@ export function applyToggle(markdown: string, sel: [number, number],
                             kind: 'bold' | 'italic' | 'code'):
                             { value: string; sel: [number, number] };  // RE·1
 export function applyBlock(markdown: string, caret: number,
-                           kind: 'h1'|'h2'|'h3'|'ul'|'ol'|'quote'):
-                            { value: string; caret: number };          // RE·1
+                           kind: 'h1'|'h2'|'h3'|'ul'|'ol'):
+                            { value: string; caret: number };          // RE·1 (no 'quote' — MarkdownRenderer has no blockquote branch; U1 drift pause)
 export function applyLink(markdown: string, sel: [number, number],
                           url: string): { value: string; sel: [number, number] }; // RE·2
 export function imageLink(alt: string, id: string): string;  // = `![alt](/content-image/{id})` (RC R·3 byte-identical)
@@ -543,7 +547,9 @@ this machine).
   `Milestones.cs` change (the AGENTS.md contract).
 - **`rc.editor.*` keys** — register in `KnownTranslationKeys` (`en` values:
   `rc.editor.bold`, `.italic`, `.code`, `.h1`, `.h2`, `.h3`, `.list`,
-  `.olist`, `.quote`, `.link`, `.image`, `.preview`) so the U04–U06 views'
+  `.olist`, `.link`, `.image`, `.preview` — **no `.quote`**: there is no
+  blockquote button, so no `rc.editor.quote` key; blockquote is a future
+  lane that must extend `MarkdownRenderer` first) so the U04–U06 views'
   `<kw-l>` keys have a fresh-boot `en` floor (ML-UI M·9 precedent). **No**
   non-`en` rows (the admin translates per key at runtime).
 - **Folder moves** — the 9 unit plan files `in-progress/` → `done/`; the

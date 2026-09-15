@@ -33,10 +33,14 @@ on a real authenticated form (RE1 FACES) before it spreads.
    name="Body">` in the register's pinned pattern: a `<div class="rc-editor">`
    containing the `<div class="rc-editor-toolbar" data-rich-editor>` (one
    `<button type="button" class="rc-btn" data-md="…">` per marker: `bold`,
-   `italic`, `code`, `h1`, `h2`, `h3`, `ul`, `ol`, `quote`, `link`, **and
-   `image`** — each labeled via `<kw-l key="rc.editor.…">`), the textarea (kept:
-   `name`, `value`, `data-rich-editor`, **and** its RC `data-image-target`
-   attribute), and the `<div class="rc-editor-pane rc-body" aria-live="polite"
+   `italic`, `code`, `h1`, `h2`, `h3`, `ul`, `ol`, `link`, **and
+   `image`** — **no `quote`/blockquote button** (U1's drift pause: the frozen
+   `MarkdownRenderer` has no blockquote branch, so RE·2 forbids a button that
+   emits a marker it can't render — the toolbar is the **10** buttons
+   bold/italic/code/h1/h2/h3/ul/ol/link/image) — each labeled via
+   `<kw-l key="rc.editor.…">`), the textarea (kept: `name`, `value`,
+   `data-rich-editor`, **and** its RC `data-image-target` attribute), and the
+   `<div class="rc-editor-pane rc-body" aria-live="polite"
    data-rich-editor-preview>`. Add `<script type="module"
    src="~/js/lib/rich-editor.js"></script>`. **Post New's RC image lane is
    complete** (write: `PostsController:692` populates `ImageIds`; serve: the
