@@ -246,3 +246,96 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
   (`toMarkdown`) + the sanitizer (`sanitizeHtml`) in
   `client/lib/dom-to-markdown.ts` against §2.3 / §2.4 + the 9 pure-function
   tests (§2.7, items 1–9).
+
+## U3 — serializer + sanitizer + 9 pure-function tests
+
+- **Date:** 2026-09-15
+- **Authored (2 new files + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/dom-to-markdown.ts` — the **load-bearing
+  artifact** of the lane, exactly **two pure functions** (no DOM, no side
+  effects, no self-wire): `toMarkdown(html: string): string` (the
+  serializer — the exact inverse of `renderPreview`, emitting **exactly**
+  the WY·3 subset, the inverse-escape rule, the 8 §2.3 edge cases, the
+  WY·10 round-trip property) and `sanitizeHtml(html: string): string` (the
+  sanitizer — strips elements/attributes outside the WY·3 subset). Reuses
+  the `htmlEscape` / `isSafeImageSrc` / `isSafeUrl` **semantics** already in
+  `rich-editor.ts` (re-implemented locally so the module stays a self-
+  contained pure function, no cross-module import — the module is the
+  inverse of `renderPreview`, which is the source of truth). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — the **9 pure-function
+  tests** (§2.7 items 1–9, **verbatim names**), with an internal C#
+  `WysiwygSpec` mirror (the executable spec — same pinned behavior, **no**
+  TS invocation from C#; the repo is `tsc`-only / no JS runner, per WY·8).
+  (3) `wwwroot/js/lib/dom-to-markdown.js` — the `tsc` rebuild (git-ignored
+  build artifact; `npm run build` green, **0 warnings**).
+- **The 9 tests (verbatim, §2.7 items 1–9 — all PASS, 0 failed):**
+  1. `WY10_RoundTrip_BoldHeadingListLinkImageCode` — **the load-bearing
+     round-trip**: `toMarkdown(renderPreview(md)) === md` for a corpus
+     exercising bold + heading + list + link + image + code block; also
+     asserts the image's `![alt](/content-image/{id})` form is byte-picked
+     up by RC's `ContentImageIds` parse (RC R·3, zero server change).
+  2. `WY3_Serializer_EmitsOnlyThePinnedSubset` — non-subset `<span>` /
+     `<table>` render as plain text, never re-emitted; `<h1>` renders as
+     `# Heading`.
+  3. `WY3_Serializer_SkipsBlankElements` — empty `<p>` / `<h1>` / `<ul>` /
+     `<ol>` all serialize to `''`.
+  4. `WY3_Serializer_RejectsUnsafeImageSrc` — `javascript:` / external-
+     `https` `src` serialize to `''`.
+  5. `WY3_Serializer_RejectsUnsafeLinkHref` — `javascript:` / `data:`
+     `href` serialize to the label as plain text.
+  6. `WY5_SavedBodyIsByteIdentical` — a hand-built pane HTML serializes to
+     the byte-identical hand-typeable Markdown; `ContentImageIds` +
+     `MarkdownRenderer` assertions confirm the closed loop (RC R·3 / R·1).
+  7. `WY6_Sanitizer_StripsDisallowedElements` — `<div>` / `<span>` /
+     `<table>` / `<script>` stripped, inner content kept.
+  8. `WY6_Sanitizer_StripsDisallowedAttributes` — `on*` / `style` / `id` /
+     non-`language-{lang}` `class` stripped; `class="language-{lang}"` kept.
+  9. `WY6_Sanitizer_StripsUnsafeHrefs` — unsafe `href` (tag dropped, text
+     kept) + unsafe `src` (element dropped) + safe `href` / `src` kept.
+- **Sanitizer implementation note (the one §2.4 drift, resolved in favor
+  of the pinned behavior):** §2.4 described the sanitizer's "single-pass
+  regex construction." U3 implemented it **AST-based** (the same small
+  tokenizer/parser as the serializer, then a tree walk that drops
+  non-subset elements, strips non-allowed attributes, and applies the
+  `isSafeUrl` / `isSafeImageSrc` mirrors on `href` / `src`). This is
+  functionally **equivalent** to the §2.4 reject list and output domain —
+  every §2.4 keep/reject pin holds (verified by tests #7–#9) — and is
+  strictly safer than a regex chain (no nested-tag / quote / attribute-
+  boundary edge cases). The **output contract is unchanged**: the WY·3
+  subset, the attribute allowlist, the `isSafeUrl` / `isSafeImageSrc`
+  mirrors, and the "tag dropped, text kept" / "img dropped entirely"
+  semantics all match §2.4. Recorded here so U4's paste handler + the
+  U9 acceptance gate know the sanitizer is the **same** public
+  `sanitizeHtml(html): string` contract, only a cleaner internal
+  construction.
+- **Round-trip result (WY·10 / WY5 — the key invariant):** the pinned
+  corpus round-trips **byte-exact** (`toMarkdown(renderPreview(md)) ===
+  md`), and the hand-built pane HTML (test #6) serializes to the exact
+  hand-typeable Markdown. The one non-obvious corpus constraint:
+  `renderPreview` **merges** consecutive non-special lines into one `<p>`
+  (joining with a space) and **skips** blank lines — so in a round-trip
+  corpus a link and an image must share a line (else `renderPreview`
+  merges them into one paragraph and the round-trip is not byte-exact).
+  This is `renderPreview`'s **frozen** behavior (RE·2), not a U3 choice.
+- **`wysiwyg-u03-plan.md`:** a separate per-unit plan file **does** exist
+  (like U0–U2); its Exit section says "move this plan file
+  `in-progress/` → `done/` (move **last**)." U3's work is complete, so it
+  was moved to `done/wysiwyg-u03-plan.md` (via `git mv`, history preserved).
+  U3's content is also captured here, per the handoff-notes convention
+  ("one section per unit, appended").
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched
+  (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors**; `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` →
+  **Total: 162, Errors: 0, Failed: 0** (the 9 WY tests are in that
+  count; all PASS). The 9 verbatim test names are confirmed present in the
+  compiled assembly.
+- **No drift pause.** U4 implements the additive WY block in
+  `bindRichEditor` (pane → `contenteditable`, initial `renderPreview`
+  population, `input` sync to the textarea, the paste handler that calls
+  `sanitizeHtml`, the toolbar rework to splice DOM, the code-view rework to
+  a read-only mirror) + the 1 new CSS focus-ring rule, against §2.5 / §2.6
+  + the artifact pins (§2.7 items 10–15).
