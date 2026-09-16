@@ -75,4 +75,22 @@ public sealed class PostReply
     /// RC R·7).
     /// </summary>
     public IReadOnlyList<string> ImageIds { get; set; } = [];
+
+    // ATT U3 file-attachment ADD (ADR 0034, ADR 0004 §B.1 additive — the 5th
+    // additive PostReply field after ADR 0016's Modified, ADR 0018's LanguageCode,
+    // ADR 0024's DeletedAt, RC's ImageIds):
+    /// <summary>
+    /// The attachment file ids referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/attachment/{id}</c> links in the
+    /// rendered body (C-ATT·1/2). Populated server-side by the owning write
+    /// lane (ATT U4); the serving route's reverse lookup
+    /// (<see cref="PostService.FindReplyByAttachmentIdAsync"/>) reads this
+    /// (C-ATT·4). The 5th additive field after <see cref="Modified"/> (ADR 0016),
+    /// <see cref="LanguageCode"/> (ADR 0018), <see cref="DeletedAt"/> (ADR 0024),
+    /// <see cref="ImageIds"/> (RC) — **separate from** <see cref="ImageIds"/>
+    /// (C-ATT·5; a reply's images stay in <see cref="ImageIds"/>, its files in
+    /// <see cref="AttachmentIds"/>) (ADR 0004 §B.1 — additive, delta-detected,
+    /// idempotent, no seed reset; ADR 0034, C-ATT·5).
+    /// </summary>
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];
 }

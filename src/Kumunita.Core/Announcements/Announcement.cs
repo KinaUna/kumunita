@@ -104,4 +104,19 @@ public sealed class Announcement
     /// seed reset; RC R·7).
     /// </summary>
     public IReadOnlyList<string> ImageIds { get; set; } = [];
-}
+    // ATT U3 file-attachment ADD (ADR 0034, ADR 0004 §B.1 additive — the 3rd
+    // additive Announcement field after ADR 0018's LanguageCode, RC's ImageIds):
+    /// <summary>
+    /// The attachment file ids referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/attachment/{id}</c> links in the
+    /// rendered body (C-ATT·1/2). Populated server-side by the owning write
+    /// lane (ATT U5); the serving route's reverse lookup
+    /// (<see cref="IAnnouncementService.FindByAttachmentIdAsync"/>) reads this
+    /// (C-ATT·4). The 3rd additive field after <see cref="LanguageCode"/>
+    /// (ADR 0018), <see cref="ImageIds"/> (RC) — **separate from**
+    /// <see cref="ImageIds"/> (C-ATT·5; an announcement's images stay in
+    /// <see cref="ImageIds"/>, its files in <see cref="AttachmentIds"/>)
+    /// (ADR 0004 §B.1 — additive, delta-detected, idempotent, no seed reset;
+    /// ADR 0034, C-ATT·5).
+    /// </summary>
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];}

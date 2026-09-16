@@ -112,4 +112,23 @@ public sealed class Post
     /// delta-detected, idempotent, no seed reset; RC R·7).
     /// </summary>
     public IReadOnlyList<string> ImageIds { get; set; } = [];
+
+    // ATT U3 file-attachment ADD (ADR 0034, ADR 0004 §B.1 additive — the 6th
+    // additive Post field after M3b's Status, ADR 0013's GroupId, ADR 0018's
+    // LanguageCode, ADR 0024's DeletedAt, RC's ImageIds):
+    /// <summary>
+    /// The attachment file ids referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/attachment/{id}</c> links in the
+    /// rendered body (C-ATT·1/2). Populated server-side by the owning write
+    /// lane (ATT U4); the serving route's reverse lookup
+    /// (<see cref="PostService.FindPostByAttachmentIdAsync"/>) reads this
+    /// (C-ATT·4). The 6th additive field after <see cref="Status"/> (M3b),
+    /// <see cref="GroupId"/> (ADR 0013), <see cref="LanguageCode"/> (ADR 0018),
+    /// <see cref="DeletedAt"/> (ADR 0024), <see cref="ImageIds"/> (RC) —
+    /// **separate from** <see cref="ImageIds"/> (C-ATT·5; a post's images stay
+    /// in <see cref="ImageIds"/>, its files in <see cref="AttachmentIds"/>)
+    /// (ADR 0004 §B.1 — additive, delta-detected, idempotent, no seed reset;
+    /// ADR 0034, C-ATT·5).
+    /// </summary>
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];
 }

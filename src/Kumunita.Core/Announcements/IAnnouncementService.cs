@@ -117,6 +117,18 @@ public interface IAnnouncementService
     /// </summary>
     Task<Announcement?> FindByImageIdAsync(string mediaId);
     /// <summary>
+    /// <b>Reverse-lookup</b> read seam (ATT U3, C-ATT·4): the first
+    /// <see cref="Announcement"/> (by <c>Created</c> ascending) whose
+    /// <see cref="Announcement.AttachmentIds"/> contains <paramref name="mediaId"/>
+    /// — the attachment serving route's owner resolution. **Un-audited**;
+    /// announcements are not audience-restricted, so there is no
+    /// <c>AccessAudit</c> lane on this bounded context. Null when no
+    /// announcement references the id (the route 404s). See
+    /// <see cref="AnnouncementService.FindByAttachmentIdAsync"/> for the full
+    /// contract.
+    /// </summary>
+    Task<Announcement?> FindByAttachmentIdAsync(string mediaId);
+    /// <summary>
     /// Deletes an <see cref="Announcement"/> in the <b>caller's</b> in-flight
     /// session (invariant C3). Hard delete (no soft-hidden state). A missing id
     /// is a <see cref="KeyNotFoundException"/> (the Web layer maps that to a 404).

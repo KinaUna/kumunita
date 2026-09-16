@@ -166,3 +166,55 @@ instruction. No code touched; the §2.x C# is specification only.
 - The §2.2 seam signatures are `Task<Post?>`, `Task<PostReply?>`,
   `Task<Announcement?>` (nullable — null when absent, so the serve route
   404s).
+
+## U3
+
+**Built:** the three `AttachmentIds` additive POCO fields + the three
+`Find*ByAttachmentIdAsync` reverse-lookup seams.
+
+- `src/Kumunita.Core/Posts/Post.cs` — added `AttachmentIds`
+  (`IReadOnlyList<string> = []`) **after** `ImageIds` (6th additive field).
+- `src/Kumunita.Core/Posts/PostReply.cs` — added `AttachmentIds`
+  (5th additive field, after `ImageIds`/4th).
+- `src/Kumunita.Core/Announcements/Announcement.cs` — added `AttachmentIds`
+  (3rd additive field, after `ImageIds`/2nd).
+- `src/Kumunita.Core/Posts/PostService.cs` — added
+  `FindPostByAttachmentIdAsync(string mediaId)` and
+  `FindReplyByAttachmentIdAsync(string mediaId)` (concrete `PostService`,
+  mirroring the `Find*ByImageIdAsync` shape with `AttachmentIds` swapped in;
+  same `ArgumentException` guard, same `QuerySession`/`OrderBy(Created)`/
+  `FirstOrDefaultAsync`, un-audited, null when absent).
+- `src/Kumunita.Core/Announcements/IAnnouncementService.cs` — added
+  `FindByAttachmentIdAsync(string mediaId)` (interface declaration, mirroring
+  `FindByImageIdAsync`).
+- `src/Kumunita.Core/Announcements/AnnouncementService.cs` — added
+  `FindByAttachmentIdAsync(string mediaId)` (implementation, mirroring
+  `FindByImageIdAsync` with `AttachmentIds` swapped in).
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` — **green** on both
+`Kumunita.Core` and `Kumunita.Web` (1 pre-existing warning in
+`WysiwygEditorTests.cs`, CS8604, unrelated). Confirmed by grep that all three
+`ImageIds` fields and all three `Find*ByImageIdAsync`/`FindByImageIdAsync`
+seams are at their original line numbers — **image lane byte-for-byte
+unchanged** (C-ATT·9). The three new fields are **separate** from `ImageIds`
+(C-ATT·5). `IMediaStore` untouched (C-ATT·3). No `IPostService` invented
+(per U2 handoff — the post/reply seams are on the concrete `PostService`).
+No write-lane persistence added (U4/U5). No tests written (U6).
+
+**Drift:** none. All five deliverable files match the unit plan exactly. The
+seam signatures use no `CancellationToken` — identical to the image twins
+(which also take no `CancellationToken`), per the unit plan's "copy their
+signature shape" instruction.
+
+**Next agent (U4) must know:**
+- U4 wires the **post + reply write lanes** to persist `AttachmentIds`.
+The three fields now exist on `Post`, `PostReply`, and `Announcement`.
+The post/reply write lanes are on the concrete `PostService`
+(`CreatePostAsync` / `CreateReplyAsync` / `UpdatePostAsync` /
+`UpdateReplyAsync`). `PostDraft` (and `GroupPostDraft`) will need a trailing
+`IReadOnlyList<string>? AttachmentIds = null` param (CS1736 shape — nullable,
+null-coalesced to `[]` at the call site).
+The reply lanes currently do **not** set `ImageIds` (the image-lane
+reply-404 drift pause, C-ATT·9) — **this** lane **does** persist
+`AttachmentIds` on replies (deliberate asymmetry, §2.3).
+- The announcement write-lane wiring is **U5**, not U4.

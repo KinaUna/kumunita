@@ -670,4 +670,28 @@ public sealed class AnnouncementService : IAnnouncementService
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// <b>Reverse-lookup</b> read seam (ATT U3, C-ATT·4): the first announcement
+    /// (by <c>Created</c> ascending) whose <see cref="Announcement.AttachmentIds"/>
+    /// contains <paramref name="mediaId"/> — the attachment serving route's owner
+    /// resolution. **Un-audited**; announcements are not audience-restricted,
+    /// so there is no <c>AccessAudit</c> lane on this bounded context (the same
+    /// "no audit row" reasoning as <see cref="ListVisibleAsync"/>). Null when no
+    /// announcement references the id (the route 404s). Read-only — no write
+    /// lane, no <c>actorId</c>.
+    /// </summary>
+    public async Task<Announcement?> FindByAttachmentIdAsync(string mediaId)
+    {
+        ArgumentNullException.ThrowIfNull(mediaId);
+        if (mediaId.Length == 0) return null;
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Announcement>()
+            .Where(a => a.AttachmentIds.Contains(mediaId))
+            .OrderBy(a => a.Created)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
 }
