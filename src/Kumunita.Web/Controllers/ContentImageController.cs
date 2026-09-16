@@ -67,10 +67,15 @@ public sealed class ContentImageController(
         var post = await posts.FindPostByImageIdAsync(id);
         if (post is not null)
         {
-            // ── Step 4 (UGC post): one CanAsync (R·4) ──────────────────
+            // ── Step 4 (UGC post): one Read decision (R·4) ─────────────
+            // Shared seam (Kumunita.Web.Security.PostReadDecision):
+            // group-lane post (GroupId non-empty) → the membership lane
+            // (ADR 0013 G·1/G·2/G·8); component post (GroupId empty) →
+            // the audience lane (the M3 read decision). One audit row
+            // (Allow or Deny) — emitted by the IAuthorizationService seam,
+            // not this action.
             var actorId = KumunitaPrincipal.SubjectId(User) ?? "";
-            var decision = await authz.CanAsync(
-                actorId, AccessAction.Read, new PostToAuditableResource(post));
+            var decision = await PostReadDecision.ResolveAsync(post, actorId, authz);
             if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403)
             // ── Step 5: serve ─────────────────────────────────────────
             var stream = await media.OpenReadAsync(id);

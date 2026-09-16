@@ -140,11 +140,16 @@ public sealed class AttachmentController(
         var post = await posts.FindPostByAttachmentIdAsync(id);
         if (post is not null)
         {
-            // ── Step 4 (UGC post): one CanAsync (C-ATT·7) ──────────────
+            // ── Step 4 (UGC post): one Read decision (C-ATT·7) ─────────
+            // Shared seam (Kumunita.Web.Security.PostReadDecision):
+            // group-lane post (GroupId non-empty) → the membership lane
+            // (ADR 0013 G·1/G·2/G·8); component post (GroupId empty) →
+            // the audience lane (the M3 read decision). One audit row
+            // (Allow or Deny) — emitted by the IAuthorizationService seam,
+            // not this action.
             var actorId = KumunitaPrincipal.SubjectId(User) ?? "";
-            var decision = await authz.CanAsync(
-                actorId, AccessAction.Read, new PostToAuditableResource(post));
-            if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403) + one Deny row (by CanAsync)
+            var decision = await PostReadDecision.ResolveAsync(post, actorId, authz);
+            if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403) + one Deny row (by the decision)
             // ── Step 5: serve (C-ATT·2 download) ───────────────────────
             return await ServeFile(id, stored);
         }
@@ -166,9 +171,12 @@ public sealed class AttachmentController(
             if (parent is null) return NotFound(); // orphan reply → 404 (zero rows)
 
             var actorId = KumunitaPrincipal.SubjectId(User) ?? "";
-            var decision = await authz.CanAsync(
-                actorId, AccessAction.Read, new PostToAuditableResource(parent));
-            if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403) + one Deny row (by CanAsync)
+            // Group-lane parent (GroupId non-empty) → the membership lane
+            // (ADR 0013 G·1/G·2/G·8); component parent (GroupId empty) →
+            // the audience lane (the M3 read decision). The shared seam is
+            // PostReadDecision.ResolveAsync — one call, one audit row.
+            var decision = await PostReadDecision.ResolveAsync(parent, actorId, authz);
+            if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403) + one Deny row (by the decision)
             // ── Step 5: serve (C-ATT·2 download) ───────────────────────
             return await ServeFile(id, stored);
         }
