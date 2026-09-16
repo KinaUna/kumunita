@@ -453,6 +453,8 @@ public sealed class AnnouncementController(
                     LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
                     // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
                     ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
+                    // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
+                    AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -573,6 +575,8 @@ public sealed class AnnouncementController(
                     LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? string.Empty : model.LanguageCode,
                     // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids.
                     ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
+                    // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids.
+                    AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
                 },
                 actorId:    actorId,
                 actorRoles: RoleSet(User),

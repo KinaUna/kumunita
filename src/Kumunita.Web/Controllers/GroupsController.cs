@@ -1082,7 +1082,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
             Body: model.Body.Trim(),
             LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
-            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body) // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (drift pause b: the U04 field was inert, now wired).
+            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (drift pause b: the U04 field was inert, now wired).
+            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body) // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (parity with the image lane's group-post wire, C-ATT·9).
         );
 
         // C3 same-transaction lane: the controller opens the

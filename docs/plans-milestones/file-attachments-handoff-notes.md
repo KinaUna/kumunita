@@ -518,3 +518,99 @@ the field is there, the edit-lane write is the gap), and the §2.3 write-lane
 spec (the discrepancy is against the spec's prose, not the frozen invariants).
 No `ImageIds` line, no `IMediaStore` method, no `AccessAction` was touched
 (C-ATT·3/9 hold).
+
+## U7
+
+**Built:** the Web parse helper + all six controller call-site wirings.
+
+- `src/Kumunita.Web/Security/AttachmentIds.cs` (**new**) —
+  `public static class AttachmentIds` in `Kumunita.Web.Security`, mirroring
+  `ContentImageIds` line-for-line: `FullIdRe` regex
+  `@"/attachment/([0-9a-f]{1,128})(?![0-9a-f])"` (`RegexOptions.Compiled`),
+  `ExtractAttachmentIds(string? body)` with the same dedupe /
+  first-occurrence-order / never-null-empty-list body; doc-comments restate
+  C-ATT·4 (Web-only, client never sends the ids) and C-ATT·6 (read-only —
+  no allowlist/size check, no store touch).
+- `src/Kumunita.Web/Controllers/PostsController.cs` — three wirings:
+  - **post create** (L693): `AttachmentIds:
+    AttachmentIds.ExtractAttachmentIds(model.Body)` directly after the
+    `ImageIds:` line (L692, unchanged).
+  - **reply create** (L977): `CreateReplyAsync(id, actor, body, session,
+    languageCode, AttachmentIds.ExtractAttachmentIds(body))` — trailing
+    6th arg, verified against the real U4 signature
+    `(string postId, string actorId, string body, IDocumentSession session,
+    string? languageCode = null, IReadOnlyList<string>? attachmentIds = null)`
+    (PostService.cs L414). **No `ImageIds` added** (reply-image asymmetry
+    stays, C-ATT·9).
+  - **reply edit** (L1045): `UpdateReplyAsync(replyId, actor, body, session,
+    AttachmentIds.ExtractAttachmentIds(body))` — trailing 5th arg, verified
+    against the real U4 signature
+    `(string replyId, string actorId, string body, IDocumentSession session,
+    IReadOnlyList<string>? attachmentIds = null)` (PostService.cs L484–489).
+    **No `ImageIds` added** (C-ATT·9).
+- `src/Kumunita.Web/Controllers/AnnouncementController.cs` — two wirings:
+  - **create** (after L455): `AttachmentIds =
+    AttachmentIds.ExtractAttachmentIds(model.Body)` directly after the
+    `ImageIds =` line (unchanged).
+  - **edit** (after L575): same line, directly after its `ImageIds =` line
+    (unchanged).
+- `src/Kumunita.Web/Controllers/GroupsController.cs` — **group-post create**
+  (after L1085): `AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body)`
+  directly after the `ImageIds:` line (unchanged).
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` → **green** on
+`Kumunita.Core`, `Kumunita.Core.Tests`, `Kumunita.Web`, and
+`Kumunita.Web.Tests` (1 pre-existing CS8604 warning in `WysiwygEditorTests.cs`
+L910 — same warning U3–U6 recorded; unrelated). Reply call-site arg order
+confirmed against the **real** `PostService` signatures (there is **no
+`IPostService`** in the tree — the plan's "re-read `IPostService`" hint was
+followed by grepping `PostService.cs` instead; signatures matched the
+expected U4 shape exactly, **no drift**). `PostDraft.AttachmentIds` and
+`GroupPostDraft.AttachmentIds` params (U4) confirmed present so the
+object-initializer lines compile. No `ImageIds` line changed anywhere
+(byte-for-byte, C-ATT·9 — verified by grep: `ContentImageIds` + every
+`ImageIds:`/`ImageIds =` line intact at their original positions). No
+production Core change, no new seam, no `IMediaStore` / `AccessAction` touch
+(C-ATT·3), parse lives in `Kumunita.Web.Security` (C-ATT·4). No tests written
+(U11 owns them); no throwaway test left behind.
+
+**Drift:** none. The two open questions resolved:
+(1) **Reply arg order** — matched the real U4 signatures (trailing
+optional `attachmentIds` in both reply lanes); no DRIFT PAUSE needed.
+(2) **Group-post parity** — design doc §2.3/§2.4 list "post create, reply
+create, reply edit, announcement create+edit" (the group-post line appears in
+§2.3's `CreateGroupPostAsync` bullet but not in §2.4's call-site list); the
+image lane wires it (GroupsController L1085), so the attachment lane wires it
+too for C-ATT·9 symmetry. **The U6 DRIFT PAUSE (`#6
+PostEdit_ReparsesAttachmentIds` — post/group-post edit lanes do not persist
+`AttachmentIds`) is not resolved here**: it concerns the Core
+`UpdatePostAsync` / `UpdateGroupPostAsync` edit lanes, which U7 does not
+touch (Web-only unit). The U6 handoff's option 1/2 decision is still pending
+for the decider before the U12 gate.
+
+**Next agent (U8) must know:**
+- U8 adds the `MediaOptions` attachment allowlist (the §2.5 members:
+  `AttachmentAllowedContentTypes` / `ResolvedAttachmentAllowedTypes` /
+  `IsAttachmentAllowed` on the **existing** `MediaOptions`, mirroring the
+  instance-style `AllowedContentTypes` / `ResolvedAllowedTypes` / `IsAllowed`
+  — **do not touch the image allowlist**) + the `POST /attachment` upload
+  route (the §2.6 4-guard ordering: null/empty → 400 `Choose a file.`,
+  oversize → 413, `!IsAttachmentAllowed` → 415, then one
+  `IMediaStore.PutAsync(bytes, file.FileName, file.ContentType, subject)`,
+  returning `Json(new { id = stored.Id })`).
+- The upload route's `subject` arg: the §2.6 spec says
+  `PutAsync(bytes, fileName, contentType, subject)` — the real
+  `IMediaStore.PutAsync` is the **4-arg** shape; mirror the real
+  `ContentImageController.Upload`'s exact `PutAsync` call (its `subject`
+  value) verbatim.
+- The editor button (U10) uploads to `POST /attachment` via `apiFetch` and
+  splices `[label](/attachment/{id})` — this helper's regex is exactly the
+  shape the button produces, so the round-trip (F9) is closed by U10's
+  splice + this helper's parse.
+- The §2.9 Web test names (`AttachUpload_F6_Empty400` /
+  `AttachUpload_F6_Oversize413` / `AttachUpload_F6_WrongType415`) exercise
+  U8's upload route; `AttachLink_F7_RemoteUrlRendersText` exercises the
+  **renderer's** `IsSafeUrl` rejection (not this helper — the helper only
+  extracts route-shaped links, it does not reject remote URLs; a
+  `javascript:`/`data:`/remote URL in a body link is never matched by
+  `FullIdRe`, so it simply isn't stored as an `AttachmentIds` id).

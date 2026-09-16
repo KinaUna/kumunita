@@ -689,7 +689,8 @@ public sealed class PostsController(
             Body: model.Body,
             Audience: model.Audience.BuildAudience(),
             LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 — null/empty ⇒ instance default materialized server-side.
-            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body)); // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
+            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
+            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body)); // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -973,7 +974,7 @@ public sealed class PostsController(
         // service's SaveChangesAsync is the single write (the M3 U6 precedent
         // in this file — cf. New()'s CreatePostAsync).
         await using var session = store.LightweightSession();
-        await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
+        await posts.CreateReplyAsync(id, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode, AttachmentIds.ExtractAttachmentIds(body)); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default. ATT U7 (C-ATT·4/8) — the reply's attachment ids, parsed server-side from the body (the deliberate asymmetry: the image reply lane does not persist ImageIds, C-ATT·9 — untouched).
 
         TempData["info"] = "Reply added.";
         return Redirect($"/posts/{id}");
@@ -1041,7 +1042,7 @@ public sealed class PostsController(
         await using var session = store.LightweightSession();
         try
         {
-            await posts.UpdateReplyAsync(replyId, actor, body, session);
+            await posts.UpdateReplyAsync(replyId, actor, body, session, AttachmentIds.ExtractAttachmentIds(body)); // ATT U7 (C-ATT·4/8) — the reply's re-parsed attachment ids (replace-style, the U4 lane's existing idiom); the image reply lane stays byte-for-byte (C-ATT·9).
         }
         catch (UnauthorizedAccessException)
         {
