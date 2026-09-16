@@ -176,9 +176,47 @@ public static class KnownTranslationKeys
             // ── posts (Index / New / Edit — headings, actions, empty-states) ─
             ["posts.write"]        = "Write a post",
             ["posts.new_title"]    = "Write a post",
+            // ADR 0036 — the composer's lede: the default audience is
+            // "everyone in the community" (was: "visible only to the
+            // people you choose below").
+            ["posts.new_intro"] =
+                "By default everyone in the community you pick below can see " +
+                "your post. Turn that off in the audience section only if you " +
+                "want to narrow who can see it to specific people or groups.",
+            ["posts.community_hint"] =
+                "The community decides which feed your post appears in — and, " +
+                "by default, who can see it (every member of that community). " +
+                "To narrow the audience, turn off “Everyone in this community” " +
+                "in the audience section below.",
             ["posts.new_submit"]   = "Post it",
             ["posts.edit_title"]   = "Edit post",
             ["posts.edit_save"]    = "Save changes",
+            // ADR 0036 — the composer's audience editor: the "Everyone in
+            // this community" default grant (checked by default; the granular
+            // picker below is hidden until it is turned off).
+            ["posts.audience_all_members"] =
+                "Everyone in this community",
+            ["posts.audience_all_members_hint"] =
+                "The default — every member of the community above can see " +
+                "this post. Turn it off only if you want to narrow who can " +
+                "see it.",
+            // Edit lane — the same grant, seeded from the post's stored
+            // audience (not a default), so the wording differs slightly.
+            ["posts.audience_all_members_hint_edit"] =
+                "When on, every member of this community can see the post. " +
+                "Turn it off to narrow the audience to specific people or " +
+                "groups.",
+            ["posts.audience_combine"] =
+                "How the picks combine",
+            ["posts.audience_restrict_hint"] =
+                "These picks are ADDITIONAL — “Everyone in this community” " +
+                "stays on unless you turn it off, so the post is visible to " +
+                "the whole community and the picks you make here.",
+            ["posts.audience_only_picks"] =
+                "Whatever you pick here becomes the post's audience — nothing " +
+                "above or below this form is added to it. An empty pick (with " +
+                "“Everyone in this community” off) means only you can see the " +
+                "post.",
             ["posts.empty_can_post"] =
                 "No posts yet here. Write the first one — it will be visible only to the audience you " +
                 "choose in the composer below the title.",

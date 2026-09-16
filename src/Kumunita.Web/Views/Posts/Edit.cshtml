@@ -142,61 +142,103 @@
                         Audience — who can see this post
                     </h6>
 
-                    <div class="form-label mt-2" style="font-weight:600;">How the picks combine</div>
-                    @foreach (var m in modes)
-                    {
-                        var checkedMark =
-                            string.Equals(Model.Audience.Mode, m, StringComparison.OrdinalIgnoreCase)
-                                ? "checked"
-                                : null;
-                        <div class="form-check" style="margin-left:0.5rem;">
-                            <input class="form-check-input" type="radio"
-                                   name="Audience.Mode" id="@($"aud-mode-{m}")"
-                                   value="@m" @checkedMark required />
-                            <label class="form-check-label" for="@($"aud-mode-{m}")">
-                                @m @(" — " + (m == "Any"
-                                    ? "a viewer matches if they're on any of the picks"
-                                    : "a viewer must be on every pick — an empty list denies everyone"))
-                            </label>
+                    @* ADR 0036 — the "Everyone in this community" checkbox
+                       is bound (Audience.CommunityVisible) and seeded from
+                       the post's stored audience (FromAudience). The
+                       granular picker block below stays hidden until the
+                       checkbox is turned off (the page script in
+                       @section Scripts drives the show/hide). Without
+                       this checkbox the edit POST would bind
+                       CommunityVisible to <c>false</c> (field absent) and
+                       silently flip a community-visible post back to
+                       owner-only. *@
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.CommunityVisible"
+                               id="aud-community"
+                               value="true"
+                               @(Model.Audience?.CommunityVisible ?? false ? "checked" : null) />
+                        <label class="form-check-label fw-semibold" for="aud-community">
+                            <kw-l key="posts.audience_all_members">Everyone in this community</kw-l>
+                        </label>
+                        <div class="text-muted small ms-4">
+                            <kw-l key="posts.audience_all_members_hint_edit">When on, every member of this community can see the post. Turn it off to narrow the audience to specific people or groups.</kw-l>
                         </div>
-                    }
+                    </div>
 
-                    @* "Who to grant to" — the shared picker partial
-                       (Views/Shared/_GrantPickers.cshtml, the same
-                       "Who to grant to" UX the Profile/Edit audience
-                       editors use). Checkboxes are display-only (no
-                       name=) — the hidden <c>Grants</c> textarea the
-                       partial renders is the only form-bound grant field,
-                       posting as <c>Audience.Grants</c>; the
-                       <c>_GrantPickerScripts</c> partial keeps the
-                       textarea in two-way sync with the selection. The
-                       picker pre-checks the post's current grants (seeded
-                       by <c>AudienceEditorModel.FromAudience</c>). *@
-                    <partial name="_GrantPickers" model="@(new GrantPickersModel
-                    {
-                        EditorName = "Audience",
-                        Editor     = Model.Audience
-                                    ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
-                        Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
-                        Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
-                    })" />
+                    <hr class="my-3" />
 
-                    @if (Model.Audience is not null
-                        && Model.Audience.IsEmpty)
-                    {
-                        <div class="alert alert-warning mt-2 mb-0">
-                            <b>Empty audience.</b>
-                            <text>With no picks, no one
-                            matches, so no one else can see your post — only
-                            you (the author) can.
-                            </text>
+                    @* The granular audience block — hidden by default
+                       (ADR 0036) unless the post already carries an
+                       explicit grant list (seeded visible by
+                       <c>AudienceEditorModel.FromAudience</c>). The
+                       hidden <c>Grants</c> textarea inside _GrantPickers
+                       stays the ONLY form-bound grant field (the
+                       U11 / F13 single-source pin) regardless of
+                       visibility. *@
+                    <div id="audience-restricted"
+                         class="audience-restricted"
+                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
+                        <div class="form-label mt-2" style="font-weight:600;">
+                            <kw-l key="posts.audience_combine">How the picks combine</kw-l>
                         </div>
-                    }
+                        @foreach (var m in modes)
+                        {
+                            var checkedMark =
+                                string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                    ? "checked"
+                                    : null;
+                            <div class="form-check" style="margin-left:0.5rem;">
+                                <input class="form-check-input" type="radio"
+                                       name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                       value="@m" @checkedMark required />
+                                <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                    @m @(" — " + (m == "Any"
+                                        ? "a viewer matches if they're on any of the picks"
+                                        : "a viewer must be on every pick — an empty list denies everyone"))
+                                </label>
+                            </div>
+                        }
 
-                    <small class="text-muted d-block mt-2">
-                        Changing the audience here changes who can see the post
-                        from now on. An empty pick means only you can see it.
-                    </small>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="posts.audience_restrict_hint">These picks are ADDITIONAL — “Everyone in this community” stays on unless you turn it off, so the post is visible to the whole community and the picks you make here.</kw-l>
+                        </div>
+
+                        @* "Who to grant to" — the shared picker partial
+                           (Views/Shared/_GrantPickers.cshtml). Checkboxes
+                           are display-only (no name=) — the hidden
+                           <c>Grants</c> textarea the partial renders is
+                           the only form-bound grant field, posting as
+                           <c>Audience.Grants</c>; the
+                           <c>_GrantPickerScripts</c> partial keeps the
+                           textarea in two-way sync with the selection.
+                           The picker pre-checks the post's current grants
+                           (seeded by <c>AudienceEditorModel.FromAudience</c>). *@
+                        <partial name="_GrantPickers" model="@(new GrantPickersModel
+                        {
+                            EditorName = "Audience",
+                            Editor     = Model.Audience
+                                        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                            Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                            Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                        })" />
+
+                        @if (Model.Audience is not null
+                            && Model.Audience.IsEmpty)
+                        {
+                            <div class="alert alert-warning mt-2 mb-0">
+                                <b>Empty audience.</b>
+                                <text>With no picks, no one
+                                matches, so no one else can see your post — only
+                                you (the author) can.
+                                </text>
+                            </div>
+                        }
+
+                        <small class="text-muted d-block mt-2">
+                            <kw-l key="posts.audience_only_picks">Whatever you pick here becomes the post's audience — nothing above or below this form is added to it. An empty pick (with “Everyone in this community” off) means only you can see the post.</kw-l>
+                        </small>
+                    </div><!-- /#audience-restricted -->
                 </div>
             </div>
 
@@ -221,4 +263,22 @@
        checkbox pickers above; the textarea is the only element
        posted. *@
     <partial name="_GrantPickerScripts" />
+
+    @* ADR 0036 — hide/show the granular audience block based on the
+       "Everyone in this community" checkbox: checked (the default for
+       community-visible posts) keeps the picker out of sight;
+       unchecking reveals it. Server-rendered state is authoritative
+       on load (already-correct class); this only reacts to user
+       changes. *@
+    <script>
+    (function () {
+        'use strict';
+        var communityBox  = document.getElementById('aud-community');
+        var restrictedDiv = document.getElementById('audience-restricted');
+        if (!communityBox || !restrictedDiv) { return; }
+        communityBox.addEventListener('change', function () {
+            restrictedDiv.classList.toggle('d-none', communityBox.checked);
+        });
+    })();
+    </script>
 }

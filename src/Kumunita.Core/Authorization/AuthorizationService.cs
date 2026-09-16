@@ -266,7 +266,7 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
             var decision = Decide(
                 candidate,
                 actorId,
-                state.EffectivePrincipalId, state.GroupIds,
+                state.EffectivePrincipalId, state.GroupIds, state.CommunityIds,
                 state.IsDelegated,
                 hasBreakGlass,
                 moderationComponentsOn);
@@ -368,7 +368,7 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         var decision = Decide(
             target,
             actorId,
-            state.EffectivePrincipalId, state.GroupIds,
+            state.EffectivePrincipalId, state.GroupIds, state.CommunityIds,
             state.IsDelegated,
             hasBreakGlass,
             moderationComponentsOn);
@@ -398,6 +398,7 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         string actorId,
         string effectivePrincipalId,
         IReadOnlySet<string> groupIds,
+        IReadOnlySet<string> communityIds,
         bool isDelegated,
         bool hasBreakGlass,
         IReadOnlySet<string> moderationComponentsOn)
@@ -423,21 +424,38 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         if (hasBreakGlass)
             return new Decision(true, AccessVia.BreakGlass, actorId);
 
-        // 4. Public resource (Audience null — not audience-restricted).
+        // 4. Community-visible branch (ADR 0036) — the resource's
+        //    Audience.Community flag is true AND the actor is a member of the
+        //    target component (the live communityIds contain the target's
+        //    ComponentId). Placed after the moderator / break-glass branches
+        //    so those standing rights still apply (a moderator who is not a
+        //    member still sees the post); before the audience / grants
+        //    branch so it short-circuits when it matches. Uses the actor's
+        //    own membership (not the effective principal's) — the same
+        //    actor-scoped standing as the break-glass / moderator branches.
+        if (target.Audience is { Community: true } &&
+            target.ComponentId is not null &&
+            communityIds.Contains(target.ComponentId))
+        {
+            var via = isDelegated ? AccessVia.Delegation : AccessVia.Community;
+            return new Decision(true, via, effectivePrincipalId);
+        }
+
+        // 5. Public resource (Audience null — not audience-restricted).
         if (target.Audience is null)
         {
             var via = isDelegated ? AccessVia.Delegation : denyVia;
             return new Decision(true, via, effectivePrincipalId);
         }
 
-        // 5. MatchGroups (C6 shared single pass — pure).
+        // 6. MatchGroups (C6 shared single pass — pure).
         if (EvaluateAudience(target.Audience, effectivePrincipalId, groupIds))
         {
             var via = isDelegated ? AccessVia.Delegation : denyVia;
             return new Decision(true, via, effectivePrincipalId);
         }
 
-        // 6. Deny — no branch matched.
+        // 7. Deny — no branch matched.
         return new Decision(false, denyVia, actorId);
     }
 
@@ -504,20 +522,30 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         // C4 — strong consistency (live membership rows, no projection lag).
         var groupIds = await userInfoService.GetGroupIdsAsync(actorId).ConfigureAwait(false);
 
+        // ADR 0036 — one community-load per AuthorizationModule call (same
+        // D4 / C4 contract as the group-load above). The actor's live
+        // community set (the GetCommunityIdsAsync read seam — the union of
+        // explicit ComponentMembership rows and the enabled ∩ mandatory
+        // set) is what the Community branch in Decide checks against the
+        // target's ComponentId.
+        var communityIdsSet = new HashSet<string>(
+            await userInfoService.GetCommunityIdsAsync(actorId).ConfigureAwait(false),
+            StringComparer.Ordinal);
+
         var grant = await userInfoService.GetActiveGrantAsync(actorId).ConfigureAwait(false);
         if (grant is null)
-            return new ActorContext(actorId, groupIds, IsDelegated: false);
+            return new ActorContext(actorId, groupIds, communityIdsSet, IsDelegated: false);
 
         if (grant.Scope.Contains(action.Id))
         {
             // Action in scope — the delegate borrows the owner's standing.
-            return new ActorContext(grant.OwnerId, groupIds, IsDelegated: true);
+            return new ActorContext(grant.OwnerId, groupIds, communityIdsSet, IsDelegated: true);
         }
 
         // Action out of scope — the delegate acts as self; isDelegated stays
         // true so the Deny row carries Via = Delegation (invariant C2, the
         // "acting identity" requirement).
-        return new ActorContext(actorId, groupIds, IsDelegated: true);
+        return new ActorContext(actorId, groupIds, communityIdsSet, IsDelegated: true);
     }
 
     private async Task<bool> HasBreakGlassAsync(IDocumentSession session, string userId)
@@ -560,5 +588,6 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
     private sealed record ActorContext(
         string EffectivePrincipalId,
         IReadOnlySet<string> GroupIds,
+        IReadOnlySet<string> CommunityIds,
         bool IsDelegated);
 }

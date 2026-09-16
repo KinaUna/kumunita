@@ -903,10 +903,12 @@ internal static class WysiwygSpec
             return $"<pre>{string.Concat(e.Children.Select(SanitizeNode))}</pre>";
         if (tag == "code")
         {
-            var cls = e.Attrs.TryGetValue("class", out var c) ? c : null;
-            var clsOk = cls is not null && Regex.IsMatch(cls, @"^language-[a-z0-9_-]+$", RegexOptions.IgnoreCase);
+            var cls = e.Attrs.TryGetValue("class", out var c)
+                        && Regex.IsMatch(c, @"^language-[a-z0-9_-]+$", RegexOptions.IgnoreCase)
+                ? c
+                : null;
             var inner = string.Concat(e.Children.Select(SanitizeNode));
-            return clsOk
+            return cls is not null
                 ? $"<code class=\"{EscAttr(cls)}\">{inner}</code>"
                 : $"<code>{inner}</code>";
         }

@@ -560,15 +560,15 @@ public sealed class PostsController(
             // highlights the right option and a no-change submit is a
             // concrete BCP-47 code (never an empty row).
             LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
-            // ADR 0001-B — the composer's choice is absolute: the
-            // editor's <b>default</b> shape is the *bootstrap* self-only
-            // audience (invariant C1: an empty audience is the
-            // deny-by-default posture; the owner branch is the only
-            // way the author sees their own draft). Mode Any + Grants []
-            // is the empty-audience shape; the user's grant addition,
-            // or mode switch to <c>All</c> + non-empty grants, is what
-            // changes the audience (never an M3 auto-augmentation of
-            // the author's choice — the M2
+            // ADR 0036 — the composer's <b>default</b> audience is
+            // "all community members": CommunityVisible is seeded
+            // <c>true</c> (the community branch allows every member of
+            // the target component), grants stay empty (the granular
+            // picker is hidden until the poster opts into a narrower
+            // audience). Unchecking the box and adding grants is the
+            // opt-in to granular restriction — the audience written on
+            // <c>POST</c> is still the composer's verbatim choice
+            // (ADR 0001-B; the M2
             // <see cref="Kumunita.Web.Controllers.ProfileController"/>
             // "never a second audience object" pin applies verbatim
             // here: exactly one <c>Audience</c> is the writer's
@@ -577,6 +577,7 @@ public sealed class PostsController(
             {
                 Mode = "Any",
                 Grants = "[]",
+                CommunityVisible = true,
             },
         };
 

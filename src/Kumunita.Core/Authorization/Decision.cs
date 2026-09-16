@@ -38,7 +38,16 @@ public enum AccessVia
     /// append precedent: an additive enum value, the eight frozen values
     /// untouched.
     /// </summary>
-    Guardian
+    Guardian,
+    /// <summary>
+    /// The community-visible standing (ADR 0036): the resource's
+    /// <see cref="Audience.Community"/> flag is <c>true</c> and the actor is a
+    /// member of the target component (the live <c>communityIds</c> contain
+    /// the target's <c>ComponentId</c>). The M1 <see cref="Admin"/> / ADR 0013
+    /// <see cref="Group"/> / ADR 0028 <see cref="Guardian"/> append precedent:
+    /// an additive enum value, the nine frozen values untouched.
+    /// </summary>
+    Community
 }
 
 /// <summary>The outcome an audited decision produced.</summary>

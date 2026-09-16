@@ -34,6 +34,20 @@ public sealed class Audience
 
     public List<AudienceGrant> Grants { get; set; } = new();
 
+    /// <summary>
+    /// The "community-visible" flag (ADR 0036): when <c>true</c>, the
+    /// resource is visible to all members of the target component (the
+    /// actor's <c>communityIds</c> must contain the target's
+    /// <c>ComponentId</c>). This is the **default** for new community posts
+    /// (the Web composer seeds it <c>true</c>); existing posts have it
+    /// <c>false</c> (the old owner-only behavior). A <c>true</c> flag with
+    /// an empty <see cref="Grants"/> list is the "all community members"
+    /// shape — the empty-audience-denies invariant (C1) does **not** apply
+    /// to the Community branch (it is a distinct grant, not a mode of the
+    /// <see cref="Grants"/> list).
+    /// </summary>
+    public bool Community { get; set; }
+
     public Audience()
     {
     }
