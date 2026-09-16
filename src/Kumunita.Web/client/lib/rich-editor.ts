@@ -579,6 +579,12 @@ export function bindRichEditor(root: HTMLElement): void {
   if (previewPane) {
     // (b) WY·1 — the pane is the editing surface.
     previewPane.contentEditable = 'true';
+    // WY·9 — a11y: label the editable pane as a multiline textbox so
+    // assistive tech announces it correctly (design doc §2.5(a)). Set at
+    // runtime, never in the Razor (the pane is the same element IE made
+    // the default view — no re-shape of the RC/IE frozen base).
+    previewPane.setAttribute('role', 'textbox');
+    previewPane.setAttribute('aria-multiline', '');
     // (c) Initial population (reuses `renderPreview` — not a new renderer).
     previewPane.innerHTML = renderPreview(textarea.value);
     // (d) WY·2 — the binder keeps the textarea in sync on every pane input.

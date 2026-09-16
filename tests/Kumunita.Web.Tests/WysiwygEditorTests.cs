@@ -358,6 +358,28 @@ public class WysiwygEditorTests
         Assert.Contains("rc-editor-source-hidden", content, StringComparison.Ordinal);
     }
 
+    // ── WY·9 — the a11y artifact-string pin (§2.7 #12) ───────────────────
+
+    /// <summary>
+    /// <b>#12</b> — the compiled <c>wwwroot/js/lib/rich-editor.js</c> sets
+    /// <c>role="textbox"</c> + <c>aria-multiline</c> on the pane (WY·9 — the
+    /// pane is keyboard-operable and announced as a multiline textbox; the
+    /// binder sets both at runtime, never in the Razor — design doc §2.5(a)).
+    /// Closes the §2.7 pin-list drift for this name (U8 recorded it as
+    /// absent / indirectly covered).
+    /// </summary>
+    [Fact]
+    public void WY9_PaneIsKeyboardOperable()
+    {
+        var content = ReadCompiledRichEditor();
+        // WY·9 — the a11y label pair is set by the WY block at runtime
+        // (the exact `setAttribute` calls the design doc §2.5(a) pins).
+        Assert.Contains(
+            "setAttribute('role', 'textbox')", content, StringComparison.Ordinal);
+        Assert.Contains(
+            "setAttribute('aria-multiline', '')", content, StringComparison.Ordinal);
+    }
+
     // ── Test helpers (mirrors <c>InlineEditorTests</c> idiom) ────────────
 
     /// <summary>
