@@ -349,3 +349,93 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
 - **No `.csproj` change, no new route, no new dependency, no second renderer.** `tsc`-only stands (WY·8); `package.json` is still `typescript`-only. The read path (`MarkdownRenderer`) is untouched (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
 - **Build + test result:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec` — not from U4); `npm run build` (in `src/Kumunita.Web`) → **tsc green, 0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` → **Total: 164, Errors: 0, Failed: 0** (U3's 9 WY tests + the 2 new artifact pins = 11 WY tests, all PASS). The compiled `wwwroot/js/lib/rich-editor.js` contains `contentEditable` + `toMarkdown` + `sanitizeHtml` + the `paste` stub + the `input` handler (all verified present).
 - **No drift pause.** U5 reworks the toolbar's `click` handlers to splice DOM (the Selection / Range API on the pane) per §2.5(e) + the per-button mapping table.
+
+## U5 — toolbar rework
+
+- **Date:** 2026-09-15
+- **Authored (2 files modified + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the **toolbar rework**
+  (design doc §2.5(e)): the body of the `for (const btn of buttons) { … }`
+  loop in `bindRichEditor` is **replaced** — the `click` handlers now splice
+  **DOM** into the pane (WY·4) via the browser's built-in Selection / Range
+  API, then keep the textarea in sync. Private helpers added **inside**
+  `bindRichEditor` (module-private, not exported — the RE surface is
+  unchanged): `syncTextarea()` (WY·2 — `textarea.value =
+  toMarkdown(previewPane.innerHTML)`, called after **every** splice),
+  `activeRange()` (the active Selection/Range inside the pane, or
+  `null`), `placeCaretAfter(node)` (collapse the caret after a node),
+  `wrapSelection(tag, setAttrs?)` (bold / italic / code / link —
+  `range.surroundContents` with the `extractContents` + `appendChild` +
+  `insertNode` fallback for a cross-element selection, per §2.5e),
+  `currentBlock()` / `changeBlockTag(tag)` (h1/h2/h3 — re-tag the current
+  block), `wrapBlockInList(listTag)` (ul/ol — wrap the current block in
+  `<ul><li>` / `<ol><li>`). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — **2** artifact-string
+  pins appended (U3's 9 tests + U4's 2 tests **untouched**):
+  `CompiledRichEditorJs_ContainsDomSplice` (asserts the compiled JS carries
+  the DOM-splice trio `surroundContents` / `extractContents` /
+  `insertNode` + `toMarkdown` — WY·4) and `WY8_TscOnly_NoEditorDependency`
+  (§2.7 #11 — asserts `package.json` is still `typescript`-only + the
+  **absence** of a known editor package name — WY·8), with a new
+  `ReadPackageJson()` helper (mirrors the `ReadCompiledRichEditor()`
+  walk-up idiom). (3) `wwwroot/js/lib/rich-editor.js` — the `tsc` rebuild
+  (git-ignored build artifact).
+- **10 per-button DOM-splice mappings (WY·4, design doc §2.5e — the
+  primary source):** **bold** → wrap selection in `<strong>`;
+  **italic** → `<em>`; **code** → `<code>` (all via
+  `wrapSelection` — `range.surroundContents` + the cross-element
+  `extractContents`/`appendChild`/`insertNode` fallback); **h1 / h2 / h3**
+  → `changeBlockTag` (change the current block's tag, caret placed inside
+  the new heading); **•** (`ul`) / **1.** (`ol`) → `wrapBlockInList`
+  (wrap the current block's content in `<ul><li>` / `<ol><li>`);
+  **link** → `window.prompt('URL:')` + `wrapSelection('a', …)` with the
+  `isSafeUrl` check — a rejected / empty url splices the label as plain
+  text (no `<a>`); **image** → the **RC upload lane** (`POST
+  /content-image` via `apiFetch`, the RE image convention — **no** new
+  route, **no** second upload) → on success splice
+  `<img src="/content-image/{id}" alt="…">` at the caret (the
+  `isSafeImageSrc` check is reused; the src is the exact
+  `ContentImageIds.FullSrcRe` form — RC R·3 byte-identity). **After every
+  splice**, `syncTextarea()` runs (WY·2 — the binder keeps the textarea in
+  sync; the pane is authoritative).
+- **The 2 new tests (verbatim names — both PASS):**
+  `CompiledRichEditorJs_ContainsDomSplice` (the §2.5e Selection / Range
+  API splice trio + `toMarkdown` are present in the compiled JS — the U5
+  rework shipped), `WY8_TscOnly_NoEditorDependency` (`package.json` is
+  `typescript`-only, no known editor package name — WY·8 / RE·3 stands).
+- **The 6 RE pure functions are UNTOUCHED** (`renderPreview` /
+  `applyToggle` / `applyBlock` / `applyLink` / `imageLink` /
+  `isSafeImageSrc`) — the rework is scoped to the toolbar `for`-loop body +
+  its private helpers; the RE surface is unchanged. The **U4 WY block**
+  (pane `contenteditable`, `input` handler, `paste` stub) and the **IE
+  toggle block** and the **self-wire loop** are all **untouched**. The
+  `RichEditorTextarea_IsNotDisabled_OrRemoved` regression pin
+  (`InlineEditorTests`) still passes — the textarea is never
+  disabled/removed/hidden-attributed.
+- **10 composer surfaces unchanged in shape** (the 16 editor blocks / 10
+  view files U0 verified). The toolbar markup, the textarea, the pane, and
+  the `data-ie-toggle` button are all **unchanged** — only the click-handler
+  JS changed. The pane was already `contenteditable` (U4) — U5 does **not**
+  re-set it.
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched (RC
+  R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5). The
+  `applyToggle` / `applyBlock` / `applyLink` RE splices are no longer called
+  by the toolbar (replaced by the DOM splices) — they remain **exported**
+  (the `CompiledRichEditorJs_StillExportsRePureFunctions` regression pin
+  still passes) and are the frozen RE surface.
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec` —
+  not from U5); `npm run build` (in `src/Kumunita.Web`) → **tsc green, 0
+  warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 166, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 = 13 WY tests, all PASS). The
+  compiled `wwwroot/js/lib/rich-editor.js` contains `surroundContents` +
+  `extractContents` + `insertNode` + `wrapSelection` + `toMarkdown` +
+  `contentEditable` + all 6 RE `export function {name}` (all verified
+  present).
+- **No drift pause.** U6 replaces the U4 `paste` handler **stub** with the
+  full sanitizer + insert (the WY·6 invariant — `sanitizeHtml` is already
+  present from U3; U6 wires it into the `paste` handler + the
+  `range.insertNode` insert + the `toMarkdown` sync), per §2.4 / §2.5(d).

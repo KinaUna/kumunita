@@ -276,6 +276,60 @@ public class WysiwygEditorTests
         Assert.Contains("toMarkdown", content, StringComparison.Ordinal);
     }
 
+    // ── WY U5 — the toolbar rework artifact-string pins (WY·4 / WY·8) ────
+
+    /// <summary>
+    /// U5 — the compiled <c>wwwroot/js/lib/rich-editor.js</c> carries the
+    /// <b>DOM-splice</b> toolbar wiring (WY·4 — the toolbar splices DOM,
+    /// not Markdown, into the pane via the Selection / Range API). The
+    /// <c>range.surroundContents</c> / <c>range.extractContents</c> /
+    /// <c>range.insertNode</c> trio is the §2.5e per-button construction;
+    /// their presence proves the U5 rework shipped (the pre-U5 loop
+    /// spliced Markdown into the textarea and referenced none of these).
+    /// The <c>export function {name}</c> RE surface is asserted verbatim
+    /// by <c>CompiledRichEditorJs_StillExportsRePureFunctions</c>
+    /// (<c>InlineEditorTests</c>) — untouched by U5.
+    /// </summary>
+    [Fact]
+    public void CompiledRichEditorJs_ContainsDomSplice()
+    {
+        var content = ReadCompiledRichEditor();
+        // The Selection / Range API splice trio (design doc §2.5e).
+        Assert.Contains("surroundContents", content, StringComparison.Ordinal);
+        Assert.Contains("extractContents", content, StringComparison.Ordinal);
+        Assert.Contains("insertNode", content, StringComparison.Ordinal);
+        // After every splice the binder keeps the textarea in sync (WY·2).
+        Assert.Contains("toMarkdown", content, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// <b>#11</b> — <c>package.json</c> is still <c>typescript</c>-only
+    /// (WY·8 — the <c>tsc</c>-only / no-editor-dependency constraint stands
+    /// unchanged). The U5 toolbar rework splices DOM via the browser's
+    /// Selection / Range API (built-in) and adds <b>no</b> editor package.
+    /// The needle is the <c>typescript</c> devDependency plus the
+    /// <b>absence</b> of a known editor package name.
+    /// </summary>
+    [Fact]
+    public void WY8_TscOnly_NoEditorDependency()
+    {
+        var pkg = ReadPackageJson();
+        // The tsc-only toolchain is the sole dependency (RE·3 / WY·8).
+        Assert.Contains("typescript", pkg, StringComparison.Ordinal);
+        // No known editor / rich-text package name appears anywhere in the
+        // manifest (a WY·8 / RE·3 regression — a WY-2 lane that adopts an
+        // editor dependency would fail here on purpose).
+        foreach (var name in new[]
+            {
+                "quill", "prosemirror", "prose-mirror", "tiptap",
+                "slate", "codemirror", "CodeMirror", "tinymce",
+                "ckeditor", "froala", "lexical",
+            })
+        {
+            Assert.DoesNotContain(name, pkg, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     // ── Test helpers (mirrors <c>InlineEditorTests</c> idiom) ────────────
 
     /// <summary>
@@ -310,6 +364,33 @@ public class WysiwygEditorTests
             }
         }
         return candidates.Distinct().ToArray();
+    }
+
+    /// <summary>
+    /// Resolve <c>src/Kumunita.Web/package.json</c> on disk and read it,
+    /// failing loud if it is absent (the <c>ReadCompiledRichEditor</c>
+    /// idiom — the same walk-up ≤ 8 levels from CWD +
+    /// <see cref="AppContext.BaseDirectory"/>).
+    /// </summary>
+    private static string ReadPackageJson()
+    {
+        const string rel = "src/Kumunita.Web/package.json";
+        var candidates = new List<string>();
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            var dir = new DirectoryInfo(start);
+            for (int i = 0; i < 8 && dir != null; i++)
+            {
+                candidates.Add(Path.Combine(dir.FullName, rel));
+                dir = dir.Parent;
+            }
+        }
+        candidates = candidates.Distinct().ToList();
+        var artifact = candidates.FirstOrDefault(p => File.Exists(p));
+        Assert.True(
+            artifact is not null,
+            $"package.json not found; searched:\n{string.Join("\n", candidates)}");
+        return File.ReadAllText(artifact);
     }
 }
 

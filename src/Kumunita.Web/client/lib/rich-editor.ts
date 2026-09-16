@@ -577,7 +577,149 @@ export function bindRichEditor(root: HTMLElement): void {
     });
   }
 
-  // Wire each toolbar button to the right pure splice function.
+  // ── WY U5 — the toolbar rework: splice DOM, not Markdown (WY·4) ─────────
+  // WY·4: the toolbar buttons splice **DOM** into the pane via the
+  // Selection / Range API (the per-button mapping, design doc §2.5e); the
+  // pane is the editing surface (WY·1, U4 — already `contenteditable`).
+  // **After every splice** the binder keeps the textarea in sync (WY·2) —
+  // the pane is authoritative, the textarea is the read-only sink. The 6
+  // RE pure functions + `renderPreview` are **untouched** (the WY block is
+  // additive); the DOM-splice helpers below are private to `bindRichEditor`.
+
+  /** Keep the textarea (the read-only sink) in sync with the pane (WY·2). */
+  const syncTextarea = (): void => {
+    if (previewPane) {
+      textarea.value = toMarkdown(previewPane.innerHTML);
+    }
+  };
+
+  /** Get the active Selection/Range inside the pane, or `null`. */
+  const activeRange = (): Range | null => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const r = sel.getRangeAt(0);
+    // A selection outside the pane (e.g. the textarea) is not ours to splice.
+    if (previewPane && !previewPane.contains(r.commonAncestorContainer)) {
+      return null;
+    }
+    return r;
+  };
+
+  /** Collapse the caret to just after `node` inside the pane. */
+  const placeCaretAfter = (node: Node): void => {
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  /**
+   * Wrap the current selection in a fresh `<tag>` element (bold / italic /
+   * code / link). Uses `range.surroundContents`; for a selection that
+   * crosses element boundaries, falls back to `extractContents` +
+   * `appendChild` + `insertNode` (design doc §2.5e). A collapsed / absent
+   * selection wraps a placeholder so the resident can type inside it.
+   */
+  const wrapSelection = (
+    tag: string,
+    setAttrs?: (el: Element) => void,
+  ): void => {
+    if (!previewPane) return;
+    const el = document.createElement(tag);
+    if (setAttrs) setAttrs(el);
+    const range = activeRange();
+    if (!range || range.collapsed) {
+      // No (or collapsed) selection — wrap a placeholder and place the
+      // caret after it so the next keystroke lands inside the element.
+      el.textContent = tag === 'a' ? '' : 'text';
+      if (range) {
+        range.insertNode(el);
+      } else {
+        previewPane.appendChild(el);
+      }
+      placeCaretAfter(el);
+    } else {
+      try {
+        range.surroundContents(el);
+      } catch {
+        // Selection crosses element boundaries — the extract/append/insert
+        // fallback (design doc §2.5e).
+        const fragment = range.extractContents();
+        el.appendChild(fragment);
+        range.insertNode(el);
+      }
+      // Select the content so a second click can operate on it again.
+      const sel = window.getSelection();
+      if (sel) {
+        const contentRange = document.createRange();
+        contentRange.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(contentRange);
+      }
+    }
+    syncTextarea();
+  };
+
+  /** The block-level elements the toolbar may re-tag / re-wrap. */
+  const BLOCK_ELEMENT_TAGS = new Set([
+    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'pre', 'div',
+  ]);
+
+  /** Find the block element containing the caret (or `null`). */
+  const currentBlock = (): Element | null => {
+    const range = activeRange();
+    if (!range || !previewPane) return null;
+    let n: Node | null = range.commonAncestorContainer;
+    while (n && n !== previewPane) {
+      if (n.nodeType === 1) {
+        const tag = (n as Element).tagName.toLowerCase();
+        if (BLOCK_ELEMENT_TAGS.has(tag)) return n as Element;
+      }
+      n = n.parentNode;
+    }
+    return null;
+  };
+
+  /** Change the current block's tag to `<h1>` / `<h2>` / `<h3>` (WY·4). */
+  const changeBlockTag = (tag: string): void => {
+    if (!previewPane) return;
+    const block = currentBlock();
+    const content = (block ? block.innerHTML : '') || 'Heading';
+    const newBlock = document.createElement(tag);
+    newBlock.innerHTML = content;
+    if (block && block.parentNode) {
+      block.parentNode.replaceChild(newBlock, block);
+    } else {
+      previewPane.appendChild(newBlock);
+    }
+    placeCaretAfter(newBlock);
+    syncTextarea();
+  };
+
+  /** Wrap the current block's content in `<ul><li>` / `<ol><li>` (WY·4). */
+  const wrapBlockInList = (listTag: string): void => {
+    if (!previewPane) return;
+    const block = currentBlock();
+    const content = (block ? block.innerHTML : '') || 'item';
+    const list = document.createElement(listTag);
+    const li = document.createElement('li');
+    li.innerHTML = content;
+    list.appendChild(li);
+    if (block && block.parentNode) {
+      block.parentNode.replaceChild(list, block);
+    } else {
+      previewPane.appendChild(list);
+    }
+    placeCaretAfter(li);
+    syncTextarea();
+  };
+
+  // Wire each toolbar button to a DOM splice on the pane (WY·4). The
+  // existing markup is unchanged — only the click handlers change.
   const buttons = Array.from(
     toolbar.querySelectorAll<HTMLButtonElement>('button[data-md]'),
   );
@@ -587,50 +729,37 @@ export function bindRichEditor(root: HTMLElement): void {
 
     btn.addEventListener('click', () => {
       if (kind === 'bold' || kind === 'italic' || kind === 'code') {
-        const sel: [number, number] = [
-          textarea.selectionStart ?? 0,
-          textarea.selectionEnd ?? 0,
-        ];
-        const r = applyToggle(textarea.value, sel, kind);
-        textarea.value = r.value;
-        textarea.selectionStart = r.sel[0];
-        textarea.selectionEnd = r.sel[1];
-        textarea.focus();
+        // Wrap the selection in <strong> / <em> / <code> (Selection/Range
+        // API on the contenteditable pane).
+        const tag =
+          kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
+        wrapSelection(tag);
       } else if (
         kind === 'h1' ||
         kind === 'h2' ||
-        kind === 'h3' ||
-        kind === 'ul' ||
-        kind === 'ol'
+        kind === 'h3'
       ) {
-        const caret = textarea.selectionStart ?? 0;
-        const r = applyBlock(textarea.value, caret, kind);
-        textarea.value = r.value;
-        textarea.selectionStart = r.caret;
-        textarea.selectionEnd = r.caret;
-        textarea.focus();
+        // Change the current block's tag to <h1> / <h2> / <h3>.
+        changeBlockTag(kind);
+      } else if (kind === 'ul' || kind === 'ol') {
+        // Wrap the current block's text in <ul><li> / <ol><li>.
+        wrapBlockInList(kind);
       } else if (kind === 'link') {
-        const sel: [number, number] = [
-          textarea.selectionStart ?? 0,
-          textarea.selectionEnd ?? 0,
-        ];
         const url = window.prompt('URL:') ?? '';
-        if (url) {
-          const r = applyLink(textarea.value, sel, url);
-          textarea.value = r.value;
-          textarea.selectionStart = r.sel[0];
-          textarea.selectionEnd = r.sel[1];
-          textarea.focus();
+        if (url && isSafeUrl(url)) {
+          // Wrap the selection in <a href="…">. A rejected url (empty or
+          // the isSafeUrl reject) leaves the selection as plain text — no
+          // <a> is spliced (the renderPreview / toMarkdown reject
+          // precedent, RC R·2).
+          wrapSelection('a', (el) => el.setAttribute('href', url));
         }
       } else if (kind === 'image') {
         // Reuse the **RC upload lane** — the same `POST /content-image`
-        // endpoint `insert-image.ts` uses (RE·3: no new route, no second
+        // endpoint the RE image path used (RE·3: no new route, no second
         // upload seam, no new `api.ts` method — `apiFetch` carries the
-        // CSRF token per the `client/lib/api.ts` convention). The design
-        // markup replaces the RC `rc-insert-image` file-input block with
-        // this toolbar button, so this is the self-contained path:
-        // programmatic file picker → upload → splice `imageLink(alt, id)`
-        // (RC R·3 byte-identical) at the cursor → refresh the preview.
+        // CSRF token per the `client/lib/api.ts` convention). On success,
+        // splice `<img src="/content-image/{id}" alt="…">` into the pane
+        // at the caret (the `isSafeImageSrc` check is reused).
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = 'image/jpeg,image/png,image/webp,image/gif';
@@ -644,20 +773,31 @@ export function bindRichEditor(root: HTMLElement): void {
               '/content-image',
               { method: 'POST', body: fd },
             );
-            // Pinned alt rule (the `insert-image.ts` convention): the
-            // file name without its extension, truncated to 40 chars.
+            // RC R·3 byte-identity: the src is the exact
+            // /content-image/{id} form ContentImageIds.FullSrcRe already
+            // parses (zero server change).
+            const src = `/content-image/${id}`;
+            if (!isSafeImageSrc(src)) {
+              window.alert('Uploaded image source was rejected.');
+              return;
+            }
+            // Pinned alt rule (the RE image convention): the file name
+            // without its extension, truncated to 40 chars.
             const alt = file.name.replace(/\.[^.]+$/, '').slice(0, 40);
-            const link = imageLink(alt, id);
-            const caret = textarea.selectionStart ?? textarea.value.length;
-            textarea.value =
-              textarea.value.slice(0, caret) +
-              link +
-              textarea.value.slice(caret);
-            const newCaret = caret + link.length;
-            textarea.selectionStart = newCaret;
-            textarea.selectionEnd = newCaret;
-            textarea.focus();
-            renderPane(); // keep the preview in sync (RE·1)
+            const img = document.createElement('img');
+            img.setAttribute('src', src);
+            img.setAttribute('alt', alt);
+            img.className = 'rc-image';
+            img.setAttribute('loading', 'lazy');
+            const range = activeRange();
+            if (range) {
+              range.deleteContents();
+              range.insertNode(img);
+            } else {
+              previewPane!.appendChild(img);
+            }
+            placeCaretAfter(img);
+            syncTextarea();
           } catch (err) {
             window.alert(
               err instanceof Error ? err.message : 'Upload failed.',
