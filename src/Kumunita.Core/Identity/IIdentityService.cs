@@ -56,6 +56,19 @@ public interface IIdentityService
     Task<ResendVerificationResult> ResendVerificationEmailAsync(string email);
 
     /// <summary>
+    /// GA (ADR 0038): resolve an email to a subject id (the assign
+    /// form's one external identifier). A read — no audit row, no
+    /// mutation. Returns the subject id, or null if the email has no
+    /// account (the Web's user-presentable error surface — the ADR
+    /// 0008 "a non-guardian learns nothing" shape: a null return, not
+    /// an exception that names the email). ADR 0006-E compatible
+    /// ADD — the M1 lifecycle ADD precedent (the
+    /// <c>ResendVerificationEmailAsync</c> shape, a read over
+    /// <c>userManager.FindByEmailAsync</c>).
+    /// </summary>
+    Task<string?> FindSubjectByEmailAsync(string email);
+
+    /// <summary>
     /// Consume a verification link (the resident clicked the link — the handoff ends
     /// on-platform): set <see cref="Profile.Verified"/>, mark the token consumed, audit
     /// (<c>via: Owner</c> — the resident verifying their own account).

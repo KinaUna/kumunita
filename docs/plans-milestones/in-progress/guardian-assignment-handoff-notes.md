@@ -93,3 +93,18 @@
 - **Files authored:** `docs/design/guardian-assignment-design.md` (new);
   `docs/adr/0038-guardian-assignment.md` (new); `docs/adr/README.md`
   (appended the `0038` row after the `0037` row).
+
+## U02 — FindSubjectByEmailAsync
+
+- **Seam signature (verbatim):** `Task<string?> FindSubjectByEmailAsync(string email);`
+- **Impl (verbatim):** `var user = await userManager.FindByEmailAsync(email); return user?.Id;`
+  (plus the `if (string.IsNullOrWhiteSpace(email)) return null;` guard — the
+  no-leak shape).
+- **Placement:** interface M1 lifecycle block, after
+  `ResendVerificationEmailAsync`, before the break-glass lane
+  (`ConsumeBreakGlassAsync`); impl in `IdentityService.cs` directly after
+  `ResendVerificationEmailAsync`.
+- **No other `IIdentityService` member changed** — the one ADD is the only
+  diff on the frozen surface; `IdentityService` is the sole implementor.
+- **Compile warnings:** none. `dotnet build Kumunita.slnx -c Debug` green
+  (all 4 projects, 11.9s).

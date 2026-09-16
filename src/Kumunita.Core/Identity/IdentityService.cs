@@ -180,6 +180,15 @@ public sealed class IdentityService(
     }
 
     /// <inheritdoc />
+    public async Task<string?> FindSubjectByEmailAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return null;
+        var user = await userManager.FindByEmailAsync(email);
+        return user?.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Profile> VerifyWithTokenAsync(string tokenValue)
     {
         var token = await FindTokenAsync(
