@@ -57,3 +57,39 @@
   U07 records the run result) = the 3 Core tests + the 5 Web tests + the
   build line. Runner quirk (AGENTS.md) applies: run via `dotnet exec
   tests\…\.dll`, not `dotnet test`.
+
+## U01 — design doc + ADR 0038
+
+- **Seam (U02):** `IIdentityService.FindSubjectByEmailAsync(string email)`
+  — one ADD on the frozen `IIdentityService` surface (ADR 0006-E
+  compatible; the M1 lifecycle block, after `ResendVerificationEmailAsync`).
+  Read; no audit row; null on unknown email.
+- **Action (U05):** `GuardianController.Assign(string childId, [FromForm]
+  AssignGuardianForm form)` — `[HttpPost("{childId}/assign")]`; standing
+  gate → resolution → self-assignment refusal → `CreateGuardianLinkAsync`.
+- **Form field (U04):** `AssignGuardianForm.Email` (`[Required,
+  EmailAddress, MaxLength(255)]`, `Display(Name = "Email of the guardian
+  to assign")`).
+- **8 pinned test names:**
+  1. `FindSubjectByEmail_ReturnsSubjectIdForKnownEmail`
+  2. `FindSubjectByEmail_ReturnsNullForUnknownEmail`
+  3. `FindSubjectByEmail_IsCaseInsensitiveOnEmail`
+  4. `Assign_NonGuardian_Returns404`
+  5. `Assign_UnknownEmail_ReturnsValidationError`
+  6. `Assign_SelfAssignment_ReturnsValidationError`
+  7. `Assign_DuplicateAssignment_IsIdempotentNoOp`
+  8. `Assign_KnownEmail_CallsCreateGuardianLinkAsync`
+- **Invariants (by id):** G-A·1 (standing from the assigning guardian's
+  active link, live-checked), G-A·2 (assigned guardian must have an
+  account; null on unknown email; no auto-create), G-A·3 (identical in
+  kind to the creator's; no content read; `GuardianLink` byte-identical),
+  G-A·4 (idempotency; duplicate pair is a no-op), G-A·5 (self-assignment
+  refused), G-A·6 (no remove path; named deferral).
+- **ADR 0038 §E non-decisions (each named):** no remove path; no
+  acceptance/consent step; no bulk assign; no self-assignment (refused,
+  not a lane); no second audit verb; no email notification to the assigned
+  guardian. Each re-litigates as an ADR 0038 amendment.
+- **Drift pauses:** none.
+- **Files authored:** `docs/design/guardian-assignment-design.md` (new);
+  `docs/adr/0038-guardian-assignment.md` (new); `docs/adr/README.md`
+  (appended the `0038` row after the `0037` row).
