@@ -175,3 +175,329 @@ stays the authoritative source for unit-level scope:
 - **Tests / acceptance model unchanged.** `xunit.v3`; build-green per unit;
   the full-suite gate runs via the `dotnet exec … .dll` path (AGENTS.md §
   Running the tests), **not** `dotnet test`.
+
+## 2. Seams (Part 2 — authored by U2)
+
+Part 1 pinned *what* (the ten invariants, the nine FACES, the scope). This
+section pins *how*: the exact C# of every seam each later unit implements, the
+serve route's 5-step ordering, the pinned test names, the acceptance gate, and
+the drift-guard. Every C# shape below is transcribed **from the real image
+lane in the tree** (`ContentImageController.cs`, `ContentImageIds.cs`,
+`PostService.cs`, `MediaOptions.cs`, `rich-editor.ts`) — where a summary
+differs from that source, **the source wins** and the delta is recorded in the
+U2 handoff note. Signatures here are *specification* (prose + short snippets),
+not files under `src/`; U3+ writes the real code against them.
+
+### 2.1 Additive POCO fields (`AttachmentIds`)
+
+The three owning POCOs each gain a **separate** `AttachmentIds` field (C-ATT·5
+— **never** merged into `ImageIds`; a body can carry both, the images in
+`ImageIds` and the files in `AttachmentIds`). Each is
+`public IReadOnlyList<string> AttachmentIds { get; set; } = [];`, the exact
+additive shape of the sibling `ImageIds` field (ADR 0004 §B.1 — zero
+migrations), placed **immediately after** the `ImageIds` field:
+
+- **`Post.AttachmentIds`** — the **6th** additive field, ordered after
+  `Status`, `GroupId`, `LanguageCode`, `DeletedAt`, `ImageIds` (5th).
+  Doc-comment: *"Attachment file ids (`/attachment/{id}`); the 6th additive
+  field after `ImageIds` (5th) — ADR 0034, C-ATT·5. Separate from
+  `ImageIds`; never merged."*
+- **`PostReply.AttachmentIds`** — the **5th** additive field, ordered after
+  `Modified`, `LanguageCode`, `DeletedAt`, `ImageIds` (4th). Same shape +
+  comment, ordinal **5th**.
+- **`Announcement.AttachmentIds`** — the **3rd** additive field, ordered after
+  `LanguageCode`, `ImageIds` (2nd). Same shape + comment, ordinal **3rd**.
+
+C-ATT·5 is the pin: a post's images and its files live in **two** fields, two
+routes, two allowlists — one byte store (C-ATT·1).
+
+### 2.2 Reverse-lookup seams (Core, un-audited, null when absent)
+
+Three read seams mirror the existing `Find*ByImageIdAsync` shape (un-audited;
+the audit row belongs to the route's `CanAsync`, C-ATT·7; **null** when no row
+owns the id so the route 404s; read-only, no `actorId`). These are the *only*
+body-adjacent reads in Core — Core still **never parses a Markdown body**
+(C-ATT·4):
+
+```csharp
+// PostService (mirror FindPostByImageIdAsync / FindReplyByImageIdAsync)
+Task<Post?>        FindPostByAttachmentIdAsync(string mediaId);
+Task<PostReply?>   FindReplyByAttachmentIdAsync(string mediaId);
+// IAnnouncementService (mirror FindByImageIdAsync)
+Task<Announcement?> FindByAttachmentIdAsync(string mediaId);
+```
+
+Implementation shape (the `ImageIds` mirror, `AttachmentIds` swapped in):
+
+```csharp
+await using var session = _store.QuerySession();
+return await session.Query<Post>()
+    .Where(p => p.AttachmentIds.Contains(mediaId))
+    .OrderBy(p => p.Created)
+    .FirstOrDefaultAsync().ConfigureAwait(false);
+```
+
+`FindPostByAttachmentIdAsync` and `FindReplyByAttachmentIdAsync` live on
+`PostService` (the concrete type the controller already injects — the image
+lane's `Find*ByImageIdAsync` are not on a `IPostService` interface, so this
+lane does not invent one); `FindByAttachmentIdAsync` lives on
+`IAnnouncementService` + `AnnouncementService` (the image lane's
+`FindByImageIdAsync` is on that interface). Each guards
+`string.IsNullOrEmpty(mediaId)` with the same `ArgumentException` the image
+seams use.
+
+### 2.3 Write-lane persistence (Web extracts, Core writes verbatim)
+
+- **`PostDraft`** gains a **trailing optional** param
+  `IReadOnlyList<string>? AttachmentIds = null`, immediately after the existing
+  `ImageIds` param. Same pinned **CS1736** note as `ImageIds`: a collection
+  expression (`= []`) is **not** a legal C# default parameter value, so the
+  draft param is nullable and the service null-coalesces to the POCO's
+  non-null empty list.
+- **`PostService.CreatePostAsync`** / `CreateGroupPostAsync` set
+  `AttachmentIds = draft.AttachmentIds ?? [];` (mirrors the existing
+  `ImageIds = draft.ImageIds ?? [];` line, one line each).
+- **`PostService.UpdatePostAsync`** / `UpdateGroupPostAsync` re-copy
+  `existing.AttachmentIds = draft.AttachmentIds ?? [];` (the same field-copy
+  shape as the `ImageIds` lines in those lanes).
+- **`PostService.CreateReplyAsync`** / **`UpdateReplyAsync`** set
+  `AttachmentIds` from the parse. **Deliberate asymmetry (recorded):** the
+  image lane's reply create/edit lanes do **not** set `ImageIds` (the
+  image-lane reply-404 drift pause, C-ATT·9); **this** lane does persist
+  `AttachmentIds` on replies, because the attachment reply serve (C-ATT·8)
+  resolves the parent post and must find the reply row owning the id.
+- **`AnnouncementService.Create` / `Update`** mirror the existing
+  `existing.ImageIds = updated.ImageIds ?? [];` idiom for
+  `AttachmentIds` (POCO-direct: the Web layer sets
+  `Announcement.AttachmentIds`, Core copies it verbatim; one line each).
+
+### 2.4 Web parse helper (mirror `ContentImageIds`)
+
+**`src/Kumunita.Web/Security/AttachmentIds.cs`** — a `public static class
+AttachmentIds` in `Kumunita.Web.Security` (the same home as
+`ContentImageIds`), with:
+
+```csharp
+public static IReadOnlyList<string> ExtractAttachmentIds(string? body)
+```
+
+- Regex (the image lane's `FullSrcRe` verbatim, route prefix swapped
+  `/content-image/` → `/attachment/`):
+  `@"/attachment/([0-9a-f]{1,128})(?![0-9a-f])"` with `RegexOptions.Compiled`.
+- **Ordering:** deduplicated, **first-occurrence order preserved** (the
+  serving route's reverse lookup returns the first owner, so a deterministic
+  order keeps the field stable). Null/empty body, or a body with no
+  route-shaped attachment links, returns an **empty** list (never null).
+- **Web-only.** Core stays body-parse-free (C-ATT·4) — the four call-sites
+  (post create, reply create, reply edit, announcement create+edit) each pass
+  `AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body)` (mirror the
+  `ContentImageIds.ExtractContentImageIds(model.Body)` call sites).
+
+### 2.5 `MediaOptions` attachment allowlist (Core-agnostic options)
+
+New **instance** members on the **existing** `MediaOptions` (C-ATT·1/3 —
+`IMediaStore` / `MediaObject` / `LocalVolumeFileStore` stay untouched; do **not**
+create a second options type). Mirror the real instance-style members
+(`AllowedContentTypes` / `ResolvedAllowedTypes` / `IsAllowed`) exactly:
+
+```csharp
+/// <summary>Comma-separated allowed attachment Content-Types (case-insensitive).
+/// Config key: Media:AttachmentAllowedContentTypes (distinct from the image
+/// Media:AllowedContentTypes). Positive-only; SVG excluded (C-ATT·6).</summary>
+public string? AttachmentAllowedContentTypes { get; set; }
+
+public IEnumerable<string> ResolvedAttachmentAllowedTypes =>
+    (AttachmentAllowedContentTypes ??
+     "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/zip,image/jpeg,image/png,image/webp,image/gif")
+        .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+public bool IsAttachmentAllowed(string? contentType) =>
+    !System.String.IsNullOrWhiteSpace(contentType)
+    && ResolvedAttachmentAllowedTypes.Any(t =>
+        System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
+```
+
+- The **pinned default allowlist** (verbatim, C-ATT·6): `application/pdf`,
+  `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`,
+  `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  `text/plain`, `text/csv`, `application/zip`, `image/jpeg`, `image/png`,
+  `image/webp`, `image/gif`.
+- **SVG is excluded** (not in the default; C-ATT·6). The **raster image types
+  are included** so a resident can attach a photo *as a download* without also
+  using the Image button.
+- The image lane's `AllowedContentTypes` / `ResolvedAllowedTypes` / `IsAllowed`
+  are **untouched** (C-ATT·9). `MaxBytes` (5 MiB) is **reused**, not a second
+  size cap.
+
+### 2.6 Upload route `POST /attachment` (mirror `POST /content-image`)
+
+**`AttachmentController`** (new) with `Upload([FromForm] IFormFile? file)`:
+
+- Attributes: `[HttpPost("/attachment")]` + `[Authorize]` +
+  `[ValidateAntiForgeryToken]` (the image upload's exact set).
+- **Guard order (verbatim from `ContentImageController.Upload`, F6):**
+  1. `file is null || file.Length == 0` → **400** (`BadRequest("Choose a file.")`)
+     — the image lane's `Choose an image.` message becomes `Choose a file.`;
+  2. `mediaOpts.Value.MaxBytes > 0 && file.Length > mediaOpts.Value.MaxBytes`
+     → **413** (`StatusCodes.Status413RequestEntityTooLarge`);
+  3. `!mediaOpts.Value.IsAttachmentAllowed(file.ContentType)` → **415**
+     (`StatusCodes.Status415UnsupportedMediaType`);
+  4. then copy the `IFormFile` to bytes and **one**
+     `IMediaStore.PutAsync(bytes, file.FileName, file.ContentType, subject)`
+     (the **4-arg** signature the real `IMediaStore.PutAsync` exposes).
+- Return `Json(new { id = stored.Id })`. **Guards run before any write**
+  (C-ATT·6). `IMediaStore` unchanged (C-ATT·3). **No audit row** on the write
+  (the image lane's choice — a write is authenticated, not an
+  audience-restricted read).
+- **Drift note (U2):** the register's U8 text names the guard message
+  `Choose a file.` — the real image controller says `Choose an image.`; this
+  lane's text is the **new** `Choose a file.`, not a copy of the image string.
+
+### 2.7 Serve route `GET /attachment/{id}` — the 5-step ordering (C-ATT·7/8)
+
+`AttachmentController.Serve([FromRoute] string id)`, mirroring the real
+`ContentImageController.Serve` verbatim (the mirror source wins). **No
+`[Authorize]`** (authorization is the per-owner `CanAsync`, the avatar
+idiom). Each step's failure shape:
+
+1. **Validate id shape** — the 8-line private `IsValidMediaId` helper (1–128
+   lowercase hex `[0-9a-f]`, **not** made public). Invalid → **400**
+   (`BadRequest`) — the real image controller returns `BadRequest()`, not 404,
+   so this lane matches it; **zero** audit rows, **no** store round-trip
+   (F8 — a bad id never reaches the store).
+2. **Store lookup** — `IMediaStore.GetAsync(id)`. Miss → **404**, **zero**
+   audit rows (F3 orphan — the doc exists check; the route 404s until an
+   owning row exists).
+3. **Reverse-lookup owner** — `FindPostByAttachmentIdAsync` →
+   `FindReplyByAttachmentIdAsync` → `FindByAttachmentIdAsync` (announcement).
+   **Post first, then reply, then announcement** (the image lane's priority,
+   minus the `LocalizedPage` branch — attachments are **not** on static pages
+   in this pass). None found → **404**, **zero** audit rows (F3).
+4. **Audience decision** (the **ONE** `CanAsync(…Read…)`):
+   - **post** → `authz.CanAsync(actorId, AccessAction.Read,
+     new PostToAuditableResource(post))`. **Deny ⇒ 404** (not 403 — the avatar
+     idiom) + exactly **one** `Deny` audit row (F2).
+   - **reply** → **resolve the parent post** (C-ATT·8) and run the **same**
+     `CanAsync(Read, parent)` against it; **Deny ⇒ 404** + **one** `Deny` row
+     (F4). **This is the deliberate difference from the image lane's
+     reply-404 drift pause:** the image lane's `Serve` returns a flat `404`
+     for replies (no `PostReplyToAuditableResource` exists), whereas this lane
+     loads the reply's parent post and authorizes against **that** single
+     `Read` decision.
+   - **announcement** → the flat scope gate
+     (`IAnnouncementService.GetAsync(id, subject, roleSet)`); **null** (not
+     visible) ⇒ **404**. No `CanAsync`, **zero** audit rows — announcements
+     are not audience-restricted (F5).
+5. **Serve** — `IMediaStore.OpenReadAsync(id)` → `File(stream,
+   stored.ContentType)` **plus** `Content-Disposition: attachment;
+   filename="<name>"` where `<name>` is the RFC 6266-sanitized original
+   `MediaObject.Filename` (path separators / `;` / `"` stripped) if one is
+   known, else a **content-hash fallback** (e.g. `{id}.bin`), plus
+   `Response.Headers["X-Content-Type-Options"] = "nosniff"` (the existing
+   idiom, verbatim). The `Content-Disposition: attachment` header is the **one
+   serve difference** from the image lane (which omits it so `<img>` renders
+   inline; C-ATT·2).
+
+**Audit rule (C-ATT·10, stated explicitly — the lane's audit contract):**
+exactly **one** `Deny` audit row on a UGC (post/reply) **Deny**; **zero** audit
+rows on every other 404 path (invalid id, store miss, orphan, announcement
+scope-deny). No existence leak (C-ATT·7).
+
+### 2.8 Editor `attachLink` + button (U10)
+
+- **`attachLink(label, id)`** → `` `[${label}](/attachment/${id})` `` (mirror
+  `imageLink`, but an **`<a>`** link, not an `<img>` — C-ATT·2).
+- **`button[data-md="attach"]`** wired in `bindRichEditor`, mirroring the
+  `button[data-md="image"]` upload wiring: upload via the **existing**
+  `apiFetch` to `POST /attachment`, read `{ id }`, and splice
+  `attachLink(label, id)` at the cursor (re-focus + restore selection — the
+  `insert-image.ts` / `imageLink` idiom). **No new editor dependency**
+  (`tsc`-only; C-ATT·10).
+- **The reply-composer nuance (recorded, U2):** reply composers carry
+  `data-rich-editor-no-image` — `bindRichEditor` **removes** the
+  `button[data-md="image"]` there (the pre-existing RC image-gate drift
+  pause). The **"Attach file" button must STILL appear in reply composers** —
+  only the **Image** button is suppressed. U10 must **not** inherit the
+  no-image suppression for the attach button (F4 needs the reply attachment
+  affordance to exist).
+- **Round-trip (F9):** `dom-to-markdown.ts` already serializes `<a>` →
+  `[label](url)`, so the `/attachment/{id}` href survives an edit with **no
+  serializer change**; the U10/U11 test pins it.
+
+### 2.9 Pinned test names (exact, verbatim)
+
+**Core (U6 — `tests/Kumunita.Core.Tests`), 10 names:**
+
+| # | Test name |
+|---|-----------|
+| 1 | `FindPostByAttachmentId_ReturnsOwningPost` |
+| 2 | `FindPostByAttachmentId_ReturnsNullWhenAbsent` |
+| 3 | `FindReplyByAttachmentId_ReturnsOwningReply` |
+| 4 | `FindAnnouncementByAttachmentId_ReturnsOwningAnnouncement` |
+| 5 | `PostCreate_PersistsAttachmentIds` |
+| 6 | `PostEdit_ReparsesAttachmentIds` |
+| 7 | `ReplyCreate_PersistsAttachmentIds` |
+| 8 | `ReplyEdit_ReparsesAttachmentIds` |
+| 9 | `AnnouncementCreate_PersistsAttachmentIds` |
+| 10 | `AnnouncementEdit_ReparsesAttachmentIds` |
+
+**Web (U11 — `tests/Kumunita.Web.Tests`), 10 names:**
+
+| # | Test name | Exercises |
+|---|-----------|-----------|
+| 1 | `AttachServe_F1_AudienceMemberDownloads` | F1 |
+| 2 | `AttachServe_F2_NonMember404` | F2 |
+| 3 | `AttachServe_F3_Orphan404` | F3 (also covers F8 — a bad id is a store-less 400/404; see the F8 note below) |
+| 4 | `AttachServe_F4_ReplyParentDeny404` | F4 |
+| 5 | `AttachServe_F5_AnnouncementPublicServes` | F5 |
+| 6 | `AttachUpload_F6_Empty400` | F6 (empty) |
+| 7 | `AttachUpload_F6_Oversize413` | F6 (oversize) |
+| 8 | `AttachUpload_F6_WrongType415` | F6 (disallowed, incl. SVG) |
+| 9 | `AttachLink_F7_RemoteUrlRendersText` | F7 |
+| 10 | `AttachRoundtrip_F9_HrefPreserved` | F9 |
+
+**F8 note (Part 1 left its "Pinned by" cell as *test to be named in U2*):**
+F8 — "an attachment id that is not a valid media id (bad hex/length) 404s
+without a store round-trip" — is **folded into**
+`AttachServe_F3_Orphan404`. Rationale: step 1 of §2.7 returns a **400** for a
+bad id *before* any store access, and step 2 returns a **404** for a
+well-formed-but-unowned id; both are the "no store round-trip / zero audit"
+posture F3 pins. F8 is thus **not** a separate test — it is the
+invalid-id branch of the same serve-route 404 posture that `AttachServe_F3`
+exercises. (If U11 prefers a distinct test, it may add
+`AttachServe_F8_InvalidId404` and back-reference it, but it is **not**
+required by this pin.)
+
+**Runner quirk (AGENTS.md, binding):** never `dotnet test`; run the compiled
+assemblies with `dotnet exec …Tests.dll`.
+
+### 2.10 The close gate (U12 records)
+
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green.
+- **Tests:** `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  then `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  (the Core run spins Testcontainers `postgres:18`, ~20 s).
+- **Docs closed:** ADR 0034 authored (Amends ADR 0025 + ADR 0011),
+  `docs/adr/README.md` row (0034), `SECURITY.md` (e) note, `OPS.md`
+  (`Media:AttachmentAllowedContentTypes` tunable), `ARCHITECTURE.md`,
+  `README.md`, the design doc `## File attachments — Closed (recorded)`, the
+  handoff `## Summary`, and the `in-progress/` → `done/` file moves.
+
+### 2.11 Drift-guard (frozen once written)
+
+The single thing that would **silently break the lane** if a unit deviated:
+
+- **(a)** `AttachmentIds` merged into `ImageIds` — breaks **C-ATT·5/9** (one
+  field cannot be both inline-render and download).
+- **(b)** `IMediaStore` / `IAuthorizationService` / the image lane touched —
+  breaks **C-ATT·3/9** (no new store method, no new `AccessAction`, image
+  lane unchanged).
+- **(c)** a non-404 on a denied UGC attachment (e.g. a 403) — an existence
+  leak, breaks **C-ATT·7**.
+- **(d)** the reply serve **not** resolving the parent post — breaks
+  **C-ATT·8/F4** (the reply attachment 404s for everyone, the lane ships
+  broken).
+
+**Instruction to every unit (U3–U12):** if you **must** deviate from a pinned
+shape, **record the drift in your handoff section** and name the invariant it
+touches — **never** silently. Silence in the handoff means "no drift."

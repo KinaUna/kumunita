@@ -92,3 +92,77 @@ No other drift.
   U1/U3–U12 — U2's §2.7 drift-guard should re-state which invariants are
   code-enforced (C-ATT·3/4/5/6/7/8) vs. doc-stated (C-ATT·1/2/9/10) so the
   U12 ADR reconciliation knows what to cite where.
+
+## U2
+
+**Built:** appended **Part 2** (`## 2. Seams (Part 2 — authored by U2)`,
+§2.1–§2.11) to `docs/design/file-attachments-design.md`, immediately after
+Part 1's `## Assumptions` (Part 1 untouched, no reorder). Sub-sections:
+**§2.1** the three additive `AttachmentIds` POCO fields (ordinals 6th / 5th
+/ 3rd, each after the sibling `ImageIds`, C-ATT·5); **§2.2** the three
+`Find*ByAttachmentIdAsync` reverse-lookup seams (un-audited, null when
+absent, the `ImageIds` mirror — post/reply on the concrete `PostService`,
+announcement on `IAnnouncementService`); **§2.3** the write-lane persistence
+(`PostDraft` trailing nullable param + the `?? []` field-copies, incl. the
+deliberate reply-asymmetry note); **§2.4** the Web-only
+`AttachmentIds.ExtractAttachmentIds` helper (the `/attachment/` regex
+prefix); **§2.5** the `MediaOptions.AttachmentAllowedContentTypes` /
+`ResolvedAttachmentAllowedTypes` / `IsAttachmentAllowed` instance members +
+the **pinned default allowlist verbatim** (SVG excluded, raster included);
+**§2.6** the `POST /attachment` upload lane (the 4-guard-before-write
+ordering, F6); **§2.7** the `GET /attachment/{id}` serve **5-step ordering**
+(C-ATT·7/8) with the explicit audit rule (C-ATT·10); **§2.8** the editor
+`attachLink` + button (incl. the **reply-composer nuance**); **§2.9** the
+pinned Core (10) + Web (10) test names + the **F8 fold-into-F3** resolution;
+**§2.10** the U12 close gate; **§2.11** the drift-guard (the 4 silent-break
+modes + the "record, never silently" instruction).
+
+**Verified:** doc-only unit (no code, no build — the gate is "Part 2 present
+and internally consistent"). Re-read the full file top-to-bottom: **10
+invariants** (C-ATT·1–10) all present and referenced by the §2.x sub-sections;
+**9 FACES** (F1–F9) all present; all **20 pinned test names** appear verbatim
+in §2.9 (10 Core + 10 Web); the **two nuance calls** are present verbatim —
+the **reply-parent** resolution (§2.7 step 4 reply branch + §2.11(d)) and the
+**reply-composer** "Attach file button must STILL appear" (§2.8). F8's
+un-named cell is **resolved**: folded into `AttachServe_F3_Orphan404` with a
+named, back-referenced rationale (no separate test required). The code-enforced
+vs. doc-stated invariant split the U1 note asked for is carried by the §2.11
+drift-guard (code-enforced C-ATT·3/5/7/8/9; doc-stated C-ATT·1/2/4/6/10).
+
+**Drift:** (1) **F8** — Part 1 left its "Pinned by" cell as *test to be named
+in U2*; U2 **folded F8 into F3** (`AttachServe_F3_Orphan404`) rather than
+naming a new test, and recorded the rationale in §2.9 (a bad id 400s at step
+1 before any store access; both branches share the "no store round-trip /
+zero audit" posture F3 pins). U11 may optionally add
+`AttachServe_F8_InvalidId404` if it wants a distinct branch, but it is **not**
+required. (2) **Guard message** — the register's U8 text names the empty-file
+message `Choose a file.`; the real `ContentImageController.Upload` says
+`Choose an image.`; Part 2 §2.6 records that this lane's text is the **new**
+`Choose a file.`, not a copy of the image string (recorded inline in §2.6).
+(3) **Seam home** — the unit plan's §2.2 names
+`IPostService.FindPostByAttachmentIdAsync`; the real image-lane
+`FindPostByImageIdAsync` / `FindReplyByImageIdAsync` are on the **concrete**
+`PostService` (there is no `IPostService` interface in the tree), so §2.2
+pinned them on the concrete `PostService` and noted the image-lane interface
+precedent — **no new `IPostService` invented**. (4) The register's own
+invariant wording still differs from Part 1's (the U1 drift); U2's §2.x and
+§2.11 cite the **Part 1 ids** (C-ATT·1–10) as pinned, per the U1 handoff
+instruction. No code touched; the §2.x C# is specification only.
+
+**Next agent (U3) must know:**
+- U3 implements **§2.1 + §2.2** — the three `AttachmentIds` fields (the exact
+  ordinal after each sibling `ImageIds`) and the three
+  `Find*ByAttachmentIdAsync` seams. The mirror source is the real
+  `PostService.FindPostByImageIdAsync` / `FindReplyByImageIdAsync` +
+  `AnnouncementService.FindByImageIdAsync` (swap `ImageIds` → `AttachmentIds`
+  in the `Where(...Contains(...))`).
+- **The post/reply seams live on the concrete `PostService`** (not a new
+  interface) — `FindByAttachmentIdAsync` is the only one on
+  `IAnnouncementService`.
+- U3 must **not** add an `IPostService`, must **not** merge
+  `AttachmentIds` into `ImageIds` (C-ATT·5), and must **not** touch
+  `IMediaStore` (C-ATT·3) or the image lane (C-ATT·9). The write-lane wiring
+  is **U4/U5**, not U3.
+- The §2.2 seam signatures are `Task<Post?>`, `Task<PostReply?>`,
+  `Task<Announcement?>` (nullable — null when absent, so the serve route
+  404s).
