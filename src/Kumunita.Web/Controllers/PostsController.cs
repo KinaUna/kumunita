@@ -691,7 +691,8 @@ public sealed class PostsController(
             Audience: model.Audience.BuildAudience(),
             LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 — null/empty ⇒ instance default materialized server-side.
             ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
-            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body)); // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
+            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
+            IsDraft: model.SaveAsDraft); // ADR 0037 — draft mode: saved but invisible to all but the author until published.
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -1113,6 +1114,63 @@ public sealed class PostsController(
         }
 
         TempData["info"] = "Post deleted.";
+        return Redirect($"/posts/{id}");
+    }
+
+    // ── Publish (POST /posts/{id}/publish) — author-only (ADR 0037) ────────
+
+    /// <summary>
+    /// Publish a draft post (ADR 0037): <c>POST /posts/{id}/publish</c>.
+    /// <b>Author-only</b> — the sole lever that clears
+    /// <see cref="Post.IsDraft"/> is the author's own choice (a non-author,
+    /// even a GlobalAdmin, is denied: a draft is invisible to them, so they
+    /// have no affordance to reach this; the service re-pins the author gate
+    /// server-side). The pre-write gate is the same
+    /// <see cref="PostService.GetPostAsync"/> the delete lane uses: a
+    /// <c>Post = null</c> (missing <em>or</em> a draft the actor is not the
+    /// author of) maps to the 403 shape (non-leaky), and the
+    /// <see cref="PostService.PublishPostAsync"/> author gate is the real
+    /// decision at POST. A missing id is a 404; on success, redirect back to
+    /// the detail page (now live).
+    /// </summary>
+    [HttpPost("/posts/{id}/publish")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Publish([FromRoute] string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to publish this post.");
+            return Forbid();
+        }
+
+        // Pre-write gate (the DeletePost precedent): GetPostAsync returns
+        // Post = null for **both** "missing" and "draft the actor is not the
+        // author of" (the ADR 0037 author-only draft gate) → 403 (non-leaky).
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.PublishPostAsync(id, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author — the 403 shape (a re-render would leak the post's
+            // content to a non-author; a draft is author-only by construction).
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Post published.";
         return Redirect($"/posts/{id}");
     }
 

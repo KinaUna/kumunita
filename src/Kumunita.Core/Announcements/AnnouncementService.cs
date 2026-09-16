@@ -71,11 +71,12 @@ public sealed class AnnouncementService : IAnnouncementService
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
-            .Where(a => (a.CommunityId == null &&
-                         (a.Scope == AnnouncementScope.Public ||
-                          (authed && a.Scope == AnnouncementScope.Community)))
-                      || (a.CommunityId != null &&
-                         (admin || communities.Contains(a.CommunityId!))))
+            .Where(a => a.IsDraft == false &&
+                        ((a.CommunityId == null &&
+                          (a.Scope == AnnouncementScope.Public ||
+                           (authed && a.Scope == AnnouncementScope.Community)))
+                         || (a.CommunityId != null &&
+                             (admin || communities.Contains(a.CommunityId!)))))
             .OrderByDescending(a => a.Created)
             .ToListAsync()
             .ConfigureAwait(false);
@@ -95,19 +96,42 @@ public sealed class AnnouncementService : IAnnouncementService
     {
         ArgumentNullException.ThrowIfNull(roles);
         if (string.IsNullOrEmpty(id)) return null;
-        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
 
         await using var session = _store.QuerySession();
-        return await session
-            .Query<Announcement>()
-            .Where(a => a.Id == id &&
-                        (a.CommunityId == null &&
-                        ((a.Scope == AnnouncementScope.Public ||
-                          (authed && a.Scope == AnnouncementScope.Community)))
-                     || (a.CommunityId != null &&
-                        (admin || communities.Contains(a.CommunityId!)))))
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
+        var announcement = await session.LoadAsync<Announcement>(id).ConfigureAwait(false);
+        if (announcement is null)
+            // Missing id ⇒ null (the Web layer's 404), the same fail-closed shape
+            // as before the draft lane existed.
+            return null;
+
+        // ADR 0037 — draft gate (author-only, no audit row, no roles): a draft
+        // announcement is invisible to **everyone except its author** — even a
+        // GlobalAdmin is denied (the author-only pin is deliberately stronger
+        // than the announcement lane's usual role split). No
+        // <c>AccessAudit</c> row (announcements have no audit lane at all), and
+        // the role set is <b>not</b> consulted: the sole decision is a pure
+        // <c>AuthorId == actorId</c> ordinal check. A non-author (including a
+        // GlobalAdmin) is denied — the Web layer maps both "missing" and
+        // "not visible" to the same 404 (the non-leaky pin, ADR 0037).
+        if (announcement.IsDraft)
+            return (string.IsNullOrEmpty(actorId) ||
+                    !string.Equals(announcement.AuthorId, actorId, StringComparison.Ordinal))
+                ? null
+                : announcement;
+
+        // Live announcement — the normal scope-vs-role visibility gate (the
+        // ADR 0017 / flat-two-way split): Public always; Community when signed
+        // in; a community-targeted row only for that community's moderator /
+        // member / a GlobalAdmin. Evaluated in C# against the loaded doc (the
+        // same predicate ListVisibleAsync / PinnedAsync apply as a query filter).
+        var (authed, admin, communities) = await ResolveReadVisibilityAsync(actorId, roles).ConfigureAwait(false);
+        var visible = (announcement.CommunityId == null &&
+                       (announcement.Scope == AnnouncementScope.Public ||
+                        (authed && announcement.Scope == AnnouncementScope.Community)))
+            || (announcement.CommunityId != null &&
+                (admin || communities.Contains(announcement.CommunityId!)));
+
+        return visible ? announcement : null;
     }
 
     /// <summary>
@@ -131,12 +155,12 @@ public sealed class AnnouncementService : IAnnouncementService
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
-            .Where(a => a.Pinned == true &&
-                        (a.CommunityId == null &&
-                        ((a.Scope == AnnouncementScope.Public ||
-                          (authed && a.Scope == AnnouncementScope.Community)))
-                     || (a.CommunityId != null &&
-                        (admin || communities.Contains(a.CommunityId!)))))
+            .Where(a => a.IsDraft == false && a.Pinned == true &&
+                        ((a.CommunityId == null &&
+                          (a.Scope == AnnouncementScope.Public ||
+                           (authed && a.Scope == AnnouncementScope.Community)))
+                         || (a.CommunityId != null &&
+                             (admin || communities.Contains(a.CommunityId!)))))
             .OrderByDescending(a => a.Created)
             .FirstOrDefaultAsync()
             .ConfigureAwait(false);
@@ -318,6 +342,97 @@ public sealed class AnnouncementService : IAnnouncementService
 
         session.Delete(announcement);
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ─── ADR 0037 — author-only publish lane (draft → live) ─────────────────
+
+    /// <summary>
+    /// Publish a draft announcement — **author-only** (ADR 0037). Clears
+    /// <see cref="Announcement.IsDraft"/> so the announcement becomes visible
+    /// under its normal <see cref="AnnouncementScope"/> split (Public always /
+    /// Community when signed in / community-targeted to that community's
+    /// members and moderator).
+    /// <para>
+    /// The sole decision is <c>announcement.AuthorId == actorId</c> (ordinal
+    /// comparison) — a non-author is denied (<see cref="UnauthorizedAccessException"/>,
+    /// the Web layer's 403) <b>even at GlobalAdmin</b> (ADR 0037's author-only
+    /// pin: publishing an announcement is the author's choice, not an admin's
+    /// lever — contrast ADR 0017's edit lane, where a GlobalAdmin may edit any
+    /// row). A missing id is a <see cref="KeyNotFoundException"/> (the Web
+    /// layer's 404), the same fail-closed shape the delete lane pins.
+    /// </para>
+    /// <para>
+    /// <b>Idempotent</b> (the ADR 0024 / no-op-re-save pin): a second publish
+    /// on an already-live announcement is a no-op — it does not stamp
+    /// <see cref="Announcement.Modified"/> when nothing changed. It does
+    /// <b>not</b> touch <see cref="Announcement.Pinned"/> (a draft may or may
+    /// not be pinned; publishing changes visibility, not pin state) and does
+    /// <b>not</b> re-evaluate the scope-vs-role split (the author already holds
+    /// the standing that created it). One <c>SaveChangesAsync</c> (invariant
+    /// C3). No <c>AccessAudit</c> row (announcements have no audit lane — the
+    /// flat split is not a per-user decision, the ADR 0017 precedent).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The announcement id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the announcement's author.</exception>
+    public async Task<Announcement> PublishAsync(string announcementId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(announcementId)) throw new ArgumentException("An announcement id is required.", nameof(announcementId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to publish.");
+
+        // Author-only gate (ADR 0037): only the author may publish. A non-author
+        // is a denial — the Web layer maps it to its 403 shape (the ADR 0017
+        // edit-lane precedent, minus the GlobalAdmin branch that ADR 0017 allows).
+        if (!string.Equals(announcement.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of an announcement may publish it.");
+
+        // Idempotent (the no-op-re-save pin): a second publish on an
+        // already-live announcement does not stamp Modified.
+        if (announcement.IsDraft)
+        {
+            announcement.IsDraft = false;
+            announcement.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(announcement);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return announcement;
+    }
+
+    /// <summary>
+    /// The **author's own** draft announcements (ADR 0037) — the
+    /// <see cref="Announcement"/>s with <see cref="Announcement.IsDraft"/> true
+    /// and <see cref="Announcement.AuthorId"/> == <paramref name="actorId"/>
+    /// (ordinal comparison), sorted by <see cref="Announcement.Created"/>
+    /// descending. This is the "My drafts" list the Web layer's
+    /// <c>GET /announcements/drafts</c> renders — the discoverability surface
+    /// for draft announcements, since <see cref="ListVisibleAsync"/> deliberately
+    /// excludes them.
+    /// <para>
+    /// <b>Not an authorization surface (the ADR 0037 author-lane precedent):</b>
+    /// the only decision is the pure <c>AuthorId == actorId</c> match in the
+    /// query itself — there is <b>no</b> <c>AccessAudit</c> row (announcements
+    /// have no audit lane at all) and no <c>roles</c> parameter (the author-only
+    /// gate is the sole decision, ADR 0037). Opens its own <c>QuerySession</c>
+    /// (the C3 read-lane shape — reads never touch the caller's write session).
+    /// </para>
+    /// </summary>
+    public async Task<IReadOnlyList<Announcement>> ListMyDraftsAsync(string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Announcement>()
+            .Where(a => a.IsDraft && a.AuthorId == actorId)
+            .OrderByDescending(a => a.Created)
+            .ToListAsync()
+            .ConfigureAwait(false);
     }
 
     // ─── ADR 0029 — user-added announcement translations lane ───────────────

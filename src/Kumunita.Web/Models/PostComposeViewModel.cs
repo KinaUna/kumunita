@@ -87,6 +87,22 @@ public sealed class PostComposeViewModel
     public IReadOnlyList<(string Id, string Name)> Components { get; set; } = [];
 
     /// <summary>
+    /// The composer's <b>save-as-draft</b> toggle (ADR 0037) — a form-bound
+    /// checkbox. When checked, the post is written with
+    /// <see cref="Kumunita.Core.Posts.Post.IsDraft"/> true: it is saved but
+    /// visible to <b>no one except its author</b> (not even a
+    /// <see cref="Kumunita.Core.Identity.Roles.GlobalAdmin"/>) until the
+    /// author publishes it (<see
+    /// cref="Kumunita.Core.Posts.PostService.PublishPostAsync"/>). The
+    /// audience/validity rules are unchanged — a draft still needs a
+    /// component + body (it is a real post the author is composing, not a
+    /// scratch fragment) — but the audience is effectively moot until publish,
+    /// since the draft gate runs before the audience decision
+    /// (<see cref="Kumunita.Core.Posts.PostService.GetPostAsync"/>).
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = false;
+
+    /// <summary>
     /// The composer's <b>audience</b> editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the
     /// <see cref="Kumunita.Core.Authorization.Audience"/> form-bound shape;

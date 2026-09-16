@@ -148,6 +148,24 @@
                             <kw-l key="announcements.pin_hint">A pinned announcement also appears as a banner at the very top of every page (including Home), in addition to the usual Announcements list. Its visibility still follows the audience you picked above: a public pin shows to every visitor; a resident pin shows only when a user is signed in. If more than one is pinned, the most recently pinned one wins.</kw-l>
                         </div>
                     </div>
+
+                    @* ADR 0037 — save-as-draft: the announcement is saved but
+                       visible to no one (not even admins / the targeted
+                       community) until you publish it. The single-valued-bool
+                       checkbox + hidden pattern (the <c>Pinned</c> round-trip
+                       pin) guarantees the flag survives re-renders. *@
+                    <hr class="my-3" />
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="save-as-draft" name="SaveAsDraft"
+                               value="true" checked="@(Model.SaveAsDraft ? "checked" : null)" />
+                        <input type="hidden" name="SaveAsDraft" value="false" />
+                        <label class="form-check-label" for="save-as-draft" style="font-weight:600;">
+                            <kw-l key="posts.save_as_draft">Save as draft</kw-l>
+                        </label>
+                        <div class="text-muted small mt-1">
+                            <kw-l key="posts.save_as_draft_hint">A draft is saved but visible to no one — not even admins — until you publish it. You can find it under “My drafts”.</kw-l>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -99,7 +99,30 @@ public sealed record AnnouncementDetailViewModel(
     /// 0018, <see cref="Announcement.LanguageCode"/>) — the detail surface
     /// renders this code as the **first, default-visible** variant chip, and
     /// the "Add a …" candidate list excludes it (the ADR 0027 / TD shape).</summary>
-    string OriginalLanguageCode);
+    string OriginalLanguageCode,
+
+    // ── ADR 0037 — draft mode (author-only) ──
+
+    /// <summary>
+    /// Whether the signed-in caller is the announcement's <b>author</b> (the
+    /// ADR 0037 author-only draft surface) — <c>AuthorId == actorId</c>. A
+    /// shape convenience for the detail page's draft badge + Publish button:
+    /// only the author ever sees a draft (<see
+    /// cref="Kumunita.Core.Announcements.AnnouncementService.GetAsync"/>
+    /// returns a draft to the author only), and only the author may publish it
+    /// (the ADR 0037 author-only pin). Defaulted so existing positional call
+    /// sites keep compiling.
+    /// </summary>
+    bool IsAuthor = false,
+
+    /// <summary>
+    /// Whether the announcement is a <b>draft</b> (ADR 0037) —
+    /// <see cref="Announcement.IsDraft"/> true. Only reachable in this view
+    /// when <see cref="IsAuthor"/> is also true (a draft is author-only), so
+    /// the detail page renders the draft badge + Publish button for exactly
+    /// the one viewer who may act on it.
+    /// </summary>
+    bool IsDraft = false);
 
 /// <summary>The /announcements/new create form (the write lane) — also reused for the
 /// /announcements/{id}/edit edit lane (with <see cref="Id"/> set), since both share
@@ -161,6 +184,24 @@ public sealed class AnnouncementComposeViewModel
     /// invalid-POST lane: unchecked → <c>false</c> from the hidden, checked →
     /// <c>true</c> from the checkbox — no hidden state loss on re-render.</summary>
     public bool Pinned { get; set; } = false;
+
+    /// <summary>
+    /// The compose form's <b>save-as-draft</b> toggle (ADR 0037). When true,
+    /// the announcement is written with <see
+    /// cref="Kumunita.Core.Announcements.Announcement.IsDraft"/> true: it is
+    /// saved but visible to <b>no one except its author</b> — not even a
+    /// GlobalAdmin or the community it targets — until the author publishes it
+    /// (<see cref="Kumunita.Core.Announcements.IAnnouncementService.PublishAsync"/>).
+    /// The draft gate runs before the scope/role gate
+    /// (<see cref="Kumunita.Core.Announcements.AnnouncementService.GetAsync"/>),
+    /// so the scope split is moot until publish. Binds from a checkbox
+    /// <c>&lt;input type="checkbox" name="SaveAsDraft" value="true"/&gt;</c>
+    /// followed by the always-posted hidden
+    /// <c>&lt;input type="hidden" name="SaveAsDraft" value="false"/&gt;</c> (the
+    /// <see cref="Pinned"/> single-valued-bool round-trip pattern, so the flag
+    /// survives edit-lane re-renders).
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = false;
 
     /// <summary>The caller's role-dependent scope options, reseeded by the controller on
     /// every render (not a form field — the POST invalid / POST unauthorized paths

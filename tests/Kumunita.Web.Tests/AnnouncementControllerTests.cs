@@ -1082,6 +1082,297 @@ public class AnnouncementControllerTests
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
 
+    // ── ADR 0037 — draft mode (author-only) at the Web layer ─────────────
+    //
+    // The draft *behavior* (a draft is invisible to everyone but its author,
+    // publish is author-only + idempotent, the my-drafts list is author-scoped)
+    // is exhaustively pinned in the Core lane (Kumunita.Core.Tests.
+    // PostDraftModeTests). These Web tests pin the thin HTTP layer's
+    // <em>mapping</em> of that lane's outcomes to status codes + view flags —
+    // the part the Core tests cannot see.
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> happy path (ADR 0037): the
+    /// service's <c>GetAsync</c> returns the draft to the author (the
+    /// author-only draft gate) and <c>PublishAsync</c> clears the flag → the
+    /// controller redirects back to the detail page (now live) and sets the
+    /// "published" TempData. The service is called with the actor's subject
+    /// id (shape pin — the controller passes the right actor).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_DraftAndAuthor_PublishesAndRedirects()
+    {
+        const string id = "ann-df-pub";
+        const string author = "subj-df-author";
+        var draft = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Public,
+            Title = "draft", Body = "a draft",
+            AuthorId = author, IsDraft = true,
+            Created = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.PublishAsync(id, author, Arg.Any<IDocumentSession>()).Returns(draft);
+
+        var controller = Build(announcements, roles: new[] { Roles.Member },
+            IsAuthenticated: true, subjectId: author);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", ((RedirectToActionResult)result).ActionName);
+        await announcements.Received(1).PublishAsync(id, author, Arg.Any<IDocumentSession>());
+        Assert.Equal("Announcement published.", controller.TempData["info"]);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — the ADR 0037 author-only pin
+    /// at the Web layer: the service's <c>GetAsync</c> returns <c>null</c> for
+    /// a draft the actor is not the author of (missing and denied are
+    /// indistinguishable by design), so the controller maps that to a
+    /// <see cref="ForbidResult"/> (403) and <b>never</b> calls
+    /// <c>PublishAsync</c> — no write, no leaked content.
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_DraftAndNonAuthor_Forbid_NoWrite()
+    {
+        const string id = "ann-df-nona";
+        const string nonAuthor = "subj-df-nonauthor"; // a GlobalAdmin is *still* a non-author here
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        // GetAsync returns null for the non-author (author-only draft gate).
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin, Roles.Member },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().PublishAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — the service's re-check throws
+    /// <see cref="UnauthorizedAccessException"/> (the defense-in-depth author
+    /// gate, the ADR 0037 pin): the controller maps that to a
+    /// <see cref="ForbidResult"/> — never a 500, never a re-render that would
+    /// leak the draft's content.
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_ServiceThrowsUnauthorized_Forbid()
+    {
+        const string id = "ann-df-unauth";
+        const string nonAuthor = "subj-df-unauth";
+        var draft = new Announcement { Id = id, AuthorId = "subj-df-someone-else", IsDraft = true };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.When(x => x.PublishAsync(id, nonAuthor, Arg.Any<IDocumentSession>()))
+            .Throws(new UnauthorizedAccessException("Only the author of an announcement may publish it."));
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — a missing id surfaces as the
+    /// service's <see cref="KeyNotFoundException"/>; the controller maps that
+    /// to a clean <see cref="NotFoundResult"/> (404, not 500).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_ServiceThrowsKeyNotFound_404()
+    {
+        const string id = "ann-df-missing";
+        const string author = "subj-df-missing-author";
+        var draft = new Announcement { Id = id, AuthorId = author, IsDraft = true };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.When(x => x.PublishAsync(id, author, Arg.Any<IDocumentSession>()))
+            .Throws(new KeyNotFoundException($"Announcement '{id}' was not found in the session; nothing to publish."));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: author);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — an anonymous caller
+    /// (no authenticated principal): the controller's <c>SubjectId(User)</c>
+    /// is empty and the lane short-circuits to an <see cref="UnauthorizedResult"/>
+    /// before touching the service (the ADR 0037 author-only pin — there is no
+    /// "author" to act for an anonymous visitor).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.Publish("ann-df-anon");
+
+        Assert.IsType<UnauthorizedResult>(result);
+        await announcements.DidNotReceive().PublishAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>GET /announcements/{id}</c> — a draft the actor authored: the
+    /// controller hands the view <c>IsAuthor = true</c> and
+    /// <c>IsDraft = true</c> (the two flags that drive the detail page's
+    /// draft badge + the author-only Publish button — ADR 0037). The service's
+    /// <c>GetAsync</c> returned the draft to the author (the author-only gate),
+    /// so both flags are true for exactly the one viewer who may act.
+    /// </summary>
+    [Fact]
+    public async Task Detail_When_DraftAuthor_FlagsAuthorAndDraft()
+    {
+        const string id = "ann-df-detail";
+        const string author = "subj-df-detail-author";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(
+            new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "draft", Body = "a draft",
+                AuthorId = author, IsDraft = true,
+                Created = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
+            });
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Author" });
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.Member },
+            IsAuthenticated: true, subjectId: author);
+
+        var view = (await controller.Detail(id)) as ViewResult;
+        var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+        Assert.True(model.IsAuthor);
+        Assert.True(model.IsDraft);
+        Assert.Equal(author, model.AuthorSubjectId);
+    }
+
+    /// <summary>
+    /// <c>GET /announcements/{id}</c> — a draft the actor is <b>not</b> the
+    /// author of (a GlobalAdmin included, the ADR 0037 author-only pin):
+    /// the service's <c>GetAsync</c> returns <c>null</c> (missing and denied
+    /// are indistinguishable by design) and the controller maps that to a
+    /// clean <see cref="NotFoundResult"/> — the non-leaky 404, never a re-render
+    /// that would leak the draft's content to a non-author.
+    /// </summary>
+    [Fact]
+    public async Task Detail_When_DraftNonAuthor_ReturnsNotFound()
+    {
+        const string id = "ann-df-detailex";
+        const string nonAuthor = "subj-df-detail-nonauthor";
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin, Roles.Member },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Detail(id);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/new</c> (compose) — the ADR 0037 draft toggle
+    /// binds through to the service's write: the controller maps the form's
+    /// <c>SaveAsDraft</c> flag onto the <see cref="Announcement.IsDraft"/>
+    /// field before calling <c>CreateAsync</c>. A <c>true</c> checkbox must
+    /// produce a draft announcement at the service seam (the Core lane pins
+    /// that a draft is then invisible to all but the author).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_True_CreatesDraft()
+    {
+        const string author = "subj-df-compose-author";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        // A capturing closure: when the controller calls CreateAsync, record the
+        // Announcement it passed so we can assert on the IsDraft mapping below.
+        Announcement? captured = null;
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                captured = call.ArgAt<Announcement>(0);
+                return new Announcement { Id = "ann-df-created" };
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body",
+            SaveAsDraft = true,
+        };
+
+        await controller.New(model);
+
+        Assert.NotNull(captured);
+        Assert.True(captured!.IsDraft);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/new</c> (compose) — the ADR 0037 draft toggle's
+    /// negative: an unchecked <c>SaveAsDraft</c> (default <c>false</c>)
+    /// produces a <b>live</b> announcement at the service seam (the toggle is
+    /// opt-in — the default behavior of creating a visible announcement is
+    /// unchanged).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_Unchecked_CreatesLive()
+    {
+        const string author = "subj-df-compose-live";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        Announcement? captured = null;
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                captured = call.ArgAt<Announcement>(0);
+                return new Announcement { Id = "ann-df-live" };
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a live post",
+            Body = "live body",
+            SaveAsDraft = false,
+        };
+
+        await controller.New(model);
+
+        Assert.NotNull(captured);
+        Assert.False(captured!.IsDraft);
+    }
+
     /// <summary>
     /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
     /// the compose form's language picker: an empty enabled catalog + the

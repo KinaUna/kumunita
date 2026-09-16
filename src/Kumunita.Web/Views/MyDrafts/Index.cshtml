@@ -1,0 +1,90 @@
+@model Kumunita.Web.Models.MyDraftsViewModel
+@using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "My drafts";
+    bool any = Model.Posts.Count > 0 || Model.Announcements.Count > 0;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="my_drafts.title">My drafts</kw-l></h1>
+        <p class="text-muted">
+            <kw-l key="posts.save_as_draft_hint">A draft is saved but visible to no one — not even admins — until you publish it. You can find it under “My drafts”.</kw-l>
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (!any)
+        {
+            <div class="alert alert-light border">
+                <kw-l key="my_drafts.empty">You have no drafts.</kw-l>
+            </div>
+        }
+
+        @if (Model.Posts.Count > 0)
+        {
+            <h6 class="mt-4 fw-semibold">Posts</h6>
+            <ul class="list-group mb-4">
+                @foreach (var p in Model.Posts)
+                {
+                    // The detail lane: a group-lane draft (non-empty ComponentId
+                    // == the group id) links to /groups/{id}/posts/{postId}; a
+                    // community draft (empty ComponentId) links to /posts/{id}.
+                    string detailUrl = !string.IsNullOrEmpty(p.ComponentId)
+                        ? $"/groups/{p.ComponentId}/posts/{p.Id}"
+                        : $"/posts/{p.Id}";
+
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark me-2">
+                                <kw-l key="posts.draft_badge">Draft</kw-l>
+                            </span>
+                            <a href="@detailUrl">
+                                @(string.IsNullOrWhiteSpace(p.Title) ? p.BodyPreview : p.Title)
+                            </a>
+                            @if (p.ComponentName is not null)
+                            {
+                                <span class="text-muted small ms-2">@p.ComponentName</span>
+                            }
+                        </div>
+                        <a class="btn btn-sm btn-outline-primary text-nowrap" href="@detailUrl">
+                            <kw-l key="posts.publish">Open</kw-l>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Model.Announcements.Count > 0)
+        {
+            <h6 class="mt-4 fw-semibold">Announcements</h6>
+            <ul class="list-group mb-4">
+                @foreach (var a in Model.Announcements)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark me-2">
+                                <kw-l key="posts.draft_badge">Draft</kw-l>
+                            </span>
+                            <a href="/announcements/@a.Id">
+                                @(string.IsNullOrWhiteSpace(a.Title)
+                                    ? MarkdownRenderer.PlainTextPreview(a.Body, 80)
+                                    : a.Title)
+                            </a>
+                        </div>
+                        <a class="btn btn-sm btn-outline-primary text-nowrap" href="/announcements/@a.Id">
+                            <kw-l key="posts.publish">Open</kw-l>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

@@ -1083,7 +1083,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             Body: model.Body.Trim(),
             LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
             ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (drift pause b: the U04 field was inert, now wired).
-            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body) // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (parity with the image lane's group-post wire, C-ATT·9).
+            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (parity with the image lane's group-post wire, C-ATT·9).
+            IsDraft: model.SaveAsDraft // ADR 0037 — draft mode: saved but invisible to all but the author until published.
         );
 
         // C3 same-transaction lane: the controller opens the
@@ -1434,6 +1435,57 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         }
 
         TempData["info"] = "Post deleted.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Publish a draft group post (ADR 0037): <c>POST
+    /// /groups/{id}/posts/{postId}/publish</c>. <b>Author-only</b> — the sole
+    /// lever that clears <see cref="Post.IsDraft"/> is the author's own choice
+    /// (a non-member, non-author, moderator, or GlobalAdmin is denied: a
+    /// group-lane draft is invisible to them, so they have no affordance to
+    /// reach this; the service re-pins the author gate server-side). The
+    /// group lane's non-leaky posture (G·3/G·4) maps both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// to a 404 (the <see cref="DeleteGroupPost"/> precedent — a 403 on a POST
+    /// would advertise a gate the UI doesn't offer). On success, redirect back
+    /// to the detail page (now live).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/publish")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PublishGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7) is the pre-write gate:
+        // a non-member, a missing post, a lane mismatch, or a draft the actor
+        // is not the author of all return Post = null → 404 (the group lane's
+        // non-leaky fail-closed shape, the ADR 0037 author-only draft gate).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.PublishPostAsync(postId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post published.";
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 

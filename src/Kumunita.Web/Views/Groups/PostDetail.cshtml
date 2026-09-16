@@ -43,6 +43,27 @@
                    authoritative deny). *@
                 @if (Model.IsAuthor)
                 {
+                    @* ADR 0037 — the draft banner: the group-lane draft gate
+                       returns the post to the author only, so this block is
+                       author-only by construction. Publish is the sole lever
+                       that clears the draft flag (the author-only lane). *@
+                    @if (Model.Post.IsDraft)
+                    {
+                        <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2" role="alert">
+                            <span>
+                                <span class="badge bg-warning text-dark me-2"><kw-l key="posts.draft_badge">Draft</kw-l></span>
+                                <kw-l key="posts.draft_note">This post is a draft — only you can see it. Publish it to make it visible to this group's members.</kw-l>
+                            </span>
+                            <form class="d-inline" method="post"
+                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/publish")">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <kw-l key="posts.publish">Publish</kw-l>
+                                </button>
+                            </form>
+                        </div>
+                    }
+
                     <div class="d-flex justify-content-end mb-2">
                         @if (Model.Post.DeletedAt is null)
                         {

@@ -49,6 +49,22 @@
                     <kw-l key="announcements.pinned_badge">pinned</kw-l>
                 </span>
             }
+            @* ADR 0037 — the draft surface: GetAsync returns a draft to the
+               author only, so IsAuthor ⇔ IsDraft here. The badge is visible
+               to the one viewer who may act on it; Publish is the sole lever
+               that clears the flag (the author-only lane). *@
+            @if (Model.IsDraft && Model.IsAuthor)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">
+                    <kw-l key="posts.draft_badge">Draft</kw-l>
+                </span>
+                <form class="d-inline" method="post" action="/announcements/@Model.Id/publish">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-success">
+                        <kw-l key="posts.publish">Publish</kw-l>
+                    </button>
+                </form>
+            }
             @* The Edit affordance (only when the caller's role split allows it —
                the same CanEditAnnouncement rule the /announcements index uses,
                carried to the detail page; the service's write-lane re-check at

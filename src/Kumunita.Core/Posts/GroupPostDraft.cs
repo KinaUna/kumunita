@@ -44,4 +44,8 @@ namespace Kumunita.Core.Posts;
 // list (the POCO field is non-null, `= []`). Same CS1736 nullable-default shape
 // as ImageIds (a collection expression is not a legal C# default parameter
 // value); PostService.CreateGroupPostAsync coalesces null → [].
-public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null, IReadOnlyList<string>? ImageIds = null, IReadOnlyList<string>? AttachmentIds = null);
+public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null, IReadOnlyList<string>? ImageIds = null, IReadOnlyList<string>? AttachmentIds = null,
+    // ADR 0037 — draft mode for group posts (same semantics as PostDraft.IsDraft;
+    // the group lane's membership decision is the author's own, so the author-only
+    // gate is the same pure AuthorId == actorId check, no membership re-check needed).
+    bool? IsDraft = null);

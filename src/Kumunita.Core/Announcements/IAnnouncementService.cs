@@ -137,6 +137,36 @@ public interface IAnnouncementService
     Task DeleteAsync(string announcementId, IDocumentSession session);
 
     /// <summary>
+    /// Publishes a draft announcement in the <b>caller's</b> in-flight session
+    /// (invariant C3) — clears <see cref="Announcement.IsDraft"/> so it becomes
+    /// visible under its normal <see cref="AnnouncementScope"/> split
+    /// (ADR 0037). **Author-only**: a non-author (even a
+    /// <see cref="Roles.GlobalAdmin"/>) is a hard
+    /// <see cref="UnauthorizedAccessException"/> (the Web layer maps that to a
+    /// 403); a missing id is a <see cref="KeyNotFoundException"/> (the Web
+    /// layer maps that to a 404). Idempotent — a second publish on an
+    /// already-live announcement is a no-op (it does not stamp
+    /// <see cref="Announcement.Modified"/>). See
+    /// <see cref="AnnouncementService.PublishAsync"/> for the full contract.
+    /// </summary>
+    Task<Announcement> PublishAsync(string announcementId, string actorId, IDocumentSession session);
+
+    /// <summary>
+    /// The actor's own draft announcements (ADR 0037): the
+    /// <see cref="Announcement"/>s with <see cref="Announcement.IsDraft"/> true
+    /// and <see cref="Announcement.AuthorId"/> == <paramref name="actorId"/>,
+    /// sorted by <c>Created</c> descending. The "My drafts" discoverability
+    /// surface — <see cref="ListVisibleAsync"/> deliberately excludes drafts.
+    /// Not an authorization surface (announcements have no
+    /// <see cref="Kumunita.Core.Authorization.AccessAudit"/> lane; the
+    /// <c>AuthorId == actorId</c> match in the query is the sole decision —
+    /// ADR 0037's author-only pin). See
+    /// <see cref="AnnouncementService.ListMyDraftsAsync"/> for the full
+    /// contract.
+    /// </summary>
+    Task<IReadOnlyList<Announcement>> ListMyDraftsAsync(string actorId);
+
+    /// <summary>
     /// The announcement's user-added translations (ADR 0029): the
     /// <see cref="AnnouncementTranslation"/> rows under
     /// <paramref name="announcementId"/>, ordered by <c>LanguageCode</c>.

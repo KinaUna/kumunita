@@ -119,4 +119,22 @@ public sealed class Announcement
     /// (ADR 0004 §B.1 — additive, delta-detected, idempotent, no seed reset;
     /// ADR 0034, C-ATT·5).
     /// </summary>
-    public IReadOnlyList<string> AttachmentIds { get; set; } = [];}
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];
+
+    // ADR 0037 draft ADD (ADR 0004 §B.1 additive — the 4th additive Announcement
+    // field after ADR 0018's LanguageCode, RC's ImageIds, ATT's AttachmentIds):
+    /// <summary>
+    /// True while this announcement is an unsaved draft (ADR 0037). A draft is
+    /// **invisible to everyone except its author** — the flat
+    /// <see cref="AnnouncementScope"/> visibility split (Public always /
+    /// Community when signed in) is bypassed entirely: a draft does not appear
+    /// in <see cref="IAnnouncementService.ListVisibleAsync"/>,
+    /// <see cref="IAnnouncementService.GetAsync"/>, or
+    /// <see cref="IAnnouncementService.PinnedAsync"/> for any caller other
+    /// than the author (even a <c>GlobalAdmin</c> is denied — ADR 0037's
+    /// author-only pin). Set to <c>false</c> by
+    /// <see cref="IAnnouncementService.PublishAsync"/> when the author is ready
+    /// to share. Default <c>false</c> — existing announcements are never drafts.
+    /// </summary>
+    public bool IsDraft { get; set; } = false;
+}

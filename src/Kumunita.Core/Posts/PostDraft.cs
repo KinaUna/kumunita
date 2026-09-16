@@ -52,4 +52,9 @@ public sealed record PostDraft(
     // a **nullable** default: the existing positional call sites keep
     // compiling unchanged (they omit it ⇒ null), and
     // PostService.CreatePostAsync coalesces null → [].
-    IReadOnlyList<string>? AttachmentIds = null);
+    IReadOnlyList<string>? AttachmentIds = null,
+    // ADR 0037 — draft mode: true ⇒ the post is saved but invisible to everyone
+    // except its author (feeds exclude it, the detail lane author-only-gates it).
+    // Optional trailing parameter (nullable, CS1736 shape) — existing positional
+    // call sites keep compiling unchanged (they omit it ⇒ null ⇒ false).
+    bool? IsDraft = null);

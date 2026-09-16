@@ -245,7 +245,12 @@ public sealed class AnnouncementController(
         return View(new AnnouncementDetailViewModel(
             a.Id, a.Scope, a.Title, a.Body, a.Created, a.Modified,
             authorName, a.AuthorId, a.Pinned, communityName, canEdit,
-            translations, languages, canTranslate, a.LanguageCode));
+            translations, languages, canTranslate, a.LanguageCode,
+            // ADR 0037 — the author-only draft surface: GetAsync returns a
+            // draft to the author only, so IsAuthor ⇔ IsDraft here; both feed
+            // the detail page's draft badge + Publish button (author-only).
+            IsAuthor: actor == a.AuthorId,
+            IsDraft:  a.IsDraft));
     }
 
     // ── Add a translation (POST /announcements/{id}/translations) ───────────
@@ -455,6 +460,8 @@ public sealed class AnnouncementController(
                     ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
                     // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
                     AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
+                    // ADR 0037 — draft mode: saved but invisible to all but the author until published.
+                    IsDraft = model.SaveAsDraft,
                 },
                 actorId:     authorId,
                 authorRoles: RoleSet(User),
@@ -517,6 +524,13 @@ public sealed class AnnouncementController(
             Pinned = existing.Pinned,
             CommunityId = existing.CommunityId,
             LanguageCode = existing.LanguageCode,
+            // ADR 0037 — mirror the stored draft state into the form (read-only
+            // surface on the edit lane; <c>AnnouncementService.UpdateAsync</c>
+            // deliberately does not touch <c>IsDraft</c>, so editing a draft
+            // never publishes it — only the author's PublishAsync does, the
+            // ADR 0037 author-only pin). Seeded for display parity; the
+            // checkbox on the edit view is informational.
+            SaveAsDraft = existing.IsDraft,
         };
         await SeedComposeOptionsAsync(model, roles);
         return View(model);
@@ -619,5 +633,58 @@ public sealed class AnnouncementController(
         {
             return NotFound();
         }
+    }
+
+    // ── Publish (POST /announcements/{id}/publish) — author-only (ADR 0037) ─
+
+    /// <summary>
+    /// Publish a draft announcement (ADR 0037): <c>POST
+    /// /announcements/{id}/publish</c>. <b>Author-only</b> — the sole lever
+    /// that clears <see cref="Announcement.IsDraft"/> is the author's own
+    /// choice. A non-author (even a GlobalAdmin) is a 403: a draft is
+    /// invisible to them (<see
+    /// cref="Kumunita.Core.Announcements.AnnouncementService.GetAsync"/>
+    /// returns a draft to the author only), so they have no affordance to
+    /// reach this, and the service re-pins the author gate server-side. A
+    /// missing id is a 404; on success, redirect back to the detail page (now
+    /// visible under its scope).
+    /// </summary>
+    [HttpPost("/announcements/{id}/publish")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Publish(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return NotFound();
+
+        var actor = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrEmpty(actor))
+            return new UnauthorizedResult();
+
+        // Pre-write gate (the ADR 0037 author-only draft gate): GetAsync
+        // returns a draft to the author only, so a null here covers both
+        // "missing" and "a draft the actor is not the author of" → 403
+        // (non-leaky, the post-lane "403 on denied" shape).
+        var a = await announcements.GetAsync(id, actor, RoleSet(User));
+        if (a is null)
+            return new ForbidResult();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.PublishAsync(id, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author (even a GlobalAdmin) — the 403 shape (the ADR 0037
+            // author-only pin; a re-render would leak the draft's content).
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Announcement published.";
+        return RedirectToAction("Detail", new { id });
     }
 }

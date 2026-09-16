@@ -93,6 +93,14 @@ table in `docs/ARCHITECTURE.md`); **M5**: projects.
   only — a non-member (moderator or admin alike) neither sees nor posts; the
   audience lane is never evaluated, and replies inherit the parent's single
   membership decision.
+- **Drafts** — a post, group post, or announcement can be **saved but not
+  made public yet**: a "Save as draft" option on every composer. A draft is
+  the author's private scratchpad — excluded from every feed and the pinned
+  list, invisible to everyone **including a `GlobalAdmin`** who is not the
+  author (no audit row, not subject to the audience decision), and visible
+  only to its author, who can edit it, find it at `/my/drafts`, and publish
+  it with one action (publishing is author-only too). Editing a draft never
+  publishes it (ADR 0037).
 - Moderation with component-scoped moderators and full audit
 - **Multilingual** — UI and platform texts (terms, help) are translatable,
   resolved per request (user preference → instance default → `en`, with
@@ -190,6 +198,7 @@ stays trivial and the authorization rules can grow freely.
 - **Rich editor** (`RE`, ADR 0031) — a WYSIWYG authoring surface over the RC Markdown lane: a split-view live preview beside the source `<textarea>` and a Markdown-splice toolbar (bold / italic / code / headings / lists / link / image) in one `tsc`-only module. No editor dependency, no second renderer, no new route — the saved body is byte-identical Markdown the RC read path already renders. **Done.**
 - **Inline editor** (`IE`, ADR 0032) — the rendered view is the default editor; the Markdown source is hidden behind a single toolbar toggle (and stays a one-click split view when revealed). Additive and client-only — no new dependency, no new route, no re-shape of the RE pure functions; the saved body is byte-identical Markdown the RC read path already renders. **Done.**
 - **File attachments** (`ATT`, ADR 0034) — attach files (PDF / Office docs / text / csv / zip + the raster image types) to **posts, group posts, replies, and announcements**: a body link `[label](/attachment/{id})` that **downloads** (`Content-Disposition: attachment`, not an inline render); a **separate** file allowlist (`Media__AttachmentAllowedContentTypes`, SVG excluded) under the **same** content-addressed byte store as the image lane (one store, one volume, one catalog); served only through an audited app endpoint under the owning resource's `Read` decision (a reply resolves its **parent post's**); an "Attach file" toolbar button on every composer (incl. reply composers). Follow-on lanes (own design doc + ADR): attachments on **static/about pages**; video/audio; in-browser preview. **Done.**
+- **Drafts** (`DM`, ADR 0037) — a post, group post, or announcement can be **saved but not made public yet**: a "Save as draft" option on every composer. A draft is the author's private scratchpad — excluded from every feed and the pinned list, invisible to **everyone else (a `GlobalAdmin` included)** (no audit row, not run through the audience decision), visible only to its author, who edits it, finds it at `/my/drafts`, and publishes it (publishing is author-only too); editing a draft never publishes it. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

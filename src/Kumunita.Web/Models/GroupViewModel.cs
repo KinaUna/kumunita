@@ -420,6 +420,20 @@ public sealed class GroupPostComposeViewModel
     [BindNever]
     public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
 
+    /// <summary>
+    /// The composer's <b>save-as-draft</b> toggle (ADR 0037) — a form-bound
+    /// checkbox. When checked, the group post is written with
+    /// <see cref="Kumunita.Core.Posts.Post.IsDraft"/> true: it is saved but
+    /// visible to <b>no one except its author</b> (not even a group member, a
+    /// moderator, or a <see cref="Kumunita.Core.Identity.Roles.GlobalAdmin"/>)
+    /// until the author publishes it
+    /// (<see cref="Kumunita.Core.Posts.PostService.PublishPostAsync"/>). The
+    /// draft gate runs before the group-lane membership decision
+    /// (<see cref="Kumunita.Core.Posts.PostService.GetGroupPostAsync"/>), so
+    /// the membership proxy is moot until publish.
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = false;
+
     /// <summary>The composer's shape is well-formed for a <c>POST</c>:
     /// <see cref="Body"/> must be non-empty (a bodyless post is a dead row;
     /// the M3 <see cref="PostComposeViewModel.IsValid"/> body pin, minus the

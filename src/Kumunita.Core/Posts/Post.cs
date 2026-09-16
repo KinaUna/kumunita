@@ -131,4 +131,24 @@ public sealed class Post
     /// ADR 0034, C-ATT·5).
     /// </summary>
     public IReadOnlyList<string> AttachmentIds { get; set; } = [];
+
+    // ADR 0037 draft ADD (ADR 0004 §B.1 additive — the 7th additive Post field
+    // after M3b's Status, ADR 0013's GroupId, ADR 0018's LanguageCode,
+    // ADR 0024's DeletedAt, RC's ImageIds, ATT's AttachmentIds):
+    /// <summary>
+    /// True while this post is an unsaved draft (ADR 0037). A draft is
+    /// **invisible to everyone except its author** — the authorization
+    /// algorithm is never consulted for a draft (no owner branch, no audience,
+    /// no membership, no break-glass); visibility is a pure
+    /// <c>Post.AuthorId == actorId</c> check in the service layer.
+    /// Feeds exclude drafts unconditionally (the author's own feed does not
+    /// surface drafts either — the author reaches drafts via the detail lane
+    /// or a future "My drafts" list). Set to <c>false</c> by
+    /// <see cref="PostService.PublishPostAsync"/> when the author is ready to
+    /// share. Default <c>false</c> — existing posts are never drafts.
+    /// Orthogonal to <see cref="Status"/> (the moderator surface) and
+    /// <see cref="DeletedAt"/> (the author soft-delete): a post can be a
+    /// draft AND active, or a draft AND hidden by a moderator, simultaneously.
+    /// </summary>
+    public bool IsDraft { get; set; } = false;
 }

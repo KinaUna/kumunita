@@ -68,7 +68,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => p.ComponentId == componentId && p.DeletedAt == null)
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
@@ -133,7 +133,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null)
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
@@ -179,6 +179,28 @@ public sealed class PostService
         var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
         if (post is null)
             return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // ADR 0037 — draft gate (author-only, no audit row): a draft is
+        // invisible to everyone except its author. The authorization algorithm
+        // is NOT consulted — no CanAsync, no AccessAudit row, no owner branch,
+        // no audience evaluation. The sole decision is a pure
+        // AuthorId == actorId ordinal check. A non-author is denied (the Web
+        // layer maps to 403); the author sees the draft with its replies
+        // (C-M3·1 shape: replies returned as-is, no second evaluation).
+        if (post.IsDraft)
+        {
+            if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+                return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+            var authorReplies = await session
+                .Query<PostReply>()
+                .Where(r => r.PostId == postId)
+                .OrderBy(r => r.Created)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            return new PostDetailResult(Post: post, Replies: authorReplies);
+        }
 
         // C3 — one decision row from this single call; C6 — one matching pass.
         var decision = await _authz.CanAsync(actorId, AccessAction.Read, new PostToAuditableResource(post)).ConfigureAwait(false);
@@ -274,6 +296,7 @@ public sealed class PostService
             ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer; null-coalesce to the POCO's non-null empty list.
             AttachmentIds = draft.AttachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list.
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
+            IsDraft = draft.IsDraft ?? false, // ADR 0037 — draft mode: saved but invisible to all but the author.
             Created = DateTimeOffset.UtcNow
         };
 
@@ -723,6 +746,106 @@ public sealed class PostService
         return reply;
     }
 
+    // ─── ADR 0037 — author-only publish lane (draft → live) ─────────────────
+
+    /// <summary>
+    /// Publish a draft post — **author-only** (ADR 0037). Clears
+    /// <see cref="Post.IsDraft"/> so the post becomes visible under its normal
+    /// lane's rules: the component lane's audience decision
+    /// (<see cref="Post.Audience"/>) for a community post, or the group lane's
+    /// membership decision for a group post. A direct sibling of the ADR 0014 /
+    /// 0016 author-only edit lanes and ADR 0024's author-only delete lane: the
+    /// sole decision is <c>post.AuthorId == actorId</c> (ordinal comparison); a
+    /// non-author is denied (<see cref="UnauthorizedAccessException"/>) even at
+    /// GlobalAdmin (ADR 0037's author-only pin — publishing is the author's
+    /// choice, not a moderator's or an admin's lever).
+    /// <para>
+    /// Lane-neutral (like <see cref="DeletePostAsync"/>): it works for a
+    /// community post (empty <see cref="Post.GroupId"/>) and a group-lane post
+    /// (non-empty <see cref="Post.GroupId"/>) alike — the publish is the same
+    /// field write either way, so there is no per-lane split. Publishing is
+    /// <b>idempotent</b>: a second publish on an already-live post is a no-op
+    /// (it only clears a flag that is already false, and does not stamp
+    /// <see cref="Post.Modified"/> in that case, mirroring the ADR 0024 /
+    /// announcement no-op-re-save pin). It does <b>not</b> touch
+    /// <see cref="Post.Status"/> (the moderator surface) or
+    /// <see cref="Post.DeletedAt"/> (the author soft-delete) — a draft that a
+    /// moderator has hidden or the author has deleted stays in that state after
+    /// publish; only the draft flag clears. One <c>SaveChangesAsync</c>
+    /// (invariant C3). No <see cref="Kumunita.Core.Authorization.AccessAudit"/>
+    /// row: the author is acting on their own content (the ADR 0014 / 0016 /
+    /// 0024 author-lane precedent — content-state changes by the author are not
+    /// audited).
+    /// </para>
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
+    public async Task<Post> PublishPostAsync(string postId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to publish.");
+
+        // Author-only gate (ADR 0037): only the author may publish. A non-author
+        // is a denial — the Web layer maps it to its lane's 403 (community) /
+        // 404 (group) shape, the ADR 0014/0016 edit-lane precedent.
+        if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a post may publish it.");
+
+        // Idempotent (the ADR 0024 / announcement no-op-re-save pin): a second
+        // publish on an already-live post is a no-op — it does not stamp
+        // Modified when nothing changed.
+        if (post.IsDraft)
+        {
+            post.IsDraft = false;
+            post.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(post);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return post;
+    }
+
+    /// <summary>
+    /// The **author's own** drafts (ADR 0037) — the community- and group-lane
+    /// <see cref="Post"/>s with <see cref="Post.IsDraft"/> true and
+    /// <see cref="Post.AuthorId"/> == <paramref name="actorId"/> (ordinal
+    /// comparison), sorted by <see cref="Post.Created"/> descending. This is the
+    /// "My drafts" list the Web layer's <c>GET /my/drafts</c> renders — the
+    /// discoverability surface for drafts, since feeds deliberately exclude
+    /// them.
+    /// <para>
+    /// <b>Not an authorization surface (the ADR 0037 author-lane precedent):</b>
+    /// the only decision is the pure <c>AuthorId == actorId</c> match in the
+    /// query itself — there is no <see cref="IAuthorizationService"/> call and
+    /// <b>no</b> <see cref="Kumunita.Core.Authorization.AccessAudit"/> row, for
+    /// the same reason the ADR 0014 / 0016 edit lanes and ADR 0024's delete
+    /// lane write none (the author acting on their own content is not a decision
+    /// about <em>others'</em> content, so there is nothing to audit). Opens its
+    /// own <c>QuerySession</c> (the C3 read-lane shape — reads never touch the
+    /// caller's write session). Deleted drafts (<see cref="Post.DeletedAt"/>
+    /// set) are excluded: an author who deleted their own draft does not see it
+    /// in the list (a draft the author deleted is gone from their working set,
+    /// the ADR 0024 "kept but hidden from the author's working surfaces" shape).
+    /// </para>
+    /// </summary>
+    public async Task<IReadOnlyList<Post>> ListMyDraftsAsync(string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("Core expects an authenticated actor (the Web layer enforces [Authorize]).", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<Post>()
+            .Where(p => p.IsDraft && p.AuthorId == actorId && p.DeletedAt == null)
+            .OrderByDescending(p => p.Created)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
     // ─── M3b C-M3b·3 — the two Moderate-gated write lanes (F3/F4) ─────────────
 
     /// <summary>
@@ -828,7 +951,7 @@ public sealed class PostService
         await using var session = _store.QuerySession();
         var candidates = await session
             .Query<Post>()
-            .Where(p => p.GroupId == groupId && p.DeletedAt == null)
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
             .OrderByDescending(p => p.Created)
             .Skip((page - 1) * PageSize)
             .Take(PageSize)
@@ -890,6 +1013,29 @@ public sealed class PostService
         // **no** decision and **no** row (the M3 shape, §2.3(b) row 3).
         if (string.IsNullOrEmpty(post.GroupId) || post.GroupId != groupId)
             return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+        // ADR 0037 — draft gate (author-only, no audit row): a group-lane draft is
+        // invisible to every member and to any moderator/admin except its author.
+        // The group-lane membership decision (CanSeeGroupAsync) is NOT consulted —
+        // no CanSeeGroupAsync, no AccessAudit row. The sole decision is a pure
+        // AuthorId == actorId ordinal check (ADR 0037 author-only pin, stronger
+        // than the lane's membership gate). A non-author member is denied (the
+        // group lane's Web 404 shape); the author sees the draft with its
+        // replies (G·7 shape: replies returned as-is, no second evaluation).
+        if (post.IsDraft)
+        {
+            if (!string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+                return new PostDetailResult(Post: null, Replies: Array.Empty<PostReply>());
+
+            var authorReplies = await session
+                .Query<PostReply>()
+                .Where(r => r.PostId == postId)
+                .OrderBy(r => r.Created)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            return new PostDetailResult(Post: post, Replies: authorReplies);
+        }
 
         // G11 (C-M3·1 analog, G·7) — exactly one standalone single-target call →
         // the detail decision row (TargetId = postId, G·5). No audience
@@ -974,6 +1120,7 @@ public sealed class PostService
             ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer (the U05 group-post create wiring); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
             AttachmentIds = draft.AttachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
+            IsDraft = draft.IsDraft ?? false, // ADR 0037 — draft mode (group lane); the author-only gate is the same pure AuthorId==actorId check (the author is a group member by construction of the create gate).
             Created = DateTimeOffset.UtcNow
         };
 

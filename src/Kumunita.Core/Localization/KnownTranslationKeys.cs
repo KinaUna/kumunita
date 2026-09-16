@@ -191,6 +191,21 @@ public static class KnownTranslationKeys
             ["posts.new_submit"]   = "Post it",
             ["posts.edit_title"]   = "Edit post",
             ["posts.edit_save"]    = "Save changes",
+            // ADR 0037 — draft mode: the composer's "save as draft" toggle.
+            ["posts.save_as_draft"] =
+                "Save as draft",
+            ["posts.save_as_draft_hint"] =
+                "A draft is saved but visible to no one — not even admins — " +
+                "until you publish it. You can find it under “My drafts”.",
+            // ADR 0037 — the detail-page draft badge + publish action.
+            ["posts.draft_badge"]   = "Draft",
+            ["posts.draft_note"] =
+                "This post is a draft — only you can see it. Publish it to " +
+                "make it visible under its audience.",
+            ["posts.publish"]       = "Publish",
+            // ADR 0037 — the "My drafts" list.
+            ["my_drafts.title"]     = "My drafts",
+            ["my_drafts.empty"]     = "You have no drafts.",
             // ADR 0036 — the composer's audience editor: the "Everyone in
             // this community" default grant (checked by default; the granular
             // picker below is hidden until it is turned off).
