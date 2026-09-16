@@ -614,3 +614,122 @@ for the decider before the U12 gate.
   extracts route-shaped links, it does not reject remote URLs; a
   `javascript:`/`data:`/remote URL in a body link is never matched by
   `FullIdRe`, so it simply isn't stored as an `AttachmentIds` id).
+
+## U8
+
+**Built:** the C-ATT·6 content gate + write path — two deliverables, exactly as
+scoped.
+
+1. `src/Kumunita.Core/Media/MediaOptions.cs` — **three new instance members**
+   added **after** the existing image members (`AllowedContentTypes` /
+   `ResolvedAllowedTypes` / `IsAllowed` / `MaxBytes` / `RootPath` all untouched):
+   - `public string? AttachmentAllowedContentTypes { get; set; }` — the
+     configurable attachment gate (config key
+     `Media:AttachmentAllowedContentTypes`, distinct from the image
+     `Media:AllowedContentTypes`), doc-comment restates C-ATT·6 + SVG-excluded.
+   - `public IEnumerable<string> ResolvedAttachmentAllowedTypes => (AttachmentAllowedContentTypes ?? "…pinned default…").Split(',', RemoveEmptyEntries | TrimEntries);`
+     — the same `Split` idiom as `ResolvedAllowedTypes`.
+   - `public bool IsAttachmentAllowed(string? contentType) => !IsNullOrWhiteSpace(contentType) && ResolvedAttachmentAllowedTypes.Any(t => OrdinalIgnoreCase-equal to contentType.Trim());`
+     — the real `IsAllowed` body, verbatim, over the attachment set.
+2. `src/Kumunita.Web/Controllers/AttachmentController.cs` (**new**) —
+   `sealed class AttachmentController(IMediaStore media, IOptions<MediaOptions>
+   mediaOpts) : Controller` with the **`POST /attachment`** `Upload([FromForm]
+   IFormFile? file)` action, mirroring `ContentImageController.Upload` verbatim
+   with exactly three documented differences: route `/attachment`, the
+   empty-file message `Choose a file.` (not the image lane's `Choose an
+   image.`), and guard 3 calling `IsAttachmentAllowed` (not `IsAllowed`). The
+   frozen guard order (F6, C-ATT·6): `subject null → 401` (the defensive
+   `KumunitaPrincipal.SubjectId(User)` null-check), empty → **400**, oversize →
+   **413**, `!IsAttachmentAllowed` → **415**, all **before** any write, then the
+   single `PutAsync`, then `Json(new { id = stored.Id })`.
+
+**The three `MediaOptions` member lines (as written):**
+- `public string? AttachmentAllowedContentTypes { get; set; }`
+- `public IEnumerable<string> ResolvedAttachmentAllowedTypes => (AttachmentAllowedContentTypes ?? "<pinned default>").Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);`
+- `public bool IsAttachmentAllowed(string? contentType) => !System.String.IsNullOrWhiteSpace(contentType) && ResolvedAttachmentAllowedTypes.Any(t => System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));`
+
+**The pinned default allowlist (verbatim, copied from design doc §2.5 — the
+primary tier):**
+`application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/zip,image/jpeg,image/png,image/webp,image/gif`
+— SVG **excluded**, the four raster types **included**. **Count note:** the
+task-prompt text for this unit said "11 types," but the pinned string (identical
+in design doc §2.5 and the U8 plan) holds **12** (pdf, msword, docx, ms-excel,
+xlsx, text/plain, text/csv, zip + 4 raster). I copied the **verbatim pinned
+string** — the design doc is the authority, not the count in the prompt — so
+U11's `AttachUpload_F6_WrongType415` expectations should be written against
+these 12.
+
+**The `PutAsync` call (as written) + signature confirmation:**
+`var stored = await media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject);`
+— matched **exactly** against the real
+`IMediaStore.PutAsync(byte[] content, string? filename, string contentType,
+string? actorId, CancellationToken ct = default)` (IMediaStore.cs L14 — the
+**five** params, `filename`+`actorId` nullable, trailing optional
+`CancellationToken`). Four args passed, `ct` left to default. **No 4-arg
+overload invented; no new `IMediaStore` method added** (C-ATT·1/3 — one store,
+one volume, one `PutAsync`).
+
+**Image lane untouched (C-ATT·9) — verified by grep:**
+- `MediaOptions.cs` L23 still reads `(AllowedContentTypes ?? "image/jpeg,image/png,image/webp,image/gif")` — the image `ResolvedAllowedTypes` default + the `AllowedContentTypes` / `IsAllowed` members are byte-for-byte at their original positions. The new attachment block sits strictly **after** `IsAllowed`.
+- `ContentImageController.cs` L151 `return BadRequest("Choose an image.");`, L154 `if (!mediaOpts.Value.IsAllowed(file.ContentType))`, and L161 the 4-arg `media.PutAsync(ms.ToArray(), file.FileName, file.ContentType, subject)` — all unchanged.
+- `ContentImageIds` + every `ImageIds:` / `ImageIds =` call-site from U7 untouched (this unit added none).
+
+**DI registration:** **not needed — and confirmed none was.** `Program.cs` L45
+binds the **whole object**: `builder.Services.Configure<MediaOptions>(
+builder.Configuration.GetSection(MediaOptions.SectionName))`. Because the new
+`AttachmentAllowedContentTypes` property lives on the **same** `MediaOptions`
+instance, OPS binds it automatically under the existing `Media__` prefix (i.e.
+`Media__AttachmentAllowedContentTypes`). No per-member registration exists in
+the tree, so there is nothing to extend. `IOptions<MediaOptions>` is injected
+the same way `ContentImageController` already does it.
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` → **green** on
+`Kumunita.Core`, `Kumunita.Core.Tests`, `Kumunita.Web`, and
+`Kumunita.Web.Tests` (1 pre-existing CS8604 warning in
+`WysiwygEditorTests.cs` L910 — the same warning U3–U7 recorded; unrelated).
+No tests written (U11 owns `AttachUpload_F6_*`); no throwaway test left behind.
+
+**Drift:** none. The two open questions resolved:
+(1) **`PutAsync` signature** — matched the real 5-param shape (4 args passed,
+`ct` defaulted); no DRIFT PAUSE. (2) **DI binding** — confirmed whole-object
+`Configure<MediaOptions>` in `Program.cs`; no new registration needed or added.
+(3) **Allowlist count** — the pinned string has **12** types, not the "11" the
+task prompt named; I followed the **pinned verbatim string** (design doc §2.5,
+the primary tier), recorded above. No `IMediaStore`, `ImageIds`, `AccessAction`,
+or image-lane line was touched (C-ATT·3/9 hold).
+
+**Next agent (U9) must know:**
+- **`AttachmentController` already exists** — U9 adds the **`Serve`** action
+  (`GET /attachment/{id}`) to the **same** controller. The current constructor
+  is deliberately **minimal** (`IMediaStore` + `IOptions<MediaOptions>`). U9's
+  §2.7 5-step ordering needs the reverse-lookup seams
+  (`PostService.FindPostByAttachmentIdAsync` / `FindReplyByAttachmentIdAsync`
+  from U3, `IAnnouncementService.FindByAttachmentIdAsync` from U3) **and**
+  `IAuthorizationService` (post/reply branch) + a parent-post load (reply
+  branch, C-ATT·8) — so **U9 will widen the constructor** (add
+  `IAuthorizationService authz`, `PostService posts`, `IAnnouncementService
+  announcements`, and whatever parent-load seam the image `Serve` reply branch
+  or a new read-only `PostService` seam provides). `Upload` (this unit) does
+  **not** use any of those, so adding them now would be dead weight; U9 adds
+  them when it writes `Serve`.
+- The serve route must set `Content-Disposition: attachment; filename="…"`
+  (the stored `MediaObject.Filename`, sanitized per RFC 6266 — path
+  separators / `;` / `"` stripped; a content-hash fallback if null) +
+  `X-Content-Type-Options: nosniff` + the **stored** `Content-Type` (C-ATT·8) —
+  the one serve difference from the image lane (which omits
+  `Content-Disposition` and renders inline). The image `Serve`'s 404/deny
+  posture + the "UGC Deny ⇒ one Deny row, announcement ⇒ zero rows" rule carry
+  over (C-ATT·2/7/10).
+- The `KumunitaPrincipal.SubjectId(User)` helper + `KumunitaPrincipal`
+  (`Kumunita.Web.Security`) is the authz-actor source U9 uses for
+  `CanAsync(…Read…)`; the image `Serve` (ContentImageController L49–L125) is
+  the 5-step mirror, **except** the attachment reply branch must **resolve the
+  parent post** and apply **one** `CanAsync(…Read…, parentPost)` (C-ATT·3/8) —
+  the image lane's reply branch deliberately 404s (its drift pause), which the
+  attachment lane does **not** copy (F4).
+- U9 must keep the image lane byte-for-byte (C-ATT·9): do not touch
+  `ContentImageController`, `AllowedContentTypes` / `ResolvedAllowedTypes` /
+  `IsAllowed`, or any `ImageIds:` call-site. The `ResolvedAttachmentAllowedTypes` /
+  `IsAttachmentAllowed` members U8 added are **read-only** gates — U9 does not
+  need them for serving (serving uses the stored `Content-Type`, not the
+  allowlist).

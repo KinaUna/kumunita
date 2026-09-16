@@ -27,4 +27,34 @@ public sealed class MediaOptions
         !System.String.IsNullOrWhiteSpace(contentType)
         && ResolvedAllowedTypes.Any(t =>
             System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Comma-separated allowed Content-Types for the attachment lane (case-insensitive).
+    /// Distinct from <see cref="AllowedContentTypes"/> (the image lane) — the attachment
+    /// lane has its own gate (C-ATT·6); the config key is
+    /// <c>Media:AttachmentAllowedContentTypes</c>. Positive-only; SVG excluded.
+    /// </summary>
+    public string? AttachmentAllowedContentTypes { get; set; }
+
+    /// <summary>
+    /// The resolved attachment allowlist (C-ATT·6). Positive-only; SVG excluded;
+    /// the raster image types are included so a resident can attach a photo *as a
+    /// download* without also using the Image button. Reuses <see cref="MaxBytes"/>
+    /// (not a second size cap). The image lane's <see cref="ResolvedAllowedTypes"/>
+    /// is untouched (C-ATT·9).
+    /// </summary>
+    public IEnumerable<string> ResolvedAttachmentAllowedTypes =>
+        (AttachmentAllowedContentTypes ??
+         "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,application/zip,image/jpeg,image/png,image/webp,image/gif")
+            .Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Whether <paramref name="contentType"/> is on the attachment allowlist
+    /// (case-insensitive; C-ATT·6). Mirrors <see cref="IsAllowed"/> over the
+    /// attachment set — the image lane's <see cref="IsAllowed"/> is untouched.
+    /// </summary>
+    public bool IsAttachmentAllowed(string? contentType) =>
+        !System.String.IsNullOrWhiteSpace(contentType)
+        && ResolvedAttachmentAllowedTypes.Any(t =>
+            System.String.Equals(t, contentType.Trim(), System.StringComparison.OrdinalIgnoreCase));
 }
