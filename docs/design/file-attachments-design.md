@@ -76,11 +76,14 @@ The constraints this lane must honor (all pre-existing, not new):
   `IsAttachmentAllowed` predicate) on the existing `MediaOptions`.
 - The `AttachmentIds` Web parse helper (`Kumunita.Web.Security`, mirroring
   `ContentImageIds`; the `/attachment/{id}` route shape).
-- The four call-site wirings: post create, reply create/edit, announcement
-  create/edit (the `ImageIds` call-site shape, mirrored).
+- The call-site wirings: post create/edit, group-post create/edit, reply
+  create/edit, and announcement create/edit (the `ImageIds` call-site shape,
+  mirrored; a group post is a `Post` doc with a `GroupId`, so it rides the
+  same create/edit/serve seams as a component post).
 - The `attachLink` editor pure function + the "Attach file" toolbar button on
-  the post / reply / announcement composers (incl. reply composers), splicing
-  `[label](/attachment/{id})` at the cursor (the `imageLink` idiom).
+  the post / group-post / reply / announcement composers (incl. the reply
+  composers), splicing `[label](/attachment/{id})` at the cursor (the
+  `imageLink` idiom).
 - The `Content-Disposition: attachment` serve header (the one serve
   difference from the image lane).
 
@@ -147,10 +150,10 @@ invariants. The seam tests (U11, and U10 for F9) cover these 1:1.
 Copied from the register (`plan-file-attachments.md` §Assumptions), which
 stays the authoritative source for unit-level scope:
 
-- **Scope = posts, replies, announcements. No more, no less.** Group posts,
-  static/about pages, the avatar lane (unchanged), the image lane (unchanged),
-  video/audio streaming, server-side file transforms, and drag-drop
-  reordering are **out** (→ future lanes, own design doc + ADR).
+- **Scope = posts, group posts, replies, and announcements.** Static/about
+  pages, the avatar lane (unchanged), the image lane (unchanged), video/audio
+  streaming, server-side file transforms, and drag-drop reordering are **out**
+  (→ future lanes, own design doc + ADR).
 - **Body-referenced, not a managed attachment list.** A body link removed ⇒
   the reference is gone ⇒ the bytes are an inert orphan (the C-MED·7
   posture) — never hard-deleted.
@@ -548,10 +551,10 @@ C-ATT·2/8).
   Testcontainers in `Kumunita.Web.Tests`). The intended bodies are preserved
   in `AttachmentServingTests.cs` comment blocks.
 - **Non-decisions (carried forward, ADR 0034 "Not decided here"):**
-  attachments on **group posts** and **static/about pages** (own design doc +
-  ADR); **video / audio** streaming; **in-browser preview**; **file
-  transforms**; the **image lane's reply-404 drift pause** (this lane did not
-  fix it — it made the *attachment* reply lane work).
+  attachments on **static/about pages** (own design doc + ADR); **video /
+  audio** streaming; **in-browser preview**; **file transforms**; the **image
+  lane's reply-404 drift pause** (this lane did not fix it — it made the
+  *attachment* reply lane work).
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane
   discipline: ATT is a lane, not a renumber). `Milestones.cs` + `MilestonesTests`
   were **not** changed — `TD` and `IE` (also in the README) are the precedent

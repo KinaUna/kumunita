@@ -7,12 +7,13 @@
 > is the design doc `docs/design/file-attachments-design.md` (authored in U1/U2,
 > **not yet implemented**). The **secondary** tier is this file (unit registry +
 > deliverables + exit criteria). The **scratch** tier is
-> `docs/plans-milestones/file-attachments-handoff-notes.md` (one appended
-> `## U#` section per unit, never rewritten).
+> `docs/plans-milestones/done/file-attachments/file-attachments-handoff-notes.md`
+> (one appended `## U#` section per unit, never rewritten).
 >
 > **What this is:** the follow-on lane ADR 0011 named and ADR 0025 deferred —
-> **file attachments** on **posts, replies, and announcements** (group posts
-> and static/about pages are **out of scope** — a future lane). It **copies the
+> **file attachments** on **posts, group posts, replies, and
+> announcements** (static/about pages are **out of scope** — a future lane).
+> It **copies the
 > content-image idiom verbatim** (ADR 0025) and shares the existing
 > `IMediaStore` + `MediaObject` byte store (ADR 0011). The one new decision:
 > the serve route downloads (`Content-Disposition: attachment`) under a
@@ -73,13 +74,14 @@ module**. `Core` stays HTTP-free and body-parse-free (C-ATT·4).
 
 ## Assumptions
 
-- **Scope = posts, replies, announcements. No more, no less.** In: the
-  attachment lane on `Post` / `PostReply` / `Announcement` (create + edit +
+- **Scope = posts, group posts, replies, and announcements.** In: the
+  attachment lane on `Post` / `PostReply` / `Announcement` (group posts are
+  `Post` docs with a `GroupId`, so they ride the same seams; create + edit +
   serve + upload + the editor affordance). **Out (→ future lane, own design
-  doc + ADR):** group posts (`GroupPost` body), static/about pages
-  (`LocalizedPage`), the avatar lane (unchanged), the image lane (unchanged),
-  video/audio streaming, server-side file transforms (crop/resize/convert),
-  drag-drop reordering. The ADR 0011/0025 "follow-on lanes" precedent holds.
+  doc + ADR):** static/about pages (`LocalizedPage`), the avatar lane
+  (unchanged), the image lane (unchanged), video/audio streaming, server-side
+  file transforms (crop/resize/convert), drag-drop reordering. The ADR
+  0011/0025 "follow-on lanes" precedent holds.
 - **Body-referenced, not a managed attachment list.** The attachment is a
   `[label](/attachment/{id})` link in the body (the image-lane idiom). The
   alternative — a separate `AttachmentIds` *list* with its own add/remove UI
@@ -625,8 +627,8 @@ handoff-note entry appended *before* any follow-up action).
   - `docs/adr/0034-file-attachments-posts-replies-announcements.md` (new) +
     the `docs/adr/README.md` row (0034). **Amends 0025** (resolves its
     "video / audio attachment" + "arbitrary downloads" non-decision for the
-    post/reply/announcement lane specifically — group posts / static pages
-    remain future lanes) and **Amends 0011** (the `AllowedContentTypes`
+    post/group-post/reply/announcement lane specifically — static pages
+    remain a future lane) and **Amends 0011** (the `AllowedContentTypes`
     extension point is now exercised by a separate attachment allowlist).
   - `docs/SECURITY.md` — the (e) media class note for attachments: the
     `Content-Disposition: attachment` + `nosniff` + separate-allowlist controls
@@ -639,8 +641,8 @@ handoff-note entry appended *before* any follow-up action).
   - `docs/ARCHITECTURE.md` — the `AttachmentIds` field + the
     `Find*ByAttachmentIdAsync` seams + the `/attachment/{id}` +
     `POST /attachment` routes + the "separate allowlist, one byte store" note.
-  - `README.md` — the feature bullet (attachments on posts/replies/
-    announcements) + the follow-on-lane note (group posts / static pages —
+  - `README.md` — the feature bullet (attachments on posts/group
+    posts/replies/announcements) + the follow-on-lane note (static pages —
     same seam, own design doc).
   - `docs/design/file-attachments-design.md` — append `## File attachments —
     Closed (recorded)` (the U6/U11 pass counts, the §2.6 gate result).

@@ -79,14 +79,15 @@ table in `docs/ARCHITECTURE.md`); **M5**: projects.
   design doc, not this one. (Post / reply / announcement attachments have
   shipped — the **File attachments** bullet below.)
 - **File attachments** — attach a file (PDF / Office docs / text / csv / zip +
-  the raster image types) to a **post, reply, or announcement**: a body link
-  `[label](/attachment/{id})` that **downloads** (`Content-Disposition:
+  the raster image types) to a **post, group post, reply, or
+  announcement**: a body link `[label](/attachment/{id})` that **downloads**
+  (`Content-Disposition:
   attachment`, not an inline render) on the **same** content-addressed byte
   store as images, under a **separate** file allowlist (SVG excluded) and the
   owning resource's `Read` decision (a reply resolves its parent post's); an
   "Attach file" toolbar button on every composer (ADR 0034). Follow-on lanes
-  (own design doc + ADR): attachments on group posts & static/about pages;
-  video/audio; in-browser preview.
+  (own design doc + ADR): attachments on static/about pages; video/audio;
+  in-browser preview.
 - **Group posts** — the post channel *inside* a group (`/groups/{id}/posts`):
   a membership-scoped feed, detail, composer and replies (ADR 0013). Members
   only — a non-member (moderator or admin alike) neither sees nor posts; the
@@ -188,7 +189,7 @@ stays trivial and the authorization rules can grow freely.
 - **Guardian controls** (`GU`, ADR 0028) — a parent adds an account for a child and supervises it at the account level: suspend/lock, curate the child's community & group memberships, and approve a group invitation sent to the child — with **no standing to read the child's private content**; the child's account is handed over to independence when the child comes of age. **Done.**
 - **Rich editor** (`RE`, ADR 0031) — a WYSIWYG authoring surface over the RC Markdown lane: a split-view live preview beside the source `<textarea>` and a Markdown-splice toolbar (bold / italic / code / headings / lists / link / image) in one `tsc`-only module. No editor dependency, no second renderer, no new route — the saved body is byte-identical Markdown the RC read path already renders. **Done.**
 - **Inline editor** (`IE`, ADR 0032) — the rendered view is the default editor; the Markdown source is hidden behind a single toolbar toggle (and stays a one-click split view when revealed). Additive and client-only — no new dependency, no new route, no re-shape of the RE pure functions; the saved body is byte-identical Markdown the RC read path already renders. **Done.**
-- **File attachments** (`ATT`, ADR 0034) — attach files (PDF / Office docs / text / csv / zip + the raster image types) to **posts, replies, and announcements**: a body link `[label](/attachment/{id})` that **downloads** (`Content-Disposition: attachment`, not an inline render); a **separate** file allowlist (`Media__AttachmentAllowedContentTypes`, SVG excluded) under the **same** content-addressed byte store as the image lane (one store, one volume, one catalog); served only through an audited app endpoint under the owning resource's `Read` decision (a reply resolves its **parent post's**); an "Attach file" toolbar button on every composer (incl. reply composers). Follow-on lanes (own design doc + ADR): attachments on **group posts** and **static/about pages**; video/audio; in-browser preview. **Done.**
+- **File attachments** (`ATT`, ADR 0034) — attach files (PDF / Office docs / text / csv / zip + the raster image types) to **posts, group posts, replies, and announcements**: a body link `[label](/attachment/{id})` that **downloads** (`Content-Disposition: attachment`, not an inline render); a **separate** file allowlist (`Media__AttachmentAllowedContentTypes`, SVG excluded) under the **same** content-addressed byte store as the image lane (one store, one volume, one catalog); served only through an audited app endpoint under the owning resource's `Read` decision (a reply resolves its **parent post's**); an "Attach file" toolbar button on every composer (incl. reply composers). Follow-on lanes (own design doc + ADR): attachments on **static/about pages**; video/audio; in-browser preview. **Done.**
 - **M4** — Events, RSVPs, reminders. **Next.**
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.

@@ -5,10 +5,10 @@ Date: 2026-09-16
 Amends: 0025 (its *"Video / audio attachment — the `AllowedContentTypes` /
 `MaxBytes` boundary is the seam"* non-decision — that boundary **is** the seam
 this lane uses, and the "arbitrary downloads" half of it is now resolved for
-the post / reply / announcement lane: a file is attached, uploaded, and served
-as a **download**. Does **not** supersede 0025; the read path (one renderer,
+the post / group-post / reply / announcement lane: a file is attached,
+uploaded, and served as a **download**. Does **not** supersede 0025; the read path (one renderer,
 `IsSafeUrl` link rejection) and the image lane are the frozen base this ADR
-builds on. Group posts and static/about pages remain future lanes.)
+builds on. Static/about pages remain a future lane.)
 Also amends 0011 (its *"Video / office docs / arbitrary downloads ship (a
 follow-on lane) — the `AllowedContentTypes` / `MaxBytes` boundary … is the
 seam this ADR is deliberately sized to leave open"* revisit clause — the
@@ -151,12 +151,9 @@ text) are the decision's enforceable core.
 
 Each is a **future lane**, named — the ADR 0011 / 0025 precedent holds:
 
-- **Attachments on group posts (`GroupPost` body)** and **static/about pages
-  (`LocalizedPage`)** — same seam, own design doc + ADR; this lane
-  deliberately does not wire them (the reverse-lookup has no
-  `LocalizedPage` branch; the group-post create lane **does** persist
-  `AttachmentIds`, its edit lane too — the serve route's post branch finds a
-  group post identically to a component post).
+- **Attachments on static/about pages (`LocalizedPage`)** — same seam, own
+  design doc + ADR; this lane deliberately does not wire them (the
+  reverse-lookup has no `LocalizedPage` branch).
 - **Video / audio streaming** — files are download-only, never streamed or
   previewed (in-browser preview is a future lane).
 - **Drag-and-drop multi-upload UI** — the button is the single affordance.
