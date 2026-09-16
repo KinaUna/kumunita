@@ -986,3 +986,123 @@ throwaway test added or left behind (U11 owns the F9 test).
   dependency, no `document.write`, no untrusted user HTML (the `attach`
   handler splices a single `<a>` node it constructs, the same shape the image
   handler splices).
+
+## U11
+
+**Built:** the ATT Web test half — **3 new files** in `tests/Kumunita.Web.Tests/`,
+mirroring the image lane's 3-file shape (`ContentImageUploadTests` /
+`ContentImageServingTests` / `MarkdownRendererTests` + `RichEditorTests`):
+
+- `AttachmentUploadTests.cs` — **F6 ×3 pinned names, executable**
+  (`AttachUpload_F6_Empty400` / `AttachUpload_F6_Oversize413` /
+  `AttachUpload_F6_WrongType415`) + **1 non-pinned support test**
+  (`AttachUpload_Support_Valid_Pdf_ReturnsJsonId_AndOneWrite` — pinning the
+  positive "one write + JSON id" path, explicitly NOT one of the §2.9 names).
+  Mirrors `ContentImageUploadTests` structurally (the byte-backed
+  `TestFormFile` carrier, the `Build(…)` NSubstitute harness with a **real**
+  `PostService` over never-used substitutes — its ctor null-checks only and
+  `Upload` never calls it, the image test's idiom).
+- `AttachmentServingTests.cs` — **F1–F5 pinned names, drift-paused**
+  (`AttachServe_F1_AudienceMemberDownloads` / `AttachServe_F2_NonMember404` /
+  `AttachServe_F3_Orphan404` / `AttachServe_F4_ReplyParentDeny404` /
+  `AttachServe_F5_AnnouncementPublicServes`) — a class with **zero `[Fact]`
+  methods** + per-name "Intended (drift-paused) / Why it is paused" comment
+  blocks. **Exactly** the shape of `ContentImageServingTests.cs`.
+- `AttachmentLinkTests.cs` — **F7 + F9, executable**
+  (`AttachLink_F7_RemoteUrlRendersText` / `AttachRoundtrip_F9_HrefPreserved`),
+  mirroring the `RichEditorTests` renderer/editor round-trip shape (the
+  `RichEditorSpec` C# spec mirror + the `AttachmentIds.ExtractAttachmentIds`
+  helper).
+
+**The 10 pinned names (verbatim, §2.9):**
+
+| # | Name | Status |
+|---|------|--------|
+| 1 | `AttachServe_F1_AudienceMemberDownloads` | ⛔ **drift-paused** (comment block, no `[Fact]`) |
+| 2 | `AttachServe_F2_NonMember404` | ⛔ **drift-paused** (comment block, no `[Fact]`) |
+| 3 | `AttachServe_F3_Orphan404` | ⛔ **drift-paused** (comment block, no `[Fact]`; F8 folded into it, per the §2.9 note) |
+| 4 | `AttachServe_F4_ReplyParentDeny404` | ⛔ **drift-paused** (comment block, no `[Fact]`) — the ATT-lane-specific one; documents the **parent-resolution** behavior U9 added that a future lift would drive |
+| 5 | `AttachServe_F5_AnnouncementPublicServes` | ⛔ **drift-paused** (comment block, no `[Fact]`) |
+| 6 | `AttachUpload_F6_Empty400` | ✅ live, pass |
+| 7 | `AttachUpload_F6_Oversize413` | ✅ live, pass |
+| 8 | `AttachUpload_F6_WrongType415` | ✅ live, pass |
+| 9 | `AttachLink_F7_RemoteUrlRendersText` | ✅ live, pass |
+| 10 | `AttachRoundtrip_F9_HrefPreserved` | ✅ live, pass |
+
+**Verified (both gates green):**
+- `dotnet build Kumunita.slnx -c Debug` → **green** on Core + Web (1 pre-existing
+  CS8604 warning in `WysiwygEditorTests.cs` L910 — the same warning U3–U10
+  recorded; unrelated).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **`Total: 176, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`** (<1 s).
+  The **7 writable** ATT tests (F6 ×3 + the non-pinned support + F7 + F9) all
+  pass. The 5 drift-paused serve tests carry **no `[Fact]`** (verified by grep:
+  `AttachmentServingTests.cs` has zero `[Fact]` literals) — an empty class,
+  which is the faithful state, not a failure.
+
+**F6 wrong-type pick (recorded, per the plan's risk note):** the two 415
+asserts in `AttachUpload_F6_WrongType415` are (a) **SVG** (`image/svg+xml` —
+C-ATT·6's named exclusion) and (b) **`video/mp4`** — a type **not** in the
+12-type default attachment allowlist at all (pdf, msword, docx, ms-excel,
+xlsx, text/plain, text/csv, zip, + the 4 raster image types). Neither is *in*
+the default, so both 415. (The plan offered `video/mp4` or `application/x-tar`;
+I picked `video/mp4`.)
+
+**F9 serializer path (recorded):** the round-trip test drives
+`RichEditorSpec.RenderPreview` (the C# spec mirror of the TS `renderPreview`,
+the `RichEditorTests` harness) + `AttachmentIds.ExtractAttachmentIds`.
+`attachLink(label, id)` (U10, TS) produces `[label](/attachment/{id})`; the
+spec mirror's `IsSafeUrl` accepts the schemeless `/attachment/{id}` path
+(`!url.Contains(':')` branch) → the render emits `<a href="/attachment/{id}">`
+(href **preserved**, C-ATT·10) and the server parse picks the id up unchanged.
+**No serializer change needed** — the U10 handoff's "F9 holds with no
+serializer edit" claim is verified by the passing test, not just by reading.
+
+**F7 example-URL refinement (recorded — the one drift from the plan's
+suggested example):** the plan suggested `https://example.com/attachment/x`
+as the "renders as plain text" example. But an attachment is an `<a>` **link**,
+and the `RichEditorSpec` link `IsSafeUrl` mirror (unlike the image lane's
+`IsSafeImageSrc`, which rejects **all** remote `src`s) correctly **allows**
+`https://` external links — a genuine remote URL renders as a legitimate
+external `<a href>`, not plain text (it is still **not** an attachment:
+`ExtractAttachmentIds` does not match a non-hex id, so nothing is stored).
+F7's "renders as plain escaped text (no scheme, no redirect)" intent is the
+XSS/exfil guard, so the faithful, **passing** form drives the **dangerous**
+schemes `data:` / `javascript:` (which `IsSafeUrl` **does** reject → plain
+text + empty extract) — the image lane's `Image_DataUriSrc_RendersAsPlainText`
+analog. The **pinned name is preserved verbatim** (`AttachLink_F7_RemoteUrlRendersText`);
+only the example URL is refined (no rename). This matches the U10 handoff,
+which named `data:`/`javascript:` as the canonical F7 reject cases.
+
+**Image lane byte-for-byte (C-ATT·9) — verified:** `ContentImageUploadTests` /
+`ContentImageServingTests` / `MarkdownRendererTests` / `RichEditorTests` are
+**untouched** (I read them as the mirror sources; I only **added** the 3 new
+files). No `Kumunita.Core.Tests` test added in this unit (U6 owns those).
+
+**The U6 `PostEdit_ReparsesAttachmentIds` drift pause is STILL OPEN** — it is a
+Core post/group-post *edit*-lane gap (`UpdatePostAsync` / `UpdateGroupPostAsync`
+do not persist `AttachmentIds`), **not** a Web-test concern. U11 did **not**
+touch `UpdatePostAsync` / `UpdateGroupPostAsync`. The decider's option 1/2
+choice must land **before** the U12 close gate checks the §2.9 **Core** names
+(the 5 Web serve tests in this unit are a *separate*, independently justified
+drift-pause — the sealed-`PostService` seam gap — and do not depend on that
+decision).
+
+**Next agent (U12) must know:** U12 is the **close** unit. Its deliverables:
+ADR 0034 (Amends 0025 + 0011), the `docs/adr/README.md` row (0034), the
+`SECURITY.md` (e) note, the `OPS.md` `Media:AttachmentAllowedContentTypes`
+tunable, the `ARCHITECTURE.md` module note, the `README.md` feature bullet +
+follow-on-lane note, the design doc `## File attachments — Closed (recorded)`
+(with the U6 9-pass + this U11 7-pass + the 5 drift-paused names + the
+`AttachServe` empty-class note), the handoff `## Summary`, and the
+`in-progress/` → `done/` file moves. **Before** U12 runs the §2.10 close gate
+(`dotnet exec` the **Core** suite, which spins Testcontainers `postgres:18`),
+the **U6 `PostEdit_ReparsesAttachmentIds` option 1/2 decision must land** —
+option 1 (U4 adds the `attachmentIds` param + write line to
+`UpdatePostAsync` / `UpdateGroupPostAsync`, then U6 un-comments the preserved
+`#6` body) or option 2 (rename the §2.9 Core name **together** with the design
+doc, recorded) — the §2.11 drift-guard (d) / the §2.9 pin check will trip on
+`#6` otherwise. The 5 Web serve tests stay drift-paused (the sealed-`PostService`
+seam gap) unless U12 also adds a substitutable seam — that is a new-infra
+decision, not a close-gate prerequisite.
+
