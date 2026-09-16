@@ -733,3 +733,115 @@ or image-lane line was touched (C-ATT·3/9 hold).
   `IsAttachmentAllowed` members U8 added are **read-only** gates — U9 does not
   need them for serving (serving uses the stored `Content-Type`, not the
   allowlist).
+
+## U9
+
+**Built:** the ATT read path — the **`GET /attachment/{id}`** `Serve` action
+added to the **existing** `src/Kumunita.Web/Controllers/AttachmentController.cs`
+(U8's file — **no second controller**, exactly as scoped). One file touched.
+
+- **Constructor widened** (the image controller's DI shape): U8's
+  `IMediaStore media` + `IOptions<MediaOptions> mediaOpts` are kept, and
+  `IAuthorizationService authz`, `PostService posts`, `IAnnouncementService
+  announcements`, and `Marten.IDocumentStore store` are **added** (the parent
+  load, below). `Upload` (U8) is **untouched** — it does not use any of the new
+  deps. All four new deps are host-resolvable (`IDocumentStore` is
+  AddMarten-registered and already injected by `PostsController`; `authz` /
+  `posts` / `announcements` are the exact ctor of `ContentImageController` —
+  that controller compiles, so the shape resolves). **No DI registration change**
+  added or needed.
+- **`Serve([FromRoute] string id)`** — the §2.7 5-step ordering, mirroring
+  `ContentImageController.Serve` **with the two deliberate differences**:
+  1. **Reply branch (C-ATT·8)** — resolves the **parent post** and authorizes
+     against **it** with one `CanAsync(Read, parentPost)`. The image lane's flat
+     404 drift pause is **not** copied (F4). Parent not found ⇒ 404, zero rows
+     (fail-closed orphan).
+  2. **Serve header (C-ATT·2)** — `Content-Disposition: attachment;
+     filename="…"; filename*=UTF-8''…` (RFC 6266) + `X-Content-Type-Options:
+     nosniff` + the **stored** `Content-Type`. The image lane omits
+     `Content-Disposition` (inline `<img>`) — the one serve difference.
+- **Step order (frozen):** (1) `IsValidMediaId` → **400**; (2)
+  `media.GetAsync(id)` miss ⇒ **404**; (3) reverse-lookup **post → reply →
+  announcement** (no `LocalizedPage` branch — attachments are not on static
+  pages this pass); all null ⇒ **404** (orphan); (4) per-owner decision — post:
+  one `authz.CanAsync(…Read…, new PostToAuditableResource(post))`, Deny ⇒
+  **404**; reply: load parent → one `CanAsync(…Read…, parent)`, Deny ⇒ **404**;
+  announcement: flat gate `announcements.GetAsync(id, subject, roleSet)`, null ⇒
+  **404** (no `CanAsync`, zero rows); (5) serve.
+- **`SanitizeFilename(string? original, string id)`** (private static) —
+  null/whitespace → **`{id}.bin`** fallback; otherwise strips the RFC 6266
+  prohibited set (path separators `/` `\`, header terminators `;` `"` CR LF,
+  and control chars + `:` `<` `>` `?` `|`), falling back to `{id}.bin` if the
+  result is empty. No new library.
+- **`IsValidMediaId(string)`** (private static) — copied verbatim from the
+  image controller (1–128 lowercase hex); kept **private**, does **not**
+  reference the image copy (C-ATT·9).
+
+**The reply parent-load seam (the C-ATT·8 top risk — recorded, per the plan):**
+**No** raw-post-by-id seam existed on `PostService` (only `GetPostAsync`,
+which runs its **own** `CanAsync` + audit — using it would **double** the
+`Deny` row). The least-new-seam path taken: a **direct document load** in the
+controller — `store.QuerySession()` → `s.LoadAsync<Post>(reply.PostId)` — the
+**same** shape `PostService.GetPostAsync` / `UpdatePostAsync` use internally
+(`session.LoadAsync<Post>(postId)`), so no new `PostService` seam was invented
+(C-ATT·3 holds — no new `IAuthorizationService` / `IMediaStore` / `PostService`
+method). `PostService` itself is **untouched** this unit.
+
+**The serve headers (verbatim):**
+- `Response.Headers["X-Content-Type-Options"] = "nosniff";`
+- `Response.Headers["Content-Disposition"] = "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + Uri.EscapeDataString(filename);`
+- `return File(stream, stored.ContentType);`
+
+**Audit contract (C-ATT·7/10) — verified by construction:** exactly **one**
+`Deny` row on a UGC (post/reply) Deny — emitted **by** the single
+`CanAsync` (the post branch: one call; the reply branch: one parent call);
+**zero** rows on every other 404 path (invalid id, store miss, orphan, missing
+parent, announcement scope-deny). **One `CanAsync` per branch** — the reply
+branch does not double it (that was the drift the plan flagged).
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` → **green** on
+`Kumunita.Core`, `Kumunita.Core.Tests`, `Kumunita.Web`, and
+`Kumunita.Web.Tests` (1 pre-existing CS8604 warning in
+`WysiwygEditorTests.cs` L910 — the same warning U3–U8 recorded; unrelated).
+`git status` shows **only** `AttachmentController.cs` modified this unit. No
+tests written (U11 owns `AttachServe_F1_AudienceMemberDownloads` /
+`F2_NonMember404` / `F3_Orphan404` / `F4_ReplyParentDeny404` /
+`F5_AnnouncementPublicServes`); **no throwaway test left behind**.
+
+**Drift:** none. All plan entry reads matched the real tree:
+`IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)`
+→ `.Allowed`; `announcements.GetAsync(id, subject, roleSet)` (3-arg);
+`media.OpenReadAsync(id)` → `Stream`; the U3 seams
+(`FindPostByAttachmentIdAsync` / `FindReplyByAttachmentIdAsync` on concrete
+`PostService`, `IAnnouncementService.FindByAttachmentIdAsync`) all present and
+used. The parent-load was the one open question — resolved to the
+document-session load (no new seam), recorded above. The `## U6 — DRIFT PAUSE`
+(`PostEdit_ReparsesAttachmentIds`) is **not** touched here — it concerns the
+Core post/group-post **edit** lanes and stays pending for the decider.
+
+**Next agent (U10) must know:**
+- **U10 is the editor affordance + F9 round-trip** — the `attachLink(label, id)`
+  pure function (mirror `imageLink`, design doc §2.8) + the
+  `button[data-md="attach"]` toolbar button (label "Attach file") wired in
+  `bindRichEditor` to upload via the **existing** `apiFetch` to
+  `POST /attachment` (U8's action) → read `{ id }` → splice
+  `` `[${label}](/attachment/${id})` `` at the cursor (re-focus + restore
+  selection — the `imageLink` idiom). **No new editor dependency** (tsc-only,
+  C-ATT·10).
+- **The reply-composer nuance (the F4 affordance gap U10 must close):** reply
+  composers carry `data-rich-editor-no-image`, which `bindRichEditor` uses to
+  **remove** `button[data-md="image"]`. The **"Attach file" button must STILL
+  appear in reply composers** — only the Image button is suppressed. U10 must
+  **not** inherit the no-image suppression for the attach button, or F4
+  (reply attachments) loses its only creation path. The serve route (this
+  unit) already resolves the parent post, so the reply attachment will serve
+  correctly once the button lets a reply composer create the link.
+- **F9 round-trip** — `dom-to-markdown.ts` already serializes `<a>` →
+  `[label](url)`, so the `/attachment/{id}` href survives an edit with **no
+  serializer change**; U10 pins `AttachRoundtrip_F9_HrefPreserved` (or hands
+  it to U11 per the §2.9 split). The U7 parse helper's regex
+  (`/attachment/([0-9a-f]{1,128})…`) is exactly the shape the button produces,
+  so create→parse is closed by U10's splice + U7's helper.
+- The U6 `PostEdit_ReparsesAttachmentIds` drift pause is **still open** and is
+  **not** a U10 concern (Web-only unit). The decider's option 1/2 choice
+  (U6 handoff) must land before the U12 close gate checks the §2.9 names.
