@@ -439,3 +439,82 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
   full sanitizer + insert (the WY·6 invariant — `sanitizeHtml` is already
   present from U3; U6 wires it into the `paste` handler + the
   `range.insertNode` insert + the `toMarkdown` sync), per §2.4 / §2.5(d).
+
+## U6 — sanitizer + paste handler
+
+- **Date:** 2026-09-16
+- **Authored (1 file modified + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the U4 `paste` handler
+  **stub** (inside the `if (previewPane) { … }` WY block) is **replaced**
+  with the **full** handler. The full handler is placed **after** the U5
+  private helpers (`syncTextarea()` / `activeRange()` / `placeCaretAfter()`
+  / `wrapSelection()` / `currentBlock()` / `changeBlockTag()` /
+  `wrapBlockInList()`) so it can call `activeRange()` and
+  `syncTextarea()` directly — the placement is the one deliberate
+  structural change U6 makes (the helpers are module-private, declared
+  inside `bindRichEditor`, so the handler must be in the same function
+  scope). The U4 WY block now carries a one-line comment at the (e) slot
+  pointing to the full handler below — no listener is double-installed.
+  The 6 RE pure functions + `renderPreview` + the IE toggle block + the
+  self-wire loop + the toolbar `for`-loop + all U5 helpers are **untouched**.
+  (2) `wwwroot/js/lib/rich-editor.js` — the `tsc` rebuild (git-ignored
+  build artifact; `npm run build` green, **0 warnings**).
+- **The 6 sub-steps (a)–(f) of the paste handler (WY·6, design doc
+  §2.5(d) + §2.4 — the primary source):**
+  - **(a)** intercepts the `paste` event on the pane
+    (`previewPane.addEventListener('paste', (e: ClipboardEvent) => { … })`).
+  - **(b)** reads the clipboard HTML
+    (`e.clipboardData?.getData('text/html') ?? ''`); **fallback to
+    `text/plain`** (wrapped in a `<p>` before sanitizing — `sanitizeHtml`
+    handles text-only input natively: it parses the string, keeps text
+    nodes, strips any non-subset tags/attributes).
+  - **(c)** sanitizes via `sanitizeHtml(raw)` (U3's pure function — WY·3
+    subset only; the §2.4 reject list is enforced **inside** `sanitizeHtml`:
+    non-subset tags, every `on*` handler, every `style`, every
+    non-`language-{lang}` `class`, every `id`, every unsafe `href`/`src`).
+  - **(d)** inserts the sanitized HTML at the selection: parse into a
+    detached `<div>` + move its children into a `DocumentFragment`, then
+    `range.deleteContents()` + `range.insertNode(fragment)` using the same
+    `activeRange()` helper U5 added; if the selection is outside the pane
+    (or absent), `previewPane.appendChild(fragment)` — append at the end.
+  - **(e)** `e.preventDefault()` — the browser's native paste is
+    suppressed; the sanitized insert is the **only** paste path.
+  - **(f)** `syncTextarea()` (WY·2 — reuse U5's helper, in scope).
+- **The sanitizer is UNCHANGED** (U3 authored `sanitizeHtml` in
+  `client/lib/dom-to-markdown.ts`; U6 only **wires** it into the `paste`
+  handler — the sanitizer's public contract, the §2.4 reject list, and the
+  "tag dropped, text kept" / "img dropped entirely" semantics are all
+  frozen). The 3 `WY6_Sanitizer_*` tests (U3's pure-function tests #7/#8/#9)
+  **still pass** — the sanitizer itself is not touched by U6.
+- **`tsc`-only stands** (WY·8): `package.json` is still `typescript`-only;
+  no `.csproj` change; no new route; no new dependency; no second renderer
+  on the read path (`MarkdownRenderer` is untouched — RC R·1). The saved
+  body is byte-identical Markdown (RC R·3 / WY·5). The 6 RE exports
+  (`renderPreview` / `applyToggle` / `applyBlock` / `applyLink` /
+  `imageLink` / `isSafeImageSrc`) + `bindRichEditor` + `toMarkdown` are
+  all present in the compiled JS (verified by `grep`). The
+  `RichEditorTextarea_IsNotDisabled_OrRemoved` regression pin (in
+  `InlineEditorTests`) still passes — the textarea is never
+  disabled/removed/hidden-attributed. The 10 composer surfaces are
+  **unchanged** in shape (the 16 editor blocks / 10 view files U0
+  verified).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec`
+  — not from U6); `npm run build` (in `src/Kumunita.Web`) → **tsc green,
+  0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 166, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 = 13 WY tests, all PASS — the
+  paste-handler change is client-only, no new C# test is authored in U6
+  per the U6 plan / design doc §2.7). The compiled
+  `wwwroot/js/lib/rich-editor.js` contains `sanitizeHtml` + `insertNode`
+  + `preventDefault` + `toMarkdown` + `contentEditable` + all 6 RE
+  `export function {name}` + `bindRichEditor` (all verified present by
+  `grep`).
+- **`tsc` warnings:** **none** (the `tsc` build reports 0 warnings; the
+  one pre-existing `WysiwygSpec` CS8604 warning is from U3's C# test
+  mirror, not from U6's TS change).
+- **No drift pause.** U7 reworks the `data-ie-toggle` button's click
+  handler to reveal the **read-only** Markdown mirror (WY·7 — the textarea
+  is revealed by removing `rc-editor-source-hidden`; the textarea's
+  `readOnly` property is set by the binder; the label swap is kept), per
+  §2.5(f).

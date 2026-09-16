@@ -563,18 +563,11 @@ export function bindRichEditor(root: HTMLElement): void {
     previewPane.addEventListener('input', () => {
       textarea.value = toMarkdown(previewPane.innerHTML);
     });
-    // (e) WY·6 — paste handler STUB (U6 replaces the body with the full
-    // sanitize + insert + `toMarkdown` sync; U4 installs the listener +
-    // `e.preventDefault()` + the `sanitizeHtml` call so U6 only swaps the
-    // body, not the wiring).
-    previewPane.addEventListener('paste', (e: ClipboardEvent) => {
-      e.preventDefault();
-      const raw =
-        e.clipboardData?.getData('text/html') ||
-        e.clipboardData?.getData('text/plain') ||
-        '';
-      sanitizeHtml(raw); // U4: sanitize (result discarded — U6 inserts)
-    });
+    // (e) WY·6 — the `paste` handler is the **full** handler (U6 completes
+    // the U4 stub with the insert + the `toMarkdown` sync). The full
+    // implementation is added later in `bindRichEditor`, right before the
+    // button wiring loop, where the U5 helpers (`activeRange()`,
+    // `syncTextarea()`) are in scope — see the U6 paste handler below.
   }
 
   // ── WY U5 — the toolbar rework: splice DOM, not Markdown (WY·4) ─────────
@@ -717,6 +710,56 @@ export function bindRichEditor(root: HTMLElement): void {
     placeCaretAfter(li);
     syncTextarea();
   };
+
+  // ── WY U6 — the paste handler: sanitize + insert + sync (WY·6) ──────
+  // Design doc §2.5(d) + §2.4 (the primary sources). The U4 stub is
+  // replaced by the full handler here, where `activeRange()` and
+  // `syncTextarea()` (U5 helpers) are in scope.
+  //
+  // (a) intercepts the `paste` event on the pane;
+  // (b) reads the clipboard HTML (`text/html`), falling back to
+  //     `text/plain` (wrapped in a `<p>` before sanitizing —
+  //     `sanitizeHtml` handles text-only input natively);
+  // (c) sanitizes via `sanitizeHtml` (U3's pure function — WY·3 subset
+  //     only; the §2.4 reject list is enforced inside it);
+  // (d) inserts the sanitized HTML at the selection (the same
+  //     `activeRange()` helper U5 added; if the selection is outside
+  //     the pane, append at the end);
+  // (e) `e.preventDefault()` — the sanitized insert is the only paste
+  //     path (the browser's native paste is suppressed);
+  // (f) keeps the textarea in sync (`syncTextarea()` — WY·2).
+  if (previewPane) {
+    previewPane.addEventListener('paste', (e: ClipboardEvent) => {
+      e.preventDefault(); // (e) — the sanitized insert is the only paste path.
+      const html = e.clipboardData?.getData('text/html') ?? '';
+      // (b) — fallback: no HTML → use plain text wrapped in a `<p>`.
+      //     `sanitizeHtml` handles text-only input (it parses the string,
+      //     keeps text nodes, and strips any non-subset tags/attributes).
+      const raw = html.length > 0 ? html : `<p>${e.clipboardData?.getData('text/plain') ?? ''}</p>`;
+      // (c) — sanitize (the §2.4 reject list is enforced inside
+      //      `sanitizeHtml`; only the WY·3 subset survives).
+      const clean = sanitizeHtml(raw);
+      if (!clean) return; // nothing to insert
+      // (d) — parse the sanitized HTML into a DocumentFragment and insert
+      //      it at the selection (the same `activeRange()` helper U5
+      //      added; if the selection is outside the pane, append at the end).
+      const container = document.createElement('div');
+      container.innerHTML = clean;
+      const fragment = document.createDocumentFragment();
+      while (container.firstChild) {
+        fragment.appendChild(container.firstChild);
+      }
+      const range = activeRange();
+      if (range) {
+        range.deleteContents();
+        range.insertNode(fragment); // the fragment's children are spliced in
+      } else {
+        previewPane.appendChild(fragment);
+      }
+      // (f) — keep the textarea in sync (WY·2).
+      syncTextarea();
+    });
+  }
 
   // Wire each toolbar button to a DOM splice on the pane (WY·4). The
   // existing markup is unchanged — only the click handlers change.
