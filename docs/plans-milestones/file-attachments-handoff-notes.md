@@ -314,3 +314,66 @@ Per U3 handoff + §2.3: the image lane's reply edit does **not** set
   lane's own precedent is "create only, not edit" for these lanes. If a
   future unit needs edit-lane attachment persistence, it must add it
   explicitly (there is no `ImageIds` line to mirror).
+
+## U5
+
+**Built:** the **announcement edit lane** now persists `AttachmentIds`.
+One file touched, one line added.
+
+- `src/Kumunita.Core/Announcements/AnnouncementService.cs` —
+  `UpdateAsync` field-copy block: added
+  `existing.AttachmentIds = updated.AttachmentIds ?? [];` at **L288**,
+  **immediately after** the existing
+  `existing.ImageIds = updated.ImageIds ?? [];` line (L287,
+  byte-for-byte unchanged — verified by grep after the edit), with the
+  style-matched doc-comment (the RC U05 comment shape, `ATT U5 (C-ATT·5)`).
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` — **green** on
+`Kumunita.Core`, `Kumunita.Core.Tests`, `Kumunita.Web`, and
+`Kumunita.Web.Tests` (1 pre-existing CS8604 warning in
+`WysiwygEditorTests.cs`, L910, unrelated — same warning U3/U4 recorded).
+Web compiled unchanged (no signature change, as the unit plan predicted).
+Confirmed by re-reading the `UpdateAsync` region: the `ImageIds` line is
+untouched, the new line sits directly below it, and the `changed`-computation
+block lists exactly Title/Body/Scope/Pinned/CommunityId/LanguageCode —
+**`ImageIds` is not in it**, so per the unit plan's rule, `AttachmentIds`
+was not added either (matches the image lane exactly — the lane
+deliberately doesn't re-stamp `Modified` for image-only edits).
+`CreateAsync` confirmed POCO-direct (it stores the controller's POCO as-is
+after minting `Id`/`AuthorId`/`Created`/`LanguageCode` — there is no
+field-copy block at create, so the create-time `AttachmentIds` write is the
+controller's object-initializer, **U7's job** — not added here).
+`FindByAttachmentIdAsync` (U3) untouched. `IMediaStore` untouched.
+
+**Drift:** none. The unit plan scoped U5 to the `UpdateAsync` field-copy
+only (the register's U5 text says "CreateAsync persists …" — that is the
+register's idealization; per the unit plan, the create write is U7's
+controller initializer, and no `CreateAsync` line was added). No
+`changed`-block addition needed or made. No tests (U6). No Web code (U7).
+
+**Next agent (U6) must know:**
+- U6 writes the **Core tests** for all three owners' create/edit +
+  reverse-lookup — the **10 pinned names** in design doc **§2.9** (note: the
+  register's §2.5 numbering was re-grouped in Part 2; the design doc's §2.9
+  is the pinned record):
+  `FindPostByAttachmentId_ReturnsOwningPost`,
+  `FindPostByAttachmentId_ReturnsNullWhenAbsent`,
+  `FindReplyByAttachmentId_ReturnsOwningReply`,
+  `FindAnnouncementByAttachmentId_ReturnsOwningAnnouncement`,
+  `PostCreate_PersistsAttachmentIds`, `PostEdit_ReparsesAttachmentIds`,
+  `ReplyCreate_PersistsAttachmentIds`, `ReplyEdit_ReparsesAttachmentIds`,
+  `AnnouncementCreate_PersistsAttachmentIds`,
+  `AnnouncementEdit_ReparsesAttachmentIds`.
+- **`AnnouncementEdit_ReparsesAttachmentIds`** exercises the line this unit
+  added: `UpdateAsync` with a re-submitted POCO whose `AttachmentIds`
+  differs from the stored row must leave `existing.AttachmentIds` equal to
+  the updated list (and a null/absent list coalesces to `[]`).
+- **`AnnouncementCreate_PersistsAttachmentIds`** exercises the POCO-direct
+  create path: `CreateAsync` stores whatever `AttachmentIds` the POCO
+  carries (U6 sets it on the POCO directly, mirroring how U7's controller
+  initializer will — Core never parses a body, C-ATT·4).
+- The announcement edit lane does **not** re-stamp `Modified` for
+  attachment-only edits (the `changed` block excludes both `ImageIds` and
+  `AttachmentIds`) — a test that pins `Modified` behavior on an
+  attachment-only re-save would fail; that is by design (matches the
+  image lane).
