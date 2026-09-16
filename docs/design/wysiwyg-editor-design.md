@@ -637,3 +637,111 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 
 *— Part 2 (seams & contracts) authored by U2 (2026-09-15). ADR 0033 is
 drafted in the same unit (U9 moves it to Accepted).*
+
+### Run result (WY acceptance gate — 2026-09-16)
+
+Recorded by **U8** (2026-09-16). This section *records* the gate from §2.8;
+it does not re-open any Part-1 / Part-2 section.
+
+**The three §2.8 gate tests:**
+
+- **Closed loop — not run.** *Reason:* this is a **manual** gate (the
+  resident opens a composer, types `**bold**` in the pane, saves; the saved
+  body + the read path are verified) and U8 has no dev server / seeded DB /
+  live browser to drive a composer in-process. The **automated floor covers
+  the same contract** without a browser: `WY5_SavedBodyIsByteIdentical`
+  pins that a pane HTML serializes to the byte-identical hand-typeable
+  Markdown, and `WY10_RoundTrip_BoldHeadingListLinkImageCode` pins
+  `toMarkdown(renderPreview(md)) === md` (bold → `<strong>` → `**bold**`).
+  **Pass is not assumed** — the next unit to land the runtime records the
+  manual pass (§2.8's rule; the register's U8 rule).
+- **Handoff — not run.** *Reason:* same — a **manual** gate (a heading + a
+  list + a link + an image + a code block typed in the pane; the saved body
+  must equal the hand-typeable Markdown; the `MarkdownRenderer` read path
+  must render it identically; the `ContentImageIds` parse must be
+  untouched). The **automated floor covers the same contract**:
+  `WY10_RoundTrip_BoldHeadingListLinkImageCode` exercises exactly that
+  heading + list + link + image + code-block corpus against the
+  `renderPreview` mirror **and** asserts RC's `ContentImageIds` picks up
+  the `![alt](/content-image/{id})` form (RC R·3 — zero server change), and
+  `WY5_SavedBodyIsByteIdentical` pins the byte-identity. **Pass is not
+  assumed** — the next unit to land the runtime records the manual pass.
+- **Part-vs-whole — PASS (automated).** The full WY test set is the
+  *whole*; the closed-loop + handoff gates are the *parts*. All automated
+  WY tests **pass together** (see the suite line below). This is the
+  binding automated evidence U8 can produce in-process.
+
+**Automated floor (the binding evidence):**
+
+- **Build:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 1
+  warning** (the pre-existing `WysiwygSpec` CS8604 nullability warning in
+  `WysiwygEditorTests.cs` — present since U3's C# spec mirror, **not** from
+  U8; no new warning introduced). `npm run build` (in `src/Kumunita.Web`)
+  → **tsc green, 0 warnings**.
+- **Suite line (verbatim):** `Kumunita.Web.Tests  Total: 167, Errors: 0,
+  Failed: 0, Skipped: 0, Not Run: 0, Time: 0.639s` — run in-process via
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  (per AGENTS.md, **not** `dotnet test` / VS Test Explorer). **Total: 167,
+  Errors: 0, Failed: 0, Skipped: 0** — the full suite is green; this matches
+  U7's recorded count (no tests were added or removed in U8 — a recording
+  unit).
+- **WY tests present in `WysiwygEditorTests.cs` (counted, not remembered):
+  14**, all PASS:
+  1. `WY10_RoundTrip_BoldHeadingListLinkImageCode`
+  2. `WY3_Serializer_EmitsOnlyThePinnedSubset`
+  3. `WY3_Serializer_SkipsBlankElements`
+  4. `WY3_Serializer_RejectsUnsafeImageSrc`
+  5. `WY3_Serializer_RejectsUnsafeLinkHref`
+  6. `WY5_SavedBodyIsByteIdentical`
+  7. `WY6_Sanitizer_StripsDisallowedElements`
+  8. `WY6_Sanitizer_StripsDisallowedAttributes`
+  9. `WY6_Sanitizer_StripsUnsafeHrefs`
+  10. `CompiledRichEditorJs_ContainsContentEditable`
+  11. `CompiledRichEditorJs_ContainsToMarkdown`
+  12. `CompiledRichEditorJs_ContainsDomSplice`
+  13. `WY8_TscOnly_NoEditorDependency`
+  14. `WY7_CodeViewIsReadOnlyMirror`
+- **Regression pins (both in `InlineEditorTests.cs`, both PASS):**
+  `RichEditorTextarea_IsNotDisabled_OrRemoved` (the textarea is never
+  disabled/removed — WY·2 / IE·1) and `CompiledRichEditorJs_StillExportsRePureFunctions`
+  (the 6 RE pure functions + `bindRichEditor` are still exported — the frozen
+  RE surface). Both green in the 167-test run.
+
+**Drift observation (recorded, not silently resolved — §2.9 / unit-series
+rule 6):** §2.7 pins a **17-test** list, but the authored set is **14**.
+Reconciling the two names:
+
+- **3 §2.7 names are absent** from the authored set (never authored by
+  U3–U7): `WY9_PaneIsKeyboardOperable` (§2.7 #12),
+  `CompiledRichEditorJs_ContainsSanitizer` (§2.7 #15), and
+  `RichEditorExports_AreIntact` (§2.7 #17). The behaviors they pin are
+  **indirectly covered**: WY·9 a11y via the §2.6 CSS focus-ring rule
+  (verified by U4's CSS deliverable, not by a C# test); `sanitizeHtml`
+  presence via `WY6_Sanitizer_StripsDisallowed*` (#7–#9) + the paste
+  handler's `sanitizeHtml` call (U6); and the RE exports via
+  `CompiledRichEditorJs_StillExportsRePureFunctions` (in `InlineEditorTests`).
+  So no *contract* is unverified — but the three **named** seam tests named
+  in §2.7 do not exist as tests.
+- **1 authored name is not in §2.7:** `CompiledRichEditorJs_ContainsDomSplice`
+  (U5) — it is a **newer, stronger** artifact pin (the Selection / Range API
+  splice trio) that §2.7's frozen list never anticipated.
+- **Net:** 14 authored = (11 of the 17 pinned) + (1 authored-not-pinned).
+  No test fails; no test is outside the pinned set in a *failing* way. This
+  is a **pin-list drift**, not a behavior drift. Per §2.9 a later unit (U9's
+  scope, or a future WY-2 lane) should reconcile §2.7's 17-name list with the
+  14-test authored reality — U8 **does not** rewrite §2.7 (drift-guard: the
+  17 names are frozen once written; a mismatch is recorded, not silently
+  edited).
+
+**`## U<m> — Drift pause` sections in the handoff note:** **none.** The
+`wysiwyg-handoff-notes.md` has **no** `## U<m> — Drift pause` section (U0–U7
+each closed with "No drift pause"); the single §2.4 sanitizer
+construction-drift (regex → AST, U3) was **resolved in favor of the pinned
+behavior** in U3's own section and is not an open drift. The drift
+observation above is new (surfaced by U8's count reconciliation) and is
+recorded here + in the U8 handoff section, **not** as a `## U<m> — Drift
+pause` unit-series pause — U8 has no code to block on it.
+
+*— U8 (2026-09-16). Recording unit: no code, no new tests, no CSS, no
+`.csproj` change. U9 closes the lane (ADR 0033 → Accepted + ADR index +
+`ARCHITECTURE.md` flip + the handoff `## Summary`).*

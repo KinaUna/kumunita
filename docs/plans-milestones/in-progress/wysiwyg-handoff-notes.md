@@ -615,3 +615,101 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
 - **No drift pause.** U8 runs + records the WY acceptance gate (the
   three-test gate from design doc §2.8 — closed-loop / handoff /
   part-vs-whole), per the lane register.
+
+## U8 — gate recorded
+
+- **Date:** 2026-09-16
+- **Scope:** **recording unit** — execute the automated floor (the existing
+  WY tests), attempt the two manual gates, and record the results in the
+  design doc + this handoff note. **No code, no new tests, no new CSS, no
+  `.csproj` change** (a new code unit would violate the recording scope).
+  U9 then closes the lane — **not** U8's scope.
+- **The three §2.8 gate tests (recorded, not invented):**
+  - **Closed loop — NOT RUN.** *Reason:* manual gate (open a composer, type
+    `**bold**` in the pane, save; verify the saved body + the read path);
+    U8 has no dev server / seeded DB / live browser to drive a composer
+    in-process. The **automated floor covers the same contract** without a
+    browser: `WY5_SavedBodyIsByteIdentical` (pane HTML → byte-identical
+    hand-typeable Markdown) + `WY10_RoundTrip_BoldHeadingListLinkImageCode`
+    (`toMarkdown(renderPreview(md)) === md`, bold → `<strong>` →
+    `**bold**`). **Pass not assumed** — the next unit to land the runtime
+    records the manual pass (§2.8's rule).
+  - **Handoff — NOT RUN.** *Reason:* manual gate (a heading + list + link +
+    image + code block typed in the pane; the saved body must equal the
+    hand-typeable Markdown; the `MarkdownRenderer` read path must render it
+    identically; the `ContentImageIds` parse must be untouched). The
+    **automated floor covers the same contract**: `WY10_RoundTrip_…`
+    exercises exactly that corpus against the `renderPreview` mirror **and**
+    asserts RC's `ContentImageIds` picks up the `![alt](/content-image/{id})`
+    form (RC R·3 — zero server change) + `WY5_SavedBodyIsByteIdentical`
+    pins the byte-identity. **Pass not assumed** — the next unit to land the
+    runtime records the manual pass.
+  - **Part-vs-whole — PASS (automated).** The full WY test set is the
+    *whole*; closed-loop + handoff are the *parts*. All automated WY tests
+    pass together (suite line below). This is the binding automated evidence
+    U8 can produce in-process.
+- **Automated floor (the binding evidence):**
+  - **Build:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded,
+    1 warning** (the pre-existing `WysiwygSpec` CS8604 nullability warning
+    in `WysiwygEditorTests.cs`, present since U3's C# spec mirror — **not**
+    from U8; no new warning introduced). `npm run build` (in
+    `src/Kumunita.Web`) → **tsc green, 0 warnings**.
+  - **Suite line (verbatim):** `Kumunita.Web.Tests  Total: 167, Errors: 0,
+    Failed: 0, Skipped: 0, Not Run: 0, Time: 0.639s` — run in-process via
+    `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    (per AGENTS.md, **not** `dotnet test` / VS Test Explorer). **Total: 167,
+    Errors: 0, Failed: 0, Skipped: 0** — the full suite is green; matches
+    U7's recorded 167 (no tests added/removed in U8 — a recording unit).
+  - **WY tests present in `WysiwygEditorTests.cs` (counted, not remembered):
+    14**, all PASS: `WY10_RoundTrip_BoldHeadingListLinkImageCode`,
+    `WY3_Serializer_EmitsOnlyThePinnedSubset`, `WY3_Serializer_SkipsBlankElements`,
+    `WY3_Serializer_RejectsUnsafeImageSrc`, `WY3_Serializer_RejectsUnsafeLinkHref`,
+    `WY5_SavedBodyIsByteIdentical`, `WY6_Sanitizer_StripsDisallowedElements`,
+    `WY6_Sanitizer_StripsDisallowedAttributes`, `WY6_Sanitizer_StripsUnsafeHrefs`,
+    `CompiledRichEditorJs_ContainsContentEditable`,
+    `CompiledRichEditorJs_ContainsToMarkdown`,
+    `CompiledRichEditorJs_ContainsDomSplice`, `WY8_TscOnly_NoEditorDependency`,
+    `WY7_CodeViewIsReadOnlyMirror`.
+  - **Regression pins (both in `InlineEditorTests.cs`, both PASS):**
+    `RichEditorTextarea_IsNotDisabled_OrRemoved` (the textarea is never
+    disabled/removed — WY·2 / IE·1) + `CompiledRichEditorJs_StillExportsRePureFunctions`
+    (the 6 RE pure functions + `bindRichEditor` still exported — the frozen
+    RE surface). Both green in the 167-test run.
+- **Drift observation (recorded, not silently resolved — §2.9 / unit-series
+  rule 6):** §2.7 pins a **17-test** list, but the authored set is **14**.
+  Reconciling: **3 §2.7 names are absent** (never authored by U3–U7):
+  `WY9_PaneIsKeyboardOperable` (#12), `CompiledRichEditorJs_ContainsSanitizer`
+  (#15), `RichEditorExports_AreIntact` (#17) — their behaviors are
+  **indirectly covered** (WY·9 via the §2.6 CSS focus-ring rule; `sanitizeHtml`
+  via `WY6_Sanitizer_StripsDisallowed*` #7–#9 + U6's paste handler; the RE
+  exports via `CompiledRichEditorJs_StillExportsRePureFunctions` in
+  `InlineEditorTests`) — so no *contract* is unverified, but the three
+  **named** seam tests in §2.7 do not exist as tests. **1 authored name is
+  not in §2.7:** `CompiledRichEditorJs_ContainsDomSplice` (U5) — a newer,
+  stronger artifact pin (the Selection / Range API splice trio) §2.7's frozen
+  list never anticipated. **Net:** 14 = (11 of the 17 pinned) + (1
+  authored-not-pinned). No test fails; this is a **pin-list drift, not a
+  behavior drift**. Per §2.9 a later unit (U9's scope, or a future WY-2
+  lane) should reconcile §2.7's 17-name list with the 14-test authored
+  reality; U8 **does not** rewrite §2.7 (the 17 names are frozen once
+  written; a mismatch is recorded, not silently edited).
+- **`## U<m> — Drift pause` sections in this note:** **none** (U0–U7 each
+  closed with "No drift pause"; the single §2.4 sanitizer construction-drift
+  (regex → AST) was resolved in favor of the pinned behavior in U3's own
+  section). The drift observation above is new (surfaced by U8's count
+  reconciliation) and is recorded here + in the design doc's Run-result
+  section, **not** as a `## U<m> — Drift pause` unit-series pause — U8 has no
+  code to block on it.
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched
+  (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
+- **Still-open drift:** the §2.7 17-name vs 14-authored pin-list
+  reconciliation (behavior covered; the three §2.7-named seam tests
+  `WY9_PaneIsKeyboardOperable` / `CompiledRichEditorJs_ContainsSanitizer` /
+  `RichEditorExports_AreIntact` absent; the authored
+  `CompiledRichEditorJs_ContainsDomSplice` not in §2.7) — open for U9 / a
+  future WY-2 lane.
+- **No drift pause.** U9 closes the lane (ADR 0033 → Accepted + ADR-index
+  row + the `ARCHITECTURE.md` `WYSIWYG inline editing` flip + the handoff
+  `## Summary`), per the lane register.
