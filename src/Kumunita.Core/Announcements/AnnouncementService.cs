@@ -71,7 +71,7 @@ public sealed class AnnouncementService : IAnnouncementService
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
-            .Where(a => a.IsDraft == false &&
+            .Where(a => !a.IsDraft &&
                         ((a.CommunityId == null &&
                           (a.Scope == AnnouncementScope.Public ||
                            (authed && a.Scope == AnnouncementScope.Community)))
@@ -155,7 +155,7 @@ public sealed class AnnouncementService : IAnnouncementService
         await using var session = _store.QuerySession();
         return await session
             .Query<Announcement>()
-            .Where(a => a.IsDraft == false && a.Pinned == true &&
+            .Where(a => !a.IsDraft && a.Pinned == true &&
                         ((a.CommunityId == null &&
                           (a.Scope == AnnouncementScope.Public ||
                            (authed && a.Scope == AnnouncementScope.Community)))
