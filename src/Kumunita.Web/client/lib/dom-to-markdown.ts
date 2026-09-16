@@ -293,7 +293,13 @@ function serializeNode(node: HtmlElement): string | null {
       const s = serializeNode(c);
       if (s !== null && s.length > 0) parts.push(s);
     }
-    return parts.length > 0 ? parts.join('\n') : null;
+    // Blocks are separated by a blank line (\n\n), not a bare \n — the
+    // frozen read path (MarkdownRenderer / renderPreview) treats a bare \n
+    // as a paragraph continuation (join with a space), so a bare-\n join
+    // merges distinct lines ("line breaks disappear" in the feed / on
+    // reopen). A blank-line separator is the true inverse of renderPreview
+    // and matches the design doc §2.3 table (each block = content + \n\n).
+    return parts.length > 0 ? parts.join('\n\n') : null;
   }
   if (node.tag === 'p') {
     const inline = inlineChildren(node);

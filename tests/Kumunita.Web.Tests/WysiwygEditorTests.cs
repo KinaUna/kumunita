@@ -47,10 +47,10 @@ public class WysiwygEditorTests
     public void WY10_RoundTrip_BoldHeadingListLinkImageCode()
     {
         const string md =
-            "# H\n" +
-            "World **bold** *italic* `code`\n" +
-            "- a\n- b\n" +
-            "[t](https://example.com) ![fence](/content-image/deadbeef)\n" +
+            "# H\n\n" +
+            "World **bold** *italic* `code`\n\n" +
+            "- a\n- b\n\n" +
+            "[t](https://example.com) ![fence](/content-image/deadbeef)\n\n" +
             "```js\nlet a = 1;\n```";
         var html = WysiwygSpec.RenderPreview(md);
         var back = WysiwygSpec.ToMarkdown(html);
@@ -61,6 +61,44 @@ public class WysiwygEditorTests
         // change).
         var ids = ContentImageIds.ExtractContentImageIds(back);
         Assert.Equal(new[] { "deadbeef" }, ids);
+    }
+
+    /// <summary>
+    /// Regression (the reported "line breaks disappear" symptom): two
+    /// paragraphs of body text must survive the save → feed round-trip as
+    /// two lines. The browser splits a block into two <c>&lt;p&gt;</c>
+    /// elements on Enter; before the fix the serializer joined top-level
+    /// blocks with a single <c>\n</c> — a paragraph *continuation* to the
+    /// frozen read path — so <c>"Line one\nLine two"</c> rendered in the
+    /// feed as one merged <c>&lt;p&gt;Line one Line two&lt;/p&gt;>. The
+    /// serializer must emit a blank-line (<c>\n\n</c>) separator between
+    /// blocks (design doc §2.3 table), so the read path renders them as
+    /// distinct <c>&lt;p&gt;</c> elements.
+    /// </summary>
+    [Fact]
+    public void WY10_RoundTrip_MultiParagraph_PreservesLineBreaks()
+    {
+        // The pane HTML a resident produces by typing "Line one", Enter,
+        // "Line two".
+        const string paneHtml = "<p>Line one</p><p>Line two</p>";
+        var md = WysiwygSpec.ToMarkdown(paneHtml);
+
+        // The saved body carries a blank-line separator between blocks —
+        // not a bare \n (which the frozen read path merges into one line).
+        Assert.Equal("Line one\n\nLine two", md);
+
+        // The feed (MarkdownRenderer) renders the two lines as distinct
+        // <p> elements.
+        var rendered = MarkdownRenderer.RenderHtml(md);
+        Assert.Contains("<p>Line one</p>", rendered);
+        Assert.Contains("<p>Line two</p>", rendered);
+        Assert.DoesNotContain("Line one Line two", rendered);
+
+        // Round-trip stability: re-serializing the reopened pane is
+        // byte-exact (WY·10 for the multi-paragraph shape).
+        var reopened = WysiwygSpec.RenderPreview(md);
+        Assert.Equal(paneHtml, reopened);
+        Assert.Equal(md, WysiwygSpec.ToMarkdown(reopened));
     }
 
     // ── WY3 — the serializer emits exactly the WY·3 subset ───────────────
@@ -158,10 +196,10 @@ public class WysiwygEditorTests
             "<img src=\"/content-image/deadbeef\" alt=\"fence\" class=\"rc-image\" loading=\"lazy\" /></p>" +
             "<pre><code class=\"language-js\">let a = 1;</code></pre>";
         var expectedMd =
-            "# H\n" +
-            "World **bold**\n" +
-            "- a\n- b\n" +
-            "[t](https://example.com) ![fence](/content-image/deadbeef)\n" +
+            "# H\n\n" +
+            "World **bold**\n\n" +
+            "- a\n- b\n\n" +
+            "[t](https://example.com) ![fence](/content-image/deadbeef)\n\n" +
             "```js\nlet a = 1;\n```";
 
         var got = WysiwygSpec.ToMarkdown(paneHtml);
@@ -490,10 +528,12 @@ public class WysiwygEditorTests
 /// behavior — the same WY·3-subset tag allowlist, the same
 /// attribute allowlist, the same <c>isSafeUrl</c>/<c>isSafeImageSrc</c>
 /// mirrors, the same inline-sibling convention (text nodes trimmed;
-/// siblings joined by a single space), and the same block-join
-/// convention (<c>\n</c> between blocks). It is the <b>executable
-/// spec</b>, not a second product renderer: the only shipped
-/// serializer is the TS <c>toMarkdown</c>, and the only shipped read
+/// siblings joined by a single space), and the same top-level block-join
+/// convention (a blank line, <c>\n\n</c>, between blocks — the true inverse
+/// of <c>renderPreview</c>, whose paragraph rule treats a bare <c>\n</c> as
+/// a continuation). It is the <b>executable spec</b>, not a second product
+/// renderer: the only shipped serializer is the TS <c>toMarkdown</c>, and
+/// the only shipped read
 /// path is <see cref="MarkdownRenderer"/> (both frozen, RC R·1).
 /// </summary>
 internal static class WysiwygSpec
@@ -768,7 +808,12 @@ internal static class WysiwygSpec
                 var s = SerializeNode((HtmlElementNode)c);
                 if (s is not null && s.Length > 0) parts.Add(s);
             }
-            return parts.Count > 0 ? string.Join("\n", parts) : null;
+            // Blocks are separated by a blank line (\n\n), not a bare \n —
+            // the frozen read path (MarkdownRenderer / renderPreview) treats
+            // a bare \n as a paragraph continuation (join with a space), so a
+            // bare-\n join merges distinct lines. A blank-line separator is
+            // the true inverse of renderPreview (design doc §2.3 table).
+            return parts.Count > 0 ? string.Join("\n\n", parts) : null;
         }
         if (tag == "p")
         {
