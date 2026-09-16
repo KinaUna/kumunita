@@ -713,3 +713,69 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
 - **No drift pause.** U9 closes the lane (ADR 0033 → Accepted + ADR-index
   row + the `ARCHITECTURE.md` `WYSIWYG inline editing` flip + the handoff
   `## Summary`), per the lane register.
+
+## Summary
+
+- **Date:** 2026-09-16
+- **Lane:** WYSIWYG inline editing (`WY`) — **closed** by U9. ADR 0033 is
+  **Accepted**; the ADR index (`docs/adr/README.md`) carries the 0033 row;
+  `docs/ARCHITECTURE.md` records the WY lane on the `Kumunita.Web/`
+  `client/lib/` surface (the lane is client-only — there is no
+  bounded-context line for it). This `## Summary` is the **final** handoff
+  note — it is written for the **WY-2 agent** (if one comes); there is **no
+  U10** and the lane is **closed**.
+- **Gate (recorded by U8, 2026-09-16):** automated floor **167/167 green**
+  (`Kumunita.Web.Tests  Total: 167, Errors: 0, Failed: 0, Skipped: 0, Not
+  Run: 0, Time: 0.639s`, run in-process via `dotnet exec`). **14 WY tests**
+  in `WysiwygEditorTests.cs` + 2 regression pins in `InlineEditorTests.cs`
+  (`RichEditorTextarea_IsNotDisabled_OrRemoved`,
+  `CompiledRichEditorJs_StillExportsRePureFunctions`), all PASS. The
+  **closed-loop + handoff** manual gates are recorded as **not-run** (no
+  dev server / seeded DB / live browser in-process); the automated floor
+  covers the **same contract** (`WY5_SavedBodyIsByteIdentical` +
+  `WY10_RoundTrip_BoldHeadingListLinkImageCode`).
+- **Shipped units (U0–U8):**
+
+  | Unit | One-liner goal | Test count (WY tests / suite total) | Deviations |
+  |------|----------------|--------------------------------------|------------|
+  | U0 | Kickoff verification (the 16 editor blocks / 10 view files + the RC-pinned subset) | — | none |
+  | U1 | Design doc Part 1 — the 9 invariants (WY·1–WY·9) + the 10 FACES (WY1–WY10) | — | none |
+  | U2 | Design doc Part 2 — seams/contracts + 17 pinned test names + ADR 0033 draft | — | none |
+  | U3 | The load-bearing serializer `toMarkdown` + sanitizer `sanitizeHtml` + the 9 pure-function tests | 9 (suite 162) | §2.4 sanitizer: regex → **AST** construction (resolved in favor of the pinned behavior) |
+  | U4 | The editing loop — pane `contenteditable` + `input` sync + the one CSS focus-ring rule | +2 (suite 164) | none |
+  | U5 | The toolbar rework — splice DOM (the Selection / Range API), not Markdown | +2 (suite 166) | authored `CompiledRichEditorJs_ContainsDomSplice` (not in §2.7's frozen list) |
+  | U6 | The sanitizer wired into the `paste` handler (WY·6) | +0 (suite 166) | none |
+  | U7 | The code-view rework — the `</>` toggle reveals the read-only mirror (WY·7) | +1 (suite 167) | none |
+  | U8 | Run + record the WY acceptance gate (the 3-test gate from §2.8) | +0 (suite 167, recorded) | §2.7 17-name vs 14-authored **pin-list drift** (recorded, not resolved) |
+
+- **Named deferrals (each a future WY-2 candidate; none re-opened by WY):**
+  nested lists, blockquotes, tables, footnotes, strikethrough,
+  `execCommand`-based undo/redo (the browser's native `contenteditable`
+  undo is the floor; a custom undo/redo is a future lane), mobile-specific
+  editing UX, caret-mapping between the pane and the code view, and
+  localStorage persistence of the editing preference. Each is a **future**
+  lane, not a WY re-open.
+- **Still-open drift (carried to a future WY-2 lane, or reconcilable in a
+  follow-on):** the §2.7 **pin-list drift** — §2.7 pins a **17-test** list,
+  the authored set is **14**. Absent §2.7 names (behaviors **indirectly
+  covered**, so no contract is unverified): `WY9_PaneIsKeyboardOperable`,
+  `CompiledRichEditorJs_ContainsSanitizer`, `RichEditorExports_AreIntact`.
+  Authored-not-pinned: `CompiledRichEditorJs_ContainsDomSplice`. This is a
+  **pin-list drift, not a behavior drift** (167/167 green). U9 **does not**
+  rewrite §2.7's frozen pin list — it records the change here per the
+  drift-guard (§2.9 / unit-series rule 6) and the U8 record (the design
+  doc's "Run result (WY acceptance gate — 2026-09-16)" section + this note's
+  `## U8 — gate recorded` section carry the full record).
+- **Frozen base (unchanged by the lane close):** `tsc`-only (no editor
+  dependency in `package.json`, no `.csproj` change), `Body` as a Markdown
+  `string` (RC R·7), the read path untouched (one renderer —
+  `MarkdownRenderer`, RC R·1), the saved body byte-identical Markdown
+  (RC R·3 / WY·5), and the 10 composer surfaces unchanged in shape.
+- **Lane close (U9, 2026-09-16):** ADR 0033 flipped to **Accepted**; the
+  0033 row appended to `docs/adr/README.md`; the `ARCHITECTURE.md`
+  `client/lib/` line now records the WY lane (WY ✓ live, gate summary above);
+  this `## Summary` appended. Housekeeping: `wysiwyg-handoff-notes.md` +
+  `wysiwyg-u09-plan.md` moved `in-progress/` → `done/` (via `git mv`, history
+  preserved). The register `plan-wysiwyg.md` **stays at the top level** (like
+  `plan-rich-editor.md` / `plan-inline-editor.md`). **No U10 — the lane is
+  closed.**

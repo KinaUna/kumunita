@@ -1,6 +1,6 @@
 # ADR 0033 — WYSIWYG inline editing: the rendered pane is the editable surface
 
-Status: Draft (lands in U9)
+Status: Accepted
 Date: 2026-09-15
 Amends: 0031 (D1's *"WYSIWYG = a split-view live preview, **not a
 `contenteditable`**"* non-decision — the **`tsc`-only** constraint, the

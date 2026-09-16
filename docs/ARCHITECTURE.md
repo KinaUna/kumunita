@@ -104,7 +104,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │       ├── Views/              # Razor views + Layout; per-feature folders (Account, Admin, AdminSetup, Announcement, Directory, Groups, Home, Moderation, Posts, Profile, Shared)
     │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
     │       ├── client/             # plain TS sources
-    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash
+    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash, insert-image.ts (RC 0025 upload lane), rich-editor.ts (RE 0031 / IE 0032 / WY 0033 composer surface: the toolbar, the rendered pane, the `contenteditable` editing surface, the read-only code-view mirror), dom-to-markdown.ts (WY 0033 ✓ live — `toMarkdown` serializer + `sanitizeHtml` sanitizer, the inverse of `renderPreview`; gate 167/167 green, closed-loop + handoff manual gates recorded as not-run with the automated floor covering the same contract)
     │       └── wwwroot/            # js/ (tsc output, compiled — not source), css/, lib/ (bootstrap + jQuery validation)
     └── tests/
         ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
