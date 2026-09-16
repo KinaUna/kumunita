@@ -828,6 +828,15 @@ body.kmb-page-fullbleed {
   outline: 2px solid var(--bs-primary, #0d6efd);
   outline-offset: 1px;
 }
+/* Active state (set at runtime by the binder when the caret/selection is
+   inside bold / italic / code, or the current block is H1 / H2 / H3): a
+   filled "on" look that reads clearly stronger than the hover state. */
+.rc-editor-toolbar .rc-btn.rc-btn-active {
+  background-color: rgba(13, 110, 253, 0.14);
+  border-color: var(--bs-primary, #0d6efd);
+  color: var(--bs-primary, #0d6efd);
+  font-weight: 600;
+}
 .rc-editor-pane {
   min-height: 6rem;
   max-height: 24rem;

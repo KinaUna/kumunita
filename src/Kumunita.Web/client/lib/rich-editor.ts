@@ -590,6 +590,7 @@ export function bindRichEditor(root: HTMLElement): void {
     // (d) WY·2 — the binder keeps the textarea in sync on every pane input.
     previewPane.addEventListener('input', () => {
       textarea.value = toMarkdown(previewPane.innerHTML);
+      updateToolbarActiveState(); // typing moves the caret — refresh the active button
     });
     // (e) WY·6 — the `paste` handler is the **full** handler (U6 completes
     // the U4 stub with the insert + the `toMarkdown` sync). The full
@@ -612,6 +613,7 @@ export function bindRichEditor(root: HTMLElement): void {
     if (previewPane) {
       textarea.value = toMarkdown(previewPane.innerHTML);
     }
+    updateToolbarActiveState(); // every splice ends here — refresh the active button
   };
 
   /** Get the active Selection/Range inside the pane, or `null`. */
@@ -638,12 +640,89 @@ export function bindRichEditor(root: HTMLElement): void {
     }
   };
 
+  /** Collapse the caret to just *inside* `node` (offset 0), so the next
+   *  keystroke lands in the element — the pending-format placeholder for a
+   *  collapsed selection (the resident's next characters become formatted).
+   */
+  const placeCaretInside = (node: Element): void => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    if (sel) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  /** The tags that represent each inline kind (the WY·3 subset + the
+   *  browser synonyms contenteditable sometimes emits — `<b>` / `<i>`). */
+  const INLINE_KIND_TAGS: Record<'bold' | 'italic' | 'code', Set<string>> = {
+    bold: new Set(['strong', 'b']),
+    italic: new Set(['em', 'i']),
+    code: new Set(['code']),
+  };
+
+  /** The innermost ancestor of `node` (within the pane) that is one of
+   *  `tags`, or `null` if the caret/selection is not inside such an element. */
+  const findFormattingAncestor = (
+    node: Node | null,
+    tags: Set<string>,
+  ): Element | null => {
+    let n: Node | null = node;
+    while (n && n !== previewPane) {
+      if (n.nodeType === 1) {
+        const tag = (n as Element).tagName.toLowerCase();
+        if (tags.has(tag)) return n as Element;
+      }
+      n = n.parentNode;
+    }
+    return null;
+  };
+
+  /** Toggle-off: remove `el`, keeping its content in place (the bold / italic
+   *  / code toggle-off), and select the now-inlined content so a later action
+   *  can target it. For an empty element (a pending-format placeholder) the
+   *  caret is left at the end of the containing block. */
+  const unwrapElement = (el: Element): void => {
+    const parent = el.parentNode;
+    if (!parent) return;
+    const first = el.firstChild;
+    const last = el.lastChild;
+    // A pending-format run that was never typed into holds *only* its
+    // placeholder `<br>` (an empty inline can't carry the caret, WY·4).
+    // Removing the element outright — rather than splicing the `<br>` out —
+    // avoids leaving a stray line break (which the sink would serialize as a
+    // lone space) behind in the block.
+    if (first !== null && first === last &&
+        first.nodeType === 1 && (first as Element).tagName.toLowerCase() === 'br') {
+      el.remove();
+    } else {
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      el.remove();
+    }
+    const sel = window.getSelection();
+    if (!sel) return;
+    const range = document.createRange();
+    if (first && last && first !== last) {
+      range.setStartBefore(first);
+      range.setEndAfter(last);
+    } else {
+      range.selectNodeContents(parent);
+      range.collapse(false);
+    }
+    sel.removeAllRanges();
+    sel.addRange(range);
+  };
+
   /**
    * Wrap the current selection in a fresh `<tag>` element (bold / italic /
    * code / link). Uses `range.surroundContents`; for a selection that
    * crosses element boundaries, falls back to `extractContents` +
    * `appendChild` + `insertNode` (design doc §2.5e). A collapsed / absent
-   * selection wraps a placeholder so the resident can type inside it.
+   * selection inserts an **empty** element and places the caret *inside* it,
+   * so the resident's next keystroke lands formatted (pending format) — it
+   * never inserts a literal placeholder word.
    */
   const wrapSelection = (
     tag: string,
@@ -654,15 +733,21 @@ export function bindRichEditor(root: HTMLElement): void {
     if (setAttrs) setAttrs(el);
     const range = activeRange();
     if (!range || range.collapsed) {
-      // No (or collapsed) selection — wrap a placeholder and place the
-      // caret after it so the next keystroke lands inside the element.
-      el.textContent = tag === 'a' ? '' : 'text';
+      // No (or collapsed) selection — start a **pending-format** run. An
+      // empty inline element cannot hold a caret (the first keystroke would
+      // escape it), so seed it with a `<br>` as a caret anchor: the caret sits
+      // just before the `<br>`, the first typed character replaces the `<br>`
+      // and lands *inside* the element — "click B, then type" yields **typed**
+      // text. A link run (`tag === 'a'`) stays empty (a label, not a run).
+      if (tag !== 'a') {
+        el.appendChild(document.createElement('br'));
+      }
       if (range) {
         range.insertNode(el);
       } else {
         previewPane.appendChild(el);
       }
-      placeCaretAfter(el);
+      placeCaretInside(el); // caret at offset 0 — just before the `<br>`
     } else {
       try {
         range.surroundContents(el);
@@ -685,6 +770,153 @@ export function bindRichEditor(root: HTMLElement): void {
     syncTextarea();
   };
 
+  // The inline formats currently "armed" for the next keystroke (the WYSIWYG
+  // **mode** model the toolbar expresses: click B → the resident's next typing
+  // is bold; click B again → it turns off and what was already written stays
+  // bold). Held as element tags ('strong' | 'em' | 'code'); empty until a
+  // button is clicked with a collapsed caret. Shared by the toggle handler
+  // below and the `beforeinput` handler that applies the format on first type.
+  const pendingInline = new Set<string>();
+
+  // Reverse of INLINE_KIND_TAGS — the tag → its synonym set (contenteditable
+  // sometimes emits <b>/<i> for strong/em), for the "already inside?" checks.
+  const TAG_SYNONYMS: Record<string, Set<string>> = {
+    strong: INLINE_KIND_TAGS.bold,
+    em: INLINE_KIND_TAGS.italic,
+    code: INLINE_KIND_TAGS.code,
+  };
+
+  /** Bold / italic / code — a **mode toggle** (RE2 "clicking B again toggles
+   *  it back" FACES, in the DOM-splice model): with a collapsed caret the
+   *  click **arms / disarms** the format for subsequent typing (the already
+   *  written run keeps its formatting — it is never stripped or selected away);
+   *  with a real selection it **wraps / unwraps** that selection (the classic
+   *  "select text, click B" path). Arming is applied by the `beforeinput`
+   *  handler below, which wraps the first typed character — identical and
+   *  reliable for all three kinds. */
+  const toggleInlineFormat = (kind: 'bold' | 'italic' | 'code'): void => {
+    if (!previewPane) return;
+    const tag = kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
+    const sel = window.getSelection();
+    const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const inPane =
+      range !== null && previewPane.contains(range.commonAncestorContainer);
+    const anchor = inPane
+      ? ((sel && sel.anchorNode) ?? range!.startContainer)
+      : null;
+    const formatting = findFormattingAncestor(anchor, INLINE_KIND_TAGS[kind]);
+
+    // (1) A real selection in the pane → the classic wrap / unwrap of it.
+    if (inPane && range && !range.collapsed) {
+      if (formatting) {
+        unwrapElement(formatting); // select text, then B → remove the format
+      } else {
+        wrapSelection(tag); // select text, then B → apply the format
+      }
+      pendingInline.clear();
+      syncTextarea();
+      return;
+    }
+
+    // (2) Collapsed caret (or none) → arm / disarm the *mode*.
+    const isOn = formatting !== null || pendingInline.has(tag);
+    if (isOn) {
+      // Turn the mode OFF. If the caret is inside the run, exit it (the run
+      // KEEPS its formatting — the just-written text stays bold/italic/code)
+      // rather than stripping and re-selecting it. If the run is the LAST
+      // node in its block, place the caret just before a block-end `<br>`
+      // (inserted as a caret anchor if one is not already there) — a bare
+      // caret "after an inline at the end of a block" is what Chromium
+      // silently pulls back into the element, so the `<br>` gives the caret
+      // a real, stable position outside the formatting. The `<br>` is a
+      // canonical contenteditable line break: the sink serializes it as a
+      // space (the existing `<br>` handling in `toMarkdown`), and a
+      // resident typing over it replaces it, so no artifact leaks into the
+      // saved body.
+      pendingInline.delete(tag);
+      if (formatting) {
+        const parent = formatting.parentNode;
+        if (parent && parent.lastChild === formatting) {
+          // A ZWS text node is a stable caret anchor at the end of a block
+          // (unlike <br>, it does not get absorbed by Chromium's caret
+          // normalization). The serializer strips it (see unescapeHtml) so
+          // it never leaks into the saved body.
+          const zw = document.createTextNode('\u200b');
+          parent.appendChild(zw);
+          const r = document.createRange();
+          r.setStart(zw, 1);
+          r.collapse(true);
+          const s = window.getSelection();
+          if (s) { s.removeAllRanges(); s.addRange(r); }
+        } else {
+          placeCaretAfter(formatting);
+        }
+      }
+      syncTextarea();
+    } else {
+      // Turn the mode ON — arm it for the next keystroke (the beforeinput
+      // handler below wraps the first typed character in the element).
+      pendingInline.add(tag);
+      syncTextarea();
+    }
+  };
+
+  // Where an armed inline format is applied: the **first** typed character is
+  // wrapped in the armed element(s). The element is created at the moment of
+  // typing (not on the button click) and the browser's own `insertText` lands
+  // inside it — so "click B, then type" reliably yields **bold** text for
+  // bold / italic / code alike, with no fragile empty placeholder element to
+  // lose a caret in. Subsequent keystrokes are skipped (the caret is already
+  // inside the run) until the mode is turned off.
+  const onBeforeInput = (e: InputEvent): void => {
+    if (pendingInline.size === 0) return;
+    if (e.inputType !== 'insertText') return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    const container = range.startContainer;
+    if (!previewPane || !previewPane.contains(container)) return;
+    const tags = Array.from(pendingInline);
+    // Already inside every armed run → the text lands formatted on its own.
+    if (
+      tags.every(
+        (t) => findFormattingAncestor(container, TAG_SYNONYMS[t]) !== null,
+      )
+    ) {
+      return;
+    }
+    // Deterministic insert: build the nested element(s) (earliest-armed =
+    // outermost), place the element at the caret, put the typed text inside
+    // the innermost element, and park the caret just after it. Prevent the
+    // browser's default insert so the text lands exactly where we put it —
+    // no reliance on the browser re-resolving the caret into the new element.
+    const data = e.data ?? '';
+    let innermost: Element = document.createElement(tags[tags.length - 1]);
+    let outermost = innermost;
+    for (let i = tags.length - 2; i >= 0; i--) {
+      const outer = document.createElement(tags[i]);
+      outer.appendChild(outermost);
+      outermost = outer;
+    }
+    range.insertNode(outermost);
+    const text = document.createTextNode(data);
+    innermost.appendChild(text);
+    const caretRange = document.createRange();
+    caretRange.setStartAfter(text);
+    caretRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+    e.preventDefault();
+    // We cancelled the default insert (deterministic placement), so the
+    // browser will NOT fire the `input` event the WY·2 sync listens to —
+    // keep the read-only textarea sink in sync ourselves.
+    syncTextarea();
+  };
+  if (previewPane) {
+    previewPane.addEventListener('beforeinput', onBeforeInput);
+  }
+
   /** The block-level elements the toolbar may re-tag / re-wrap. */
   const BLOCK_ELEMENT_TAGS = new Set([
     'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'pre', 'div',
@@ -704,6 +936,57 @@ export function bindRichEditor(root: HTMLElement): void {
     }
     return null;
   };
+
+  /** Reflect the caret's formatting on the toolbar: highlight (and set
+   *  `aria-pressed` on) the bold / italic / code button when the caret or
+   *  selection is inside that inline element, and the H1 / H2 / H3 button
+   *  when the current block is a matching heading. The non-toggle buttons
+   *  (list / link / image) are left untouched — they are not toggles. */
+  const updateToolbarActiveState = (): void => {
+    if (!previewPane || !toolbar) return;
+    const sel = window.getSelection();
+    const anchor =
+      sel && sel.rangeCount > 0
+        ? (sel.anchorNode ?? sel.getRangeAt(0).startContainer)
+        : null;
+    const inPane = anchor !== null && previewPane.contains(anchor);
+    const block = inPane ? currentBlock() : null;
+    for (const btn of toolbar.querySelectorAll<HTMLButtonElement>('button[data-md]')) {
+      const kind = btn.dataset.md;
+      if (
+        kind !== 'bold' && kind !== 'italic' && kind !== 'code' &&
+        kind !== 'h1' && kind !== 'h2' && kind !== 'h3'
+      ) {
+        continue; // not a toggle-highlightable button (list / link / image)
+      }
+      let active = false;
+      if (kind === 'bold' || kind === 'italic' || kind === 'code') {
+        const tag =
+          kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
+        active =
+          pendingInline.has(tag) ||
+          (inPane &&
+            findFormattingAncestor(anchor, INLINE_KIND_TAGS[kind]) !== null);
+      } else {
+        active = block !== null && block.tagName.toLowerCase() === kind;
+      }
+      btn.classList.toggle('rc-btn-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+  };
+
+  // The caret can move without a splice (clicking into existing bold text,
+  // arrow-key navigation, typing) — `selectionchange` is the single reliable
+  // hook that covers all of them. Filtered to the pane so a caret elsewhere
+  // (or the read-only source view) doesn't churn the toolbar state.
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchor = sel.anchorNode;
+    if (anchor && previewPane && previewPane.contains(anchor)) {
+      updateToolbarActiveState();
+    }
+  });
 
   /** Change the current block's tag to `<h1>` / `<h2>` / `<h3>` (WY·4). */
   const changeBlockTag = (tag: string): void => {
@@ -798,13 +1081,23 @@ export function bindRichEditor(root: HTMLElement): void {
     const kind = btn.dataset.md;
     if (!kind) continue;
 
+    // Keep the caret + selection in the **pane** when a toolbar button is
+    // pressed. A normal mousedown would focus the button (it is focusable),
+    // stealing focus from the contenteditable — the subsequent keystrokes
+    // would then type into the button (or nowhere) instead of the pane.
+    // The click event still fires (preventDefault only cancels the default
+    // focus change), so the handler below runs with the pane's selection
+    // intact. This is the standard contenteditable-toolbar pattern.
+    btn.addEventListener('mousedown', (e: Event) => {
+      e.preventDefault();
+    });
+
     btn.addEventListener('click', () => {
       if (kind === 'bold' || kind === 'italic' || kind === 'code') {
-        // Wrap the selection in <strong> / <em> / <code> (Selection/Range
-        // API on the contenteditable pane).
-        const tag =
-          kind === 'bold' ? 'strong' : kind === 'italic' ? 'em' : 'code';
-        wrapSelection(tag);
+        // Bold / italic / code is a toggle: unwrap if the caret/selection is
+        // already inside the kind's element, otherwise wrap (or, for a
+        // collapsed selection, start a pending-format run).
+        toggleInlineFormat(kind);
       } else if (
         kind === 'h1' ||
         kind === 'h2' ||

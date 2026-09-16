@@ -497,9 +497,9 @@ works exactly as it did before WY (the IE no-op guard). The WY block:
 
   | Button (`data-md`) | DOM splice into the pane (Selection / Range API) |
   |--------------------|--------------------------------------------------|
-  | **bold** | wrap the selection in `<strong>` (`range.surroundContents` or the `extractContents` + `appendChild` + `insertNode` fallback for a selection that crosses element boundaries) |
-  | **italic** | wrap the selection in `<em>` (same construction) |
-  | **code** | wrap the selection in `<code>` (same construction) |
+  | **bold** | a **mode toggle** (see below): with a real selection wrap it in `<strong>`; with a collapsed caret arm / disarm bold for subsequent typing (the first typed character is wrapped in `<strong>`) |
+  | **italic** | a **mode toggle** in `<em>` (same construction as bold) |
+  | **code** | a **mode toggle** in `<code>` (same construction as bold) |
   | **h1** / **h2** / **h3** | change the current block's tag to `<h1>` / `<h2>` / `<h3>` (the caret is placed inside the new heading) |
   | **ul** (•) | wrap the current block's text in `<ul><li>` |
   | **ol** (1.) | wrap the current block's text in `<ol><li>` |
@@ -509,6 +509,64 @@ works exactly as it did before WY (the IE no-op guard). The WY block:
   **After every splice**, the toolbar calls `textarea.value =
   toMarkdown(pane.innerHTML)` (WY·2 — the binder keeps the textarea in
   sync).
+
+  **Bold / italic / code are mode toggles** (the RE2 FACES — "clicking B
+  again toggles it back" — expressed as a WYSIWYG *mode*, not as
+  "un-format what you just wrote"). The handler branches on the caret /
+  selection:
+
+  - **A real selection** → the classic wrap / unwrap of *that* text: if the
+    selection is already inside the kind's element, **unwrap** it (the tag is
+    removed and the text stays in place); otherwise **wrap** it in the tag.
+    This is the "select text, click B" path and is unchanged.
+  - **A collapsed caret (the "click B, then type" path)** → **arm / disarm
+    the mode** for subsequent typing, held in a small `pendingInline` set
+    (empty until armed):  
+    - *Arming*: the format is turned **on** for what the resident types next.
+    - *Disarming*: the format is turned **off** — the already-written run
+    **keeps** its formatting (it is never stripped or re-selected). This is
+    what "clicking B again" means in every WYSIWYG editor, and it fixes the
+    "second click selects the text just written and removes the tags" bug.
+    - *Applying the arm*: the **first** typed character is wrapped. A
+    `beforeinput` handler (only active while something is armed) intercepts
+    the first `insertText`, creates the element (or elements — several formats
+    can be armed at once, nesting outermost = earliest-armed), inserts it at
+    the caret, places the typed text inside, parks the caret just after it,
+    and `preventDefault()`s the default insert so the text lands exactly there.
+    This is **identical and deterministic for bold / italic / code** — there
+    is no empty placeholder element to lose a caret in (the earlier `<br>`
+    placeholder approach was fragile and the source of the italic-specific
+    failure). Because the default insert is cancelled, the handler calls
+    `syncTextarea()` itself to keep the WY·2 read-only sink in sync.
+
+  **The toolbar reflects the caret's state (active buttons).** A
+  `selectionchange` listener (filtered to the pane) plus a call after every
+  splice and every `input` call `updateToolbarActiveState()`: the bold /
+  italic / code button is highlighted (`.rc-btn-active`, `aria-pressed`) when
+  the format is **armed** (in `pendingInline`) **or** the caret / selection is
+  inside that inline element, and the H1 / H2 / H3 button when the current
+  block is a matching heading. The non-toggle buttons (list / link / image)
+  are left untouched — they are not toggles.
+
+  **Toolbar buttons do not steal focus from the pane.** Each
+  `button[data-md]` carries a `mousedown → preventDefault()` handler so
+  clicking a toolbar button does not move focus to the button — the caret and
+  selection in the `contenteditable` pane survive the click, so the
+  resident's subsequent keystrokes land in the pane (not in the button).
+  The `click` event still fires (only the default focus change is cancelled).
+  Without this the "click B, then type" flow was broken — the keystrokes
+  went to the now-focused button, not the pane.
+
+  **Disarm at end of block uses a ZWS caret anchor.** When the resident
+  disarms a format (clicks B to turn it off) and the run is the last node in
+  its block, a zero-width-space text node (U+200B) is inserted after the run
+  and the caret is placed just after the ZWS character. A bare caret
+  "after an inline at the end of a block" is what Chromium silently pulls
+  back *into* the element (a known contenteditable quirk), so the ZWS gives
+  the caret a stable position outside the formatting. The serializer
+  (`unescapeHtml` in `dom-to-markdown.ts`) strips ZWS from the output so it
+  never leaks into the saved body — the pane DOM may carry it as a caret
+  anchor, but the textarea sink and the saved Markdown do not.
 - **(f)** reworks the **`data-ie-toggle` button's click handler** (U7) so the
   code view is a **read-only mirror**: the two states are (1) **pane only**
   (the default — the textarea is hidden by the `rc-editor-source-hidden`

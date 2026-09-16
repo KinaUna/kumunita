@@ -123,6 +123,43 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
 because it starts `postgres:18` via Testcontainers (and leaves Docker containers
 behind if the process is killed — clean up with `docker container prune`).
 
+## Using the browser (trusted-folder quirk)
+
+The integrated browser (Playwright) can only open files in **trusted**
+folders. The Windows system temp folder (e.g. `%LOCALAPPDATA%\Temp\...`) is
+not trusted: any `file://` URL pointing there returns a **403 "Forbidden.
+File does not reside within a trusted folder."** error — and overwriting an
+already-trusted file in that folder *invalidates* its trust (a previously
+shared page stops loading). This wastes a lot of time: the harness looks
+broken (JS leaks, page errors, typing "does nothing") when the real cause is
+the untrusted path.
+
+The reliable setup (already in the repo):
+
+- **`d:\repos\kumunita\.tmp\`** — a gitignored scratch folder (see
+  `.gitignore`). Files under the repo root **are** trusted, so a browser
+  harness placed here loads and runs fine.
+- **`.tmp\build-harness.js`** — regenerates `.tmp\harness.html` by inlining
+  the **real** compiled JS (`wwwroot/js/lib/rich-editor.js` +
+  `dom-to-markdown.js`, with `import`/`export` stripped and any `</script>`
+  in JS doc-comments escaped to `<\/script>` so it doesn't close the inline
+  `<script>` early). Run it with `node .tmp\build-harness.js` after every
+  `npm --prefix src/Kumunita.Web run build`.
+- The harness mirrors the real toolbar/pane/textarea markup (from
+  `Views/Announcement/Edit.cshtml`) so `bindRichEditor` self-wires exactly as
+  in the app.
+
+Rules:
+
+1. **Never put browser harness files in the system temp folder.** Use
+   `.tmp/` (in-repo, gitignored).
+2. **Re-run `node .tmp\build-harness.js` after each TS recompile** so the
+   harness picks up the latest `wwwroot/js` output — a stale harness will
+   test the wrong code.
+3. **Drive with real `page.keyboard.type`** once the page is trusted — the
+   in-repo harness gives a working, faithful proxy for contenteditable
+   behavior (the old untrusted setup could not).
+
 ## Running PowerShell commands safely (Windows agents)
 
 If you run terminal commands on this machine, the shell is PowerShell. PowerShell

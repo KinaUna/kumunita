@@ -71,7 +71,11 @@ function unescapeHtml(s: string): string {
     // leak verbatim into the saved Markdown body (where the read-path renderer
     // would escape the `&` and render the literal text). A regular space is the
     // hand-typeable, byte-identical choice (WY·10).
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&nbsp;/g, ' ')
+    // Zero-width spaces (U+200B) are used as caret anchors by the editor's
+    // disarm path and are never user-typed content — strip them so they
+    // cannot leak verbatim into the saved body.
+    .replace(/\u200b/g, '');
 }
 
 function isSafeUrl(url: string): boolean {
