@@ -820,6 +820,15 @@ body.kmb-page-fullbleed {
   cursor: pointer;
   color: inherit;
 }
+/* Icon buttons (Link / Image / Attach file): center the inline SVG both
+   vertically and horizontally — the padding above is tuned for text, so give
+   the icon a small gap on each side and vertical-center it. */
+.rc-editor-toolbar .rc-btn svg {
+  display: block;
+  margin: 0 auto;
+  width: 1rem;
+  height: 1rem;
+}
 .rc-editor-toolbar .rc-btn:hover {
   background-color: rgba(31, 42, 37, 0.08);
   border-color: var(--kmb-border, rgba(31, 42, 37, 0.15));
