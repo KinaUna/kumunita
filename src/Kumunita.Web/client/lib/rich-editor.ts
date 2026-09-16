@@ -381,7 +381,7 @@ export function applyBlock(
 /**
  * RE·2 — wrap a selection in `[label](url)`. Pure.
  *
- * The URL comes from a `prompt` in the binder (`bindRichEditor`); this
+ * The URL comes from the Link modal in the binder (`bindRichEditor`); this
  * function is a pure text splice.
  */
 export function applyLink(
@@ -455,6 +455,273 @@ export function isSafeImageSrc(src: string): boolean {
   // no whitespace. (Defensive; the route branch is the intended
   // producer.)
   return !src.includes(':') && !src.startsWith('//') && !/\s/.test(src);
+}
+
+// ── Toolbar modals (Link / Attach file) ──────────────────────────────────
+// The Link and Attach-file toolbar actions previously used
+// `window.prompt` / `window.alert`. They now open a single shared Bootstrap
+// modal (Bootstrap JS is loaded globally in the layout —
+// `bootstrap.bundle.min.js`, so `bootstrap.Modal` is available in the
+// browser). The module also self-wires in a non-DOM test environment, so
+// every DOM touch below is lazy + guarded: the modal element is created on
+// first open, in a browser only. The pure splice helpers (`applyLink`,
+// `attachLink`, `isSafeUrl`, …) and the per-editor DOM splices
+// (`wrapSelection`, the attach `<a>` insert) are untouched — the modal only
+// collects the URL / label / file and hands them back to the editor's
+// `onConfirm` closure.
+//
+// One modal is shared by every editor on a page (multiple reply composers
+// each bind their own toolbar); the per-editor behavior comes from the
+// `onConfirm` closure the button handler passes in, which closes over that
+// editor's `wrapSelection` / `activeRange` / `syncTextarea`.
+type RcmModalInstance = {
+  show: () => void | Promise<unknown>;
+  hide: () => void | Promise<unknown>;
+};
+type RcmModalCtor = new (el: HTMLElement) => RcmModalInstance;
+type RcmField = {
+  id: string;
+  label: string;
+  type: 'url' | 'text' | 'file';
+  value?: string;
+  placeholder?: string;
+  required?: boolean;
+};
+type RcmOpts = {
+  title: string;
+  fields: RcmField[];
+  confirmLabel: string;
+  busyLabel: string;
+  onConfirm: () => boolean | Promise<boolean>;
+};
+
+let rcmEl: HTMLDivElement | null = null;
+let rcmInstance: RcmModalInstance | null = null;
+let rcmSavedRange: Range | null = null;
+let rcmBusy = false;
+
+function rcmModalCtor(): RcmModalCtor {
+  // `bootstrap` is the global from `bootstrap.bundle.min.js` (loaded in the
+  // layout, before the module scripts). Guarded: a non-DOM / SSR context has
+  // no `bootstrap`, and the modal is only ever opened from a click handler.
+  const w = window as unknown as {
+    bootstrap?: { Modal?: RcmModalCtor };
+  };
+  const Ctor = w.bootstrap?.Modal;
+  if (!Ctor) throw new Error('Bootstrap modal is unavailable.');
+  return Ctor;
+}
+
+function rcmInstance0(): RcmModalInstance {
+  if (rcmInstance && rcmEl?.isConnected) return rcmInstance;
+  if (rcmEl) rcmEl.remove();
+  rcmEl = document.createElement('div');
+  rcmEl.className = 'modal fade';
+  rcmEl.setAttribute('tabindex', '-1');
+  rcmEl.setAttribute('role', 'dialog');
+  rcmEl.setAttribute('aria-modal', 'true');
+  rcmEl.setAttribute('aria-hidden', 'true');
+  rcmEl.innerHTML =
+    '<div class="modal-dialog modal-dialog-centered">' +
+      '<div class="modal-content">' +
+        '<div class="modal-header">' +
+          '<h5 class="modal-title"></h5>' +
+          '<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>' +
+        '</div>' +
+        '<div class="modal-body"></div>' +
+        '<div class="modal-footer"></div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(rcmEl);
+  // `rcmModalCtor()` is the factory that returns the Bootstrap `Modal`
+  // constructor; `new … (rcmEl)` instantiates it against our element.
+  const inst = new (rcmModalCtor())(rcmEl);
+  rcmInstance = inst;
+  return inst;
+}
+
+function rcmField(id: string): HTMLInputElement {
+  return rcmEl!.querySelector<HTMLInputElement>('#' + id)!;
+}
+
+function rcmSetFieldError(id: string, message: string | null): void {
+  const field = rcmField(id);
+  const fb =
+    field.parentElement?.querySelector<HTMLElement>('.invalid-feedback') ??
+    null;
+  if (message) {
+    field.classList.add('is-invalid');
+    field.setAttribute('aria-invalid', 'true');
+    if (fb) {
+      fb.textContent = message;
+      fb.style.display = 'block';
+    }
+  } else {
+    field.classList.remove('is-invalid');
+    field.removeAttribute('aria-invalid');
+    if (fb) fb.style.display = 'none';
+  }
+}
+
+function rcmConfirmBtn(): HTMLButtonElement {
+  return rcmEl!.querySelector<HTMLButtonElement>('button.rcm-confirm')!;
+}
+
+function rcmSetBusy(
+  busy: boolean,
+  labels: { confirm: string; busy: string },
+): void {
+  rcmBusy = busy;
+  const btn = rcmConfirmBtn();
+  btn.disabled = busy;
+  if (busy) {
+    btn.innerHTML =
+      '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' +
+      htmlEscape(labels.busy);
+  } else {
+    btn.textContent = labels.confirm;
+  }
+}
+
+function rcmClearError(): void {
+  const slot = rcmEl?.querySelector<HTMLElement>('.rcm-error');
+  if (slot) slot.style.display = 'none';
+}
+
+function rcmShowError(message: string): void {
+  let slot = rcmEl!.querySelector<HTMLElement>('.rcm-error');
+  if (!slot) {
+    slot = document.createElement('div');
+    slot.className = 'rcm-error alert alert-danger mt-3';
+    slot.setAttribute('role', 'alert');
+    rcmEl!.querySelector('.modal-body')!.appendChild(slot);
+  }
+  slot.textContent = message;
+  slot.style.display = 'block';
+}
+
+function rcmSaveRange(): void {
+  const sel = window.getSelection();
+  rcmSavedRange =
+    sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+}
+
+function rcmRestoreRange(): void {
+  if (!rcmSavedRange) return;
+  const sel = window.getSelection();
+  if (!sel) return;
+  sel.removeAllRanges();
+  sel.addRange(rcmSavedRange);
+}
+
+function rcmAnyFilled(fields: RcmField[]): boolean {
+  return fields.every((f) => {
+    if (!f.required) return true;
+    const input = rcmField(f.id);
+    if (input.type === 'file') return input.files && input.files.length > 0;
+    return input.value.trim().length > 0;
+  });
+}
+
+function rcmFieldGroup(f: RcmField): HTMLElement {
+  const group = document.createElement('div');
+  group.className = 'mb-3';
+
+  const label = document.createElement('label');
+  label.htmlFor = f.id;
+  label.textContent = f.label;
+  group.appendChild(label);
+
+  const input = document.createElement('input');
+  input.id = f.id;
+  input.className = 'form-control';
+  if (f.type === 'file') {
+    input.type = 'file';
+  } else {
+    input.type = f.type; // 'url' | 'text'
+    input.value = f.value ?? '';
+    if (f.placeholder) input.placeholder = f.placeholder;
+  }
+  group.appendChild(input);
+
+  const fb = document.createElement('div');
+  fb.className = 'invalid-feedback';
+  fb.style.display = 'none';
+  group.appendChild(fb);
+
+  return group;
+}
+
+function rcmPresent(opts: RcmOpts): void {
+  const modal = rcmInstance0();
+  rcmBusy = false;
+
+  rcmEl!.querySelector('.modal-title')!.textContent = opts.title;
+
+  const body = rcmEl!.querySelector('.modal-body')!;
+  body.textContent = '';
+  const form = document.createElement('form');
+  form.id = 'rcm-form';
+  for (const f of opts.fields) form.appendChild(rcmFieldGroup(f));
+  body.appendChild(form);
+
+  const footer = rcmEl!.querySelector('.modal-footer')!;
+  footer.textContent = '';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn-secondary';
+  cancel.dataset.bsDismiss = 'modal';
+  cancel.textContent = 'Cancel';
+  footer.appendChild(cancel);
+  // The confirm button lives in the footer, OUTSIDE the (body) form, so it
+  // is associated with that form via the `form` attribute. `type="submit"`
+  // then dispatches the form's `submit` event (handled below) on click,
+  // and pressing Enter in any field submits the same way.
+  const confirm = document.createElement('button');
+  confirm.type = 'submit';
+  // Associate with the (body) form without nesting (the `form` IDL property
+  // is read-only; set the `form` content attribute instead).
+  confirm.setAttribute('form', 'rcm-form');
+  confirm.className = 'btn btn-primary rcm-confirm';
+  confirm.textContent = opts.confirmLabel;
+  footer.appendChild(confirm);
+
+  rcmConfirmBtn().disabled = !rcmAnyFilled(opts.fields);
+  for (const f of opts.fields) {
+    if (!f.required) continue;
+    const revalidate = () => {
+      rcmConfirmBtn().disabled = !rcmAnyFilled(opts.fields);
+    };
+    rcmField(f.id).addEventListener('input', revalidate);
+    rcmField(f.id).addEventListener('change', revalidate);
+  }
+
+  form.addEventListener('submit', async (e: SubmitEvent) => {
+    e.preventDefault();
+    if (rcmBusy) return;
+    if (rcmConfirmBtn().disabled) return;
+    rcmSetBusy(true, { confirm: opts.confirmLabel, busy: opts.busyLabel });
+    let shouldClose = false;
+    try {
+      shouldClose = await opts.onConfirm();
+    } catch (err) {
+      rcmSetBusy(false, { confirm: opts.confirmLabel, busy: opts.busyLabel });
+      rcmShowError(
+        err instanceof Error ? err.message : 'Something went wrong.',
+      );
+      return;
+    }
+    rcmSetBusy(false, { confirm: opts.confirmLabel, busy: opts.busyLabel });
+    if (shouldClose) modal.hide();
+    // else: a required-field / safety error was set in onConfirm — the
+    // modal stays open so the resident can correct it.
+  });
+
+  const first = rcmField(opts.fields[0].id);
+  rcmEl!.addEventListener('shown.bs.modal', () => first.focus(), {
+    once: true,
+  });
+  modal.show();
 }
 
 // ── Binder (RE·1, D1/D2 — the one DOM-touching export) ────────────────────
@@ -1121,14 +1388,43 @@ export function bindRichEditor(root: HTMLElement): void {
         // Wrap the current block's text in <ul><li> / <ol><li>.
         wrapBlockInList(kind);
       } else if (kind === 'link') {
-        const url = window.prompt('URL:') ?? '';
-        if (url && isSafeUrl(url)) {
-          // Wrap the selection in <a href="…">. A rejected url (empty or
-          // the isSafeUrl reject) leaves the selection as plain text — no
-          // <a> is spliced (the renderPreview / toMarkdown reject
-          // precedent, RC R·2).
-          wrapSelection('a', (el) => el.setAttribute('href', url));
-        }
+        // The URL is collected in a modal (no more `window.prompt`), then the
+        // selection is wrapped in `<a href="…">`. A rejected url (empty or
+        // the isSafeUrl reject) shows a field error and leaves the selection
+        // as plain text — no `<a>` is spliced (the renderPreview / toMarkdown
+        // reject precedent, RC R·2).
+        rcmSaveRange();
+        rcmPresent({
+          title: 'Insert link',
+          fields: [
+            {
+              id: 'rcm-url',
+              label: 'URL',
+              type: 'url',
+              placeholder: 'https://…',
+              required: true,
+            },
+          ],
+          confirmLabel: 'Insert link',
+          busyLabel: 'Inserting…',
+          onConfirm: () => {
+            const url = rcmField('rcm-url').value.trim();
+            if (!url) {
+              rcmSetFieldError('rcm-url', 'Enter a URL.');
+              return false;
+            }
+            if (!isSafeUrl(url)) {
+              rcmSetFieldError(
+                'rcm-url',
+                'Use an http(s), mailto, or relative URL.',
+              );
+              return false;
+            }
+            rcmRestoreRange();
+            wrapSelection('a', (el) => el.setAttribute('href', url));
+            return true;
+          },
+        });
       } else if (kind === 'image') {
         // Reuse the **RC upload lane** — the same `POST /content-image`
         // endpoint the RE image path used (RE·3: no new route, no second
@@ -1194,29 +1490,42 @@ export function bindRichEditor(root: HTMLElement): void {
         });
         fileInput.click();
       } else if (kind === 'attach') {
-        // ATT U10 (C-ATT·2) — reuse the **U8 upload lane** (`POST /attachment`,
-        // the same `apiFetch` convention — no new `api.ts` method), but splice
-        // an **`<a>` link** (a download), not an `<img>`. The label is
-        // prompted (the link convention); the id is the U8 content-hash.
-        // **No** `<img>`/blob-preview/`data-cid` — that is the image lane
-        // (C-ATT·9); an attachment is a link, not a second image (C-ATT·2).
-        const label = window.prompt('Link text:', 'Attachment') ?? 'Attachment';
-        if (!label) return;
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        // No `accept` restriction — the U8 allowlist is the gate (C-ATT·6);
-        // a rejected type 415s and the handler alerts. `accept` is a UX
-        // nicety, not a security boundary (left unset — any file).
-        fileInput.addEventListener('change', async () => {
-          const file = fileInput.files?.[0];
-          if (!file) return;
-          try {
+        // ATT U10 (C-ATT·2) — the file is collected in a modal (no more
+        // `window.prompt`), uploaded through the **U8 upload lane**
+        // (`POST /attachment`, the same `apiFetch` convention — no new
+        // `api.ts` method), then spliced as an **`<a>` link** (a download),
+        // not an `<img>`. **No** `<img>`/blob-preview/`data-cid` — that is
+        // the image lane (C-ATT·9); an attachment is a link, not a second
+        // image (C-ATT·2). A rejected type 415s and the error is shown in
+        // the modal (C-ATT·6); the label defaults to "Attachment".
+        rcmSaveRange();
+        rcmPresent({
+          title: 'Attach file',
+          fields: [
+            { id: 'rcm-file', label: 'File', type: 'file', required: true },
+            {
+              id: 'rcm-attach-label',
+              label: 'Link text',
+              type: 'text',
+              value: 'Attachment',
+            },
+          ],
+          confirmLabel: 'Attach',
+          busyLabel: 'Uploading…',
+          onConfirm: async () => {
+            const file = rcmField('rcm-file').files?.[0];
+            if (!file) {
+              rcmSetFieldError('rcm-file', 'Choose a file to attach.');
+              return false;
+            }
+            const label =
+              rcmField('rcm-attach-label').value.trim() || 'Attachment';
             const fd = new FormData();
             fd.append('file', file);
-            const { id } = await apiFetch<{ id: string }>(
-              '/attachment',
-              { method: 'POST', body: fd },
-            );
+            const { id } = await apiFetch<{ id: string }>('/attachment', {
+              method: 'POST',
+              body: fd,
+            });
             // F9: the value is the exact /attachment/{id} form U7's
             // AttachmentIds.ExtractAttachmentIds parses (zero server change).
             // Splice an <a> at the caret (the link convention), then sync.
@@ -1224,22 +1533,19 @@ export function bindRichEditor(root: HTMLElement): void {
             const a = document.createElement('a');
             a.setAttribute('href', canonical);
             a.textContent = label;
+            rcmRestoreRange();
             const range = activeRange();
             if (range) {
               range.deleteContents();
               range.insertNode(a);
-            } else {
-              previewPane!.appendChild(a);
+            } else if (previewPane) {
+              previewPane.appendChild(a);
             }
             placeCaretAfter(a);
             syncTextarea();
-          } catch (err) {
-            window.alert(
-              err instanceof Error ? err.message : 'Upload failed.',
-            );
-          }
+            return true;
+          },
         });
-        fileInput.click();
       }
     });
   }
