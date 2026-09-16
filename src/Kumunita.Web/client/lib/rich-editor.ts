@@ -508,21 +508,41 @@ export function bindRichEditor(root: HTMLElement): void {
   renderPane(); // initial render (so the preview is populated on load)
 
   // IE·1, D1/D2 — the view toggle (additive; the existing wiring is
-  // untouched). Finds the data-ie-toggle button, sets the initial
-  // state (source hidden, pane visible), and wires the click to
-  // toggle the source visibility + swap the button's label.
+  // untouched). WY U7 rework (design doc §2.5f): the `</>` button's
+  // semantics change from "toggle the editable source's visibility" to
+  // "toggle the **read-only** code view's visibility". The two states
+  // (WY·7):
+  //   (1) **pane only** (the default — the textarea is hidden by the
+  //       `rc-editor-source-hidden` class, unchanged from IE);
+  //   (2) **pane + code view** (the textarea is revealed by removing
+  //       `rc-editor-source-hidden`; the textarea is **read-only** —
+  //       `readOnly = true`, WY·2 / WY·7 — the resident never types into
+  //       the mirror; the pane stays editable + visible in both states —
+  //       WY·1, the code view is a mirror, not a mode switch).
+  // The label swap (the `rc.editor.source` / `rc.editor.showPreview`
+  // keys via the `<kw-l>` element) is **kept** — the
+  // `_RichEditorToggle` partial resolves them server-side, unchanged
+  // from IE.
   // If the button is absent (a view not yet updated), this block is a
   // no-op — the editor works exactly as it did before IE.
   const toggle = root.querySelector<HTMLButtonElement>('button[data-ie-toggle]');
   if (toggle) {
     const srcHidden = 'rc-editor-source-hidden';
-    const paneActive = 'rc-editor-pane-active';
-    const setView = (showSource: boolean): void => {
-      textarea.classList.toggle(srcHidden, !showSource);
-      if (previewPane) previewPane.classList.toggle(paneActive, showSource);
-      // Label swap: the button carries both labels as data-* attributes
-      // (data-ie-label-source / data-ie-label-preview), resolved server-side
-      // by the _RichEditorToggle partial (ITranslationProvider → en floor).
+    // WY·7 / WY·2 — the textarea is the read-only sink (the server binds
+    // it on submit, RC R·3 / RE·1); the resident never types into the
+    // mirror. Set once, independent of the two view states — the pane
+    // is the editing surface in both (WY·1).
+    textarea.readOnly = true;
+    const setView = (showCodeView: boolean): void => {
+      // WY·7 — the code view is a **mirror**, not a mode switch: the
+      // textarea's visibility is toggled (hidden by the
+      // `rc-editor-source-hidden` class, unchanged from IE) while the
+      // pane stays editable + visible in both states (WY·1).
+      textarea.classList.toggle(srcHidden, !showCodeView);
+      // Label swap (kept unchanged from IE): the button carries both
+      // labels as data-* attributes (data-ie-label-source /
+      // data-ie-label-preview), resolved server-side by the
+      // _RichEditorToggle partial (ITranslationProvider → en floor).
       // The <kw-l> element's textContent is the load-bearing live path;
       // the <kw-l> key attribute swap is the a11y / HTML-source pin.
       // If the data-* attrs are absent (a legacy button without the
@@ -531,15 +551,17 @@ export function bindRichEditor(root: HTMLElement): void {
       const labelPreview  = toggle.dataset.ieLabelPreview  ?? 'Preview';
       const kw = toggle.querySelector('kw-l');
       if (kw) {
-        kw.setAttribute('key', showSource ? 'rc.editor.showPreview' : 'rc.editor.source');
-        kw.textContent = showSource ? labelPreview : labelSource;
+        kw.setAttribute('key', showCodeView ? 'rc.editor.showPreview' : 'rc.editor.source');
+        kw.textContent = showCodeView ? labelPreview : labelSource;
       }
     };
-    setView(false); // IE·1: the rendered pane is the default view (source hidden).
+    setView(false); // WY·7 state (1) — the editable pane is the default view (code view hidden).
     toggle.addEventListener('click', () => {
-      // Flip the view: currently hidden (class present) → show source;
-      // currently visible (class absent) → hide it again. The argument is
-      // the current "is hidden?" state, so each click inverts it.
+      // Flip the code view: currently hidden (class present) → reveal the
+      // read-only mirror; currently visible (class absent) → hide it
+      // again. The argument is the current "is hidden?" state, so each
+      // click inverts it. The pane stays editable + visible throughout
+      // (WY·1 — the code view is a mirror, not a mode switch).
       setView(textarea.classList.contains(srcHidden));
     });
   }

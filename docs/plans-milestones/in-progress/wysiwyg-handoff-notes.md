@@ -518,3 +518,100 @@ Part 1 against the 16-block / 10-file list and the RC subset above.
   is revealed by removing `rc-editor-source-hidden`; the textarea's
   `readOnly` property is set by the binder; the label swap is kept), per
   §2.5(f).
+
+## U7 — code view rework
+
+- **Date:** 2026-09-16
+- **Authored (1 file modified + 1 test file extended + 1 rebuilt
+  artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the **IE toggle block**
+  in `bindRichEditor` is **reworked in place** (design doc §2.5(f) + §2.2
+  — the primary sources). The same `button[data-ie-toggle]` stays; its
+  **semantics** change from "toggle the source's visibility (an editable
+  source)" to "toggle the **code view's** visibility (a read-only
+  mirror)". Concretely: (a) the `setView(showSource)` parameter is
+  re-named to `setView(showCodeView)` — the body's `classList.toggle`
+  line is unchanged (the textarea's reveal/hide is still the
+  `rc-editor-source-hidden` class, unchanged from IE); (b)
+  `textarea.readOnly = true` is set **once** in the `if (toggle)` block,
+  before `setView` (WY·7 / WY·2 — the textarea is the read-only sink the
+  server binds on submit, RC R·3 / RE·1 / IE·1 unchanged; the resident
+  never types into the mirror); (c) the unused `paneActive`
+  (`rc-editor-pane-active`) constant + its `previewPane.classList.toggle`
+  line are **removed** — the IE "pane-active" marker had no meaning once
+  the pane is the editing surface in both states (WY·1 — the code view is
+  a mirror, not a mode switch; the pane stays editable + visible in both
+  states); (d) the label swap (the `rc.editor.source` /
+  `rc.editor.showPreview` keys via the `<kw-l>` element's `textContent` +
+  `key` attribute) is **kept verbatim** — the `_RichEditorToggle.cshtml`
+  partial is **unchanged** (the partial resolves both labels
+  server-side; the binder reads them via `data-ie-label-source` /
+  `data-ie-label-preview`). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — **1** new
+  artifact-string pin appended (U3's 9 + U4's 2 + U5's 2 = **13** WY
+  tests **untouched**): `WY7_CodeViewIsReadOnlyMirror` (§2.7 #10 —
+  asserts the compiled JS contains `readOnly` **and**
+  `rc-editor-source-hidden`). (3) `wwwroot/js/lib/rich-editor.js` — the
+  `tsc` rebuild (git-ignored build artifact).
+- **The two states (WY·7 invariant, design doc §2.5(f) — the primary
+  source):**
+  - **(1) pane only** (the default — the resident sees the editable
+    pane; the textarea is hidden by the `rc-editor-source-hidden` class
+    — **unchanged** from IE).
+  - **(2) pane + code view** (the resident sees the editable pane
+    **plus** the **read-only** textarea — revealed by removing
+    `rc-editor-source-hidden`; the textarea is **read-only** — the
+    binder sets `textarea.readOnly = true`; the resident never types
+    into it — the WY·2 invariant: the textarea is the read-only sink,
+    not the editing surface).
+  - **The pane stays editable + visible in both states** (WY·1 — the
+    pane is the editing surface; the code view is a **mirror**, not a
+    **mode switch**). The `setView` body no longer touches the pane at
+    all (the IE `rc-editor-pane-active` marker is removed — it had no
+    meaning once the pane is the editing surface in both states).
+- **The 1 new test (verbatim name — PASS):**
+  `WY7_CodeViewIsReadOnlyMirror` (§2.7 #10 — asserts the compiled JS
+  contains `readOnly` (the WY·7 read-only mirror) **and**
+  `rc-editor-source-hidden` (the IE·1 frozen base — the source-hidden
+  class is still the reveal/hide mechanism)).
+- **The existing 13 WY tests still pass** (U3's 9 pure-function +
+  U4's 2 + U5's 2 — **untouched** by U7). The `RichEditorTextarea_
+  IsNotDisabled_OrRemoved` regression pin (`InlineEditorTests`) still
+  passes — the textarea is never `disabled` / `removed` / `hidden`-
+  attributed (U7 adds `readOnly` only, which is orthogonal to those
+  three needles). The `CompiledRichEditorJs_StillExportsRePureFunctions`
+  regression pin (`InlineEditorTests`) still passes — all 6 RE pure
+  functions + `bindRichEditor` are still `export function {name}` in the
+  compiled JS.
+- **Everything else is untouched:** the 6 RE pure functions,
+  `renderPreview`, the U4 WY block (`contenteditable` / `input` /
+  initial-population), the U5 toolbar DOM-splice handlers + private
+  helpers (`syncTextarea` / `activeRange` / `placeCaretAfter` /
+  `wrapSelection` / `currentBlock` / `changeBlockTag` /
+  `wrapBlockInList`), the U6 `paste` handler, the self-wire loop, and the
+  `dom-to-markdown.ts` module (U3's `toMarkdown` + `sanitizeHtml` are
+  frozen). The `_RichEditorToggle.cshtml` partial is **unchanged** (the
+  label swap is kept — the partial resolves both labels server-side; the
+  binder reads them via the `data-ie-label-*` attributes). The 10
+  composer surfaces are **unchanged** in shape (the 16 editor blocks / 10
+  view files U0 verified). No `.csproj` change, no new route, no new
+  dependency, no second renderer on the read path (`MarkdownRenderer` is
+  untouched — RC R·1). The saved body stays byte-identical Markdown (RC
+  R·3 / WY·5).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec`
+  — not from U7); `npm run build` (in `src/Kumunita.Web`) → **tsc green,
+  0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 167, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 + U7's 1 = **14** WY tests, all
+  PASS). The compiled `wwwroot/js/lib/rich-editor.js` contains `readOnly`
+  + `rc-editor-source-hidden` + `contentEditable` + `toMarkdown` +
+  `sanitizeHtml` + all 6 RE `export function {name}` (all verified
+  present by `grep`); `rc-editor-pane-active` is **gone** (the IE marker
+  is removed — the pane is the editing surface in both states, WY·1).
+- **`tsc` warnings:** **none** (the `tsc` build reports 0 warnings; the
+  one pre-existing `WysiwygSpec` CS8604 warning is from U3's C# test
+  mirror, not from U7's TS change).
+- **No drift pause.** U8 runs + records the WY acceptance gate (the
+  three-test gate from design doc §2.8 — closed-loop / handoff /
+  part-vs-whole), per the lane register.

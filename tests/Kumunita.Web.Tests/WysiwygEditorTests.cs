@@ -330,6 +330,34 @@ public class WysiwygEditorTests
         }
     }
 
+    // ── WY U7 — the code view rework (WY·7) ───────────────────────────────
+
+    /// <summary>
+    /// <b>#10</b> — the compiled <c>wwwroot/js/lib/rich-editor.js</c>
+    /// sets <c>textarea.readOnly</c> (WY·7 — the code view is a
+    /// <b>read-only</b> mirror of the pane; the resident never types into
+    /// the sink — WY·2: the textarea stays the live form field the server
+    /// binds on submit, never disabled / removed / re-shaped, RC R·3 /
+    /// RE·1 / IE·1) <b>and</b> still carries the
+    /// <c>rc-editor-source-hidden</c> class toggle (the IE·1 frozen base
+    /// — the textarea is revealed / hidden by that CSS class, unchanged
+    /// from IE). The two needles together prove the U7 <c>setView</c>
+    /// rework shipped (the pre-U7 block toggled only the class — an
+    /// editable source — and referenced no <c>readOnly</c>).
+    /// </summary>
+    [Fact]
+    public void WY7_CodeViewIsReadOnlyMirror()
+    {
+        var content = ReadCompiledRichEditor();
+        // WY·7 / WY·2 — the textarea is the read-only sink (the binder
+        // sets `textarea.readOnly = true` in the U7 setView block).
+        Assert.Contains("readOnly", content, StringComparison.Ordinal);
+        // IE·1 frozen base — the source-hidden class is still the
+        // reveal/hide mechanism (the code view is a mirror, not a mode
+        // switch — WY·1: the pane stays editable + visible in both states).
+        Assert.Contains("rc-editor-source-hidden", content, StringComparison.Ordinal);
+    }
+
     // ── Test helpers (mirrors <c>InlineEditorTests</c> idiom) ────────────
 
     /// <summary>
