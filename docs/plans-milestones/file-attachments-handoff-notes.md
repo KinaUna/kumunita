@@ -377,3 +377,144 @@ controller initializer, and no `CreateAsync` line was added). No
   `AttachmentIds`) — a test that pins `Modified` behavior on an
   attachment-only re-save would fail; that is by design (matches the
   image lane).
+
+## U6
+
+**Built:** the ATT Core test half — one new file:
+`tests/Kumunita.Core.Tests/AttachmentOwnershipTests.cs`. A `AttachmentOwnershipTests
+(PostgresFixture fixture) : IClassFixture<PostgresFixture>` class that mirrors
+`ContentImageOwnershipTests` line-for-line (same harness: `BootStoreAsync` /
+`Services` / `AnnouncementsSvc` / `Plant` / `RunInSession` / `GlobalAdminRoles`;
+added a small `AnnouncementsSvc` helper — `new AnnouncementService(store, new
+UserInfoService(store))` — because the image file has no announcement test to
+mirror, so the announcement tests mirror `AnnouncementServiceTests`'
+composition instead). **9 live `[Fact]` tests** with the exact §2.9 pinned
+names + **1 pinned name (`PostEdit_ReparsesAttachmentIds`) left commented out
+as a DRIFT PAUSE** (see the section below). No production code touched; no
+image-lane test file or `PostgresFixture` touched (C-ATT·9 byte-for-byte).
+
+**The 10 pinned names (verbatim, as in design doc §2.9):**
+
+| # | Name | Status | What it exercises |
+|---|------|--------|-------------------|
+| 1 | `FindPostByAttachmentId_ReturnsOwningPost` | ✅ live, pass | `PostService.FindPostByAttachmentIdAsync` — an owning post is found (mirror image `R5_…FindsOwningPost`) |
+| 2 | `FindPostByAttachmentId_ReturnsNullWhenAbsent` | ✅ live, pass | `FindPostByAttachmentIdAsync` → null for an unowned id (the serve-404 branch, §2.7 step 2) |
+| 3 | `FindReplyByAttachmentId_ReturnsOwningReply` | ✅ live, pass | `PostService.FindReplyByAttachmentIdAsync` — an owning reply is found (mirror image `R5_…FindsOwningReply`) |
+| 4 | `FindAnnouncementByAttachmentId_ReturnsOwningAnnouncement` | ✅ live, pass | `IAnnouncementService.FindByAttachmentIdAsync` — an owning announcement is found (mirror image `FindByImageIdAsync`) |
+| 5 | `PostCreate_PersistsAttachmentIds` | ✅ live, pass | `CreatePostAsync` writes the draft's `AttachmentIds` verbatim (non-null, order-preserving) + round-trips from Postgres (mirror image `R3_…PopulatedFromBodyLinks`) |
+| 6 | `PostEdit_ReparsesAttachmentIds` | ⛔ **DRIFT PAUSE — commented out** | **cannot pass**: `UpdatePostAsync` / `UpdateGroupPostAsync` do **not** persist `AttachmentIds` (see DRIFT PAUSE below) |
+| 7 | `ReplyCreate_PersistsAttachmentIds` | ✅ live, pass | `CreateReplyAsync` persists `AttachmentIds` (C-ATT·8 — the write the image reply lane deliberately lacks; written fresh from the U4 signature) |
+| 8 | `ReplyEdit_ReparsesAttachmentIds` | ✅ live, pass | `UpdateReplyAsync` re-copies `AttachmentIds` (replace-style, the U4 line; written fresh from the U4 signature) |
+| 9 | `AnnouncementCreate_PersistsAttachmentIds` | ✅ live, pass | `CreateAsync` POCO-direct: the `AttachmentIds` the POCO carries is preserved verbatim (mirror the U7 controller-initializer shape, C-ATT·4) |
+| 10 | `AnnouncementEdit_ReparsesAttachmentIds` | ✅ live, pass | `UpdateAsync` re-copies `existing.AttachmentIds = updated.AttachmentIds ?? []` (the U5 line); a null/absent list coalesces to `[]`. `Modified`-stamp behavior deliberately **not** pinned (the `changed` block excludes both `ImageIds` and `AttachmentIds` — by design) |
+
+**Verified:**
+- `dotnet build Kumunita.slnx -c Debug` → **green** on Core + Web (1 pre-existing
+  CS8604 warning in `WysiwygEditorTests.cs` L910 — same warning U3/U4/U5
+  recorded; unrelated).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  → **`Total: 409, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0`** (the Core
+  suite spins `postgres:18` via Testcontainers, ~46 s). That 409 includes the
+  9 live ATT tests, all passing.
+- **The commented-out `#6` is provably excluded:** the file **builds green**,
+  but the commented `#6` body calls `UpdatePostAsync(…, AttachmentIds: …)` — a
+  named argument that method does **not** have (it takes no `attachmentIds`).
+  If `#6` were live, that call would be a compile error. Build-green ⇒ `#6` is
+  commented out, so it is correctly not in the 409. The 10 `[Fact]` literals in
+  the file (9 live + 1 commented) and the 10 verbatim names (including the
+  commented one) are the §2.9 pin; a later grep for the literal name will still
+  find `#6` in the source, which is intended (it is preserved for the decider).
+
+**Drift:** see the **`## U6 — DRIFT PAUSE`** section below — test `#6`
+(`PostEdit_ReparsesAttachmentIds`) is pinned by §2.9 and §2.3, but the real
+`UpdatePostAsync` / `UpdateGroupPostAsync` do **not** persist `AttachmentIds`.
+Per the U6 unit plan (test-only; "a pinned test that can't pass is a drift
+pause, not a reason to fix PostService"), I did **not** add the missing write
+line (U4-scoped) and did **not** rename `#6` to assert the opposite (the §2.9
+name is the frozen pin). I left it commented out + recorded the decision. No
+other drift.
+
+**Next agent (U7) must know:**
+- **The `PostEdit` situation is unresolved and is U7's (or the decider's)
+  next decision — do not silently paper over it.** Two options, both requiring
+  a handoff note:
+  1. **U4 adds** the `attachmentIds` param + `existing.AttachmentIds =
+     draft.AttachmentIds ?? []` line to `UpdatePostAsync` /
+     `UpdateGroupPostAsync` (parity with `CreatePostAsync` /
+     `CreateGroupPostAsync`, and with the §2.3 spec), **then** U7 un-comments
+     the preserved `#6` body (it already calls the right shape) and it passes.
+  2. **The lane ships create-only on post/group-post edit** (U4's deliberate
+     "create only, not edit" choice, matching the image lane's own precedent
+     for these two lanes). Then `#6`'s pinned name is **wrong for this tree**
+     and must be **renamed with a recorded note** (e.g.
+     `PostEdit_PreservesStoredAttachmentIds` — asserting the stored list is
+     untouched on edit) — the §2.9 name is a frozen pin, so the U12 gate and
+     the design doc §2.9 must be updated **together**, not one silently.
+  - Whichever way it goes, the decision + rationale must land in the handoff
+    before the U12 close gate checks the §2.9 names.
+- **U7's Web work is unchanged by this:** the `AttachmentIds` parse helper
+  (`Kumunita.Web.Security.AttachmentIds.ExtractAttachmentIds`) + the four
+  controller call-site wirings (post create, reply create, reply edit,
+  announcement create+edit). The Core seams U7 passes ids into all exist and
+  are green: `PostDraft.AttachmentIds`, `GroupPostDraft.AttachmentIds`,
+  `CreateReplyAsync(…, attachmentIds: …)`, `UpdateReplyAsync(…,
+  attachmentIds: …)`, `Announcement.AttachmentIds` (POCO-direct), and the three
+  `Find*ByAttachmentIdAsync` seams. U7 does **not** touch `UpdatePostAsync` /
+  `UpdateGroupPostAsync` unless the decider picks option 1 above.
+- **`Kumunita.Core.Tests` references only `Kumunita.Core`** (no Web) — the
+  parse (dedupe / order / not-over-match) is U7's Web helper and is **not**
+  re-asserted in these tests (the same drift-pause note the image file
+  carries). Core stays body-parse-free (C-ATT·4).
+
+## U6 — DRIFT PAUSE
+
+**Test `#6 — PostEdit_ReparsesAttachmentIds` cannot pass against the real
+tree.** This is a genuine conflict between the pinned name (design doc §2.9)
++ the write-lane spec (§2.3) and the actual U4 implementation:
+
+- **What §2.3 says:** "`PostService.UpdatePostAsync` / `UpdateGroupPostAsync`
+  re-copy `existing.AttachmentIds = draft.AttachmentIds ?? []` (the same
+  field-copy shape as the `ImageIds` lines in those lanes)."
+- **What U4 actually did (its handoff is explicit + deliberate):** the
+  post/group-post **edit** lanes do **not** persist `AttachmentIds`. U4
+  followed the image lane's own precedent — `UpdatePostAsync` and
+  `UpdateGroupPostAsync` do not set `ImageIds` either ("create only, not
+  edit" for these two lanes).
+- **Verified against the real tree** (`src/Kumunita.Core/Posts/PostService.cs`):
+  - `UpdatePostAsync` (L346) — signature is
+    `(string postId, string actorId, string? title, string body, Audience
+    audience, string? languageCode, IDocumentSession session)`. Body sets
+    `Title` / `Body` / `Audience` / `LanguageCode` / `Modified`. **No
+    `attachmentIds` parameter, no `AttachmentIds` write line.**
+  - `UpdateGroupPostAsync` (L545) — same shape: **no `attachmentIds`
+    parameter, no `AttachmentIds` write line.**
+  - By contrast, the reply edit lane **does** persist it (U4, correct):
+    `UpdateReplyAsync` (L484) has the trailing `attachmentIds` param and
+    sets `reply.AttachmentIds = attachmentIds ?? []` (L504). And
+    `CreatePostAsync` (L275) / `CreateGroupPostAsync` (L934) /
+    `CreateReplyAsync` (L427) all persist it. So **create + reply-edit**
+    coverage exists; only the **post/group-post edit** lane is missing.
+
+**Why I stopped here instead of "fixing" it:** the U6 unit plan is explicit
+that U6 is **test-only**, that the U3–U5 seams/lanes are **frozen**, and that
+"a pinned test that can't pass is a DRIFT PAUSE, not a reason to fix
+PostService." Adding the missing `attachmentIds` param + write line to
+`UpdatePostAsync` / `UpdateGroupPostAsync` is a **U4-scoped decision**
+(parity with the image lane, or not). Renaming `#6` to assert the opposite
+would silently weaken a **frozen pin** the U12 gate checks against. Neither
+was within U6's authority.
+
+**What I did instead (recorded, not silent):** left `#6` **commented out** in
+`AttachmentOwnershipTests.cs` with a full inline explanation + the intended
+call shape preserved, so the 9 tests that **can** pass run green and the
+conflict is surfaced. The 9 live tests all pass (full suite 409 / 0 failed /
+0 not-run). **The decider (U7 or a human) must choose option 1 or 2 in the
+U6 handoff above before the U12 close gate** — until then `#6` stays
+commented and the §2.9 name stays pinned (unimplemented).
+
+**Invariants touched by this drift (named, per §2.11):** C-ATT·5 (the
+`AttachmentIds` field exists and is separate from `ImageIds` — not violated;
+the field is there, the edit-lane write is the gap), and the §2.3 write-lane
+spec (the discrepancy is against the spec's prose, not the frozen invariants).
+No `ImageIds` line, no `IMediaStore` method, no `AccessAction` was touched
+(C-ATT·3/9 hold).
