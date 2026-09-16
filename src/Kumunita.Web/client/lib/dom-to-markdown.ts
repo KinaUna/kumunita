@@ -217,8 +217,18 @@ function serializeLink(a: HtmlElement): string {
 }
 
 function serializeImage(img: HtmlElement): string {
-  const src = img.attrs.get('src');
   const alt = img.attrs.get('alt') ?? '';
+  // WY local-preview image: the pane <img> displays a blob: preview (the
+  // serving route is orphan-safe and 404s until the post is saved, R·4 /
+  // ADR 0011) and carries the canonical route in data-cid. The VALUE is
+  // data-cid — not the display src — so the submitted body stays
+  // byte-identical to the hand-typed ![alt](/content-image/{id}) form (RC
+  // R·3) regardless of the preview.
+  const canonical = img.attrs.get('data-cid');
+  if (canonical !== undefined && isSafeImageSrc(unescapeHtml(canonical))) {
+    return `![${unescapeHtml(alt)}](${unescapeHtml(canonical)})`;
+  }
+  const src = img.attrs.get('src');
   if (src !== undefined && isSafeImageSrc(unescapeHtml(src))) {
     return `![${unescapeHtml(alt)}](${unescapeHtml(src)})`; // RC R·3 byte-identity
   }

@@ -844,11 +844,11 @@ export function bindRichEditor(root: HTMLElement): void {
               '/content-image',
               { method: 'POST', body: fd },
             );
-            // RC R·3 byte-identity: the src is the exact
+            // RC R·3 byte-identity: the **value** is the exact
             // /content-image/{id} form ContentImageIds.FullSrcRe already
             // parses (zero server change).
-            const src = `/content-image/${id}`;
-            if (!isSafeImageSrc(src)) {
+            const canonical = `/content-image/${id}`;
+            if (!isSafeImageSrc(canonical)) {
               window.alert('Uploaded image source was rejected.');
               return;
             }
@@ -856,7 +856,19 @@ export function bindRichEditor(root: HTMLElement): void {
             // without its extension, truncated to 40 chars.
             const alt = file.name.replace(/\.[^.]+$/, '').slice(0, 40);
             const img = document.createElement('img');
-            img.setAttribute('src', src);
+            // The serving route is orphan-safe (R·4 / ADR 0011): it 404s
+            // until a SAVED post references the id, so the canonical URL is
+            // not yet fetchable inside the pre-save editor — a plain
+            // <img src="/content-image/{id}"> would render as a broken icon.
+            // Display a local preview of the file the resident just chose
+            // (a blob: URL, same-origin, always loads) and carry the
+            // canonical route in data-cid. serializeImage (dom-to-markdown)
+            // reads data-cid as the value, so the submitted body is still the
+            // byte-identical ![alt](/content-image/{id}) form (RC R·3) — the
+            // preview is never emitted and never 404s the value.
+            const displaySrc = URL.createObjectURL(file);
+            img.setAttribute('src', displaySrc);
+            img.setAttribute('data-cid', canonical);
             img.setAttribute('alt', alt);
             img.className = 'rc-image';
             img.setAttribute('loading', 'lazy');
