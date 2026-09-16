@@ -36,4 +36,12 @@ namespace Kumunita.Core.Posts;
 // **nullable** default: the existing positional call sites (5 in
 // GroupPostServiceTests) keep compiling unchanged (they omit it ⇒ null), and
 // PostService coalesces null → []. See the U04 handoff note.
-public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null, IReadOnlyList<string>? ImageIds = null);
+// ATT U4 (C-ATT·4; design doc §2.3) — the file-attachment references, **server-side**
+// (the Web layer parses the body's /attachment/{id} links via
+// AttachmentIds.ExtractAttachmentIds before calling the service — Core stays
+// body-parse-free, C-ATT·4). Written onto the Post doc (ADR 0004 §B.1 additive
+// field, **separate from** ImageIds — C-ATT·5) with a null-coalesce to an empty
+// list (the POCO field is non-null, `= []`). Same CS1736 nullable-default shape
+// as ImageIds (a collection expression is not a legal C# default parameter
+// value); PostService.CreateGroupPostAsync coalesces null → [].
+public sealed record GroupPostDraft(string GroupId, string? Title, string Body, string? LanguageCode = null, IReadOnlyList<string>? ImageIds = null, IReadOnlyList<string>? AttachmentIds = null);

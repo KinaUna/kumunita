@@ -218,3 +218,99 @@ The reply lanes currently do **not** set `ImageIds` (the image-lane
 reply-404 drift pause, C-ATT·9) — **this** lane **does** persist
 `AttachmentIds` on replies (deliberate asymmetry, §2.3).
 - The announcement write-lane wiring is **U5**, not U4.
+
+## U4
+
+**Built:** the post + reply + group-post **create** write lanes now persist
+`AttachmentIds` (Core writes the collection verbatim; the Web layer — U7 —
+extracts it from the body). Three files touched, all in `Kumunita.Core`.
+
+- `src/Kumunita.Core/Posts/PostDraft.cs` — added trailing
+  `IReadOnlyList<string>? AttachmentIds = null` param **after** `ImageIds`
+  (6th positional, the CS1736 nullable-default shape — a collection
+  expression is not a legal C# default; `PostService.CreatePostAsync`
+  coalesces null → `[]`).
+- `src/Kumunita.Core/Posts/GroupPostDraft.cs` — same trailing
+  `AttachmentIds = null` param after `ImageIds` (5th positional). (See Drift
+  #1 below — the unit plan did not list `GroupPostDraft` as a deliverable,
+  but §2.3 and the register both name `CreateGroupPostAsync`, and U7's
+  group-post call-site needs the param to compile.)
+- `src/Kumunita.Core/Posts/PostService.cs`:
+  - `CreatePostAsync` — added
+    `AttachmentIds = draft.AttachmentIds ?? []` directly after the existing
+    `ImageIds = draft.ImageIds ?? []` line (L274→L275).
+  - `CreateGroupPostAsync` — added
+    `AttachmentIds = draft.AttachmentIds ?? []` directly after the existing
+    `ImageIds = draft.ImageIds ?? []` line (L933→L934).
+  - `CreateReplyAsync` — added trailing
+    `IReadOnlyList<string>? attachmentIds = null` param after
+    `languageCode`; the new `PostReply` gets
+    `AttachmentIds = attachmentIds ?? []` (L427).
+  - `UpdateReplyAsync` — added trailing
+    `IReadOnlyList<string>? attachmentIds = null` param after `session`;
+    the body now sets `reply.AttachmentIds = attachmentIds ?? []`
+    (L504), replace-style (mirrors `reply.Body = body ?? string.Empty` —
+    the edit lane's existing idiom: the re-parse of the re-submitted body
+    is authoritative, so the list is replaced wholesale).
+  - Updated the two reply-lane XML doc comments to reflect the new
+    `attachmentIds` parameter and the deliberate image-asymmetry note
+    (C-ATT·8/9).
+
+**Verified:** `dotnet build Kumunita.slnx -c Debug` — **green** on
+`Kumunita.Core` and `Kumunita.Web` (1 pre-existing CS8604 warning in
+`WysiwygEditorTests.cs`, unrelated). All four existing `ImageIds` write
+lines confirmed byte-for-byte unchanged at their original line numbers
+(L274, L933, and the two `Find*ByImageIdAsync` reverse-lookup queries at
+L1247/L1268) — **image lane untouched** (C-ATT·9). The new `AttachmentIds`
+fields are **separate** from `ImageIds` (C-ATT·5). `IMediaStore` untouched
+(C-ATT·3). No `IPostService` invented (the reply lanes are on the concrete
+`PostService` — there is no `IPostService` interface in the tree, per U3
+handoff). No announcement write-lane changes (U5). No tests (U6). No Web
+code (U7).
+
+**Drift:**
+(1) **`GroupPostDraft` + `CreateGroupPostAsync` in scope.** The unit plan's
+Deliverables list (3 edits) names only `PostDraft`, `CreatePostAsync`,
+`CreateReplyAsync`, `UpdateReplyAsync`. But design doc §2.3 and the
+register both list `CreateGroupPostAsync` / `UpdateGroupPostAsync`, and the
+`GroupPostDraft` param is **required** for U7's group-post call-site to
+compile. I added the `GroupPostDraft` param + `CreateGroupPostAsync` line.
+`UpdateGroupPostAsync` has **no** existing `ImageIds` write line (the image
+lane deliberately skips the post *edit* lanes — `UpdatePostAsync` and
+`UpdateGroupPostAsync` do not set `ImageIds`), so there is no line to
+mirror; I did **not** add `AttachmentIds` to the post/group-post **edit**
+lanes. If the group-post edit lane should persist `AttachmentIds` (parity
+with create), that is a future decision — the image lane's own precedent is
+"create only, not edit," which I followed.
+(2) **`UpdateReplyAsync` has no `ImageIds` write (the reply drift pause).**
+Per U3 handoff + §2.3: the image lane's reply edit does **not** set
+`ImageIds` (the reply-404 drift pause). This lane **does** set
+`AttachmentIds` on the reply edit (the deliberate asymmetry, C-ATT·8). The
+`ImageIds` asymmetry is left byte-for-byte untouched (C-ATT·9).
+
+**Next agent (U5) must know:**
+- U5 wires the **announcement** create/edit write lanes to persist
+  `AttachmentIds`. The `Announcement.AttachmentIds` field already exists
+  (U3). The idiom to mirror is the announcement lane's existing
+  `existing.ImageIds = updated.ImageIds ?? []` field-copy in
+  `AnnouncementService.CreateAsync` / `UpdateAsync` — add
+  `existing.AttachmentIds = updated.AttachmentIds ?? []` (or
+  `AttachmentIds = announcement.AttachmentIds ?? []` at create) alongside
+  it. No `PostDraft`/draft-record param needed — the announcement lane is
+  POCO-direct (the Web layer sets `Announcement.AttachmentIds`, Core
+  copies verbatim).
+- The `PostDraft` and `GroupPostDraft` records now both have a trailing
+  `IReadOnlyList<string>? AttachmentIds = null` param — U7's Web call-sites
+  will use named-argument syntax (`AttachmentIds: …`) so the positional
+  order is irrelevant, but the param **is present** and compiles.
+- The `CreateReplyAsync` / `UpdateReplyAsync` signatures now have a
+  trailing `IReadOnlyList<string>? attachmentIds = null` optional param.
+  U7's Web call-sites will pass
+  `AttachmentIds.ExtractAttachmentIds(model.Body)` as that argument.
+  The existing Web call-sites compile unchanged (the param is optional,
+  defaults to null → `[]`).
+- The post/group-post **edit** lanes (`UpdatePostAsync` /
+  `UpdateGroupPostAsync`) do **not** persist `AttachmentIds` — the image
+  lane's own precedent is "create only, not edit" for these lanes. If a
+  future unit needs edit-lane attachment persistence, it must add it
+  explicitly (there is no `ImageIds` line to mirror).

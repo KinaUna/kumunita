@@ -272,6 +272,7 @@ public sealed class PostService
             Body = draft.Body,
             Audience = draft.Audience, // ADR 0001-B — written verbatim; never mutated here.
             ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer; null-coalesce to the POCO's non-null empty list.
+            AttachmentIds = draft.AttachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list.
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };
@@ -393,8 +394,24 @@ public sealed class PostService
     /// stored row always carries a concrete BCP-47 code. Optional trailing
     /// parameter — the two existing controller call sites keep compiling.
     /// </para>
+    /// <para>
+    /// <paramref name="attachmentIds"/> (ATT U4, C-ATT·4) carries the reply's
+    /// file-attachment references — the Web layer parses the body's
+    /// <c>/attachment/{id}</c> links (via <c>Kumunita.Web.Security.AttachmentIds
+    /// .ExtractAttachmentIds</c>, a Web-only helper — Core never parses the
+    /// body, C-ATT·4) before calling this seam and passes them in; Core writes
+    /// them verbatim.
+    /// <b>Deliberate asymmetry (recorded, C-ATT·8/9):</b> the image lane's
+    /// reply create/edit lane does <b>not</b> set
+    /// <see cref="PostReply.ImageIds"/> (the image-lane reply-404 drift pause,
+    /// C-ATT·9), but <b>this</b> lane does persist
+    /// <see cref="PostReply.AttachmentIds"/>, because the attachment reply
+    /// serve (C-ATT·8) resolves the parent post and must find the reply row
+    /// owning the id. Optional trailing parameter (nullable, the CS1736
+    /// shape) — the existing controller call sites keep compiling unchanged.
+    /// </para>
     /// </summary>
-    public async Task<PostReply> CreateReplyAsync(string postId, string actorId, string body, IDocumentSession session, string? languageCode = null)
+    public async Task<PostReply> CreateReplyAsync(string postId, string actorId, string body, IDocumentSession session, string? languageCode = null, IReadOnlyList<string>? attachmentIds = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A parent post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A reply author is required.", nameof(actorId));
@@ -407,6 +424,7 @@ public sealed class PostService
             AuthorId = actorId,
             Body = body ?? string.Empty,
             LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false), // ADR 0018
+            AttachmentIds = attachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
             Created = DateTimeOffset.UtcNow
         };
 
@@ -424,13 +442,33 @@ public sealed class PostService
     /// there is **no** moderator or GlobalAdmin branch (a moderator's lever
     /// over a reply is the parent post's Hide/Remove, not re-writing text).
     /// <para>
-    /// The reply's <see cref="PostReply.Body"/> is the **only** editable
-    /// field — <c>PostId</c>, <c>AuthorId</c>, <c>Created</c>, and
+    /// The reply's <see cref="PostReply.Body"/> is the **only editable text
+    /// field** — <c>PostId</c>, <c>AuthorId</c>, <c>Created</c>, and
     /// <see cref="PostReply.LanguageCode"/> (ADR 0018 — the authored-in tag is
     /// written at create time only) are
     /// immutable (a reply cannot be re-parented or re-attributed; the reply
-    /// carries no <c>Audience</c> to re-choose, C-M3·1). The edit stamps
+    /// carries no <c>Audience</c> to re-choose, C-M3·1). As of ATT U4 the
+    /// edit also re-copies <see cref="PostReply.AttachmentIds"/> (the body's
+    /// re-parsed <c>/attachment/{id}</c> references — see the
+    /// <paramref name="attachmentIds"/> note below); the image lane's
+    /// <see cref="PostReply.ImageIds"/> stays untouched on this lane (C-ATT·9).
+    /// The edit stamps
     /// <see cref="PostReply.Modified"/> forward (null until first edited).
+    /// </para>
+    /// <para>
+    /// <paramref name="attachmentIds"/> (ATT U4, C-ATT·4) re-copies the
+    /// reply's file-attachment references from the Web layer's re-parse of the
+    /// (re-submitted) body — the same replace-style as
+    /// <paramref name="body"/> (a body edit can add <c>or remove</c>
+    /// <c>/attachment/{id}</c> links; the re-parse is authoritative, so the
+    /// stored list is replaced wholesale, mirroring
+    /// <c>reply.Body = body ?? string.Empty</c>). <b>Deliberate asymmetry
+    /// (recorded, C-ATT·8/9):</b> the image lane's reply edit lane does
+    /// <b>not</b> set <see cref="PostReply.ImageIds"/> (the image-lane
+    /// reply-404 drift pause, C-ATT·9); <b>this</b> lane does persist
+    /// <see cref="PostReply.AttachmentIds"/> (C-ATT·8). Optional trailing
+    /// parameter (nullable, the CS1736 shape) — the existing controller call
+    /// sites keep compiling unchanged.
     /// </para>
     /// <para>
     /// Like <see cref="CreateReplyAsync"/>, this method does **not** re-check
@@ -447,7 +485,8 @@ public sealed class PostService
         string replyId,
         string actorId,
         string body,
-        IDocumentSession session)
+        IDocumentSession session,
+        IReadOnlyList<string>? attachmentIds = null)
     {
         if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
@@ -462,6 +501,7 @@ public sealed class PostService
             throw new UnauthorizedAccessException("Only the author of a reply may edit it.");
 
         reply.Body = body ?? string.Empty;
+        reply.AttachmentIds = attachmentIds ?? []; // ATT U4 (C-ATT·4) — the re-parse from the (re-submitted) body is authoritative; replace-style, mirroring the reply.Body line (C-ATT·8 — the image lane's reply ImageIds drift pause stays untouched, C-ATT·9).
         reply.Modified = DateTimeOffset.UtcNow;
 
         session.Store(reply);
@@ -891,6 +931,7 @@ public sealed class PostService
             Body = draft.Body,
             Audience = new Audience(),  // G·8 — written non-null **empty**; never authored here.
             ImageIds = draft.ImageIds ?? [], // RC R·3/R·7 (ADR 0025) — populated server-side by the Web layer (the U05 group-post create wiring); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
+            AttachmentIds = draft.AttachmentIds ?? [], // ATT U4 (C-ATT·4) — populated server-side by the Web layer (AttachmentIds.ExtractAttachmentIds); null-coalesce to the POCO's non-null empty list (the CreatePostAsync precedent).
             LanguageCode = await ResolveLanguageCodeAsync(draft.LanguageCode, session).ConfigureAwait(false), // ADR 0018
             Created = DateTimeOffset.UtcNow
         };
