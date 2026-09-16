@@ -181,6 +181,45 @@ public class WysiwygEditorTests
         Assert.Contains("<strong>bold</strong>", rendered);
     }
 
+    // ── WY5b — a non-breaking space can't leak verbatim into the body ─────
+
+    /// <summary>
+    /// <b>#6b</b> — a non-breaking space (U+00A0), which browsers serialize
+    /// into the literal <c>&amp;nbsp;</c> entity string inside
+    /// <c>innerHTML</c> (a common <c>contenteditable</c> byproduct around
+    /// <c>&lt;b&gt;</c>/<c>&lt;strong&gt;</c> boundaries, e.g. the
+    /// Ctrl+B → type → Ctrl+B flow), is decoded to a plain space by
+    /// <c>toMarkdown</c> rather than leaking verbatim into the saved body.
+    /// Left undecoded, the read-path <see cref="MarkdownRenderer"/>
+    /// would escape the <c>&amp;</c> and render the literal <c>&amp;nbsp;</c>
+    /// text — the reported "ampersand-nbsp-after-bold" symptom.
+    /// </summary>
+    [Fact]
+    public void WY5_SavedBody_NonBreakingSpace_DecodedToPlainSpace()
+    {
+        // Trailing nbsp after bold text — the exact reported shape.
+        Assert.Equal("**word**",
+            WysiwygSpec.ToMarkdown("<p><b>word&nbsp;</b></p>"));
+
+        // nbsp between words collapses to the single-space join the
+        // serializer already uses between inline children.
+        Assert.Equal("a b",
+            WysiwygSpec.ToMarkdown("<p>a&nbsp;b</p>"));
+
+        // A lone nbsp produces no blank fragment (trimmed away).
+        Assert.Equal(string.Empty,
+            WysiwygSpec.ToMarkdown("<p>&nbsp;</p>"));
+
+        // The decoded body is byte-identical to a hand-typed one and the
+        // read path renders it back cleanly (no literal &amp;nbsp; text).
+        var got = WysiwygSpec.ToMarkdown("<p><strong>word&nbsp;</strong></p>");
+        Assert.Equal("**word**", got);
+        var rendered = MarkdownRenderer.RenderHtml(got);
+        Assert.DoesNotContain("&amp;nbsp;", rendered);
+        Assert.DoesNotContain("nbsp;", rendered);
+        Assert.Contains("<strong>word</strong>", rendered);
+    }
+
     // ── WY6 — the sanitizer strips disallowed elements/attrs/urls ─────────
 
     /// <summary>
@@ -840,7 +879,12 @@ internal static class WysiwygSpec
             .Replace("&lt;", "<")
             .Replace("&gt;", ">")
             .Replace("&quot;", "\"")
-            .Replace("&#39;", "'");
+            .Replace("&#39;", "'")
+            // Browsers serialize a non-breaking space (U+00A0) — a common
+            // contenteditable byproduct around <b>/<strong> boundaries — into
+            // the literal `&nbsp;` entity string; decode it to a plain space
+            // so it can't leak verbatim into the saved Markdown body.
+            .Replace("&nbsp;", " ");
 
     private static bool IsSafeUrl(string url)
     {

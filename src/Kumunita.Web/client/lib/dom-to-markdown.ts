@@ -25,7 +25,12 @@
  * **The escape rule (design doc §2.3):** the five HTML entities `&amp;`
  * / `&lt;` / `&gt;` / `&quot;` / `&#39;` are un-escaped before emitting
  * Markdown, so a round-tripped body is byte-identical to the original
- * (WY·10 / WY5).
+ * (WY·10 / WY5). In addition, `&nbsp;` is normalized to a plain space:
+ * browsers serialize a non-breaking space (U+00A0, a common contenteditable
+ * byproduct around `<b>`/`<strong>` boundaries) into the literal `&nbsp;`
+ * entity string, and leaving it verbatim would surface as visible `&nbsp;`
+ * text after the read path escapes the `&` (the reported bug). A plain
+ * space keeps the body hand-typeable and byte-identical.
  *
  * **The WY·10 round-trip property (the key invariant):**
  * `toMarkdown(renderPreview(md)) === md` for the pinned corpus (WY·10 /
@@ -59,7 +64,14 @@ function unescapeHtml(s: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    // Browsers serialize a non-breaking space (U+00A0) — a common
+    // contenteditable byproduct around <b>/<strong> boundaries — into the
+    // literal `&nbsp;` entity string. Decode it to a plain space so it can't
+    // leak verbatim into the saved Markdown body (where the read-path renderer
+    // would escape the `&` and render the literal text). A regular space is the
+    // hand-typeable, byte-identical choice (WY·10).
+    .replace(/&nbsp;/g, ' ');
 }
 
 function isSafeUrl(url: string): boolean {
