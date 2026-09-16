@@ -88,7 +88,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
     │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; RC ✓ (ADR 0025) — `LocalizedPage.ImageIds` (R·7); see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
-    │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11)
+    │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; ADR 0025 ✓ (RC) — the content-image lane (same store, same catalog); ADR 0034 ✓ (ATT) — the file-attachment (download) lane: a separate route + allowlist + `Content-Disposition: attachment` over the same store (one store, one volume, one catalog — C-ATT·1/3); see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11) + design/file-attachments-design.md § File attachments — Closed (recorded) (2026-09-16)
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
     │   │   └── Projects/           # M5 — not yet created
@@ -135,7 +135,23 @@ the seam for later extraction.
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
   content-addressed payloads on a dedicated volume behind the HTTP-free
   `IMediaStore` seam, cataloged in `mt`, served only through an audited app
-  endpoint (the profile avatar is the reference lane).
+  endpoint (the profile avatar is the reference lane). The same store now
+  carries **two** lanes over **one** volume + **one** catalog (C-ATT·1/3):
+  the **content-image** lane (ADR 0025, `GET /content-image/{id}`, inline
+  `<img>`) and the **file-attachment** download lane (ADR 0034,
+  `GET /attachment/{id}`, `Content-Disposition: attachment` + `nosniff`). The
+  attachment lane is a **separate** lane — a separate route, a separate
+  allowlist (`MediaOptions.AttachmentAllowedContentTypes`, distinct from the
+  image `AllowedContentTypes`), and download semantics — over the **same**
+  `IMediaStore` / `MediaObject` / `MaxBytes`. The owning doc carries an
+  additive `AttachmentIds` POCO field on `Post` / `PostReply` / `Announcement`
+  (ADR 0004 §B.1, **zero migrations**), **separate** from `ImageIds`; the
+  ids are derived **server-side** from the body (Core never parses a body,
+  C-ATT·4). The serve route reuses the owning resource's single
+  `CanAsync(…Read…)` decision — a **reply resolves its parent post's** decision
+  (C-ATT·8; a document-session load, **no new `PostService`** seam), a post
+  its own, an announcement its flat scope gate (zero `AccessAudit` rows).
+  Every miss is a 404; one `Deny` row on a UGC deny, zero elsewhere (C-ATT·7/10).
 
 Dependency rule: feature modules depend on the three identity/access modules (and Marten),
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never

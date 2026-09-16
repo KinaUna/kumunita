@@ -4,9 +4,9 @@
 > file-attachments lane: it pins the invariant numbers (C-ATT·1–10), the
 > FACES (F1–F9), the exact C# of every seam, the pinned seam-test names, the
 > acceptance gate, and the drift guard (Part 2 is authored by U2). The register
-> (`docs/plans-milestones/plan-file-attachments.md`) is the **secondary** tier
-> (unit-level deliverables + exit criteria).
-> `docs/plans-milestones/file-attachments-handoff-notes.md` is the **scratch**
+> (`docs/plans-milestones/done/file-attachments/plan-file-attachments.md`) is
+> the **secondary** tier (unit-level deliverables + exit criteria).
+> `docs/plans-milestones/done/file-attachments/file-attachments-handoff-notes.md` is the **scratch**
 > tier (one short section per unit, appended, never rewritten).
 > When the three disagree, **this file wins for the pinned shapes**; the
 > register wins for *which files exist* and *what each unit does*.
@@ -501,3 +501,61 @@ The single thing that would **silently break the lane** if a unit deviated:
 **Instruction to every unit (U3–U12):** if you **must** deviate from a pinned
 shape, **record the drift in your handoff section** and name the invariant it
 touches — **never** silently. Silence in the handoff means "no drift."
+
+## File attachments — Closed (recorded) (2026-09-16)
+
+The ATT lane (file attachments on post / reply / announcement, ADR 0034) is
+**shipped**. The three `AttachmentIds` additive fields (C-ATT·5, zero
+migrations), the three `Find*ByAttachmentIdAsync` reverse-lookup seams, the
+post/reply/announcement write lanes (create + edit), the `POST /attachment`
+upload lane (the separate `AttachmentAllowedContentTypes` gate, F6), the
+`GET /attachment/{id}` serve lane (the 5-step ordering, the reply parent
+resolution, `Content-Disposition: attachment` + `nosniff`), the "Attach file"
+editor button (16 composers, incl. reply composers), and the Core + Web seam
+tests are all live and green. **C-ATT·1–10 held** (the image lane byte-for-byte
+unchanged, C-ATT·9; no new `IMediaStore` / `AccessAction`, C-ATT·3; Core
+body-parse-free, C-ATT·4; orphan-safe 404s, C-ATT·7; download semantics,
+C-ATT·2/8).
+
+- **Decision record:** **ADR 0034** (Amends **0025** — resolves its deferred
+  "arbitrary downloads" follow-on for the post / reply / announcement lane —
+  and **0011** — the `AllowedContentTypes` extension point now exercised by a
+  separate `AttachmentAllowedContentTypes`). `docs/adr/README.md` row 0034.
+- **Gate (§2.10, recorded 2026-09-16):** `dotnet build Kumunita.slnx -c
+  Debug` **green** (Core + Web; 1 pre-existing CS8604 warning in
+  `WysiwygEditorTests.cs` L910, unrelated — the same warning U3–U11 recorded).
+  `dotnet exec …\Kumunita.Web.Tests.dll` → **`Total: 176, Errors: 0,
+  Failed: 0`** (the 7 live ATT Web tests — F6 ×3 + the non-pinned support + F7
+  + F9 — all pass; the 5 `AttachServe_F1…F5` are drift-paused in
+  `AttachmentServingTests.cs`, zero `[Fact]`, the faithful image-lane shape).
+  `dotnet exec …\Kumunita.Core.Tests.dll` → **`Total: 410, Errors: 0,
+  Failed: 0`** (the **10** live ATT Core tests — all §2.9 Core names, **including
+  the newly-un-paused `PostEdit_ReparsesAttachmentIds`** — pass; the Core run
+  spins `postgres:18` via Testcontainers).
+- **The U6 drift pause resolved (option 1 — code fixed, pin restored):** the
+  post / group-post **edit** lanes now persist `AttachmentIds`
+  (`UpdatePostAsync` / `UpdateGroupPostAsync` take a trailing `attachmentIds`
+  param, write `post.AttachmentIds = attachmentIds ?? []`, replace-style), and
+  the Web edit call-sites pass the re-parsed
+  `AttachmentIds.ExtractAttachmentIds(body)`. Test `#6` is **live again** (the
+  §2.3 frozen pin restored by fixing the code rather than weakening the name —
+  **no pin renamed, no silent drift**). The **image** lane's edit lanes still
+  do not set `ImageIds` (the deliberate "create only, not edit" precedent,
+  C-ATT·9) — the asymmetry is recorded in `## U6 — DRIFT PAUSE` + the ADR.
+- **Known limitation (recorded, a future lane):** the **5 Web serve tests**
+  (`AttachServe_F1…F5`) are drift-paused (the sealed-concrete-`PostService`
+  seam gap — lifting them needs a substitutable `PostService` seam or
+  Testcontainers in `Kumunita.Web.Tests`). The intended bodies are preserved
+  in `AttachmentServingTests.cs` comment blocks.
+- **Non-decisions (carried forward, ADR 0034 "Not decided here"):**
+  attachments on **group posts** and **static/about pages** (own design doc +
+  ADR); **video / audio** streaming; **in-browser preview**; **file
+  transforms**; the **image lane's reply-404 drift pause** (this lane did not
+  fix it — it made the *attachment* reply lane work).
+- **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane
+  discipline: ATT is a lane, not a renumber). `Milestones.cs` + `MilestonesTests`
+  were **not** changed — `TD` and `IE` (also in the README) are the precedent
+  for named lanes that live in the README Roadmap without a `Milestones.cs`
+  entry (the `MilestonesTests` exact-order pin forbids an `ATT` insert); the
+  ATT lane ships via the **README** Roadmap + Features bullets only. See the
+  handoff `## Summary` for the drift note.

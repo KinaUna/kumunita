@@ -340,6 +340,23 @@ public sealed class PostService
     /// default (never blanking a stored tag). This mirrors the ADR 0017
     /// announcement edit lane, where the tag was already editable.
     /// </para>
+    /// <para>
+    /// <paramref name="attachmentIds"/> (ATT U12, C-ATT·4) carries the post's
+    /// file-attachment references — the Web layer re-parses the (re-submitted)
+    /// body's <c>/attachment/{id}</c> links (via the Web-only
+    /// <c>Kumunita.Web.Security.AttachmentIds.ExtractAttachmentIds</c>) and
+    /// passes them in; Core writes them verbatim, replace-style (the
+    /// <c>body = body ?? string.Empty</c> idiom: the re-parse of the
+    /// re-submitted body is authoritative, so the list is replaced wholesale).
+    /// <b>Deliberate asymmetry (recorded, C-ATT·8/9):</b> the image lane's
+    /// post/group-post edit lanes do <b>not</b> set
+    /// <see cref="Post.ImageIds"/> (the image-lane "create only, not edit"
+    /// precedent, C-ATT·9); <b>this</b> lane persists
+    /// <see cref="Post.AttachmentIds"/> because the attachment serve route
+    /// (C-ATT·2) must find the post row owning the id. Optional trailing
+    /// parameter (nullable, the CS1736 shape) — the existing controller call
+    /// sites keep compiling unchanged.
+    /// </para>
     /// </summary>
     /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
     /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
@@ -350,7 +367,8 @@ public sealed class PostService
         string body,
         Authorization.Audience audience,
         string? languageCode,
-        IDocumentSession session)
+        IDocumentSession session,
+        IReadOnlyList<string>? attachmentIds = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
@@ -373,6 +391,12 @@ public sealed class PostService
         // through the shared helper so a blank submission falls back to the
         // instance default (it never blanks a stored tag).
         post.LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false);
+        // ATT U12 (C-ATT·4/8) — the post edit lane persists the re-parsed
+        // attachment references (replace-style, the re-parse is authoritative).
+        // Deliberate asymmetry: the image lane's edit lane does not set ImageIds
+        // (C-ATT·9); this lane persists AttachmentIds so the serve route can find
+        // the post row owning the id.
+        post.AttachmentIds = attachmentIds ?? [];
         post.Modified = DateTimeOffset.UtcNow;
 
         session.Store(post);
@@ -539,6 +563,17 @@ public sealed class PostService
     /// lane's 404 shape) maps both to a 404 to stay non-leaky, unlike the
     /// component lane's 403. One <c>SaveChangesAsync</c> (invariant C3).
     /// </para>
+    /// <para>
+    /// <paramref name="attachmentIds"/> (ATT U12, C-ATT·4) carries the group
+    /// post's file-attachment references — the Web layer re-parses the
+    /// (re-submitted) body's <c>/attachment/{id}</c> links and passes them in;
+    /// Core writes them verbatim, replace-style. <b>Deliberate asymmetry
+    /// (recorded, C-ATT·8/9):</b> the image lane's post/group-post edit lanes
+    /// do <b>not</b> set <see cref="Post.ImageIds"/>; <b>this</b> lane persists
+    /// <see cref="Post.AttachmentIds"/> so the serve route can find the group
+    /// post row owning the id. Optional trailing parameter (nullable, the
+    /// CS1736 shape) — the existing controller call site keeps compiling.
+    /// </para>
     /// </summary>
     /// <exception cref="KeyNotFoundException">The post id is not found.</exception>
     /// <exception cref="UnauthorizedAccessException">The actor is not the post's author.</exception>
@@ -548,7 +583,8 @@ public sealed class PostService
         string? title,
         string body,
         string? languageCode,
-        IDocumentSession session)
+        IDocumentSession session,
+        IReadOnlyList<string>? attachmentIds = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
@@ -575,6 +611,11 @@ public sealed class PostService
         // through the shared helper so a blank submission falls back to the
         // instance default (it never blanks a stored tag).
         post.LanguageCode = await ResolveLanguageCodeAsync(languageCode, session).ConfigureAwait(false);
+        // ATT U12 (C-ATT·4/8) — the group-post edit lane persists the re-parsed
+        // attachment references (replace-style). Deliberate asymmetry: the image
+        // lane's edit lanes do not set ImageIds (C-ATT·9); this lane persists
+        // AttachmentIds so the serve route can find the group post row.
+        post.AttachmentIds = attachmentIds ?? [];
         post.Modified = DateTimeOffset.UtcNow;
         // GroupId / ComponentId / Audience / AuthorId / Created / Status are
         // deliberately untouched — the group lane's identity is immutable.

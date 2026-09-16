@@ -1230,7 +1230,8 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
                 string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
                 model.Body.Trim(),
                 string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
-                session);
+                session,
+                AttachmentIds.ExtractAttachmentIds(model.Body.Trim())); // ATT U12 (C-ATT·4/8) — the group-post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
         }
         catch (KeyNotFoundException)
         {

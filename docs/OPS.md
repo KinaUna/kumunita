@@ -38,7 +38,8 @@ All per-instance identity and integration is env. The *image* is identical every
 | `DataProtection__KeysDirectory` | Recommended | No | Persistent directory holding the data-protection keyring — keeps sign-in + antiforgery state across redeploys (COOLIFY §5.2). Omit = in-memory (sessions die on restart) |
 | `Media__RootPath` | Recommended | No | The dedicated media volume mount (content-addressed byte store, ADR 0011). The in-code default (`{appDir}/media`) sits **inside the image layer** — in prod this must point at an operator-provided attached volume, or uploads are lost on redeploy, same discipline as `DataProtection__KeysDirectory` |
 | `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
-| `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The extension point for follow-on lanes (group logos, attachments) |
+| `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The image lane's raster-only gate; the extension point this row was sized to leave open for follow-on lanes |
+| `Media__AttachmentAllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive, for the **attachment (download) lane** (ADR 0034, lane `ATT`) — **distinct** from the image lane's `Media__AllowedContentTypes`. Default: `application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv, application/zip, image/jpeg, image/png, image/webp, image/gif` (SVG excluded; the four raster types included so a photo can be attached *as a download*). Same `Media__MaxBytes` cap. Guards-before-write: empty → 400, oversize → 413, disallowed → 415 (SECURITY.md §3(e)) |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -151,7 +152,11 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 
 **Second restore surface — the media volume (ADR 0011):** the *byte payload* of
 avatars lives on the dedicated volume at `Media__RootPath`, not in Postgres; the
-dump carries only the catalog (the `MediaObject` rows). So:
+dump carries only the catalog (the `MediaObject` rows). The **attachment
+(payload bytes of the ADR 0034 download lane) live on this same volume** — one
+volume, two route families (`/content-image/{id}` + `/attachment/{id}`), one
+catalog, one snapshot (C-ATT·1; C-MED·7 unchanged — no new restore surface).
+So:
 
 - **Snapshot the volume in the same backup set as its dump** — a
   `media-<date>.tgz` of `Media__RootPath`, taken just before that `pg_dump`

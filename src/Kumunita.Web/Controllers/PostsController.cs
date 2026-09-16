@@ -863,7 +863,8 @@ public sealed class PostsController(
                 model.Body,
                 audience,
                 string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
-                session);
+                session,
+                AttachmentIds.ExtractAttachmentIds(model.Body)); // ATT U12 (C-ATT·4/8) — the post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
             TempData["info"] = "Post updated.";
             return Redirect($"/posts/{id}");
         }

@@ -80,6 +80,7 @@ How each class is stored and what its loss means.
 | **(c) Audit & moderation** | `AccessAudit`, `Report`, `AdminOverride` | `mt` | **High, asymmetric** — reveals *who accessed what*, incl. *denied* items (see §3.1) |
 | **(d) Secrets** | DB/SMTP credentials, seed token, backup keys | env / secrets manager / object store | Critical — full instance compromise |
 | **(e) Media & uploaded bytes** | raster avatars (jpeg/png/webp/gif) — identifying images of residents — and the `MediaObject` catalog (hash id, original filename, size, first-storer) | bytes: dedicated volume (OPS.md §4/§5, second restore surface); catalog: `mt` (ADR 0011) | High — a face is identity material; served **only** through an auth + audit-gated app endpoint (never a static path), raster-only (SVG excluded as a script vector) |
+| **(e) Attachment files (ADR 0034, lane `ATT`)** | user-attached files (PDF / Office docs / text / csv / zip / raster) on posts, replies, announcements — arbitrary resident content — cataloged by the **same** `MediaObject` doc on the **same** volume as (e) above | same volume + same `mt` catalog as (e); the owning doc carries `AttachmentIds` (additive, zero migrations, ADR 0004 §B.1) | High — same as (e): served **only** through the auth + audit-gated `GET /attachment/{id}` endpoint (never a static path), a **separate** file allowlist (SVG excluded, `Media__AttachmentAllowedContentTypes`), `Content-Disposition: attachment` + `nosniff` (a download, not an inline render — C-ATT·2/8), every miss a 404 (orphan-safe — C-ATT·7) |
 
 ### 3.1 The audit log is a disclosure surface (accepted by design)
 
@@ -143,6 +144,7 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Audit log (always-on, tiered retention) | accountability for A3, A4 | ARCHITECTURE.md §5 |
 | Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |
 | Upload type/size allowlist at the edge — raster only (SVG = excluded script vector), 5 MiB cap, self-only write lane | A3 (payload-as-XSS, self-impersonation of others) | ADR 0011 (C-MED·5/8); `Media__*` keys (OPS.md) |
+| **Attachment lane (ADR 0034):** served only through `GET /attachment/{id}` (never static); the owning post / reply (parent post) / announcement's **single** `Read` decision; **every miss a 404** (store-miss, orphan, Deny) — existence never leaks; **one `Deny` row** on a UGC (post/reply) Deny, **zero rows** on every other 404 (announcement ⇒ zero rows); `Content-Disposition: attachment` + `nosniff` + stored `Content-Type` (a download, not an inline render); a **separate** file allowlist (SVG excluded); the `AttachmentIds` id is derived **server-side** from the body (never client-sent); a removed link ⇒ inert bytes (orphan-safe, never hard-deleted) | A1 (scraping), A3 (payload-as-XSS, self-impersonation) | ADR 0034 (C-ATT·1–10); design doc `file-attachments-design.md`; `Media__AttachmentAllowedContentTypes` (OPS.md) |
 
 ## 6. Decisions & open items
 

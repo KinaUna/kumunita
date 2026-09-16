@@ -27,22 +27,22 @@ namespace Kumunita.Core.Tests;
 /// <b>verbatim <c>AttachmentIds</c> write</b>, not the gate.
 /// </para>
 /// <para>
-/// <b>Drift pause (recorded here + in the handoff note):</b> test
-/// <c>#6 — PostEdit_ReparsesAttachmentIds</c> is pinned by §2.9, and
-/// design doc §2.3 (the write-lane spec) says the post / group-post
-/// <b>edit</b> lanes re-copy
-/// <c>existing.AttachmentIds = draft.AttachmentIds ?? []</c>. But U4 —
-/// deliberately, and following the image lane's own "create only, not edit"
-/// precedent for these two lanes — did <b>not</b> add an
+/// <b>U6 drift pause — RESOLVED (U12, option 1):</b> test
+/// <c>#6 — PostEdit_ReparsesAttachmentIds</c> was left commented out by U6
+/// because U4 — deliberately, following the image lane's own "create only,
+/// not edit" precedent for these two lanes — had not added an
 /// <c>attachmentIds</c> parameter to
 /// <see cref="PostService.UpdatePostAsync"/> /
-/// <see cref="PostService.UpdateGroupPostAsync"/>, so there is no seam to
-/// exercise. Per the U6 unit plan ("a pinned test that can't pass is a
-/// drift pause, not a reason to fix production code"), this method is
-/// <b>commented out</b> rather than silently weakened or made to assert the
-/// opposite. See <c>## U6 — DRIFT PAUSE</c> in the handoff notes for the
-/// decision the next agent must make. The 9 tests that <b>can</b> pass are
-/// live below and green.
+/// <see cref="PostService.UpdateGroupPostAsync"/>. U12 (the close unit)
+/// resolved the pause as <b>option 1</b> (restore the §2.3 frozen pin by
+/// fixing the code, per the decision framing in the U6 handoff): the two
+/// edit lanes now take the trailing <c>attachmentIds</c> param and write
+/// <c>post.AttachmentIds = attachmentIds ?? []</c> (replace-style), and the
+/// Web edit call-sites pass the re-parsed
+/// <c>AttachmentIds.ExtractAttachmentIds(body)</c>. Test #6 below is live
+/// again and pins that. Recorded in the handoff <c>## U12</c> /
+/// <c>## Summary</c> (see <c>## U6 — DRIFT PAUSE</c> for the original
+/// conflict).
 /// </para>
 /// <para>
 /// <b>Parse behavior is not re-asserted here</b> (the same drift-pause note
@@ -263,44 +263,15 @@ public class AttachmentOwnershipTests(PostgresFixture fixture) : IClassFixture<P
 
     // ── 6 — PostEdit_ReparsesAttachmentIds ────────────────────────────────
     //
-    // ⚠ DRIFT PAUSE (recorded; NOT silently weakened) ⚠
-    //
-    // This test is pinned by the design doc §2.9 and by §2.3 (which says the
-    // post / group-post <b>edit</b> lanes re-copy
-    // `existing.AttachmentIds = draft.AttachmentIds ?? []`). But the actual
-    // tree disagrees with §2.3 on this one line:
-    //
-    //   - `PostService.UpdatePostAsync`   (L346)  — NO `attachmentIds`
-    //                                                 parameter, NO
-    // `AttachmentIds` write line. It sets Title / Body / Audience /
-    // LanguageCode / Modified and nothing else.
-    //   - `PostService.UpdateGroupPostAsync` (L545) — the same: NO
-    // `attachmentIds` parameter, NO `AttachmentIds` write line.
-    //
-    // U4's handoff note is explicit that this is <b>deliberate</b>: the image
-    // lane's own precedent for these two edit lanes is "create only, not
-    // edit" (`UpdatePostAsync` / `UpdateGroupPostAsync` do not set
-    // `ImageIds` either), and U4 followed it. There is therefore no seam to
-    // exercise here — a test that calls `UpdatePostAsync` cannot observe any
-    // `AttachmentIds` change (the method does not take or write one).
-    //
-    // Per the U6 unit plan ("if a pinned test can't pass against the real
-    // tree, that is a DRIFT PAUSE, not a reason to fix PostService"), and
-    // the register's rule ("U6 is test-only — never touch U3–U5 production
-    // code"), I did NOT:
-    //   (a) add the missing `attachmentIds` parameter / write line to
-    //       `UpdatePostAsync` / `UpdateGroupPostAsync` (U4-scoped);
-    //   (b) rename the pinned test to assert the opposite (create-persists,
-    //       edit-does-not) — the §2.9 name is the frozen pin the U12 gate
-    //       checks against.
-    //
-    // The method is commented out so the 9 tests that <b>can</b> pass run
-    // green, and the conflict is surfaced for the next agent to decide. See
-    // `## U6 — DRIFT PAUSE` in the handoff notes. The intended shape (what
-    // would be written <b>if</b> the edit lane gained the seam) is preserved
-    // here for the decider:
+    // The post edit lane persists `AttachmentIds` (replaced wholesale — the
+    // re-parse of the re-submitted body is authoritative, the same shape as
+    // the reply edit lane, #8). LIVE since U12 (option 1): the
+    // `UpdatePostAsync` edit lane gained the trailing `attachmentIds`
+    // parameter + the `post.AttachmentIds = attachmentIds ?? []` write (U12
+    // resolved the `## U6 — DRIFT PAUSE` by restoring the §2.3 frozen pin
+    // rather than weakening it). The Web edit call-site passes the re-parsed
+    // `AttachmentIds.ExtractAttachmentIds(body)` (the U12 wiring).
 
-    /*
     [Fact]
     public async Task PostEdit_ReparsesAttachmentIds()
     {
@@ -321,14 +292,13 @@ public class AttachmentOwnershipTests(PostgresFixture fixture) : IClassFixture<P
             created.Id, Actor, "new title", "new body with [x](/attachment/new1) " +
                                           "and [y](/attachment/new2)",
             Audience(GrantKind.User, Actor), null, s,
-            AttachmentIds: ["new1", "new2"]));
+            attachmentIds: ["new1", "new2"]));
 
         Assert.Equal(["new1", "new2"], edited.AttachmentIds);
         var stored = await RunInSession(store, s => s.LoadAsync<Post>(edited.Id));
         Assert.NotNull(stored);
         Assert.Equal(["new1", "new2"], stored!.AttachmentIds);
     }
-    */
 
     // ── 7 — ReplyCreate_PersistsAttachmentIds ─────────────────────────────
     //
