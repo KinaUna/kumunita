@@ -648,6 +648,7 @@ public static class KnownTranslationKeys
             ["rc.editor.olist"]   = "1.",
             ["rc.editor.link"]    = "Link",
             ["rc.editor.image"]   = "Image",
+            ["rc.editor.attach"]  = "Attach file",
             ["rc.editor.source"]      = "</>",
             ["rc.editor.showPreview"] = "Preview",
         };

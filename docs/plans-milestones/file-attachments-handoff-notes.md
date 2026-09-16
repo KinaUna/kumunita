@@ -845,3 +845,144 @@ Core post/group-post **edit** lanes and stays pending for the decider.
 - The U6 `PostEdit_ReparsesAttachmentIds` drift pause is **still open** and is
   **not** a U10 concern (Web-only unit). The decider's option 1/2 choice
   (U6 handoff) must land before the U12 close gate checks the §2.9 names.
+
+## U10
+
+**Built:** the ATT editor affordance — the `attachLink` pure fn + the
+`data-md="attach"` handler (both in `rich-editor.ts`) + the "Attach file"
+button in every composer toolbar that carries the Image button.
+
+- `src/Kumunita.Web/client/lib/rich-editor.ts`:
+  - **`attachLink(label, id)`** (added **after** `imageLink`, ≈ L409) →
+    `` `[${label}](/attachment/${id})` `` — an **`<a>`** link, never an
+    `<img>` (C-ATT·2). Doc-comment anchors C-ATT·2 + the U7 `FullIdRe`
+    shape the splice is byte-identical to.
+  - **`else if (kind === 'attach')`** branch (added **after** the
+    `kind === 'image'` branch in the `bindRichEditor` click handler) — the
+    **link** splice path, **not** the image's `<img>`/blob-preview/`data-cid`
+    path: prompts for a **label** (the link convention, not an `alt`),
+    builds an `<input type="file">` with **no `accept`** (the U8 allowlist is
+    the gate, C-ATT·6 — a rejected type 415s and the handler alerts), uploads
+    via `apiFetch<{ id: string }>('/attachment', { method: 'POST', body: fd })`
+    (the **U8 lane**, no new `api.ts` method), then splices an
+    `<a href="/attachment/{id}">` (via `activeRange()` → `insertNode(a)`,
+    `previewPane!.appendChild(a)` fallback), `placeCaretAfter(a)`,
+    `syncTextarea()`. **`activeRange` / `placeCaretAfter` / `previewPane` /
+    `syncTextarea` are the exact helper names the image handler uses** (the
+    plan's snippet matched the real file verbatim — **no drift** on helper
+    names).
+- `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — added
+  `["rc.editor.attach"] = "Attach file"` **after** `rc.editor.image` (the
+  buttons use `<kw-l key="rc.editor.attach">Attach file</kw-l>` — cosmetic
+  parity with the adjacent `rc.editor.image` button; the en floor, matching
+  the closed `rc.editor.*` set shape).
+- **The "Attach file" button — 16 buttons across 10 views**, each placed
+  **directly after** the existing `<button data-md="image">` (markup
+  `<button type="button" class="rc-btn" data-md="attach"><kw-l
+  key="rc.editor.attach">Attach file</kw-l></button>`, matching the image
+  button's real `class`/`title`-via-`kw-l` shape):
+  - `Views/Announcement/New.cshtml` (L125), `Edit.cshtml` (L125),
+    `Detail.cshtml` (L167 — the reply/inline composer, carries
+    `data-rich-editor-no-image`).
+  - `Views/Groups/New.cshtml` (L73), `Edit.cshtml` (L74), `PostDetail.cshtml`
+    (L175, L320, L380, L450 — the 4 inline composers, each carries
+    `data-rich-editor-no-image`).
+  - `Views/Posts/New.cshtml` (L101), `Edit.cshtml` (L105), `Detail.cshtml`
+    (L181, L346, L406, L496 — the 4 inline composers, each carries
+    `data-rich-editor-no-image`).
+  - `Views/Languages/PreviewPage.cshtml` (L62 — the translation-preview
+    composer; carries the image button, so gets the attach button too).
+  - 16 `data-md="attach"` buttons, 1:1 with the 16 `data-md="image"` buttons
+    (verified by grep: 16 = 16).
+
+**Reply composers RETAIN the attach button (the F4 affordance — the top drift
+point):** the `data-rich-editor-no-image` removal block (rich-editor.ts
+L502–508) targets **only** `button[data-md="image"]` and is **byte-for-byte
+untouched**. The new `button[data-md="attach"]` is a **different** `data-md`
+value, so it is **not** caught by that removal — verified against the real
+reply composer markup (`Posts/Detail.cshtml` L170–182): the toolbar carries
+`data-rich-editor-no-image`, the image button is removed at runtime, and the
+attach button (L181) **stays**. No `data-rich-editor-no-attach` flag was
+added; `attach` was **not** added to the no-image removal list (C-ATT·9 holds,
+F4's only creation path is intact).
+
+**F9 serializer check (verified by reading, not by test):**
+`dom-to-markdown.ts` `serializeLink` (L227–232) emits
+`[${inline}](${unescapeHtml(href)})` **iff** `isSafeUrl(href)`. The
+`isSafeUrl` (L81–88) for `/attachment/{id}` (no `://`, not `//`, no `:`) is
+**true** (the schemeless-branch: `!url.includes(':')`). So an
+`<a href="/attachment/{id}">label</a>` serializes to
+`[label](/attachment/{id})` — **the F9 "no serializer change" claim HOLDS**
+with **no serializer edit needed**. U11 can author
+`AttachRoundtrip_F9_HrefPreserved` against the existing serializer as-is.
+**No drift — the serializer is unchanged** (recorded per the plan's
+"read-and-verify, do not silently fix" instruction; nothing to flag to U11
+beyond writing the pinned test).
+
+**Image lane byte-for-byte (C-ATT·9) — verified by grep:**
+`imageLink` (L408), `isSafeImageSrc` (L440), the `data-md="image"` handler
+(L1120+, incl. its `isSafeImageSrc`/`<img>`/`data-cid`/`placeCaretAfter`/
+`syncTextarea` body), and the `data-rich-editor-no-image` removal block
+(L502–508) are all at their **original** positions, untouched. The
+`attachLink` fn + `attach` handler + all 16 buttons were added
+**alongside/after** them only.
+
+**Verified (both gates green):**
+- `npm --prefix src/Kumunita.Web run build` → **green** (`tsc` — the TS
+  compiles; `attachLink` + the `attach` handler type-check).
+- `dotnet build Kumunita.slnx -c Debug` → **green** on `Kumunita.Core`,
+  `Kumunita.Core.Tests`, `Kumunita.Web`, and `Kumunita.Web.Tests` (1
+  pre-existing CS8604 warning in `WysiwygEditorTests.cs` L910 — the same
+  warning U3–U9 recorded; unrelated). The Razor views referencing the new
+  button + the `rc.editor.attach` key all compile.
+
+**Drift:** none. The two highest-risk drifts avoided:
+(1) **The splice is a link, not an image** — the `attach` handler POSTs to
+`/attachment` (U8 lane), takes a **prompted label**, and splices an
+**`<a>`** (never `<img>`/blob/`data-cid`) (C-ATT·2). (2) **The
+reply-composer suppression** — the attach button is a distinct `data-md`, the
+no-image block is byte-for-byte, and reply composers retain the button (F4).
+The one small deviation from the register's U10 text: it said "not in
+read-only detail views," but the **reply/inline composers** in
+`Posts/Detail.cshtml` + `Groups/PostDetail.cshtml` are the **only**
+attachment-creation path for replies (F4), and they **carry** the image
+button + `data-rich-editor-no-image` — so they **are** composers and **do**
+get the attach button. This is the correct reading of the U9 handoff
+("the reply composers … must STILL appear in reply composers") + the plan's
+own "match the image button's real surface" rule; the attach button goes
+where the image button is, which is exactly the set of composers. No
+throwaway test added or left behind (U11 owns the F9 test).
+
+**Next agent (U11) must know:**
+- U11 authors the **Web tests** — the **10 pinned names** in design doc
+  **§2.9** (the `Kumunita.Web.Tests` half): `AttachServe_F1_AudienceMemberDownloads`,
+  `AttachServe_F2_NonMember404`, `AttachServe_F3_Orphan404`,
+  `AttachServe_F4_ReplyParentDeny404`, `AttachServe_F5_AnnouncementPublicServes`,
+  `AttachUpload_F6_Empty400`, `AttachUpload_F6_Oversize413`,
+  `AttachUpload_F6_WrongType415`, `AttachLink_F7_RemoteUrlRendersText`,
+  `AttachRoundtrip_F9_HrefPreserved`.
+- **F9 (`AttachRoundtrip_F9_HrefPreserved`)** can be written against the
+  **existing** `dom-to-markdown.ts` serializer **unchanged** — the `<a
+  href="/attachment/{id}">` branch emits `[label](/attachment/{id})`
+  verbatim (verified above; `isSafeUrl` accepts the schemeless `/attachment/`
+  path). No serializer edit is needed; assert the round-trip as-is.
+- **F8** is **folded into F3** (per the §2.9 note / U2 handoff) — an
+  invalid-id 400/404 with no store round-trip; U11 **may** optionally add a
+  distinct `AttachServe_F8_InvalidId404` and back-reference it, but it is
+  **not** required by the pin.
+- **F7 (`AttachLink_F7_RemoteUrlRendersText`)** exercises the **renderer's**
+  `IsSafeUrl` rejection (a hand-typed `data:`/`javascript:`/remote URL renders
+  as plain text) — **not** the U7 `ExtractAttachmentIds` helper (which only
+  extracts the exact `/attachment/{id}` route shape). The U10 `attachLink`
+  fn + `attach` handler are the **producer** side of F9 (the test round-trips
+  a spliced link through `renderPreview` → `toMarkdown` → assert the
+  `/attachment/{id}` href survives).
+- The **U6 `PostEdit_ReparsesAttachmentIds` drift pause is STILL OPEN** —
+  it is **not** a U11 concern (Web tests), but the decider's option 1/2
+  choice must land before the **U12** close gate checks the §2.9 Core names.
+  U11 does **not** touch the Core `UpdatePostAsync` / `UpdateGroupPostAsync`
+  edit lanes.
+- The editor affordance is **tsc-only** (C-ATT·10) — no new editor
+  dependency, no `document.write`, no untrusted user HTML (the `attach`
+  handler splices a single `<a>` node it constructs, the same shape the image
+  handler splices).

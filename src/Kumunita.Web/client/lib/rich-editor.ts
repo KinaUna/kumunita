@@ -410,6 +410,18 @@ export function imageLink(alt: string, id: string): string {
 }
 
 /**
+ * ATT U10 (C-ATT·2) — the **exact** attachment link form the server parse
+ * (`AttachmentIds.FullIdRe` = `/attachment/([0-9a-f]{1,128})(?![0-9a-f])`)
+ * already understands. An **`<a>` link**, never an `<img>` (the difference
+ * from `imageLink`): a file is a **download**, not an inline render. Splicing
+ * this form is byte-identical to a resident hand-typing the link (zero server
+ * change — U7's `ExtractAttachmentIds` picks it up on save).
+ */
+export function attachLink(label: string, id: string): string {
+  return `[${label}](/attachment/${id})`;
+}
+
+/**
  * RE·2, D3 — the client `IsSafeImageSrc` mirror. **Exported** so
  * U07's parity tests can assert the accept/reject semantics directly
  * (the design doc pins this as a separate export).
@@ -1173,6 +1185,53 @@ export function bindRichEditor(root: HTMLElement): void {
               previewPane!.appendChild(img);
             }
             placeCaretAfter(img);
+            syncTextarea();
+          } catch (err) {
+            window.alert(
+              err instanceof Error ? err.message : 'Upload failed.',
+            );
+          }
+        });
+        fileInput.click();
+      } else if (kind === 'attach') {
+        // ATT U10 (C-ATT·2) — reuse the **U8 upload lane** (`POST /attachment`,
+        // the same `apiFetch` convention — no new `api.ts` method), but splice
+        // an **`<a>` link** (a download), not an `<img>`. The label is
+        // prompted (the link convention); the id is the U8 content-hash.
+        // **No** `<img>`/blob-preview/`data-cid` — that is the image lane
+        // (C-ATT·9); an attachment is a link, not a second image (C-ATT·2).
+        const label = window.prompt('Link text:', 'Attachment') ?? 'Attachment';
+        if (!label) return;
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        // No `accept` restriction — the U8 allowlist is the gate (C-ATT·6);
+        // a rejected type 415s and the handler alerts. `accept` is a UX
+        // nicety, not a security boundary (left unset — any file).
+        fileInput.addEventListener('change', async () => {
+          const file = fileInput.files?.[0];
+          if (!file) return;
+          try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const { id } = await apiFetch<{ id: string }>(
+              '/attachment',
+              { method: 'POST', body: fd },
+            );
+            // F9: the value is the exact /attachment/{id} form U7's
+            // AttachmentIds.ExtractAttachmentIds parses (zero server change).
+            // Splice an <a> at the caret (the link convention), then sync.
+            const canonical = `/attachment/${id}`;
+            const a = document.createElement('a');
+            a.setAttribute('href', canonical);
+            a.textContent = label;
+            const range = activeRange();
+            if (range) {
+              range.deleteContents();
+              range.insertNode(a);
+            } else {
+              previewPane!.appendChild(a);
+            }
+            placeCaretAfter(a);
             syncTextarea();
           } catch (err) {
             window.alert(
