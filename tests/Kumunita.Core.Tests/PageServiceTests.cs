@@ -411,10 +411,13 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public void PG_CheckCreateStanding_CommunityModerator_AllowsScopedPage()
+    public void PG_CheckCreateStanding_CommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page (the default Kind) is GlobalAdmin-only for
+        // create — a community Moderator has no standing on it.
         var page = new Page { Id = "pg-stand-create-c", ComponentId = "comp-x" };
-        PageService.CheckCreateStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), page);
+        Assert.Throws<UnauthorizedAccessException>(
+            () => PageService.CheckCreateStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), page));
     }
 
     [Fact]
@@ -436,9 +439,10 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public void PG_CheckEditStanding_Author_Allows()
+    public void PG_CheckEditStanding_Author_Allows_BlogPage()
     {
-        var page = new Page { Id = "pg-stand-edit", AuthorId = "u-author" };
+        // ADR 0040: the author lane applies to a blog page (Kind = User).
+        var page = new Page { Id = "pg-stand-edit", AuthorId = "u-author", Kind = PageKind.User };
         PageService.CheckEditStanding("u-author", RolesSet(Roles.Member), page);
     }
 
@@ -450,10 +454,13 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public void PG_CheckEditStanding_CommunityModerator_AllowsScopedPage()
+    public void PG_CheckEditStanding_CommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page is GlobalAdmin-only for edit — a community
+        // Moderator has no standing on it.
         var page = new Page { Id = "pg-stand-edit-c", AuthorId = "u-someone-else", ComponentId = "comp-x" };
-        PageService.CheckEditStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), page);
+        Assert.Throws<UnauthorizedAccessException>(
+            () => PageService.CheckEditStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), page));
     }
 
     [Fact]
@@ -479,10 +486,17 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public void PG_CheckTranslateStanding_CommunityModerator_AllowsScopedPage()
+    public void PG_CheckTranslateStanding_CommunityModerator_Denied_AllKinds()
     {
-        var page = new Page { Id = "pg-stand-trans-c", ComponentId = "comp-x" };
-        PageService.CheckTranslateStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), page);
+        // ADR 0040: a community Moderator has no translation standing on
+        // either kind (system: no community to moderate; blog: personal
+        // content). Only GlobalAdmin / Translator qualify.
+        var systemPage = new Page { Id = "pg-stand-trans-c-s", ComponentId = "comp-x" };
+        var blogPage = new Page { Id = "pg-stand-trans-c-b", ComponentId = "comp-x", Kind = PageKind.User };
+        Assert.Throws<UnauthorizedAccessException>(
+            () => PageService.CheckTranslateStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), systemPage));
+        Assert.Throws<UnauthorizedAccessException>(
+            () => PageService.CheckTranslateStanding("u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), blogPage));
     }
 
     [Fact]
@@ -537,23 +551,16 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public void PG6_CanTranslatePage_CommunityModerator_AllowsScopedPage_DeniesFlat()
+    public void PG6_CanTranslatePage_CommunityModerator_Denied_AllKinds()
     {
-        // The community-Moderator branch qualifies ONLY on a page scoped to a
-        // community they moderate (the ADR 0029 matrix); a flat/public page
-        // has no community to moderate, so the branch does not qualify.
-        var scoped = new Page { Id = "pg6-t-mod-s", ComponentId = "comp-x" };
-        var flat = new Page { Id = "pg6-t-mod-f", ComponentId = null };
+        // ADR 0040: a community Moderator has no translation standing on
+        // either kind (the ADR 0039 §3.7 moderator lane is removed).
+        var systemPage = new Page { Id = "pg6-t-mod-s", ComponentId = "comp-x" };
+        var blogPage = new Page { Id = "pg6-t-mod-b", ComponentId = "comp-x", Kind = PageKind.User };
         var modRoles = RolesSet(Roles.Moderator, Roles.ModeratorComponent("comp-x"));
 
-        Assert.True(PageService.CanTranslatePage("u-mod", modRoles, scoped));
-        // A flat/public page: the same moderator claim does NOT qualify.
-        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, flat));
-        // A scoped page in a DIFFERENT community: the actor's comp-x
-        // moderator claim does not match comp-other (the other-component
-        // denial).
-        var otherScoped = new Page { Id = "pg6-t-mod-o", ComponentId = "comp-other" };
-        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, otherScoped));
+        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, systemPage));
+        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, blogPage));
     }
 
     [Fact]
@@ -725,20 +732,22 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG3_Create_ByCommunityModerator_Persists_WithModeratorAudit()
+    public async Task PG3_Create_ByCommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page (default Kind) is GlobalAdmin-only for
+        // create — a community Moderator is denied.
         var store = await BootStoreAsync();
         var svc = new PageService(store);
         var page = new Page { Slug = "c-mod", Title = "T", Body = "b", ComponentId = "comp-c" };
 
         await using var session = newSession(store);
-        var saved = await svc.CreateAsync(
-            page, "u-mod-c", RolesSet(Roles.Moderator, Roles.ModeratorComponent("comp-c")), session);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAsync(page, "u-mod-c", RolesSet(Roles.Moderator, Roles.ModeratorComponent("comp-c")), session));
 
-        var audits = await AuditRows(store);
-        var row = Assert.Single(audits, a => a.TargetId == saved.Id && a.Action == "page.create");
-        Assert.Equal("page", row.TargetKind);
-        Assert.Equal(AccessVia.Moderator, row.Via);
+        // The deny precedes SaveChangesAsync — nothing is persisted, no audit row.
+        await using var q = store.QuerySession();
+        Assert.Equal(0, await q.Query<Page>().CountAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(await AuditRows(store));
     }
 
     [Fact]
@@ -801,7 +810,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     {
         var store = await BootStoreAsync();
         var svc = new PageService(store);
-        await Plant(store, new Page { Id = "pg3-u-auth", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-author" });
+        await Plant(store, new Page { Id = "pg3-u-auth", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-author", Kind = PageKind.User });
 
         await using var session = newSession(store);
         var saved = await svc.UpdateAsync(
@@ -834,21 +843,20 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG3_Update_ByCommunityModerator_Allows_WithModeratorAudit()
+    public async Task PG3_Update_ByCommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page (default Kind) is GlobalAdmin-only for edit
+        // — a community Moderator is denied.
         var store = await BootStoreAsync();
         var svc = new PageService(store);
         await Plant(store, new Page
         { Id = "pg3-u-mod", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-someone", ComponentId = "comp-u" });
 
         await using var session = newSession(store);
-        await svc.UpdateAsync(
-            new Page { Id = "pg3-u-mod", Slug = "u", Title = "New", Body = "nb" },
-            "u-mod-u", RolesSet(Roles.ModeratorComponent("comp-u")), session);
-
-        var audits = await AuditRows(store);
-        Assert.Equal(AccessVia.Moderator,
-            (await AuditsFor(store, "pg3-u-mod", "page.update")).Single().Via);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateAsync(
+                new Page { Id = "pg3-u-mod", Slug = "u", Title = "New", Body = "nb" },
+                "u-mod-u", RolesSet(Roles.ModeratorComponent("comp-u")), session));
     }
 
     [Fact]
@@ -976,19 +984,18 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG3_Move_ByCommunityModerator_Allows_WithModeratorAudit()
+    public async Task PG3_Move_ByCommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page (default Kind) is GlobalAdmin-only for move
+        // — a community Moderator is denied.
         var store = await BootStoreAsync();
         var svc = new PageService(store);
         await Plant(store, new Page
         { Id = "pg3-m-mod", Slug = "m", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-m" });
 
         await using var session = newSession(store);
-        await svc.MoveAsync("pg3-m-mod", null, "m2", "u-mod-m", RolesSet(Roles.ModeratorComponent("comp-m")), session);
-
-        var audits = await AuditRows(store);
-        Assert.Equal(AccessVia.Moderator,
-            (await AuditsFor(store, "pg3-m-mod", "page.move")).Single().Via);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.MoveAsync("pg3-m-mod", null, "m2", "u-mod-m", RolesSet(Roles.ModeratorComponent("comp-m")), session));
     }
 
     [Fact]
@@ -1063,19 +1070,22 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG3_Delete_ByCommunityModerator_Allows_WithModeratorAudit()
+    public async Task PG3_Delete_ByCommunityModerator_Denied_SystemPage()
     {
+        // ADR 0040: a system page (default Kind) is GlobalAdmin-only for
+        // delete — a community Moderator is denied.
         var store = await BootStoreAsync();
         var svc = new PageService(store);
         await Plant(store, new Page
         { Id = "pg3-d-mod", Slug = "d", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-d" });
 
         await using var session = newSession(store);
-        await svc.DeleteAsync("pg3-d-mod", "u-mod-d", RolesSet(Roles.ModeratorComponent("comp-d")), session);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteAsync("pg3-d-mod", "u-mod-d", RolesSet(Roles.ModeratorComponent("comp-d")), session));
 
-        var audits = await AuditRows(store);
-        Assert.Equal(AccessVia.Moderator,
-            (await AuditsFor(store, "pg3-d-mod", "page.delete")).Single().Via);
+        // Nothing changed — the page is still live.
+        await using var q = store.QuerySession();
+        Assert.False((await q.LoadAsync<Page>("pg3-d-mod", TestContext.Current.CancellationToken))!.IsDeleted);
     }
 
     [Fact]
@@ -1125,20 +1135,24 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG3_Translate_ByCommunityModerator_Persists_WithModeratorAudit()
+    public async Task PG3_Translate_ByCommunityModerator_Denied_AllKinds()
     {
+        // ADR 0040: a community Moderator has no translation standing on
+        // either kind (the ADR 0039 §3.7 moderator lane is removed).
         var store = await BootStoreAsync();
         var svc = new PageService(store);
         await Plant(store, new Page
-        { Id = "pg3-t-mod", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-t" });
+        { Id = "pg3-t-mod-s", Slug = "ts", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-t" });
+        await Plant(store, new Page
+        { Id = "pg3-t-mod-b", Slug = "tb", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-t", Kind = PageKind.User });
 
         await using var session = newSession(store);
-        await svc.AddTranslationAsync("pg3-t-mod", "es", "T", "Cuerpo",
-            "u-mod-t", RolesSet(Roles.ModeratorComponent("comp-t")), session);
-
-        var audits = await AuditRows(store);
-        Assert.Equal(AccessVia.Moderator,
-            (await AuditsFor(store, "pg3-t-mod", "page.translation.add")).Single().Via);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddTranslationAsync("pg3-t-mod-s", "es", "T", "Cuerpo",
+                "u-mod-t", RolesSet(Roles.ModeratorComponent("comp-t")), session));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddTranslationAsync("pg3-t-mod-b", "es", "T", "Cuerpo",
+                "u-mod-t", RolesSet(Roles.ModeratorComponent("comp-t")), session));
     }
 
     [Fact]
@@ -1199,18 +1213,19 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             svc.AddTranslationAsync("pg3-t-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
     }
 
-    // ─── PG U05 (ADR 0039 §3.9) — the seeder's Page docs ─────────────────────
+    // ─── PG U05 (ADR 0039 §3.9, amended by ADR 0040) — the seeder's Page docs ─
     //
     // The seeder seeds the new Page docs for the canonical default pages (terms +
-    // help), straight into the caller's IDocumentSession, idempotently. The
-    // seeder's Page-upsert is a public static (SeedDefaultPagesAsync) + a public
-    // page-data source (EnDefaultPages), so these tests pin idempotency + the
-    // exact set across two live sessions (boot twice, no duplicate roots) and
-    // the U05 drift pin (no `about` root is seeded — the /about product-story
-    // view stays authoritative on a fresh instance).
+    // help) under a `system` namespace root (ADR 0040), straight into the
+    // caller's IDocumentSession, idempotently. The seeder's Page-upsert is a
+    // public static (SeedDefaultPagesAsync) + a public page-data source
+    // (EnDefaultPages), so these tests pin idempotency + the exact set across
+    // two live sessions (boot twice, no duplicates) and the U05 drift pin
+    // (no `about` page is seeded — the /about product-story view stays
+    // authoritative on a fresh instance).
 
     [Fact]
-    public async Task PG5_Seeder_TermsAndHelp_AreRootPages_NoDuplicates_AcrossTwoBoots()
+    public async Task PG5_Seeder_TermsAndHelp_UnderSystemRoot_NoDuplicates_AcrossTwoBoots()
     {
         var store = await BootStoreAsync();
         var defaultPages = FirstBootSeeder.EnDefaultPages();
@@ -1223,28 +1238,40 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             await s1.SaveChangesAsync(ct);
         }
 
-        // Boot 2 — a second seed into a SECOND session must NOT create new roots
-        // (idempotent refresh, not a duplicate), per (Slug, ParentId == null).
+        // Boot 2 — a second seed into a SECOND session must NOT create new rows
+        // (idempotent refresh, not a duplicate).
         await using (var s2 = newSession(store))
         {
             await FirstBootSeeder.SeedDefaultPagesAsync(s2, defaultPages, DateTimeOffset.UtcNow, ct);
             await s2.SaveChangesAsync(ct);
         }
 
-        // Exactly the seeded slugs, each exactly once, all roots (ParentId null).
+        // The `system` root exists (ADR 0040 namespace container).
         await using var q = store.QuerySession();
-        var roots = await q.Query<Page>()
-            .Where(p => p.ParentId == null)
+        var systemRoot = await q.Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstOrDefaultAsync(ct);
+        Assert.NotNull(systemRoot);
+        Assert.Equal(PageKind.System, systemRoot!.Kind);
+
+        // terms + help are nested under the `system` root (not roots themselves).
+        var children = await q.Query<Page>()
+            .Where(p => p.ParentId == systemRoot.Id && p.IsDeleted == false)
             .ToListAsync(ct);
-
-        // The seeded set is terms + help (the EnDefaultPages closed set).
         Assert.Equal(new[] { "help", "terms" },
-            roots.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
+            children.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
 
-        // Exactly one root per slug (no duplicate from the second boot).
-        Assert.Equal(2, roots.Count);
-        Assert.Equal(1, roots.Count(p => p.Slug == "terms"));
-        Assert.Equal(1, roots.Count(p => p.Slug == "help"));
+        // Exactly one child per slug (no duplicate from the second boot).
+        Assert.Equal(2, children.Count);
+        Assert.Equal(1, children.Count(p => p.Slug == "terms"));
+        Assert.Equal(1, children.Count(p => p.Slug == "help"));
+
+        // No other roots exist (the `system` root is the only root-level page).
+        var allRoots = await q.Query<Page>()
+            .Where(p => p.ParentId == null && p.IsDeleted == false)
+            .ToListAsync(ct);
+        var onlyRoot = Assert.Single(allRoots);
+        Assert.Equal("system", onlyRoot.Slug);
     }
 
     [Fact]
@@ -1262,13 +1289,13 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
         // The U05 drift pin: `about` is deliberately absent from the seeded set —
         // a fresh /about is the full-bleed product-story view (not a Markdown
-        // page), so the seeder never writes an `about` root Page.
+        // page), so the seeder never writes an `about` page (root or nested).
         await using var q = store.QuerySession();
-        var aboutRoots = await q.Query<Page>()
-            .Where(p => p.Slug == "about" && p.ParentId == null)
+        var aboutPages = await q.Query<Page>()
+            .Where(p => p.Slug == "about" && p.IsDeleted == false)
             .CountAsync(ct);
 
-        Assert.Equal(0, aboutRoots);
+        Assert.Equal(0, aboutPages);
     }
 
     [Fact]
@@ -1285,18 +1312,23 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         }
 
         await using var q = store.QuerySession();
+        var systemRoot = await q.Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstAsync(ct);
         var terms = await q.Query<Page>()
-            .Where(p => p.Slug == "terms" && p.ParentId == null)
+            .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
             .FirstAsync(ct);
 
         // The seeded page's shape: public (Audience null — the one place pages
         // differ from posts, ADR 0039 §3.4), authored-in `en` (the seeder's
-        // source language), a root (ParentId null), platform content (no
-        // resident author — AuthorId empty), not a draft / not deleted.
+        // source language), nested under the `system` root (ADR 0040),
+        // platform content (no resident author — AuthorId empty), not a
+        // draft / not deleted.
         Assert.Null(terms.Audience);
         Assert.Equal(FirstBootSeeder.SourceLanguage, terms.LanguageCode);
-        Assert.Null(terms.ParentId);
+        Assert.Equal(systemRoot.Id, terms.ParentId);
         Assert.Equal(string.Empty, terms.AuthorId);
+        Assert.Equal(PageKind.System, terms.Kind);
         Assert.False(terms.IsDraft);
         Assert.False(terms.IsDeleted);
         // Body + title carried verbatim (the byte-identical gate: the seeded

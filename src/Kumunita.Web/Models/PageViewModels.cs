@@ -71,6 +71,43 @@ public sealed record PageNode(
 public sealed record PageTreeViewModel(IReadOnlyList<PageNode> Roots);
 
 /// <summary>
+/// The <c>GET /blog/{userId}</c> per-user blog feed (ADR 0040) — the
+/// resident's own <see cref="Kumunita.Core.Pages.Page"/> set
+/// (<see cref="Kumunita.Core.Pages.PageKind"/> = <c>User</c>, authored by
+/// that resident), newest-first. Each row links to the page's
+/// <c>/pages/…</c> href (the same <see cref="Kumunita.Web.Security
+/// .PagePaths"/> the tree browse uses). The feed is a <b>read-only
+/// listing</b> — the write lanes (create/edit/move/delete) are the
+/// <c>/pages/…</c> controller's, and the feed itself carries no standing
+/// affordances (a resident's own feed is theirs; another resident's feed is
+/// a read-only list of their public + community-visible pages).
+/// </summary>
+public sealed record BlogViewModel(
+    string AuthorId,
+    string? AuthorDisplayName,
+    IReadOnlyList<BlogPostRow> Posts,
+    /// <summary>
+    /// Whether the acting caller is the <b>author</b> of this feed (the
+    /// affordance pin — the "New page" / "New blog page" button is shown on
+    /// your own feed; another resident's feed is read-only).
+    /// </summary>
+    bool IsOwner);
+
+/// <summary>
+/// One row of the <see cref="BlogViewModel"/> feed: the page's title, the
+/// <c>/pages/…</c> href, and the last-modified stamp. A <b>draft</b> page
+/// (ADR 0037) is <b>absent</b> from another resident's feed (a draft is its
+/// author's) — the controller filters it; the <see cref="IsDraft"/> flag is
+/// present only so the author's own feed can badge it.
+/// </summary>
+public sealed record BlogPostRow(
+    string Id,
+    string Title,
+    string Href,
+    DateTimeOffset Modified,
+    bool IsDraft);
+
+/// <summary>
 /// The <c>GET /pages/{**path}</c> post view (the full-body read surface —
 /// the tree browse shows a title + path and links here). The page's own
 /// shape plus the ADR 0027 chip-swap data (the authored-in
@@ -141,6 +178,30 @@ public sealed class PageComposeViewModel
     /// <summary>The page id (set only for the edit lane; null for create).
     /// The edit form posts to <c>/pages/</c> + this value + <c>/edit</c>.</summary>
     public string? PageId { get; set; }
+
+    /// <summary>
+    /// The <b>page kind</b> (ADR 0040) the composer is authoring —
+    /// <see cref="Kumunita.Core.Pages.PageKind.System"/> (a system/platform
+    /// page under the <c>system/</c> root, GlobalAdmin-only) or
+    /// <see cref="Kumunita.Core.Pages.PageKind.User"/> (a blog page under the
+    /// actor's own <c>blog/{uid}</c> root). The form binds a
+    /// <c>"System"</c>/<c>"User"</c> string; the controller maps it to the
+    /// enum. Default <c>System</c> — a plain <c>/pages/new</c> is a system
+    /// page (the ADR 0039 shape); the blog lane posts <c>Kind = "User"</c>
+    /// with the actor's blog root as the parent.
+    /// </summary>
+    public string? Kind { get; set; } = "System";
+
+    /// <summary>
+    /// Whether the acting caller is a <b>GlobalAdmin</b> — drives the
+    /// parent-picker differentiation in <c>_PageForm.cshtml</c> (ADR 0040):
+    /// a GlobalAdmin sees <em>both</em> the system page set and their own
+    /// blog root as nesting candidates; a plain resident sees only their own
+    /// blog root. <b>[BindNever]</b> — the server derives it from the
+    /// principal (never bound from the form, so it cannot be spoofed).
+    /// </summary>
+    [BindNever]
+    public bool IsAdmin { get; set; }
 
     public string? Title { get; set; }
 

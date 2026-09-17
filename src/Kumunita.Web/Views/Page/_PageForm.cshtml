@@ -46,6 +46,16 @@
         <form id="page-form" method="post" action="@action">
             @Html.AntiForgeryToken()
 
+            @* ADR 0040 — the page kind (System = a platform page under the
+               `system/` root; User = a blog page under the actor's own
+               `blog/…` root) is set server-side by the controller from the
+               caller's standing (an admin opens a system page, a resident
+               opens their blog page) and round-trips unchanged so the POST
+               writes the right PageKind. It is NOT a user choice — a resident
+               cannot author a system page (the service denies it, C3) and a
+               blog page is always the actor's own. *@
+            <input type="hidden" name="Kind" value="@Model.Kind" />
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="title" style="font-weight:600;">Title</label>
@@ -92,14 +102,16 @@
                         <div class="col-md-6">
                             <label class="form-label" for="parent" style="font-weight:600;">Parent page</label>
                             <select class="form-control" id="parent" name="ParentId">
-                                <option value="">Top level (no parent)</option>
+                                <option value="">@(Model.Kind == "User" ? "Top level — this becomes a new top-level blog page" : "Top level — a top-level system page")</option>
                                 @foreach (var (id, label) in Model.ParentPages)
                                 {
                                     <option value="@id" selected="@(id == Model.ParentId ? "selected" : null)">@label</option>
                                 }
                             </select>
                             <div class="text-muted small mt-1">
-                                Nesting a page under a parent gives it a longer path (e.g. <code>help/getting-started</code>).
+                                @(Model.Kind == "User"
+                                    ? "A blog page may nest under your own blog pages only (or be a top-level blog page). The system namespace is not available to blog pages."
+                                    : "A system page may nest under another system page only (e.g. <code>system/about</code>). Blog pages cannot nest under a system page.")
                             </div>
                         </div>
                         <div class="col-md-6">

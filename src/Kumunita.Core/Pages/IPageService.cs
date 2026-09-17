@@ -80,6 +80,35 @@ public interface IPageService
     /// </summary>
     Task<Page?> GetByMountPointAsync(string slot);
 
+    // ─── ADR 0040 — blog lanes (per-user feed + ownership guard) ─────────
+
+    /// <summary>
+    /// Returns the actor's own <see cref="PageKind.User"/> (blog) root page
+    /// (a root-level, non-deleted user page whose <c>AuthorId</c> is
+    /// <paramref name="actorId"/>), or <c>null</c> when the actor has no blog
+    /// yet. Used by the Web composer's "My blog" parent-picker and the
+    /// <c>/blog/{userId}</c> feed (which lists pages under this root).
+    /// </summary>
+    Task<Page?> GetBlogRootAsync(string actorId);
+
+    /// <summary>
+    /// Returns the active, non-deleted <see cref="PageKind.User"/> (blog)
+    /// pages of <paramref name="authorId"/> (all levels — the feed shows the
+    /// blog's full content in Modified-desc order), or an empty list when the
+    /// actor has no published blog content (the feed renders the "no posts
+    /// yet" empty state).
+    /// </summary>
+    Task<IReadOnlyList<Page>> GetBlogPagesAsync(string authorId);
+
+    /// <summary>
+    /// Returns <c>true</c> when the page at <paramref name="pageId"/> is
+    /// under the <see cref="PageKind.User"/> (blog) namespace — i.e. its
+    /// root is a user page. <c>false</c> for a system page. Used by the Web
+    /// tree view (to group "system" vs "blog" roots) and the composer's kind
+    /// pre-gate. A missing page returns <c>false</c> (treated as absent).
+    /// </summary>
+    Task<bool> IsUnderBlogAsync(string pageId);
+
     // ─── Write lanes (ADR 0039 §3.7 — U03) ────────────────────────────────
     //
     // Each re-checks standing **server-side** (the C3 single-source pin — a
@@ -95,16 +124,20 @@ public interface IPageService
 
     /// <summary>
     /// Creates a <see cref="Page"/> in the **caller's** in-flight session
-    /// (C3). Standing (§3.7): a GlobalAdmin (<see cref="Authorization
-    /// .AccessVia.Admin"/>) or a community Moderator scoped to
-    /// <see cref="Page.ComponentId"/> (<see cref="Authorization
-    /// .AccessVia.Moderator"/>); a plain Member is denied
-    /// (<see cref="UnauthorizedAccessException"/>, the Web layer's 403).
-    /// A root-slug collision (two roots sharing a <see cref="Page.Slug"/>)
-    /// is a <see cref="InvalidOperationException"/> — the
-    /// <c>(ParentId, Slug)</c> unique index does **not** prevent it (Postgres
-    /// treats NULLs as distinct), so this lane is the authoritative root-slug
-    /// guard. A denied actor throws **before** anything is stored.
+    /// (C3). Standing (ADR 0040, amending §3.7): a <see
+    /// cref="PageKind.System"/> page is a GlobalAdmin
+    /// (<see cref="Authorization.AccessVia.Admin"/>); a <see
+    /// cref="PageKind.User"/> (blog) page is any signed-in actor (they become
+    /// the author — <see cref="AccessVia.Owner"/> — the ownership guard keeps
+    /// it under their own blog root); a community Moderator has no standing
+    /// on either kind. A root-slug collision (two roots sharing a
+    /// <see cref="Page.Slug"/> **in the same namespace** — scoped by
+    /// <see cref="PageKind"/> + <see cref="Page.AuthorId"/>) is a <see
+    /// cref="InvalidOperationException"/> — the <c>(ParentId, Slug)</c>
+    /// unique index does **not** prevent it (Postgres treats NULLs as
+    /// distinct), so this lane is the authoritative root-slug guard. A
+    /// denied actor throws <see cref="UnauthorizedAccessException"/> (the Web
+    /// layer's 403) **before** anything is stored.
     /// </summary>
     Task<Page> CreateAsync(
         Page page, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
@@ -112,13 +145,14 @@ public interface IPageService
     /// <summary>
     /// Edits an existing <see cref="Page"/> (title / body / audience /
     /// hierarchy fields) in the **caller's** in-flight session (C3). Standing
-    /// (§3.7): the page's <see cref="Page.AuthorId"/> (<see cref="Authorization
-    /// .AccessVia.Owner"/>), a GlobalAdmin (<see cref="Authorization
-    /// .AccessVia.Admin"/>), or a community Moderator scoped to
-    /// <see cref="Page.ComponentId"/> (<see cref="Authorization
-    /// .AccessVia.Moderator"/>). A missing page is a
-    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
-    /// actor is a <see cref="UnauthorizedAccessException"/> (403).
+    /// (ADR 0040, amending §3.7): a <see cref="PageKind.System"/> page is a
+    /// GlobalAdmin (<see cref="Authorization.AccessVia.Admin"/>); a <see
+    /// cref="PageKind.User"/> (blog) page is the page's <see
+    /// cref="Page.AuthorId"/> (<see cref="Authorization.AccessVia.Owner"/>)
+    /// or a GlobalAdmin; a community Moderator has no standing on either
+    /// kind. A missing page is a <see cref="KeyNotFoundException"/> (the Web
+    /// layer's 404); a denied actor is a
+    /// <see cref="UnauthorizedAccessException"/> (403).
     /// </summary>
     Task<Page> UpdateAsync(
         Page updated, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
@@ -135,13 +169,17 @@ public interface IPageService
 
     /// <summary>
     /// Moves a <see cref="Page"/> under a new parent (reparent) in the
-    /// **caller's** in-flight session (C3). Standing (§3.7): a GlobalAdmin or
-    /// a community Moderator scoped to <see cref="Page.ComponentId"/> —
-    /// **not** a plain author (a page is platform content, not a personal
-    /// note; <see cref="AccessVia"/> is <c>Admin</c> / <c>Moderator</c>,
-    /// never <c>Owner</c>). Applies the **cycle-guard** (the new parent is
-    /// not a descendant of the page) and the **depth-cap** (chain ≤
-    /// <c>MaxDepth</c>, 8); the derived path is rewritten by the single
+    /// **caller's** in-flight session (C3). Standing (ADR 0040, amending
+    /// §3.7): a <see cref="PageKind.System"/> page is a GlobalAdmin
+    /// (<see cref="Authorization.AccessVia.Admin"/>); a <see
+    /// cref="PageKind.User"/> (blog) page is the author
+    /// (<see cref="Authorization.AccessVia.Owner"/>) or a GlobalAdmin; a
+    /// community Moderator has no standing on either kind. The **namespace
+    /// guard** (a page can only move within its kind's namespace) and the
+    /// **blog-ownership guard** (a blog page can only move under the actor's
+    /// own blog root) apply on top. Applies the **cycle-guard** (the new
+    /// parent is not a descendant of the page) and the **depth-cap** (chain
+    /// ≤ <c>MaxDepth</c>, 8); the derived path is rewritten by the single
     /// <see cref="Page.ParentId"/> / <see cref="Page.Slug"/> column write
     /// (paths are not stored). A <c>newSlug</c> change is authoritative for
     /// root-level uniqueness (the index does not guard it).
@@ -155,24 +193,24 @@ public interface IPageService
     /// session (C3): sets <see cref="Page.IsDeleted"/> to <c>true</c> and
     /// stamps <see cref="Page.Modified"/> — it does **not** remove the row or
     /// orphan its children (the ADR 0024 shape; the U02 read lanes filter the
-    /// flag out). Standing (§3.7): a GlobalAdmin or a community Moderator
-    /// scoped to <see cref="Page.ComponentId"/> — **not** a plain author
-    /// (<see cref="AccessVia"/> is <c>Admin</c> / <c>Moderator</c>, never
-    /// <c>Owner</c>).
+    /// flag out). Standing (ADR 0040, amending §3.7): a <see
+    /// cref="PageKind.System"/> page is a GlobalAdmin
+    /// (<see cref="Authorization.AccessVia.Admin"/>); a <see
+    /// cref="PageKind.User"/> (blog) page is the author
+    /// (<see cref="Authorization.AccessVia.Owner"/>) or a GlobalAdmin; a
+    /// community Moderator has no standing on either kind.
     /// </summary>
     Task DeleteAsync(
         string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
 
     /// <summary>
     /// Adds a **user-added translation** of a page in the **caller's**
-    /// in-flight session (C3; the ADR 0029 standing carried over, design doc
-    /// §3.7). Standing: a GlobalAdmin (<see cref="Authorization
-    /// .AccessVia.Admin"/>), a Translator (<see cref="Authorization
-    /// .AccessVia.Admin"/>), or a community Moderator scoped to
-    /// <see cref="Page.ComponentId"/> (<see cref="Authorization
-    /// .AccessVia.Moderator"/>); a flat/public page has no community to
-    /// moderate, so the component-moderator standing does not qualify.
-    /// The <c>(PageId, LanguageCode)</c> unique index (U01) is the add-only
+    /// in-flight session (C3; the ADR 0029 standing carried over). Standing
+    /// (ADR 0040, amending §3.7): a GlobalAdmin
+    /// (<see cref="Authorization.AccessVia.Admin"/>) or a Translator
+    /// (<see cref="Authorization.AccessVia.Admin"/>) — on **either** page
+    /// kind; a community Moderator has no standing on either kind. The
+    /// <c>(PageId, LanguageCode)</c> unique index (U01) is the add-only
     /// duplicate guard. A missing page is a
     /// <see cref="KeyNotFoundException"/> (404); a denied actor is a
     /// <see cref="UnauthorizedAccessException"/> (403).

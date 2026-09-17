@@ -21,8 +21,10 @@ knowledge tree**:
 - **Seeded default pages** — home, about, terms & conditions — present on a
   fresh instance, each with at least an `en` floor, **editable in the WYSIWYG
   editor** (the RE `bindRichEditor` + `MarkdownRenderer` surface).
-- **Admin- and community-moderator-authored pages** — a blogging surface for
-  "how the platform works", "what's coming", longer resident prose.
+- **System (platform) + resident-blog pages** — a `System` page is
+  admin-authored ("how the platform works", "what's coming"); a `User` (blog)
+  page is a **resident's own blog** — their own prose, nested under their own
+  root (ADR 0040).
 - **Audiences like community posts** — a page is **private** (a subset of
   users/groups), **community-visible** (all members of a component), or
   **public** (everyone) — reusing the exact `Audience` mechanism posts use
@@ -44,10 +46,11 @@ the user-added-translation row shape (ADR 0022/0026/0029), the `MarkdownRenderer
 + `bindRichEditor` authoring surface (ADR 0025 / ADR 0031), the content-image /
 attachment idiom (ADR 0025 / ADR 0034), and the ADR 0004 §B.1 **additive-field**
 rule (delta-detected, idempotent, no seed reset, zero migrations for new fields).
-**No new `AccessAction`** (the existing `Read` / `Moderate` are enough), **no new
-`AccessVia` value** (the audience / community / moderator branches already cover
-the standing), **no new bounded-context authorization path** (it goes through the
-frozen `IAuthorizationService`).
+**No new `AccessAction`** (the existing `Read` is enough), **no new
+`AccessVia` value** (pages use the settled `Owner` / `Admin` branches — ADR 0040
+retires the community-Moderator lane, so `Moderator` is never a page standing),
+**no new bounded-context authorization path** (it goes through the frozen
+`IAuthorizationService`).
 
 ## 2. The existing surface this lane builds on (verified, 2026-09-17)
 
@@ -78,8 +81,8 @@ Read directly, not assumed:
 6. **Translatable UGC row shape is settled** — `PostTranslation` /
    `ReplyTranslation` / `AnnouncementTranslation` / `GroupTranslation` /
    `CommunityTranslation`, all `(ParentId, LanguageCode)` unique-indexed,
-   standing = GlobalAdmin ∪ Translator (∪ community Moderator for community-
-   scoped targets), display via the ADR 0027 chip-swap.
+   standing = GlobalAdmin ∪ Translator (the community-Moderator lane is
+   retired on pages by ADR 0040), display via the ADR 0027 chip-swap.
 7. **Reference-from-UGC is free** — `MarkdownRenderer` renders
    `[label](url)` under the `IsSafeUrl` whitelist (relative paths accepted), so
    a `[About](/pages/about)` link in a post body already works end-to-end with
@@ -142,9 +145,10 @@ public sealed class Page
     // Audience (ADR 0001-B / 0036 — REUSED verbatim, not a new scope).
     public Authorization.Audience? Audience { get; set; } // null = public (Decide() branch 5)
 
-    // Authorship + moderation scoping.
+    // Authorship (ADR 0040: author ∪ GlobalAdmin on a blog; GlobalAdmin on a system page).
+    public PageKind Kind { get; set; } = PageKind.System;  // System (platform) vs User (resident blog)
     public string AuthorId { get; set; } = string.Empty;
-    public string? ComponentId { get; set; }              // the community a moderator is scoped to
+    public string? ComponentId { get; set; }              // the community a community-scoped audience reads it for (ADR 0036), not a standing seam
     public string LanguageCode { get; set; } = string.Empty; // ADR 0018 authored-in tag
 
     // Mount point (the "special root nodes" — where a page appears in the UI).
@@ -167,7 +171,8 @@ public sealed class Page
 | `ParentId` / `Slug` | *new, this lane* | the hierarchy. `Slug` is **unique per parent** (a `(ParentId, Slug)` unique index, the `GroupMembership` business-key convention). The full path is *derived* (`/pages/a/b/c`) — not stored — so a subtree moves in one column write. |
 | `Title` / `Body` / `LanguageCode` | `Post` / `Announcement` (ADR 0018) | authored-in tag + Markdown body; rendered by the single `MarkdownRenderer`. |
 | `Audience` | `Post.Audience` (ADR 0001-B / 0036) | **`null` = public** (Decide branch 5); non-null = grant list / `Community` flag. Reuses the `AudienceEditorModel` form surface verbatim. |
-| `AuthorId` / `ComponentId` | `Post` / `Announcement` | owner branch + moderator scoping, both already in `Decide()`. |
+| `Kind` | *new, ADR 0040* | `System` (a platform page) vs `User` (a resident's blog) — the standing matrix in §3.7 keys off this. |
+| `AuthorId` / `ComponentId` | `Post` / `Announcement` | the `Owner` branch (a blog page's author) + a community-scoped audience's `ComponentId` — a *read* scope, **not** a standing seam (ADR 0040 retires the Moderator lane). |
 | `MountPoint` | *new, this lane* | a **nullable string tag** (e.g. `"footer/community"`). A UI slot reads "the page mounted at X". It is a *display* concern (where to surface a link), **not** an access boundary — access is always the `Audience` + `CanAsync(Read)`. |
 | `IsDraft` | `Announcement.IsDraft` (ADR 0037) | the author-only draft pin, reused for "admin drafting a blog post before publishing". |
 | `ImageIds` / `AttachmentIds` | `Announcement` (RC U03 / ATT U3) | the content-image + attachment idiom, byte-store + reverse-lookup serving reused. |
@@ -222,8 +227,9 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
   `PostToAuditableResource` verbatim: `Id`/`Name`/`OwnerId = AuthorId` /
   `Audience` (null allowed) / `ComponentId` / `TargetKind = "page"`). **No new
   `AccessAction`** (`Read` exists) and **no new `AccessVia`** (the
-  `Owner`/`Moderator`/`Community`/`Audience` branches already cover every
-  standing a page needs). The adapter is the *only* new authorization surface.
+  `Owner`/`Community`/`Audience` branches already cover every *read* standing a
+  page needs; the community-Moderator branch does not apply to pages — ADR
+  0040). The adapter is the *only* new authorization surface.
 - **List/tree views** filter via `CanSeeAsync(Read, candidates)` (the same
   C6 no-drift, aggregate-audit bulk decision posts use) so a resident only
   *sees* pages they can read — the tree does not leak the *existence* of a
@@ -246,11 +252,10 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
 - **Authored-in** is `Page.LanguageCode` (ADR 0018) — the base body is
   authored in one language; the `PageTranslation` rows are **user-added**
   (never machine-translated — ADR 0005 C stands).
-- **Standing = GlobalAdmin ∪ Translator** (ADR 0021/0022) **plus the
-  community-Moderator lane for a community-scoped page** (`ComponentId` set and
-  equal to a community the actor moderates — the ADR 0029 announcement lane,
-  carried over). Add-only (ADR 0022); a wrong translation is corrected by the
-  same standing adding the right one, the unique index preventing a duplicate.
+- **Standing = GlobalAdmin ∪ Translator** (ADR 0021/0022), **on either page
+  kind** (ADR 0040 — the community-Moderator lane is retired on pages).
+  Add-only (ADR 0022); a wrong translation is corrected by the same standing
+  adding the right one, the unique index preventing a duplicate.
 - **Display = the ADR 0027 chip-swap**, reused verbatim: the authored-in
   variant is the default visible one, a chip per `PageTranslation`, click to
   swap. The page view (`/pages/{path}`) renders exactly like the
@@ -273,15 +278,27 @@ separate `Read` decision that can 403/404. No `ImageIds`-style population is
 needed (a page reference is a URL, not an in-body media id — the RC reverse
 lookup is for media bytes, not for page links).
 
-### 3.7 Write lanes + standing  **[DECIDED — ADR 0039]**
+### 3.7 Write lanes + standing  **[DECIDED — ADR 0039, amended by ADR 0040]**
 
-| Action | Standing | `AccessVia` |
-|---|---|---|
-| **Create** a page | GlobalAdmin ∪ (community Moderator, `ComponentId` = a community they moderate) | `Admin` / `Moderator` |
-| **Edit** a page's body / audience / hierarchy | its `AuthorId` ∪ GlobalAdmin ∪ (a Moderator of its `ComponentId`) | `Owner` / `Admin` / `Moderator` |
-| **Add a translation** | GlobalAdmin ∪ Translator ∪ (community Moderator, community-scoped) | `Admin` / `Moderator` |
-| **Publish** a draft | its `AuthorId` only (ADR 0037 pin) | `Owner` |
-| **Move / rename / delete** | GlobalAdmin ∪ (a Moderator of its `ComponentId`) — *not* a plain author (a page is platform content, not a personal note) | `Admin` / `Moderator` |
+ADR 0040 splits a page into a **`PageKind`** — `System` (a platform page, e.g.
+About/Terms/Help) or `User` (a **resident's blog**, a page authored by and under
+that resident's own root) — and retires the community-Moderator lane entirely.
+Standing now depends on the kind (a **community Moderator has no standing on
+either kind** — the §3.7 Moderator lane is retired):
+
+| Action | `System` page | `User` (blog) page | `AccessVia` |
+|---|---|---|---|
+| **Create** | GlobalAdmin | any signed-in resident (becomes the **author**, under their own blog root — the ownership guard keeps it there) | `Admin` / `Owner` |
+| **Edit** body / audience / hierarchy | GlobalAdmin | the `AuthorId` ∪ GlobalAdmin | `Admin` / `Owner` |
+| **Add a translation** | GlobalAdmin ∪ Translator | GlobalAdmin ∪ Translator (same on either kind) | `Admin` |
+| **Publish** a draft | the `AuthorId` only (ADR 0037 pin) | the `AuthorId` only (ADR 0037 pin) | `Owner` |
+| **Move / rename / delete** | GlobalAdmin | the `AuthorId` ∪ GlobalAdmin (within their own blog root — the namespace + ownership guards) | `Admin` / `Owner` |
+
+- **`AccessVia.Moderator` is never written for a page** — the `Moderator`
+  audit tag is gone from this lane; the standing is the kind + the author
+  identity. A `Page.ComponentId` still names the community a *community-scoped
+  audience* reads the page for (ADR 0036), but it is **not** a standing seam
+  (ADR 0040 retires its ADR 0039 §3.7 use).
 
 - The standing is **enforced server-side** in the `PageService` (the
   `AnnouncementService.CreateAsync` scope-vs-role re-check pattern, C3), not
@@ -344,8 +361,9 @@ lookup is for media bytes, not for page links).
 ## 4. What this lane is deliberately *not* (non-decisions)
 
 - **Not a CMS with its own permissions engine.** Standing is the *existing*
-  role matrix (GlobalAdmin / Moderator / Translator) re-checks; there is no
-  page-specific role.
+  role matrix (GlobalAdmin / Translator) + the page's own authorship, re-checked
+  per action; there is no page-specific role, and a community Moderator has no
+  page standing (ADR 0040).
 - **Not a comment / discussion surface.** A page is *about* content; discussion
   belongs in posts/replies that *reference* the page (the RC link idiom).
 - **Not search.** A page-listing *filter* box may ship; full-text search over

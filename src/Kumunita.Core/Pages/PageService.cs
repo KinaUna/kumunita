@@ -145,15 +145,23 @@ public sealed class PageService : IPageService
     // it is directly testable and callable from any of U03's write lanes.
     // A null page is a KeyNotFoundException (the Web layer's 404); a denied
     // actor is an UnauthorizedAccessException (the Web layer's 403). The
-    // existing role claims (Roles.GlobalAdmin / Roles.Translator /
-    // Roles.ModeratorComponent) are reused — no new AccessAction, no new
-    // AccessVia, no branch in the frozen IAuthorizationService (ADR 0039).
+    // existing role claims (Roles.GlobalAdmin / Roles.Translator) are
+    // consulted — no new AccessAction, no new AccessVia, no branch in the
+    // frozen IAuthorizationService (ADR 0039). ADR 0040 removes the community
+    // Moderator lane from pages (a system page has no community to moderate; a
+    // blog page is personal content), so Roles.ModeratorComponent grants no
+    // page standing.
 
     /// <summary>
-    /// The **create** standing (ADR 0039 §3.7): a GlobalAdmin may create any
-    /// page; a community Moderator may create a page scoped to their
-    /// community (<c>page.ComponentId</c>); a plain Member may not. A
-    /// flat/public page (<c>ComponentId</c> null) requires a GlobalAdmin.
+    /// The **create** standing (ADR 0040, amending ADR 0039 §3.7): a
+    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (a
+    /// community Moderator has <i>no</i> standing on a system page — the ADR
+    /// 0040 amendment, user sign-off 2026-09-17); a <see cref
+    /// "PageKind.User"/> (blog) page may be created by <b>any signed-in
+    /// actor</b> (they become the author). The "only the user themselves"
+    /// constraint is enforced by the <b>ownership</b> guard in
+    /// <see cref="EnsureBlogOwnershipAsync"/> (a blog page must nest under the
+    /// actor's own <c>blog/{uid}</c> root), <b>not</b> here.
     /// </summary>
     public static void CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
     {
@@ -163,20 +171,25 @@ public sealed class PageService : IPageService
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required.");
 
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-        if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
-            return;
+        if (page.Kind == PageKind.System)
+        {
+            if (actorRoles.Contains(Roles.GlobalAdmin))
+                return;
+            throw new UnauthorizedAccessException("Only a GlobalAdmin may create a system page.");
+        }
 
-        throw new UnauthorizedAccessException(
-            $"Only a GlobalAdmin or a moderator of community '{page.ComponentId}' may create a page.");
+        // PageKind.User (a blog page): any signed-in actor — they become the
+        // author. The ownership guard ensures it is under their own blog root.
     }
 
     /// <summary>
-    /// The **edit** standing (ADR 0039 §3.7): the page's <c>AuthorId</c> may
-    /// edit; a GlobalAdmin may edit any page; a community Moderator may edit a
-    /// page scoped to their community (<c>page.ComponentId</c>). A plain
-    /// Member who did not author it is denied.
+    /// The **edit** standing (ADR 0040, amending ADR 0039 §3.7): a
+    /// <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b> (the
+    /// author branch is disabled for a system page — a community Moderator
+    /// has no standing on it); a <see cref="PageKind.User"/> (blog) page is
+    /// the <b>author ∪ GlobalAdmin</b> (the ADR 0040 amendment: a community
+    /// Moderator has no standing on a resident's personal blog — it is
+    /// personal content, not community content).
     /// </summary>
     public static void CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
     {
@@ -186,24 +199,34 @@ public sealed class PageService : IPageService
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required.");
 
+        if (page.Kind == PageKind.System)
+        {
+            if (actorRoles.Contains(Roles.GlobalAdmin))
+                return;
+            throw new UnauthorizedAccessException("Only a GlobalAdmin may edit a system page.");
+        }
+
+        // PageKind.User (a blog page): the author (the resident) ∪ GlobalAdmin
+        // (platform override). A community Moderator has no standing on a
+        // resident's personal blog (ADR 0040 — a blog page is personal
+        // content, not community content).
         if (string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
             return;
         if (actorRoles.Contains(Roles.GlobalAdmin))
             return;
-        if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
-            return;
 
         throw new UnauthorizedAccessException(
-            $"Only the author, a GlobalAdmin, or a moderator of community '{page.ComponentId}' may edit this page.");
+            "Only the author or a GlobalAdmin may edit this blog page.");
     }
 
     /// <summary>
-    /// The **translation** standing (ADR 0039 §3.7 / ADR 0029 carried over):
-    /// a GlobalAdmin or a Translator may add a translation of any page; a
-    /// community Moderator may add a translation of a page scoped to their
-    /// community (<c>page.ComponentId</c>). A flat/public page has no community
-    /// to moderate, so the component-moderator standing does not qualify —
-    /// only GlobalAdmin / Translator may translate it.
+    /// The **translation** standing (ADR 0040, amending ADR 0039 §3.7 /
+    /// ADR 0029 carried over): a <see cref="PageKind.System"/> page may be
+    /// translated by a <b>GlobalAdmin or a Translator only</b> (the ADR 0040
+    /// amendment; a platform page has no community to moderate); a
+    /// <see cref="PageKind.User"/> (blog) page is also GlobalAdmin ∪ Translator
+    /// — a community Moderator has <b>no</b> translation standing on either
+    /// kind (a blog is personal content, not community content).
     /// </summary>
     public static void CheckTranslateStanding(string actorId, IReadOnlySet<string> actorRoles, Page? page)
     {
@@ -215,7 +238,7 @@ public sealed class PageService : IPageService
 
         if (!CanTranslatePage(actorId, actorRoles, page))
             throw new UnauthorizedAccessException(
-                $"Only a GlobalAdmin, a Translator, or a moderator of community '{page.ComponentId}' may add a translation.");
+                "Only a GlobalAdmin or a Translator may add a translation.");
     }
 
     /// <summary>
@@ -242,22 +265,21 @@ public sealed class PageService : IPageService
     }
 
     /// <summary>
-    /// The single shared translation-standing decision (ADR 0039 §3.7 / ADR
-    /// 0029 carried over): a GlobalAdmin or a Translator qualifies on **any**
-    /// page; a community Moderator qualifies only when the page is scoped to
-    /// their community (<c>page.ComponentId</c> — a flat/public page has no
-    /// community to moderate, so that branch never qualifies). Called by both
-    /// <see cref="CanTranslatePage"/> (the display probe) and
-    /// <see cref="CheckTranslateStanding"/> (the write-lane gate), so the two
-    /// can never disagree.
+    /// The single shared translation-standing decision (ADR 0040, amending
+    /// ADR 0039 §3.7 / ADR 0029 carried over): a GlobalAdmin or a Translator
+    /// qualifies on **any** page (system or user). A community Moderator has
+    /// **no** translation standing on either kind (the ADR 0040 amendment:
+    /// a system page has no community to moderate; a blog page is personal
+    /// content, not community content). Called by both <see
+    /// cref="CanTranslatePage"/> (the display probe) and <see
+    /// cref="CheckTranslateStanding"/> (the write-lane gate), so the two can
+    /// never disagree.
     /// </summary>
     private static bool CanTranslatePageCore(IReadOnlySet<string> actorRoles, Page page)
     {
         if (actorRoles.Contains(Roles.GlobalAdmin))
             return true;
         if (actorRoles.Contains(Roles.Translator))
-            return true;
-        if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
             return true;
         return false;
     }
@@ -343,6 +365,63 @@ public sealed class PageService : IPageService
                 $"Moving a page under '{newParentId}' (depth {parentDepth}) would exceed the max depth of {MaxDepth}.");
     }
 
+    // ─── ADR 0040 — blog lanes (per-user feed + ownership guard) ─────────
+
+    public async Task<Page?> GetBlogRootAsync(string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An actor id is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        return await session.Query<Page>()
+            .Where(p => p.Kind == PageKind.User
+                && p.ParentId == null
+                && p.AuthorId == actorId
+                && p.IsDeleted == false)
+            .OrderByDescending(p => p.Modified)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<Page>> GetBlogPagesAsync(string authorId)
+    {
+        if (string.IsNullOrEmpty(authorId))
+            throw new ArgumentException("An author id is required.", nameof(authorId));
+
+        await using var session = _store.QuerySession();
+        return await session.Query<Page>()
+            .Where(p => p.Kind == PageKind.User
+                && p.AuthorId == authorId
+                && p.IsDeleted == false)
+            .OrderByDescending(p => p.Modified)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    public async Task<bool> IsUnderBlogAsync(string pageId)
+    {
+        if (string.IsNullOrEmpty(pageId))
+            return false;
+
+        await using var session = _store.QuerySession();
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            return false;
+
+        if (page.Kind == PageKind.User)
+            return true;
+
+        // Walk up to the root and check its kind.
+        var cursor = page;
+        while (cursor.ParentId is not null)
+        {
+            cursor = await session.LoadAsync<Page>(cursor.ParentId).ConfigureAwait(false);
+            if (cursor is null)
+                return false;
+        }
+        return cursor.Kind == PageKind.User;
+    }
+
     // ─── Write lanes (ADR 0039 §3.7 — U03) ─────────────────────────────────
     //
     // Each write lane (a) re-checks standing **server-side** (the C3
@@ -350,12 +429,12 @@ public sealed class PageService : IPageService
     // not the source of truth), (b) persists the mutation, and (c) stores an
     // AccessAudit row **in the caller's in-flight IDocumentSession**
     // (invariant C3, ADR 0006 — synchronous, in-transaction, not a Wolverine
-    // side effect) with TargetKind = "page" and the §3.7 action name. The
+    // side effect) with TargetKind = "page" and the ADR 0040 action name. The
     // standing helpers (U02) are the pure gate; the **move/delete** standing
-    // (admin/mod only, *not* a plain author) is a distinct resolver below,
-    // because CheckEditStanding (U02) deliberately allows the author and
-    // move/delete must not (design doc §3.7: a page is platform content, not a
-    // personal note — AccessVia is Admin/Moderator, never Owner, for these two).
+    // (ADR 0040 — a system page is GlobalAdmin-only; a blog page is author ∪
+    // GlobalAdmin; a community Moderator has no standing on either) is a
+    // distinct resolver below, because CheckEditStanding (U02) is the edit gate
+    // and move/delete resolve a narrower / different set per kind.
     // The ImageIds / AttachmentIds fields are populated by the caller (the
     // Web layer's ContentImageIds.ExtractContentImageIds /
     // AttachmentIds.ExtractAttachmentIds idiom, ADR 0025 / ADR 0034 — the
@@ -364,9 +443,13 @@ public sealed class PageService : IPageService
 
     /// <summary>
     /// Creates a <see cref="Page"/> in the **caller's** in-flight session
-    /// (C3). Standing (§3.7): a GlobalAdmin or a community Moderator scoped
-    /// to <see cref="Page.ComponentId"/>; a plain Member is denied (403).
-    /// A root-slug collision (two roots sharing a slug) is a
+    /// (C3). Standing (ADR 0040, amending §3.7): a <see cref="PageKind
+    /// .System"/> page is a GlobalAdmin only; a <see cref="PageKind.User"/>
+    /// (blog) page is any signed-in actor (they become the author — the
+    /// ownership guard in <see cref="EnsureBlogOwnershipAsync"/> keeps it
+    /// under their own <c>blog/{uid}</c> root); a community Moderator has no
+    /// standing on either kind. A root-slug collision (two roots sharing a
+    /// slug <b>in the same namespace</b> — scoped by Kind + AuthorId) is a
     /// <see cref="InvalidOperationException"/> — the
     /// <c>(ParentId, Slug)</c> unique index does **not** prevent it (Postgres
     /// treats NULLs as distinct), so this lane is the authoritative root-slug
@@ -383,24 +466,56 @@ public sealed class PageService : IPageService
         if (string.IsNullOrWhiteSpace(page.Slug))
             throw new ArgumentException("A page slug is required.", nameof(page.Slug));
 
-        // Standing re-check (server-side, C3 single-source pin).
-        // The helper requires a non-null page — pass the (still-in-memory)
-        // incoming doc, not a DB load. CheckCreateStanding is a pure role-claim
-        // check: GlobalAdmin or a ModeratorComponent(page.ComponentId).
+        // Standing re-check (server-side, C3 single-source pin, ADR 0040
+        // kind-aware): a system page is GlobalAdmin-only; a blog page is
+        // any signed-in actor (they become the author).
         CheckCreateStanding(actorId, actorRoles, page);
+
+        // A blog page is authored by the actor (they own it) — the web
+        // composer pre-gate is a convenience, the write lane is the source of
+        // truth (C3). A system page may have an empty AuthorId (a platform
+        // page has no resident author).
+        if (page.Kind == PageKind.User && string.IsNullOrEmpty(page.AuthorId))
+            page.AuthorId = actorId;
+
+        // ADR 0040 namespace + ownership guards (server-side, C3):
+        //   1. a page may only nest under a parent of the *same* kind
+        //      (system ⇔ system, blog ⇔ blog);
+        //   2. a blog page may only nest under the actor's own blog root.
+        Page? parent = null;
+        if (page.ParentId is not null)
+            parent = await session.LoadAsync<Page>(page.ParentId).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException(
+                    $"Parent page '{page.ParentId}' not found.");
+        await EnsureCreateNamespaceAsync(page.Kind, parent, session).ConfigureAwait(false);
+        await EnsureBlogOwnershipAsync(page.Kind, parent, actorId, session).ConfigureAwait(false);
 
         // Root-slug guard (the index does not cover it — Postgres treats NULLs
         // as distinct, the U01 drift note): if ParentId is null, no *other*
-        // root page may already carry this slug.
+        // root page may already carry this slug **in the same namespace**.
+        // ADR 0040 scopes the collision by (Kind, AuthorId):
+        //   • a <b>system</b> root (Kind=System) collides only with another
+        //     same-slug system root — the <c>system/</c> namespace is singular;
+        //   • a <b>blog</b> root (Kind=User) collides only with another
+        //     same-slug root owned by the <b>same</b> author — two residents'
+        //     blogs are disjoint by ownership, so two residents may both have
+        //     a root page slugged <c>"recipes"</c> (their <c>blog/{uid}</c>
+        //     namespaces never overlap), while a single resident is still
+        //     capped at one blog root (a second top-level page of theirs
+        //     nests under the first).
         if (page.ParentId is null)
         {
             var existingRoot = await session.Query<Page>()
-                .Where(p => p.ParentId == null && p.Slug == page.Slug && p.IsDeleted == false)
+                .Where(p => p.ParentId == null
+                    && p.Slug == page.Slug
+                    && p.Kind == page.Kind
+                    && p.AuthorId == page.AuthorId
+                    && p.IsDeleted == false)
                 .FirstOrDefaultAsync()
                 .ConfigureAwait(false);
             if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
                 throw new InvalidOperationException(
-                    $"A root page with slug '{page.Slug}' already exists (id '{existingRoot.Id}'); " +
+                    $"A root page with slug '{page.Slug}' already exists in this namespace (id '{existingRoot.Id}'); " +
                     "choose a different slug or nest the new page under a parent.");
         }
 
@@ -412,10 +527,13 @@ public sealed class PageService : IPageService
         page.ImageIds = page.ImageIds ?? [];       // RC ADR 0025 — caller-parsed, never spoofed
         page.AttachmentIds = page.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed, never spoofed
 
-        // Resolve the audit Via tag (Admin for GlobalAdmin, Moderator for a
-        // component-moderator) before storing. A create has no stored author,
-        // so the standing is the narrowest of {GlobalAdmin, Moderator}.
-        var via = ResolveWriteStandingVia(actorRoles, page.ComponentId);
+        // Resolve the audit Via tag before storing. A create's actor IS the
+        // author for a blog page (they own it — AccessVia.Owner, the narrowest
+        // standing), and for a system page a GlobalAdmin (AccessVia.Admin). A
+        // system page has no resident author, so isAuthor is false there.
+        var via = ResolveWriteStandingVia(
+            page.Kind, actorRoles, page.ComponentId,
+            isAuthor: page.Kind == PageKind.User);
 
         var audit = new AccessAudit
         {
@@ -438,10 +556,12 @@ public sealed class PageService : IPageService
 
     /// <summary>
     /// Edits an existing <see cref="Page"/> in the **caller's** in-flight
-    /// session (C3). Standing (§3.7): the author, a GlobalAdmin, or a
-    /// community Moderator scoped to <see cref="Page.ComponentId"/>.
-    /// A missing page is a <see cref="KeyNotFoundException"/> (404); a denied
-    /// actor is a <see cref="UnauthorizedAccessException"/> (403).
+    /// session (C3). Standing (ADR 0040, amending §3.7): a <see cref
+    /// "PageKind.System"/> page is a GlobalAdmin only; a <see cref
+    /// "PageKind.User"/> (blog) page is the author ∪ GlobalAdmin; a community
+    /// Moderator has no standing on either kind. A missing page is a <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is a <see
+    /// cref="UnauthorizedAccessException"/> (403).
     /// </summary>
     public async Task<Page> UpdateAsync(
         Page updated, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
@@ -478,8 +598,10 @@ public sealed class PageService : IPageService
         existing.AttachmentIds = updated.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed
 
         // The audit Via tag (narrowest standing that applied): Owner if the
-        // actor is the author, else Moderator (component-scoped), else Admin.
+        // actor is the author (a blog page), else Admin (a GlobalAdmin). ADR
+        // 0040: a community Moderator has no write standing on either kind.
         var via = ResolveWriteStandingVia(
+            existing.Kind,
             actorRoles,
             storedComponentId,
             isAuthor: string.Equals(storedAuthorId, actorId, StringComparison.Ordinal));
@@ -553,12 +675,14 @@ public sealed class PageService : IPageService
 
     /// <summary>
     /// Moves a <see cref="Page"/> under a new parent (reparent) in the
-    /// **caller's** in-flight session (C3). Standing (§3.7): a GlobalAdmin or
-    /// a community Moderator scoped to <see cref="Page.ComponentId"/> —
-    /// **not** a plain author. Applies the cycle-guard + depth-cap; a
-    /// <paramref name="newSlug"/> change is authoritative for root-level
-    /// uniqueness. The derived path is rewritten by the single
-    /// <see cref="Page.ParentId"/> / <see cref="Page.Slug"/> column write.
+    /// **caller's** in-flight session (C3). Standing (ADR 0040, amending §3.7):
+    /// a <see cref="PageKind.System"/> page is a GlobalAdmin only; a <see cref
+    /// "PageKind.User"/> (blog) page is the author ∪ GlobalAdmin; a community
+    /// Moderator has no standing on either kind. Applies the cycle-guard +
+    /// depth-cap + the ADR 0040 namespace guard; a <paramref name="newSlug"/>
+    /// change is authoritative for root-level uniqueness. The derived path is
+    /// rewritten by the single <see cref="Page.ParentId"/> / <see
+    /// cref="Page.Slug"/> column write.
     /// </summary>
     public async Task<Page> MoveAsync(
         string pageId, string? newParentId, string? newSlug,
@@ -573,15 +697,30 @@ public sealed class PageService : IPageService
         if (page is null)
             throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to move.");
 
-        // Standing re-check (server-side): admin/mod only, NOT author.
-        var via = ResolveMoveDeleteStanding(page.ComponentId, actorId, actorRoles);
+        // Standing re-check (ADR 0040): a system page is GlobalAdmin-only;
+        // a blog page is author ∪ GlobalAdmin.
+        var via = ResolveMoveDeleteStanding(page.Kind, page.AuthorId, page.ComponentId, actorId, actorRoles);
         if (via is null)
             throw new UnauthorizedAccessException(
-                $"Only a GlobalAdmin or a moderator of community '{page.ComponentId}' may move a page.");
+                page.Kind == PageKind.System
+                    ? "Only a GlobalAdmin may move a system page."
+                    : "Only the author or a GlobalAdmin may move a blog page.");
 
         // Cycle guard + depth cap (the U02 hierarchy guards).
         await EnsureNoCycleAsync(pageId, newParentId).ConfigureAwait(false);
         await EnsureDepthWithinLimitAsync(newParentId).ConfigureAwait(false);
+
+        // ADR 0040 namespace guard (server-side, C3): a page may only be
+        // reparented under a parent of the *same* kind (a system page under
+        // a system page, a blog page under a blog page). A root move
+        // (newParentId null) is a no-op for the guard.
+        if (newParentId is not null)
+        {
+            Page? newParent = await session.LoadAsync<Page>(newParentId).ConfigureAwait(false)
+                ?? throw new KeyNotFoundException(
+                    $"Parent page '{newParentId}' not found.");
+            await EnsureCreateNamespaceAsync(page.Kind, newParent, session).ConfigureAwait(false);
+        }
 
         // Root-slug guard: if the move makes the page a root (newParentId null)
         // and newSlug is specified, no *other* root page may already carry it.
@@ -626,9 +765,10 @@ public sealed class PageService : IPageService
     /// <summary>
     /// **Soft-deletes** a <see cref="Page"/> in the **caller's** in-flight
     /// session (C3): sets <see cref="Page.IsDeleted"/> to <c>true</c> and
-    /// stamps <see cref="Page.Modified"/>. Standing (§3.7): a GlobalAdmin or
-    /// a community Moderator scoped to <see cref="Page.ComponentId"/> —
-    /// **not** a plain author.
+    /// stamps <see cref="Page.Modified"/> (ADR 0024 idiom). Standing (ADR 0040,
+    /// amending §3.7): a <see cref="PageKind.System"/> page is a GlobalAdmin
+    /// only; a <see cref="PageKind.User"/> (blog) page is the author ∪
+    /// GlobalAdmin; a community Moderator has no standing on either kind.
     /// </summary>
     public async Task DeleteAsync(
         string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
@@ -642,11 +782,14 @@ public sealed class PageService : IPageService
         if (page is null)
             throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to delete.");
 
-        // Standing re-check (server-side): admin/mod only, NOT author.
-        var via = ResolveMoveDeleteStanding(page.ComponentId, actorId, actorRoles);
+        // Standing re-check (ADR 0040): a system page is GlobalAdmin-only;
+        // a blog page is author ∪ GlobalAdmin.
+        var via = ResolveMoveDeleteStanding(page.Kind, page.AuthorId, page.ComponentId, actorId, actorRoles);
         if (via is null)
             throw new UnauthorizedAccessException(
-                $"Only a GlobalAdmin or a moderator of community '{page.ComponentId}' may delete a page.");
+                page.Kind == PageKind.System
+                    ? "Only a GlobalAdmin may delete a system page."
+                    : "Only the author or a GlobalAdmin may delete a blog page.");
 
         var now = DateTimeOffset.UtcNow;
         page.IsDeleted = true;
@@ -673,10 +816,10 @@ public sealed class PageService : IPageService
     /// <summary>
     /// Adds a **user-added translation** of a page in the **caller's**
     /// in-flight session (C3; the ADR 0029 standing carried over, design doc
-    /// §3.7). Standing: a GlobalAdmin, a Translator, or a community Moderator
-    /// scoped to <see cref="Page.ComponentId"/>; a flat/public page has no
-    /// community to moderate, so the component-moderator standing does not
-    /// qualify. The <c>(PageId, LanguageCode)</c> unique index (U01) is the
+    /// §3.7). Standing (ADR 0040): a GlobalAdmin or a Translator on **either**
+    /// kind — a community Moderator has no translation standing on either kind
+    /// (a system page has no community to moderate; a blog page is personal
+    /// content). The <c>(PageId, LanguageCode)</c> unique index (U01) is the
     /// add-only duplicate guard.
     /// </summary>
     public async Task<PageTranslation> AddTranslationAsync(
@@ -698,10 +841,10 @@ public sealed class PageService : IPageService
         if (page is null)
             throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to translate.");
 
-        // Standing re-check (server-side): GlobalAdmin / Translator /
-        // ModeratorComponent(page.ComponentId). CheckTranslateStanding is
-        // the U02 pure helper — it throws UnauthorizedAccessException if the
-        // actor has no qualifying standing.
+        // Standing re-check (server-side, ADR 0040): GlobalAdmin / Translator
+        // on either kind — a community Moderator has no translation standing.
+        // CheckTranslateStanding is the U02 pure helper — it throws
+        // UnauthorizedAccessException if the actor has no qualifying standing.
         CheckTranslateStanding(actorId, actorRoles, page);
 
         var now = DateTimeOffset.UtcNow;
@@ -717,7 +860,7 @@ public sealed class PageService : IPageService
         };
 
         var via = ResolveTranslationStandingVia(
-            page.ComponentId, actorId, actorRoles);
+            page.Kind, page.ComponentId, actorId, actorRoles);
 
         var audit = new AccessAudit
         {
@@ -741,65 +884,168 @@ public sealed class PageService : IPageService
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
 
     /// <summary>
-    /// The **move/delete** standing resolver (§3.7: a GlobalAdmin or a
-    /// community Moderator scoped to <paramref name="componentId"/> — **not**
-    /// a plain author). Returns the <see cref="AccessVia"/> the actor
-    /// qualifies under, or <c>null</c> to deny. Precedence: Moderator (most
-    /// specific) before Admin. A flat/public page (componentId null) has no
-    /// community to moderate, so only a GlobalAdmin qualifies.
+    /// The **move/delete** standing resolver (ADR 0040, amending ADR 0039
+    /// §3.7): a <see cref="PageKind.System"/> page is <b>GlobalAdmin only</b>
+    /// (a community Moderator has no standing on a system page, and the ADR
+    /// 0037 author-only publish pin is the *only* place an author's lane
+    /// applies — it does not extend to move/delete of a system page); a
+    /// <see cref="PageKind.User"/> (blog) page is <b>author ∪ GlobalAdmin</b>
+    /// — the **author lane is enabled** for this kind (the ADR 0040 behavioral
+    /// change: a resident may reparent / soft-delete their own blog pages),
+    /// while a community Moderator still has no standing on it (a blog is
+    /// personal content, not community content). Returns the
+    /// <see cref="AccessVia"/> the actor qualifies under, or <c>null</c> to
+    /// deny. Precedence (most specific first): Owner → Admin.
     /// </summary>
     private static AccessVia? ResolveMoveDeleteStanding(
-        string? componentId, string actorId, IReadOnlySet<string> actorRoles)
+        PageKind kind, string authorId, string? componentId,
+        string actorId, IReadOnlySet<string> actorRoles)
     {
         ArgumentNullException.ThrowIfNull(actorRoles);
-        if (componentId is not null
-            && actorRoles.Contains(Roles.ModeratorComponent(componentId)))
-            return AccessVia.Moderator;
+
+        if (kind == PageKind.System)
+        {
+            // ADR 0040: a system page is GlobalAdmin-only for move/delete —
+            // neither the author (there is no resident author) nor a
+            // community Moderator qualifies.
+            if (actorRoles.Contains(Roles.GlobalAdmin))
+                return AccessVia.Admin;
+            return null;
+        }
+
+        // PageKind.User (a blog page): the author (the resident) ∪ GlobalAdmin
+        // (platform override). A community Moderator has no standing on a
+        // resident's personal blog (ADR 0040 — a blog page is personal
+        // content, not community content).
+        if (!string.IsNullOrEmpty(authorId)
+            && string.Equals(authorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
         if (actorRoles.Contains(Roles.GlobalAdmin))
             return AccessVia.Admin;
         return null;
     }
 
     /// <summary>
-    /// The **translation** standing resolver (design doc §3.7 / ADR 0029
-    /// carried over): a Translator or a GlobalAdmin (<see cref="AccessVia
-    /// .Admin"/>), or a community Moderator scoped to
-    /// <paramref name="componentId"/> (<see cref="AccessVia.Moderator"/>).
-    /// A flat/public page (componentId null) has no community to moderate,
-    /// so the component-moderator branch is excluded for it. Precedence:
-    /// Moderator (most specific) before Admin.
+    /// The **translation** standing resolver (ADR 0040, amending ADR 0039
+    /// §3.7 / ADR 0029 carried over): a GlobalAdmin or a Translator
+    /// (<see cref="AccessVia.Admin"/>) on <b>either</b> kind. A community
+    /// Moderator has <b>no</b> translation standing on either kind (the ADR
+    /// 0040 amendment — a system page has no community to moderate; a blog
+    /// page is personal content, not community content), so the
+    /// component-moderator branch (<see cref="AccessVia.Moderator"/>) is
+    /// retired for both. Both qualifying roles map to
+    /// <see cref="AccessVia.Admin"/>.
     /// </summary>
     private static AccessVia ResolveTranslationStandingVia(
-        string? componentId, string actorId, IReadOnlySet<string> actorRoles)
+        PageKind kind, string? componentId, string actorId, IReadOnlySet<string> actorRoles)
     {
         ArgumentNullException.ThrowIfNull(actorRoles);
-        if (componentId is not null
-            && actorRoles.Contains(Roles.ModeratorComponent(componentId)))
-            return AccessVia.Moderator;
-        return AccessVia.Admin;   // GlobalAdmin or Translator — both map to Admin
+        // ADR 0040: a community Moderator has no translation standing on
+        // either kind (a system page has no community to moderate; a blog
+        // page is personal content). Only GlobalAdmin / Translator qualify,
+        // both of which map to AccessVia.Admin.
+        return AccessVia.Admin;
     }
 
     /// <summary>
     /// Resolves the <see cref="AccessVia"/> tag for the **create** and
-    /// **edit** write lanes' audit rows. Precedence (most specific / narrowest
-    /// right first, so the audit row records the narrowest standing that
-    /// applied): <c>Owner</c> (the author, edit-lane only) → <c>Moderator</c>
-    /// (a community-moderator scoped to <paramref name="moderatorComponentId"/>)
-    /// → <c>Admin</c> (GlobalAdmin). The caller has already verified the
-    /// standing before calling this — it is a pure tag-resolution, not a gate.
+    /// **edit** write lanes' audit rows. Precedence (narrowest right first,
+    /// so the audit row records the narrowest standing that applied):
+    /// <c>Owner</c> (the author, a blog page) → <c>Admin</c> (GlobalAdmin).
+    /// ADR 0040: a community Moderator has no write standing on either kind,
+    /// so <see cref="AccessVia.Moderator"/> is never returned (the
+    /// <paramref name="moderatorComponentId"/> parameter is retained for
+    /// seam-shape stability, not consulted). The caller has already verified
+    /// the standing before calling this — it is a pure tag-resolution, not a
+    /// gate.
     /// </summary>
     private static AccessVia ResolveWriteStandingVia(
-        IReadOnlySet<string> actorRoles,
-        string? moderatorComponentId,
-        bool isAuthor = false)
+        PageKind kind, IReadOnlySet<string> actorRoles,
+        string? moderatorComponentId, bool isAuthor = false)
     {
         ArgumentNullException.ThrowIfNull(actorRoles);
         if (isAuthor)
             return AccessVia.Owner;
-        if (moderatorComponentId is not null
-            && actorRoles.Contains(Roles.ModeratorComponent(moderatorComponentId)))
-            return AccessVia.Moderator;
+        // ADR 0040: a community Moderator has no write standing on either
+        // kind (a system page is GlobalAdmin-only; a blog page is author ∪
+        // GlobalAdmin). Only GlobalAdmin qualifies here → AccessVia.Admin.
         return AccessVia.Admin;
+    }
+
+    // ─── ADR 0040 — namespace guards + blog lanes (the standing matrix's
+    //     "parent page option differentiates between system and user pages"
+    //     and the "only the user themselves" ownership constraint) ─────────
+
+    /// <summary>
+    /// The <b>namespace guard</b> for a <b>create</b> (ADR 0040): a
+    /// <see cref="PageKind.System"/> page may nest only under another system
+    /// page (or be a root), and a <see cref="PageKind.User"/> (blog) page may
+    /// nest only under another user page owned by the actor's blog root (or be
+    /// a root — which for a blog is the <c>blog/{uid}</c> root itself). The
+    /// guard is <b>parent-driven</b>: it walks up from <paramref name="parent"/>
+    /// to the root and checks the root's kind matches the page's kind. A
+    /// mismatch (<c>system/…</c> under <c>blog/{uid}</c>, or the reverse) is a
+    /// structural error — the two namespaces are disjoint by design.
+    /// </summary>
+    private async Task EnsureCreateNamespaceAsync(
+        PageKind kind, Page? parent, IDocumentSession session)
+    {
+        if (parent is null)
+            return;   // a root — no parent to mismatch against
+
+        // Walk up to the root of the parent's subtree; the root's kind must
+        // match the page's kind (the two namespaces are disjoint).
+        var cursor = parent;
+        while (cursor.ParentId is not null)
+        {
+            cursor = await session.LoadAsync<Page>(cursor.ParentId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Orphaned page chain: parent '{cursor.ParentId}' not found.");
+        }
+        if (cursor.Kind != kind)
+            throw new InvalidOperationException(
+                kind == PageKind.System
+                    ? "A system page may not be nested under a user (blog) page."
+                    : "A user (blog) page may not be nested under a system page.");
+    }
+
+    /// <summary>
+    /// The <b>ownership guard</b> for a <b>blog</b> create/move (ADR 0040,
+    /// user sign-off 1): a <see cref="PageKind.User"/> page must nest under the
+    /// actor's <b>own</b> <c>blog/{uid}</c> root — a resident cannot nest under
+    /// another resident's blog. A <see cref="PageKind.System"/> page is
+    /// admin-only (no ownership constraint). Called by the Web composer
+    /// pre-gate and <see cref="CreateAsync"/> / <see cref="MoveAsync"/>
+    /// (server-side, C3).
+    /// </summary>
+    private async Task EnsureBlogOwnershipAsync(
+        PageKind kind, Page? parent, string actorId, IDocumentSession session)
+    {
+        if (kind != PageKind.User)
+            return;   // a system page — the admin-only path; no ownership guard
+
+        // A root-level blog page <b>is</b> the actor's own blog root — the
+        // actor becomes its author, so there is nothing to guard against.
+        // (A resident cannot forge another resident's root because the author
+        // is always set to the actor by the write lane.)
+        if (parent is null)
+            return;
+
+        // Walk up to the root of the parent's subtree.
+        Page root = parent;
+        while (root.ParentId is not null)
+        {
+            root = await session.LoadAsync<Page>(root.ParentId).ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Orphaned page chain: parent '{root.ParentId}' not found.");
+        }
+
+        // The blog root must be owned by the actor (or be the global admin's
+        // own blog root — the admin may manage their own blog).
+        if (!string.Equals(root.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException(
+                $"A blog page may only be nested under the actor's own blog root " +
+                $"(found root author '{root.AuthorId}', actor '{actorId}').");
     }
 
     // ─── Private helpers ───────────────────────────────────────────────────

@@ -230,15 +230,31 @@ public sealed class PageController(
     // ── GET/POST /pages/new — the composer ───────────────────────────────────
 
     /// <summary>
-    /// <c>GET /pages/new</c> — the composer form (GlobalAdmin / community
-    /// <c>Moderator</c> — the Web pre-gate; the service re-checks standing at
-    /// write time, C3).
+    /// <c>GET /pages/new</c> — the composer form (any signed-in actor — the
+    /// ADR 0040 pre-gate; the service re-checks standing at write time, C3).
+    /// ADR 0040 differentiates the two page kinds:
+    /// <list type="bullet">
+    /// <item>A <b>GlobalAdmin</b> opens on a <b>system</b> page (the
+    ///       <c>system/</c> namespace — the parent picker offers the system
+    ///       pages, so they can add <c>system/about</c>, <c>system/help</c>,
+    ///       or a new system sub-level) and can also switch to a <b>blog</b>
+    ///       page (their own <c>blog/…</c> root).</item>
+    /// <item>A plain <b>resident</b> opens on a <b>blog</b> page (their own
+    ///       personal namespace — the parent picker offers only their own blog
+    ///       pages, or "Top level" for their first page, which becomes their
+    ///       blog root). They have <i>no</i> system-page standing — the service
+    ///       denies a <c>Kind = System</c> create for them (C3).</item>
+    /// </list>
     /// </summary>
     [HttpGet]
     [Route("new")]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> New()
     {
+        var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        var roles = KumunitaPrincipal.RoleSet(User);
+        bool isAdmin = roles.Contains(Roles.GlobalAdmin);
+
         // ADR 0039 §3.4 (amended 2026-09-17 — now consistent with posts, ADR
         // 0036): the composer's default is **non-public, community-visible** —
         // signed-in residents can see it, unauthenticated visitors cannot.
@@ -247,8 +263,15 @@ public sealed class PageController(
         {
             IsPublic = false,
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
+            // ADR 0040 — the kind is role-derived: an admin opens on a system
+            // page (the platform namespace); a resident opens on a blog page
+            // (their personal namespace). A resident CANNOT author a system
+            // page (the service denies it, C3), so a non-admin is pinned to
+            // "User".
+            Kind = isAdmin ? "System" : "User",
+            IsAdmin = isAdmin,
         };
-        await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+        await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
         // The community branch (Decide() branch 4) allows a reader only when
         // BOTH Audience.Community is true AND the reader's community set
         // contains the page's ComponentId — so seed the first reachable
@@ -274,25 +297,32 @@ public sealed class PageController(
     [HttpPost]
     [Route("new")]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> New(PageComposeViewModel model)
     {
-        if (!model.IsValid)
-        {
-            await SeedComposeOptionsAsync(model).ConfigureAwait(false);
-            return View(model);
-        }
-
         var actorId = KumunitaPrincipal.SubjectId(User);
         if (string.IsNullOrEmpty(actorId))
         {
             ModelState.AddModelError(string.Empty, "You must be signed in to create a page.");
-            await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+            await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
+            return View(model);
+        }
+
+        if (!model.IsValid)
+        {
+            await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
             return View(model);
         }
 
         var page = new Page
         {
+            // ADR 0040 — the page kind (System = a platform page under the
+            // `system/` root, GlobalAdmin-only; User = a blog page under the
+            // actor's own `blog/…` root). Parsed from the form's Kind string;
+            // the service re-checks standing for System pages (a resident's
+            // System create is a 403, C3 — the view hides the toggle from
+            // them, so this is a belt-and-braces gate).
+            Kind = ParseKind(model.Kind),
             Title = model.Title!.Trim(),
             Body = model.Body ?? string.Empty,
             // The slug is the title, slugified (the derived path's leaf; the
@@ -331,7 +361,7 @@ public sealed class PageController(
         catch (InvalidOperationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+            await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
             return View(model);
         }
     }
@@ -349,7 +379,7 @@ public sealed class PageController(
     /// </summary>
     [HttpGet]
     [Route("{id:guid}/edit")]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> Edit(string id)
     {
         Page page;
@@ -367,12 +397,20 @@ public sealed class PageController(
             return NotFound();
 
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        // ADR 0040 — HasEditStanding is kind-aware (a system page is
+        // GlobalAdmin-only; a blog page is author ∪ GlobalAdmin). The service
+        // re-checks standing at write time (C3).
         if (!HasEditStanding(page, actorId, KumunitaPrincipal.RoleSet(User)))
             return new ForbidResult();
 
         var model = new PageComposeViewModel
         {
             PageId = page.Id,
+            // ADR 0040 — the page's kind round-trips from the stored page (a
+            // blog page stays a blog page, a system page stays a system page —
+            // the kind is NOT a form field on the edit lane; it is the page's
+            // standing namespace). Drives the parent-picker differentiation.
+            Kind = page.Kind == PageKind.User ? "User" : "System",
             Title = page.Title,
             Body = page.Body,
             ParentId = page.ParentId,
@@ -381,8 +419,9 @@ public sealed class PageController(
             CommunityId = page.ComponentId,
             MountPoint = page.MountPoint,
             LanguageCode = page.LanguageCode,
+            IsAdmin = KumunitaPrincipal.RoleSet(User).Contains(Roles.GlobalAdmin),
         };
-        await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+        await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
         return View(model);
     }
 
@@ -398,20 +437,20 @@ public sealed class PageController(
     [HttpPost]
     [Route("{id:guid}/edit")]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> Edit(string id, PageComposeViewModel model)
     {
-        if (!model.IsValid)
-        {
-            await SeedComposeOptionsAsync(model).ConfigureAwait(false);
-            return View(model);
-        }
-
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
         if (string.IsNullOrEmpty(actorId))
         {
             ModelState.AddModelError(string.Empty, "You must be signed in to edit a page.");
-            await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+            await SeedComposeOptionsAsync(model, string.Empty).ConfigureAwait(false);
+            return View(model);
+        }
+
+        if (!model.IsValid)
+        {
+            await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
             return View(model);
         }
 
@@ -509,15 +548,20 @@ public sealed class PageController(
 
     /// <summary>
     /// <c>POST /pages/{id}/delete</c> — soft-delete a page (a
-    /// <see cref="Page.IsDeleted"/> flip, the ADR 0039 §3.6 lane): the author
-    /// cannot delete their own page (author-OR standing is for publish /
-    /// edit, NOT delete — delete is Moderator / GlobalAdmin). <b>403</b> on a
-    /// standing re-check, <b>404</b> on absent.
+    /// <see cref="Page.IsDeleted"/> flip, the ADR 0039 §3.6 lane). ADR 0040
+    /// makes the standing kind-aware: a <b>system</b> page is
+    /// <b>GlobalAdmin only</b>; a <b>blog</b> page is <b>author ∪
+    /// GlobalAdmin</b> (the resident may delete their own blog page — the
+    /// old "author cannot delete their own page" pin is superseded by the
+    /// ADR 0040 matrix). <b>403</b> on a standing re-check, <b>404</b> on
+    /// absent. The service is the authority (C3); the <c>[Authorize]</c>
+    /// pre-gate is relaxed to any signed-in actor so a resident's own-blog
+    /// delete is reachable.
     /// </summary>
     [HttpPost]
     [Route("{id:guid}/delete")]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> Delete(string id)
     {
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
@@ -543,17 +587,22 @@ public sealed class PageController(
     /// <summary>
     /// <c>POST /pages/{id}/move</c> — reparent a page (a <see cref="Page
     /// .ParentId"/> change) and/or change its slug (a path change), the ADR
-    /// 0039 §3.3 lane. A <b>Moderator / GlobalAdmin</b> lane (NOT author —
-    /// author-OR standing is for publish / edit, not reparent): the
-    /// service's cycle-guard (a page cannot move under itself / a descendant)
-    /// and depth-cap reject a bad move (<see cref="InvalidOperationException"/>
-    /// → re-rendered) or a standing re-check (<see cref="UnauthorizedAccessException"/>
-    /// → <b>403</b>).
+    /// 0039 §3.3 lane. ADR 0040 makes the standing kind-aware: a
+    /// <b>system</b> page is <b>GlobalAdmin only</b>; a <b>blog</b> page is
+    /// <b>author ∪ GlobalAdmin</b> (the resident may reparent their own blog
+    /// page within their own blog — the service's ADR 0040 namespace guard
+    /// blocks a cross-namespace move). The service's cycle-guard (a page
+    /// cannot move under itself / a descendant) and depth-cap reject a bad
+    /// move (<see cref="InvalidOperationException"/> → re-rendered) or a
+    /// standing re-check (<see cref="UnauthorizedAccessException"/> →
+    /// <b>403</b>). The service is the authority (C3); the <c>[Authorize]</c>
+    /// pre-gate is relaxed to any signed-in actor so a resident's own-blog
+    /// move is reachable.
     /// </summary>
     [HttpPost]
     [Route("{id:guid}/move")]
     [ValidateAntiForgeryToken]
-    [Authorize(Roles = "GlobalAdmin,Moderator")]
+    [Authorize]
     public async Task<IActionResult> Move(string id, string? newParentId, string? newSlug)
     {
         var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
@@ -723,9 +772,12 @@ public sealed class PageController(
     /// <see cref="PageComposeViewModel.Components"/> community picker, and the
     /// <c>_GrantPickers</c> user / group options the audience editor reads) —
     /// called on every composer / edit render (including a failed
-    /// <c>POST</c>'s re-render).
+    /// <c>POST</c>'s re-render). <paramref name="actorId"/> drives the ADR
+    /// 0040 parent-picker differentiation (a blog page's picker is scoped to
+    /// the actor's own blog; an empty id — a signed-out re-render — scopes it
+    /// to nothing).
     /// </summary>
-    private async Task SeedComposeOptionsAsync(PageComposeViewModel model)
+    private async Task SeedComposeOptionsAsync(PageComposeViewModel model, string actorId)
     {
         var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
         model.Languages = catalog
@@ -736,14 +788,37 @@ public sealed class PageController(
 
         var tree = await pages.GetTreeAsync().ConfigureAwait(false);
         var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
-        model.ParentPages = tree.Select(p => (p.Id, PagePaths.Href(byId, p))).ToList();
+
+        // ADR 0040 — the parent picker differentiates by the page kind being
+        // composed (the "differentiate parent-page options between system and
+        // user pages" requirement):
+        //   • a <b>System</b> page (admin-only) may nest only under another
+        //     System page — offer the <c>system/</c> namespace (the `system`
+        //     root + its sub-pages) so an admin adds <c>system/about</c>,
+        //     <c>system/help</c>, or a new system sub-level;
+        //   • a <b>User</b> (blog) page may nest only under the actor's OWN
+        //     blog pages — offer their own blog root + sub-pages (or the form's
+        //     "Top level" option for their first page, which becomes their blog
+        //     root). The ownership guard in the service enforces this (C3); the
+        //     picker is the UX that makes a cross-namespace or cross-resident
+        //     parent simply unselectable.
+        // A "Top level" (no parent) option is always available in the form — it
+        // creates a root page (a blog root for a User page, a top-level page for
+        // a System page).
+        var kind = ParseKind(model.Kind);
+        var candidates = kind == PageKind.System
+            ? tree.Where(p => p.Kind == PageKind.System)
+            : tree.Where(p => p.Kind == PageKind.User
+                && string.Equals(p.AuthorId, actorId, StringComparison.Ordinal));
+        model.ParentPages = candidates
+            .Select(p => (p.Id, PagePaths.Href(byId, p)))
+            .ToList();
 
         var components = await userInfo.GetComponentsAsync(true).ConfigureAwait(false);
         model.Components = components.Select(c => (c.Id, c.Name)).ToList();
 
         // The audience editor's user / group picker options (the _GrantPickers
         // partial reads these from ViewData) — the reusable M2 grant-pick shape.
-        var actorId = KumunitaPrincipal.SubjectId(User);
         var selfId = string.IsNullOrWhiteSpace(actorId) ? null : actorId;
         var profiles = (await userInfo.GetProfilesAsync(true).ConfigureAwait(false)).ToList();
         var users = profiles
@@ -758,23 +833,46 @@ public sealed class PageController(
     }
 
     /// <summary>
-    /// The edit / move / delete lane's standing (the ADR 0039 §3.7 row the
-    /// controller pre-gates; the service re-checks the same standing server-side
-    /// — C3). <b>Author</b> (the page's author), <b>GlobalAdmin</b> (any
-    /// page), or a community <b>Moderator</b> (a page scoped to that
-    /// component). The <see cref="Page.AuthorId"/> is the page's author (a
-    /// page is not a profile — there is no
-    /// <see cref="Kumunita.Core.UserInfo.Profile.OwnedBy"/> analog; the
-    /// page's <c>AuthorId</c> is the standing key, the ADR 0037 author-only
-    /// pin).
+    /// The edit lane's standing (ADR 0040, amending ADR 0039 §3.7) the
+    /// controller pre-gates; the service re-checks the same standing
+    /// server-side — C3. Kind-aware, mirroring <see cref="PageService
+    /// .CheckEditStanding"/> exactly:
+    /// <list type="bullet">
+    /// <item>A <b>System</b> page is <b>GlobalAdmin only</b> — the author
+    ///       branch (a system page may have a GlobalAdmin author, but standing
+    ///       is role-based, not ownership-based) and the community-Moderator
+    ///       lane are both disabled (a platform page has no community to
+    ///       moderate).</item>
+    /// <item>A <b>User</b> (blog) page is <b>author ∪ GlobalAdmin</b> — the
+    ///       community-Moderator lane is disabled (a resident's personal blog
+    ///       is not community content).</item>
+    /// </list>
+    /// The <see cref="Page.AuthorId"/> is the standing key for a blog page
+    /// (a page is not a profile — there is no
+    /// <see cref="Kumunita.Core.UserInfo.Profile.OwnedBy"/> analog).
     /// </summary>
     private static bool HasEditStanding(Page page, string actorId, IReadOnlySet<string> roles)
     {
+        if (page.Kind == PageKind.System)
+            return roles.Contains(Roles.GlobalAdmin);
+
+        // PageKind.User (a blog page): the author (the resident) ∪ GlobalAdmin
+        // (platform override).
         if (string.Equals(page.AuthorId, actorId, StringComparison.Ordinal)) return true;
-        if (roles.Contains(Roles.GlobalAdmin)) return true;
-        if (page.ComponentId is { } component && roles.Contains(Roles.ModeratorComponent(component))) return true;
-        return false;
+        return roles.Contains(Roles.GlobalAdmin);
     }
+
+    /// <summary>
+    /// Maps the form's <see cref="PageComposeViewModel.Kind"/> string
+    /// (<c>"System"</c>/<c>"User"</c>) to the <see cref="PageKind"/> enum.
+    /// A blank or unrecognized value defaults to <see cref="PageKind.System"/>
+    /// (the ADR 0039 shape — a plain <c>/pages/new</c> is a system page; the
+    /// blog lane posts <c>"User"</c> explicitly).
+    /// </summary>
+    private static PageKind ParseKind(string? kind)
+        => string.Equals(kind, "User", StringComparison.OrdinalIgnoreCase)
+            ? PageKind.User
+            : PageKind.System;
 
     /// <summary>
     /// A title → slug derivation (a display-label → path-segment mapping; the

@@ -44,13 +44,21 @@ public class StaticPagesControllerPgTests
         if (pageFactory is null)
         {
             // Default: absent from the tree (KeyNotFoundException — the
-            // "absent" contract, not an error).
+            // "absent" contract, not an error). Both the ADR 0040 primary
+            // path (system/{slug}) and the legacy fallback ({slug}) miss.
             pages.GetByPathAsync(Arg.Any<string>())
                 .Returns(Task.FromException<Page>(new KeyNotFoundException($"no page at '{slug}'")));
         }
         else
         {
-            pages.GetByPathAsync(slug).Returns(pageFactory(slug)!);
+            // ADR 0040: the canonical static pages live under the `system/`
+            // root, so the controller resolves `system/{slug}` first. Plant
+            // the page there (the primary hit); the bare `{slug}` fallback
+            // is a legacy seam that misses (proving the primary path is the
+            // one that resolves).
+            pages.GetByPathAsync($"system/{slug}").Returns(pageFactory(slug)!);
+            pages.GetByPathAsync(slug)
+                .Returns(Task.FromException<Page>(new KeyNotFoundException($"no page at '{slug}'")));
         }
 
         var controller = new StaticPagesController(
@@ -97,7 +105,8 @@ public class StaticPagesControllerPgTests
         Assert.Equal("The terms body (markdown).", model.Body);
         Assert.Equal(now, model.Updated); // Modified ?? Created
 
-        await pages.Received(1).GetByPathAsync("terms");
+        // ADR 0040 — resolved via the `system/terms` primary path.
+        await pages.Received(1).GetByPathAsync("system/terms");
     }
 
     [Fact(DisplayName = "U07 about: tree-absent → the product-story view (the U05 drift pin — about is NOT seeded)")]

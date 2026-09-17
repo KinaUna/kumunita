@@ -69,14 +69,28 @@ public sealed class StaticPagesController(
 
         // The one store: the Page tree (the absorb, ADR 0039 §3.8). A missing
         // path is a clean "absent" (KeyNotFoundException), not an error.
+        //
+        // ADR 0040 — the seeder now nests the canonical static pages under the
+        // `system/` root, so `system/{slug}` is the primary resolution. The
+        // bare `{slug}` fallback covers instances seeded before ADR 0040 whose
+        // terms/help/about were still orphan roots (the seeder re-parents them
+        // on next boot, but a page an admin created pre-migration may not have
+        // been re-seeded) — keeping the hard-coded routes from 404ing.
         Page? page;
         try
         {
-            page = await pages.GetByPathAsync(slug);
+            page = await pages.GetByPathAsync($"system/{slug}");
         }
         catch (KeyNotFoundException)
         {
-            page = null;
+            try
+            {
+                page = await pages.GetByPathAsync(slug);
+            }
+            catch (KeyNotFoundException)
+            {
+                page = null;
+            }
         }
 
         if (page is not null)

@@ -419,13 +419,25 @@ public static class KnownTranslationKeys
             ["pages.title"]       = "Pages",
             ["pages.new_button"]  = "New page",
             ["pages.none"] =
-                "No pages yet. Global admins and community moderators can " +
-                "create the first one — an About page is the common starting " +
-                "point.",
+                "No pages yet. Global admins can create the first system " +
+                "page — an About page is the common starting point — and any " +
+                "resident can start their own blog (a page of their own).",
             ["pages.back"]        = "← Back to the pages",
             ["pages.by"]          = "by",
             ["pages.delete"]      = "Delete",
             ["pages.untitled"]    = "Untitled page",
+
+            // ── blog (per-resident page feed, ADR 0040) ─────────────────────
+            // The /blog/{userId} feed — a resident's own User-kind pages,
+            // newest first. Plain text only (the kw-l TagHelper emits via
+            // SetContent, auto-escaped — a value carrying <b>/<i> would render
+            // as literal brackets).
+            ["blog.new_page"]     = "New blog page",
+            ["blog.empty_own"] =
+                "You have no blog pages yet. Create your first — it becomes the " +
+                "root of your blog, and you can nest more under it.",
+            ["blog.empty_other"]  = "This resident has no blog pages yet.",
+            ["blog.draft"]        = "Draft",
 
             // ── groups (Create page) ─────────────────────────────────────────
             ["groups.create_back"] = "← Back to groups",

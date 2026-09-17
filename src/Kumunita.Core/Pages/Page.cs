@@ -111,20 +111,24 @@ public sealed class Page
     /// </summary>
     public Authorization.Audience? Audience { get; set; }
 
-    // Authorship + moderation scoping (ADR 0039 §3.7 standing matrix).
+    // Authorship + audience scoping (ADR 0040 standing matrix).
     /// <summary>
-    /// The subject id of the author (the <c>Owner</c> branch of the frozen
-    /// <c>Decide()</c> — edit/publish standing; ADR 0039 §3.7).
+    /// The subject id of the author. For a <see cref="PageKind.System"/>
+    /// page this is the creating GlobalAdmin (an audit identity, not a
+    /// standing branch); for a <see cref="PageKind.User"/> (blog) page it is
+    /// the blog owner and the <c>Owner</c> branch of the frozen <c>Decide()</c>
+    /// (edit/move/delete standing). A community Moderator has no standing on
+    /// either kind (ADR 0040 retires the ADR 0039 §3.7 Moderator lane).
     /// </summary>
     public string AuthorId { get; set; } = string.Empty;
 
     /// <summary>
-    /// The community a <see cref="Authorization.AccessVia.Moderator"/> is
-    /// scoped to (a <see cref="UserInfo.Component"/> by id) — the
-    /// community-scope standing branches (ADR 0036's <c>Community</c>
-    /// audience flag + the ADR 0029 translation lane, carried over). A
-    /// flat/public page has no community to moderate, so a non-null
-    /// <c>Community</c> audience must have this set.
+    /// The community a <see cref="Authorization.Audience"/> with the
+    /// <c>Community</c> flag is scoped to (a <see cref="UserInfo.Component"/>
+    /// by id; ADR 0036) — who may <i>read</i> the page, not a standing
+    /// branch. A community-scoped audience must set this; a flat/public page
+    /// leaves it <c>null</c>. ADR 0040 retires the ADR 0039 §3.7 use of this
+    /// as a Moderator scoping seam (a Moderator has no page standing).
     /// </summary>
     public string? ComponentId { get; set; }
 
@@ -146,6 +150,25 @@ public sealed class Page
     /// <see cref="Audience"/> + <c>CanAsync(Read)</c>).
     /// </summary>
     public string? MountPoint { get; set; }
+
+    // Kind (ADR 0040, the PG-B extension of the PG lane, ADR 0039): the standing
+    // namespace of the page (a platform `system/…` page vs. a resident's
+    // `blog/{subjectId}/…` page). Additive (ADR 0004 §B.1) — a non-indexed
+    // scalar field, zero migration; the PageDocTypes registration is unchanged.
+    /// <summary>
+    /// The <b>kind</b> of this page (ADR 0040): <see cref="PageKind.System"/>
+    /// (a platform page — the standing lane is GlobalAdmin only, the ADR 0040
+    /// amendment to the ADR 0039 §3.7 matrix) or <see cref="PageKind.User"/>
+    /// (a resident's blog page — the standing lane is author ∪ GlobalAdmin ∪
+    /// ModeratorComponent, the ADR 0039 §3.7 shape unchanged for this kind,
+    /// plus the ADR 0040 author move/delete lane). Default <see cref
+    /// "PageKind.System"/> — the existing canonical pages (the seeder's
+    /// <c>terms</c> / <c>help</c>) and every page that predates this field
+    /// are system pages; a resident's blog page is explicitly set to
+    /// <see cref="PageKind.User"/> by the owning write lane (the PG-B
+    /// composer's "My blog" lane, the seeder's <c>blog</c> root).
+    /// </summary>
+    public PageKind Kind { get; set; } = PageKind.System;
 
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }

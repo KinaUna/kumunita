@@ -413,33 +413,94 @@ public static class FirstBootSeeder
         DateTimeOffset now,
         CancellationToken ct)
     {
+        // 1. Ensure the `system` namespace root (ADR 0040: the standing
+        //    discriminator — a kind=System container for the platform pages;
+        //    admins may add sub-levels under it, e.g. system/about).
+        var systemRoot = await session
+            .Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        if (systemRoot is null)
+        {
+            systemRoot = new Page
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Slug = "system",
+                ParentId = null,
+                Kind = PageKind.System,
+                Title = string.Empty,    // a container — no content of its own
+                Body = string.Empty,
+                LanguageCode = SourceLanguage,
+                Audience = null,         // public
+                AuthorId = string.Empty, // platform content — no resident author
+                Created = now,
+                Modified = now,
+            };
+            session.Store(systemRoot);
+        }
+        else if (systemRoot.Kind != PageKind.System)
+        {
+            // An upgrade path: a pre-ADR-0040 `system` root may exist with
+            // the default kind — normalize it (the ADR 0004 §B.1 additive
+            // delta: a field refresh is idempotent).
+            systemRoot.Kind = PageKind.System;
+            session.Store(systemRoot);
+        }
+
+        // 2. Seed the platform pages under the `system` root (terms + help).
         foreach (var (slug, title, body) in defaultPages)
         {
             var existingPage = await session
                 .Query<Page>()
-                .Where(p => p.Slug == slug && p.ParentId == null)
+                .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
                 .FirstOrDefaultAsync(ct)
                 .ConfigureAwait(false);
 
             if (existingPage is null)
             {
+                // A pre-ADR-0040 deployment may have a root-level page with
+                // this slug (terms/help were roots in ADR 0039). Re-parent it
+                // under the `system` root rather than duplicating it.
+                var orphan = await session
+                    .Query<Page>()
+                    .Where(p => p.Slug == slug && p.ParentId == null && p.IsDeleted == false)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (orphan is not null)
+                {
+                    orphan.ParentId = systemRoot.Id;
+                    orphan.Kind = PageKind.System;
+                    orphan.Title = title;
+                    orphan.Body = body;
+                    orphan.Modified = now;
+                    session.Store(orphan);
+                    continue;
+                }
+
                 session.Store(new Page
                 {
                     Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
                     Slug = slug,
-                    ParentId = null,   // a root node (the forest is a forest — no mandatory root)
+                    ParentId = systemRoot.Id,   // under the `system` root (ADR 0040)
+                    Kind = PageKind.System,     // a platform page
                     Title = title,
                     Body = body,
                     LanguageCode = SourceLanguage,
-                    Audience = null,    // public — the seeded canonical pages are world-readable (ADR 0039 §3.4)
-                    AuthorId = string.Empty,   // platform content — no resident author
+                    Audience = null,            // public — world-readable (ADR 0039 §3.4)
+                    AuthorId = string.Empty,    // platform content — no resident author
                     Created = now,
+                    Modified = now,
                 });
             }
             else
             {
+                existingPage.Kind = PageKind.System;   // normalize on re-seed
                 existingPage.Title = title;
                 existingPage.Body = body;   // code wins: refresh the `en` page body
+                existingPage.Modified = now;
                 session.Store(existingPage);
             }
         }

@@ -15,17 +15,14 @@ namespace Kumunita.Core.Pages;
 /// when this is absent) and <see cref="Body"/> (required).
 /// </para>
 /// <para>
-/// **Standing (ADR 0039 §3.7):** a translation is added by a
-/// <b>GlobalAdmin</b> or a <b>Translator</b> (both an
+/// **Standing (ADR 0040, amending ADR 0039 §3.7):** a translation is added
+/// by a <b>GlobalAdmin</b> or a <b>Translator</b> (both an
 /// <see cref="Authorization.AccessVia.Admin"/> audit tag — instance-wide, the
-/// ADR 0021/0026 Translator standing) and — for a community-scoped page
-/// (<see cref="Page.CommunityId"/> set) — by a
-/// <see cref="Identity.Roles.Moderator"/> scoped to that community (an
-/// <see cref="Authorization.AccessVia.Moderator"/> audit tag; the ADR 0029
-/// announcement lane, carried over). A flat/public page has no community to
-/// moderate, so the component-moderator standing does not qualify for it.
-/// The decision + its <see cref="Authorization.AccessAudit"/> row are written
-/// by <c>AddTranslationAsync</c> (U03) in the caller's transaction (C3).
+/// ADR 0021/0026 Translator standing) — on **either** page kind. A community
+/// Moderator has no standing here (ADR 0040 retires the ADR 0039 §3.7
+/// community-moderator lane). The decision + its
+/// <see cref="Authorization.AccessAudit"/> row are written by
+/// <c>AddTranslationAsync</c> (U03) in the caller's transaction (C3).
 /// </para>
 /// <para>
 /// **Not an authorization surface (the ADR 0022 read-pin carried over):**

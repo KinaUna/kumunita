@@ -205,12 +205,19 @@ public class MLUI_FacesTests
 
         if (page is null)
         {
+            // Absent from the tree (KeyNotFoundException) — the U05 drift pin.
+            // Both the ADR 0040 primary path (system/about) and the legacy
+            // fallback (about) miss.
             pages.GetByPathAsync(Arg.Any<string>())
                 .Returns(Task.FromException<Page>(new KeyNotFoundException()));
         }
         else
         {
-            pages.GetByPathAsync("about").Returns(page);
+            // ADR 0040: the `about` page lives under the `system/` root, so
+            // the controller resolves `system/about` first.
+            pages.GetByPathAsync("system/about").Returns(page);
+            pages.GetByPathAsync("about")
+                .Returns(Task.FromException<Page>(new KeyNotFoundException()));
         }
 
         var controller = new StaticPagesController(
