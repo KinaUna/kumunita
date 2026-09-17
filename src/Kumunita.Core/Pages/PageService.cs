@@ -1,3 +1,4 @@
+using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Marten;
 using Marten.Services;
@@ -302,6 +303,465 @@ public sealed class PageService : IPageService
         if (parentDepth + 1 > MaxDepth)
             throw new InvalidOperationException(
                 $"Moving a page under '{newParentId}' (depth {parentDepth}) would exceed the max depth of {MaxDepth}.");
+    }
+
+    // ─── Write lanes (ADR 0039 §3.7 — U03) ─────────────────────────────────
+    //
+    // Each write lane (a) re-checks standing **server-side** (the C3
+    // single-source pin — a Web [Authorize(Roles=…)] is a convenience pre-gate,
+    // not the source of truth), (b) persists the mutation, and (c) stores an
+    // AccessAudit row **in the caller's in-flight IDocumentSession**
+    // (invariant C3, ADR 0006 — synchronous, in-transaction, not a Wolverine
+    // side effect) with TargetKind = "page" and the §3.7 action name. The
+    // standing helpers (U02) are the pure gate; the **move/delete** standing
+    // (admin/mod only, *not* a plain author) is a distinct resolver below,
+    // because CheckEditStanding (U02) deliberately allows the author and
+    // move/delete must not (design doc §3.7: a page is platform content, not a
+    // personal note — AccessVia is Admin/Moderator, never Owner, for these two).
+    // The ImageIds / AttachmentIds fields are populated by the caller (the
+    // Web layer's ContentImageIds.ExtractContentImageIds /
+    // AttachmentIds.ExtractAttachmentIds idiom, ADR 0025 / ADR 0034 — the
+    // RC U04/U05 + ATT U5 shape: Core never parses the body, it normalizes
+    // the POCO's fields via ?? []). The client never sends them.
+
+    /// <summary>
+    /// Creates a <see cref="Page"/> in the **caller's** in-flight session
+    /// (C3). Standing (§3.7): a GlobalAdmin or a community Moderator scoped
+    /// to <see cref="Page.ComponentId"/>; a plain Member is denied (403).
+    /// A root-slug collision (two roots sharing a slug) is a
+    /// <see cref="InvalidOperationException"/> — the
+    /// <c>(ParentId, Slug)</c> unique index does **not** prevent it (Postgres
+    /// treats NULLs as distinct), so this lane is the authoritative root-slug
+    /// guard. A denied actor throws **before** anything is stored.
+    /// </summary>
+    public async Task<Page> CreateAsync(
+        Page page, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An authoring actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        if (string.IsNullOrWhiteSpace(page.Slug))
+            throw new ArgumentException("A page slug is required.", nameof(page.Slug));
+
+        // Standing re-check (server-side, C3 single-source pin).
+        // The helper requires a non-null page — pass the (still-in-memory)
+        // incoming doc, not a DB load. CheckCreateStanding is a pure role-claim
+        // check: GlobalAdmin or a ModeratorComponent(page.ComponentId).
+        CheckCreateStanding(actorId, actorRoles, page);
+
+        // Root-slug guard (the index does not cover it — Postgres treats NULLs
+        // as distinct, the U01 drift note): if ParentId is null, no *other*
+        // root page may already carry this slug.
+        if (page.ParentId is null)
+        {
+            var existingRoot = await session.Query<Page>()
+                .Where(p => p.ParentId == null && p.Slug == page.Slug && p.IsDeleted == false)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+            if (existingRoot is not null && !string.Equals(existingRoot.Id, page.Id, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"A root page with slug '{page.Slug}' already exists (id '{existingRoot.Id}'); " +
+                    "choose a different slug or nest the new page under a parent.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        if (string.IsNullOrEmpty(page.Id))
+            page.Id = Guid.NewGuid().ToString("N");
+        page.AuthorId = actorId;
+        page.Created = now;
+        page.ImageIds = page.ImageIds ?? [];       // RC ADR 0025 — caller-parsed, never spoofed
+        page.AttachmentIds = page.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed, never spoofed
+
+        // Resolve the audit Via tag (Admin for GlobalAdmin, Moderator for a
+        // component-moderator) before storing. A create has no stored author,
+        // so the standing is the narrowest of {GlobalAdmin, Moderator}.
+        var via = ResolveWriteStandingVia(actorRoles, page.ComponentId);
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.create",
+            TargetKind = "page",
+            TargetId = page.Id,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(page);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return page;
+    }
+
+    /// <summary>
+    /// Edits an existing <see cref="Page"/> in the **caller's** in-flight
+    /// session (C3). Standing (§3.7): the author, a GlobalAdmin, or a
+    /// community Moderator scoped to <see cref="Page.ComponentId"/>.
+    /// A missing page is a <see cref="KeyNotFoundException"/> (404); a denied
+    /// actor is a <see cref="UnauthorizedAccessException"/> (403).
+    /// </summary>
+    public async Task<Page> UpdateAsync(
+        Page updated, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        ArgumentNullException.ThrowIfNull(updated);
+        if (string.IsNullOrEmpty(updated.Id)) throw new ArgumentException("A page id is required.", nameof(updated.Id));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var existing = await session.LoadAsync<Page>(updated.Id).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Page '{updated.Id}' was not found in the session; nothing to edit.");
+
+        // Standing re-check (server-side, C3 single-source pin).
+        CheckEditStanding(actorId, actorRoles, existing);
+
+        // Capture the **stored** page's author + component scope *before* the
+        // field-copy below overwrites them: the standing decision (and the
+        // audit Via tag) is based on the resource the actor has standing over
+        // (the stored page), not the incoming `updated` (which may carry a
+        // null ComponentId on a content-only edit).
+        var storedAuthorId = existing.AuthorId;
+        var storedComponentId = existing.ComponentId;
+
+        var now = DateTimeOffset.UtcNow;
+        existing.Title = updated.Title;
+        existing.Body = updated.Body;
+        existing.Audience = updated.Audience;
+        existing.ComponentId = updated.ComponentId;
+        existing.LanguageCode = updated.LanguageCode;
+        existing.MountPoint = updated.MountPoint;
+        existing.ImageIds = updated.ImageIds ?? [];          // RC ADR 0025 — caller-parsed
+        existing.AttachmentIds = updated.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed
+
+        // The audit Via tag (narrowest standing that applied): Owner if the
+        // actor is the author, else Moderator (component-scoped), else Admin.
+        var via = ResolveWriteStandingVia(
+            actorRoles,
+            storedComponentId,
+            isAuthor: string.Equals(storedAuthorId, actorId, StringComparison.Ordinal));
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.update",
+            TargetKind = "page",
+            TargetId = existing.Id,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        existing.Modified = now;
+        session.Store(existing);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <summary>
+    /// Publishes a draft <see cref="Page"/> — **author-only** (ADR 0037 pin):
+    /// the sole decision is <c>AuthorId == actorId</c> (ordinal); a
+    /// non-author is denied (403) **even at GlobalAdmin**. Idempotent.
+    /// </summary>
+    public async Task<Page> PublishAsync(string pageId, string actorId, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to publish.");
+
+        // Author-only gate (ADR 0037): only the author may publish. A
+        // non-author (including a GlobalAdmin) is denied — the ADR 0037 pin.
+        if (!string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author of a page may publish it.");
+
+        var now = DateTimeOffset.UtcNow;
+        bool wasDraft = page.IsDraft;
+        if (wasDraft)
+        {
+            page.IsDraft = false;
+            page.Modified = now;
+        }
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.publish",
+            TargetKind = "page",
+            TargetId = page.Id,
+            Via = AccessVia.Owner,   // ADR 0037 — the publish standing is Owner-only
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(page);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return page;
+    }
+
+    /// <summary>
+    /// Moves a <see cref="Page"/> under a new parent (reparent) in the
+    /// **caller's** in-flight session (C3). Standing (§3.7): a GlobalAdmin or
+    /// a community Moderator scoped to <see cref="Page.ComponentId"/> —
+    /// **not** a plain author. Applies the cycle-guard + depth-cap; a
+    /// <paramref name="newSlug"/> change is authoritative for root-level
+    /// uniqueness. The derived path is rewritten by the single
+    /// <see cref="Page.ParentId"/> / <see cref="Page.Slug"/> column write.
+    /// </summary>
+    public async Task<Page> MoveAsync(
+        string pageId, string? newParentId, string? newSlug,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to move.");
+
+        // Standing re-check (server-side): admin/mod only, NOT author.
+        var via = ResolveMoveDeleteStanding(page.ComponentId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                $"Only a GlobalAdmin or a moderator of community '{page.ComponentId}' may move a page.");
+
+        // Cycle guard + depth cap (the U02 hierarchy guards).
+        await EnsureNoCycleAsync(pageId, newParentId).ConfigureAwait(false);
+        await EnsureDepthWithinLimitAsync(newParentId).ConfigureAwait(false);
+
+        // Root-slug guard: if the move makes the page a root (newParentId null)
+        // and newSlug is specified, no *other* root page may already carry it.
+        if (newParentId is null && newSlug is not null && !string.IsNullOrWhiteSpace(newSlug)
+            && (newSlug != page.Slug || page.ParentId is not null))
+        {
+            var existingRoot = await session.Query<Page>()
+                .Where(p => p.ParentId == null && p.Slug == newSlug && p.IsDeleted == false)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+            if (existingRoot is not null && !string.Equals(existingRoot.Id, pageId, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"A root page with slug '{newSlug}' already exists (id '{existingRoot.Id}'); " +
+                    "choose a different slug or nest the page under a parent.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        page.ParentId = newParentId;
+        if (newSlug is not null && !string.IsNullOrWhiteSpace(newSlug))
+            page.Slug = newSlug;
+        page.Modified = now;
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.move",
+            TargetKind = "page",
+            TargetId = page.Id,
+            Via = via.Value,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(page);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return page;
+    }
+
+    /// <summary>
+    /// **Soft-deletes** a <see cref="Page"/> in the **caller's** in-flight
+    /// session (C3): sets <see cref="Page.IsDeleted"/> to <c>true</c> and
+    /// stamps <see cref="Page.Modified"/>. Standing (§3.7): a GlobalAdmin or
+    /// a community Moderator scoped to <see cref="Page.ComponentId"/> —
+    /// **not** a plain author.
+    /// </summary>
+    public async Task DeleteAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId)) throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side): admin/mod only, NOT author.
+        var via = ResolveMoveDeleteStanding(page.ComponentId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                $"Only a GlobalAdmin or a moderator of community '{page.ComponentId}' may delete a page.");
+
+        var now = DateTimeOffset.UtcNow;
+        page.IsDeleted = true;
+        page.Modified = now;
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.delete",
+            TargetKind = "page",
+            TargetId = page.Id,
+            Via = via.Value,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(page);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a page in the **caller's**
+    /// in-flight session (C3; the ADR 0029 standing carried over, design doc
+    /// §3.7). Standing: a GlobalAdmin, a Translator, or a community Moderator
+    /// scoped to <see cref="Page.ComponentId"/>; a flat/public page has no
+    /// community to moderate, so the component-moderator standing does not
+    /// qualify. The <c>(PageId, LanguageCode)</c> unique index (U01) is the
+    /// add-only duplicate guard.
+    /// </summary>
+    public async Task<PageTranslation> AddTranslationAsync(
+        string pageId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId))
+            throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to translate.");
+
+        // Standing re-check (server-side): GlobalAdmin / Translator /
+        // ModeratorComponent(page.ComponentId). CheckTranslateStanding is
+        // the U02 pure helper — it throws UnauthorizedAccessException if the
+        // actor has no qualifying standing.
+        CheckTranslateStanding(actorId, actorRoles, page);
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new PageTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            PageId = pageId,
+            LanguageCode = languageCode,
+            Title = title,
+            Body = body,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var via = ResolveTranslationStandingVia(
+            page.ComponentId, actorId, actorRoles);
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.translation.add",
+            TargetKind = "page",
+            TargetId = pageId,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
+
+    /// <summary>
+    /// The **move/delete** standing resolver (§3.7: a GlobalAdmin or a
+    /// community Moderator scoped to <paramref name="componentId"/> — **not**
+    /// a plain author). Returns the <see cref="AccessVia"/> the actor
+    /// qualifies under, or <c>null</c> to deny. Precedence: Moderator (most
+    /// specific) before Admin. A flat/public page (componentId null) has no
+    /// community to moderate, so only a GlobalAdmin qualifies.
+    /// </summary>
+    private static AccessVia? ResolveMoveDeleteStanding(
+        string? componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (componentId is not null
+            && actorRoles.Contains(Roles.ModeratorComponent(componentId)))
+            return AccessVia.Moderator;
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return AccessVia.Admin;
+        return null;
+    }
+
+    /// <summary>
+    /// The **translation** standing resolver (design doc §3.7 / ADR 0029
+    /// carried over): a Translator or a GlobalAdmin (<see cref="AccessVia
+    /// .Admin"/>), or a community Moderator scoped to
+    /// <paramref name="componentId"/> (<see cref="AccessVia.Moderator"/>).
+    /// A flat/public page (componentId null) has no community to moderate,
+    /// so the component-moderator branch is excluded for it. Precedence:
+    /// Moderator (most specific) before Admin.
+    /// </summary>
+    private static AccessVia ResolveTranslationStandingVia(
+        string? componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (componentId is not null
+            && actorRoles.Contains(Roles.ModeratorComponent(componentId)))
+            return AccessVia.Moderator;
+        return AccessVia.Admin;   // GlobalAdmin or Translator — both map to Admin
+    }
+
+    /// <summary>
+    /// Resolves the <see cref="AccessVia"/> tag for the **create** and
+    /// **edit** write lanes' audit rows. Precedence (most specific / narrowest
+    /// right first, so the audit row records the narrowest standing that
+    /// applied): <c>Owner</c> (the author, edit-lane only) → <c>Moderator</c>
+    /// (a community-moderator scoped to <paramref name="moderatorComponentId"/>)
+    /// → <c>Admin</c> (GlobalAdmin). The caller has already verified the
+    /// standing before calling this — it is a pure tag-resolution, not a gate.
+    /// </summary>
+    private static AccessVia ResolveWriteStandingVia(
+        IReadOnlySet<string> actorRoles,
+        string? moderatorComponentId,
+        bool isAuthor = false)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (isAuthor)
+            return AccessVia.Owner;
+        if (moderatorComponentId is not null
+            && actorRoles.Contains(Roles.ModeratorComponent(moderatorComponentId)))
+            return AccessVia.Moderator;
+        return AccessVia.Admin;
     }
 
     // ─── Private helpers ───────────────────────────────────────────────────

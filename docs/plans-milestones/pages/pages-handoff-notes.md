@@ -368,3 +368,248 @@ untouched, no Web code. **Next unit: U03** (the write lanes
 `CreateAsync`/`UpdateAsync`/`PublishAsync`/`MoveAsync`/`DeleteAsync`/
 `AddTranslationAsync`, each with its C3 `AccessAudit` row, `TargetKind =
 "page"` — reusing the U02 standing helpers + hierarchy guards).
+
+## U3 — write lanes + C3 audit
+
+**What I built** (all in `Kumunita.Core.Pages` + the U02 test file; no Web
+code — U04, no `LocalizedPage`/`M1DocTypes` touched — U07):
+
+- `src/Kumunita.Core/Pages/IPageService.cs` (modified) — added the six
+  write-lane signatures (the C3 caller-session `IDocumentSession` shape, the
+  `AnnouncementService.CreateAsync` / `PostService.CreatePostAsync` convention):
+  `CreateAsync(Page, actorId, actorRoles, session)`, `UpdateAsync(Page updated,
+  actorId, actorRoles, session)`, `PublishAsync(pageId, actorId, session)`
+  (author-only — no `actorRoles` param, the ADR 0037 pin), `MoveAsync(pageId,
+  newParentId, newSlug, actorId, actorRoles, session)`, `DeleteAsync(pageId,
+  actorId, actorRoles, session)` (soft-delete), and `AddTranslationAsync(pageId,
+  languageCode, title, body, actorId, actorRoles, session)`. Added the `using
+  Marten;` for `IDocumentSession`. The U02 read-lane signatures + the standing
+  helpers' "not on the interface" comment are unchanged.
+
+- `src/Kumunita.Core/Pages/PageService.cs` (modified) — the six write-lane
+  implementations + the two **new** private standing resolvers the move/delete
+  and translation audit rows need (distinct from U02's `Check*Standing`
+  helpers, which throw — the resolvers return the `AccessVia` tag for the
+  audit row). **The `PageService` constructor is unchanged**
+  (`PageService(IDocumentStore store)` — one param; the write lanes compose
+  the audit row directly in the caller's `IDocumentSession`, the C3 shape;
+  no new constructor params were needed). The write lanes:
+  - **`CreateAsync`** — `CheckCreateStanding` (U02) → **root-slug guard**
+    (the `(ParentId, Slug)` unique index does NOT cover it, the U01 drift
+    note) → mint id, set `AuthorId = actorId`, `Created = now`, normalize
+    `ImageIds`/`AttachmentIds` via `?? []` (RC ADR 0025 / ATT ADR 0034 — the
+    caller parses the body, Core normalizes the POCO's fields) → store the
+    `page.create` `AccessAudit` row (`TargetKind = "page"`, `Via = Admin` for
+    GlobalAdmin / `Moderator` for a component-moderator) in the caller's
+    session → `SaveChangesAsync` → return the page.
+  - **`UpdateAsync`** — load the stored page (404 on missing) →
+    `CheckEditStanding` (U02, author/admin/mod) → **capture the stored
+    `AuthorId` + `ComponentId` before the field-copy** (the standing decision
+    and the audit `Via` tag are based on the resource the actor has standing
+    over — the stored page — not the incoming `updated`, which may carry a
+    null `ComponentId` on a content-only edit) → copy
+    `Title`/`Body`/`Audience`/`ComponentId`/`LanguageCode`/`MountPoint`/
+    `ImageIds`/`AttachmentIds` → store the `page.update` `AccessAudit` row
+    (`Via = Owner` if the actor is the stored author, else `Moderator` /
+    `Admin`) → stamp `Modified = now` → `SaveChangesAsync` → return the page.
+  - **`PublishAsync`** — load (404) → **author-only gate** (ADR 0037 pin:
+    `AuthorId == actorId` ordinal; a non-author is denied **even at
+    GlobalAdmin** — the ADR 0037 pin) → idempotent (a second publish on an
+    already-live page does not stamp `Modified`) → set `IsDraft = false` →
+    store the `page.publish` `AccessAudit` row (`Via = Owner`, the ADR 0037
+    author-pin) → `SaveChangesAsync` → return the page.
+  - **`MoveAsync`** — load (404) → **admin/mod only** (the new
+    `ResolveMoveDeleteStanding` resolver — *not* `CheckEditStanding`, which
+    allows the author; §3.7: move is platform content, not a personal note)
+    → `EnsureNoCycleAsync` + `EnsureDepthWithinLimitAsync` (the U02 hierarchy
+    guards) → **root-slug guard** (if the move makes the page a root and a
+    `newSlug` is specified, no other root page may already carry it) → set
+    `ParentId` / `Slug` (the derived path is rewritten by the single-column
+    write — paths are not stored) → store the `page.move` `AccessAudit` row
+    (`Via = Admin` / `Moderator`) → `SaveChangesAsync` → return the page.
+  - **`DeleteAsync`** — load (404) → **admin/mod only** (same resolver) → set
+    `IsDeleted = true` (soft-delete, the ADR 0024 shape — the row is NOT
+    removed, children are NOT orphaned; the U02 read lanes filter the flag)
+    → store the `page.delete` `AccessAudit` row (`Via = Admin` / `Moderator`)
+    → `SaveChangesAsync`.
+  - **`AddTranslationAsync`** — load the page (404) → `CheckTranslateStanding`
+    (U02, admin/translator/mod) → mint the `PageTranslation` row → store the
+    `page.translation.add` `AccessAudit` row (`Via = Admin` for GlobalAdmin /
+    Translator, `Moderator` for a component-moderator) → `SaveChangesAsync`
+    → return the row. The `(PageId, LanguageCode)` unique index (U01) is the
+    add-only duplicate guard — a second add of the same pair is rejected by
+    the DB (Marten wraps it in a Postgres exception).
+  - **`ResolveMoveDeleteStanding`** (new, private static) — the move/delete
+    standing resolver (§3.7): `Moderator` if the actor holds a
+    `ModeratorComponent(page.ComponentId)` claim (most specific first), else
+    `Admin` if GlobalAdmin, else `null` (deny). A flat/public page
+    (`ComponentId` null) has no community to moderate, so only GlobalAdmin
+    qualifies. Distinct from `CheckEditStanding` (which allows the author) —
+    move/delete are admin/mod-only per §3.7.
+  - **`ResolveTranslationStandingVia`** (new, private static) — the
+    translation standing `Via` tag: `Moderator` if component-scoped, else
+    `Admin` (GlobalAdmin or Translator — both map to `Admin`). The
+    *decision* is still `CheckTranslateStanding` (U02); this is only the
+    audit tag.
+  - **`ResolveWriteStandingVia`** (new, private static) — the create/edit
+    standing `Via` tag (narrowest standing first): `Owner` if the actor is
+    the author (edit-lane only — a create has no stored author), else
+    `Moderator` (component-scoped), else `Admin` (GlobalAdmin). The caller
+    has already verified the standing before calling this — it is a pure
+    tag-resolution, not a gate.
+
+- `tests/Kumunita.Core.Tests/PageServiceTests.cs` (modified) — **the `PG3_*`
+  family (30 tests)** added after the U02 `PG_*` family, mirroring the
+  `AnnouncementServiceTests` write-lane harness shape (fresh scratch Postgres
+  per test, `Plant` seeding, the caller's in-flight `IDocumentSession` via
+  `newSession(store)`, the `AccessAudit` read-back via `AuditRows(store)` /
+  `AuditsFor(store, targetId, action)`):
+  - **Create** (5): GlobalAdmin → `Admin` audit; CommunityModerator →
+    `Moderator` audit; PlainMember denied (no row); root-slug collision
+    (`InvalidOperationException`); `ImageIds`/`AttachmentIds` non-null after
+    save (the `?? []` guard).
+  - **Update** (5): Author → `Owner` audit; GlobalAdmin → `Admin` audit;
+    CommunityModerator → `Moderator` audit (the bug I caught — the `Via`
+    must be resolved from the **stored** page's `ComponentId`, not the
+    incoming `updated` which may carry a null `ComponentId`); non-author
+    Member denied; missing page → `KeyNotFoundException`.
+  - **Publish** (4): Author → `IsDraft` cleared, `Owner` audit; GlobalAdmin
+    denied (ADR 0037 pin — *not* the author); Moderator denied; already-live
+    → idempotent (no `Modified` stamp).
+  - **Move** (5): GlobalAdmin re-parents → `Admin` audit; Author denied
+    (not the author lane); CommunityModerator → `Moderator` audit; moving
+    under a descendant → cycle-guard throws; moving under a depth-8 node →
+    depth-cap throws.
+  - **Delete** (4): GlobalAdmin → `IsDeleted = true`, hidden from
+    `GetByPathAsync` + `GetTreeAsync`, `Admin` audit; Author denied (not the
+    author lane); CommunityModerator → `Moderator` audit; missing page →
+    `KeyNotFoundException`.
+  - **AddTranslation** (6): GlobalAdmin → `Admin` audit; Translator →
+    `Admin` audit; CommunityModerator → `Moderator` audit; PlainMember
+    denied; flat-page + moderator-of-other-comp denied; duplicate
+    `(PageId, LanguageCode)` → DB unique-index rejection
+    (`ThrowsAnyAsync<Exception>`); missing page → `KeyNotFoundException`.
+  - **Helpers added**: `newSession(store)` (the
+    `AnnouncementServiceTests.newSession` shape), `AuditRows(store)` (all
+    `AccessAudit` rows), `AuditsFor(store, targetId, action)` (the filtered
+    "assert the audit-row shape" helper).
+
+**What I verified** (the test-runner quirk in `AGENTS.md` applies — never
+`dotnet test` / VS Test Explorer):
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings** (after
+  fixing the two xUnit analyzer issues: the un-awaited
+  `Assert.ThrowsAsync` in the delete test, and the missing
+  `CancellationToken` on `CountAsync`; and the CS8625 nullable warning in
+  the `ImageIds`/`AttachmentIds` test — simplified to verify non-null after
+  save rather than assigning `null` to a non-nullable POCO field).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 505, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (45.6 s).
+  U02's run was **475**; the delta is exactly the **30 new `PG3_*` tests**
+  (475 + 30 = 505) — the full existing suite stayed green, so the U03 write
+  lanes + audit rows introduced no regression.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 203, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (10.3 s) —
+  confirms the U03 changes (Core-only) did not regress the Web host.
+- `git --no-pager status --short` — the change set is exactly the closed U03
+  deliverable set: `M src/Kumunita.Core/Pages/IPageService.cs`,
+  `M src/Kumunita.Core/Pages/PageService.cs`,
+  `M tests/Kumunita.Core.Tests/PageServiceTests.cs`. **`LocalizedPage`/
+  `M1DocTypes` untouched** (U07 retires it), and **no Web code** was added
+  (U04).
+
+**Drift from the plan** (three, all minor and recorded per protocol):
+
+1. **The `ImageIds`/`AttachmentIds` "server-side parse" is the
+   caller-parses-and-normalizes shape, not a Core-side regex parse.** The
+   plan's deliverable #7 ("Server-side body parse — `ImageIds` /
+   `AttachmentIds` derived from the `Body` in the write lane") reads as if
+   Core calls the regex helper. The **actual** repo idiom (the
+   `PostService.CreatePostAsync` / `AnnouncementService.UpdateAsync`
+   shape, the `RC R·3` / `ATT U4` comments) is that the **Web layer**
+   (the `ContentImageIds.ExtractContentImageIds` /
+   `AttachmentIds.ExtractAttachmentIds` helpers in
+   `Kumunita.Web.Security`) parses the body and sets the POCO's fields
+   before calling the Core service; Core then **normalizes** the POCO's
+   fields via `?? []` (null-coalesce to the non-null empty list). I
+   followed the implemented idiom (the POCO's fields are already set by the
+   caller; Core's `?? []` is the defensive null-coalesce). The U04
+   `PageController` will call the Web-layer parse helpers and set
+   `page.ImageIds` / `page.AttachmentIds` before calling
+   `CreateAsync`/`UpdateAsync` — the Core write lanes do **not** parse the
+   body. **This is not a drift-pause (a) — it is the existing idiom, not a
+   new standing or branch.**
+2. **The `UpdateAsync` audit `Via` tag is resolved from the *stored* page's
+   `AuthorId`/`ComponentId`, not the incoming `updated` POCO.** The test
+   `PG3_Update_ByCommunityModerator_Allows_WithModeratorAudit` caught a
+   real bug: if the incoming `updated` carries a null `ComponentId` (a
+   content-only edit that doesn't re-state the component scope), and Core
+   copies `existing.ComponentId = updated.ComponentId` *before* resolving
+   the `Via` tag, the `Via` would be `Admin` (GlobalAdmin fallback) instead
+   of `Moderator` (component-scoped). The fix: capture
+   `storedAuthorId`/`storedComponentId` **before** the field-copy, and
+   resolve the `Via` from those. The standing decision itself
+   (`CheckEditStanding`) was already correct (it runs against the stored
+   page before the copy); only the audit tag needed the fix. Recorded here
+   so U04's `PageController` does not re-introduce the bug.
+3. **The `PageService` constructor did NOT gain
+   `IUserInfoService`/`IAuthorizationService` params.** The U02 handoff
+   note said "U03's write lanes … can compose
+   `IAuthorizationService`/`IUserInfoService` **in U03** if it needs
+   them." The U03 write lanes **do not need them** — the standing
+   re-check is a pure role-claim check (U02's static helpers), and the
+   audit row is written directly in the caller's `IDocumentSession` (the
+   C3 shape, the `AnnouncementService` precedent — no separate
+   `IAuthorizationService.CanAsync` call needed for the write-lane audit;
+   the read decision is the Web layer's job through the adapter). The
+   constructor stays `PageService(IDocumentStore store)` — one param. This
+   is consistent with the U02 note's "if it needs them" (it didn't).
+
+**What the next agent (U04) must know** that isn't already in the plan:
+
+- **The `PageService` constructor is `PageService(IDocumentStore store)`** —
+  **one param only**, unchanged from U02. The write lanes do not need
+  `IUserInfoService`/`IAuthorizationService` (the standing re-check is a
+  pure role-claim check, the audit row is written in the caller's session).
+  The U04 `PageController` resolves `IPageService` from DI (the
+  `DependencyInjection.cs` registration is unchanged from U01) and passes
+  the caller's `IDocumentSession` to the write lanes (the C3 shape — the
+  Web layer's `DocumentStore.LightweightSession()`).
+- **The `ImageIds`/`AttachmentIds` are set by the Web layer before calling
+  the write lanes** (the `ContentImageIds.ExtractContentImageIds` /
+  `AttachmentIds.ExtractAttachmentIds` idiom — `Kumunita.Web.Security`).
+  Core's write lanes normalize them via `?? []` but do **not** parse the
+  body. The U04 composer must call the parse helpers and set the POCO's
+  fields before calling `CreateAsync`/`UpdateAsync`.
+- **The `UpdateAsync` audit `Via` is resolved from the stored page's
+  `AuthorId`/`ComponentId`, captured before the field-copy.** Do not
+  re-introduce the bug (resolve `Via` from `existing.ComponentId` *after*
+  `existing.ComponentId = updated.ComponentId` — that's wrong; the `Via`
+  must be based on the resource the actor has standing over, the stored
+  page).
+- **`MoveAsync`/`DeleteAsync` are admin/mod-only, NOT author** (the
+  `ResolveMoveDeleteStanding` resolver, not `CheckEditStanding`). A
+  `PageController` route `[Authorize(Roles = GlobalAdmin)]` is a
+  convenience pre-gate, not the source of truth — the service re-checks
+  standing server-side.
+- **`PublishAsync` is author-only (ADR 0037)** — a GlobalAdmin cannot
+  publish someone else's draft. The `PageController` route should be
+  `[Authorize]` (any authenticated user) — the service enforces the
+  author-only gate.
+- **The soft-delete filter lives in the U02 read lanes** — U04's
+  `GetByPathAsync` / `GetTreeAsync` / `GetByMountPointAsync` already filter
+  `IsDeleted` pages out. U03's `DeleteAsync` only sets the flag. Do not
+  duplicate the filter in U04.
+- **The `(ParentId, Slug)` unique index does NOT prevent two roots sharing
+  a slug** (the U01 drift note). U03's `CreateAsync`/`MoveAsync` are the
+  authoritative root-slug guard. U04's composer should surface a clear
+  error if the user tries to create a root page with a slug that already
+  exists at the root level.
+- **No `LocalizedPage`/`M1DocTypes` was touched** (U07 retires it), and
+  **no Web code** was added (U04).
+
+**Status: U03 GREEN.** Build clean (zero warnings), Core tests
+**505/505** green (475 pre-existing + 30 new `PG3_*`), Web tests
+**203/203** green (no regression), `LocalizedPage`/`M1DocTypes`
+untouched, no Web code. **Next unit: U04** (the `PageController` + the
+tree browse + the post view + the composer — the Web surface).

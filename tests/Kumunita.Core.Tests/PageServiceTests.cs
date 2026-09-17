@@ -608,6 +608,521 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.Equal(3, await svc.GetDepthAsync("pgdeep-c"));
     }
 
+    // ─── 10 — Write lanes (ADR 0039 §3.7 — U03) ───────────────────────────
+    //
+    // The standing-gated mutation surface. Each lane: (a) re-checks standing
+    // server-side (the C3 single-source pin — a Web [Authorize] is not the
+    // source of truth), (b) persists, and (c) stores an AccessAudit row in
+    // the caller's in-flight session (C3, ADR 0006 — synchronous,
+    // in-transaction, not a Wolverine side effect) with TargetKind = "page"
+    // and the §3.7 action name. The standing matrix per lane (§3.7):
+    //   create  → GlobalAdmin ∪ Moderator(ComponentId)          Via Admin/Moderator
+    //   edit    → Author ∪ GlobalAdmin ∪ Moderator(ComponentId) Via Owner/Admin/Moderator
+    //   publish → Author only (ADR 0037)                         Via Owner
+    //   move    → GlobalAdmin ∪ Moderator(ComponentId) — NOT author    Via Admin/Moderator
+    //   delete  → GlobalAdmin ∪ Moderator(ComponentId) — NOT author    Via Admin/Moderator
+    //   translate → GlobalAdmin ∪ Translator ∪ Moderator(ComponentId) Via Admin/Moderator
+    // The ImageIds/AttachmentIds are caller-parsed (the Web layer's
+    // ContentImageIds/AttachmentIds idiom, ADR 0025/0034) — Core normalizes
+    // the POCO's fields (?? []) and never parses the body.
+
+    // ─── 10.1 — CreateAsync ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task PG3_Create_ByGlobalAdmin_Persists_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var page = new Page { Slug = "c-ga", Title = "T", Body = "b", ComponentId = "comp-c" };
+
+        await using var session = newSession(store);
+        var saved = await svc.CreateAsync(page, "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.False(string.IsNullOrEmpty(saved.Id));
+        Assert.Equal("u-admin", saved.AuthorId);
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == saved.Id && a.Action == "page.create");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal("u-admin", row.ActorId);
+    }
+
+    [Fact]
+    public async Task PG3_Create_ByCommunityModerator_Persists_WithModeratorAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var page = new Page { Slug = "c-mod", Title = "T", Body = "b", ComponentId = "comp-c" };
+
+        await using var session = newSession(store);
+        var saved = await svc.CreateAsync(
+            page, "u-mod-c", RolesSet(Roles.Moderator, Roles.ModeratorComponent("comp-c")), session);
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == saved.Id && a.Action == "page.create");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Moderator, row.Via);
+    }
+
+    [Fact]
+    public async Task PG3_Create_ByPlainMember_Denied_NoRow()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var page = new Page { Slug = "c-mem", Title = "T", Body = "b", ComponentId = "comp-c" };
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateAsync(page, "u-member", RolesSet(Roles.Member), session));
+
+        // The deny precedes SaveChangesAsync — nothing is persisted, no audit row.
+        await using var q = store.QuerySession();
+        Assert.Equal(0, await q.Query<Page>().CountAsync(TestContext.Current.CancellationToken));
+        Assert.Empty(await AuditRows(store));
+    }
+
+    [Fact]
+    public async Task PG3_Create_RootSlugCollision_Throws()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        // The (ParentId, Slug) unique index does NOT prevent two roots sharing
+        // a slug (Postgres treats NULLs as distinct) — CreateAsync is the
+        // authoritative root-slug guard.
+        await Plant(store, new Page { Id = "pg3-c-root-1", Slug = "dup", Title = "R1", Body = "b" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.CreateAsync(new Page { Slug = "dup", Title = "R2", Body = "b" },
+                "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    [Fact]
+    public async Task PG3_Create_NormalizesNullImageAndAttachmentIds()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        // The caller (Web layer) parses the body into ImageIds/AttachmentIds
+        // (ADR 0025/0034) and sets them on the POCO; Core persists them
+        // verbatim (?? []). The POCO's non-null default [] round-trips through
+        // CreateAsync — verify the fields are non-null and stable after save.
+        var page = new Page { Slug = "c-img", Title = "T", Body = "b" };   // default ImageIds/AttachmentIds = []
+
+        await using var session = newSession(store);
+        var saved = await svc.CreateAsync(page, "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.NotNull(saved.ImageIds);
+        Assert.NotNull(saved.AttachmentIds);
+        Assert.Empty(saved.ImageIds);
+        Assert.Empty(saved.AttachmentIds);
+    }
+
+    // ─── 10.2 — UpdateAsync ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task PG3_Update_ByAuthor_Persists_WithOwnerAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-auth", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-author" });
+
+        await using var session = newSession(store);
+        var saved = await svc.UpdateAsync(
+            new Page { Id = "pg3-u-auth", Slug = "u", Title = "New", Body = "nb" },
+            "u-author", RolesSet(Roles.Member), session);
+
+        Assert.Equal("New", saved.Title);
+        Assert.NotNull(saved.Modified);
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pg3-u-auth" && a.Action == "page.update");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    [Fact]
+    public async Task PG3_Update_ByGlobalAdmin_Allows_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-ga", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await svc.UpdateAsync(
+            new Page { Id = "pg3-u-ga", Slug = "u", Title = "New", Body = "nb" },
+            "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Admin,
+            (await AuditsFor(store, "pg3-u-ga", "page.update")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Update_ByCommunityModerator_Allows_WithModeratorAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page
+        { Id = "pg3-u-mod", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-someone", ComponentId = "comp-u" });
+
+        await using var session = newSession(store);
+        await svc.UpdateAsync(
+            new Page { Id = "pg3-u-mod", Slug = "u", Title = "New", Body = "nb" },
+            "u-mod-u", RolesSet(Roles.ModeratorComponent("comp-u")), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Moderator,
+            (await AuditsFor(store, "pg3-u-mod", "page.update")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Update_ByNonAuthorMember_Denied()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-den", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateAsync(new Page { Id = "pg3-u-den", Slug = "u", Title = "X", Body = "nb" },
+                "u-member", RolesSet(Roles.Member), session));
+    }
+
+    [Fact]
+    public async Task PG3_Update_MissingPage_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.UpdateAsync(new Page { Id = "pg3-u-miss", Title = "X", Body = "nb" },
+                "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    // ─── 10.3 — PublishAsync (ADR 0037 author-only pin) ────────────────────
+
+    [Fact]
+    public async Task PG3_Publish_ByAuthor_ClearsDraft_WithOwnerAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-p-auth", Slug = "p", Title = "T", Body = "b", AuthorId = "u-author", IsDraft = true });
+
+        await using var session = newSession(store);
+        var saved = await svc.PublishAsync("pg3-p-auth", "u-author", session);
+
+        Assert.False(saved.IsDraft);
+        Assert.NotNull(saved.Modified);
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pg3-p-auth" && a.Action == "page.publish");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Owner, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+    }
+
+    [Fact]
+    public async Task PG3_Publish_ByGlobalAdmin_Denied_Adr0037Pin()
+    {
+        // ADR 0037 author-only: a GlobalAdmin CANNOT publish someone else's
+        // draft — publishing is the author's choice, not an admin's lever.
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-p-ga", Slug = "p", Title = "T", Body = "b", AuthorId = "u-author", IsDraft = true });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.PublishAsync("pg3-p-ga", "u-admin", session));
+
+        Assert.Empty(await AuditRows(store));
+    }
+
+    [Fact]
+    public async Task PG3_Publish_ByModerator_Denied()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page
+        { Id = "pg3-p-mod", Slug = "p", Title = "T", Body = "b", AuthorId = "u-author", IsDraft = true, ComponentId = "comp-p" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.PublishAsync("pg3-p-mod", "u-mod-p", session));
+    }
+
+    [Fact]
+    public async Task PG3_Publish_AlreadyLive_Idempotent_NoModifiedStamp()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var initial = DateTimeOffset.UtcNow.AddDays(-1);
+        await Plant(store, new Page { Id = "pg3-p-idem", Slug = "p", Title = "T", Body = "b", AuthorId = "u-author", IsDraft = false, Modified = initial });
+
+        await using var session = newSession(store);
+        var saved = await svc.PublishAsync("pg3-p-idem", "u-author", session);
+
+        // Idempotent — a second publish on an already-live page does not stamp Modified.
+        Assert.Equal(initial, saved.Modified);
+    }
+
+    // ─── 10.4 — MoveAsync (admin/mod only; cycle-guard + depth-cap) ────────
+
+    [Fact]
+    public async Task PG3_Move_ByGlobalAdmin_ReparsesPath_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-m-root", Slug = "root", Title = "R", Body = "b" });
+        await Plant(store, new Page { Id = "pg3-m-child", Slug = "child", ParentId = "pg3-m-root", Title = "C", Body = "b" });
+
+        // Move the child to be a root (newParentId null).
+        await using var session = newSession(store);
+        var saved = await svc.MoveAsync("pg3-m-child", null, null, "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.Null(saved.ParentId);
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pg3-m-child" && a.Action == "page.move");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+    }
+
+    [Fact]
+    public async Task PG3_Move_ByAuthor_Denied_NotAuthorLane()
+    {
+        // §3.7: move is admin/moderator-scoped, NOT a plain author (a page is
+        // platform content, not a personal note). Even the author is denied.
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-m-auth", Slug = "m", Title = "T", Body = "b", AuthorId = "u-author" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.MoveAsync("pg3-m-auth", null, "m2", "u-author", RolesSet(Roles.Member), session));
+    }
+
+    [Fact]
+    public async Task PG3_Move_ByCommunityModerator_Allows_WithModeratorAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page
+        { Id = "pg3-m-mod", Slug = "m", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-m" });
+
+        await using var session = newSession(store);
+        await svc.MoveAsync("pg3-m-mod", null, "m2", "u-mod-m", RolesSet(Roles.ModeratorComponent("comp-m")), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Moderator,
+            (await AuditsFor(store, "pg3-m-mod", "page.move")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Move_UnderDescendant_CycleGuardThrows()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await PlantChainAsync(store, depth: 3, rootId: "pg3-cyc");   // a→b→c
+
+        // Moving a under c (a's own descendant) is a cycle.
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.MoveAsync("pg3-cyc-a", "pg3-cyc-c", null, "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    [Fact]
+    public async Task PG3_Move_UnderDepthEight_Throws_DepthCap()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await PlantChainAsync(store, depth: 8, rootId: "pg3-dep");   // a..h, h is depth 8
+        await Plant(store, new Page { Id = "pg3-dep-x", Slug = "x", Title = "X", Body = "b" });   // a separate root
+
+        // Moving x under h (depth 8) would make it depth 9 — exceeds MaxDepth (8).
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.MoveAsync("pg3-dep-x", "pg3-dep-h", null, "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    // ─── 10.5 — DeleteAsync (soft-delete; admin/mod only) ─────────────────
+
+    [Fact]
+    public async Task PG3_Delete_ByGlobalAdmin_SoftDeletes_HiddenFromRead()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-d-ga", Slug = "d", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await svc.DeleteAsync("pg3-d-ga", "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        // The row is NOT removed — it is soft-deleted (IsDeleted = true).
+        await using var q = store.QuerySession();
+        var stored = await q.LoadAsync<Page>("pg3-d-ga", TestContext.Current.CancellationToken);
+        Assert.NotNull(stored);
+        Assert.True(stored!.IsDeleted);
+
+        // And it is hidden from the read lanes (U02's IsDeleted filter).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetByPathAsync("d"));
+        Assert.DoesNotContain(await svc.GetTreeAsync(), p => p.Id == "pg3-d-ga");
+
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pg3-d-ga" && a.Action == "page.delete");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+    }
+
+    [Fact]
+    public async Task PG3_Delete_ByAuthor_Denied_NotAuthorLane()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-d-auth", Slug = "d", Title = "T", Body = "b", AuthorId = "u-author" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteAsync("pg3-d-auth", "u-author", RolesSet(Roles.Member), session));
+
+        // Nothing changed — the page is still live.
+        await using var q = store.QuerySession();
+        Assert.False((await q.LoadAsync<Page>("pg3-d-auth", TestContext.Current.CancellationToken))!.IsDeleted);
+    }
+
+    [Fact]
+    public async Task PG3_Delete_ByCommunityModerator_Allows_WithModeratorAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page
+        { Id = "pg3-d-mod", Slug = "d", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-d" });
+
+        await using var session = newSession(store);
+        await svc.DeleteAsync("pg3-d-mod", "u-mod-d", RolesSet(Roles.ModeratorComponent("comp-d")), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Moderator,
+            (await AuditsFor(store, "pg3-d-mod", "page.delete")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Delete_MissingPage_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.DeleteAsync("pg3-d-miss", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    // ─── 10.6 — AddTranslationAsync (standing + add-only + audit) ─────────
+
+    [Fact]
+    public async Task PG3_Translate_ByGlobalAdmin_Persists_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-t-ga", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        var saved = await svc.AddTranslationAsync("pg3-t-ga", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.Equal("pg3-t-ga", saved.PageId);
+        Assert.Equal("fr", saved.LanguageCode);
+        var audits = await AuditRows(store);
+        var row = Assert.Single(audits, a => a.TargetId == "pg3-t-ga" && a.Action == "page.translation.add");
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+    }
+
+    [Fact]
+    public async Task PG3_Translate_ByTranslator_Persists_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-t-tr", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await svc.AddTranslationAsync("pg3-t-tr", "de", "T", "Körper", "u-translator", RolesSet(Roles.Translator), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Admin,
+            (await AuditsFor(store, "pg3-t-tr", "page.translation.add")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Translate_ByCommunityModerator_Persists_WithModeratorAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page
+        { Id = "pg3-t-mod", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = "comp-t" });
+
+        await using var session = newSession(store);
+        await svc.AddTranslationAsync("pg3-t-mod", "es", "T", "Cuerpo",
+            "u-mod-t", RolesSet(Roles.ModeratorComponent("comp-t")), session);
+
+        var audits = await AuditRows(store);
+        Assert.Equal(AccessVia.Moderator,
+            (await AuditsFor(store, "pg3-t-mod", "page.translation.add")).Single().Via);
+    }
+
+    [Fact]
+    public async Task PG3_Translate_ByPlainMember_Denied()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-t-mem", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddTranslationAsync("pg3-t-mem", "fr", "T", "Corps", "u-member", RolesSet(Roles.Member), session));
+
+        Assert.Empty(await AuditRows(store));
+    }
+
+    [Fact]
+    public async Task PG3_Translate_FlatPage_ModeratorOfOtherComp_Denied()
+    {
+        // A flat/public page has no community to moderate — the component-
+        // moderator standing does not qualify; only GlobalAdmin / Translator.
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-t-flat", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone", ComponentId = null });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddTranslationAsync("pg3-t-flat", "fr", "T", "Corps",
+                "u-mod", RolesSet(Roles.ModeratorComponent("comp-other")), session));
+    }
+
+    [Fact]
+    public async Task PG3_Translate_DuplicateLanguage_UseIndexToReject()
+    {
+        // The (PageId, LanguageCode) unique index is the add-only duplicate
+        // guard: a second add of the same (page, language) is rejected by the
+        // DB (Marten wraps it in a Postgres exception).
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-t-dup", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using (var session = newSession(store))
+        {
+            await svc.AddTranslationAsync("pg3-t-dup", "fr", "T1", "Corps 1", "u-admin", RolesSet(Roles.GlobalAdmin), session);
+        }
+        await using var session2 = newSession(store);
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            svc.AddTranslationAsync("pg3-t-dup", "fr", "T2", "Corps 2", "u-admin", RolesSet(Roles.GlobalAdmin), session2));
+    }
+
+    [Fact]
+    public async Task PG3_Translate_MissingPage_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.AddTranslationAsync("pg3-t-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page doc types) and
@@ -719,4 +1234,32 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     private static HashSet<string> RolesSet(params string[] roles) => roles.ToHashSet();
+
+    /// <summary>Open the caller's in-flight write session (the C3 shape the
+    /// write lanes commit into — the <c>AnnouncementServiceTests.newSession</c>
+    /// shape, reused).</summary>
+    private static IDocumentSession newSession(IDocumentStore store)
+        => store.OpenSession(new Marten.Services.SessionOptions());
+
+    /// <summary>All <see cref="AccessAudit"/> rows in the store (the
+    /// <c>AnnouncementServiceTests.AuditRows</c> shape, reused).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> AuditRows(IDocumentStore store)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<AccessAudit>().ToListAsync(ct);
+    }
+
+    /// <summary>The <see cref="AccessAudit"/> rows for one (target, action)
+    /// pair — the "assert the audit-row shape" helper (the audit-row
+    /// Action/TargetKind/Via shape pin, asserted on every lane).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> AuditsFor(
+        IDocumentStore store, string targetId, string action)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var s = store.QuerySession();
+        return await s.Query<AccessAudit>()
+            .Where(a => a.TargetId == targetId && a.Action == action)
+            .ToListAsync(ct);
+    }
 }
