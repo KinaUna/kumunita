@@ -34,6 +34,7 @@ public static class Milestones
         new("GU", "Guardian controls — a parent adds a child's account and supervises it at the account level (suspend, communities/groups, invitation approval); no standing to read the child's private content (ADR 0028)", StatusDone),
         new("GA", "Guardian assignment — an existing guardian assigns a second guardian to a child's account (email-driven; one IIdentityService ADD + one GuardianController action + the Detail view's assign form + ADR 0038)", StatusDone),
         new("RE", "Rich editor — a WYSIWYG split-view + Markdown-splice toolbar over the RC Markdown lane; tsc-only, no editor dependency (ADR 0031)", StatusDone),
+        new("PG", "Pages — a hierarchical, audience-restricted, translatable knowledge tree (a `Page` + `PageTranslation` doc; reuses the `Audience` doc, the frozen `IAuthorizationService` via a `PageToAuditableResource` adapter, the ADR 0022/0027/0029 translation lane, the ADR 0025/0031/0033 WYSIWYG editor; a `MountPoint` string for UI slots; absorbs and retires the `LocalizedPage` static-page lane; the `PG` named lane; ADR 0039)", StatusPlanned),
         new("M4", "Events, RSVPs & reminders", StatusNext),
         new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),
