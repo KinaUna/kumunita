@@ -150,3 +150,11 @@
   `NormalizeName`).
 - **Drift pauses:** none (all 3 tests are exactly the design-doc pinned
   names; no test added beyond the pinned set).
+
+## U04 — VMs
+
+- **`GuardianItem` record (fields, verbatim):** `public sealed record GuardianItem(string SubjectId, string DisplayName);` — the `ChildAccountItem` shape mirrored (placed directly after `ChildAccountItem`, before `PendingInvitationItem`).
+- **`AssignGuardianForm` field (verbatim):** `public string? Email { get; set; }` with `[Required, EmailAddress, MaxLength(255)]` + `[Display(Name = "Email of the guardian to assign")]` — the single-field form, placed after `AddChildForm`.
+- **`MembershipEditorModel` new field (verbatim, LAST):** `IReadOnlyList<GuardianItem> GuardianItems` — appended as the 5th and final parameter in the record's parameter list, after `PendingInvitations`.
+- **Existing `MembershipEditorModel` fields untouched:** `ChildId`, `GroupIds`, `CommunityIds`, `PendingInvitations` are byte-identical and in their original order.
+- **Build status (U05 to pick up):** `dotnet build Kumunita.slnx -c Debug` is **red for exactly one line** — `GuardianController.cs(107,25) error CS7036: no argument for required parameter 'GuardianItems'`. This is the U05-owned `Detail` action's construction site (the register: "The `Detail` action's `MembershipEditorModel` construction **(U05)** gains the `GuardianItems` argument"). I did **not** add a default value to force it to compile — that would deviate from the pinned contract's exact C# (a drift pause). `GuardianViewModels.cs` itself compiles clean; U05 must add the `GuardianItems` argument to the `Detail` construction to close the loop. No compile **warnings**.

@@ -21,6 +21,18 @@ namespace Kumunita.Web.Models;
 public sealed record ChildAccountItem(string ChildId, string DisplayName, bool Blocked);
 
 /// <summary>
+/// One <b>assigned guardian row</b> on the child's <c>Detail</c> "other
+/// guardians" list (GA, ADR 0038). The <see cref="ChildAccountItem"/> shape
+/// mirrored: <see cref="SubjectId"/> is the assigned guardian's
+/// <see cref="Kumunita.Core.UserInfo.Profile.SubjectId"/>; <see
+/// cref="DisplayName"/> is resolved via <see
+/// cref="Kumunita.Core.UserInfo.IUserInfoService.GetProfileAsync"/> (a read,
+/// not a decision; G-A·3 — the assigned guardian's standing is identical in
+/// kind to the creator's, no content read).
+/// </summary>
+public sealed record GuardianItem(string SubjectId, string DisplayName);
+
+/// <summary>
 /// One <b>pending group invitation row</b> on the child's <c>Detail</c> curation
 /// view (GU, ADR 0028). <see cref="GroupId"/> is the route's <c>{groupId}</c> the
 /// approve POST posts to; <see cref="GroupName"/> is the display label (resolved
@@ -47,7 +59,8 @@ public sealed record MembershipEditorModel(
     string ChildId,
     IReadOnlyList<string> GroupIds,
     IReadOnlyList<string> CommunityIds,
-    IReadOnlyList<PendingInvitationItem> PendingInvitations);
+    IReadOnlyList<PendingInvitationItem> PendingInvitations,
+    IReadOnlyList<GuardianItem> GuardianItems);
 
 /// <summary>
 /// The <b>add-a-child</b> form model (GU, ADR 0028) bound via <c>[FromForm]</c> on
@@ -72,4 +85,23 @@ public sealed class AddChildForm
     [Required, DataType(DataType.Password), MinLength(8)]
     [Display(Name = "Password")]
     public string? Password { get; set; }
+}
+
+/// <summary>
+/// GA (ADR 0038): the assign-a-second-guardian form model, bound
+/// via <c>[FromForm]</c> on <c>GuardianController.Assign</c>.
+/// The <b>assigned guardian</b> is never form-bound beyond the
+/// email (the email is the one external identifier; the
+/// <c>FindSubjectByEmailAsync</c> seam resolves it to a
+/// subject id). The <b>assigning guardian</b> is never form-bound
+/// — it is minted by the Web layer from
+/// <c>KumunitaPrincipal.SubjectId(User)</c> (the single identity
+/// source, the <c>AddChildForm</c> precedent). The <b>child</b>
+/// is the route's <c>{childId}</c>.
+/// </summary>
+public sealed class AssignGuardianForm
+{
+    [Required, EmailAddress, MaxLength(255)]
+    [Display(Name = "Email of the guardian to assign")]
+    public string? Email { get; set; }
 }
