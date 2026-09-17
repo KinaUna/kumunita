@@ -128,5 +128,54 @@
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-danger">Dissolve guardianship</button>
         </form>
+
+        @*
+            GA (ADR 0038) — the "other guardians" list: the child's active
+            GuardianLink rows (not the guardian's child rows — the
+            ActiveChildrenAsync read inverted), each resolved to a
+            display name via the existing GetProfileAsync (a read, not a
+            decision; G-A·3 — the assigned guardian's standing is
+            identical in kind to the creator's). The list is the
+            standing itself — a non-guardian's page is a 404 (the
+            Detail route already gates on ActiveLinkAsync).
+        *@
+        <h2 class="mt-4"><kw-l key="guardian.otherGuardians.title">Other guardians</kw-l></h2>
+        @if (Model.GuardianItems.Count == 0)
+        {
+            <div class="alert alert-info"><kw-l key="guardian.otherGuardians.empty">No other guardians assigned.</kw-l></div>
+        }
+        else
+        {
+            <ul class="list-group mb-3">
+                @foreach (var g in Model.GuardianItems)
+                {
+                    <li class="list-group-item">@g.DisplayName</li>
+                }
+            </ul>
+        }
+
+        @*
+            GA (ADR 0038) — the assign form: a single email field +
+            submit. The form is NOT bound to the child or the guardian
+            (both come from the route + the cookie principal — the
+            AddChildForm precedent). The POST is the one-commit write
+            (G-A·1 standing gate + G-A·2 resolution + G-A·4 idempotency +
+            G-A·5 self-assignment refusal + the CreateGuardianLinkAsync
+            call). The field posts as name="Email" (this view's @model is
+            MembershipEditorModel, so the pinned markup's asp-for="Email"
+            is uncompilable here — see the U06 drift pause); the Assign
+            action's [FromForm] AssignGuardianForm binds the "Email" post
+            field, exactly as the design doc's prose note pins.
+        *@
+        <h2 class="mt-4"><kw-l key="guardian.assign.title">Assign a guardian</kw-l></h2>
+        <form method="post" action="@Url.Action("Assign", "Guardian", new { childId = Model.ChildId })">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="All" class="text-danger mb-3"></div>
+            <div class="mb-3">
+                <label for="assignEmail" class="form-label"><kw-l key="guardian.assign.email">Email of the guardian to assign</kw-l></label>
+                <input name="Email" id="assignEmail" class="form-control" />
+            </div>
+            <button type="submit" class="btn btn-primary"><kw-l key="guardian.assign.submit">Assign</kw-l></button>
+        </form>
     </div>
 </div>

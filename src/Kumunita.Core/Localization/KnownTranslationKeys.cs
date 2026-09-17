@@ -88,6 +88,16 @@ public static class KnownTranslationKeys
             ["guardian.add"]          = "Add a child account",
             ["guardian.manage_title"] = "Manage a child account",
 
+            // ── guardian assignment (GA ADR 0038) ──
+            ["guardian.otherGuardians.title"] = "Other guardians",
+            ["guardian.otherGuardians.empty"] = "No other guardians assigned.",
+            ["guardian.assign.title"]        = "Assign a guardian",
+            ["guardian.assign.email"]        = "Email of the guardian to assign",
+            ["guardian.assign.submit"]       = "Assign",
+            ["guardian.assign.noAccount"]    = "No account with that email.",
+            ["guardian.assign.self"]         = "You are already this child's guardian.",
+            ["guardian.assign.success"]      = "Guardian assigned.",
+
             // ── footer (the shared footer, _Layout) ─────────────────────────
             ["footer.tagline"]  =
                 "A private home for one neighborhood — the feed, the groups and the pinned notes. " +
