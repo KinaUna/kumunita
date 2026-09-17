@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
@@ -1121,6 +1122,114 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await using var session = newSession(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.AddTranslationAsync("pg3-t-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    // ─── PG U05 (ADR 0039 §3.9) — the seeder's Page docs ─────────────────────
+    //
+    // The seeder seeds the new Page docs for the canonical default pages (terms +
+    // help), straight into the caller's IDocumentSession, idempotently. The
+    // seeder's Page-upsert is a public static (SeedDefaultPagesAsync) + a public
+    // page-data source (EnDefaultPages), so these tests pin idempotency + the
+    // exact set across two live sessions (boot twice, no duplicate roots) and
+    // the U05 drift pin (no `about` root is seeded — the /about product-story
+    // view stays authoritative on a fresh instance).
+
+    [Fact]
+    public async Task PG5_Seeder_TermsAndHelp_AreRootPages_NoDuplicates_AcrossTwoBoots()
+    {
+        var store = await BootStoreAsync();
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Boot 1 — seed into one session, commit.
+        await using (var s1 = newSession(store))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(s1, defaultPages, DateTimeOffset.UtcNow, ct);
+            await s1.SaveChangesAsync(ct);
+        }
+
+        // Boot 2 — a second seed into a SECOND session must NOT create new roots
+        // (idempotent refresh, not a duplicate), per (Slug, ParentId == null).
+        await using (var s2 = newSession(store))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(s2, defaultPages, DateTimeOffset.UtcNow, ct);
+            await s2.SaveChangesAsync(ct);
+        }
+
+        // Exactly the seeded slugs, each exactly once, all roots (ParentId null).
+        await using var q = store.QuerySession();
+        var roots = await q.Query<Page>()
+            .Where(p => p.ParentId == null)
+            .ToListAsync(ct);
+
+        // The seeded set is terms + help (the EnDefaultPages closed set).
+        Assert.Equal(new[] { "help", "terms" },
+            roots.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
+
+        // Exactly one root per slug (no duplicate from the second boot).
+        Assert.Equal(2, roots.Count);
+        Assert.Equal(1, roots.Count(p => p.Slug == "terms"));
+        Assert.Equal(1, roots.Count(p => p.Slug == "help"));
+    }
+
+    [Fact]
+    public async Task PG5_Seeder_About_IsNotSeeded_ProductStoryStaysAuthoritative()
+    {
+        var store = await BootStoreAsync();
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var ct = TestContext.Current.CancellationToken;
+
+        await using (var s = newSession(store))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+            await s.SaveChangesAsync(ct);
+        }
+
+        // The U05 drift pin: `about` is deliberately absent from the seeded set —
+        // a fresh /about is the full-bleed product-story view (not a Markdown
+        // page), so the seeder never writes an `about` root Page.
+        await using var q = store.QuerySession();
+        var aboutRoots = await q.Query<Page>()
+            .Where(p => p.Slug == "about" && p.ParentId == null)
+            .CountAsync(ct);
+
+        Assert.Equal(0, aboutRoots);
+    }
+
+    [Fact]
+    public async Task PG5_Seeder_SeededPages_ArePublic_AudienceNull_LanguageEn_EmptyAuthor()
+    {
+        var store = await BootStoreAsync();
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var ct = TestContext.Current.CancellationToken;
+
+        await using (var s = newSession(store))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+            await s.SaveChangesAsync(ct);
+        }
+
+        await using var q = store.QuerySession();
+        var terms = await q.Query<Page>()
+            .Where(p => p.Slug == "terms" && p.ParentId == null)
+            .FirstAsync(ct);
+
+        // The seeded page's shape: public (Audience null — the one place pages
+        // differ from posts, ADR 0039 §3.4), authored-in `en` (the seeder's
+        // source language), a root (ParentId null), platform content (no
+        // resident author — AuthorId empty), not a draft / not deleted.
+        Assert.Null(terms.Audience);
+        Assert.Equal(FirstBootSeeder.SourceLanguage, terms.LanguageCode);
+        Assert.Null(terms.ParentId);
+        Assert.Equal(string.Empty, terms.AuthorId);
+        Assert.False(terms.IsDraft);
+        Assert.False(terms.IsDeleted);
+        // Body + title carried verbatim (the byte-identical gate: the same text
+        // the legacy LocalizedPage row carries, so /terms renders identically
+        // whether read from the old store or the new tree).
+        var expected = defaultPages.Single(p => p.Slug == "terms");
+        Assert.Equal(expected.Body, terms.Body);
+        Assert.Equal(expected.Title, terms.Title);
     }
 
     // ─── Shared helpers ─────────────────────────────────────────────────────

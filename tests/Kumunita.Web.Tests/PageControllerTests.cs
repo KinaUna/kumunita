@@ -153,6 +153,82 @@ public class PageControllerTests
         Assert.IsType<ForbidResult>(result);
     }
 
+    // ── PG U05 (ADR 0039 §3.9) — reference-from-UGC: a link in an authorized
+    //    post does NOT imply the target page is authorized ─────────────────
+    //
+    // The link is free (MarkdownRenderer + IsSafeUrl render [About](/pages/about)
+    // as an <a>), but opening /pages/about is a separate
+    // IAuthorizationService.CanAsync(Read) decision — this test pins that the
+    // "link present" half and the "target allowed/denied" half are decoupled.
+
+    /// <summary>
+    /// A <c>[About](/pages/about)</c> link in an **authorized** post's body
+    /// renders as a live <c>&lt;a href="/pages/about"&gt;</c> (the frozen
+    /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/> +
+    /// <see cref="IsSafeUrl"/> allow relative paths) — the link's PRESENCE is
+    /// free and does not depend on the target's <c>Audience</c>. This is the
+    /// "reference-from-UGC" half of PG U05: confirm the existing rendering,
+    /// don't re-implement it.
+    /// </summary>
+    [Fact]
+    public async Task PG5_ReferenceFromUgc_LinkInAuthorizedPost_RendersFree()
+    {
+        // The frozen renderer: a relative target is a safe URL → a live link.
+        // This is exactly what an authorized post body containing the link
+        // produces (the posts view renders via this same single renderer).
+        var html = MarkdownRenderer.RenderHtml("See [About](/pages/about) for more.");
+
+        Assert.Contains("<a href=\"/pages/about\">About</a>", html);
+        // The surrounding text is preserved (the link is inline, not a
+        // whole-block rewrite) — the post body is otherwise untouched.
+        Assert.Contains("See ", html);
+        Assert.Contains("for more.", html);
+    }
+
+    /// <summary>
+    /// The **target** page being denied is a SEPARATE <c>Read</c> decision from
+    /// the link's presence: a caller who can read an authorized post containing
+    /// a link to a page they are denied opens <c>/pages/about</c> and gets a
+    /// <see cref="ForbidResult"/> (403) — NOT the link silently 404-ing, and
+    /// NOT the link's presence leaking the target. The pin: "I can see a link
+    /// to it" ≠ "I am allowed to open it" (ADR 0039 §3.8's 404-vs-403 split,
+    /// applied to the from-UGC reference path).
+    /// </summary>
+    [Fact]
+    public async Task PG5_ReferenceFromUgc_LinkPresentButTargetDenied_Forbid_NotAllowed()
+    {
+        var page = new Page
+        {
+            Id = "page-target-001",
+            Slug = "about",
+            Title = "About (denied)",
+            Body = "member-only about page",
+            AuthorId = "someone-else",
+            Audience = new Kumunita.Core.Authorization.Audience
+            {
+                Mode = AudienceMode.Any,
+                Grants = new List<AudienceGrant> { new AudienceGrant(GrantKind.User, "some-grant") }
+            },
+            IsDraft = false,
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("about").Returns(page);
+
+        // The target's Read decision denies THIS actor (the separate decision
+        // the link's presence never makes).
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync("subj-resident-001", Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: false, Via: AccessVia.Audience, EffectivePrincipalId: "subj-resident-001"));
+
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var result = await controller.Show("about");
+
+        // Denied → 403 (the page exists and a decision ran; distinct from the
+        // absent 404, and from "the link rendered" which is a different surface).
+        Assert.IsType<ForbidResult>(result);
+    }
+
     /// <summary>
     /// <see cref="PageController.Show"/> on a <em>draft</em> page the caller
     /// did NOT author is a <see cref="ForbidResult"/> — the draft gate is

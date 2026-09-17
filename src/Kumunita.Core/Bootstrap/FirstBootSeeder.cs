@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -40,9 +41,15 @@ namespace Kumunita.Core.Bootstrap;
 /// <li><b>Canonical <c>en</c> UI strings + pages</b> (ML-UI U1, D2): the closed set
 /// in <see cref="Localization.KnownTranslationKeys"/> materialized as <c>en</c>
 /// <c>TranslationResource</c> rows, plus the <c>en</c> <c>terms</c> / <c>help</c>
-/// <c>LocalizedPage</c> rows. Code-wins upsert for <c>en</c> only (never touches a
-/// non-<c>en</c> row); <c>about</c> is intentionally not seeded. Makes the M·9
-/// <c>en</c> floor and the M·12 completeness view real on first boot.</li>
+/// <c>LocalizedPage</c> rows <em>and</em> the new <see cref="Kumunita.Core
+/// .Pages.Page"/> docs (PG U05, ADR 0039 §3.9 — the absorb: the same <c>en</c>
+/// bodies on the new
+/// <c>Page</c> surface, so <c>/terms</c> / <c>/help</c> are byte-identical to
+/// today whether read from the old store or the new tree). Code-wins upsert
+/// for <c>en</c> only (never touches a non-<c>en</c> row); <c>about</c> is
+/// intentionally not seeded (a fresh <c>/about</c> is the product-story view,
+/// not a Markdown page). Makes the M·9 <c>en</c> floor and the M·12
+/// completeness view real on first boot.</li>
 /// <li><b>First-boot setup email</b> to the seed admin (OPS §2 handoff — staged on
 /// the session, dispatched by the durable handler in M1 step 7). Honors absence:
 /// no seed admin ⇒ no email (the lane is skipped end-to-end).</li>
@@ -354,34 +361,7 @@ public static class FirstBootSeeder
         // (Slug, "en")). `about` is deliberately NOT seeded — a fresh instance's
         // /about keeps its product-story view, and an admin can create an
         // `about` page at runtime (the seeder never writes it).
-        var enPages = new (string Slug, string Title, string Body)[]
-        {
-            ("terms", "Terms",
-             "## Terms of use\n\n" +
-             "Kumunita is a self-hosted platform for one neighborhood. As its operator, " +
-             "you are responsible for how your community uses it: who joins, what they " +
-             "post, and how you moderate it.\n\n" +
-             "- **Residency is by design.** The platform assumes a single, bounded " +
-             "neighborhood — not a public feed.\n" +
-             "- **Audiences are chosen by the author.** Every post carries the audience " +
-             "its author picked; the platform enforces it.\n" +
-             "- **You own your data.** The database and the uploaded files are yours to " +
-             "back up, migrate, and retire.\n"),
-            ("help", "Help",
-             "## Getting started\n\n" +
-             "Kumunita is a private home for one neighborhood — the feed, the groups, " +
-             "and the pinned notes.\n\n" +
-             "- **Post** to a community feed and choose who can see it (an individual, a " +
-             "group, or everyone in the neighborhood).\n" +
-             "- **Groups** let you organize residents around a building, a project, or a " +
-             "shared interest.\n" +
-             "- **Directory** shows the residents on the platform and the details each " +
-             "has chosen to share.\n" +
-             "- **Moderation** lets a global admin (and, where granted, a moderator) " +
-             "keep the feed a safe place.\n\n" +
-             "Need help with the instance itself? That's an operator concern — see the " +
-             "self-hosted documentation linked in the footer.\n"),
-        };
+        var enPages = EnDefaultPages();
         foreach (var (slug, title, body) in enPages)
         {
             var existing = await session
@@ -411,12 +391,146 @@ public static class FirstBootSeeder
             }
         }
 
+        // PG U05 (ADR 0039 §3.9): the **new** `Page` docs for the seeded
+        // default pages — the same `en` terms/help bodies as the `LocalizedPage`
+        // rows above, so a fresh instance is byte-identical to today for
+        // /terms and /help whether read from the old store (the
+        // `StaticPagesController` fallback, retired in U07) or the new tree
+        // (`StaticPagesController` reading `IPageService.GetByPathAsync`).
+        // `about` is deliberately NOT seeded here either (the drift pin): a
+        // fresh instance's /about is the full-bleed product-story view, not a
+        // Markdown page — see EnDefaultPages()'s doc comment.
+        //
+        // Same session, same single SaveChangesAsync below — the new `Page`
+        // docs and the legacy `LocalizedPage` rows commit atomically (one
+        // store transition, not two). Extracted to a public static so the
+        // Core test can pin idempotency across two sessions (boot twice, no
+        // duplicate root pages).
+        await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         logger.LogInformation(
-            "First boot: canonical `en` UI strings seeded ({Keys} keys) + `en` terms/help pages " +
-            "({Pages} pages); `about` is not seeded (admin-created at runtime).",
-            KnownTranslationKeys.EnValues.Count, enPages.Length);
+            "First boot: canonical `en` UI strings seeded ({0} keys) + `en` terms/help pages " +
+            "({1} LocalizedPage rows, {2} Page docs); `about` is not seeded (admin-created at runtime).",
+            KnownTranslationKeys.EnValues.Count, enPages.Length, enPages.Length);
+    }
+
+    /// <summary>
+    /// PG U05 (ADR 0039 §3.9) — seed the **new** <see cref="Page"/> docs for
+    /// the canonical default pages, into the **caller's** in-flight
+    /// <see cref="IDocumentSession"/> (the C3 invariant: same session as the
+    /// caller's other writes, so it commits in the caller's single
+    /// <c>SaveChangesAsync</c>). Idempotent: a root page (a
+    /// <see cref="Page.ParentId"/> of <c>null</c>) with the same slug is
+    /// refreshed in place (<c>Title</c>/<c>Body</c>), never duplicated — so
+    /// booting twice (or a warm re-run) yields exactly the same set of root
+    /// <c>Page</c> docs.
+    /// <para>
+    /// Each seeded page is <see cref="Page.Audience"/> = <c>null</c> (public —
+    /// the one place pages deliberately differ from posts, ADR 0039 §3.4),
+    /// <see cref="Page.LanguageCode"/> = <c>en</c> (the
+    /// <see cref="SourceLanguage"/>), a root node (<see cref="Page.ParentId"/>
+    /// = <c>null</c>), and <see cref="Page.AuthorId"/> empty (platform content
+    /// — no resident author). It does NOT touch the legacy
+    /// <see cref="LocalizedPage"/> rows (the caller seeds those separately in
+    /// the same session) and does NOT seed <c>about</c> (the U05 drift pin —
+    /// a fresh <c>/about</c> is the product-story view, not a Markdown page).
+    /// </para>
+    /// <para>
+    /// Public (not internal) so the Core test can pin idempotency + the
+    /// exact set across two live sessions without an
+    /// <c>InternalsVisibleTo</c> (the repo's Core test constraint — only
+    /// <c>public</c> members are reachable).
+    /// </para>
+    /// </summary>
+    public static async Task SeedDefaultPagesAsync(
+        IDocumentSession session,
+        IReadOnlyList<(string Slug, string Title, string Body)> defaultPages,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        foreach (var (slug, title, body) in defaultPages)
+        {
+            var existingPage = await session
+                .Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == null)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existingPage is null)
+            {
+                session.Store(new Page
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Slug = slug,
+                    ParentId = null,   // a root node (the forest is a forest — no mandatory root)
+                    Title = title,
+                    Body = body,
+                    LanguageCode = SourceLanguage,
+                    Audience = null,    // public (the one place pages differ from posts, ADR 0039 §3.4)
+                    AuthorId = string.Empty,   // platform content — no resident author
+                    Created = now,
+                });
+            }
+            else
+            {
+                existingPage.Title = title;
+                existingPage.Body = body;   // code wins: refresh the `en` page body
+                session.Store(existingPage);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The canonical <c>en</c> default-page bodies (terms + help). The single
+    /// source of the seed text: both the legacy <see cref="LocalizedPage"/>
+    /// rows and the new <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05,
+    /// ADR 0039 §3.9) carry <em>exactly</em> this text, so a fresh instance is
+    /// byte-identical to today for <c>/terms</c> and <c>/help</c> whether read
+    /// from the old store or the new tree.
+    /// <para>
+    /// <b><c>about</c> is deliberately absent</b> (the U05 drift pin): a fresh
+    /// instance's <c>/about</c> is the <em>full-bleed product-story view</em>
+    /// (<c>Views/StaticPages/About</c>, driven by <c>HomeViewModel</c>), not a
+    /// Markdown body. Seeding an <c>about</c> <see cref="Kumunita.Core
+    /// .Pages.Page"/> would change what <c>/about</c> renders and break the
+    /// "byte-identical to today" exit gate — so the seeder never writes it and
+    /// the <c>StaticPagesController</c> keeps its product-story fallback. This
+    /// deviates from the plan's "seed all three" wording in favor of the
+    /// byte-identical gate (recorded in the U05 handoff notes).
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] EnDefaultPages()
+    {
+        return
+        [
+            ("terms", "Terms",
+             "## Terms of use\n\n" +
+             "Kumunita is a self-hosted platform for one neighborhood. As its operator, " +
+             "you are responsible for how your community uses it: who joins, what they " +
+             "post, and how you moderate it.\n\n" +
+             "- **Residency is by design.** The platform assumes a single, bounded " +
+             "neighborhood — not a public feed.\n" +
+             "- **Audiences are chosen by the author.** Every post carries the audience " +
+             "its author picked; the platform enforces it.\n" +
+             "- **You own your data.** The database and the uploaded files are yours to " +
+             "back up, migrate, and retire.\n"),
+            ("help", "Help",
+             "## Getting started\n\n" +
+             "Kumunita is a private home for one neighborhood — the feed, the groups, " +
+             "and the pinned notes.\n\n" +
+             "- **Post** to a community feed and choose who can see it (an individual, a " +
+             "group, or everyone in the neighborhood).\n" +
+             "- **Groups** let you organize residents around a building, a project, or a " +
+             "shared interest.\n" +
+             "- **Directory** shows the residents on the platform and the details each " +
+             "has chosen to share.\n" +
+             "- **Moderation** lets a global admin (and, where granted, a moderator) " +
+             "keep the feed a safe place.\n\n" +
+             "Need help with the instance itself? That's an operator concern — see the " +
+             "self-hosted documentation linked in the footer.\n"),
+        ];
     }
 
     private static string SeedAdminBody(string email, string userId, string token) =>

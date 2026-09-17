@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Pages;
 using Kumunita.Web.Controllers;
 using Marten;
 using Microsoft.AspNetCore.Http;
@@ -79,7 +80,16 @@ public class PublicLocaleAndAboutTests
         provider.GetPageAsync("about", Arg.Any<string?>())
             .Returns(Task.FromResult(page));
 
+        // PG U05: the StaticPagesController is now tree-first; these about tests
+        // exercise the LEGACY LocalizedPage fallback, so the Page tree reports
+        // "absent" (KeyNotFoundException) and the controller falls through to
+        // the provider (the pre-U05 branches, preserved).
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("about")
+            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
         var controller = new StaticPagesController(
+            pages,
             provider,
             Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
 
@@ -145,7 +155,14 @@ public class PublicLocaleAndAboutTests
         provider.GetPageAsync("terms", Arg.Any<string?>())
             .Returns(Task.FromResult<LocalizedPage?>(null));
 
+        // PG U05: tree-first — the Page tree reports absent so the route falls
+        // through to the (also-absent) provider → the 404 floor is preserved.
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("terms")
+            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
         var controller = new StaticPagesController(
+            pages,
             provider,
             Options.Create(new CommunityOptions { Name = "Kumunita" }));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };

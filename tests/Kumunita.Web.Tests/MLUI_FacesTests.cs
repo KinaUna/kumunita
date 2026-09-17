@@ -1,5 +1,6 @@
 using Kumunita.Core;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Pages;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Security;
 using Marten;
@@ -201,7 +202,18 @@ public class MLUI_FacesTests
         var provider = Substitute.For<ITranslationProvider>();
         provider.GetPageAsync("about", Arg.Any<string?>()).Returns(Task.FromResult(page));
 
+        // PG U05: the StaticPagesController is now tree-first. These L9 tests
+        // exercise the LEGACY LocalizedPage fallback (M·2's per-page fallback),
+        // so the new Page tree reports "absent" (KeyNotFoundException) and the
+        // controller falls through to the provider — preserving the pre-U05
+        // three branches (a/b/c) exactly. (A tree-present test lives in
+        // StaticPagesControllerPgTests.cs.)
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("about")
+            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
         var controller = new StaticPagesController(
+            pages,
             provider,
             Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
 

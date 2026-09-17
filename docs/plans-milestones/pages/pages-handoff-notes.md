@@ -722,3 +722,180 @@ this handoff section appended — ✅.
 **203/203** green (no regression), `LocalizedPage`/`M1DocTypes`
 untouched, no Web code. **Next unit: U04** (the `PageController` + the
 tree browse + the post view + the composer — the Web surface).
+
+## U5 — Reference-from-UGC + the seeded default pages + the `/about` retarget
+
+**What I built** (closed set of three deliverables; two `src` files + test
+files):
+
+- `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (modified) — **the absorb
+  seed (deliverable #2).** The step-5 lane now writes the **new** `Page` docs
+  for the seeded default pages, in the **same atomic session** as the legacy
+  `LocalizedPage` rows (one store transition, not two), then a single
+  `SaveChangesAsync`.
+  - `EnDefaultPages()` flipped `private` → **`public`** so the Core test can
+    read the seeded set without an `InternalsVisibleTo` (the repo's Core-test
+    constraint — only `public` members are reachable across the assembly
+    boundary). Returns the closed `(Slug, Title, Body)[]` for **`terms` +
+    `help`** (the exact original body text — the single source the legacy rows
+    and the new `Page` docs both carry, so `/terms` + `/help` render
+    byte-identically from either store).
+  - **`SeedDefaultPagesAsync(IDocumentSession, IReadOnlyList<(Slug,Title,Body)>,
+    DateTimeOffset, CancellationToken)`** added as a **`public static`**
+    seam (extracted from the inline loop) — the idempotent root-`Page`
+    upsert (query by `(Slug, ParentId == null)`; store a new root with
+    `Audience = null` / `LanguageCode = "en"` / `AuthorId = ""` /
+    `ParentId = null`, or refresh `Title`/`Body` in place). `SeedTranslationResourcesAsync`
+    calls it within its existing session, so the new `Page` docs and the
+    legacy `LocalizedPage` rows commit atomically.
+- `src/Kumunita.Web/Controllers/StaticPagesController.cs` (modified) — **the
+  retarget (deliverable #3).** Constructor gains `IPageService pages` as the
+  first param (`StaticPagesController(IPageService, ITranslationProvider,
+  IOptions<CommunityOptions>)`). Each route (`/terms`/`/help`/`/about`) is now
+  **tree-first**: try `IPageService.GetByPathAsync(slug)` (catch
+  `KeyNotFoundException` → absent); on a hit, project the `Page` to a
+  throwaway `LocalizedPage` (Title/Body/`Updated = Modified ?? Created`) and
+  `View("Page", …)` — the **same** single view + `MarkdownRenderer` as today,
+  so a tree-present page renders byte-identically (no new view file). On a
+  miss, fall through to the legacy `ITranslationProvider.GetPageAsync` (the
+  `LocalizedPage` store, **retired in U07** — the "absorb, don't yank"
+  contract); then for `/about` the existing product-story
+  `View("About", HomeViewModel)` fallback, else `NotFound`.
+- `tests/Kumunita.Web.Tests/PageControllerTests.cs` (modified) — **deliverable
+  #1 (the `PG5_*` Web tests).** Two new `PG5_*` tests pinned after the 404-vs-403
+  split: (a) `PG5_ReferenceFromUgc_LinkInAuthorizedPost_RendersFree` — confirms
+  the frozen `MarkdownRenderer.RenderHtml("[About](/pages/about) …")` yields a
+  live `<a href="/pages/about">About</a>` (the "link present" half is free and
+  does not depend on the target's audience — **confirm, not re-implement**);
+  (b) `PG5_ReferenceFromUgc_LinkPresentButTargetDenied_Forbid_NotAllowed` — a
+  caller who can read an authorized post containing the link opens
+  `/pages/about` and gets a `ForbidResult` (the target's `Read` decision is
+  **separate** from the link's presence; "I see a link to it" ≠ "I may open it").
+- `tests/Kumunita.Web.Tests/StaticPagesControllerPgTests.cs` (new) — the
+  **retarget** tests: (1) tree-present → `Page` view with the projected model
+  (Title/Body/`Updated`) and the legacy provider **not consulted** (one store,
+  not two); (2) tree-absent + legacy-present → the legacy `LocalizedPage`
+  renders verbatim (the absorb, don't yank); (3) tree-absent + legacy-absent on
+  `/about` → the product-story view (the U05 drift pin — `about` is not
+  seeded); (4) same on `/help` → the 404 floor (not the product-story).
+- `tests/Kumunita.Core.Tests/PageServiceTests.cs` (modified) — **the `PG5_*`
+  Core tests.** Three new tests (live scratch Postgres, two sessions):
+  (1) `PG5_Seeder_TermsAndHelp_AreRootPages_NoDuplicates_AcrossTwoBoots` —
+  seed into two separate sessions, assert exactly the two root `Page` docs
+  (`terms` + `help`), one each, no duplicate (the idempotency pin);
+  (2) `PG5_Seeder_About_IsNotSeeded_ProductStoryStaysAuthoritative` — assert
+  **zero** `about` root `Page` docs (the U05 drift pin — a fresh `/about` is
+  the full-bleed product-story view, not a Markdown page);
+  (3) `PG5_Seeder_SeededPages_ArePublic_AudienceNull_LanguageEn_EmptyAuthor`
+  — the seeded page shape: `Audience = null` (public — the one place pages
+  differ from posts, ADR 0039 §3.4), `LanguageCode = "en"`, `ParentId = null`
+  (a root), `AuthorId = ""` (platform content), not draft / not deleted,
+  `Body`/`Title` carried verbatim (the byte-identical gate).
+- `tests/Kumunita.Web.Tests/MLUI_FacesTests.cs` + `PublicLocaleAndAboutTests.cs`
+  (modified) — the two `StaticPagesController` construction sites now pass the
+  new `IPageService` first param. These L9/`/about` tests exercise the **legacy**
+  `LocalizedPage` fallback, so the substitute's `GetByPathAsync` faults with a
+  `KeyNotFoundException` (NSubstitute: `Returns(Task.FromException<Page>(new
+  KeyNotFoundException()))` — the tree is absent, the controller falls through
+  to the provider) — preserving the pre-U05 branches (a/b/c) exactly.
+
+**What I verified** (the test-runner quirk in `AGENTS.md` applies — never
+`dotnet test` / VS Test Explorer):
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings** (after
+  fixing the CA2017 log-template warning — the seeded-page log line used
+  `{Keys}`/`{Pages}`×2 named placeholders (3 named, 2 args); switched to
+  `{0}`/`{1}`/`{2}` with three args).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 224, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (9.1 s).
+  U04's run was **218**; the delta is exactly the **6 new tests** (2 `PG5_*`
+  reference-from-UGC in `PageControllerTests` + 4 retarget tests in
+  `StaticPagesControllerPgTests`) — the full existing suite (including the
+  U7 L9 a/b/c `/about` branches and the `/terms` 404 floor, re-pointed onto the
+  new tree-first constructor) stayed green.
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 508, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (48.9 s).
+  U04's run was **505**; the delta is exactly the **3 new `PG5_*` tests**
+  (505 + 3 = 508) — the full existing suite stayed green, so the seeder's
+  new `Page` docs introduced no regression.
+- `git --no-pager status --short` — the only Core `src` change is
+  `M src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` (+ the Core test file);
+  `M src/Kumunita.Web/Controllers/StaticPagesController.cs`; and the four Web
+  test files (+ one new). **`IPageService`/`PageService`/`Page`/`PageTranslation`/
+  `LocalizedPage`/`M1DocTypes`/`PageDocTypes`/registration are all untouched**
+  (the frozen seams) — `git status` confirms no Core `Pages/` file changed.
+
+**Drift from the plan** (one, the load-bearing one, recorded per protocol —
+this is the U05 drift-pause (e) decision, not a silent deviation):
+
+- **`about` is NOT seeded — the `/about` product-story view stays
+  authoritative on a fresh instance.** The plan's deliverable #2 reads "seed
+  `about`/`terms`/`help` … as `Page` docs" *and* the exit gate reads "a fresh
+  instance is byte-identical to today." Those two conflict: today's `/about`
+  is a **full-bleed product-story HTML view** (`Views/StaticPages/About`, driven
+  by `HomeViewModel`), **not** a Markdown body. Seeding an `about` `Page` doc
+  would (a) change what `/about` renders (the product story → a Markdown page),
+  and (b) mount the `footer/community` slot (the mount slot's resolver would now
+  find a page), breaking the "byte-identical to today" gate. So I took **option
+  (b)** from the plan's own ⚠️: seed **only `terms` + `help`** as `Page` docs
+  (the two that ARE Markdown static pages today), and leave `about` unseeded
+  with the existing product-story fallback intact. The `StaticPagesController`
+  is still tree-first for all three slugs — it just happens that a fresh
+  instance's `about` resolves tree-absent → legacy-absent → product-story. This
+  deviates from the plan's "seed all three" wording **in favor of the lane's
+  byte-identical exit gate**, exactly the drift-pause (e) the plan anticipated
+  ("if 'byte-identical' and 'seed all three' can't both be satisfied … STOP and
+  record the decision"). **U07 (the `LocalizedPage` retirement) must not seed
+  an `about` page** — the product-story view is the fresh-instance `/about`
+  until an admin creates a real `about` `Page` at runtime.
+
+**What the next agent (U06) must know** that isn't already in the plan:
+
+- **`StaticPagesController` is now tree-first with a legacy fallback.** The
+  constructor is `(IPageService, ITranslationProvider, IOptions<CommunityOptions>)`.
+  A tree hit projects the `Page` to a throwaway `LocalizedPage`
+  (Title/Body/`Updated = Modified ?? Created`) for the **shared**
+  `Views/StaticPages/Page.cshtml` (so no new view file). U07 retires the
+  `ITranslationProvider.GetPageAsync`/`LocalizedPage` path — at that point the
+  tree-miss branches (legacy fallback) simply disappear and `/about`'s
+  product-story fallback + the `/terms`/`/help` 404 floor remain. Do **not**
+  leave the legacy fallback after U07 — the whole point of the "absorb, don't
+  yank" two-step is that U05 lands the tree read and U07 removes the old one.
+- **The seeder's `SeedDefaultPagesAsync` is `public static` and
+  `EnDefaultPages()` is `public`** — they exist so the Core test can pin
+  idempotency + the exact set without an `InternalsVisibleTo`. If U06/U07
+  change the seeded set, update `EnDefaultPages()` (the single source) — the
+  legacy `LocalizedPage` rows and the new `Page` docs both read from it, so
+  they stay byte-identical by construction.
+- **`about` is deliberately absent from `EnDefaultPages()`** — do not add it
+  back (the U05 drift pin). A fresh `/about` is the product-story view; an
+  admin-created `about` `Page` (or legacy `LocalizedPage`) is the only way
+  `/about` becomes a Markdown page. The `footer/community` mount slot is
+  unmounted on a fresh instance (the U04 layout's `{ ViewData["MountSlot"] =
+  "footer/community" }` + `_MountSlot` partial resolves to `null` → no link).
+- **The `PG5_*` Web reference-from-UGC tests are in `PageControllerTests.cs`,
+  not `StaticPagesControllerPgTests.cs`** — the "link in an authorized post"
+  half is about the **post** view's rendering (the single `MarkdownRenderer`)
+  and the **page** `Read` decision (the `PageController.Show` 403), both of
+  which live on the `PageController`/`MarkdownRenderer` surface. The
+  `StaticPagesControllerPgTests.cs` file is the `/terms`/`/help`/`/about`
+  legacy-route retarget (tree-first + legacy fallback + product-story). Keep
+  them separate (they pin different surfaces).
+- **NSubstitute gotcha (re-confirmed this unit):** for a `Task<Page>`-returning
+  lane (`IPageService.GetByPathAsync`), make it fault with
+  `.Returns(Task.FromException<Page>(new KeyNotFoundException()))` — **not**
+  `.ThrowsAsync(...)` (which does not bind to a `Task<T>` return). The U04
+  note flagged the same for the write lanes; it applies to the read lanes too.
+- **The seeder log line uses `{0}`/`{1}`/`{2}` positional placeholders**
+  (3 distinct, 3 args) — CA2017 counts *total placeholder occurrences* vs arg
+  count, so reusing one named placeholder twice (`{Pages}` ×2) is a warning.
+  If U06/U07 add a new placeholder, keep it positional and distinct.
+
+**Status: U05 GREEN.** Build clean (zero warnings), Web tests **224/224** green
+(218 pre-existing + 6 new `PG5_*`/retarget), Core tests **508/508** green (505
+pre-existing + 3 new `PG5_*`), `LocalizedPage`/`M1DocTypes`/`IPageService`/
+`PageService`/`Page`/registration **untouched** (the frozen seams — verified by
+`git status`), the `about`-unseeded drift pin recorded. **Next unit: U06**
+(per the register — the remaining unit before U07's destructive
+`LocalizedPage` retirement; U07 may **not** seed an `about` page and **must**
+remove the `StaticPagesController` legacy fallback).
