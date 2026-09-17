@@ -696,6 +696,298 @@ public class PageControllerTests
         Assert.IsType<ForbidResult>(result);
     }
 
+    // ── PG6 — the user-added-translation lane (ADR 0029 carried to pages) ──
+    //
+    // The POST route is the Web plumbing over the IPageService.AddTranslationAsync
+    // seam (C3 — the service is the standing authority; the controller re-runs
+    // the Read gate first and surfaces 403/404). The standing decision itself
+    // is pinned by the Core family (PageServiceTests.PG6_CanTranslatePage_* +
+    // the U03 PG3_Translate_* write-lane tests). The (PageId, LanguageCode)
+    // duplicate rejection is DB-side (the unique index) and is NOT re-tested
+    // here (the service is substituted).
+
+    /// <summary>
+    /// (a) A <b>Translator</b> POSTs an <c>fr</c> translation on an
+    /// authorized page → <see cref="IPageService.AddTranslationAsync"/> is
+    /// called with the right args and the result is a
+    /// <see cref="RedirectToActionResult"/> (NOT a 403) — the Read gate ran
+    /// first and the success is surfaced. The <c>title</c> (a null-able) and
+    /// <c>body</c> are passed through verbatim.
+    /// </summary>
+    [Fact]
+    public async Task PG6_AddTranslation_Translator_Allowed_CallsService_AndRedirects()
+    {
+        const string pageId = "page-pg6-tr";
+        var page = new Page
+        {
+            Id = pageId, Slug = "about", Title = "About", Body = "body",
+            AuthorId = "someone-else", Audience = null, ComponentId = null,
+            IsDraft = false, IsDeleted = false,
+        };
+        var (store, pages, authz) = WireStoreAndAllow(page);
+
+        var controller = Build(pages, authz, store: store, IsAuthenticated: true,
+            subjectId: "subj-translator", roles: new[] { Roles.Translator });
+
+        var result = await controller.AddTranslation(pageId, "fr", "À propos", "Corps du texte");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await pages.Received(1).AddTranslationAsync(
+            pageId, "fr", "À propos", "Corps du texte", "subj-translator",
+            Arg.Is<IReadOnlySet<string>>(r => r.Contains(Roles.Translator)),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// (b) ADR 0029 matrix — a <b>community Moderator</b> is <b>allowed</b> on
+    /// a page whose <see cref="Page.ComponentId"/> is a community they moderate
+    /// (the service's standing passes, the controller surfaces the success).
+    /// The same actor is <b>denied</b> (403) on a flat/public page
+    /// (<c>ComponentId == null</c> — no community to moderate), pinned by the
+    /// sibling test <see cref="PG6_AddTranslation_CommunityModerator_FlatPage_Denied"/>.
+    /// </summary>
+    [Fact]
+    public async Task PG6_AddTranslation_CommunityModerator_ScopedPage_Allowed()
+    {
+        const string pageId = "page-pg6-mod-s";
+        var page = new Page
+        {
+            Id = pageId, Slug = "community-about", Title = "About", Body = "body",
+            AuthorId = "someone-else",
+            Audience = new Audience { Mode = AudienceMode.Any, Community = true, Grants = new List<AudienceGrant>() },
+            ComponentId = "community-001",   // scoped — the moderator's standing key
+            IsDraft = false, IsDeleted = false,
+        };
+        var (store, pages, authz) = WireStoreAndAllow(page);
+
+        var controller = Build(pages, authz, store: store, IsAuthenticated: true,
+            subjectId: "subj-mod", roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-001") });
+
+        var result = await controller.AddTranslation(pageId, "de", "Über uns", "Körper");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await pages.Received(1).AddTranslationAsync(
+            pageId, "de", "Über uns", "Körper", "subj-mod",
+            Arg.Is<IReadOnlySet<string>>(r => r.Contains(Roles.ModeratorComponent("community-001"))),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// (b) ADR 0029 matrix — the <b>flat/public page</b> branch: a community
+    /// Moderator has no community to moderate on a page whose
+    /// <see cref="Page.ComponentId"/> is <c>null</c>, so the standing
+    /// <see cref="IPageService.AddTranslationAsync"/> re-check denies — the
+    /// <see cref="UnauthorizedAccessException"/> surfaces as a
+    /// <see cref="ForbidResult"/> (403), NOT a 404 (the page-specific split).
+    /// </summary>
+    [Fact]
+    public async Task PG6_AddTranslation_CommunityModerator_FlatPage_Denied()
+    {
+        const string pageId = "page-pg6-mod-f";
+        var page = new Page
+        {
+            Id = pageId, Slug = "about", Title = "About", Body = "body",
+            AuthorId = "someone-else", Audience = null, ComponentId = null,   // flat/public
+            IsDraft = false, IsDeleted = false,
+        };
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Page>(pageId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Page?>(page));
+        store.QuerySession().Returns(readSession);
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var pages = Substitute.For<IPageService>();
+        // The service's standing re-check (C3) denies — the component-moderator
+        // branch does not qualify on a flat/public page.
+        pages.AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<PageTranslation>(new UnauthorizedAccessException(
+                "only a GlobalAdmin, a Translator, or a moderator of the page's community may add a translation")));
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj-mod"));
+
+        var controller = Build(pages, authz, store: store, IsAuthenticated: true,
+            subjectId: "subj-mod", roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-001") });
+
+        var result = await controller.AddTranslation(pageId, "fr", "À propos", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// (c) A <b>plain Member</b> (no standing claim) POSTs a translation →
+    /// the service's standing re-check denies → a <see cref="ForbidResult"/>
+    /// (403), not a 404.
+    /// </summary>
+    [Fact]
+    public async Task PG6_AddTranslation_PlainMember_Denied()
+    {
+        const string pageId = "page-pg6-mem";
+        var page = new Page
+        {
+            Id = pageId, Slug = "about", Title = "About", Body = "body",
+            AuthorId = "someone-else", Audience = null, ComponentId = null,
+            IsDraft = false, IsDeleted = false,
+        };
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Page>(pageId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Page?>(page));
+        store.QuerySession().Returns(readSession);
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var pages = Substitute.For<IPageService>();
+        pages.AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<PageTranslation>(new UnauthorizedAccessException("only a standing-holder may add a translation")));
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj-member"));
+
+        var controller = Build(pages, authz, store: store, IsAuthenticated: true,
+            subjectId: "subj-member", roles: new[] { Roles.Member });
+
+        var result = await controller.AddTranslation(pageId, "fr", "À propos", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// (d) <see cref="PageController.AddTranslation"/> on an absent page
+    /// (the store's <c>LoadAsync&lt;Page&gt;</c> returns <c>null</c>) is a
+    /// <see cref="NotFoundResult"/> (404) — the page-specific split holds on
+    /// the translation lane too.
+    /// </summary>
+    [Fact]
+    public async Task PG6_AddTranslation_AbsentPage_ReturnsNotFound()
+    {
+        // The default Build store's QuerySession().LoadAsync<Page> returns
+        // null (the absent shape) — the actor is authenticated so the actorId
+        // gate passes and the page load is what 404s.
+        var pages = Substitute.For<IPageService>();
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-translator", roles: new[] { Roles.Translator });
+
+        var result = await controller.AddTranslation("page-pg6-absent", "fr", "À propos", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+        await pages.DidNotReceive().AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// (e) The <see cref="PageShowViewModel.CanTranslate"/> affordance flag:
+    /// <b>set</b> for a <b>Translator</b> on a public page (the display pin —
+    /// <see cref="PageService.CanTranslatePage"/>), so the "add a
+    /// translation" form renders. The real gate is the service (C3); the flag
+    /// is the button's visibility.
+    /// </summary>
+    [Fact]
+    public async Task PG6_Show_CanTranslateFlag_SetForTranslator()
+    {
+        const string path = "about";
+        var page = new Page
+        {
+            Id = "page-pg6-flag-tr", Slug = "about", Title = "About", Body = "body",
+            AuthorId = "someone-else", Audience = null, ComponentId = null,
+            IsDraft = false, IsDeleted = false,
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync(path).Returns(page);
+        pages.GetTranslationsAsync(page.Id).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { page });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj-translator"));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj-translator", roles: new[] { Roles.Translator });
+
+        var view = (await controller.Show(path)) as ViewResult;
+        Assert.NotNull(view);
+        var model = view!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(model);
+        Assert.True(model!.CanTranslate);
+    }
+
+    /// <summary>
+    /// (e) The <see cref="PageShowViewModel.CanTranslate"/> affordance flag:
+    /// <b>unset</b> for a <b>plain Member</b> on a public page (the display
+    /// pin — <see cref="PageService.CanTranslatePage"/> is false for a
+    /// resident with no standing), so the "add a translation" form does not
+    /// render.
+    /// </summary>
+    [Fact]
+    public async Task PG6_Show_CanTranslateFlag_UnsetForPlainMember()
+    {
+        const string path = "about";
+        var page = new Page
+        {
+            Id = "page-pg6-flag-mem", Slug = "about", Title = "About", Body = "body",
+            AuthorId = "someone-else", Audience = null, ComponentId = null,
+            IsDraft = false, IsDeleted = false,
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync(path).Returns(page);
+        pages.GetTranslationsAsync(page.Id).Returns(new List<PageTranslation>());
+        pages.GetTreeAsync().Returns(new List<Page> { page });
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj-member"));
+
+        var controller = Build(pages, authz, IsAuthenticated: true,
+            subjectId: "subj-member", roles: new[] { Roles.Member });
+
+        var view = (await controller.Show(path)) as ViewResult;
+        Assert.NotNull(view);
+        var model = view!.ViewData.Model as PageShowViewModel;
+        Assert.NotNull(model);
+        Assert.False(model!.CanTranslate);
+    }
+
+    // ── PG6 harness helper ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Wires the store (the page is loadable by id from
+    /// <c>QuerySession().LoadAsync&lt;Page&gt;</c>) + the service
+    /// (<see cref="IPageService.AddTranslationAsync"/> returns a fresh
+    /// <see cref="PageTranslation"/> — the allow shape) + the Read decision
+    /// (allowed). The deny shapes are wired inline in the sibling tests.
+    /// </summary>
+    private static (IDocumentStore store, IPageService pages, IAuthorizationService authz)
+        WireStoreAndAllow(Page page)
+    {
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Page>(page.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Page?>(page));
+        store.QuerySession().Returns(readSession);
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var pages = Substitute.For<IPageService>();
+        pages.AddTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => Task.FromResult(new PageTranslation
+            {
+                Id = "tr-new",
+                PageId = call.ArgAt<string>(0),
+                LanguageCode = call.ArgAt<string>(1),
+            }));
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: "subj"));
+
+        return (store, pages, authz);
+    }
+
     // ── harness ────────────────────────────────────────────────────────────
 
     private static ILocalizationService DefaultLocalization()

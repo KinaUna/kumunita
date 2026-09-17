@@ -899,3 +899,161 @@ pre-existing + 3 new `PG5_*`), `LocalizedPage`/`M1DocTypes`/`IPageService`/
 (per the register — the remaining unit before U07's destructive
 `LocalizedPage` retirement; U07 may **not** seed an `about` page and **must**
 remove the `StaticPagesController` legacy fallback).
+
+## U6 — The translation lane live on pages (standing + display)
+
+U06 makes the multilingual lane **live on pages** — the Web "add a
+translation" surface for a `Page`, plus the **display** pin that decides
+whether that affordance renders at all. It closes with four deliverables, all
+additive and reusing the established announcement/post translation patterns
+(`AnnouncementService.CanTranslateAnnouncement` /
+`PostService.CanAddTranslation` are the exact shapes this mirrors):
+
+1. A **non-throwing `CanTranslatePage` display gate** on `PageService` that
+   shares **one decision body** with `CheckTranslateStanding` — so the display
+   flag and the write-lane deny can never drift apart.
+2. A **`PageShowViewModel.CanTranslate`** flag (the 13th positional arg) +
+   the **gated add-form** in `Show.cshtml`.
+3. A **`[HttpPost("{id}/translations")]`** POST route in `PageController`.
+4. A **`PG6_*` Web test family** + **Core tests** pinning `CanTranslatePage`
+   as a pure allow/deny matrix.
+
+**What I changed** (the exact `git --no-pager status --short` set — nothing
+else touched, and **none of the frozen seams** — `IPageService`/`Page`/
+`PageTranslation`/`PageDocTypes`/`LocalizedPage`/registration):
+
+- `src/Kumunita.Core/Pages/PageService.cs` (**the only Core `src` change**) —
+  added `public static bool CanTranslatePage(string actorId,
+  IReadOnlySet<string> actorRoles, Page? page)` and the private shared
+  decision body `CanTranslatePageCore(IReadOnlySet<string>, Page)`;
+  **refactored `CheckTranslateStanding` to delegate to `CanTranslatePage`**
+  (it still throws `UnauthorizedAccessException` when the decision is `false`).
+  The decision body is the single source of truth:
+
+  ```csharp
+  private static bool CanTranslatePageCore(IReadOnlySet<string> actorRoles, Page page)
+  {
+      if (actorRoles.Contains(Roles.GlobalAdmin)) return true;
+      if (actorRoles.Contains(Roles.Translator)) return true;
+      if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
+          return true;
+      return false;
+  }
+  ```
+
+  **ADR 0029 standing carried to pages:** a GlobalAdmin or a Translator
+  qualifies on **any** page (scoped or flat/public); a community Moderator
+  (`Roles.ModeratorComponent(page.ComponentId)`) qualifies **only** when the
+  page is scoped to a community they moderate — a flat/public page
+  (`ComponentId == null`) has no community to moderate, so that branch never
+  qualifies; a plain Member never qualifies. **No new `IPageService` method,
+  no new `AccessAction`/`AccessVia`/authorization branch, no new editor.**
+- `src/Kumunita.Web/Models/PageViewModels.cs` — `PageShowViewModel` gains the
+  13th positional `bool CanTranslate` (documented as the ADR 0029 display
+  affordance flag / pin).
+- `src/Kumunita.Web/Controllers/PageController.cs` — (a) `Show` now computes
+  `var canTranslate = PageService.CanTranslatePage(actorId ?? string.Empty,
+  KumunitaPrincipal.RoleSet(User), page);` and passes it as the 13th arg;
+  (b) the new `AddTranslation` POST action (`[HttpPost("{id:guid}/translations")]`,
+  `[ValidateAntiForgeryToken]`, `[Authorize(Roles = "GlobalAdmin,Moderator,Translator")]`)
+  that loads the page **by id from the store** (the Edit GET lane's pattern —
+  the route is keyed by `{id:guid}`, the same key the Edit/Publish/Delete/Move
+  lanes use), re-checks `Read`, calls `AddTranslationAsync`, and maps
+  `UnauthorizedAccessException` → `ForbidResult`, `KeyNotFoundException` →
+  `NotFound`; plus two private helpers, `DerivePathAsync` (redirect target via
+  `PagePaths.Href(byId, page)`, matching the existing `Publish` redirect) and
+  `SeedLanguageName` (a `ListLanguagesAsync` lookup for the `TempData["info"]`
+  message, falling back to the raw code).
+- `src/Kumunita.Web/Views/Pages/Show.cshtml` — the `@{}` block computes
+  `originalCode` + `missingLanguages` (`Model.Languages` that lack a
+  translation, excluding the original), and a **gated add-a-translation form**
+  (inside the existing chip-row `<div class="mb-3 border-top pt-3">`) renders
+  per-`missingLanguages` language as a `<details>` + `<form method="post"
+  action="@($"/pages/{Model.Id}/translations")">` with a hidden `languageCode`,
+  a `title` input, the `rc-editor` toolbar + `textarea[name=body][data-rich-editor]`,
+  the `_RichEditorToggle` partial, and a submit — **gated `@if (Model.CanTranslate)`**,
+  mirroring `Views/Announcement/Detail.cshtml`'s `@if (Model.CanTranslate)`
+  block. The existing ADR 0027 chip-swap markup is **unchanged**.
+
+**Tests** (the test-runner quirk in `AGENTS.md` applies — never `dotnet
+test` / VS Test Explorer):
+
+- `tests/Kumunita.Web.Tests/PageControllerTests.cs` (modified) — **7 `PG6_*`
+  tests** + a `WireStoreAndAllow(Page)` helper (stores the page loadable by id
+  from `QuerySession().LoadAsync<Page>`, makes `AddTranslationAsync` return a
+  fresh `PageTranslation`, and `CanAsync` return allowed):
+  (a) `PG6_AddTranslation_Translator_Allowed_CallsService_AndRedirects`;
+  (b-scoped) `PG6_AddTranslation_CommunityModerator_ScopedPage_Allowed`
+  (`ComponentId="community-001"`); (b-flat)
+  `PG6_AddTranslation_CommunityModerator_FlatPage_Denied` (`ComponentId=null`,
+  service faults → `ForbidResult`); (c)
+  `PG6_AddTranslation_PlainMember_Denied`; (d)
+  `PG6_AddTranslation_AbsentPage_ReturnsNotFound` (default Build store's
+  `LoadAsync` returns `null` → the absent shape); (e)
+  `PG6_Show_CanTranslateFlag_SetForTranslator`; (e)
+  `PG6_Show_CanTranslateFlag_UnsetForPlainMember`.
+- `tests/Kumunita.Core.Tests/PageServiceTests.cs` (modified) — **5
+  `PG6_CanTranslatePage_*` tests** pinning the pure matrix (the repo tests the
+  bool probes directly — `PostService.CanAddTranslation` /
+  `AnnouncementService.CanTranslateAnnouncement` are tested as allow/deny
+  matrices, not only via their write lanes): GlobalAdmin any page; Translator
+  any page; community-Moderator **allows** the scoped page, **denies** the flat
+  page + denies a page in a **different** community they don't moderate; plain
+  Member denies; null-page/blank-actor denies (the probe is pure — the
+  write-lane gate is the one that throws for those shapes).
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 231, Errors: 0, Failed: 0** (10.2 s). U05's run was **224**; the
+  delta is exactly the **7 new `PG6_*` tests** (224 + 7 = 231) — the full
+  existing suite stayed green.
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 513, Errors: 0, Failed: 0** (47.9 s). U05's run was **508**; the
+  delta is exactly the **5 new `PG6_CanTranslatePage_*` tests** (508 + 5 = 513).
+  The existing `PG3_Translate_*` standing family (GlobalAdmin / Translator /
+  community-Moderator / plain-Member / flat-page-mod-of-other-comp /
+  duplicate-language) **stayed green** — `CheckTranslateStanding` now delegates
+  to `CanTranslatePage`, so those pins exercise the refactored decision body.
+- `git --no-pager status --short` — **exactly six files**: the four above + the
+  two test files. **No `IPageService`/`Page`/`PageTranslation`/`PageDocTypes`/
+  `LocalizedPage`/`DependencyInjection` registration change** (the frozen
+  seams) — `git status` confirms no Core `Pages/` file changed beyond
+  `PageService.cs`.
+
+**Drift from the plan:** **none.** No `IPageService`/Core seam was needed, the
+ADR 0029 standing is fully expressible by the existing claims (`Roles.Moderator`,
+`Roles.ModeratorComponent`, `Roles.Translator`, `Roles.GlobalAdmin`), and the
+chip-swap shape was left untouched. **No drift-pause triggered.**
+
+**What the next agent (U07) must know** that isn't already in the plan:
+
+- **`CanTranslatePage` is `public static`** — the Web layer calls it directly
+  (no `IPageService` registration change). If U07 touches `PageService`
+  standing, the single decision body to change is **`CanTranslatePageCore`** —
+  both the display probe and the `CheckTranslateStanding` write-lane gate flow
+  through it, so they can't drift.
+- **The `PG6_*` Web tests live in `PageControllerTests.cs`** (not a new file) —
+  the `WireStoreAndAllow` helper is the pattern for stubbing a store whose
+  `QuerySession().LoadAsync<Page>(id)` resolves a real `Page` (the absent
+  shape, by contrast, is the default Build store's `LoadAsync` → `null` → the
+  `NotFound` branch).
+- **The NSubstitute `Task<T>` gotcha re-applies** — for the
+  `Task<Page>`-returning store load, the absent shape is
+  `Task.FromResult<Page?>(null)`, and a faulting store is
+  `.Returns(Task.FromException<Page>(new ...))` (**not** `.ThrowsAsync(...)`) —
+  CS1061 otherwise.
+- **U07 is the destructive `LocalizedPage` retirement** — it may **not** seed an
+  `about` page (the U05 drift pin) and **must** remove the `StaticPagesController`
+  legacy fallback. U06's translation surface is **orthogonal** to that — it
+  operates on `Page`/`PageTranslation` docs (the frozen seams), which U07 does
+  not touch.
+
+**Status: U06 GREEN.** Build clean (zero warnings), Web tests **231/231** green
+(224 pre-existing + 7 new `PG6_*`), Core tests **513/513** green (508
+pre-existing + 5 new `PG6_CanTranslatePage_*`), `IPageService`/`Page`/
+`PageTranslation`/`PageDocTypes`/`LocalizedPage`/registration **untouched** (the
+frozen seams — verified by `git status`), **no drift-pause triggered**. **Next
+unit: U07** (the destructive `LocalizedPage` retirement — the last unit of the
+`PG` lane).

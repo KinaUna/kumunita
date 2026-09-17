@@ -503,6 +503,81 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             () => PageService.CheckTranslateStanding("u-member", RolesSet(Roles.Member), page));
     }
 
+    // ─── 8b — the public display probe (CanTranslatePage) ──────────────────
+    //
+    // U06 (ADR 0029 carried to pages): the Web layer's "add a translation"
+    // affordance flag (PageShowViewModel.CanTranslate) and the AddTranslationAsync
+    // write-lane gate both reduce to this one decision. The repo pins the
+    // bool probes directly (PostService.CanAddTranslation /
+    // AnnouncementService.CanTranslateAnnouncement are tested as pure
+    // allow/deny matrices, not only via their write-lane tests), so the
+    // three standing branches are pinned here. A scoped page (ComponentId
+    // "comp-x") vs a flat/public page (ComponentId null) is the ADR 0029
+    // matrix: the community-Moderator branch only qualifies on the scoped
+    // page.
+
+    [Fact]
+    public void PG6_CanTranslatePage_GlobalAdmin_AllowsAnyPage()
+    {
+        // GlobalAdmin qualifies on a scoped page AND a flat/public page.
+        var scoped = new Page { Id = "pg6-t-ga-s", ComponentId = "comp-x" };
+        var flat = new Page { Id = "pg6-t-ga-f", ComponentId = null };
+        Assert.True(PageService.CanTranslatePage("u-admin", RolesSet(Roles.GlobalAdmin), scoped));
+        Assert.True(PageService.CanTranslatePage("u-admin", RolesSet(Roles.GlobalAdmin), flat));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_Translator_AllowsAnyPage()
+    {
+        // Translator qualifies on a scoped page AND a flat/public page.
+        var scoped = new Page { Id = "pg6-t-tr-s", ComponentId = "comp-x" };
+        var flat = new Page { Id = "pg6-t-tr-f", ComponentId = null };
+        Assert.True(PageService.CanTranslatePage("u-translator", RolesSet(Roles.Translator), scoped));
+        Assert.True(PageService.CanTranslatePage("u-translator", RolesSet(Roles.Translator), flat));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_CommunityModerator_AllowsScopedPage_DeniesFlat()
+    {
+        // The community-Moderator branch qualifies ONLY on a page scoped to a
+        // community they moderate (the ADR 0029 matrix); a flat/public page
+        // has no community to moderate, so the branch does not qualify.
+        var scoped = new Page { Id = "pg6-t-mod-s", ComponentId = "comp-x" };
+        var flat = new Page { Id = "pg6-t-mod-f", ComponentId = null };
+        var modRoles = RolesSet(Roles.Moderator, Roles.ModeratorComponent("comp-x"));
+
+        Assert.True(PageService.CanTranslatePage("u-mod", modRoles, scoped));
+        // A flat/public page: the same moderator claim does NOT qualify.
+        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, flat));
+        // A scoped page in a DIFFERENT community: the actor's comp-x
+        // moderator claim does not match comp-other (the other-component
+        // denial).
+        var otherScoped = new Page { Id = "pg6-t-mod-o", ComponentId = "comp-other" };
+        Assert.False(PageService.CanTranslatePage("u-mod", modRoles, otherScoped));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_PlainMember_Denies()
+    {
+        // A plain resident (no standing claim) never qualifies — scoped or
+        // flat, a Translator-elsewhere, nothing.
+        var scoped = new Page { Id = "pg6-t-mem-s", ComponentId = "comp-x" };
+        var flat = new Page { Id = "pg6-t-mem-f", ComponentId = null };
+        Assert.False(PageService.CanTranslatePage("u-member", RolesSet(Roles.Member), scoped));
+        Assert.False(PageService.CanTranslatePage("u-member", RolesSet(Roles.Member), flat));
+    }
+
+    [Fact]
+    public void PG6_CanTranslatePage_NullPageOrBlankActor_Denies()
+    {
+        // The probe is pure (no exception) — a null page or a blank actor
+        // is a flat denial (the display flag is simply unset; the write-lane
+        // gate is the one that throws for those shapes).
+        var scoped = new Page { Id = "pg6-t-n", ComponentId = "comp-x" };
+        Assert.False(PageService.CanTranslatePage("u-admin", RolesSet(Roles.GlobalAdmin), null));
+        Assert.False(PageService.CanTranslatePage("", RolesSet(Roles.GlobalAdmin), scoped));
+    }
+
     [Fact]
     public void PG_CheckStanding_NullPage_KeyNotFound()
     {

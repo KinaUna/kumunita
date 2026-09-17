@@ -96,7 +96,20 @@ public sealed record PageShowViewModel(
     bool IsDraft,
     bool CanEdit,
     string? AuthorDisplayName,
-    string? CommunityDisplayName);
+    string? CommunityDisplayName,
+    /// <summary>
+    /// The ADR 0029 "add a translation" affordance flag (the display pin —
+    /// <see cref="Kumunita.Core.Pages.PageService.CanTranslatePage"/>, the
+    /// same rule the <c>AddTranslationAsync</c> write-lane gate re-checks
+    /// server-side): a GlobalAdmin / a Translator may add a translation of
+    /// any page; a community Moderator only of a page scoped to their
+    /// community (a flat/public page has no community to moderate). <c>true</c>
+    /// ⇒ the post view renders the "add a translation" form (gated on this
+    /// flag), the candidate list drawn from <see cref="Languages"/> excluding
+    /// the authored-in language + any already-translated code (the ADR 0027
+    /// "candidate list excludes the item's own language" rule).
+    /// </summary>
+    bool CanTranslate);
 
 /// <summary>
 /// The composer form-bound model — <c>GET/POST /pages/new</c> and

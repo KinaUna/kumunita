@@ -202,6 +202,14 @@ public sealed class PageController(
             communityName = (await userInfo.GetComponentsAsync(true).ConfigureAwait(false))
                 .FirstOrDefault(c => c.Id == component)?.Name;
 
+        // ADR 0029 — the "add a translation" affordance flag (the display pin):
+        // the same rule the AddTranslationAsync write-lane gate re-checks
+        // server-side (U06; the PostService.CanAddTranslation /
+        // AnnouncementService.CanTranslateAnnouncement shape). A display
+        // convenience only — the real gate is the service (C3).
+        var canTranslate = PageService.CanTranslatePage(
+            actorId ?? string.Empty, KumunitaPrincipal.RoleSet(User), page);
+
         return View(new PageShowViewModel(
             page.Id,
             page.Title,
@@ -214,7 +222,8 @@ public sealed class PageController(
             page.IsDraft,
             isAuthor,
             authorProfile?.DisplayName,
-            communityName
+            communityName,
+            canTranslate
         ));
     }
 
@@ -560,7 +569,138 @@ public sealed class PageController(
         }
     }
 
+    // ── POST /pages/{id}/translations — the user-added-translation lane ─────
+
+    /// <summary>
+    /// <c>POST /pages/{id}/translations</c> — a **user-added-translation
+    /// intake** (ADR 0029; the ADR 0022 post-translation lane carried onto
+    /// <see cref="Page"/>, U06). Standing re-checked **server-side** by
+    /// <see cref="IPageService.AddTranslationAsync"/> (a GlobalAdmin or a
+    /// Translator on any page, plus a community Moderator of a page scoped to
+    /// a community they moderate — a flat/public page has no such moderator
+    /// lane; the ADR 0029 matrix): the <c>[Authorize]</c> gate is a
+    /// convenience pre-gate, the service is the authority (C3). A
+    /// <see cref="KeyNotFoundException"/> (the page is absent) is a
+    /// <b>404</b>; an <see cref="UnauthorizedAccessException"/> (the actor has
+    /// no standing) is a <b>403</b> (the page-specific split, ADR 0039 §3.8).
+    /// On success it redirects back to <see cref="Show"/>, which re-renders the
+    /// now-present chip via the existing ADR 0027 chip-swap markup (no display
+    /// rework).
+    /// </summary>
+    [HttpPost("{id:guid}/translations")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "GlobalAdmin,Moderator,Translator")]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        // Re-run the Read gate (absent → 404; denied/draft → 403) — the
+        // page-specific split, the same shape Show uses. The route is keyed by
+        // the page id (the {id:guid} shape — the Edit/Publish/Delete/Move
+        // lanes), so the page is loaded by id from the store (the Edit GET
+        // lane's pattern), not round-tripped through GetByPathAsync. These
+        // gates run BEFORE the form validation so a bad form on an absent /
+        // denied page is a 404/403, not a redirect.
+        Page page;
+        try
+        {
+            await using var readSession = store.QuerySession();
+            page = (await readSession.LoadAsync<Page>(id).ConfigureAwait(false))!;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        if (page is null || page.IsDeleted)
+            return NotFound();
+
+        if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            return new ForbidResult();
+
+        var decision = await authz.CanAsync(
+            actorId, Authorization.AccessAction.Read, new PageToAuditableResource(page)).ConfigureAwait(false);
+        if (!decision.Allowed)
+            return new ForbidResult();
+
+        // The page is read-authorized — now the form validation (a shape
+        // error redirects back to the post view with the error banner).
+        var path = await DerivePathAsync(page).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Show), new { path });
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return RedirectToAction(nameof(Show), new { path });
+        }
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await pages.AddTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                KumunitaPrincipal.RoleSet(User),
+                session).ConfigureAwait(false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
+        TempData["info"] = $"Translation added ({name}).";
+        return RedirectToAction(nameof(Show), new { path });
+    }
+
+    /// <summary>
+    /// The <see cref="Page"/>'s post-view route value (ADR 0039 §3.3) for the
+    /// <c>Show</c> redirect — the <see cref="PagePaths.Href"/> the tree browse
+    /// + the existing <see cref="Publish"/> redirect use (the single
+    /// <c>/pages/…</c> value the route consumes). Loads the live tree to
+    /// resolve the ancestor-slug chain (the path is never stored, ADR 0039
+    /// §3.3).
+    /// </summary>
+    private async Task<string> DerivePathAsync(Page page)
+    {
+        var tree = await pages.GetTreeAsync().ConfigureAwait(false);
+        var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        return PagePaths.Href(byId, page);
+    }
+
     // ── shared seeding + helpers ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Resolves a language code to its native name for a confirmation banner
+    /// (the <see cref="Kumunita.Web.Controllers
+    /// .AnnouncementController.SeedLanguageName"/> pattern). A "a read, not a
+    /// decision" catalog lookup; falls back to the raw code when the language
+    /// is not in the catalog (a never-blank shape).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
+    }
 
     /// <summary>
     /// Seeds the composer / edit form's picker options (the

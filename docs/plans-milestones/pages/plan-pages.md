@@ -256,7 +256,7 @@ about slot still mounts the page; the ADR 0039 "Consequences" note
 | U03 | write lanes (create/edit/publish/move/delete + translation) + C3 audit | write-lane tests green | ☐ |
 | U04 | `PageController` + tree + post view + composer (WYSIWYG) | Web tests green, E2E browse/compose | ✓ (E2E browse/compose is live-run only) |
 | U05 | reference-from-UGC + seeded pages + `/about` fallback | fresh instance byte-identical, link gated | ✓ (`about` unseeded — product-story fallback kept; `terms`+`help` seeded) |
-| U06 | translation lane live (standing + ADR 0027 display) | Translator add + chip-swap green | ☐ |
+| U06 | translation lane live (standing + ADR 0027 display) | Translator add + chip-swap green | ✓ (Web 231 + Core 513 green; no drift) |
 | U07 | **absorb complete — retire `LocalizedPage`** (last) | zero `LocalizedPage` refs in `src/`, all green | ☐ |
 
 ## Drift-pause policy (the repo's convention)

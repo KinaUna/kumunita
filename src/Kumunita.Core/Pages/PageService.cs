@@ -213,15 +213,53 @@ public sealed class PageService : IPageService
         if (string.IsNullOrEmpty(actorId))
             throw new UnauthorizedAccessException("An acting actor is required.");
 
-        if (actorRoles.Contains(Roles.GlobalAdmin))
-            return;
-        if (actorRoles.Contains(Roles.Translator))
-            return;
-        if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
-            return;
+        if (!CanTranslatePage(actorId, actorRoles, page))
+            throw new UnauthorizedAccessException(
+                $"Only a GlobalAdmin, a Translator, or a moderator of community '{page.ComponentId}' may add a translation.");
+    }
 
-        throw new UnauthorizedAccessException(
-            $"Only a GlobalAdmin, a Translator, or a moderator of community '{page.ComponentId}' may add a translation.");
+    /// <summary>
+    /// The public ADR 0029 standing probe the Web layer calls to decide
+    /// whether to render the "add a translation" affordance on a page (a
+    /// <b>display</b> pin, not a gate — the real deny is the
+    /// <see cref="AddTranslationAsync"/> standing re-check, which re-runs this
+    /// same rule server-side via <see cref="CheckTranslateStanding"/>). It
+    /// delegates to the single shared decision body
+    /// (<see cref="CanTranslatePageCore"/>), so the display and the gate can
+    /// never drift apart (the
+    /// <see cref="Kumunita.Core.Posts.PostService.CanAddTranslation"/> /
+    /// <see cref="Kumunita.Core.Announcements.AnnouncementService
+    /// .CanTranslateAnnouncement"/> shape).
+    /// </summary>
+    public static bool CanTranslatePage(string actorId, IReadOnlySet<string> actorRoles, Page? page)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (page is null)
+            return false;
+        if (string.IsNullOrEmpty(actorId))
+            return false;
+        return CanTranslatePageCore(actorRoles, page);
+    }
+
+    /// <summary>
+    /// The single shared translation-standing decision (ADR 0039 §3.7 / ADR
+    /// 0029 carried over): a GlobalAdmin or a Translator qualifies on **any**
+    /// page; a community Moderator qualifies only when the page is scoped to
+    /// their community (<c>page.ComponentId</c> — a flat/public page has no
+    /// community to moderate, so that branch never qualifies). Called by both
+    /// <see cref="CanTranslatePage"/> (the display probe) and
+    /// <see cref="CheckTranslateStanding"/> (the write-lane gate), so the two
+    /// can never disagree.
+    /// </summary>
+    private static bool CanTranslatePageCore(IReadOnlySet<string> actorRoles, Page page)
+    {
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return true;
+        if (actorRoles.Contains(Roles.Translator))
+            return true;
+        if (page.ComponentId is not null && actorRoles.Contains(Roles.ModeratorComponent(page.ComponentId)))
+            return true;
+        return false;
     }
 
     // ─── Hierarchy guards (ADR 0039 §3.3 — cycle-guard + depth-cap) ───────
