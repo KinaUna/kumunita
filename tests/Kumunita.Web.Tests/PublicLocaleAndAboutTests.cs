@@ -73,40 +73,34 @@ public class PublicLocaleAndAboutTests
 
     // ── (c) GET /about — page truly absent → product-story view ────────────
 
-    private static (StaticPagesController controller, ITranslationProvider provider) BuildAbout(
-        LocalizedPage? page, string? cookie)
+    private static (StaticPagesController controller, IPageService pages) BuildAbout(Page? page)
     {
-        var provider = Substitute.For<ITranslationProvider>();
-        provider.GetPageAsync("about", Arg.Any<string?>())
-            .Returns(Task.FromResult(page));
-
-        // PG U05: the StaticPagesController is now tree-first; these about tests
-        // exercise the LEGACY LocalizedPage fallback, so the Page tree reports
-        // "absent" (KeyNotFoundException) and the controller falls through to
-        // the provider (the pre-U05 branches, preserved).
         var pages = Substitute.For<IPageService>();
-        pages.GetByPathAsync("about")
-            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
+        if (page is null)
+        {
+            // Absent from the tree (KeyNotFoundException) — the U05 drift pin:
+            // a fresh instance has no `about` Page.
+            pages.GetByPathAsync(Arg.Any<string>())
+                .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+        }
+        else
+        {
+            pages.GetByPathAsync("about").Returns(page);
+        }
 
         var controller = new StaticPagesController(
             pages,
-            provider,
             Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
-        var httpContext = new DefaultHttpContext();
-        if (cookie is not null)
-            // IRequestCookieCollection is read-only; seed the preference via the raw
-            // Cookie header (the cookie collection parses it) — same value LocaleCookie.Read sees.
-            httpContext.Request.Headers["Cookie"] = $"kumunita.locale={cookie}";
-        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-
-        return (controller, provider);
+        return (controller, pages);
     }
 
     [Fact]
     public async Task Get_About_NoPage_Renders_ProductStory_View()
     {
-        var (controller, _) = BuildAbout(page: null, cookie: null);
+        var (controller, _) = BuildAbout(page: null);
 
         var result = await controller.About();
 
@@ -118,52 +112,47 @@ public class PublicLocaleAndAboutTests
         Assert.Equal("Maplewood", vm.CommunityName);
     }
 
-    // ── (d) GET /about — page present → localized page in preferred language ─
+    // ── (d) GET /about — page present → the shared Page view ───────────────
 
     [Fact]
-    public async Task Get_About_PagePresent_Renders_LocalizedPage_In_Preference()
+    public async Task Get_About_PagePresent_RendersPageView()
     {
-        var page = new LocalizedPage
+        var (controller, _) = BuildAbout(page: new Page
         {
+            Id = "page-about-001",
+            ParentId = null,
             Slug = "about",
-            LanguageCode = "pl",
             Title = "O nas",
             Body = "Jesteśmy Twoim sąsiedztwem.",
-            Updated = DateTimeOffset.UtcNow,
-        };
-        var (controller, provider) = BuildAbout(page: page, cookie: "pl");
+            LanguageCode = "pl",
+            Audience = null,
+            Created = DateTimeOffset.UtcNow,
+            Modified = DateTimeOffset.UtcNow,
+        });
 
         var result = await controller.About();
 
-        // The page renders through the shared static-page engine, and the
-        // preferred code (the pl cookie) is what was handed to the provider.
+        // The page renders through the shared static-page engine (the
+        // StaticPageViewModel shape).
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Page", view.ViewName);
-        Assert.Same(page, view.ViewData.Model);
-
-        await provider.Received(1).GetPageAsync("about", "pl");
+        var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
+        Assert.Equal("about", model.Slug);
+        Assert.Equal("O nas", model.Title);
     }
 
-    // ── /terms and /help keep the 404 floor (the additive Slugs guard is
-    //      non-regressive — terms/help still NotFound when absent, not
-    //      product-story) ──────────────────────────────────────────────────
+    // ── /terms and /help keep the 404 floor (terms/help still NotFound when
+    //      absent from the tree, not product-story) ─────────────────────────
 
     [Fact]
     public async Task Get_Terms_NoPage_Still_404s()
     {
-        var provider = Substitute.For<ITranslationProvider>();
-        provider.GetPageAsync("terms", Arg.Any<string?>())
-            .Returns(Task.FromResult<LocalizedPage?>(null));
-
-        // PG U05: tree-first — the Page tree reports absent so the route falls
-        // through to the (also-absent) provider → the 404 floor is preserved.
         var pages = Substitute.For<IPageService>();
         pages.GetByPathAsync("terms")
             .Returns(Task.FromException<Page>(new KeyNotFoundException()));
 
         var controller = new StaticPagesController(
             pages,
-            provider,
             Options.Create(new CommunityOptions { Name = "Kumunita" }));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 

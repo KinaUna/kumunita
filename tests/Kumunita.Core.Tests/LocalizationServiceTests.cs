@@ -125,42 +125,10 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(null));
     }
 
-    // ── M5 — static page localizes per page ──────────────────────────────────
-    // `en` has a "terms" page; `pl` has NO "terms" page (fallback to en).
-    // `pl` has a "help" page (preferred wins).
-    // (M·2, M·7.)
-
-    [Fact]
-    public async Task M5_StaticPageLocalizesPerPage()
-    {
-        var store = await BootStoreAsync();
-        await SeedM1RowAsync(store);
-        await AddLanguage(store, "pl", "Polski");
-
-        // en terms page; no pl terms page (per-page fallback).
-        await UpsertPage(store, "terms", "en", "Terms", "en-terms-body");
-        // pl help page (preferred wins).
-        await UpsertPage(store, "help", "pl", "Pomoc", "pl-help-body");
-
-        var provider = new TranslationProvider(store);
-
-        // "terms" with pl preference → no pl row → falls back to en (M·2).
-        var terms = await provider.GetPageAsync("terms", "pl");
-        Assert.NotNull(terms);
-        Assert.Equal("Terms", terms!.Title);
-        Assert.Equal("en-terms-body", terms.Body);
-
-        // "help" with pl preference → the pl row (preferred wins).
-        var help = await provider.GetPageAsync("help", "pl");
-        Assert.NotNull(help);
-        Assert.Equal("Pomoc", help!.Title);
-    }
-
     // ── M6 — UGC renders as authored, never translated ──────────────────────
-    // Plant an `en` Post; plant a `pl` TranslationResource and a `pl`
-    // LocalizedPage. The Post's Body is **unchanged** (as authored). The
-    // provider resolves the `pl` UI string and page independently — it
-    // **never** reads a Post body (M·3).
+    // Plant an `en` Post; plant a `pl` TranslationResource. The Post's Body is
+    // **unchanged** (as authored). The provider resolves the `pl` UI string
+    // independently — it **never** reads a Post body (M·3).
     // (M·3.)
 
     [Fact]
@@ -182,17 +150,13 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
             Audience = new Authorization.Audience(),
         });
 
-        // Platform text: a pl TranslationResource and a pl LocalizedPage.
+        // Platform text: a pl TranslationResource.
         await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
-        await UpsertPage(store, "help", "pl", "Pomoc", "pl-help");
 
         var provider = new TranslationProvider(store);
 
         // The provider resolves platform text in pl (independent of the Post).
         Assert.Equal("Strona główna", await provider.GetAsync("nav.home", "pl"));
-        var page = await provider.GetPageAsync("help", "pl");
-        Assert.NotNull(page);
-        Assert.Equal("Pomoc", page!.Title);
 
         // The Post's Body is **unchanged** — never translated (M·3).
         await using var session = store.QuerySession();
@@ -353,8 +317,8 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
     }
 
     // ── M12 — completeness view shows missing keys ──────────────────────────
-    // en has keys a, b, c; pl has a, b (no c). en has "terms" page; pl has
-    // "terms" page. Completeness for pl: MissingKeys = [c].
+    // en has keys a, b, c; pl has a, b (no c). Completeness for pl:
+    // MissingKeys = [c].
     // (M·2, M·6.)
 
     [Fact]
@@ -364,16 +328,14 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         await SeedM1RowAsync(store);
         await AddLanguage(store, "pl", "Polski");
 
-        // en universe: keys a, b, c; page "terms".
+        // en universe: keys a, b, c.
         await UpsertTranslation(store, "a", "en", "A");
         await UpsertTranslation(store, "b", "en", "B");
         await UpsertTranslation(store, "c", "en", "C");
-        await UpsertPage(store, "terms", "en", "Terms", "en");
 
-        // pl present: keys a, b (no c); page "terms".
+        // pl present: keys a, b (no c).
         await UpsertTranslation(store, "a", "pl", "A-pl");
         await UpsertTranslation(store, "b", "pl", "B-pl");
-        await UpsertPage(store, "terms", "pl", "Warunki", "pl");
 
         var svc = new LocalizationService(store);
         var completeness = await svc.GetCompletenessAsync("pl");
@@ -384,38 +346,6 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.DoesNotContain("c", completeness.PresentKeys);
         Assert.Contains("c", completeness.MissingKeys);
         Assert.DoesNotContain("a", completeness.MissingKeys);
-        Assert.Contains("terms", completeness.PresentPageSlugs);
-        Assert.Empty(completeness.MissingPageSlugs);
-    }
-
-    // ── M13 — removed-language page rows are retained ────────────────────────
-    // Seed `en` + `pl`; a `pl` "terms" page. Remove `pl`. Re-add `pl`.
-    // The `pl` "terms" page row is **restored** (retained, not deleted).
-    // (M·7.)
-
-    [Fact]
-    public async Task M13_RemovedLanguagePageRows_Retained()
-    {
-        var store = await BootStoreAsync();
-        await SeedM1RowAsync(store);
-        await AddLanguage(store, "pl", "Polski");
-
-        const string actor = "admin-m13";
-        var svc = new LocalizationService(store);
-
-        await svc.UpsertPageAsync("terms", "pl", "Warunki", "pl-terms-body", actor);
-
-        // Remove pl (not the default — allowed).
-        await svc.RemoveLanguageAsync("pl", actor);
-
-        // Re-add pl.
-        await svc.AddLanguageAsync("pl", "Polski", actor);
-
-        // The pl "terms" page row is **restored** (M·7 retention).
-        var page = await svc.GetPageAsync("terms", "pl");
-        Assert.NotNull(page);
-        Assert.Equal("Warunki", page!.Title);
-        Assert.Equal("pl-terms-body", page.Body);
     }
 
     // ── ML-UI U6 — the batch read (D6-1: raw rows, no fallback, empty-not-null) ──
@@ -542,30 +472,6 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("translation.save", row.Action);
         Assert.Equal("translation", row.TargetKind);
         Assert.Equal(key, row.TargetId);
-        Assert.Equal(AccessVia.Admin, row.Via);
-        Assert.Equal(AccessOutcome.Allow, row.Outcome);
-        Assert.Equal(actor, row.ActorId);
-    }
-
-    // 18 — Admin_SavePage_AuditRowShape_ViaAdmin
-    [Fact]
-    public async Task Admin_SavePage_AuditRowShape_ViaAdmin()
-    {
-        var store = await BootStoreAsync();
-        await SeedM1RowAsync(store);
-        await AddLanguage(store, "pl", "Polski");
-
-        const string actor = "admin-a18";
-        const string slug = "terms";
-        var svc = new LocalizationService(store);
-        await svc.UpsertPageAsync(slug, "pl", "Warunki", "body", actor);
-
-        var audits = await AuditRows(store, action: "page.save");
-        Assert.Single(audits);
-        var row = audits[0];
-        Assert.Equal("page.save", row.Action);
-        Assert.Equal("localized_page", row.TargetKind);
-        Assert.Equal(slug, row.TargetId);
         Assert.Equal(AccessVia.Admin, row.Via);
         Assert.Equal(AccessOutcome.Allow, row.Outcome);
         Assert.Equal(actor, row.ActorId);
@@ -811,37 +717,6 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         else
         {
             existing.Text = text;
-            session.Store(existing);
-        }
-        await session.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Upsert a LocalizedPage row via a direct write (test fixture
-    /// seeding — not a service write seam).</summary>
-    private static async Task UpsertPage(
-        IDocumentStore store, string slug, string languageCode, string title, string body)
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var session = store.OpenSession(new SessionOptions());
-        var existing = await session
-            .Query<LocalizedPage>()
-            .Where(p => p.Slug == slug && p.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct);
-        if (existing is null)
-            session.Store(new LocalizedPage
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Slug = slug,
-                LanguageCode = languageCode,
-                Title = title,
-                Body = body,
-                Updated = DateTimeOffset.UtcNow
-            });
-        else
-        {
-            existing.Title = title;
-            existing.Body = body;
-            existing.Updated = DateTimeOffset.UtcNow;
             session.Store(existing);
         }
         await session.SaveChangesAsync(ct);

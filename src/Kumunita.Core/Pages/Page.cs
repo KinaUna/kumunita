@@ -2,8 +2,9 @@ namespace Kumunita.Core.Pages;
 
 /// <summary>
 /// A **page** — the body/structure node of the platform's knowledge tree
-/// (ADR 0039; the Pages lane `PG`, absorbing the static-page lane ADR 0005 A
-/// — `LocalizedPage` is retired last, in U07). A page is one node in a
+/// (ADR 0039; the Pages lane `PG`, which absorbed the static-page lane ADR
+/// 0005 A — the legacy per-slug static-page doc was retired in U07, and this
+/// <see cref="Page"/> is now the single source). A page is one node in a
 /// **forest**: nested by <see cref="ParentId"/> (null = a root node),
 /// identified within its parent by <see cref="Slug"/> — the
 /// <c>(ParentId, Slug)</c> unique index (<see cref="PageDocTypes.Configure"/>)

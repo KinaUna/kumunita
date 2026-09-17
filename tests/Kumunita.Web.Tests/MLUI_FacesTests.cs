@@ -192,45 +192,39 @@ public class MLUI_FacesTests
         Assert.Equal(new[] { "Code", "Rows" }, editorProps);
     }
 
-    // ── L9 — /about, three branches (per-page fallback → product-story) ──────
-    // (M·2, M·7.) The provider (substituted) owns the per-page fallback; the
-    // controller is the thin route. We assert which page the controller renders.
+    // ── L9 — /about (absent → product-story; present → the shared Page view) ─
+    // (M·2, M·7.) PG U07: the controller is tree-only — the Page tree is the
+    // single store. The two branches here: absent (the U05 drift pin — `about`
+    // is not seeded) degrades to the product-story view; present renders the
+    // shared Page view. (The per-page language fallback is the Page tree's
+    // job, covered in the ML-UI U7 Core surface, not the controller.)
 
-    private static (StaticPagesController controller, ITranslationProvider provider) BuildAbout(
-        LocalizedPage? page, string? cookie)
+    private static (StaticPagesController controller, IPageService pages) BuildAbout(Page? page)
     {
-        var provider = Substitute.For<ITranslationProvider>();
-        provider.GetPageAsync("about", Arg.Any<string?>()).Returns(Task.FromResult(page));
-
-        // PG U05: the StaticPagesController is now tree-first. These L9 tests
-        // exercise the LEGACY LocalizedPage fallback (M·2's per-page fallback),
-        // so the new Page tree reports "absent" (KeyNotFoundException) and the
-        // controller falls through to the provider — preserving the pre-U05
-        // three branches (a/b/c) exactly. (A tree-present test lives in
-        // StaticPagesControllerPgTests.cs.)
         var pages = Substitute.For<IPageService>();
-        pages.GetByPathAsync("about")
-            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+
+        if (page is null)
+        {
+            pages.GetByPathAsync(Arg.Any<string>())
+                .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+        }
+        else
+        {
+            pages.GetByPathAsync("about").Returns(page);
+        }
 
         var controller = new StaticPagesController(
             pages,
-            provider,
             Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
-        var httpContext = new DefaultHttpContext();
-        if (cookie is not null)
-            // Seed the preference via the raw Cookie header (the collection parses
-            // it) — same value LocaleCookie.Read sees (the U7 pattern).
-            httpContext.Request.Headers["Cookie"] = $"kumunita.locale={cookie}";
-        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
-
-        return (controller, provider);
+        return (controller, pages);
     }
 
-    [Fact(DisplayName = "L9a no about row in any language → the product-story view (Home/About + HomeViewModel)")]
+    [Fact(DisplayName = "L9a no about page in the tree → the product-story view (Home/About + HomeViewModel)")]
     public async Task MLUI_U8_L9_AboutAbsent_ProductStoryView()
     {
-        var (controller, _) = BuildAbout(page: null, cookie: null);
+        var (controller, _) = BuildAbout(page: null);
 
         var result = await controller.About();
 
@@ -241,48 +235,28 @@ public class MLUI_FacesTests
         Assert.Equal("Maplewood", vm.CommunityName);
     }
 
-    [Fact(DisplayName = "L9b en about present, pl preference, no pl row → the en page (per-page fallback, M·2)")]
-    public async Task MLUI_U8_L9_AboutEnPage_PrefPlNoPlRow_RendersEnPage()
+    [Fact(DisplayName = "L9b an about page present in the tree → the shared Page view")]
+    public async Task MLUI_U8_L9_AboutPagePresent_RendersPageView()
     {
-        var enPage = new LocalizedPage
+        var (controller, _) = BuildAbout(page: new Page
         {
+            Id = "page-about-001",
+            ParentId = null,
             Slug = "about",
-            LanguageCode = "en",
-            Title = "About",
-            Body = "We are your neighborhood.",
-            Updated = DateTimeOffset.UtcNow,
-        };
-        // Per-page fallback is the provider's job: pl preference, no pl row →
-        // the provider hands back the en page. The controller renders it.
-        var (controller, provider) = BuildAbout(page: enPage, cookie: "pl");
-
-        var result = await controller.About();
-
-        var view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("Page", view.ViewName);
-        Assert.Same(enPage, view.ViewData.Model);
-        // The preferred code (the pl cookie) is what was handed to the provider.
-        await provider.Received(1).GetPageAsync("about", "pl");
-    }
-
-    [Fact(DisplayName = "L9c pl about present → the pl page wins (preferred language)")]
-    public async Task MLUI_U8_L9_AboutPlPage_PrefPl_RendersPlPage()
-    {
-        var plPage = new LocalizedPage
-        {
-            Slug = "about",
-            LanguageCode = "pl",
             Title = "O nas",
             Body = "Jesteśmy Twoim sąsiedztwem.",
-            Updated = DateTimeOffset.UtcNow,
-        };
-        var (controller, provider) = BuildAbout(page: plPage, cookie: "pl");
+            LanguageCode = "pl",
+            Audience = null,
+            Created = DateTimeOffset.UtcNow,
+            Modified = DateTimeOffset.UtcNow,
+        });
 
         var result = await controller.About();
 
         var view = Assert.IsType<ViewResult>(result);
         Assert.Equal("Page", view.ViewName);
-        Assert.Same(plPage, view.ViewData.Model);
-        await provider.Received(1).GetPageAsync("about", "pl");
+        var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
+        Assert.Equal("about", model.Slug);
+        Assert.Equal("O nas", model.Title);
     }
 }

@@ -1057,3 +1057,137 @@ pre-existing + 5 new `PG6_CanTranslatePage_*`), `IPageService`/`Page`/
 frozen seams — verified by `git status`), **no drift-pause triggered**. **Next
 unit: U07** (the destructive `LocalizedPage` retirement — the last unit of the
 `PG` lane).
+
+## U7 — Absorb complete: retire `LocalizedPage` (destructive, last)
+
+U07 is the **destructive** unit — the last of the `PG` lane. U01–U06 put the
+new `Page`/`PageTranslation` tree in front of every seam that used to read
+`LocalizedPage`, so U07 simply **deletes the legacy document and every service
+seam that still touches it**, and leaves the routes (`/about`/`/terms`/`/help`)
+pointing at the tree. No new surface, no new ADR — it's a removal.
+
+**What I changed:**
+
+- **`src/Kumunita.Core/Localization/LocalizedPage.cs` — DELETED.** The legacy
+  static-page document is gone.
+- **`src/Kumunita.Core/M1DocTypes.cs`** — removed the `LocalizedPage`
+  unique-index registration (the doc-type registration surface no longer lists
+  it).
+- **`src/Kumunita.Core/Localization/ITranslationProvider.cs` +
+  `TranslationProvider.cs`** — removed `GetPageAsync` and
+  `FindPageByImageIdAsync` (the two page-string / page-image seams).
+- **`src/Kumunita.Core/Localization/ILocalizationService.cs` +
+  `LocalizationService.cs`** — removed `GetPageAsync` + `UpsertPageAsync`.
+  **`GetCompletenessAsync` now returns the 3-prop `LanguageCompleteness`** — the
+  `PresentPageSlugs` / `MissingPageSlugs` pair is gone, so the record and the
+  call site both dropped to `(LanguageCode, PresentKeys, MissingKeys)` (the one
+  compile fix of the unit — `LanguageCompleteness` no longer takes 5 args).
+- **`src/Kumunita.Core/Localization/LanguageCompleteness.cs`** — trimmed to the
+  3 props above.
+- **`src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs`** — removed the
+  `LocalizedPage` seed loop; the seeder now writes only `TranslationResource`
+  (string keys) + the `en` `Page`/`PageTranslation` docs (`SeedDefaultPagesAsync`
+  / `EnDefaultPages`). **`about` is still NOT seeded** (the U05 drift pin) — a
+  fresh `/about` renders the full-bleed product-story view, never a Markdown
+  page. Log message reworded to "(`{0}` keys) + `en` terms/help pages (`{1}`
+  Page docs); `about` is not seeded".
+- **`src/Kumunita.Web/Controllers/StaticPagesController.cs`** — rewritten
+  **tree-only**: the `LocalizedPage` fallback branch is deleted; `Page()` now
+  reads the `Page`/`PageTranslation` tree (catching `KeyNotFoundException` →
+  `NotFound`) and returns a new nested
+  **`StaticPageViewModel(string Slug, string Title, string Body,
+  DateTimeOffset Updated)`**. The ctor dropped `ITranslationProvider` — it is now
+  **2-arg** `(IPageService pages, IOptions<CommunityOptions> community)`. The
+  `/about`/`/terms`/`/help` **routes remain**; only the old store path is gone.
+- **`src/Kumunita.Web/Views/StaticPages/Page.cshtml`** — `@model` →
+  `StaticPagesController.StaticPageViewModel`.
+- **`src/Kumunita.Web/Controllers/LanguagesController.cs`** — removed the ML-UI
+  admin **page editor** (`PreviewPage` / `SavePage` actions + `PageEditorViewModel`)
+  and dropped `PresentPageSlugs` / `MissingPageSlugs` from `LanguageRowViewModel`.
+- **`src/Kumunita.Web/Views/Languages/Index.cshtml`** — removed the "Pages"
+  column + "Edit pages" link + page-slug cells; **`Views/Languages/PreviewPage.cshtml`
+  — DELETED.**
+- **`src/Kumunita.Web/Controllers/ContentImageController.cs`** — removed the
+  `ITranslationProvider pages` ctor param, the platform-page
+  `FindPageByImageIdAsync` serve branch, and the `Kumunita.Core.Localization`
+  using. The content-image owner chain is now **post → reply → announcement**
+  (a page is no longer a possible image owner).
+- **Comment / cref scrubs** across `MarkdownRenderer.cs`, `PageController.cs`,
+  `AttachmentController.cs`, `HomeController.cs`, and `Pages/Page.cs` — any
+  lingering `LocalizedPage` reference in a doc-comment/cref is gone.
+- **`src/Kumunita.Web/Milestones.cs`** — the `PG` label reworded to "absorbs and
+  retires the legacy static-page lane" (dropped the literal `LocalizedPage` name
+  from the label; `MilestonesTests` pins Ids + status, not label text). Status
+  **left at `StatusPlanned`** — the single-in-progress pin forces M4 as the only
+  `StatusNext`, so `PG` does not move to `StatusDone`/`StatusNext`.
+- **Tests** (6 files): `LocalizationServiceTests.cs` (removed the
+  `LocalizedPage`-backed tests incl. `Admin_SavePage_AuditRowShape_ViaAdmin`,
+  trimmed the completeness asserts, dropped the `UpsertPage` helper);
+  `MLUI_FacesTests.cs` (Core + Web — dropped the page-slug completeness cells);
+  `PageServiceTests.cs` (comment scrub); `StaticPagesControllerPgTests.cs`
+  (rewritten tree-only); `PublicLocaleAndAboutTests.cs` (`BuildAbout` reworked
+  tree-based; kept the about-absent + terms-404 pins);
+  `ContentImageUploadTests.cs` (5-arg ctor, dropped the Localization using);
+  `ContentImageServingTests.cs` (the retired platform-page cell recorded as
+  RETIRED — see drift below).
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 229, Errors: 0, Failed: 0**. U06's run was **231**; the delta is
+  exactly the **retired `LocalizedPage` page tests** (the two ML-UI page-slug
+  cells + the platform-page image-serve cell) — the full remaining suite is green.
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 510, Errors: 0, Failed: 0**. U06's run was **513**; the delta is
+  exactly the **three removed `LocalizationService` page tests** (M5 + M13 +
+  `Admin_SavePage_AuditRowShape_ViaAdmin`).
+- **Zero `LocalizedPage` in `src/`** — `Select-String` over every `src/**/*.cs`
+  and `src/**/*.cshtml` returns nothing; the only remaining mentions in the repo
+  are the ADR / design-doc / plan historical references (expected — they are the
+  historical record, not live code).
+- `git --no-pager status --short` — **21 modified + 2 deleted**; **no frozen-seam
+  file touched** — `Page`/`PageTranslation` docs, `IPageService`/`PageService`,
+  `PageDocTypes`, the U06 translation surface (`CanTranslatePage` /
+  `CheckTranslateStanding`), and the `DependencyInjection` registrations are all
+  clean in `git status`.
+- The **`about`-unseeded drift pin is preserved** — no `about` `Page` is seeded
+  (the U05 pin); a fresh `/about` still mounts the product-story view, not a
+  Markdown page.
+
+**Drift from the plan:** two **drift-pause decisions** (recorded here, per the
+repo's convention — a pause is documented, not silently worked around):
+
+1. **`ContentImageController`'s platform-page serve branch retired with the doc.**
+   `IPageService` has no image reverse-lookup seam, so a page was never a
+   possible content-image owner under the new tree; the branch was removed with
+   `LocalizedPage`. `ContentImageServingTests`' item 16 is now the **closed
+   (RETIRED)** cell that had pinned it.
+2. **The ML-UI admin page editor retired.** `PreviewPage` / `SavePage` /
+   `PageEditorViewModel` are gone; page editing and translation now flow through
+   the **PG U04 composer** + the **U06 translation surface** (the
+   `CanTranslatePage` / chip-swap lane) — the two dedicated page-authoring paths
+   are the tree, not the legacy ML-UI page tab.
+
+**What the next agent must know** that isn't already in the plan:
+
+- **U07 is the LAST unit of the `PG` lane — there is no U08.** The `PG` lane is
+  **complete**. The roadmap's next in-progress milestone is **M4** (events /
+  RSVPs). Do not expect a following pages unit.
+- **`Milestones.cs` `PG` status is deliberately `StatusPlanned`** — the
+  `MilestonesTests.M4_Is_The_Single_InProgress_Milestone` pin requires **exactly
+  one** `StatusNext` (M4). Do **not** flip `PG` to `StatusDone`/`StatusNext`;
+  that would break the single-in-progress pin.
+- **`LanguageCompleteness` is now 3-prop** — any code that reads the
+  completeness row must use `(LanguageCode, PresentKeys, MissingKeys)`; the
+  `PresentPageSlugs`/`MissingPageSlugs` pair no longer exists.
+- **The `StaticPagesController` ctor is 2-arg** — a test or caller that still
+  passes an `ITranslationProvider` will not compile.
+
+**Status: U07 GREEN — the `PG` lane is complete.** Build clean (zero warnings),
+Web tests **229/229** green, Core tests **510/510** green, **zero
+`LocalizedPage` references in `src/`**, `Page`/`PageTranslation`/
+`IPageService`/`PageDocTypes`/registration **untouched** (the frozen seams), the
+**`about`-unseeded pin preserved**, and the two drift-pause decisions
+(documented above) recorded. **The `PG` lane (U00–U07) is now fully absorbed —
+`LocalizedPage` is retired.** **No next unit in this lane.**

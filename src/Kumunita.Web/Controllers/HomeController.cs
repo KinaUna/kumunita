@@ -21,8 +21,8 @@ public class HomeController : Controller
     }
 
     // NOTE (ML-UI U7): GET /about moved to StaticPagesController.About — one
-    // route, one owner. It now renders an admin-created `about` LocalizedPage
-    // when one exists, falling back to the product-story view
+    // route, one owner. It now renders an admin-created `about` Page (the PG
+    // tree) when one exists, falling back to the product-story view
     // (Views/StaticPages/About) when the page is truly absent. The footer's
     // asp-action="About" link is a route, so it still targets /about unchanged.
 

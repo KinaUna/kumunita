@@ -5,8 +5,8 @@
     // ADR 0021 — the split surface: a GlobalAdmin sees the full catalog
     // (add / enable / reorder / set-default / remove) *and* the translation
     // editors; a Translator sees only the completeness view + the per-language
-    // "UI strings" and "Edit pages" editors. isGlobalAdmin gates the catalog
-    // controls below (the controller gates the same actions with [Authorize]).
+    // "UI strings" editor. isGlobalAdmin gates the catalog controls below (the
+    // controller gates the same actions with [Authorize]).
     bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
 }
 
@@ -22,8 +22,8 @@
     else
     {
         <text>
-            Review the platform's translation coverage and update the UI strings and
-            static pages. Changes take effect on the next request.
+            Review the platform's translation coverage and update the UI strings.
+            Changes take effect on the next request.
         </text>
     }
 </p>
@@ -91,7 +91,6 @@
                 <th>Native name</th>
                 <th>Enabled</th>
                 <th>UI keys</th>
-                <th>Pages</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -116,13 +115,6 @@
                         @if (row.MissingKeys.Count > 0)
                         {
                             <span class="text-warning small">· @row.MissingKeys.Count missing</span>
-                        }
-                    </td>
-                    <td>
-                        <span class="text-success small">@row.PresentPageSlugs.Count present</span>
-                        @if (row.MissingPageSlugs.Count > 0)
-                        {
-                            <span class="text-warning small">· @row.MissingPageSlugs.Count missing</span>
                         }
                     </td>
                     <td class="text-nowrap">
@@ -150,17 +142,14 @@
                                 </form>
                             }
 
-                            @* Translation editors — open to both GlobalAdmin and Translator (ADR 0021). *@
-                            <a href="/admin/languages/@row.Code/pages/terms"
-                               class="btn btn-outline-info">Edit pages</a>
-
+                            @* Translation editor — open to both GlobalAdmin and Translator (ADR 0021). *@
                             <a href="/admin/languages/@row.Code/translations"
                                class="btn btn-outline-info">UI strings</a>
 
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/admin/languages/@row.Code" class="d-inline"
-                                      onsubmit="return confirm('Remove @row.Code? Its translation and page rows are retained and will be restored if the language is re-added.');">
+                                      onsubmit="return confirm('Remove @row.Code? Its translation rows are retained and will be restored if the language is re-added.');">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="btn btn-outline-danger">Remove</button>
                                 </form>

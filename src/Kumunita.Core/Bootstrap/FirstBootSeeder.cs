@@ -41,13 +41,11 @@ namespace Kumunita.Core.Bootstrap;
 /// <li><b>Canonical <c>en</c> UI strings + pages</b> (ML-UI U1, D2): the closed set
 /// in <see cref="Localization.KnownTranslationKeys"/> materialized as <c>en</c>
 /// <c>TranslationResource</c> rows, plus the <c>en</c> <c>terms</c> / <c>help</c>
-/// <c>LocalizedPage</c> rows <em>and</em> the new <see cref="Kumunita.Core
-/// .Pages.Page"/> docs (PG U05, ADR 0039 §3.9 — the absorb: the same <c>en</c>
-/// bodies on the new
-/// <c>Page</c> surface, so <c>/terms</c> / <c>/help</c> are byte-identical to
-/// today whether read from the old store or the new tree). Code-wins upsert
-/// for <c>en</c> only (never touches a non-<c>en</c> row); <c>about</c> is
-/// intentionally not seeded (a fresh <c>/about</c> is the product-story view,
+/// <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039 §3.9 — the
+/// absorb: the <c>Page</c> surface is the single source for <c>/terms</c> /
+/// <c>/help</c>, so a fresh instance is byte-identical to today). Code-wins
+/// upsert for <c>en</c> only (never touches a non-<c>en</c> row); <c>about</c>
+/// is intentionally not seeded (a fresh <c>/about</c> is the product-story view,
 /// not a Markdown page). Makes the M·9 <c>en</c> floor and the M·12
 /// completeness view real on first boot.</li>
 /// <li><b>First-boot setup email</b> to the seed admin (OPS §2 handoff — staged on
@@ -294,7 +292,7 @@ public static class FirstBootSeeder
     /// Step 5 — the canonical <c>en</c> UI-string floor + the <c>en</c> terms/help
     /// pages (ML-UI U1, D2). Materializes, as <c>en</c> rows, every key in
     /// <see cref="KnownTranslationKeys"/> (one <see cref="TranslationResource"/>
-    /// per key) plus the <c>en</c> <see cref="LocalizedPage"/> rows for
+    /// per key) plus the <c>en</c> <see cref="Kumunita.Core.Pages.Page"/> docs for
     /// <c>terms</c> and <c>help</c>. This is what makes M·9's "<c>en</c> floor is
     /// always seeded" and M·12's completeness view (missing = <c>en</c>-present
     /// minus <c>code</c>-present) real the moment a fresh instance boots.
@@ -357,63 +355,28 @@ public static class FirstBootSeeder
             }
         }
 
-        // Static pages: the `en` terms + help rows (code-wins upsert by
-        // (Slug, "en")). `about` is deliberately NOT seeded — a fresh instance's
-        // /about keeps its product-story view, and an admin can create an
-        // `about` page at runtime (the seeder never writes it).
+        // Static pages: the `en` terms + help `Page` docs (PG U05/U07, ADR 0039
+        // §3.9). `about` is deliberately NOT seeded — a fresh instance's /about
+        // keeps its product-story view, and an admin can create an `about` page
+        // at runtime (the seeder never writes it).
         var enPages = EnDefaultPages();
-        foreach (var (slug, title, body) in enPages)
-        {
-            var existing = await session
-                .Query<LocalizedPage>()
-                .Where(p => p.Slug == slug && p.LanguageCode == SourceLanguage)
-                .FirstOrDefaultAsync(ct)
-                .ConfigureAwait(false);
 
-            if (existing is null)
-            {
-                session.Store(new LocalizedPage
-                {
-                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
-                    Slug = slug,
-                    LanguageCode = SourceLanguage,
-                    Title = title,
-                    Body = body,
-                    Updated = now
-                });
-            }
-            else
-            {
-                existing.Title = title;
-                existing.Body = body;
-                existing.Updated = now;   // code wins: refresh the `en` page
-                session.Store(existing);
-            }
-        }
-
-        // PG U05 (ADR 0039 §3.9): the **new** `Page` docs for the seeded
-        // default pages — the same `en` terms/help bodies as the `LocalizedPage`
-        // rows above, so a fresh instance is byte-identical to today for
-        // /terms and /help whether read from the old store (the
-        // `StaticPagesController` fallback, retired in U07) or the new tree
-        // (`StaticPagesController` reading `IPageService.GetByPathAsync`).
-        // `about` is deliberately NOT seeded here either (the drift pin): a
-        // fresh instance's /about is the full-bleed product-story view, not a
-        // Markdown page — see EnDefaultPages()'s doc comment.
+        // PG U05 (ADR 0039 §3.9): the `Page` docs for the seeded default pages —
+        // the `en` terms/help bodies, so a fresh instance is byte-identical for
+        // /terms and /help read from the tree (`StaticPagesController` reading
+        // `IPageService.GetByPathAsync`). The legacy static-page store was
+        // retired in U07 — this is now the single source.
         //
-        // Same session, same single SaveChangesAsync below — the new `Page`
-        // docs and the legacy `LocalizedPage` rows commit atomically (one
-        // store transition, not two). Extracted to a public static so the
-        // Core test can pin idempotency across two sessions (boot twice, no
-        // duplicate root pages).
+        // Extracted to a public static so the Core test can pin idempotency
+        // across two sessions (boot twice, no duplicate root pages).
         await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         logger.LogInformation(
             "First boot: canonical `en` UI strings seeded ({0} keys) + `en` terms/help pages " +
-            "({1} LocalizedPage rows, {2} Page docs); `about` is not seeded (admin-created at runtime).",
-            KnownTranslationKeys.EnValues.Count, enPages.Length, enPages.Length);
+            "({1} Page docs); `about` is not seeded (admin-created at runtime).",
+            KnownTranslationKeys.EnValues.Count, enPages.Length);
     }
 
     /// <summary>
@@ -432,9 +395,7 @@ public static class FirstBootSeeder
     /// <see cref="Page.LanguageCode"/> = <c>en</c> (the
     /// <see cref="SourceLanguage"/>), a root node (<see cref="Page.ParentId"/>
     /// = <c>null</c>), and <see cref="Page.AuthorId"/> empty (platform content
-    /// — no resident author). It does NOT touch the legacy
-    /// <see cref="LocalizedPage"/> rows (the caller seeds those separately in
-    /// the same session) and does NOT seed <c>about</c> (the U05 drift pin —
+    /// — no resident author). It does NOT seed <c>about</c> (the U05 drift pin —
     /// a fresh <c>/about</c> is the product-story view, not a Markdown page).
     /// </para>
     /// <para>
@@ -484,11 +445,10 @@ public static class FirstBootSeeder
 
     /// <summary>
     /// The canonical <c>en</c> default-page bodies (terms + help). The single
-    /// source of the seed text: both the legacy <see cref="LocalizedPage"/>
-    /// rows and the new <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05,
-    /// ADR 0039 §3.9) carry <em>exactly</em> this text, so a fresh instance is
-    /// byte-identical to today for <c>/terms</c> and <c>/help</c> whether read
-    /// from the old store or the new tree.
+    /// source of the seed text: the <see cref="Kumunita.Core.Pages.Page"/> docs
+    /// (PG U05, ADR 0039 §3.9) carry <em>exactly</em> this text, so a fresh
+    /// instance is byte-identical to today for <c>/terms</c> and <c>/help</c>
+    /// read from the tree.
     /// <para>
     /// <b><c>about</c> is deliberately absent</b> (the U05 drift pin): a fresh
     /// instance's <c>/about</c> is the <em>full-bleed product-story view</em>

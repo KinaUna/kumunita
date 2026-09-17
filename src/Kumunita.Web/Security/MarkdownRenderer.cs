@@ -1,9 +1,10 @@
 namespace Kumunita.Web.Security;
 
 /// <summary>
-/// A minimal, escape-first Markdown → HTML renderer for
-/// <see cref="Kumunita.Core.Localization.LocalizedPage.Body"/> (ADR 0005 A —
-/// the "single page engine" the ADR promises for static pages).
+/// A minimal, escape-first Markdown → HTML renderer for the rich-content
+/// <c>Body</c> fields across the platform (static pages, the <c>Page</c>
+/// tree, announcements, posts, and replies — the "single Markdown engine"
+/// promise).
 /// <para>
 /// <b>XSS-safe by construction:</b> every input character is escaped
 /// (HtmlEncode) <i>before</i> any inline rules are applied, so a hostile
@@ -27,8 +28,8 @@ namespace Kumunita.Web.Security;
 /// </para>
 /// <para>
 /// This is the **only** place Markdown is rendered in the Web project — the
-/// U5-pinned <c>PreviewPage</c> editor view and the U6 static-page route
-/// (<c>/terms</c> / <c>/help</c>) both call <see cref="RenderHtml"/>.
+/// static-page route (<c>/terms</c> / <c>/help</c>), the <c>Page</c> tree, and
+/// the announcement/post/reply views all call <see cref="RenderHtml"/>.
 /// </para>
 /// </summary>
 public static class MarkdownRenderer

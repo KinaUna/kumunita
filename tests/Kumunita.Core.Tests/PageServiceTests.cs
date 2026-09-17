@@ -1299,9 +1299,9 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.Equal(string.Empty, terms.AuthorId);
         Assert.False(terms.IsDraft);
         Assert.False(terms.IsDeleted);
-        // Body + title carried verbatim (the byte-identical gate: the same text
-        // the legacy LocalizedPage row carries, so /terms renders identically
-        // whether read from the old store or the new tree).
+        // Body + title carried verbatim (the byte-identical gate: the seeded
+        // `Page` doc carries exactly the canonical `en` text, so /terms renders
+        // the expected body).
         var expected = defaultPages.Single(p => p.Slug == "terms");
         Assert.Equal(expected.Body, terms.Body);
         Assert.Equal(expected.Title, terms.Title);

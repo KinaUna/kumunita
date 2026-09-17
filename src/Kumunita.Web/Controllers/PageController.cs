@@ -13,10 +13,10 @@ namespace Kumunita.Web.Controllers;
 
 /// <summary>
 /// The <b>Pages</b> lane's Web surface (the <c>PG</c> lane, ADR 0039 §3.8) —
-/// the first surface to read and write the new <see cref="Page"/> /
-/// <see cref="PageTranslation"/> docs (M1's retired <see cref="Kumunita.Core.Localization
-/// .LocalizedPage"/> is not this). Six route groups, over the frozen
-/// <see cref="IPageService"/> seams (CQRS-lite, ADR 0039):
+/// the surface that reads and writes the <see cref="Page"/> /
+/// <see cref="PageTranslation"/> docs (the single source; the legacy
+/// per-slug static-page doc was retired in U07). Six route groups, over the
+/// frozen <see cref="IPageService"/> seams (CQRS-lite, ADR 0039):
 /// <list type="bullet">
 /// <item><c>GET /pages</c> — the tree browse (the
 ///       <see cref="Kumunita.Core.Authorization.IAuthorizationService.CanSeeAsync"/>(Read)-filtered

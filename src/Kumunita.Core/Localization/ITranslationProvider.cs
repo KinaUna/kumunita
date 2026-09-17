@@ -38,24 +38,4 @@ public interface ITranslationProvider
     /// </summary>
     Task<IReadOnlyDictionary<string, string>> GetManyAsync(
         IReadOnlyCollection<string> keys, string? preferredLanguageCode);
-
-    /// <summary>
-    /// One static page with **per-page** fallback (M·2): (slug, effective) →
-    /// (slug, default) → (slug, "en") → <c>null</c>. A <c>null</c> result means the
-    /// page truly does not exist in **any** language (the Web renders a 404) —
-    /// contrast the string path, whose floor is the registry's <c>en</c> source
-    /// text (ADR 0015 D1; M·1).
-    /// </summary>
-    Task<LocalizedPage?> GetPageAsync(string slug, string? preferredLanguageCode);
-
-    /// <summary>
-    /// <b>Reverse-lookup</b> read seam (RC U03, R·5): the first
-    /// <see cref="LocalizedPage"/> (by <c>Updated</c> ascending) whose
-    /// <see cref="LocalizedPage.ImageIds"/> contains
-    /// <paramref name="mediaId"/> — the serving route's platform-owner
-    /// resolution (RC R·4). **Un-audited** (RC R·5); a static page is public
-    /// by construction, so there is no <c>AccessAudit</c> lane. Null when no
-    /// page references the id (the route 404s). Read-only.
-    /// </summary>
-    Task<LocalizedPage?> FindPageByImageIdAsync(string mediaId);
 }

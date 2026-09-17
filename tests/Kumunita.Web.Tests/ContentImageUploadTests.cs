@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
-using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
@@ -275,7 +274,6 @@ public class ContentImageUploadTests
         var authz = Substitute.For<IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         var announcements = Substitute.For<IAnnouncementService>();
-        var pages = Substitute.For<ITranslationProvider>();
         var posts = new PostService(userInfo, authz, Substitute.For<IDocumentStore>());
 
         var controller = new ContentImageController(
@@ -283,7 +281,6 @@ public class ContentImageUploadTests
             authz,
             posts,
             announcements,
-            pages,
             Options.Create(mediaOptions));
 
         var httpContext = new DefaultHttpContext();

@@ -27,7 +27,7 @@ namespace Kumunita.Core.Localization;
 /// <see cref="LocaleSettings.DefaultLanguageCode"/> throws
 /// <see cref="InvalidOperationException"/> <b>before</b> any write — no
 /// <c>AccessAudit</c> row is committed for the blocked attempt. Content rows
-/// (<see cref="TranslationResource"/> / <see cref="LocalizedPage"/>) for a removed
+/// (<see cref="TranslationResource"/>) for a removed
 /// language are **retained** so re-adding restores them.
 /// </para>
 /// </summary>
@@ -128,19 +128,6 @@ public sealed class LocalizationService : ILocalizationService
     }
 
     /// <inheritdoc />
-    public async Task<LocalizedPage?> GetPageAsync(string slug, string languageCode)
-    {
-        await using var session = _store.QuerySession();
-        var ct = System.Threading.CancellationToken.None;
-
-        return await session
-            .Query<LocalizedPage>()
-            .Where(p => p.Slug == slug && p.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
     public async Task<LanguageCompleteness> GetCompletenessAsync(string languageCode)
     {
         // M·9: the "known" universe of keys / slugs is the instance's seeded `en`
@@ -169,32 +156,10 @@ public sealed class LocalizationService : ILocalizationService
 
         var missingStringKeys = enKeys.Except(presentStringKeys).OrderBy(k => k).ToList();
 
-        // Static pages: the `en` universe (M·9) vs. the language's present set.
-        var allPageRows = await session
-            .Query<LocalizedPage>()
-            .Where(p => p.LanguageCode == "en" || p.LanguageCode == languageCode)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        var enSlugs = allPageRows
-            .Where(p => p.LanguageCode == "en")
-            .Select(p => p.Slug)
-            .Distinct()
-            .ToHashSet();
-
-        var presentPageSlugs = allPageRows
-            .Where(p => p.LanguageCode == languageCode)
-            .Select(p => p.Slug)
-            .ToHashSet();
-
-        var missingPageSlugs = enSlugs.Except(presentPageSlugs).OrderBy(s => s).ToList();
-
         return new LanguageCompleteness(
             languageCode,
             presentStringKeys.OrderBy(k => k).ToList(),
-            missingStringKeys,
-            presentPageSlugs.OrderBy(s => s).ToList(),
-            missingPageSlugs);
+            missingStringKeys);
     }
 
     // ── Catalog mutations (M·6: one session + one SaveChangesAsync + one audit row) ──
@@ -345,7 +310,7 @@ public sealed class LocalizationService : ILocalizationService
         if (catalog is null)
             throw new InvalidOperationException($"Language not found: {code}");
 
-        // M·7: content rows (TranslationResource / LocalizedPage) are **retained**
+        // M·7: content rows (TranslationResource) are **retained**
         // — only the catalog row is deleted. Re-adding the language restores them.
         session.Delete<LanguageCatalog>(catalog.Id);
 
@@ -584,60 +549,6 @@ public sealed class LocalizationService : ILocalizationService
             Action = "translation.save",
             TargetKind = "translation",
             TargetId = key,
-            Via = Authorization.AccessVia.Admin,
-            Outcome = Authorization.AccessOutcome.Allow
-        });
-
-        await session.SaveChangesAsync(ct).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task UpsertPageAsync(string slug, string languageCode, string title, string body, string actorId, IReadOnlyList<string>? imageIds = null)
-    {
-        var now = DateTimeOffset.UtcNow;
-
-        await using var session = _store.OpenSession(new SessionOptions());
-        var ct = System.Threading.CancellationToken.None;
-
-        // Pair idiom: upsert by (Slug, LanguageCode) — the unique index enforces
-        // one row per pair (M·4: data, not config; live on the next request).
-        var existing = await session
-            .Query<LocalizedPage>()
-            .Where(p => p.Slug == slug && p.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-
-        if (existing is null)
-        {
-            session.Store(new LocalizedPage
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Slug = slug,
-                LanguageCode = languageCode,
-                Title = title,
-                Body = body,
-                ImageIds = imageIds ?? [], // RC U05 (R·3) — the static-page write lane persists the server-side-parsed content-image ids (null-coalesce to the doc's non-null empty list).
-                Updated = now
-            });
-        }
-        else
-        {
-            existing.Title = title;
-            existing.Body = body;
-            existing.ImageIds = imageIds ?? []; // RC U05 (R·3) — re-parsed from the (re-)edited body on every save; a body with no image links resets to empty.
-            existing.Updated = now; // server time (design doc §Pinned contract §3)
-            session.Store(existing);
-        }
-
-        session.Store(new Authorization.AccessAudit
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            At = now,
-            ActorId = actorId,
-            EffectivePrincipalId = actorId,
-            Action = "page.save",
-            TargetKind = "localized_page",
-            TargetId = slug,
             Via = Authorization.AccessVia.Admin,
             Outcome = Authorization.AccessOutcome.Allow
         });

@@ -234,9 +234,9 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
     // ── L8 — a pl-preferring resident reads an en post → the body is as authored ──
     // (M·3.) D8-8: the negative test. Plant an `en` Post (the `ML` M6 idiom),
-    // seed a `pl` registry row + a `pl` page, and assert: the post's Body is
-    // unchanged (load it back), the provider resolves the `pl` UI string, and
-    // the provider API surface has **no** method that takes a Post/PostReply/Group.
+    // seed a `pl` registry row, and assert: the post's Body is unchanged (load
+    // it back), the provider resolves the `pl` UI string, and the provider API
+    // surface has **no** method that takes a Post/PostReply/Group.
 
     [Fact(DisplayName = "L8 an en post body is never translated; the provider surface never consults UGC")]
     public async Task MLUI_U8_L8_UgcBodyAsAuthored_ProviderNeverConsultsUgc()
@@ -257,17 +257,13 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
             Audience = new Authorization.Audience(),
         });
 
-        // Platform text: a `pl` row for a **registry** key + a `pl` page.
+        // Platform text: a `pl` row for a **registry** key.
         await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
-        await UpsertPage(store, "help", "pl", "Pomoc", "pl-help-body");
 
         var provider = new TranslationProvider(store);
 
-        // The provider resolves platform text in pl (a registry key + a page).
+        // The provider resolves platform text in pl (a registry key).
         Assert.Equal("Strona główna", await provider.GetAsync("nav.home", "pl"));
-        var page = await provider.GetPageAsync("help", "pl");
-        Assert.NotNull(page);
-        Assert.Equal("Pomoc", page!.Title);
 
         // The Post's Body is **unchanged** — never translated (M·3).
         await using var session = store.QuerySession();
@@ -546,37 +542,6 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         else
         {
             existing.Text = text;
-            session.Store(existing);
-        }
-        await session.SaveChangesAsync(ct);
-    }
-
-    /// <summary>Upsert a LocalizedPage row via a direct write (test fixture
-    /// seeding — not a service write seam).</summary>
-    private static async Task UpsertPage(
-        IDocumentStore store, string slug, string languageCode, string title, string body)
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var session = store.OpenSession(new SessionOptions());
-        var existing = await session
-            .Query<LocalizedPage>()
-            .Where(p => p.Slug == slug && p.LanguageCode == languageCode)
-            .FirstOrDefaultAsync(ct);
-        if (existing is null)
-            session.Store(new LocalizedPage
-            {
-                Id = Guid.NewGuid().ToString("N"),
-                Slug = slug,
-                LanguageCode = languageCode,
-                Title = title,
-                Body = body,
-                Updated = DateTimeOffset.UtcNow
-            });
-        else
-        {
-            existing.Title = title;
-            existing.Body = body;
-            existing.Updated = DateTimeOffset.UtcNow;
             session.Store(existing);
         }
         await session.SaveChangesAsync(ct);

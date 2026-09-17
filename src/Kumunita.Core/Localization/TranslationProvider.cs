@@ -11,11 +11,12 @@ namespace Kumunita.Core.Localization;
 /// <para>
 /// <b>HTTP-free</b> (M·8): the preferred language arrives as a plain
 /// <see cref="string"/> — the provider never touches a cookie or a claim.
-/// It reads <b>only</b> the two content documents (<see cref="TranslationResource"/>
-/// / <see cref="LocalizedPage"/>) plus the M1 seed (<see cref="LanguageCatalog"/>
-/// / <see cref="LocaleSettings"/>) through a Marten <c>IQuerySession</c>; it
-/// <b>never</b> reads a <c>Post</c> / <c>PostReply</c> / <c>Group</c> body
-/// (M·3 — UGC is authored and rendered as written).
+/// It reads <b>only</b> the UI-string content document
+/// (<see cref="TranslationResource"/>) plus the M1 seed
+/// (<see cref="LanguageCatalog"/> / <see cref="LocaleSettings"/>) through a
+/// Marten <c>IQuerySession</c>; it <b>never</b> reads a
+/// <c>Post</c> / <c>PostReply</c> / <c>Group</c> body (M·3 — UGC is authored
+/// and rendered as written).
 /// </para>
 /// <para>
 /// <b>Resolution order (M·1, M·9):</b> preferred (if enabled in the catalog)
@@ -23,15 +24,14 @@ namespace Kumunita.Core.Localization;
 /// always seeded by the first-run seeder). Never returns null or empty.
 /// </para>
 /// <para>
-/// <b>Per-string / per-page fallback (M·2):</b> a partially translated language
-/// degrades gracefully per key (UI strings) and per slug (static pages) —
-/// never as a whole view flipping to <c>"en"</c>. The last-resort floor for a
-/// UI string is the key's <c>en</c> source text from the
-/// <see cref="KnownTranslationKeys"/> registry (the provider floor, ADR 0015
-/// D1 — code is the floor, so a newly wrapped string renders its English on
-/// every instance without a reseed); an unregistered key falls back to the
-/// raw key itself. A resident never sees a blank label either way; for a
-/// static page the floor is <c>null</c> (the Web renders a 404).
+/// <b>Per-string fallback (M·2):</b> a partially translated language
+/// degrades gracefully per key (UI strings) — never as a whole view flipping
+/// to <c>"en"</c>. The last-resort floor for a UI string is the key's
+/// <c>en</c> source text from the <see cref="KnownTranslationKeys"/> registry
+/// (the provider floor, ADR 0015 D1 — code is the floor, so a newly wrapped
+/// string renders its English on every instance without a reseed); an
+/// unregistered key falls back to the raw key itself. A resident never sees a
+/// blank label either way.
 /// </para>
 /// </summary>
 public sealed class TranslationProvider : ITranslationProvider
@@ -159,43 +159,5 @@ public sealed class TranslationProvider : ITranslationProvider
             result[key] = text ?? (KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key);
         }
         return result;
-    }
-
-    /// <inheritdoc />
-    public async Task<LocalizedPage?> GetPageAsync(string slug, string? preferredLanguageCode)
-    {
-        var (_, chain) = await ResolveChainAsync(preferredLanguageCode).ConfigureAwait(false);
-        await using var session = _store.QuerySession();
-        var ct = CancellationToken.None;
-
-        // One query: all candidate rows for this slug (M·2: per-page fallback).
-        var rows = await session
-            .Query<LocalizedPage>()
-            .Where(p => p.Slug == slug && chain.Contains(p.LanguageCode))
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
-
-        foreach (var lang in chain)
-        {
-            var match = rows.FirstOrDefault(p => p.LanguageCode == lang);
-            if (match != null)
-                return match;
-        }
-        return null; // M·2: truly absent in every language → the Web renders a 404.
-    }
-
-    /// <inheritdoc />
-    public async Task<LocalizedPage?> FindPageByImageIdAsync(string mediaId)
-    {
-        if (string.IsNullOrEmpty(mediaId))
-            throw new ArgumentException("A media id is required.", nameof(mediaId));
-
-        await using var session = _store.QuerySession();
-        return await session
-            .Query<LocalizedPage>()
-            .Where(p => p.ImageIds.Contains(mediaId))
-            .OrderBy(p => p.Updated)
-            .FirstOrDefaultAsync()
-            .ConfigureAwait(false);
     }
 }

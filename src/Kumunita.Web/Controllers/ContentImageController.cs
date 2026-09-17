@@ -1,6 +1,5 @@
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Authorization;
-using Kumunita.Core.Localization;
 using Kumunita.Core.Media;
 using Kumunita.Core.Posts;
 using Kumunita.Web.Security;
@@ -15,7 +14,7 @@ namespace Kumunita.Web.Controllers;
 /// <ol>
 /// <li>Validate the id: 1–128 lowercase hex chars. Reject (400) anything else.</li>
 /// <li><see cref="IMediaStore.GetAsync"/> → miss ⇒ <b>404</b> (zero audit rows).</li>
-/// <li>Reverse lookup: post → reply → announcement → page. All null ⇒ <b>404</b>
+/// <li>Reverse lookup: post → reply → announcement. All null ⇒ <b>404</b>
 /// (orphan is inert — R·4; no GlobalAdmin branch).</li>
 /// <li>Branch by owner:
 /// <ul>
@@ -28,8 +27,6 @@ namespace Kumunita.Web.Controllers;
 /// scope/communities read gate (<see cref="IAnnouncementService.GetAsync"/>),
 /// else <b>404</b> (no <c>CanAsync</c> + no <c>AccessAudit</c> row — announcements
 /// are not audience-restricted; the flat gate is the whole decision).</li>
-/// <li>Platform page → serve directly (public by construction — zero
-/// <c>CanAsync</c>, zero audit rows).</li>
 /// </ul></li>
 /// <li><see cref="IMediaStore.OpenReadAsync"/> →
 /// <c>File(stream, stored.ContentType)</c> + <c>X-Content-Type-Options: nosniff</c>
@@ -45,7 +42,6 @@ public sealed class ContentImageController(
     IAuthorizationService authz,
     PostService posts,
     IAnnouncementService announcements,
-    ITranslationProvider pages,
     IOptions<MediaOptions> mediaOpts) : Controller
 {
     /// <summary>
@@ -109,16 +105,6 @@ public sealed class ContentImageController(
                 announcement.Id, KumunitaPrincipal.SubjectId(User), KumunitaPrincipal.RoleSet(User));
             if (visible is null) return NotFound(); // not visible → 404 (no-leak)
             // ── Step 5: serve ─────────────────────────────────────────
-            var stream = await media.OpenReadAsync(id);
-            Response.Headers["X-Content-Type-Options"] = "nosniff";
-            return File(stream, stored.ContentType);
-        }
-
-        var page = await pages.FindPageByImageIdAsync(id);
-        if (page is not null)
-        {
-            // ── Step 4 (platform page): public by construction (R·4) ───
-            // ── Step 5: serve (zero CanAsync, zero audit rows) ─────────
             var stream = await media.OpenReadAsync(id);
             Response.Headers["X-Content-Type-Options"] = "nosniff";
             return File(stream, stored.ContentType);

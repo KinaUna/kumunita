@@ -12,10 +12,11 @@ namespace Kumunita.Web.Controllers;
 /// controller:
 /// <para>
 /// The **translation editors** — <see cref="Translations"/>,
-/// <see cref="SaveTranslation"/>, <see cref="PreviewPage"/>, <see cref="SavePage"/>
-/// — are open to both <see cref="Roles.GlobalAdmin"/> and <see
-/// cref="Roles.Translator"/> (ADR 0021): a delegated Translator may update and add
-/// the UI strings and static pages but holds no catalog standing.
+/// <see cref="SaveTranslation"/> — are open to both <see cref="Roles.GlobalAdmin"/>
+/// and <see cref="Roles.Translator"/> (ADR 0021): a delegated Translator may update
+/// and add the UI strings but holds no catalog standing. (The static-page editor
+/// was retired in the PG U07 absorb — page editing/translation now flows through
+/// the Page-tree surface.)
 /// </para>
 /// <para>
 /// The **catalog mutations** — <see cref="Add"/>, <see cref="Enable"/>,
@@ -47,8 +48,7 @@ namespace Kumunita.Web.Controllers;
 /// <c>/terms</c> <c>/about</c> <c>/help</c> static-page routes) and the Razor
 /// views that bind to this controller were **U6**'s (the key-managed editor,
 /// <see cref="Translations"/>) — built on top of this controller's stable HTTP
-/// surface (<see cref="SaveTranslation"/> / <see cref="SavePage"/>), which it
-/// reused rather than reshaped.
+/// surface (<see cref="SaveTranslation"/>), which it reused rather than reshaped.
 /// </summary>
 // Attribute routing: the documented URL is /admin/languages (ADR 0005 D, design
 // doc §5, README, ARCHITECTURE.md, and every hardcoded view form action). The
@@ -79,9 +79,10 @@ public sealed class LanguagesController(
 
         // The M·12 completeness view (design doc §5 pins Index to exactly
         // ListLanguagesAsync + GetCompletenessAsync — no LocaleSettings read here,
-        // no new seam): for each language, which UI keys and static pages are
-        // present vs. missing — the gap a resident would hit via M·2's per-string
-        // fallback, surfaced *before* they hit it.
+        // no new seam): for each language, which UI keys are present vs. missing —
+        // the gap a resident would hit via M·2's per-string fallback, surfaced
+        // *before* they hit it. (Static-page coverage moved to the Page tree in
+        // the PG lane; the completeness view reports UI keys only.)
         var rows = new List<LanguageRowViewModel>();
         foreach (var row in catalog.OrderBy(r => r.SortOrder))
         {
@@ -94,8 +95,6 @@ public sealed class LanguagesController(
                 SortOrder        = row.SortOrder,
                 PresentKeys      = completeness.PresentKeys,
                 MissingKeys      = completeness.MissingKeys,
-                PresentPageSlugs = completeness.PresentPageSlugs,
-                MissingPageSlugs = completeness.MissingPageSlugs,
             });
         }
 
@@ -240,40 +239,6 @@ public sealed class LanguagesController(
         return RedirectToAction(nameof(Index));
     }
 
-    // ── /admin/languages/{code}/pages/{slug} — static-page editor/preview (M5/M13) ──
-
-    [HttpGet("{code}/pages/{slug}")]
-    public async Task<IActionResult> PreviewPage(string code, string slug)
-    {
-        var page = await localization.GetPageAsync(slug, code);
-        return View(new PageEditorViewModel
-        {
-            Code  = code,
-            Slug  = slug,
-            Title = page?.Title ?? string.Empty,
-            Body  = page?.Body ?? string.Empty,
-            HasSaved = page is not null,
-        });
-    }
-
-    [HttpPost("{code}/pages/{slug}")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SavePage(string code, string slug, string title, string body)
-    {
-        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(slug))
-            return RedirectToAction(nameof(Index));
-
-        var actor = ActorId(User) ?? string.Empty;
-        // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links
-        // into the LocalizedPage.ImageIds the service persists; the client never
-        // sends the ids (a form field would be spoofable). Same shared helper the
-        // announcement + group-post write lanes use (one seam, no copy-paste).
-        var imageIds = ContentImageIds.ExtractContentImageIds(body);
-        await localization.UpsertPageAsync(slug, code, title ?? string.Empty, body ?? string.Empty, actor, imageIds);
-        TempData["info"] = $"Page “{slug}” in “{code}” saved (visible on the next request).";
-        return RedirectToAction(nameof(PreviewPage), new { code, slug });
-    }
-
     // ── View models (the shell + editor shapes) ─────────────────────────────────────
     // Nested **public** types so U6's Razor views can bind to them as
     // `@model LanguagesController.LanguageRowViewModel` (a private nested type is
@@ -288,17 +253,6 @@ public sealed class LanguagesController(
         public int SortOrder { get; init; }
         public IReadOnlyList<string> PresentKeys { get; init; } = Array.Empty<string>();
         public IReadOnlyList<string> MissingKeys { get; init; } = Array.Empty<string>();
-        public IReadOnlyList<string> PresentPageSlugs { get; init; } = Array.Empty<string>();
-        public IReadOnlyList<string> MissingPageSlugs { get; init; } = Array.Empty<string>();
-    }
-
-    public sealed class PageEditorViewModel
-    {
-        public string Code { get; init; } = string.Empty;
-        public string Slug { get; init; } = string.Empty;
-        public string Title { get; init; } = string.Empty;
-        public string Body { get; init; } = string.Empty;
-        public bool HasSaved { get; init; }
     }
 
     // U6 (ML-UI): the key-managed editor (FACES L5). Same D6-5 pattern as the

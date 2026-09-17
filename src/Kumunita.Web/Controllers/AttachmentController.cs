@@ -104,9 +104,9 @@ public sealed class AttachmentController(
     /// </ol>
     /// 5-step ordering (frozen, C-ATT·7): (1) validate id → 400; (2)
     /// <see cref="IMediaStore.GetAsync"/> miss ⇒ 404 (zero audit rows);
-    /// (3) reverse-lookup post → reply → announcement (no
-    /// <c>LocalizedPage</c> branch — attachments are not on static pages this
-    /// pass); all null ⇒ 404 (orphan, zero audit rows); (4) per-owner decision
+    /// (3) reverse-lookup post → reply → announcement (no static-page branch
+    /// — attachments are not on static pages this pass); all null ⇒ 404
+    /// (orphan, zero audit rows); (4) per-owner decision
     /// — post: one <see cref="IAuthorizationService.CanAsync"/>, Deny ⇒ 404
     /// (not 403) + exactly one <c>Deny</c> audit row; reply: load the parent
     /// post → one <see cref="IAuthorizationService.CanAsync"/>, Deny ⇒ 404 + one

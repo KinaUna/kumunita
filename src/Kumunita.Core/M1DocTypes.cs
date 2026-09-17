@@ -83,19 +83,18 @@ public static class M1DocTypes
 
         // Localization (ADR 0005, the ML lane): the language catalog + the
         // per-instance default (the seeder materializes the `en` row and a default
-        // of `en` on first boot — already shipped), plus the two content documents
-        // this lane ships (the ADR's module surface on top of that seed).
-        // The pair idiom (surrogate Id + unique index on the business-key pair) is
-        // the GroupMembership / ComponentMembership convention: one text per key
-        // per language, one page per slug per language. Rows are **retained** when
-        // a language is removed (M·7) — that retention is the ILocalizationService's
-        // job (U3), not a delete here.
+        // of `en` on first boot — already shipped), plus the UI-string content doc
+        // this lane ships (the ADR's module surface on top of that seed). The pair
+        // idiom (surrogate Id + unique index on the business-key pair) is the
+        // GroupMembership / ComponentMembership convention: one text per key per
+        // language. Rows are **retained** when a language is removed (M·7) — that
+        // retention is the ILocalizationService's job (U3), not a delete here.
+        // (The static-page doc retired in PG U07 — ADR 0039: the `Page`/
+        // `PageTranslation` docs on the Pages context own that surface now.)
         opts.Schema.For<LanguageCatalog>();
         opts.Schema.For<LocaleSettings>();
         opts.Schema.For<TranslationResource>()
                .UniqueIndex(t => t.Key, t => t.LanguageCode);   // business key (one text per key per language)
-        opts.Schema.For<LocalizedPage>()
-               .UniqueIndex(p => p.Slug, p => p.LanguageCode);  // business key (one page per slug per language)
 
         // Group / community name+description translations (ADR 0026; the
         // "separate feature" ADR 0021's scope boundary deferred, the same

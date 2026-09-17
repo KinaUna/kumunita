@@ -116,7 +116,7 @@ public class ContentImageServingTests
     //
     // Intended (drift-paused): the store returns a <see cref="Kumunita.Core.Media.MediaObject"/>
     // (the bytes <b>exist</b>), <b>all</b> owner lookups (post → reply →
-    // announcement → page) return null (orphan — R·4's inert posture) →
+    // announcement) return null (orphan — R·4's inert posture) →
     // assert <b>404</b> even though the actor is a GlobalAdmin (the
     // "including GlobalAdmin" case — there is no branch that serves an
     // orphan, FACES R5) + <c>authz.CanAsync</c> received <b>zero</b> times
@@ -131,17 +131,14 @@ public class ContentImageServingTests
 
     // ── 16 — R4_PlatformPageOwner_ZeroCanAsyncCalls ───────────────────────
     //
-    // Intended (drift-paused): the page-owner lookup
-    // (<c>pages.FindPageByImageIdAsync</c>) returns a
-    // <see cref="Kumunita.Core.Localization.LocalizedPage"/> (the
-    // post/reply/announcement lookups return null) → assert a
-    // <c>FileResult</c> served + <c>authz.CanAsync</c> received <b>zero</b>
-    // times (the platform branch — public by construction, FACES R6's
-    // serving half; the R6 render half is U06's grep proof).
-    // <para>
-    // Why it is paused: driving <c>Serve</c> to the platform branch
-    // requires the <b>post</b> and <b>reply</b> lookups to return null
-    // first (owner order is post → reply → announcement → page) — which
-    // again needs the sealed <c>PostService</c> over a real Postgres.
-    // </para>
+    // RETIRED (PG U07): the platform-page serve branch depended on the
+    // legacy per-slug static-page reverse-lookup
+    // (<c>ITranslationProvider.FindPageByImageIdAsync</c>), which was
+    // retired with the static-page doc in U07 — <c>Serve</c> no longer
+    // carries a page-owner branch (owner order is now post → reply →
+    // announcement). This drift-pause cell is therefore closed: the branch
+    // no longer exists to be driven, and the remaining owner branches
+    // (items 13–15) are still unwritable against the sealed
+    // <c>PostService</c> over a real Postgres for the reason documented in
+    // the file header.
 }
