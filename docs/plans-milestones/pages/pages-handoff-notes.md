@@ -231,3 +231,140 @@ fresh-agent unit, so it has no `## U0` log section here.)_
 Web tests 203/203 green, `LocalizedPage`/`M1DocTypes` untouched. **Next unit:
 U02** (the read lanes + `PageToAuditableResource` + the standing matrix —
 the first behavioral unit of the lane).
+
+## U2 — `PageService` read lanes + `PageToAuditableResource` + the standing matrix
+
+**What I built** (all in the `Kumunita.Core.Pages` context; no Web code — U04):
+
+- `src/Kumunita.Core/Pages/PageToAuditableResource.cs` (new) — **the adapter**
+  (the only new authorization surface, ADR 0039 §3.4). Mirrors
+  `Posts.PostToAuditableResource` verbatim: `Id` = `Page.Id`; `Name` =
+  `Page.Title` or a 60-char-truncated `Page.Body` (the same `57 + "..."`
+  fallback); `OwnerId` = `Page.AuthorId`; `Audience` = `Page.Audience`
+  (**null allowed** — the one place pages differ from posts; `Post`'s is
+  `null!`); `ComponentId` = `Page.ComponentId`; `TargetKind` = `"page"`.
+  `sealed`. Compiles against the **frozen** `IAuthorizationService`
+  (ADR 0006 §A) with **no** signature change — no new `AccessAction`, no new
+  `AccessVia`, no new `Decide()` branch.
+- `src/Kumunita.Core/Pages/IPageService.cs` (modified) — added the five read-lane
+  signatures: `GetByPathAsync(string)`, `GetBySlugUnderParentAsync(string?,
+  string)`, `GetTreeAsync()`, `GetTranslationsAsync(string)`,
+  `GetByMountPointAsync(string)` (returns `Page?`). The U03 write lanes are a
+  comment placeholder (unchanged).
+- `src/Kumunita.Core/Pages/PageService.cs` (modified) — the implementation.
+  - **Read lanes:** `GetByPathAsync` (walks the `(ParentId, Slug)` chain
+    root→leaf; `KeyNotFoundException` on a missing segment);
+    `GetBySlugUnderParentAsync` (one level; `KeyNotFoundException` on absent);
+    `GetTreeAsync` (**`IsDeleted` filtered here** — the ADR 0024 soft-delete
+    read filter lives with the read, not the write, per the plan);
+    `GetTranslationsAsync` (loads the page first, `KeyNotFoundException` if
+    absent; rows ordered by `LanguageCode`); `GetByMountPointAsync` (string
+    equality match on `MountPoint`, `IsDeleted` filtered, returns `null` when
+    the slot is unmounted or empty — a display concern, not a 404).
+  - **Standing-matrix gate helpers** (`CheckCreateStanding` /
+    `CheckEditStanding` / `CheckTranslateStanding`) — **pure / static** role-claim
+    checks (the `AnnouncementService` C3 server-side re-check shape, but
+    store-free so they are directly testable and callable from any U03 write
+    lane). A `null` page → `KeyNotFoundException` (404); a denied actor →
+    `UnauthorizedAccessException` (403). Reuses the **existing** role claims
+    (`Roles.GlobalAdmin` / `Roles.Translator` / `Roles.ModeratorComponent`) —
+    no new ADR needed, so **no drift-pause (a)**.
+  - **Hierarchy guards** (`GetDepthAsync` / `EnsureNoCycleAsync` /
+    `EnsureDepthWithinLimitAsync`, `MaxDepth = 8`) — DB-backed (Marten has no
+    FK, so the guard is the service's). Exercised now (U02) so the guard is
+    pinned before U03's `MoveAsync`/`CreateAsync` call them.
+- `tests/Kumunita.Core.Tests/PageServiceTests.cs` (new) — **the `PG_*` family
+  (42 tests)** mirroring the `A0036_*` / `PostServiceTests` harness shape:
+  (1) the adapter projection (3); (2) the frozen `Decide()` branches through a
+  `Page` target — null-audience-public, `Community` flag+member, grants, owner
+  (5); (3) `GetByPath` root→leaf / absent / deleted-segment (3); (4)
+  `GetBySlugUnderParent` resolved / absent (2); (5) `GetTree`
+  IsDeleted-filtered / all-live (2); (6) `GetTranslations` ordered / missing /
+  empty (3); (7) `GetByMountPoint` resolved / unmounted / deleted (3); (8) the
+  standing matrix — create/edit/translate × GlobalAdmin / Moderator / Member,
+  incl. the flat-page denial + the null-page 404 (16); (9) the hierarchy
+  guards — cycle (self / descendant / sibling) + depth-cap (within / exceeds)
+  + `GetDepth` (7).
+
+**What I verified** (the test-runner quirk in `AGENTS.md` applies — never
+`dotnet test` / VS Test Explorer):
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 475, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (45.2 s).
+  U01's run was **433**; the delta is exactly the **42 new `PG_*` tests**
+  (433 + 42 = 475) — the full existing suite stayed green, so the U01
+  `Page`/`PageTranslation` schema + the U02 read/standing/guard code introduced
+  no regression.
+- **Adapter against the frozen seam:** `PageToAuditableResource` references
+  only `IAuditableResource` + `Authorization.Audience` (both pre-existing) and
+  adds **no** `AccessAction` / `AccessVia` / `Decide()` branch — confirmed by
+  the `PG_NullAudience_Stranger_Reads_Public` (branch 5),
+  `PG_CommunityFlagAndMember_Allows_ViaCommunity` (branch 4),
+  `PG_GrantsBranch_UserGrant_Allows` (branch 6), and
+  `PG_GrantsBranch_OwnerBranchStillAllows` (branch 1) tests all passing through
+  the real `AuthorizationService`.
+
+**Drift from the plan** (two, both minor and recorded per protocol):
+
+1. **Key type is `string`, not `Guid`.** The plan's read-lane signatures read
+   `GetBySlugUnderParentAsync(Guid? parentId, …)` /
+   `GetTranslationsAsync(Guid pageId)`, but the U01 handoff note (and the U01
+   `Page`/`PageTranslation` POCOs) established the **`string Id`** Marten
+   conventional-identity convention for this context (the M3 "string Id"
+   convention). I followed the **implemented** doc shape (`string` /
+   `string?`), which the U01 note already flagged as the correction to the
+   plan's `Guid` wording. Consistent, no behavior difference.
+2. **The standing helpers are `static` and take `(actorId, actorRoles, page)`**
+   rather than an instance method on `(actor, page)`. The plan's
+   `CheckEditStanding(actor, page)` etc. are a *server-side* re-check, so the
+   helper needs the actor's **role claims** (the `IReadOnlySet<string>`), not
+   just an id. Making them `static` keeps them store-free and pure (directly
+   testable, callable from any U03 write lane), which is the
+   `AnnouncementService` C3 re-check shape minus the store. The U03 write lanes
+   will call `PageService.CheckEditStanding(actorId, actorRoles, page)` and
+   throw the 403/404 it raises. This is the *intended* U03 call shape, recorded
+   here so U03 does not re-decide it.
+
+**What the next agent (U03) must know** that isn't already in the plan:
+
+- **The `PageService` constructor is `PageService(IDocumentStore store)`** —
+  **one param only.** The standing helpers are `static` (no store) and the read
+  lanes need no `IUserInfoService`/`IAuthorizationService` (the read decision
+  is made by the **Web layer** through the `PageToAuditableResource` adapter,
+  not inside `PageService`). The U01 handoff note's expectation that U02 would
+  add `IUserInfoService`/`IAuthorizationService` constructor params **did not
+  materialize** — U02's read lanes are pure document reads, so the frozen seams
+  stay out of `PageService`. U03's write lanes add their own audit-write path
+  (the `AnnouncementService` C3 caller-session `AccessAudit` row) and can
+  compose `IAuthorizationService`/`IUserInfoService` **in U03** if it needs them.
+- **`IsDeleted` filtering lives in the U02 read lanes**
+  (`GetTreeAsync` / `GetByPathAsync` / `GetByMountPointAsync` / the private
+  `LoadByParentAndSlugAsync`), **not** in a `CanSeeAsync` call. The `Page`
+  doc's `IsDeleted` flag is set by U03's `DeleteAsync`. Do not duplicate the
+  filter in U03's `Get*` read paths — it is already here.
+- **`MaxDepth = 8`** is a `public const` on `PageService`. `GetDepthAsync`
+  (root = depth 1) / `EnsureNoCycleAsync` (walk up from the new parent; self- or
+  descendant-parent ⇒ `InvalidOperationException`) /
+  `EnsureDepthWithinLimitAsync` (`GetDepthAsync(parent) + 1 > MaxDepth` ⇒
+  `InvalidOperationException`) are the **write-lane guard seams** — U03's
+  `CreateAsync`/`MoveAsync` call them before committing. The depth-cap test
+  boundary: a chain of 8 pages (depth 1..8) **exceeds** when a new node is
+  placed under the depth-8 node (would be depth 9); a chain of 7 allows a
+  depth-8 child.
+- **The `(ParentId, Slug)` unique index does NOT prevent two roots sharing a
+  slug** (the U01 drift note — Postgres treats NULLs as distinct). U03's
+  `CreateAsync`/`MoveAsync` must be the authoritative root-slug guard.
+- **`GetByMountPointAsync` returns `Page?`** (`null` = unmounted), not
+  `Page` — the Web layer (U04) skips the link on `null`. The two known slots
+  are `"footer/community"` and `"help/account"`.
+- **No `LocalizedPage`/`M1DocTypes` was touched** (U07 retires it), and **no
+  Web code** was added (U04).
+
+**Status: U02 GREEN.** Build clean (zero warnings), Core tests **475/475** green
+(433 pre-existing + 42 new `PG_*`), the adapter compiles against the **frozen**
+`IAuthorizationService` with no signature change, `LocalizedPage`/`M1DocTypes`
+untouched, no Web code. **Next unit: U03** (the write lanes
+`CreateAsync`/`UpdateAsync`/`PublishAsync`/`MoveAsync`/`DeleteAsync`/
+`AddTranslationAsync`, each with its C3 `AccessAudit` row, `TargetKind =
+"page"` — reusing the U02 standing helpers + hierarchy guards).
