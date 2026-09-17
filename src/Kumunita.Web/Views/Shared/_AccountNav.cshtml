@@ -77,6 +77,11 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
         </li>
+        @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
+           group posts, and announcements live here, hidden from every feed. *@
+        <li class="nav-item">
+            <a class="nav-link text-dark" href="/my/drafts"><kw-l key="nav.my_drafts">My drafts</kw-l></a>
+        </li>
         <li class="nav-item">
             <a class="nav-link text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
         </li>

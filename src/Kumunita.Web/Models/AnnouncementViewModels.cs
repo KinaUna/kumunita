@@ -203,6 +203,16 @@ public sealed class AnnouncementComposeViewModel
     /// </summary>
     public bool SaveAsDraft { get; set; } = false;
 
+    /// <summary>
+    /// ADR 0037 — the id of an already-saved draft this composer is continuing
+    /// to edit. The <see cref="Kumunita.Web.Controllers.AnnouncementController"/>
+    /// POST sets it after the first draft save; a subsequent draft save then
+    /// <b>updates</b> the same draft (never minting a duplicate) because the id
+    /// round-trips through a hidden form field across the stateless re-renders.
+    /// Empty on a fresh composer (the first save creates the draft).
+    /// </summary>
+    public string? DraftId { get; set; }
+
     /// <summary>The caller's role-dependent scope options, reseeded by the controller on
     /// every render (not a form field — the POST invalid / POST unauthorized paths
     /// always overwrite from the caller's role set before the view sees this).</summary>

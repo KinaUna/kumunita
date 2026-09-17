@@ -80,6 +80,7 @@ public static class KnownTranslationKeys
             ["nav.translations"]  = "Translations",
             ["nav.sign_out"]      = "Sign out",
             ["nav.children"]      = "Children",
+            ["nav.my_drafts"]     = "My drafts",
 
             // ── guardian (the /me/children child-accounts surface, GU ADR 0028) ──
             ["guardian.title"]        = "Your children",

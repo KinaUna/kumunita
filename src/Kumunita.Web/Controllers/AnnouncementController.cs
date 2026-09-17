@@ -410,12 +410,19 @@ public sealed class AnnouncementController(
     }
 
     /// <summary>
-    /// <c>POST /announcements/new</c> — the write lane. On success, redirects
-    /// to the read page (the new announcement is visible to the visitor
-    /// immediately — the split is the gate, not a re-render). On failure,
-    /// re-renders <c>New</c> with the caller's <c>AllowedScopes</c> restored
-    /// to their role-dependent set (a POST that 500s into a fresh GET with a
-    /// different AllowedScopes would mis-seed the scope picker).
+    /// <c>POST /announcements/new</c> — the write lane. A <b>live</b> save
+    /// (save-as-draft off) redirects to the read page (the new announcement is
+    /// visible to the visitor immediately — the split is the gate, not a
+    /// re-render). A <b>draft</b> save (ADR 0037, save-as-draft on) persists
+    /// and stays on the composer: the first save creates the draft, and each
+    /// later save <b>updates the same draft</b> (the <see
+    /// cref="Kumunita.Web.Models.AnnouncementComposeViewModel.DraftId"/>
+    /// round-trips via a hidden field) so continued work never mints a
+    /// duplicate; the author keeps working where they left off. A failed save
+    /// (invalid, unauthorized, or missing actor) re-renders <c>New</c> with the
+    /// caller's <c>AllowedScopes</c> restored to their role-dependent set (a
+    /// POST that 500s into a fresh GET with a different AllowedScopes would
+    /// mis-seed the scope picker).
     /// </summary>
     [HttpPost("/announcements/new")]
     [ValidateAntiForgeryToken]
@@ -446,8 +453,7 @@ public sealed class AnnouncementController(
 
         try
         {
-            var created = await announcements.CreateAsync(
-                new Announcement
+            var toSave = new Announcement
                 {
                     Title  = string.IsNullOrWhiteSpace(model.Title) ? string.Empty : model.Title.Trim(),
                     Body   = model.Body!,
@@ -462,10 +468,49 @@ public sealed class AnnouncementController(
                     AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
                     // ADR 0037 — draft mode: saved but invisible to all but the author until published.
                     IsDraft = model.SaveAsDraft,
-                },
-                actorId:     authorId,
-                authorRoles: RoleSet(User),
-                session);
+                };
+
+            Announcement result;
+            if (model.SaveAsDraft && !string.IsNullOrWhiteSpace(model.DraftId))
+            {
+                // ADR 0037 — continuing an already-saved draft: UPDATE the same
+                // document (the DraftId round-trips via a hidden field, so the
+                // stateless re-render keeps pointing at one draft) instead of
+                // minting a duplicate. UpdateAsync is author-gated (the author is
+                // always the caller here) and never touches IsDraft — editing a
+                // draft never publishes it (ADR 0037).
+                toSave.Id = model.DraftId;
+                result = await announcements.UpdateAsync(
+                    toSave,
+                    actorId:    authorId,
+                    actorRoles: RoleSet(User),
+                    session);
+            }
+            else
+            {
+                result = await announcements.CreateAsync(
+                    toSave,
+                    actorId:     authorId,
+                    authorRoles: RoleSet(User),
+                    session);
+            }
+
+            if (model.SaveAsDraft)
+            {
+                // ADR 0037 — draft save: persist and let the author keep working.
+                // Do NOT navigate away (a redirect to the feed would look like a
+                // loss — the draft is invisible there anyway). Re-render the
+                // compose form with the author's content still in the editor (the
+                // model round-trips Title/Body/Scope/etc.) and a confirmation, so
+                // they continue where they left off. Remember the draft's id so
+                // the next save updates this same draft (no duplicates). The
+                // draft is reachable any time via "My drafts".
+                model.DraftId = result.Id;
+                await SeedComposeOptionsAsync(model, RoleSet(User));
+                TempData["info"] = "Saved as draft — it's hidden from everyone (including admins) until you publish it. Find it under “My drafts”.";
+                return View(model);
+            }
+
             TempData["info"] = "Announcement created.";
             return RedirectToAction("Index");
         }

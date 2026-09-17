@@ -1373,6 +1373,125 @@ public class AnnouncementControllerTests
         Assert.False(captured!.IsDraft);
     }
 
+    // ── ADR 0037 — draft save stays on the composer (no navigation) ─────────
+
+    /// <summary>
+    /// ADR 0037 — the draft-save <b>navigation</b> pin: a <c>POST /announcements/new</c>
+    /// with <c>SaveAsDraft = true</c> and <b>no</b> remembered <see
+    /// cref="AnnouncementComposeViewModel.DraftId"/> (a first save) must (a)
+    /// <b>create</b> the draft via <see cref="IAnnouncementService.CreateAsync"/>
+    /// (not the edit seam), (b) return a <b>view</b> (re-render the composer)
+    /// rather than a redirect to the feed (a redirect would leave the author's
+    /// content looking lost, since the draft is invisible to the feed), and
+    /// (c) set <c>model.DraftId</c> to the created announcement's id so a
+    /// subsequent save continues this same draft. The author stays where they
+    /// left off — "persist it and let the user continue working on it."
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_FirstSave_CreatesAndStaysOnComposer()
+    {
+        const string author = "subj-df-compose-stay";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                var a = call.ArgAt<Announcement>(0);
+                a.Id = "ann-df-stay-created";
+                return a;
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body",
+            SaveAsDraft = true,
+            DraftId = null,
+        };
+
+        var result = await controller.New(model);
+
+        // (a) created via the create seam — and NOT via the edit seam.
+        await announcements.Received(1).CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+        await announcements.DidNotReceive().UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+
+        // (b) stayed on the composer (a view), not a redirect away.
+        var view = Assert.IsType<ViewResult>(result);
+        var reRendered = Assert.IsType<AnnouncementComposeViewModel>(view.ViewData.Model);
+        // The author's content is still in the form (continued where they left off).
+        Assert.Equal("draft body", reRendered.Body);
+
+        // (c) the draft's id is remembered for the next save.
+        Assert.Equal("ann-df-stay-created", model.DraftId);
+    }
+
+    /// <summary>
+    /// ADR 0037 — the draft-save <b>no-duplicate</b> pin: a <c>POST
+    /// /announcements/new</c> with <c>SaveAsDraft = true</c> and a remembered
+    /// <see cref="AnnouncementComposeViewModel.DraftId"/> (a continuation save)
+    /// must <b>update</b> the existing draft via <see
+    /// cref="IAnnouncementService.UpdateAsync"/> — passing the remembered id as
+    /// the announcement's <c>Id</c> — and must <b>not</b> mint a duplicate via
+    /// <see cref="IAnnouncementService.CreateAsync"/>. Re-saving while staying
+    /// on the composer keeps pointing at one draft (the id round-trips via the
+    /// form's hidden field).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_SecondSave_UpdatesSameDraft_NoDuplicate()
+    {
+        const string author = "subj-df-compose-again";
+        const string existingDraftId = "ann-df-existing";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        Announcement? capturedUpdate = null;
+        announcements.UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                capturedUpdate = call.ArgAt<Announcement>(0);
+                return capturedUpdate;
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body, revised",
+            SaveAsDraft = true,
+            DraftId = existingDraftId,
+        };
+
+        var result = await controller.New(model);
+
+        // Updated the existing draft — carrying its id — and did NOT create a new one.
+        await announcements.Received(1).UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+        await announcements.DidNotReceive().CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(existingDraftId, capturedUpdate!.Id);
+
+        // Stayed on the composer.
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal(existingDraftId, model.DraftId);
+    }
+
     /// <summary>
     /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
     /// the compose form's language picker: an empty enabled catalog + the

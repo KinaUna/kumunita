@@ -43,6 +43,12 @@
         <form id="new-announcement-form" method="post" action="/announcements/new">
             @Html.AntiForgeryToken()
 
+            @* ADR 0037 — draft round-trip: after the first "save as draft" the
+               controller remembers this draft's id and re-renders with it set,
+               so a later save UPDATES the same draft (no duplicates). Empty on
+               a fresh composer; the model binder fills it back from this field. *@
+            <input type="hidden" name="DraftId" value="@Model.DraftId" />
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="scope" style="font-weight:600;">
