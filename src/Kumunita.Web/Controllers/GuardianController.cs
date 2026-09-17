@@ -104,11 +104,14 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                 inv.InvitedAt.ToString("O")));
         }
 
+        var guardianItems = await ActiveGuardiansAsync(childId);
+
         return View(new MembershipEditorModel(
             childId,
             groupIds.OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList(),
             communityIds.OrderBy(c => c, StringComparer.OrdinalIgnoreCase).ToList(),
-            invitations));
+            invitations,
+            guardianItems));
     }
 
     /// <summary>Suspend a child (sets <c>Profile.Blocked</c>; the existing
@@ -370,6 +373,91 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// GA (ADR 0038): assign a second guardian to this child. The
+    /// standing gate (G-A·1 — the <c>ActiveLinkAsync</c> helper the
+    /// <c>Dissolve</c> route already uses) runs first; a non-guardian
+    /// → 404. The resolution (G-A·2 — the
+    /// <c>FindSubjectByEmailAsync</c> seam) runs second; null → the
+    /// form's error surface ("No account with that email.").
+    /// Self-assignment (G-A·5) + duplicate-assignment (G-A·4) are the
+    /// third step (both <see cref="InvalidOperationException"/> →
+    /// the form's error surface). The
+    /// <see cref="IUserInfoService.CreateGuardianLinkAsync"/> call is
+    /// the fourth — one commit, one <c>guardian.create</c> audit row
+    /// (C3), the <b>existing</b> GU seam (no new Core seam).
+    /// </summary>
+    [HttpPost("{childId}/assign")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Assign(string childId, [FromForm] AssignGuardianForm form)
+    {
+        if (!ModelState.IsValid)
+            return View("Detail", new AssignGuardianForm { Email = form.Email });
+
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(childId))
+            return NotFound();
+
+        // G-A·1 — the standing gate: the actor must hold an active link
+        // over this child (the ActiveLinkAsync helper the Dissolve route
+        // already uses). A non-guardian → 404 (the ADR 0012/0013 "a
+        // non-guardian learns nothing" shape).
+        var link = await ActiveLinkAsync(subject, childId);
+        if (link is null)
+            return NotFound();
+
+        var email = (form.Email ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(email))
+        {
+            ModelState.AddModelError(nameof(AssignGuardianForm.Email), "An email is required.");
+            return View("Detail", new AssignGuardianForm { Email = email });
+        }
+
+        // G-A·2 — the resolution: the email → subject id (the
+        // FindSubjectByEmailAsync seam). Null → the form's error
+        // surface (a user-presentable error, never a 500, never an
+        // auto-create — the GU lane's G·4 "formation is creation-based"
+        // precedent).
+        var assignedId = await identity.FindSubjectByEmailAsync(email);
+        if (assignedId is null)
+        {
+            ModelState.AddModelError(string.Empty, "No account with that email.");
+            return View("Detail", new AssignGuardianForm { Email = email });
+        }
+
+        // G-A·5 — self-assignment is refused (the (actorId, childId)
+        // pair is the same as the (assignedId, childId) pair — the GU
+        // formation lane's territory, and CreateGuardianLinkAsync is
+        // already idempotent for it — a no-op, not a useful act).
+        if (assignedId == subject)
+        {
+            ModelState.AddModelError(string.Empty, "You are already this child's guardian.");
+            return View("Detail", new AssignGuardianForm { Email = email });
+        }
+
+        try
+        {
+            // G-A·4 — the CreateGuardianLinkAsync seam is idempotent for
+            // the (guardianId, childId) pair (the GU lane's G·4
+            // precedent, inherited): a duplicate active row is a no-op —
+            // the row is left as-is, no second audit row. The happy
+            // path is one commit, one guardian.create audit row (C3).
+            await userInfo.CreateGuardianLinkAsync(childId, assignedId);
+            TempData["info"] = $"Guardian assigned.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("Detail", new AssignGuardianForm { Email = email });
+        }
+
+        return RedirectToAction(nameof(Detail), new { childId });
+    }
+
     // ── Read helpers (the GuardianLink standing read + the per-child
     //    display-name join) — reads only, no standing logic, no writes. ────────
 
@@ -392,6 +480,33 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
                 link.ChildId,
                 profile?.DisplayName ?? link.ChildId,
                 profile?.Blocked ?? false));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// GA (ADR 0038) — the child's <b>active</b>
+    /// <see cref="GuardianLink"/> rows (a read, not a decision), joined
+    /// to each guardian's display name (ids/names only — G-A·3). The
+    /// <c>ActiveChildrenAsync</c> helper inverted: the child's active
+    /// guardian rows, not the guardian's child rows.
+    /// </summary>
+    private async Task<IReadOnlyList<GuardianItem>> ActiveGuardiansAsync(string childId)
+    {
+        await using var session = store.QuerySession();
+        var links = await session
+            .Query<GuardianLink>()
+            .Where(l => l.ChildId == childId && l.Status == GuardianLinkStatus.Active)
+            .ToListAsync(System.Threading.CancellationToken.None);
+
+        var rows = new List<GuardianItem>(links.Count);
+        foreach (var link in links)
+        {
+            var profile = await userInfo.GetProfileAsync(link.GuardianId);
+            rows.Add(new GuardianItem(
+                link.GuardianId,
+                profile?.DisplayName ?? link.GuardianId));
         }
 
         return rows;
