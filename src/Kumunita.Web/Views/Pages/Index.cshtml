@@ -1,0 +1,76 @@
+@model Kumunita.Web.Models.PageTreeViewModel
+@using Kumunita.Web.Models
+@{
+    ViewData["Title"] = "Pages";
+
+    // Flatten the forest to a depth-tagged list (pre-order, parent before
+    // its children) so the tree renders as one foreach — Razor @functions
+    // cannot mix HTML with an async Task, so we flatten here instead of
+    // recursing in the view. (A pure projection of the already-loaded model;
+    // no I/O.)
+    var flat = new List<(PageNode Node, int Depth)>();
+    void Walk(IReadOnlyList<PageNode> nodes, int depth)
+    {
+        foreach (var n in nodes)
+        {
+            flat.Add((n, depth));
+            Walk(n.Children, depth + 1);
+        }
+    }
+    Walk(Model.Roots, 0);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h1 class="mb-0"><kw-l key="pages.title">Pages</kw-l></h1>
+            @if (User?.Identity?.IsAuthenticated == true)
+            {
+                <a class="btn btn-sm btn-primary ms-auto" href="/pages/new">
+                    <kw-l key="pages.new_button">New page</kw-l>
+                </a>
+            }
+        </div>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (Model.Roots.Count == 0)
+        {
+            <div class="alert alert-info">
+                <kw-l key="pages.none">No pages yet. Global admins and community moderators can create the first one — an <b>About</b> page is the common starting point.</kw-l>
+            </div>
+        }
+        else
+        {
+            <nav aria-label="Page tree">
+                <ul class="list-unstyled page-tree">
+                @foreach (var (node, depth) in flat)
+                {
+                    <li class="page-tree-item" style="margin-left:@(depth * 1.25)rem">
+                        <a class="page-tree-link" href="@node.Path">@node.Title</a>
+                        @if (node.IsDraft)
+                        {
+                            <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+                                <kw-l key="posts.draft_badge">Draft</kw-l>
+                            </span>
+                        }
+                    </li>
+                }
+                </ul>
+            </nav>
+        }
+    </div>
+</div>

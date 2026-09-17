@@ -574,6 +574,115 @@ code — U04, no `LocalizedPage`/`M1DocTypes` touched — U07):
   The U04 `PageController` resolves `IPageService` from DI (the
   `DependencyInjection.cs` registration is unchanged from U01) and passes
   the caller's `IDocumentSession` to the write lanes (the C3 shape — the
+
+---
+
+## U4 — PageController + tree + post view + composer
+
+**What was built (all under `src/Kumunita.Web/` + `tests/Kumunita.Web.Tests/`; `Kumunita.Core` untouched, verified by `git status`):**
+
+- `Controllers/PageController.cs` — the six route groups (tree browse,
+  post view, composer GET/POST, edit GET/POST, publish, delete, move).
+- `Security/PagePaths.cs` — pure `Derive`/`Href` (the `Page` → derived-path
+  projection, 64-step cycle guard; Web-only, no store / HTTP / authorization).
+- `Security/PageMountResolver.cs` — `ResolveAsync(IPageService, string slot)
+  → Task<(string Href, string Title)?>`; null when unmounted / slot blank /
+  mounted page absent from the live tree; runs NO access decision.
+- `Models/PageViewModels.cs` — `PageNode`, `PageTreeViewModel`,
+  `PageShowViewModel`, `PageComposeViewModel` (`IsPublic = true` default,
+  `[BindNever]` pickers, `IsValid`).
+- `Views/Pages/{Index,Show,New,Edit,_PageForm}.cshtml` — the composer (New)
+  and edit (Edit) **share `_PageForm.cshtml`** (one editor, one renderer);
+  Index flattens the forest to a `List<(PageNode, int Depth)>` and renders one
+  `foreach` (a `@functions { async Task ... }` block with HTML does not compile).
+- `Views/Shared/_MountSlot.cshtml` — slot-generic partial; the layout's footer
+  wires `{ ViewData["MountSlot"] = "footer/community"; }` +
+  `<partial name="_MountSlot" />` (replacing the old `/about` link).
+
+**Locked decisions (recorded here so U05+ does not re-derive them):**
+
+- **Slug = `Slugify(Title)` server-side; the slug is NOT a form field** — the
+  path is derived from the `(ParentId, Slug)` chain (ADR 0039 §3.2/§3.3), never
+  stored from a POST. A non-ASCII-only title falls back to the slug `"page"`.
+- **`IsPublic = true` → `Audience = null` AND `ComponentId = null`** (the public
+  shape — no audience object, no community scope). `IsPublic = false` →
+  `model.Audience.BuildAudience()` + the posted `CommunityId` (the ADR 0036
+  single-source: the editor is the ONLY deserialization site).
+- **The draft gate is a Web-layer pin** (a non-author never sees a
+  `Page.IsDraft` page — it is filtered from the tree browse AND 403s on the
+  post view). It runs *before* the audience `Read` decision; the `Read`
+  decision (via `PageToAuditableResource` + the frozen
+  `IAuthorizationService.CanAsync`/`CanSeeAsync`) is the audience pin. The two
+  are distinct and both run.
+- **404 vs 403 are DISTINCT and MUST NOT collapse** (the page-specific split,
+  unlike posts/announcements which 404 both): `GetByPathAsync` KNE → **404**;
+  page-exists-but-`CanAsync(Read)`-deny / draft-not-author / anonymous-non-public
+  → **403**. `UnauthorizedAccessException` from a write lane → **403** (never
+  folded into a 404).
+- **Anonymous non-public → `ForbidResult` (403)** — not a 404 (the page exists;
+  the caller has no standing).
+- **`[Authorize(Roles = "GlobalAdmin,Moderator")]` is SAFE** on New/Edit/Move/
+  Delete (the role claim type is `"Kumunita.Role"` at identity mint; component
+  moderators carry base `Moderator` + `moderator:{componentId}`). Publish is
+  plain `[Authorize]` (author-only, re-checked by the service — ADR 0037, NO
+  `actorRoles` param).
+- **Edit GET loads via `store.QuerySession().LoadAsync<Page>(id)`** (the read
+  session, the `AnnouncementController` idiom); **Edit POST loads the existing
+  row via `store.LightweightSession().LoadAsync<Page>(id)`** (the write
+  session, then `UpdateAsync` in a second `LightweightSession`). Both use the
+  **no-CT** overload (Marten's `LoadAsync` has an *optional* CT — a single
+  method; the tests stub `Arg.Any<CancellationToken>()` which matches both and
+  satisfies xUnit1051).
+- **ImageIds/AttachmentIds are set Web-side before the write lane** (the U03
+  invariant): `ContentImageIds.ExtractContentImageIds` / `AttachmentIds
+  .ExtractAttachmentIds` scan the body for **hex** route-shaped ids
+  (`/content-image/{hex}` / `/attachment/{hex}`, 1–128 hex); Core normalizes
+  `?? []` and never parses the body.
+
+**What is unit-tested (NSubstitute, no live Postgres) vs live-run verified:**
+
+- Unit-tested: the 404≠403 split (absent / denied / draft-gate), the tree
+  browse filter (a denied page is *absent*, not blanked; a non-author's draft
+  is absent), the mount resolver (mounted / unmounted / soft-deleted-mounted),
+  the composer audience round-trip (IsPublic=true → null audience + null
+  component; IsPublic=false → `BuildAudience` output + community; the
+  `ImageIds`/`AttachmentIds` extraction before `CreateAsync`), and the standing
+  re-check (Delete UAAE → 403, Delete KNE → 404, Publish UAAE → 403).
+- Live-run only (not unit-pinned here): the `_PageForm` render, the
+  `_MountSlot` partial in the footer, the `MarkdownRenderer` over the body, and
+  the ADR 0027 chip-swap across `PageTranslation` rows — these exercise the
+  view layer / DI / Marten read path and are exercised by the running app, not
+  by the NSubstitute harness.
+
+**Drifts / notes for U05 (StaticPagesController retarget):**
+
+- The **`help/account` mount slot has NO existing Web surface** — the layout
+  only wires `footer/community`. Do **NOT** invent a `help/account` page or
+  surface for U05; if a design asks for one, that is a NEW UI surface and a
+  drift-pause trigger.
+- `StaticPagesController.cs` is **untouched** (U05 retargets it onto this
+  `Page` surface). `_AudienceEditor.cshtml` is untouched (the page composer
+  uses `_GrantPickers` + inline radios instead — the page's audience editor is
+  a distinct, simpler shape than the profile's two-audience editor).
+- **NSubstitute gotcha (cost one build cycle):** for `Task<T>`-returning lanes
+  (`CreateAsync`/`UpdateAsync`/`PublishAsync`) a multi-parameter lambda
+  (`.Returns((T p, string a, ...) => ...)`) does **not** bind — use the
+  `call => { var p = call.ArgAt<T>(0); ...; return Task.FromResult(p); }` form.
+  And `Task.FromException` needs the generic parameter
+  (`Task.FromException<T>(...)`) to match a `Task<T>` return.
+- `AccessVia` has **no `None`/`Public`** members (use `Audience`/`Community`);
+  `Audience.Mode` is the `AudienceMode` **enum** (not a string) and
+  `Audience.Grants` is `List<AudienceGrant>` (record `(GrantKind, string)`),
+  while `AudienceEditorModel.Mode` **is** a string ("Any"/"All"). `Page` is a
+  **sealed class** (no `with` expressions). `Kumunita.Core.Identity.ClaimTypes`
+  is ambiguous with `System.Security.Claims.ClaimTypes` in the test file —
+  fully-qualify it.
+
+**Exit-gate status (this unit):** (1) `dotnet build Kumunita.slnx -c Debug`
+green, zero warnings — ✅; (2) `dotnet exec ...Kumunita.Web.Tests.dll` green
+— 218/218 (203 baseline + 15 PageControllerTests) — ✅; (3) `LocalizedPage` /
+`M1DocTypes` / `Kumunita.Core` untouched — ✅ (verified by `git status`); (4)
+this handoff section appended — ✅.
   Web layer's `DocumentStore.LightweightSession()`).
 - **The `ImageIds`/`AttachmentIds` are set by the Web layer before calling
   the write lanes** (the `ContentImageIds.ExtractContentImageIds` /

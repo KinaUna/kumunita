@@ -1,0 +1,695 @@
+using System.Security.Claims;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Pages;
+using Kumunita.Core.UserInfo;
+using Kumunita.Web.Controllers;
+using Kumunita.Web.Models;
+using Kumunita.Web.Security;
+using Marten;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using NSubstitute;
+
+namespace Kumunita.Web.Tests;
+
+/// <summary>
+/// Unit tests for <see cref="PageController"/> — the <c>PG</c> lane's
+/// Web surface (ADR 0039 §3.8). The pins this harness owns (the
+/// <see cref="IPageService"/> seams + the <see cref="Kumunita.Core.Authorization
+/// .IAuthorizationService"/> decision the Web layer runs):
+/// <list type="number">
+/// <item><b>404 on absent / 403 on denied are DISTINCT</b> (ADR 0039 §3.8,
+///       the page-specific split, MUST NOT be collapsed): <see
+///       cref="PageController.Show"/> on a path the service does not know is
+///       a <see cref="NotFound"/> (the <see cref="KeyNotFoundException"/>
+///       from <see cref="IPageService.GetByPathAsync"/>); the same action on
+///       a path the service <em>does</em> know but the caller is denied to
+///       (a <see cref="Decision"/> with <c>Allowed == false</c>) is a
+///       <see cref="ForbidResult"/>. The two are different HTTP semantics
+///       (the page does not exist vs. the page exists and is hidden from
+///       this actor) — collapsing them (posts / announcements'
+///       both-404 shape) would mislead both the user and the audit trail
+///       (a 403 implies a standing decision ran; a 404 implies none did).</item>
+/// <item><b>Draft gate (author-only)</b> (ADR 0037): a non-author caller
+///       hitting a draft page gets a <see cref="ForbidResult"/> — even if
+///       the <see cref="IAuthorizationService"/> <c>Read</c> decision would
+///       allow them (a draft is its author's, until published; the draft
+///       gate is the Web-layer pin, the <see cref="IAuthorizationService"/>
+///       decision is the audience pin). An author sees their own draft (the
+///       badge + publish affordance).</item>
+/// <item><b>Tree browse filter (C6 aggregate)</b>: <see
+///       cref="PageController.Index"/> calls
+///       <see cref="IAuthorizationService.CanSeeAsync"/> ONCE over the whole
+///       candidate set (the C6 aggregate row, not one per page), and a page
+///       hidden from the <c>Visible</c> set is <b>absent</b> from the
+///       rendered <see cref="PageTreeViewModel"/> — not blanked.</item>
+/// <item><b>Mount-point resolver</b> (ADR 0039 §3.8, display not access):
+///       <see cref="PageMountResolver.ResolveAsync"/> on a slot with a
+///       mounted page returns that page's <c>/pages/…</c> href + its
+///       title; on an unmounted slot (the service returns <c>null</c>) it
+///       returns <c>null</c> (the layout omits the link); on a slot whose
+///       mounted page has since been soft-deleted (not in the live tree)
+///       it returns <c>null</c> (no valid path to offer). The resolver runs
+///       NO access decision — the <c>Read</c> decision is the page's own
+///       <see cref="PageController.Show"/>.</item>
+/// <item><b>Composer audience round-trip (ADR 0036 single source)</b>:
+///       <see cref="PageController.New"/> (POST) builds the
+///       <see cref="Kumunita.Core.Authorization.Audience"/> via
+///       <see cref="AudienceEditorModel.BuildAudience"/> and passes it
+///       verbatim to <see cref="IPageService.CreateAsync"/>; when
+///       <see cref="PageComposeViewModel.IsPublic"/> is <c>true</c>, the
+///       page is written with <c>Audience = null</c> + <c>ComponentId =
+///       null</c> (the "pages default public" shape); when <c>false</c>,
+///       the editor's <c>BuildAudience()</c> + the <see
+///       cref="PageComposeViewModel.CommunityId"/> are the stored values.
+///       <see cref="PageController.Edit"/> (POST) round-trips the same way
+///       through <see cref="IPageService.UpdateAsync"/>.</item>
+/// <item><b>403 on a standing re-check (C3)</b>: <see
+///       cref="PageController.Delete"/> / <see cref="PageController.Move"/>
+///       on a page the service's <c>actorRoles</c> gate rejects (a
+///       <see cref="UnauthorizedAccessException"/> from
+///       <see cref="IPageService.DeleteAsync"/> /
+///       <see cref="IPageService.MoveAsync"/>) surface as a
+///       <see cref="ForbidResult"/> — the service is the real gate (C3),
+///       the Web <c>[Authorize(Roles=…)]</c> is a pre-gate.</item>
+/// </list>
+/// <para>
+/// The harness mirrors <see cref="AnnouncementControllerTests"/>: a
+/// NSubstitute <see cref="IPageService"/> +
+/// <see cref="IAuthorizationService"/> + <see cref="ILocalizationService"/>
+/// + <see cref="IUserInfoService"/> + <see cref="IDocumentStore"/> (the
+/// write lanes' <c>LightweightSession()</c>; the <c>Edit</c> GET lane's
+/// <c>QuerySession()</c>) — no live Postgres, no host. A
+/// <see cref="KumunitaPrincipal"/>-shaped principal is built with the
+/// <see cref="Kumunita.Core.Identity.ClaimTypes.Subject"/> +
+/// <see cref="Kumunita.Core.Identity.ClaimTypes.Role"/> claims (the
+/// repo's role-claim convention).
+/// </para>
+/// </summary>
+public class PageControllerTests
+{
+    // ── 404 vs 403 split (the page-specific pin) ─────────────────────────
+
+    /// <summary>
+    /// <see cref="PageController.Show"/> on a path the service does not
+    /// know is a <see cref="NotFound"/> — the <see
+    /// cref="KeyNotFoundException"/> from
+    /// <see cref="IPageService.GetByPathAsync"/> surfaces as a clean 404,
+    /// NOT a 403 (the page-specific split, ADR 0039 §3.8). This is the
+    /// pin that the Web layer does not collapse absent/denied (the posts /
+    /// announcements both-404 shape is NOT the page's shape).
+    /// </summary>
+    [Fact]
+    public async Task Show_When_PathAbsent_ReturnsNotFound_NotForbid()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("about").Returns(Task.FromException<Page>(
+            new KeyNotFoundException("no page at 'about'")));
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var result = await controller.Show("about");
+
+        Assert.IsType<NotFoundResult>(result);
+        await pages.DidNotReceive().GetByMountPointAsync(Arg.Any<string>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.Show"/> on a path the service <em>does</em>
+    /// know but the caller is denied to (a <see cref="Decision"/> with
+    /// <c>Allowed == false</c>) is a <see cref="ForbidResult"/> — a
+    /// distinct HTTP semantic from the absent case (a standing decision ran
+    /// here; none did in the 404 case). The pin: the Web layer does not
+    /// collapse denied→404 (the posts / announcements both-404 shape is NOT
+    /// the page's shape, ADR 0039 §3.8).
+    /// </summary>
+    [Fact]
+    public async Task Show_When_PageDenied_ReturnsForbid_NotNotFound()
+    {
+        const string pageId = "page-denied-001";
+        var page = new Page
+        {
+            Id = pageId,
+            Slug = "denied",
+            Title = "A denied page",
+            Body = "you shall not read",
+            AuthorId = "someone-else",
+            Audience = new Kumunita.Core.Authorization.Audience { Mode = AudienceMode.Any, Grants = new List<AudienceGrant> { new AudienceGrant(GrantKind.User, "some-grant") } },
+            IsDraft = false,
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("denied").Returns(page);
+
+        var authz = Substitute.For<IAuthorizationService>();
+        authz.CanAsync("subj-resident-001", Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>())
+            .Returns(new Decision(Allowed: false, Via: AccessVia.Audience, EffectivePrincipalId: "subj-resident-001"));
+
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var result = await controller.Show("denied");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// <see cref="PageController.Show"/> on a <em>draft</em> page the caller
+    /// did NOT author is a <see cref="ForbidResult"/> — the draft gate is
+    /// the Web-layer pin (a draft is its author's, until published; ADR
+    /// 0037), and it runs BEFORE the audience <see
+    /// cref="IAuthorizationService.CanAsync"/> decision (a non-author
+    /// hitting a draft never reaches the audience decision — the draft is
+    /// simply not theirs). The pin: a non-author's 403 on a draft is NOT
+    /// because the audience said no, it's because the draft is the author's.
+    /// </summary>
+    [Fact]
+    public async Task Show_When_DraftAndNotAuthor_ReturnsForbid()
+    {
+        var page = new Page
+        {
+            Id = "page-draft-001",
+            Slug = "my-draft",
+            Title = "A draft page",
+            Body = "work in progress",
+            AuthorId = "the-author",
+            Audience = null,    // even public, a non-author cannot see a draft
+            IsDraft = true,
+        };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByPathAsync("my-draft").Returns(page);
+        var authz = Substitute.For<IAuthorizationService>();
+
+        // A non-author (subject ≠ AuthorId) hits the draft gate → 403, and
+        // the CanAsync decision is never even consulted (the draft gate
+        // short-circuits first).
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var result = await controller.Show("my-draft");
+
+        Assert.IsType<ForbidResult>(result);
+        await authz.DidNotReceive().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
+    }
+
+    // ── Tree browse (C6 aggregate filter) ─────────────────────────────────
+
+    /// <summary>
+    /// <see cref="PageController.Index"/> calls
+    /// <see cref="IAuthorizationService.CanSeeAsync"/> ONCE over the whole
+    /// candidate set (the C6 aggregate, not one per page), and a page whose
+    /// id is not in the <c>Visible</c> set is <b>absent</b> from the
+    /// rendered <see cref="PageTreeViewModel"/> — not blanked. The pin: the
+    /// tree browse's filter is the aggregate row, and a denied page does not
+    /// render as an empty node.
+    /// </summary>
+    [Fact]
+    public async Task Index_When_CanSeeAsync_HidesPage_DeniedPageIsAbsent()
+    {
+        const string visibleId = "page-visible-001";
+        const string hiddenId  = "page-hidden-001";
+        var visible = new Page { Id = visibleId, Slug = "visible", Title = "Visible page", AuthorId = "someone", IsDraft = false, IsDeleted = false };
+        var hidden  = new Page { Id = hiddenId,  Slug = "hidden",  Title = "Hidden page",  AuthorId = "someone", IsDraft = false, IsDeleted = false };
+        var pages = Substitute.For<IPageService>();
+        pages.GetTreeAsync().Returns(new List<Page> { visible, hidden });
+
+        var authz = Substitute.For<IAuthorizationService>();
+        // Only the visible page is in the Visible set.
+        authz.CanSeeAsync("subj-resident-001", Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                Visible: new List<(string Id, AccessVia Via)> { (visibleId, AccessVia.Audience) },
+                HiddenCount: 1));
+
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var view = (await controller.Index()) as ViewResult;
+        Assert.NotNull(view);
+
+        var model = view!.ViewData.Model as PageTreeViewModel;
+        Assert.NotNull(model);
+        // Exactly one node (the visible one) — the hidden one is absent, not blanked.
+        Assert.Single(model!.Roots);
+        Assert.Equal(visibleId, model.Roots[0].Id);
+        Assert.Equal("Visible page", model.Roots[0].Title);
+        Assert.Equal("/pages/visible", model.Roots[0].Path);
+
+        // And the aggregate was called ONCE over the whole set (the C6
+        // pin — not one per page).
+        await authz.Received(1).CanSeeAsync(Arg.Is<string>(s => s == "subj-resident-001"), Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>());
+    }
+
+    /// <summary>
+    /// A non-author's <see cref="PageController.Index"/> never sees a
+    /// <see cref="Page.IsDraft"/> page — the draft gate (author-only, ADR
+    /// 0037) ran BEFORE the <see
+    /// cref="IAuthorizationService.CanSeeAsync"/> decision (a draft is its
+    /// author's; a non-author's candidate set does not include their own
+    /// author's drafts). The pin: a non-author never sees a draft in the
+    /// tree browse, even if the audience decision would have allowed it.
+    /// </summary>
+    [Fact]
+    public async Task Index_When_NonAuthor_DraftPagesAreAbsentFromTree()
+    {
+        const string draftId   = "page-draft-001";
+        const string liveId    = "page-live-001";
+        var draft = new Page { Id = draftId, Slug = "draft", Title = "A draft",  AuthorId = "the-author", IsDraft = true,  IsDeleted = false };
+        var live  = new Page { Id = liveId,  Slug = "live",  Title = "A live",   AuthorId = "the-author", IsDraft = false, IsDeleted = false };
+        var pages = Substitute.For<IPageService>();
+        pages.GetTreeAsync().Returns(new List<Page> { draft, live });
+
+        var authz = Substitute.For<IAuthorizationService>();
+        // The CanSeeAsync decision runs over the post-draft-gate candidate
+        // set (live only) and allows it.
+        authz.CanSeeAsync("subj-resident-001", Arg.Any<AccessAction>(), Arg.Any<IEnumerable<IAuditableResource>>())
+            .Returns(new VisibleSet(
+                Visible: new List<(string Id, AccessVia Via)> { (liveId, AccessVia.Audience) },
+                HiddenCount: 0));
+
+        // A non-author (subject ≠ "the-author") hits the index.
+        var controller = Build(pages, authz, IsAuthenticated: true, subjectId: "subj-resident-001", roles: new[] { Roles.Member });
+
+        var view = (await controller.Index()) as ViewResult;
+        Assert.NotNull(view);
+
+        var model = view!.ViewData.Model as PageTreeViewModel;
+        Assert.NotNull(model);
+        Assert.Single(model!.Roots);
+        Assert.Equal(liveId, model.Roots[0].Id);
+        Assert.False(model.Roots[0].IsDraft);
+    }
+
+    // ── Mount-point resolver (display, not access) ────────────────────────
+
+    /// <summary>
+    /// <see cref="PageMountResolver.ResolveAsync"/> on a slot with a
+    /// mounted page returns that page's <c>/pages/…</c> href + its title.
+    /// The pin: the resolver is the layout's "about slot → about page"
+    /// seam (ADR 0039 §3.8), and it is display-only (no access decision).
+    /// </summary>
+    [Fact]
+    public async Task MountResolver_When_Mounted_ReturnsHrefAndTitle()
+    {
+        const string aboutId = "page-about-001";
+        var about = new Page { Id = aboutId, Slug = "about", Title = "About the community", MountPoint = "footer/community", IsDeleted = false };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByMountPointAsync("footer/community").Returns(about);
+        pages.GetTreeAsync().Returns(new List<Page> { about });
+
+        var resolved = await PageMountResolver.ResolveAsync(pages, "footer/community");
+
+        Assert.NotNull(resolved);
+        Assert.Equal("/pages/about", resolved!.Value.Href);
+        Assert.Equal("About the community", resolved.Value.Title);
+    }
+
+    /// <summary>
+    /// <see cref="PageMountResolver.ResolveAsync"/> on an unmounted slot
+    /// (the service returns <c>null</c>) returns <c>null</c> — the layout
+    /// omits the link. The pin: an unmounted slot is NOT an error (the
+    /// <see cref="IPageService.GetByMountPointAsync"/> contract is
+    /// <c>null</c> for unmounted, not a <see cref="KeyNotFoundException"/>),
+    /// and the resolver does not invent a link.
+    /// </summary>
+    [Fact]
+    public async Task MountResolver_When_Unmounted_ReturnsNull()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.GetByMountPointAsync("footer/community").Returns((Page?)null);
+
+        var resolved = await PageMountResolver.ResolveAsync(pages, "footer/community");
+
+        Assert.Null(resolved);
+    }
+
+    /// <summary>
+    /// <see cref="PageMountResolver.ResolveAsync"/> on a slot whose mounted
+    /// page has since been soft-deleted (not in the live tree) returns
+    /// <c>null</c> — there is no valid <c>/pages/…</c> href to offer (the
+    /// path is the ancestor-slug chain; a page not in the tree has no
+    /// resolvable chain). The pin: a stale mount (a page deleted after it
+    /// was mounted) does not produce a dangling link.
+    /// </summary>
+    [Fact]
+    public async Task MountResolver_When_PageSoftDeleted_ReturnsNull()
+    {
+        var about = new Page { Id = "page-about-001", Slug = "about", Title = "About", MountPoint = "footer/community", IsDeleted = true };
+        var pages = Substitute.For<IPageService>();
+        pages.GetByMountPointAsync("footer/community").Returns(about);
+        // The tree (the live, non-deleted set) does NOT contain the about
+        // page (it's soft-deleted) — the resolver cannot derive a path for
+        // it.
+        pages.GetTreeAsync().Returns(new List<Page>());
+
+        var resolved = await PageMountResolver.ResolveAsync(pages, "footer/community");
+
+        Assert.Null(resolved);
+    }
+
+    // ── Composer audience round-trip (ADR 0036 single source) ─────────────
+
+    /// <summary>
+    /// <see cref="PageController.New"/> (POST, <see
+    /// cref="PageComposeViewModel.IsPublic"/> = <c>true</c>) writes the page
+    /// with <c>Audience = null</c> + <c>ComponentId = null</c> (the "pages
+    /// default public" shape — the one place pages differ from posts, ADR
+    /// 0039 §3.7). The pin: a public page is NOT written with a non-null
+    /// audience (the editor's <see cref="AudienceEditorModel.BuildAudience"/>
+    /// output is inert when <see cref="PageComposeViewModel.IsPublic"/> is
+    /// <c>true</c>).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_IsPublic_WritesNullAudienceAndNullComponent()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.CreateAsync(Arg.Any<Page>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => { var p = call.ArgAt<Page>(0); p.Id = "page-new-001"; p.AuthorId = call.ArgAt<string>(1); return Task.FromResult(p); });
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var model = new PageComposeViewModel
+        {
+            Title = "About",
+            Body = "The community's about page.",
+            IsPublic = true,
+            // A non-null editor (it would be inert — IsPublic=true) — the
+            // pin is that the editor's output is NOT what gets stored.
+            Audience = new AudienceEditorModel { Mode = "All", Grants = "[\"some-grant\"]", CommunityVisible = false },
+            CommunityId = "community-001",
+            LanguageCode = "en",
+        };
+
+        var result = await controller.New(model);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        // The CreateAsync call's Page argument must have Audience = null and
+        // ComponentId = null (the IsPublic=true shape).
+        await pages.Received(1).CreateAsync(
+            Arg.Is<Page>(p => p.Audience == null && p.ComponentId == null && p.Slug == "about" && p.Title == "About"),
+            Arg.Is<string>(s => s == "subj-admin-001"),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.New"/> (POST, <see
+    /// cref="PageComposeViewModel.IsPublic"/> = <c>false</c>) writes the
+    /// page with the editor's <see cref="AudienceEditorModel.BuildAudience"/>
+    /// output + the <see cref="PageComposeViewModel.CommunityId"/> (the
+    /// non-public shape — the ADR 0036 single-source pin: the editor is the
+    /// only deserialization site, the <c>BuildAudience()</c> output is the
+    /// stored <see cref="Kumunita.Core.Authorization.Audience"/>).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_IsNotPublic_WritesEditorAudienceAndCommunity()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.CreateAsync(Arg.Any<Page>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => { var p = call.ArgAt<Page>(0); p.Id = "page-new-002"; p.AuthorId = call.ArgAt<string>(1); return Task.FromResult(p); });
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var model = new PageComposeViewModel
+        {
+            Title = "A restricted page",
+            Body = "Restricted content.",
+            IsPublic = false,
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
+            CommunityId = "community-002",
+            LanguageCode = "en",
+        };
+
+        var result = await controller.New(model);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        // Assert value-level equivalence (the controller constructs its own Audience
+        // instance via BuildAudience, so ReferenceEquals would never hold).
+        await pages.Received(1).CreateAsync(
+            Arg.Is<Page>(p => p.Audience != null
+                             && p.Audience.Mode == AudienceMode.Any
+                             && p.Audience.Community
+                             && p.Audience.Grants.Count == 0
+                             && p.ComponentId == "community-002"
+                             && p.Slug == "a-restricted-page" && p.Title == "A restricted page"),
+            Arg.Is<string>(s => s == "subj-admin-001"),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.Edit"/> (POST) round-trips the stored
+    /// page's <see cref="Kumunita.Core.Authorization.Audience"/> through
+    /// <see cref="AudienceEditorModel.FromAudience"/> (the GET lane) and
+    /// back through <see cref="AudienceEditorModel.BuildAudience"/> (the
+    /// POST lane) — the ADR 0036 single-source pin (the editor is the ONLY
+    /// deserialization site). The pin: an edit that does not change the
+    /// audience round-trips to an equivalent stored shape (a
+    /// <see cref="Kumunita.Core.Authorization.Audience"/> with the same
+    /// <c>Mode</c> / <c>Grants</c> / <c>Community</c> as the editor
+    /// re-emits).
+    /// </summary>
+    [Fact]
+    public async Task Edit_Post_RoundTripsAudienceThroughFromAudienceAndBuildAudience()
+    {
+        const string pageId = "page-edit-001";
+        var existing = new Page
+        {
+            Id = pageId,
+            Slug = "existing",
+            Title = "Existing title",
+            Body = "Existing body.",
+            Audience = new Kumunita.Core.Authorization.Audience { Mode = AudienceMode.Any, Grants = new List<AudienceGrant> { new AudienceGrant(GrantKind.User, "grant-1") }, Community = true },
+            ComponentId = "community-003",
+            LanguageCode = "en",
+            AuthorId = "subj-admin-001",
+            IsDraft = false,
+            IsDeleted = false,
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        // The controller's Edit GET reads via store.QuerySession().LoadAsync<Page>(id)
+        // and the Edit POST reads via store.LightweightSession().LoadAsync<Page>(id)
+        // (Marten's LoadAsync has an optional CancellationToken — the same single
+        // method; Arg.Any<CancellationToken>() matches both the no-CT controller
+        // call and satisfies xUnit1051). Stub both sessions.
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Page>(pageId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Page?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var writeSession = Substitute.For<IDocumentSession>();
+        writeSession.LoadAsync<Page>(pageId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Page?>(existing));
+        store.LightweightSession().Returns(writeSession);
+
+        var pages = Substitute.For<IPageService>();
+        pages.UpdateAsync(Arg.Any<Page>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => { var p = call.ArgAt<Page>(0); p.Id = pageId; p.AuthorId = call.ArgAt<string>(1); return Task.FromResult(p); });
+        pages.GetTreeAsync().Returns(new List<Page> { existing });
+
+        var controller = Build(pages, store: store, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        // The GET lane's model is the round-trip start: FromAudience(existing.Audience).
+        var get = (await controller.Edit(pageId)) as ViewResult;
+        Assert.NotNull(get);
+        var getModel = get!.ViewData.Model as PageComposeViewModel;
+        Assert.NotNull(getModel);
+        Assert.False(getModel!.IsPublic);    // existing.Audience is non-null
+        Assert.Equal("Any", getModel.Audience.Mode);
+        Assert.True(getModel.Audience.CommunityVisible);
+
+        // A no-op edit (the model is re-posted unchanged) round-trips to a
+        // BuildAudience() output equal in Mode/Community (the Grants are the
+        // JSON array the editor's hidden textarea posts — the same shape the
+        // FromAudience call produced, re-emitted on POST).
+        var post = (await controller.Edit(pageId, getModel)) as RedirectToActionResult;
+        Assert.NotNull(post);
+
+        await pages.Received(1).UpdateAsync(
+            Arg.Is<Page>(p => p.Audience != null
+                             && p.Audience.Mode == AudienceMode.Any
+                             && p.Audience.Community == true
+                             && p.ComponentId == "community-003"
+                             && p.Slug == "existing"
+                             && p.ParentId == existing.ParentId
+                             && p.IsDraft == existing.IsDraft),
+            Arg.Is<string>(s => s == "subj-admin-001"),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.New"/> (POST) sets the <see
+    /// cref="Page.ImageIds"/> + <see cref="Page.AttachmentIds"/> from the
+    /// body (via <see cref="ContentImageIds.ExtractContentImageIds"/> +
+    /// <see cref="AttachmentIds.ExtractAttachmentIds"/>) <b>before</b>
+    /// calling <see cref="IPageService.CreateAsync"/> — the U03 invariant
+    /// (the Web layer owns the extraction, Core normalizes <c>?? []</c>
+    /// and never parses the body).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SetsImageIdsAndAttachmentIdsFromBody_BeforeCallingCreate()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.CreateAsync(Arg.Any<Page>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => { var p = call.ArgAt<Page>(0); p.Id = "page-new-003"; p.AuthorId = call.ArgAt<string>(1); return Task.FromResult(p); });
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var model = new PageComposeViewModel
+        {
+            Title = "A page with media",
+            Body = "![alt](/content-image/a1b2c3d4)\nSome body.\n[Download](/attachment/e5f6a7b8)",
+            IsPublic = true,
+            LanguageCode = "en",
+        };
+
+        await controller.New(model);
+
+        await pages.Received(1).CreateAsync(
+            Arg.Is<Page>(p =>
+                // The body's content-image + attachment references are
+                // extracted server-side and set on the Page before the
+                // CreateAsync call (the U03 invariant).
+                p.ImageIds.Count >= 1 && p.ImageIds.Contains("a1b2c3d4")
+                && p.AttachmentIds.Count >= 1 && p.AttachmentIds.Contains("e5f6a7b8")
+                && p.Body == model.Body),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    // ── 403 on a standing re-check (C3) ────────────────────────────────────
+
+    /// <summary>
+    /// <see cref="PageController.Delete"/> on a page the service's
+    /// <c>actorRoles</c> gate rejects (a <see cref="UnauthorizedAccessException"/>
+    /// from <see cref="IPageService.DeleteAsync"/>) surfaces as a
+    /// <see cref="ForbidResult"/> — the service is the real gate (C3), the
+    /// Web <c>[Authorize(Roles=…)]</c> is a pre-gate. The pin: a standing
+    /// re-check denial is NOT folded into a 404 (the page-specific split,
+    /// ADR 0039 §3.8).
+    /// </summary>
+    [Fact]
+    public async Task Delete_When_ServiceDeniesStanding_ReturnsForbid_NotNotFound()
+    {
+        const string pageId = "page-del-001";
+        var pages = Substitute.For<IPageService>();
+        pages.DeleteAsync(pageId, Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("only a Moderator/GlobalAdmin may delete")));
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.Member });
+
+        var result = await controller.Delete(pageId);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// <see cref="PageController.Delete"/> on an absent page (a
+    /// <see cref="KeyNotFoundException"/> from
+    /// <see cref="IPageService.DeleteAsync"/>) surfaces as a
+    /// <see cref="NotFoundResult"/> — the absent/denied split holds on the
+    /// write lanes too (a 404 = the page does not exist; a 403 = the page
+    /// exists but the caller may not delete it; ADR 0039 §3.8).
+    /// </summary>
+    [Fact]
+    public async Task Delete_When_ServiceReturnsKeyNotFound_ReturnsNotFound()
+    {
+        const string pageId = "page-del-002";
+        var pages = Substitute.For<IPageService>();
+        pages.DeleteAsync(pageId, Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new KeyNotFoundException("no such page")));
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var result = await controller.Delete(pageId);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// <see cref="PageController.Publish"/> on a page the service's
+    /// author-only gate rejects (a <see cref="UnauthorizedAccessException"/>
+    /// from <see cref="IPageService.PublishAsync"/>) surfaces as a
+    /// <see cref="ForbidResult"/> — ADR 0037 author-only (a GlobalAdmin who
+    /// is not the author is still denied; the service is the real gate, C3).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_ServiceDeniesStanding_ReturnsForbid()
+    {
+        const string pageId = "page-pub-001";
+        var pages = Substitute.For<IPageService>();
+        pages.PublishAsync(pageId, Arg.Any<string>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Page>(new UnauthorizedAccessException("only the author may publish")));
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var result = await controller.Publish(pageId);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    // ── harness ────────────────────────────────────────────────────────────
+
+    private static ILocalizationService DefaultLocalization()
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>
+        {
+            new() { Id = "en", NativeName = "English", Enabled = true, SortOrder = 1 },
+        });
+        localization.GetDefaultLanguageCodeAsync().Returns("en");
+        return localization;
+    }
+
+    private static PageController Build(
+        IPageService pages,
+        IAuthorizationService? authz = null,
+        IUserInfoService? userInfo = null,
+        IDocumentStore? store = null,
+        string[]? roles = null,
+        bool IsAuthenticated = false,
+        string? subjectId = null)
+    {
+        var authzImpl = authz ?? Substitute.For<IAuthorizationService>();
+        var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
+        if (userInfo is null)
+        {
+            userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+            userInfoImpl.GetProfilesAsync(true).Returns(new List<Profile>());
+            userInfoImpl.GetPublicGroupsAsync().Returns(new List<Group>());
+        }
+
+        var storeImpl = store ?? Substitute.For<IDocumentStore>();
+        if (store is null)
+        {
+            storeImpl.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+            var readSession = Substitute.For<IQuerySession>();
+            readSession.LoadAsync<Page>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<Page?>(null));
+            storeImpl.QuerySession().Returns(readSession);
+        }
+
+        var localization = DefaultLocalization();
+
+        var controller = new PageController(pages, authzImpl, localization, userInfoImpl, storeImpl);
+        var httpContext = new DefaultHttpContext();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+        if (IsAuthenticated || (roles is { Length: > 0 }))
+        {
+            var claims = new List<Claim>();
+            if (subjectId is not null)
+                claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+            if (roles is { Length: > 0 })
+                claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+            controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(
+                new ClaimsIdentity(claims, authenticationType: "test"));
+        }
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
+
+    private sealed class NoOpTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object?> LoadTempData(HttpContext context) =>
+            new Dictionary<string, object?>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
+        {
+            // no-op — the assertion target is the redirect / the call log, not the bag
+        }
+    }
+}

@@ -1,0 +1,123 @@
+@model Kumunita.Web.Models.PageShowViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Pages
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Page" : Model.Title;
+
+    // ADR 0027 chip-swap (TD): the authored-in language is the first
+    // default-visible variant; each added translation is a hidden variant;
+    // the chip row is a selector that swaps them.
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/pages" class="btn btn-link p-0">
+                <kw-l key="pages.back">← Back to the pages</kw-l>
+            </a>
+        </p>
+
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @* ADR 0037 — draft surface: visible to the author only. *@
+            @if (Model.IsDraft && Model.IsAuthor)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">
+                    <kw-l key="posts.draft_badge">Draft</kw-l>
+                </span>
+                <form class="d-inline" method="post" action="/pages/@Model.Id/publish">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-success">
+                        <kw-l key="posts.publish">Publish</kw-l>
+                    </button>
+                </form>
+            }
+
+            @if (Model.CommunityDisplayName is not null)
+            {
+                <span class="badge text-bg-primary" title="Scoped to a community">
+                    @Model.CommunityDisplayName
+                </span>
+            }
+
+            @if (Model.AuthorDisplayName is not null)
+            {
+                <span class="text-muted small">
+                    <kw-l key="pages.by">by</kw-l> <b>@Model.AuthorDisplayName</b>
+                </span>
+            }
+
+            @if (Model.CanEdit)
+            {
+                <div class="ms-auto d-flex gap-1">
+                    <a class="btn btn-sm btn-outline-primary" href="/pages/@Model.Id/edit">
+                        <kw-l key="announcements.edit_button">Edit</kw-l>
+                    </a>
+                    <form class="d-inline" method="post" action="/pages/@Model.Id/delete"
+                          onsubmit="return confirm('Delete this page?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <kw-l key="pages.delete">Delete</kw-l>
+                        </button>
+                    </form>
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div data-td-group="page">
+                    @* Original variant (default-visible). *@
+                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                        <h1 class="mb-1">
+                            @if (string.IsNullOrWhiteSpace(Model.Title))
+                            {
+                                <span class="text-body-tertiary"><kw-l key="pages.untitled">Untitled page</kw-l></span>
+                            }
+                            else
+                            {
+                                @Model.Title
+                            }
+                        </h1>
+                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                    </div>
+
+                    @* One hidden variant per stored translation. *@
+                    @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                    {
+                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                            @if (!string.IsNullOrWhiteSpace(t.Title))
+                            {
+                                <h1 class="mb-1">@t.Title</h1>
+                            }
+                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                        </div>
+                    }
+
+                    @* The chip row — a selector. The original chip is always present. *@
+                    <div class="mb-3 border-top pt-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="text-muted small fw-semibold">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </span>
+                            <button type="button" class="badge text-bg-light border"
+                                    data-translation-chip data-td-group="page"
+                                    data-td-variant="@Model.OriginalLanguageCode">
+                                @LangName(Model.OriginalLanguageCode)
+                            </button>
+                            @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="page"
+                                        data-td-variant="@t.LanguageCode">
+                                    @LangName(t.LanguageCode)
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
