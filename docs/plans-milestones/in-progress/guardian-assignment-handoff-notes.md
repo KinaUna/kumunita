@@ -108,3 +108,45 @@
   diff on the frozen surface; `IdentityService` is the sole implementor.
 - **Compile warnings:** none. `dotnet build Kumunita.slnx -c Debug` green
   (all 4 projects, 11.9s).
+
+## U03 — Core seam tests (3)
+
+- **File:** `tests/Kumunita.Core.Tests/GuardianAssignmentTests.cs` (new;
+  class `GuardianAssignmentTests(PostgresFixture fixture) :
+  IClassFixture<PostgresFixture>` — the GU-lane harness shape).
+- **3 pinned seam tests (names verbatim, all 3 present, none extra):**
+  1. `FindSubjectByEmail_ReturnsSubjectIdForKnownEmail` — **PASS**
+  2. `FindSubjectByEmail_ReturnsNullForUnknownEmail` — **PASS**
+  3. `FindSubjectByEmail_IsCaseInsensitiveOnEmail` — **PASS**
+- **Pass/red:** 3/3 passed, 0 failed. Run via the reliable path (AGENTS.md
+  runner quirk, **not** `dotnet test`):
+  `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll -class "Kumunita.Core.Tests.GuardianAssignmentTests"`
+  → `Total: 3, Errors: 0, Failed: 0, Skipped: 0`.
+- **Build:** `dotnet build Kumunita.slnx -c Debug` green (0 warnings, 0 errors).
+- **Harness shape (U06/U07 to consume):** the seam reads the `identity`
+  schema (EF/Identity) for the email→id and the `mt` schema (Marten) for the
+  M1-lifecycle rows, so each test boots **both** stores over one fresh
+  scratch Postgres DB (the `PostgresFixture.NewDatabaseAsync` + GU-lane
+  `BootStoreAsync` Marten boot, plus `AppDbContext.Database.MigrateAsync`).
+  The account is seeded through the **real M1 lifecycle** —
+  `RegisterAsync` + `VerifyWithTokenAsync` (token read back from the seeded
+  `IdentityToken` row and consumed, as the Web's `/account/verify` would) —
+  driving the real EF `UserStore<User, IdentityRole, AppDbContext, …>` over
+  the migrated `identity` schema, the real `PasswordHasher<User>`, and the
+  `.NET 10` `UpperInvariantLookupNormalizer`. Two minimal Core-side doubles
+  stand in for the Web-only seams the `IdentityService` ctor takes: a no-op
+  `IMailerStage` (the durable-outbox path isn't under test) and a
+  `ClaimsPrincipal? Current => null` `IClaimsSource` (not request-driven in a
+  Core test). Core-only: no `Kumunita.Web` type referenced.
+- **`.NET 10` Identity API notes (consumed to get to green; U06's Web
+  controller tests will hit the same surface):** the public `Null*` test
+  doubles (`NullUserStore`, `NullPasswordHasher`, `NullValidator`,
+  `NullClaimsPrincipalFactory`, `NullLookupNormalizer`) are **gone** in
+  .NET 10. `UserManager<TUser>`'s ctor is now 10 args (gained `IServiceProvider`
+  + `ILogger<UserManager<TUser>>` at the tail). `UserValidator<TUser>` no
+  longer also implements `IPasswordValidator<TUser>` — the password slot needs
+  `PasswordValidator<TUser>`. `ILookupNormalizer` is implemented by
+  `UpperInvariantLookupNormalizer` (parameterless ctor; `NormalizeEmail` /
+  `NormalizeName`).
+- **Drift pauses:** none (all 3 tests are exactly the design-doc pinned
+  names; no test added beyond the pinned set).

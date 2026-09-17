@@ -1,4 +1,6 @@
 <Solution>
+  <Folder Name="/.tmp/" />
+  <Folder Name="/.tmp/identityprobe/" />
   <Folder Name="/src/">
     <Project Path="src/Kumunita.Core/Kumunita.Core.csproj" />
     <Project Path="src/Kumunita.Web/Kumunita.Web.csproj" />
