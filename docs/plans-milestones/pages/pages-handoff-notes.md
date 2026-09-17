@@ -1259,3 +1259,288 @@ design (ADR 0039 §3.8); only its consuming view was missing.
   curated registry — a Translator can translate them like any other UI string.
 - **The `PG` lane (U00–U07) remains the complete lane; this is a follow-on
   note, not a U08.** The roadmap's next in-progress milestone is still **M4**.
+
+## Follow-on (2026-09-17) — the pages tree browse is now in the navbar
+
+A second review flagged that, although the full pages surface is built and
+green (`GET /pages` tree browse, `/pages/{path}` post view, the composer),
+**no navigation entry pointed to it** — a resident had no discoverable way to
+browse the knowledge tree and even an admin had to type `/pages`. The design
+doc's model is "pages are referenced or mounted, not a top-level nav section"
+(ADR 0039 §3.8, `pages-design.md` §3.3), but that left the tree undiscoverable
+in the meantime. Per the product decision recorded here, a **navbar link is
+added for now** so the tree is easy to reach; **the whole navigation system is
+deferred to a later milestone** (when more features land and the nav can be
+redesigned coherently) — this is a deliberate stopgap, not the final nav.
+
+**What I changed:**
+
+- **`src/Kumunita.Web/Views/Shared/_Layout.cshtml`** — added a **Pages** nav
+  item between *Groups* and *Directory*, linking to `/pages` (the tree browse).
+  A comment notes it is a stopgap (display, not access — the tree is
+  `CanSeeAsync(Read)`-filtered; the *New page* button is standing-gated) and
+  that the full nav redesign is deferred.
+- **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — added the
+  `nav.pages` key (`"Pages"`) alongside the other `nav.*` keys, so the label
+  is in the curated `kw-l` registry like every other nav item.
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\...\Kumunita.Web.Tests.dll` — **Total:
+  229, Errors: 0, Failed: 0** (unchanged — the `MLUI_FacesTests` are
+  registry-driven, so the new `nav.pages` key is covered automatically).
+- `dotnet exec tests\Kumunita.Core.Tests\...\Kumunita.Core.Tests.dll` — **Total:
+  510, Errors: 0, Failed: 0** (unchanged).
+- **Display, not access confirmed:** `GET /pages` (the tree) is
+  `CanSeeAsync(Read)`-filtered for any authenticated visitor; `GET /pages/new`
+  is `[Authorize(Roles = "GlobalAdmin,Moderator")]`, so a resident without
+  standing sees the tree but 403s on the *New page* route.
+
+**Known coarseness (left as-is — pre-existing, out of scope):** the *New page*
+button in `Views/Pages/Index.cshtml` shows for **any** authenticated user
+(`User?.Identity?.IsAuthenticated`), so a plain resident sees it but gets 403
+on click. The route itself is correctly role-gated, so this is a UI-affordance
+imperfection, not an access hole. The deferred nav redesign is the natural
+place to tighten this (e.g. show the button only when `CheckCreateStanding`
+passes) if it is in scope then.
+
+**What the next agent must know:**
+
+- **Pages is now a first-class navbar entry** — reachable from the top nav, not
+  just by URL. Do **not** treat this as the final navigation design: the whole
+  nav is a stated **later-milestone** concern. If M4+ work touches the navbar,
+  this stopgap should fold into that coherent redesign rather than being
+  extended piecemeal.
+- **The `PG` lane (U00–U07) remains the complete lane; this is a follow-on
+  note, not a U08.** The roadmap's next in-progress milestone is still **M4**.
+
+## Bug fix (2026-09-17) — the Web surface was runtime-broken: view folder mismatch
+
+**The pages Web surface was silently 500ing at runtime** — `/pages` (the tree
+browse), `/pages/{path}` (the post view), `/pages/new`, and `/pages/{id}/edit`
+all threw `InvalidOperationException: The view 'Index' was not found`, even for
+a GlobalAdmin. **This is not a new capability — it is a defect in the shipped
+U04 Web surface** that the lane's "complete and green" status did not catch.
+
+**Root cause:** ASP.NET Core derives the view folder from the **controller's
+class name** (minus "Controller"). The controller is `PageController` (singular
+— the `Page` doc type), so the view engine searches **`Views/Page/`** — but the
+views were created in **`Views/Pages/`** (plural, matching the *route* and the
+surface name). The mismatch is one letter (`Page` vs `Pages`) and is fatal: the
+engine only searches `Views/Page/` and `Views/Shared/`.
+
+**Why the tests missed it (the load-bearing note):** the Web unit tests
+(`PageControllerTests`) instantiate the controller directly and assert the
+**`ViewResult` type + model** without ever resolving the view through the view
+engine. So a green Web suite is *not* proof the views render. A runtime-broken
+view path is invisible to that harness. This is the same class of gap as
+"unit tests pass, integration fails" — recorded here so the next agent does not
+trust the Web suite alone for view-resolution bugs. **If a controller/view
+mismatch like this ever recurs, the fix is in the *name*, not a `View()`
+override** (renaming to force the path would drift every doc that locks
+`PageController`).
+
+**What I changed:**
+
+- **`git mv src/Kumunita.Web/Views/Pages src/Kumunita.Web/Views/Page`** — the
+  folder is now `Views/Page/`, matching `PageController`. All five views moved
+  intact (`Index`, `Show`, `New`, `Edit`, `_PageForm`); git records them as
+  **renames** (history preserved). The relative `<partial name="_PageForm">`
+  includes in `New`/`Edit` still resolve (they moved with the folder); the
+  `Shared` partials (`_RichEditorToggle`, `_GrantPickers`) resolve via the
+  standard `Views/Shared/` fallback, untouched.
+- **No class rename.** `PageController` (singular) is locked across ADR 0039,
+  the design doc, the README, the plans, and the `PageControllerTests` class —
+  and it matches the `Page` doc type. Renaming it to `PagesController` would
+  create exactly the doc/code drift this repo forbids, for no benefit. The
+  ASP.NET convention is *folder = controller name* (the precedent:
+  `PostsController`→`Views/Posts`, `GroupsController`→`Views/Groups`).
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings** (Razor views
+  compile at build time in .NET 10, so a broken partial/`@model` reference
+  would have surfaced here — it did not).
+- `dotnet exec tests\Kumunita.Web.Tests\...\Kumunita.Web.Tests.dll` — **Total:
+  229, Errors: 0, Failed: 0** (unchanged — the suite was already green, as the
+  harness never exercised view resolution).
+- **`git status`** shows the five files as **staged renames**
+  (`R src/Kumunita.Web/Views/Pages/*.cshtml -> src/Kumunita.Web/Views/Page/*.cshtml`);
+  the old `Views/Pages` is **gone**.
+- `PageController` was the **only** controller whose view folder didn't match
+  its name (every other controller is 1:1), so this is the complete fix, not
+  one of several.
+
+**What the next agent must know:**
+
+- **The pages Web surface now renders** — `/pages`, `/pages/{path}`,
+  `/pages/new`, `/pages/{id}/edit` all resolve their views. The runtime 500 is
+  gone.
+- **The Web unit suite is not proof of view resolution.** A green
+  `Kumunita.Web.Tests` run does **not** confirm a view renders. For any change
+  that adds a controller or moves/renames a view, either (a) keep the folder
+  name == the controller's class-name-minus-"Controller", or (b) verify at
+  runtime (the app / a browser harness). Do **not** rely on the unit suite to
+  catch a view-path bug.
+- **The `PG` lane (U00–U07) remains the complete lane; this is a defect fix in
+  the shipped Web surface, not a U08.** The roadmap's next in-progress
+  milestone is still **M4**.
+
+## Bug fix (2026-09-17) — the pages views' `kw-l` keys were unregistered (raw-key labels)
+
+**The pages views rendered raw keys as labels.** On `/pages` (and the post
+view), every `kw-l`-wrapped string in the page views — the **New page** button,
+the **Pages** heading, the "No pages yet" empty-state, "← Back to the pages",
+"by", "Delete", and "Untitled page" — showed its **literal key** (e.g.
+`"pages.new_button"`) instead of the English text. A resident/admin saw
+machine keys where UI labels should be.
+
+**Root cause:** the PG lane's views wrapped **seven** strings in `kw-l` keys —
+`pages.title`, `pages.new_button`, `pages.none`, `pages.back`, `pages.by`,
+`pages.delete`, `pages.untitled` — but **none of them were registered** in
+`KnownTranslationKeys`. The `kw-l` TagHelper (`LocalizeTagHelper`) resolves a
+key through `ITranslationProvider` and, on an **unregistered** key, falls back
+to **the raw key itself** (M·1/M·2). It then emits via
+`output.Content.SetContent(text)` — which **overwrites** the element's inner
+English reference (the "New page" inner text was only a conceptual floor, not
+the emitted value). So unregistered key ⇒ resident sees the key string.
+
+**Why the tests missed it (the load-bearing note):** the
+`MLUI_FacesTests` are **registry-driven** — L5 verifies the editor lists
+*exactly* the closed registry (`AllKeys`) in order, and the per-key cells verify
+each *registered* key resolves. **None of them cross-check that every
+*used* key is *registered*.** So a view can wrap a key that was never added to
+the registry and the whole suite stays green. This is the same blind-spot
+class as the earlier view-resolution gap: the unit harness does not render the
+view, so neither a missing view file nor a missing key is caught. Both were
+"green on the unit suite, broken at runtime."
+
+**What I changed:**
+
+- **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — registered the
+  seven `pages.*` keys (the `pages` block, before `groups.create_back`), each
+  with its **plain-text** `en` source text. **Plain text matters:** the TagHelper
+  emits via `SetContent`, which **auto-escapes** — a value carrying
+  `<b>About</b>` would render as the literal brackets `<b>About</b>`.
+- **`src/Kumunita.Web/Views/Page/Index.cshtml`** — the `pages.none` line's
+  inner text wrapped "About" in `<b>`; I dropped the markup so the inner text
+  **matches the registered plain-text value** (the registry's own invariant:
+  "a fresh `en` instance renders identically whether or not the `kw-l`
+  TagHelper is in play").
+- **`tests/Kumunita.Web.Tests/KwLRegistryConsistencyTests.cs`** (new) — a
+  **regression test** that statically scans every `.cshtml` under
+  `Views/` for `kw-l … key="…"` and asserts **each key is in
+  `KnownTranslationKeys.EnValues`** (a `usages.Count > 0` guard proves the scan
+  actually matched). This enforces the view↔registry seam from the **view
+  side** — the direction the `MLUI_FacesTests` never covered. It needs no
+  Postgres / host / view resolution, so it runs in the fast Web assembly.
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\...\Kumunita.Web.Tests.dll` — **Total:
+  230, Errors: 0, Failed: 0** (was **229**; +1 = the new
+  `KwLRegistryConsistencyTests`, which passes ⇒ every `kw-l` key in every view
+  is now registered).
+- The seven `pages.*` keys are the **only** unregistered keys in the page views
+  (every other key they reuse — `posts.publish`, `posts.draft_badge`,
+  `announcements.edit_button`, the `rc.editor.*` and `posts.translation_*`
+  sets — was already registered).
+
+**What the next agent must know:**
+
+- **`kw-l` keys must be registered in `KnownTranslationKeys`** — a `kw-l`
+  element with an unregistered key renders the **raw key** to the resident
+  (the TagHelper overwrites the inner English reference with the resolved
+  value, which for an unknown key is the key itself). **Register plain text
+  only** (the TagHelper auto-escapes; `<b>`/`<i>` markup in a value shows as
+  literal brackets).
+- **The `KwLRegistryConsistencyTests` test now guards this** — if you add a
+  `kw-l` key in a view and forget to register it, the Web suite will **fail**
+  with the exact file + key. Do not remove it; it is the view-side half of the
+  registry contract (the `MLUI_FacesTests` L5 is the registry-side half).
+- **The `PG` lane (U00–U07) remains the complete lane; this is a defect fix in
+  the shipped Web surface, not a U08.** The roadmap's next in-progress
+  milestone is still **M4**.
+
+## Design decision (2026-09-17) — pages now default non-public / community-visible (consistent with posts)
+
+A resident requested: *"on /pages/new the default is public; it should be
+non-public, only signed-in users should see the content."* In this system
+"signed-in users only" is not a first-class `Audience` value (the frozen
+`Audience` model, ADR 0006, has no "any authenticated user" grant — only
+`User`/`Group` grants + the `Community` flag, and `null` = world-readable
+*including unauthenticated*). The closest expressible value — and the **posts
+default** (ADR 0036) — is **community-visible**: all members of the community.
+In this single-neighborhood platform with mandatory membership (ADR 0012),
+"community members" ≈ "signed-in residents," which is exactly the requested
+behavior. The resident confirmed the intent: *"keep pages consistent with posts
+is what I was going for."*
+
+**This reverses a locked decision.** ADR 0039 §3.4 + the design doc + several
+code doc-comments + `PageComposeViewModel.IsPublic` all asserted **"pages
+default public — the one place pages deliberately differ from posts"** (pages
+were read, so public; posts were community-visible). It is now reversed:
+**pages default to the same non-public, community-visible shape as posts.** The
+**public capability is retained** (an admin can still opt a page into
+world-readable), and the **seeded canonical pages** (`about`/`terms`/`help`)
+**remain public** (written by the seeder, not the composer default) so the
+hard-coded `/about` `/terms` `/help` routes keep serving unauthenticated
+visitors.
+
+**What I changed:**
+
+- **`PageController.New()` (GET)** — the composer now seeds
+  `IsPublic = false`, `Audience = { Mode = "Any", Grants = "[]",
+  CommunityVisible = true }`, **and** `CommunityId = the first reachable
+  community` (mirroring the posts composer's `ComponentId = first.Id`). The
+  `CommunityId` is **required**, not decorative: the community branch
+  (`Decide()` branch 4) allows a reader only when `Audience.Community` is
+  true **AND** the reader's community set contains the page's
+  `ComponentId` — with an empty audience and no component, Invariant C1
+  (empty-audience-denies) would deny *everyone, including residents*.
+- **`PageComposeViewModel.IsPublic`** — default `true` → `false`; doc updated
+  to "non-public by default, public is the retained capability."
+- **`_PageForm.cshtml`** — the `IsPublic` hint reworded from "Pages default
+  public (the one place pages differ from posts)" to "Off by default — visible
+  to signed-in residents (community-visible, like posts). Turn on to make it
+  visible to everyone."
+- **Doc reconciliation** (every now-false "pages default public" statement):
+  ADR 0039 §3.4 (decision + the "difference from posts" bullet), the design
+  doc §3.4, the plan register (U00 line), and the code doc-comments in
+  `Page.cs`, `PageToAuditableResource.cs`, `FirstBootSeeder.cs` (seed stays
+  public — that's the seeder, not the default), and `StaticPagesController.cs`
+  (the seeded canonical pages are public). The handoff-notes earlier `## U#`
+  sections are a historical log and were **not** amended (append-only).
+- **`tests/Kumunita.Web.Tests/PageControllerTests.cs`** — added
+  `New_Get_DefaultsToNonPublicCommunityVisible`, pinning the GET default
+  (`IsPublic = false`, `CommunityVisible = true`, `Grants = "[]"`, and a
+  seeded `CommunityId`). The existing POST tests (`New_Post_IsPublic_...`,
+  `New_Post_IsNotPublic_...`) still pass — the public *capability* is
+  unchanged; only the default flipped.
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings**.
+- `dotnet exec tests\Kumunita.Web.Tests\...\Kumunita.Web.Tests.dll` — **Total:
+  231, Errors: 0, Failed: 0** (was **230**; +1 = the new default-pin test,
+  which passes).
+- `dotnet exec tests\Kumunita.Core.Tests\...\Kumunita.Core.Tests.dll` — **Total:
+  510, Errors: 0, Failed: 0** (unchanged — the Core changes were doc-comments
+  only; behavior and the seed are untouched).
+
+**What the next agent must know:**
+
+- **Pages and posts now share the default** (non-public, community-visible).
+  Do **not** reintroduce "pages default public" — the ADR/design/plan/code
+  statements were deliberately reconciled (2026-09-17). The public path is the
+  *capability* (`IsPublic = true`), and the *seeded* `about`/`terms`/`help`
+  pages are public by the **seeder**, not by the composer default.
+- **The `CommunityId` seed in `New()` is load-bearing.** Removing it would
+  drop the default back to "denies everyone" (C1). If you change the composer
+  default, keep the community scope (or an explicit grant) so residents aren't
+  locked out.
+- **The `PG` lane (U00–U07) remains the complete lane; this is a design-decision
+  amendment, not a U08.** The roadmap's next in-progress milestone is still
+  **M4**.

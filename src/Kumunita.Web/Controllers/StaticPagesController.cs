@@ -24,8 +24,8 @@ namespace Kumunita.Web.Controllers;
 /// <para>
 /// The three hard-coded routes are **kept** (backward-compatible) and read
 /// from the tree. They remain un-audited public readers (the static-page
-/// contract — a page is public by construction, <see cref="Page.Audience"/>
-/// = <c>null</c>).
+/// contract — these resolve to the seeded canonical pages, which are public,
+/// <see cref="Page.Audience"/> = <c>null</c>).
 /// </para>
 /// </summary>
 public sealed class StaticPagesController(

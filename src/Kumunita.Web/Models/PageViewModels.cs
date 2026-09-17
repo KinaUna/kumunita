@@ -160,18 +160,18 @@ public sealed class PageComposeViewModel
     public string? ParentId { get; set; }
 
     /// <summary>
-    /// The <b>public</b> toggle (the ADR 0039 "pages default public" shape —
-    /// the one place pages differ from posts). <c>true</c> ⇒ the page is
-    /// written with <see cref="Kumunita.Core.Pages.Page.Audience"/> <c>null</c>
-    /// (world-readable, unauthenticated included) and
-    /// <see cref="Kumunita.Core.Pages.Page.ComponentId"/> <c>null</c>;
-    /// <c>false</c> ⇒ the <see cref="Audience"/> editor +
-    /// <see cref="CommunityId"/> are stored verbatim. Round-trips from a
-    /// stored page as <c>page.Audience is null</c>. Defaulted
-    /// <c>true</c> — a fresh page is public (the lane's default), matching
-    /// the seeded <c>about</c>/<c>terms</c>/<c>help</c> pages.
+    /// The <b>public</b> toggle. <c>true</c> ⇒ the page is written with
+    /// <see cref="Kumunita.Core.Pages.Page.Audience"/> <c>null</c> (world-readable,
+    /// unauthenticated included) and <see cref="Kumunita.Core.Pages.Page.ComponentId"/>
+    /// <c>null</c>; <c>false</c> ⇒ the <see cref="Audience"/> editor +
+    /// <see cref="CommunityId"/> are stored verbatim. Round-trips from a stored
+    /// page as <c>page.Audience is null</c>. Defaulted <c>false</c> — a fresh
+    /// page is **non-public** (community-visible, matching posts — ADR 0039 §3.4
+    /// amended 2026-09-17); an admin can still opt a page into the public
+    /// capability. (The seeded <c>about</c>/<c>terms</c>/<c>help</c> pages are
+    /// written public by the seeder, not by this default.)
     /// </summary>
-    public bool IsPublic { get; set; } = true;
+    public bool IsPublic { get; set; } = false;
 
     /// <summary>
     /// The page's <b>audience</b> editor — the M2 reusable

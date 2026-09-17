@@ -72,6 +72,7 @@ public static class KnownTranslationKeys
             ["nav.announcements"] = "Announcements",
             ["nav.community"]     = "Community",
             ["nav.groups"]        = "Groups",
+            ["nav.pages"]         = "Pages",
             ["nav.directory"]     = "Directory",
             ["nav.sign_in"]       = "Sign in",
             ["nav.sign_up"]       = "Sign up",
@@ -407,6 +408,24 @@ public static class KnownTranslationKeys
             ["posts.translation_body_label"] = "Body",
             ["posts.translation_optional"] = "optional",
             ["posts.translation_save"] = "Save translation",
+
+            // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
+            // ADR 0039 §3.8 — the pages surface's UI copy. Plain text only:
+            // the kw-l TagHelper emits via SetContent (auto-escaped), so a value
+            // carrying <b>/<i> markup would render as literal brackets. These
+            // were missing from the registry (the views wrapped keys that were
+            // never registered) — the resident saw the raw key ("pages.
+            // new_button") because an unregistered key falls back to itself.
+            ["pages.title"]       = "Pages",
+            ["pages.new_button"]  = "New page",
+            ["pages.none"] =
+                "No pages yet. Global admins and community moderators can " +
+                "create the first one — an About page is the common starting " +
+                "point.",
+            ["pages.back"]        = "← Back to the pages",
+            ["pages.by"]          = "by",
+            ["pages.delete"]      = "Delete",
+            ["pages.untitled"]    = "Untitled page",
 
             // ── groups (Create page) ─────────────────────────────────────────
             ["groups.create_back"] = "← Back to groups",

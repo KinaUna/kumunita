@@ -7,7 +7,7 @@ namespace Kumunita.Core.Pages;
 /// <see cref="IAuthorizationService"/> as an <see cref="IAuditableResource"/>.
 /// It mirrors <see cref="Posts.PostToAuditableResource"/> verbatim — the
 /// **only** differences are that <see cref="Page.Audience"/> is <b>null
-/// allowed</b> (pages default public, the one place pages differ from posts,
+/// allowed</b> (a public page — world-readable — has a null audience,
 /// ADR 0039 §3.4) and <see cref="TargetKind"/> is <c>"page"</c>.
 /// <para>
 /// Mapping (ADR 0039 §3.4 / §3.2 provenance):

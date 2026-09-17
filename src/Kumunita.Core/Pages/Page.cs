@@ -23,10 +23,13 @@ namespace Kumunita.Core.Pages;
 /// <b>not</b> a new scope. <c>null</c> = **public** (everyone, including
 /// unauthenticated — the frozen <c>Decide()</c> branch 5); non-null =
 /// <c>Mode</c> + <c>Grants</c> (users/groups) + the <c>Community</c> flag.
-/// Pages **default public** (<c>Audience = null</c>) — the one place pages
-/// deliberately differ from posts (ADR 0036 seeds posts *community-visible*
-/// by default; a page is meant to be *read*, so the author narrows when they
-/// want private). ADR 0039.
+/// A page **may be public** (<c>Audience = null</c> — world-readable, including
+/// unauthenticated) or **non-public** (community-visible / grant-restricted).
+/// The composer's **default** is non-public + community-visible, consistent
+/// with posts (ADR 0039 §3.4, amended 2026-09-17 — originally "pages default
+/// public, the one place pages differ from posts"; reversed to match the post
+/// default); the public capability is retained for pages that should be
+/// world-readable. ADR 0039.
 /// </para>
 /// <para>
 /// **Translatable UGC (ADR 0018 authored-in tag; ADR 0022/0026/0029 row

@@ -391,7 +391,9 @@ public static class FirstBootSeeder
     /// <c>Page</c> docs.
     /// <para>
     /// Each seeded page is <see cref="Page.Audience"/> = <c>null</c> (public —
-    /// the one place pages deliberately differ from posts, ADR 0039 §3.4),
+    /// the canonical <c>about</c>/<c>terms</c>/<c>help</c> pages are world-readable;
+    /// the *composer* default is non-public/community-visible, ADR 0039 §3.4
+    /// amended 2026-09-17 — the seed and the composer default are independent),
     /// <see cref="Page.LanguageCode"/> = <c>en</c> (the
     /// <see cref="SourceLanguage"/>), a root node (<see cref="Page.ParentId"/>
     /// = <c>null</c>), and <see cref="Page.AuthorId"/> empty (platform content
@@ -429,7 +431,7 @@ public static class FirstBootSeeder
                     Title = title,
                     Body = body,
                     LanguageCode = SourceLanguage,
-                    Audience = null,    // public (the one place pages differ from posts, ADR 0039 §3.4)
+                    Audience = null,    // public — the seeded canonical pages are world-readable (ADR 0039 §3.4)
                     AuthorId = string.Empty,   // platform content — no resident author
                     Created = now,
                 });

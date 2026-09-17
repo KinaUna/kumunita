@@ -42,7 +42,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     // signature change. These tests pin the projection shape (Id / Name /
     // OwnerId / Audience / ComponentId / TargetKind) verbatim against the
     // PostToAuditableResource mapping, including the null-allowed Audience
-    // that is the one place pages differ from posts.
+    // (a public page's world-readable shape — ADR 0039 §3.4).
 
     [Fact]
     public void PG_Adapter_ProjectsEveryField_Verbatim()
@@ -70,8 +70,8 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     [Fact]
     public void PG_Adapter_NullAudience_ProjectsNull_PublicPath()
     {
-        // The one place pages differ from posts (ADR 0039 §3.4): Audience is
-        // null-allowed, and the frozen Decide() branch 5 treats null as public.
+        // A public page (ADR 0039 §3.4): Audience is null-allowed, and the
+        // frozen Decide() branch 5 treats null as public (world-readable).
         var page = new Page { Id = "pg-adapter-null", AuthorId = "u-author-2" };
         var target = new PageToAuditableResource(page);
 

@@ -62,7 +62,7 @@ namespace Kumunita.Web.Tests;
 ///       verbatim to <see cref="IPageService.CreateAsync"/>; when
 ///       <see cref="PageComposeViewModel.IsPublic"/> is <c>true</c>, the
 ///       page is written with <c>Audience = null</c> + <c>ComponentId =
-///       null</c> (the "pages default public" shape); when <c>false</c>,
+///       null</c> (the public capability); when <c>false</c> (the default),
 ///       the editor's <c>BuildAudience()</c> + the <see
 ///       cref="PageComposeViewModel.CommunityId"/> are the stored values.
 ///       <see cref="PageController.Edit"/> (POST) round-trips the same way
@@ -462,6 +462,50 @@ public class PageControllerTests
             Arg.Is<string>(s => s == "subj-admin-001"),
             Arg.Any<IReadOnlySet<string>>(),
             Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.New"/> (GET) seeds the composer's default as
+    /// **non-public, community-visible** — consistent with posts (ADR 0039
+    /// §3.4, amended 2026-09-17; originally "pages default public, the one
+    /// place pages differ from posts"). The pin: a fresh composer is NOT
+    /// public by default — <see cref="PageComposeViewModel.IsPublic"/> is
+    /// <c>false</c>, the audience editor is <c>Community</c>-visible with
+    /// empty grants, and the first reachable community is seeded as the
+    /// scope (the community branch, <c>Decide()</c> branch 4, requires a
+    /// non-null <see cref="Kumunita.Core.Pages.Page.ComponentId"/> or
+    /// residents would be denied — Invariant C1).
+    /// </summary>
+    [Fact]
+    public async Task New_Get_DefaultsToNonPublicCommunityVisible()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.GetTreeAsync().Returns(new List<Page>());
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>
+        {
+            new Component { Id = "comp-default", Name = "Safety", Enabled = true },
+        });
+        userInfo.GetProfilesAsync(true).Returns(new List<Profile>());
+        userInfo.GetPublicGroupsAsync().Returns(new List<Group>());
+        var store = Substitute.For<IDocumentStore>();
+        store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
+
+        var controller = new PageController(
+            pages, Substitute.For<IAuthorizationService>(), DefaultLocalization(), userInfo, store);
+        var httpContext = new DefaultHttpContext();
+        controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+        controller.TempData = new TempDataDictionary(httpContext, new NoOpTempDataProvider());
+
+        var result = Assert.IsType<ViewResult>(await controller.New());
+        var model = Assert.IsType<PageComposeViewModel>(result.ViewData.Model);
+
+        // Non-public + community-visible, with a community scope seeded so
+        // residents aren't denied by the otherwise-empty audience.
+        Assert.False(model.IsPublic);
+        Assert.True(model.Audience.CommunityVisible);
+        Assert.Equal("[]", model.Audience.Grants);
+        Assert.Equal("comp-default", model.CommunityId);
     }
 
     /// <summary>

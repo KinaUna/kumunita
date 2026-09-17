@@ -239,12 +239,25 @@ public sealed class PageController(
     [Authorize(Roles = "GlobalAdmin,Moderator")]
     public async Task<IActionResult> New()
     {
+        // ADR 0039 §3.4 (amended 2026-09-17 — now consistent with posts, ADR
+        // 0036): the composer's default is **non-public, community-visible** —
+        // signed-in residents can see it, unauthenticated visitors cannot.
+        // The audience is Community=true + empty grants (the posts default).
         var model = new PageComposeViewModel
         {
-            IsPublic = true,
-            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            IsPublic = false,
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
         };
         await SeedComposeOptionsAsync(model).ConfigureAwait(false);
+        // The community branch (Decide() branch 4) allows a reader only when
+        // BOTH Audience.Community is true AND the reader's community set
+        // contains the page's ComponentId — so seed the first reachable
+        // community as the scope (the posts composer's `ComponentId = first.Id`
+        // precedent). Without a ComponentId the empty audience would deny
+        // *everyone* (Invariant C1 — including residents), so the community
+        // scope is what keeps residents in. An admin can still flip the page
+        // public, or pick a different community / grant specific people.
+        model.CommunityId = model.Components.FirstOrDefault().Id;
         return View(model);
     }
 
@@ -287,10 +300,11 @@ public sealed class PageController(
             // naming surface the lane's closed set does not call for).
             Slug = Slugify(model.Title!.Trim()),
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
-            // Pages default public: IsPublic ⇒ null audience + null component
-            // (world-readable); a non-public page carries the editor's
-            // audience + community scope verbatim (the ADR 0036 single-source
-            // BuildAudience path).
+            // IsPublic (the composer's toggle, off by default — ADR 0039 §3.4
+            // amended 2026-09-17) ⇒ null audience + null component
+            // (world-readable, the public *capability*); a non-public page
+            // carries the editor's audience + community scope verbatim (the
+            // ADR 0036 single-source BuildAudience path).
             Audience = model.IsPublic ? null : model.Audience.BuildAudience(),
             ComponentId = model.IsPublic
                 ? null

@@ -50,7 +50,11 @@
         @if (Model.Roots.Count == 0)
         {
             <div class="alert alert-info">
-                <kw-l key="pages.none">No pages yet. Global admins and community moderators can create the first one — an <b>About</b> page is the common starting point.</kw-l>
+                @* Plain text — the kw-l TagHelper auto-escapes (SetContent),
+                   so the registered pages.none value carries no <b> markup and
+                   this inner text matches it (the "renders identically whether
+                   or not the TagHelper is in play" invariant). *@
+                <kw-l key="pages.none">No pages yet. Global admins and community moderators can create the first one — an About page is the common starting point.</kw-l>
             </div>
         }
         else

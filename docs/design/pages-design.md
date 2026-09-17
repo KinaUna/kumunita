@@ -229,13 +229,12 @@ A page's `Audience` is **exactly** a post's: `null` = public; non-null =
   *sees* pages they can read — the tree does not leak the *existence* of a
   private page they cannot open.
 - **The default is the author's choice, verbatim** (ADR 0001-B) — the composer
-  seeds the `AudienceEditorModel` exactly as the post composer does (ADR 0036's
-  "community-visible by default" is a *per-surface* choice; for **pages** the
-  default is **[PROPOSED]: public** (`Audience = null`), because a default page
-  like `about`/`terms` is meant for everyone and a blog post is meant to be
-  read — the *author* narrows when they want private. This is the one place
-  pages differ from posts (posts default community-visible; pages default
-  public). **[DECIDED — ADR 0039]**
+  seeds the `AudienceEditorModel` **exactly as the post composer does** (ADR 0036's
+  "community-visible by default"): **pages default non-public,
+  community-visible**, consistent with posts. ~~[PROPOSED]: public
+  (`Audience = null`)~~ — **reversed 2026-09-17** to keep pages consistent with
+  posts (a page is meant to be read; the author opts into public when they want
+  it world-readable). **[DECIDED — ADR 0039, amended 2026-09-17]**
 
 ### 3.5 Translations  **[DECIDED — reuses ADR 0018 / 0022 / 0026 / 0027 / 0029]**
 

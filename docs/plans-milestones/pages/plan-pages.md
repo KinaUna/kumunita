@@ -88,7 +88,8 @@ Lock the **[PROPOSED]** decisions in `docs/design/pages-design.md` into the
 accepted **ADR 0039** (`docs/adr/0039-pages-hierarchy-audience-translations.md`):
 the absorb (§3.1), the `Page` field set (§3.2), the hierarchy +
 derived-path + cycle-guard + depth-cap model (§3.3), the page-audience default
-(**public**, `Audience = null` — the one place pages differ from posts, §3.4),
+(**non-public, community-visible — consistent with posts, §3.4**; amended
+2026-09-17, originally "public, the one place pages differ from posts"),
 the **soft-delete** (`IsDeleted` flag + `CanSeeAsync` filter, §3.7), the
 standing matrix (§3.7), the mount-point-as-string resolver (§3.2/§3.8), and the
 absorb-migration ordering (§3.9). Add the `PG` row to `Milestones.All` (a named

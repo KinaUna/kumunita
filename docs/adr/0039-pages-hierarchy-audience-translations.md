@@ -95,11 +95,14 @@ repo's "no destructive step until green" discipline.
   `AudienceMode`**, **no new `AccessVia` value** — the frozen
   `Decide()` algorithm already covers every standing a page needs
   (`Owner` / `Moderator` / `Community` / `Audience` / `Delegation` /
-  `BreakGlass` / `Admin`). The **default** for a new page is **public**
-  (`Audience = null`) — the one place pages deliberately differ from posts
-  (ADR 0036 seeds posts *community-visible* by default; a page is meant to
-  be *read*, so the author narrows when they want private). This is a
-  *per-surface composer choice*, not a change to the `Audience` doc.
+  `BreakGlass` / `Admin`). The **default** for a new page is **non-public,
+  community-visible** (`Audience.Community = true` + a `ComponentId`, empty
+  grants) — **consistent with posts** (ADR 0036 seeds posts community-visible
+  by default). ~~Originally "pages default public (`Audience = null`) — the
+  one place pages deliberately differ from posts"~~ — **reversed 2026-09-17**
+  so pages match posts (a page is still meant to be *read*, and the author can
+  opt a page into the public capability when they want it world-readable). This
+  is a *per-surface composer choice*, not a change to the `Audience` doc.
 
 - **The decision path is the frozen `IAuthorizationService`.** A new
   **`PageToAuditableResource`** adapter (mirrors
@@ -252,12 +255,14 @@ repo's "no destructive step until green" discipline.
   *last* (U07), after the new surface is proven, with the old surface kept
   readable until then — the lowest-risk ordering the repo's
   "no destructive step until green" convention allows.
-- **The default-audience difference from posts is a composer choice, not a
-  doc change.** Posts default community-visible (ADR 0036); pages default
-  public (`Audience = null`). The `Audience` doc is *identical* on both
-  surfaces; only the *seed value* in the composer differs. A page author
-  who wants a community page sets `Audience.Community = true` +
-  `ComponentId` (the ADR 0036 branch, unchanged).
+- **The default-audience now matches posts (amended 2026-09-17).** Posts
+  default community-visible (ADR 0036); **pages now do too** (composer seeds
+  `IsPublic = false`, `Audience.Community = true`, the first reachable
+  `ComponentId`). ~~Previously "pages default public (`Audience = null`)"~~ —
+  reversed to keep pages consistent with posts. The `Audience` doc is still
+  *identical* on both surfaces; a page author who wants a **public** page sets
+  `IsPublic = true` (audience `null`), and one who wants a specific grant set
+  picks that community / users / groups.
 - **The standing matrix is the existing role matrix re-checked server-side.**
   No new role, no new `AccessVia`, no new `AccessAction`. A community
   Moderator's standing on a page is the *same* `moderator:{CommunityId}`
