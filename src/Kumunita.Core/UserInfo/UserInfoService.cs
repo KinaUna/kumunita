@@ -2022,6 +2022,84 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task<GuardianLink> AssignGuardianLinkAsync(
+        string childId, string guardianId, string assignedById)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+        if (string.IsNullOrWhiteSpace(assignedById))
+            throw new ArgumentException("Assigning guardian id is required.", nameof(assignedById));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // S·6 — idempotent formation: a duplicate (GuardianId, ChildId) Active row
+        // is a no-op — the row is left as-is and returned (not a throw), no
+        // second pair of audit rows (the G-A·4 precedent, inherited).
+        var existing = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            // No mutation, no audit (a no-op is a no-op — the contract, not an
+            // error). Return the existing row as-is.
+            return existing;
+        }
+
+        var link = new GuardianLink
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GuardianId = guardianId,
+            ChildId = childId,
+            Status = GuardianLinkStatus.Active,
+            CreatedAt = now
+        };
+        session.Store(link);
+
+        // S·5 — the two complementary audit rows, written in the SAME session
+        // (S·1 — one SaveChangesAsync, no partial write):
+        //
+        // (1) guardian.create — the GU seam's shape, byte-identical to what
+        //     CreateGuardianLinkAsync writes (S·2): ActorId = the ASSIGNED
+        //     guardian (the standing-holder).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.create",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        // (2) guardian.assign — the GA-AR conferral verb: ActorId = the
+        //     ASSIGNING guardian (the conferrer, S·5).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = assignedById,
+            EffectivePrincipalId = assignedById,
+            Action = "guardian.assign",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
     public async Task SuspendChildAsync(string childId, string guardianId)
     {
         if (string.IsNullOrWhiteSpace(childId))

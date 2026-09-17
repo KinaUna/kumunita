@@ -369,7 +369,8 @@ authors) with exactly these **5**:
 5. `Assign_UnknownEmail_ReturnsValidationError`
 6. `Assign_SelfAssignment_ReturnsValidationError`
 7. `Assign_DuplicateAssignment_IsIdempotentNoOp`
-8. `Assign_KnownEmail_CallsCreateGuardianLinkAsync`
+8. `Assign_KnownEmail_CallsAssignGuardianLinkAsync` (GA-AR rename,
+   2026-09-17 — the action now calls the new seam)
 
 And the **9th** (the acceptance gate's **handoff** leg, promoted from
 inference to a test on 2026-09-17 — see `## GA — Closed (recorded)`;
@@ -381,6 +382,23 @@ ADR 0038 §Amendment): `tests/Kumunita.Core.Tests/` (the same Core file)
    assigned guardian drives `SuspendChildAsync` / `UnsuspendChildAsync`
    over the child (G-A·3 — identical in kind to the creator's, no content
    read). The suspension row's `ActorId` is the **assigned** guardian.
+
+**GA-AR (2026-09-17):** the pinned-test list is extended from 9 to
+**11** names (5 Core + 6 Web) by the GA-AR lane (the second-audit-row
+amendment, ADR 0038 §Amendment (2026-09-17, second)). The GA lane's 9
+original names are unchanged (one renamed — #8, above); the GA-AR lane
+adds:
+
+10. `AssignGuardianLink_WritesBothAuditRows` — `tests/Kumunita.Core.Tests/`
+    (Core) — the seam's both-audit-rows + idempotency shape (U01).
+11. `Assign_KnownEmail_WritesAssignAuditRow` — `tests/Kumunita.Web.Tests/`
+    (Web) — the `guardian.assign` row's `ActorId` = the assigning
+    guardian (U02).
+
+> **Count reconciliation (U02, 2026-09-17):** the register's prose pinned
+> "10 (4 Core + 6 Web)"; the measured truth is **11** (5 Core + 6 Web) —
+> the register undercounted U01's new Core test. The test NAMES above are
+> authoritative; the 5/5 Core + 6/6 Web run results confirm the count.
 
 A test whose exact name is not in this list is a `## U<m> — Drift pause`.
 (A test added under this list — #9 — is an ADR 0038 amendment, not a
@@ -399,8 +417,14 @@ The three tests:
   content read. **Proven** by the pinned test #9
   (`Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild`), not inferred
   (2026-09-17, ADR 0038 §Amendment).
-- **part-vs-whole** — the 9-test list is the whole; closed-loop + handoff
-  are the parts; all must pass together.
+- **part-vs-whole** — the **11-test** list (5 Core + 6 Web, after the
+  GA-AR rename + add) is the whole; closed-loop + handoff are the parts;
+  all must pass together.
+- **audit legibility (GA-AR, 2026-09-17)** — the `guardian.assign`
+  row's `ActorId` is the **assigning** guardian (the conferrer) — the
+  §D named legibility limitation (the 2026-09-17 first amendment) is
+  **resolved**; proven by `AssignGuardianLink_WritesBothAuditRows`
+  (Core) + `Assign_KnownEmail_WritesAssignAuditRow` (Web).
 
 ### Drift-guard (frozen once written)
 
@@ -412,6 +436,16 @@ appends, the localization key set, the 9 pinned test names (#1–#9, #9
 added 2026-09-17), the
 G-A·1–G-A·6 invariants, and the acceptance gate — all frozen pins; any
 mismatch is a `## U<m> — Drift pause`.
+
+**GA-AR (2026-09-17) extends the drift-guard** (the GA lane's existing
+pins are unchanged): the `IUserInfoService.AssignGuardianLinkAsync` seam
++ its doc-comment, the `GuardianController.Assign` one changed line
+(`CreateGuardianLinkAsync` → `AssignGuardianLinkAsync(childId, assignedId,
+subject)`), the S·1–S·6 invariants, the FACES F1–F4, and the
+3 new/renamed test names (`AssignGuardianLink_WritesBothAuditRows`,
+`Assign_KnownEmail_CallsAssignGuardianLinkAsync`,
+`Assign_KnownEmail_WritesAssignAuditRow`) — all frozen pins; any mismatch
+is a `## U<m> — Drift pause`.
 
 ## Verification + reconciliation (2026-09-17)
 
@@ -431,6 +465,12 @@ lane is complete and green and reconciled two drifts (ADR 0038 §Amendment
   §D/§E did not match the code and is superseded; the **assigning**
   guardian's identity is **not persisted** on the row (named legibility
   limitation).
+- **Superseded (GA-AR, 2026-09-17):** the named legibility limitation
+  (the assigning guardian not persisted) is **resolved** by the GA-AR
+  lane — the `guardian.assign` audit row's `ActorId` is the assigning
+  guardian (ADR 0038 §Amendment (2026-09-17, second)). The
+  `GuardianLink` POCO is still byte-identical (S·3) — the conferrer is
+  in the **audit trail**, not the relationship document.
 - **Carried (unchanged):** the `name="Email"` (not `asp-for`) note and the
   `Kumunita.Web.Tests` own-`PostgresFixture` note from the U06 drift pauses
   — both still hold.
@@ -459,3 +499,77 @@ Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorMo
 - **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR 0004 §B.1 additive; `M1DocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); `docs/ARCHITECTURE.md`'s `Identity/` + `UserInfo/` lines carry the surface (U07).
 - **Non-decisions (ADR 0038 §E, each named, carried forward):** no remove path (a co-guardian dissolving *another* co-guardian's link, or the child dissolving a co-guardian's link — the ADR 0028 G·5 safety valve remains the only "dissolve any active link" path); no acceptance/consent step on the assigned guardian; no bulk assign (one email per form); no self-assignment (refused, G-A·5, not a lane); no second audit verb (`guardian.create` is the one verb); no email notification to the assigned guardian. Each re-litigates as an ADR 0038 amendment, not a toggle.
 - **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane discipline: GA is not a renumber).
+
+## GA-AR — Second audit row (implemented) (2026-09-17)
+
+The GA-AR lane (guardian assignment, second audit row; ADR 0038
+§Amendment (2026-09-17, second)) is **shipped**. It resolves the §D
+named legibility limitation the GA lane's first amendment recorded
+(the assigning guardian not persisted) by adding a **second audit row**,
+`guardian.assign` (`ActorId` = the assigning guardian / conferrer),
+written in the **same commit** as the `GuardianLink` row + the
+`guardian.create` row (`ActorId` = the assigned guardian). The conferrer
+is now on the **audit trail**, not the relationship document — the
+`GuardianLink` POCO stays byte-identical.
+
+- **Pinned contract (the register, primary):** the additive seam
+  `IUserInfoService.AssignGuardianLinkAsync(string childId, string
+  guardianId, string assignedById)` (the conferral-based standing basis,
+  vs. `CreateGuardianLinkAsync`'s creation-based basis) + the
+  `GuardianController.Assign` **one changed line**
+  (`CreateGuardianLinkAsync(childId, assignedId)` →
+  `AssignGuardianLinkAsync(childId, assignedId, subject)`). The
+  standing gate (G-A·1), the resolution (G-A·2), the self-assignment
+  refusal (G-A·5), the `try/catch` shape, the `TempData["info"]` line,
+  and the redirect are **untouched**.
+- **Invariants S·1–S·6** (each named):
+  - **S·1 — C3 atomicity:** the link + the `guardian.create` row + the
+    `guardian.assign` row are in **one** `SaveChangesAsync`; a partial
+    write is a bug, not a state.
+  - **S·2 — GU seam byte-identical:** `CreateGuardianLinkAsync(childId,
+    guardianId)` unchanged in signature, behavior, and audit shape; the
+    GU lane's `AddChild` call site unchanged.
+  - **S·3 — POCO byte-identical:** `GuardianLink` has no new field / enum
+    value; `M1DocTypes` unchanged.
+  - **S·4 — Standing unchanged:** the assigned guardian's standing is
+    identical in kind to the creator's; no new GU action / content read /
+    "assigned" tier; the `IAuthorizationService` frozen surface unchanged.
+  - **S·5 — Audit shape:** `guardian.assign`'s `ActorId` /
+    `EffectivePrincipalId` = the **assigning** guardian;
+    `guardian.create`'s `ActorId` / `EffectivePrincipalId` = the
+    **assigned** guardian; both `TargetId`s = the link's id, both
+    `Via = Guardian`, `Outcome = Allow`, `TargetKind = "guardian-link"`.
+  - **S·6 — Idempotency (G-A·4, inherited):** a duplicate
+    `(guardianId, childId)` active row is a no-op — no second row, no
+    second pair of audit rows.
+- **FACES F1–F4** (each named):
+  - **F1** a non-guardian cannot assign (404) — G-A·1 (inherited).
+  - **F2** the `guardian.assign` row's `ActorId` is the assigning
+    guardian — S·5.
+  - **F3** a duplicate assignment is a no-op (no second pair of audit
+    rows) — S·6.
+  - **F4** the GU seam + POCO are byte-identical — S·2, S·3.
+- **Gate (U02's record — 2026-09-17):** the 11 pinned seam tests (5 Core
+  + 6 Web) all **PASS** — 5/5 Core (`Kumunita.Core.Tests`, incl. the new
+  `AssignGuardianLink_WritesBothAuditRows`), 6/6 Web
+  (`Kumunita.Web.Tests`, incl. the renamed
+  `Assign_KnownEmail_CallsAssignGuardianLinkAsync` + the new
+  `Assign_KnownEmail_WritesAssignAuditRow`), full `Kumunita.Web.Tests`
+  suite 201/201. **Closed loop** + **handoff** (inherited) +
+  **part-vs-whole** (all 11 pass together) + **audit legibility** (the
+  `guardian.assign` row's `ActorId` = the assigning guardian) — the gate
+  holds. (The register's prose said "10 (4 Core + 6 Web)"; the measured
+  truth is 11 (5 Core + 6 Web) — see the § Pinned seam tests
+  reconciliation note.)
+- **GU lane byte-identity (confirmed by reading the file):**
+  `CreateGuardianLinkAsync`, the `GuardianLink` POCO, `M1DocTypes`, the
+  five GU actions, `AccessVia`, and the GU enforcement path are all
+  byte-identical (S·2, S·3, S·4) — the new seam is additive.
+- **Drift-guard (frozen):** the `AssignGuardianLinkAsync` seam + its
+  doc-comment, the `GuardianController.Assign` one changed line, the
+  S·1–S·6 invariants, the FACES F1–F4, and the 3 new/renamed test names —
+  all frozen pins (see § Drift-guard, GA-AR extension).
+- **Roadmap trio untouched** (README / `Milestones.cs` /
+  `MilestonesTests.cs`) — the GA-AR lane is an audit-legibility
+  refinement of a shipped lane, not a new roadmap item (the GU/GA lane
+  discipline). M4/M5/M6 stay Events / Projects / Portability.

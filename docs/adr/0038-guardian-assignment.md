@@ -169,3 +169,78 @@ non-decisions are unchanged.
    `SuspendChildAsync` / `UnsuspendChildAsync` over the child (G-A·3,
    identical in kind, no content read). The gate is now 4 Core + 5 Web =
    **9 pinned seam tests**, and the handoff leg is proven, not inferred.
+
+## Amendment (2026-09-17, second)
+
+The named legibility limitation in §D — the assigning guardian's identity
+is not persisted on the row — is **resolved** by the GA-AR lane (the
+"guardian assignment, second audit row" lane, this ADR's §E "no second
+audit verb" deferral, now implemented). The GU lane (ADR 0028) and the
+GA lane's shipped surface (the `GuardianLink` POCO, the
+`CreateGuardianLinkAsync` seam, the five GU actions, the `AccessVia`
+enum, the GU enforcement path) are all **byte-identical** (invariant
+S·2/S·3/S·4, inherited from G-A·3).
+
+1. **New seam (additive, ADR 0006-E compatible):**
+   `IUserInfoService.AssignGuardianLinkAsync(string childId, string
+   guardianId, string assignedById)` — the conferral-based standing basis
+   (vs. `CreateGuardianLinkAsync`'s creation-based basis). Writes the
+   `GuardianLink` row + **two** audit rows in **one** `SaveChangesAsync`
+   (C3 atomicity, invariant S·1): (a) `guardian.create` with `ActorId =
+   guardianId` (the standing-holder, the GU seam's shape — S·5); (b)
+   `guardian.assign` with `ActorId = assignedById` (the conferrer — S·5).
+   Idempotent for the `(guardianId, childId)` pair (S·6, the G-A·4
+   precedent). The GU lane's `CreateGuardianLinkAsync` is **unchanged**
+   (S·2) — its `AddChild` call site still calls it (creation-based).
+
+2. **`guardian.assign` verb (the §E "no second audit verb" deferral is now
+   implemented):** the `guardian.assign` row's `ActorId` /
+   `EffectivePrincipalId` is the **assigning** guardian (the conferrer).
+   The `guardian.create` row's `ActorId` / `EffectivePrincipalId` is the
+   **assigned** guardian (the standing-holder). Both `TargetId`s = the
+   link's id, both `Via = Guardian`, `Outcome = Allow`, `TargetKind =
+   "guardian-link"` (S·5). Together they answer *"who holds standing over
+   this child?"* AND *"who conferred the standing?"* — the §D named
+   limitation is resolved.
+
+3. **C3 atomicity (S·1):** the link + the two audit rows are in **one**
+   commit. A partial write (the link + the `guardian.create` row but no
+   `guardian.assign` row, or vice-versa) is a **bug**, not a state. The
+   Web action writes **no** audit row itself — the audit is the Core
+   seam's responsibility (the `CreateGuardianLinkAsync` precedent).
+
+4. **The Web action's one changed line:** `GuardianController.Assign`
+   calls `AssignGuardianLinkAsync(childId, assignedId, subject)` instead
+   of `CreateGuardianLinkAsync(childId, assignedId)`. The standing gate
+   (G-A·1), the resolution (G-A·2), the self-assignment refusal (G-A·5),
+   and the redirect are **untouched**. The GU lane's `AddChild` call
+   site is **untouched** (S·2).
+
+5. **Tests:** the Core lane adds
+   `AssignGuardianLink_WritesBothAuditRows` (the seam's both-audit-rows +
+   idempotency shape). The Web lane renames
+   `Assign_KnownEmail_CallsCreateGuardianLinkAsync` →
+   `Assign_KnownEmail_CallsAssignGuardianLinkAsync` (the action now
+   calls the new seam) + adds `Assign_KnownEmail_WritesAssignAuditRow`
+   (the `guardian.assign` row's `ActorId` = the assigning guardian). The
+   other 9 pinned tests (the GA lane's 3 Core `FindSubjectByEmail_*` + 1
+   Core `Handoff_*` + 4 Web `Assign_*`) are **unchanged**. The acceptance
+   gate is now **11 tests (5 Core + 6 Web)**, all PASS (the register's
+   prose "10 (4 Core + 6 Web)" undercounts by one — its 4-Core tally counts
+   only the GA lane's 4 Core tests and omits U01's new Core test
+   `AssignGuardianLink_WritesBothAuditRows`; the measured run is 5/5 Core
+   + 6/6 Web).
+
+6. **Invariants S·1–S·6** (the design doc's § Pinned contract, verbatim) +
+   **FACES F1–F4** (the design doc's § Pinned contract, verbatim).
+
+7. **Roadmap trio:** **untouched** — the GA-AR lane is an
+   audit-legibility refinement of a shipped lane, not a new roadmap item
+   (the GU/GA lane discipline: the roadmap records shipped surfaces, not
+   their internal refinement). M4/M5/M6 stay Events / Projects /
+   Portability.
+
+Each of §E's other non-decisions (no remove path; no acceptance/consent
+step; no bulk assign; no self-assignment; no email notification) is
+**unchanged** — still *deferred*, not *denied*; each re-litigates as a
+future ADR 0038 amendment when it earns its keep.

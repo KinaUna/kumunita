@@ -383,9 +383,12 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
     /// Self-assignment (G-A·5) + duplicate-assignment (G-A·4) are the
     /// third step (both <see cref="InvalidOperationException"/> →
     /// the form's error surface). The
-    /// <see cref="IUserInfoService.CreateGuardianLinkAsync"/> call is
-    /// the fourth — one commit, one <c>guardian.create</c> audit row
-    /// (C3), the <b>existing</b> GU seam (no new Core seam).
+    /// <see cref="IUserInfoService.AssignGuardianLinkAsync"/> call (GA-AR,
+    /// ADR 0038 §Amendment (2026-09-17, second)) is the fourth — one
+    /// commit, <b>two</b> audit rows (C3): <c>guardian.create</c>
+    /// (<c>ActorId</c> = the assigned guardian, the GU seam's shape) +
+    /// <c>guardian.assign</c> (<c>ActorId</c> = the assigning guardian /
+    /// conferrer).
     /// </summary>
     [HttpPost("{childId}/assign")]
     [ValidateAntiForgeryToken]
@@ -437,12 +440,15 @@ public sealed class GuardianController(IUserInfoService userInfo, IIdentityServi
 
         try
         {
-            // G-A·4 — the CreateGuardianLinkAsync seam is idempotent for
+            // G-A·4 — the AssignGuardianLinkAsync seam is idempotent for
             // the (guardianId, childId) pair (the GU lane's G·4
             // precedent, inherited): a duplicate active row is a no-op —
-            // the row is left as-is, no second audit row. The happy
-            // path is one commit, one guardian.create audit row (C3).
-            await userInfo.CreateGuardianLinkAsync(childId, assignedId);
+            // the row is left as-is, no second pair of audit rows. The
+            // happy path is one commit, two audit rows (C3 — the
+            // guardian.create row [ActorId = the assigned guardian, S·5]
+            // + the guardian.assign row [ActorId = the assigning
+            // guardian / conferrer, S·5]). GA-AR (ADR 0038 amendment).
+            await userInfo.AssignGuardianLinkAsync(childId, assignedId, subject);
             TempData["info"] = $"Guardian assigned.";
         }
         catch (UnauthorizedAccessException)

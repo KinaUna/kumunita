@@ -142,6 +142,75 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(AccessVia.Guardian, row.Via);
     }
 
+    // ── 10 (GA-AR) — the conferral seam writes BOTH audit rows in one commit ──
+    // S·1 (C3 atomicity) + S·5 (audit shape) + S·6 (idempotency). The
+    // guardian.create row records the ASSIGNED guardian (the standing-holder,
+    // the GU seam's shape); the guardian.assign row records the ASSIGNING
+    // guardian (the conferrer, the GA-AR verb). Together they answer "who
+    // holds standing" AND "who conferred it."
+
+    [Fact]
+    public async Task AssignGuardianLink_WritesBothAuditRows()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-ar-assigning";
+        const string assignedGuardian = "ga-ar-assigned";
+        const string child = "ga-ar-child";
+
+        await SeedChildProfileAsync(store, child, ct);
+
+        // Call the seam — one commit, two audit rows (S·1).
+        var link = await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+        Assert.Equal(GuardianLinkStatus.Active, link.Status);
+
+        // (a) one GuardianLink row for the pair, Active.
+        await using var q1 = store.QuerySession();
+        var linkCount = await Marten.QueryableExtensions.CountAsync(
+            q1.Query<GuardianLink>()
+                .Where(l => l.GuardianId == assignedGuardian && l.ChildId == child),
+            ct);
+        Assert.Equal(1, linkCount);
+
+        // (b) one guardian.create row, ActorId = the ASSIGNED guardian (S·5).
+        var createRow = await LastAuditAsync(store, "guardian.create", link.Id, ct);
+        Assert.Equal(assignedGuardian, createRow.ActorId);
+        Assert.Equal(AccessVia.Guardian, createRow.Via);
+        Assert.Equal(AccessOutcome.Allow, createRow.Outcome);
+
+        // (c) one guardian.assign row, ActorId = the ASSIGNING guardian (S·5).
+        var assignRow = await LastAuditAsync(store, "guardian.assign", link.Id, ct);
+        Assert.Equal(assigningGuardian, assignRow.ActorId);
+        Assert.Equal(assigningGuardian, assignRow.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Guardian, assignRow.Via);
+        Assert.Equal(AccessOutcome.Allow, assignRow.Outcome);
+
+        // (d) both rows target the same link id, TargetKind = "guardian-link".
+        Assert.Equal(link.Id, createRow.TargetId);
+        Assert.Equal(link.Id, assignRow.TargetId);
+        Assert.Equal("guardian-link", createRow.TargetKind);
+        Assert.Equal("guardian-link", assignRow.TargetKind);
+
+        // (e) S·6 — idempotency: a second call with the same pair is a no-op —
+        //     the row count stays 1, the audit-row counts stay 1 each.
+        await userInfo.AssignGuardianLinkAsync(
+            child, assignedGuardian, assigningGuardian);
+
+        await using var q2 = store.QuerySession();
+        var linkCount2 = await Marten.QueryableExtensions.CountAsync(
+            q2.Query<GuardianLink>()
+                .Where(l => l.GuardianId == assignedGuardian && l.ChildId == child),
+            ct);
+        Assert.Equal(1, linkCount2);
+
+        var createCount2 = await CountAuditAsync(store, "guardian.create", link.Id, ct);
+        var assignCount2 = await CountAuditAsync(store, "guardian.assign", link.Id, ct);
+        Assert.Equal(1, createCount2);
+        Assert.Equal(1, assignCount2);
+    }
+
     // ── Shared harness ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -302,5 +371,18 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
                 ct);
         Assert.NotNull(row);
         return row!;
+    }
+
+    /// <summary>The count of <see cref="AccessAudit"/> rows for an action +
+    /// target (the GU lane's <c>CountAuditAsync</c> shape) — the idempotency
+    /// sub-assertion reads the audit-row counts.</summary>
+    private static async Task<int> CountAuditAsync(
+        IDocumentStore store, string action, string targetId, CancellationToken ct)
+    {
+        await using var session = store.QuerySession();
+        return await Marten.QueryableExtensions.CountAsync(
+            session.Query<AccessAudit>()
+                .Where(a => a.Action == action && a.TargetId == targetId),
+            ct);
     }
 }

@@ -16,13 +16,16 @@ namespace Kumunita.Web.Tests;
 
 /// <summary>
 /// GA (ADR 0038 — guardian assignment: an existing guardian assigns a second
-/// guardian to a child's account) — the lane's <b>5 pinned Web controller tests</b>
-/// for <see cref="GuardianController.Assign"/> (POST <c>me/children/{childId}/
-/// assign</c>). These are the <c>Pinned contract → Pinned seam tests (exact
-/// names)</c> #4–#8 frozen in <c>docs/design/guardian-assignment-design.md</c>
-/// (U01), asserting U05's action (the standing gate G-A·1, the resolution
-/// G-A·2, the self-assignment refusal G-A·5, the idempotent no-op G-A·4, and
-/// the happy-path <c>CreateGuardianLinkAsync</c> call).
+/// guardian to a child's account) + GA-AR (ADR 0038 §Amendment (2026-09-17,
+/// second) — the second audit row) — the lane's <b>6 pinned Web controller
+/// tests</b> for <see cref="GuardianController.Assign"/> (POST
+/// <c>me/children/{childId}/assign</c>). These are the <c>Pinned contract →
+/// Pinned seam tests (exact names)</c> #4–#9 frozen in
+/// <c>docs/design/guardian-assignment-design.md</c> (U01, extended by the
+/// GA-AR rename + add), asserting U05's action (the standing gate G-A·1, the
+/// resolution G-A·2, the self-assignment refusal G-A·5, the idempotent no-op
+/// G-A·4, the happy-path <c>AssignGuardianLinkAsync</c> call, and the
+/// <c>guardian.assign</c> conferral row).
 /// <para>
 /// These are <b>integration</b> tests (not NSubstitute-only): the
 /// <c>Assign</c> action's standing gate (<c>ActiveLinkAsync</c>) and the
@@ -36,14 +39,15 @@ namespace Kumunita.Web.Tests;
 /// the <c>BootStoreAsync</c> shape the GU lane established in
 /// <c>Kumunita.Core.Tests</c>.
 /// <para>
-/// <b>Drift pause (U06):</b> the pinned contract §D / test description #8
-/// says <c>ActorId</c> = the <b>assigning</b> guardian. The byte-identical GU
-/// seam <c>CreateGuardianLinkAsync(childId, guardianId)</c> sets
-/// <c>ActorId = guardianId</c> — and the <c>Assign</c> action passes
-/// <c>assignedId</c> as the <c>guardianId</c> argument, so <c>ActorId</c> =
-/// the <b>assigned</b> guardian. Since G-A·3 forbids a new seam, the prose pin
-/// and the code pin are mutually unsatisfiable. This test asserts the <b>real</b>
-/// behavior (<c>ActorId = assignedGuardian</c>) and records the drift.
+/// <b>Resolved (GA-AR, 2026-09-17):</b> the U06 drift pause (the pinned
+/// contract §D / test #8 said <c>ActorId</c> = the <b>assigning</b> guardian,
+/// but the byte-identical GU seam <c>CreateGuardianLinkAsync</c> set
+/// <c>ActorId</c> = the <b>assigned</b> guardian) is now <b>met</b> by the
+/// GA-AR seam <c>AssignGuardianLinkAsync</c>: it writes <b>two</b> audit rows
+/// — <c>guardian.create</c> (<c>ActorId</c> = the assigned guardian, the GU
+/// seam's shape) + <c>guardian.assign</c> (<c>ActorId</c> = the assigning
+/// guardian / conferrer). The §D prose pin and the code pin are no longer
+/// mutually unsatisfiable.
 /// A test whose exact name is not in the design doc's pinned list is a drift
 /// pause, not a silent add.
 /// </para>
@@ -173,20 +177,18 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
         Assert.Equal(0, auditCount);
     }
 
-    // ── 8 — happy path — CreateGuardianLinkAsync is called, new row + audit ─
+    // ── 8 — happy path — AssignGuardianLinkAsync is called, new row + 2 audit ─
     // A guardian assigns a known, non-self, non-duplicate email → the
-    // CreateGuardianLinkAsync seam creates a new GuardianLink row (Active)
-    // + one guardian.create audit row, in one commit (C3). The action
-    // redirects to Detail.
-    //
-    // DRIFT PAUSE (U06): the pinned contract §D says ActorId = the assigning
-    // guardian. The code (CreateGuardianLinkAsync(childId, guardianId)) sets
-    // ActorId = guardianId = the ASSIGNED guardian (the Assign action passes
-    // assignedId as the guardianId argument). This test asserts the REAL
-    // behavior (ActorId = NewGuardian), not the prose pin.
+    // AssignGuardianLinkAsync seam (GA-AR, ADR 0038 §Amendment
+    // (2026-09-17, second)) creates a new GuardianLink row (Active) + TWO
+    // audit rows in one commit (C3 — S·1): guardian.create [ActorId = the
+    // ASSIGNED guardian, the GU seam's shape] + guardian.assign [ActorId =
+    // the ASSIGNING guardian / conferrer] (S·5). The action redirects to
+    // Detail. (Resolves the U06 drift pause: the §D prose pin "ActorId =
+    // the assigning guardian" is now met by the guardian.assign row.)
 
     [Fact]
-    public async Task Assign_KnownEmail_CallsCreateGuardianLinkAsync()
+    public async Task Assign_KnownEmail_CallsAssignGuardianLinkAsync()
     {
         // The actor is the guardian (an active link over the child is seeded).
         // The email resolves to a NEW guardian (non-self, non-duplicate).
@@ -211,20 +213,63 @@ public sealed class GuardianAssignmentTests(PostgresFixture fixture) : IClassFix
         Assert.NotNull(newLink);
         Assert.Equal(GuardianLinkStatus.Active, newLink!.Status);
 
-        // Exactly one guardian.create audit row targeting the new link.
-        var auditCount = await CountAuditAsync(store, "guardian.create", newLink.Id, ct);
-        Assert.Equal(1, auditCount);
+        // Two audit rows target the new link (S·1 — one commit, two rows):
+        // (1) guardian.create — ActorId = the ASSIGNED guardian (S·5).
+        var createRow = await LastAuditAsync(store, "guardian.create", newLink.Id, ct);
+        Assert.Equal(NewGuardian, createRow.ActorId);          // the assigned guardian
+        Assert.Equal(AccessVia.Guardian, createRow.Via);
 
-        // The audit row shape: ActorId = the assigned guardian (the REAL
-        // behavior of CreateGuardianLinkAsync(childId, guardianId) — see the
-        // drift pause in the class doc-comment), EffectivePrincipalId = the
-        // assigned guardian, TargetKind = "guardian-link", Via = Guardian.
-        var audit = await LastAuditAsync(store, "guardian.create", newLink.Id, ct);
-        Assert.Equal(NewGuardian, audit.ActorId);
-        Assert.Equal(NewGuardian, audit.EffectivePrincipalId);
-        Assert.Equal("guardian-link", audit.TargetKind);
-        Assert.Equal(AccessVia.Guardian, audit.Via);
-        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+        // (2) guardian.assign — ActorId = the ASSIGNING guardian (S·5).
+        var assignRow = await LastAuditAsync(store, "guardian.assign", newLink.Id, ct);
+        Assert.Equal(Guardian, assignRow.ActorId);             // the assigning guardian (the test's actor)
+        Assert.Equal(AccessVia.Guardian, assignRow.Via);
+
+        Assert.Equal(newLink.Id, createRow.TargetId);
+        Assert.Equal(newLink.Id, assignRow.TargetId);
+        Assert.Equal("guardian-link", assignRow.TargetKind);
+    }
+
+    // ── 8a — GA-AR (2026-09-17) — the guardian.assign row's ActorId is the
+    //      ASSIGNING guardian (the conferrer), NOT the assigned guardian.
+    //      This is the §D named legibility limitation (ADR 0038, first
+    //      amendment) now resolved: the conferrer is on the audit trail.
+
+    [Fact]
+    public async Task Assign_KnownEmail_WritesAssignAuditRow()
+    {
+        // The actor is the guardian (an active link over the child is seeded).
+        // The email resolves to a NEW guardian (non-self, non-duplicate).
+        var (controller, identity, store) = await BuildAsync();
+        var ct = TestContext.Current.CancellationToken;
+        identity.FindSubjectByEmailAsync("new@example.com")
+            .Returns(Task.FromResult<string?>(NewGuardian));
+
+        var result = await controller.Assign(
+            Child,
+            new AssignGuardianForm { Email = "new@example.com" });
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+
+        // The new link row exists (the seam's write, S·1).
+        await using var session = store.QuerySession();
+        var newLink = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == NewGuardian && l.ChildId == Child)
+            .FirstOrDefaultAsync(ct);
+        Assert.NotNull(newLink);
+
+        // S·5 — the guardian.assign row's ActorId is the ASSIGNING guardian
+        // (the actor, the test's Guardian constant), NOT the assigned
+        // guardian (NewGuardian). This is the conferral legibility the
+        // GA-AR lane adds (ADR 0038 §D's named limitation, resolved).
+        var assignRow = await LastAuditAsync(store, "guardian.assign", newLink!.Id, ct);
+        Assert.Equal(Guardian, assignRow.ActorId);             // the assigning guardian (the actor)
+        Assert.Equal(Guardian, assignRow.EffectivePrincipalId);
+        Assert.NotEqual(NewGuardian, assignRow.ActorId);       // NOT the assigned guardian
+        Assert.Equal("guardian-link", assignRow.TargetKind);
+        Assert.Equal(newLink.Id, assignRow.TargetId);
+        Assert.Equal(AccessVia.Guardian, assignRow.Via);
+        Assert.Equal(AccessOutcome.Allow, assignRow.Outcome);
     }
 
     // ── Shared harness ─────────────────────────────────────────────────────

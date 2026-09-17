@@ -788,6 +788,30 @@ public interface IUserInfoService
     Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
 
     /// <summary>
+    /// GA-AR (ADR 0038 amendment): assign a second guardian to a child — the
+    /// conferral-based standing basis (vs. <see cref="CreateGuardianLinkAsync"/>'s
+    /// creation-based basis). Writes the <see cref="GuardianLink"/> row + TWO
+    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
+    /// <c>ActorId = guardianId</c> (the standing-holder, the GU seam's shape —
+    /// byte-identical to what <see cref="CreateGuardianLinkAsync"/> writes);
+    /// (2) <c>guardian.assign</c> with <c>ActorId = assignedById</c> (the
+    /// conferrer). Together they answer "who holds standing" AND "who
+    /// conferred it." The <see cref="GuardianLink"/> POCO is unchanged (S·3).
+    /// Idempotent for the (guardianId, childId) pair (S·6 — the G-A·4
+    /// precedent, inherited): a duplicate active row is a no-op — no second
+    /// row, no second pair of audit rows.
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// standing-holder; the <c>GuardianLink.GuardianId</c> value; the
+    /// <c>guardian.create</c> audit row's <c>ActorId</c>).</param>
+    /// <param name="assignedById">The assigning guardian's subject id (the
+    /// conferrer; the <c>guardian.assign</c> audit row's
+    /// <c>ActorId</c>/<c>EffectivePrincipalId</c>).</param>
+    Task<GuardianLink> AssignGuardianLinkAsync(
+        string childId, string guardianId, string assignedById);
+
+    /// <summary>
     /// Suspend the child (ADR 0028 §C action 2; G·2 — live standing off
     /// <see cref="Profile.Blocked"/>). The **standing gate** runs first: an
     /// <b>active</b> <see cref="GuardianLink"/> with
