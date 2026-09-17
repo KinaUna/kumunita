@@ -1191,3 +1191,71 @@ Web tests **229/229** green, Core tests **510/510** green, **zero
 **`about`-unseeded pin preserved**, and the two drift-pause decisions
 (documented above) recorded. **The `PG` lane (U00–U07) is now fully absorbed —
 `LocalizedPage` is retired.** **No next unit in this lane.**
+
+## Follow-on (2026-09-17) — the `help/account` mount slot is now wired
+
+A review of the completed lane flagged one gap against the design doc: ADR
+0039 §3.8 and `pages-design.md` §3.2/§3.3 name **two** mount slots —
+`footer/community` **and** `help/account` (the account-help page) — but only
+`footer/community` was actually consumed by a layout partial. `help/account`
+existed only as the `_PageForm` placeholder text and the `PageMountResolver`
+docs; no view ever resolved it. That was exactly the drift-pause policy item
+**(d)** — *"a mount-point slot that requires a new UI surface not already in a
+layout partial — a **new unit**, not a silently-omitted slot."* Rather than
+leave it defined-but-unconsumed, it is now wired (this follow-on, not a new
+numbered unit):
+
+**What I changed:**
+
+- **`src/Kumunita.Web/Views/Locale/Index.cshtml`** — the resident **settings**
+  page (titled "Your settings"; the resident's account surface — the natural
+  home for the design doc's "account-change-password help" slot). Added
+  `@inject Kumunita.Core.Pages.IPageService Pages` and, after the date-format
+  section, a **`help/account` mount block**: it calls the **same**
+  `PageMountResolver.ResolveAsync(Pages, "help/account")` the footer slot uses
+  (`_Layout.cshtml`), and renders a heading + lede + a link to the mounted page's
+  `/pages/…` href. **Unmounted ⇒ the block renders nothing** (the resolver
+  returns `null`), so a fresh instance (no page mounted there) is unchanged.
+  **Display, not access** — the link's target is opened by the page's own
+  `Show` action (the 403/404 Read decision), exactly as the footer slot
+  behaves.
+- **`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`** — added two
+  platform-copy keys (`settings.help_heading`, `settings.help_lede`) for the
+  block's heading + lede, so the copy is in the curated registry (the `kw-l`
+  floor) like every other in-scope view. The `MLUI_FacesTests` are
+  registry-driven (they iterate `AllKeys` / `EnValues`, no hardcoded count),
+  so the two new keys are covered automatically and the completeness universe
+  grows by two.
+
+**What I verified:**
+
+- `dotnet build Kumunita.slnx -c Debug` — **green, zero warnings** (the Razor
+  block compiles; the `@inject IPageService` + `await PageMountResolver.
+  ResolveAsync(...)` render path is valid).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  — **Total: 229, Errors: 0, Failed: 0** (unchanged from U07).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  — **Total: 510, Errors: 0, Failed: 0** (unchanged from U07).
+- `help/account` is now a **consumed** slot: `grep help/account` in `src/` shows
+  the resolver docs, the `_PageForm` placeholder, **and** the new
+  `Views/Locale/Index.cshtml` block — it is no longer defined-but-unconsumed.
+- No frozen seam touched: `Page`/`PageTranslation`/`IPageService`/`PageService`/
+  `PageDocTypes`/`PageMountResolver`/registration are all unchanged — this is a
+  pure **Web view** addition reusing the existing resolver seam.
+
+**Drift from the plan:** none — this **closes** the drift-pause (d) gap that
+the plan's register noted as an open set. It is a follow-on to the **complete**
+`PG` lane (U00–U07), not a new unit: the `help/account` slot was always in the
+design (ADR 0039 §3.8); only its consuming view was missing.
+
+**What the next agent must know:**
+
+- The `help/account` slot is live on the **settings** page
+  (`/settings/language`, `Views/Locale/Index.cshtml`). To make a page appear
+  there, set its `MountPoint` to `"help/account"` in the composer (the
+  `_PageForm` field) — the same as `footer/community`. Both slots are now
+  generic over any `MountPoint` string via the one `PageMountResolver`.
+- The two new keys (`settings.help_heading`, `settings.help_lede`) are in the
+  curated registry — a Translator can translate them like any other UI string.
+- **The `PG` lane (U00–U07) remains the complete lane; this is a follow-on
+  note, not a U08.** The roadmap's next in-progress milestone is still **M4**.

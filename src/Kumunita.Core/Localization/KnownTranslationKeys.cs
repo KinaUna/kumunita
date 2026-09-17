@@ -115,6 +115,12 @@ public static class KnownTranslationKeys
             ["settings.settings"]       = "Settings",
             ["settings.choose_language"] = "Choose your language",
 
+            // ── settings — account help (the help/account mount slot, ADR 0039 §3.8) ──
+            ["settings.help_heading"]     = "Help with your account",
+            ["settings.help_lede"]        =
+                "Stuck on your account — a password, your access, or anything else? " +
+                "This guide walks you through it.",
+
             // ── settings — timezone (ADR 0019: the user-override page + the
             // admin platform-default surface) ───────────────────────────────
             ["settings.timezone_title"]        = "Time zone",

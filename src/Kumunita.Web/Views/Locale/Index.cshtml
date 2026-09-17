@@ -1,5 +1,6 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
+@inject Kumunita.Core.Pages.IPageService Pages
 @{
     ViewData["Title"] = "Settings — Language";
 }
@@ -142,4 +143,22 @@
         <input type="hidden" name="clear" value="1" />
         <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.dateformat_reset">Reset to platform default</kw-l></button>
     </form>
+}
+
+@* ADR 0039 §3.8 — the help/account mount slot (the account-help page): the page
+   mounted at this slot renders as a link; an unmounted slot renders nothing.
+   Display, not access — the Show action is the Read decision. Resolved via the
+   same PageMountResolver the footer/community slot uses (_Layout). *@
+@{
+    var accountHelp = await PageMountResolver.ResolveAsync(Pages, "help/account");
+}
+@if (accountHelp is not null)
+{
+    <h2 class="mt-4"><kw-l key="settings.help_heading">Help with your account</kw-l></h2>
+    <p class="text-muted">
+        <kw-l key="settings.help_lede">Stuck on your account — a password, your access, or anything else? This guide walks you through it.</kw-l>
+    </p>
+    <p>
+        <a href="@accountHelp.Value.Href" class="btn btn-outline-primary">@accountHelp.Value.Title</a>
+    </p>
 }
