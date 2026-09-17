@@ -82,6 +82,17 @@ public static class ServiceCollectionExtensions
         // separate IUserInfoService / IAuthorizationService pairing).
         services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
 
+        // PG (ADR 0039, plan U01): the pages-side service seam (bounded
+        // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
+        // translatable knowledge tree" lane that absorbs the static-page lane
+        // in U07) — a store-composing service kept behind an interface so the
+        // Web-side consumer (the U04 PageController) can be tested without a
+        // live Postgres (the same "AddTransient with the store injected" shape
+        // as IAnnouncementService above; U02/U03 add the read/write methods —
+        // this unit is the seam + registration only).
+        services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
         // seams with the host-registered Marten IDocumentStore (the same

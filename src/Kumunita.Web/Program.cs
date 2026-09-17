@@ -85,6 +85,12 @@ var marten = builder.Services.AddMarten(opts =>
     // no business-key index (the M3 "string Id" convention). ADR 0004 §B.1. Without
     // this call the MediaObject doc is invisible to Marten (C-MED·7 drift).
     MediaDocTypes.Configure(opts);
+
+    // PG (ADR 0039, plan U01): the Pages bounded context's documents (Page +
+    // PageTranslation, ADR 0004 §B.1 additive — the two business-key unique
+    // indexes: (ParentId, Slug) and (PageId, LanguageCode)). Without this call
+    // the docs are invisible to Marten (the M3/Media precedent).
+    PageDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
