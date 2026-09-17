@@ -40,7 +40,7 @@ public sealed class GuardianViewModelsTests
     }
 
     [Fact]
-    public void MembershipEditorModel_Is_Exact_Four_Field_Projection()
+    public void MembershipEditorModel_Is_Exact_Five_Field_Projection()
     {
         var fields = typeof(MembershipEditorModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -48,10 +48,12 @@ public sealed class GuardianViewModelsTests
             .OrderBy(n => n)
             .ToList();
 
-        // The U07 pin: ChildId + GroupIds + CommunityIds + PendingInvitations.
-        // The three curation sets are **ids/names only** (G·1) — never the
-        // child's posts, profile body, or any audience-restricted content.
-        Assert.Equal(new[] { "ChildId", "CommunityIds", "GroupIds", "PendingInvitations" }, fields.ToArray());
+        // GU pin: ChildId + GroupIds + CommunityIds + PendingInvitations.
+        // GA (ADR 0038) U04 added the 5th: GuardianItems (the "other
+        // guardians" list — the assigned guardian's display name; G-A·3
+        // identical-in-kind pin; G·1 held: ids/names only, never the
+        // child's posts, profile body, or any audience-restricted content).
+        Assert.Equal(new[] { "ChildId", "CommunityIds", "GroupIds", "GuardianItems", "PendingInvitations" }, fields.ToArray());
     }
 
     [Fact]

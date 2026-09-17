@@ -395,3 +395,28 @@ The `IIdentityService.FindSubjectByEmailAsync` seam + its doc-comment, the
 appends, the localization key set, the 8 pinned test names, the
 G-A·1–G-A·6 invariants, and the acceptance gate — all frozen pins; any
 mismatch is a `## U<m> — Drift pause`.
+
+## GA — Closed (recorded) (2026-09-17)
+
+The GA lane (guardian assignment, ADR 0038) is **shipped**. The
+`IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.
+Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys are live. Standing is **identical in kind** to the creator's — invariant **G-A·3** held: the assigned guardian's standing is the same five GU actions, **no content read**, no "assigned" tier; the `GuardianLink` POCO and the GU enforcement path are byte-identical.
+
+- **Decision record:** ADR 0038 (guardian assignment; amends 0028's G·4 non-decision for the existing-guardian case, 0006 one `IIdentityService` ADD, 0012/0013 the standing-gate + "a non-guardian learns nothing" 404 shape inherited).
+- **Gate (U07's record — 2026-09-17):** the three tests (closed loop / handoff / part-vs-whole) are the 8 pinned seam tests below, all **PASS**:
+  - **3 Core tests** (`tests/Kumunita.Core.Tests/GuardianAssignmentTests.cs`, U03 — `PostgresFixture`, the real M1 lifecycle `RegisterAsync` + `VerifyWithTokenAsync`, both EF `identity` + Marten `mt` stores over one fresh scratch Postgres DB):
+    1. `FindSubjectByEmail_ReturnsSubjectIdForKnownEmail` — **PASS**
+    2. `FindSubjectByEmail_ReturnsNullForUnknownEmail` — **PASS**
+    3. `FindSubjectByEmail_IsCaseInsensitiveOnEmail` — **PASS**
+  - **5 Web tests** (`tests/Kumunita.Web.Tests/GuardianAssignmentTests.cs`, U06 — integration tests via `PostgresFixture` (postgres:18), asserting real `GuardianLink` + `guardian.create` audit rows):
+    4. `Assign_NonGuardian_Returns404` — **PASS**
+    5. `Assign_UnknownEmail_ReturnsValidationError` — **PASS**
+    6. `Assign_SelfAssignment_ReturnsValidationError` — **PASS**
+    7. `Assign_DuplicateAssignment_IsIdempotentNoOp` — **PASS**
+    8. `Assign_KnownEmail_CallsCreateGuardianLinkAsync` — **PASS**
+  - **Total:** 8/8 passed, 0 failed. **Closed loop** (the assigned guardian's standing is live on their next read) + **handoff** (the assigned guardian, now a full guardian, can suspend / un-suspend / curate / approve over the child) + **part-vs-whole** (all 8 pass together) — the gate holds.
+- **Drift pauses carried from U06 (named, not silently resolved):** (i) `Detail.cshtml` uses plain `name="Email"` (not `asp-for="Email"`) — the pinned `@model` is `MembershipEditorModel` (no `Email` property), so the `asp-for` TagHelper is uncompilable; the `Assign` action binds `AssignGuardianForm.Email` by its own property name on the POST, matching the existing curation-forms convention; (ii) the `guardian.create` audit row's `ActorId` is the **assigned** guardian (the `CreateGuardianLinkAsync(childId, guardianId)` seam sets `ActorId = guardianId`, and `guardianId` is the `assignedId` the `Assign` action passes) — the pinned contract §D prose says "assigning guardian", but the byte-identical GU seam (G-A·3 forbids a new seam) sets it to the assigned guardian; the tests assert the real behavior; (iii) `Kumunita.Web.Tests` now carries its own `PostgresFixture` (a byte-for-byte copy of `Kumunita.Core.Tests`'s) — the repo's documented convention ("Web.Tests is NSubstitute-only, Testcontainers lives in Core.Tests") is overridden by the explicit U06 requirement to run the 5 pinned tests against a real store.
+- **Cross-lane red surfaced (NOT in GA's deliverables, not fixed by GA):** `GuardianViewModelsTests.MembershipEditorModel_Is_Exact_Four_Field_Projection` (GU lane, pre-existing) asserts exactly `{ "ChildId", "CommunityIds", "GroupIds", "PendingInvitations" }`, but U04 legitimately added `GuardianItems` as the 5th field → that test is **red** in the full `Kumunita.Web.Tests` suite (1 failure out of 200 total). This is a cross-lane breakage outside GA's sealed scope — surfaced to the user as a decision (update the GU projection test to expect 5 fields vs. leave it) rather than silently fixed or ignored.
+- **Layout:** the `IIdentityService.FindSubjectByEmailAsync` ADD + the `GuardianController.Assign` action + the `AssignGuardianForm` / `GuardianItem` / `MembershipEditorModel.GuardianItems` VMs + the `Detail.cshtml` two appends + the `guardian.assign.*` / `guardian.otherGuardians.*` localization keys ride the existing surface (ADR 0004 §B.1 additive; `M1DocTypes` byte-identical — the `GuardianLink` line is already there, GU U02); `docs/ARCHITECTURE.md`'s `Identity/` + `UserInfo/` lines carry the surface (U07).
+- **Non-decisions (ADR 0038 §E, each named, carried forward):** no remove path (a co-guardian dissolving *another* co-guardian's link, or the child dissolving a co-guardian's link — the ADR 0028 G·5 safety valve remains the only "dissolve any active link" path); no acceptance/consent step on the assigned guardian; no bulk assign (one email per form); no self-assignment (refused, G-A·5, not a lane); no second audit verb (`guardian.create` is the one verb); no email notification to the assigned guardian. Each re-litigates as an ADR 0038 amendment, not a toggle.
+- **M4/M5/M6 untouched** (Events / Projects / Portability — the named-lane discipline: GA is not a renumber).
