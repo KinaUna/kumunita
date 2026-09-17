@@ -90,8 +90,9 @@ Portability**.
   second guardian over a child (refused, G-A·5 — the GU formation lane's
   territory, and `CreateGuardianLinkAsync` is already idempotent for the
   pair).
-- **No second audit verb** — `guardian.create` is the one verb; the
-  `ActorId` / `EffectivePrincipalId` are both the assigning guardian.
+- **No second audit verb** — `guardian.create` is the one verb (its
+  `ActorId` records the **assigned** guardian as standing-holder, not the
+  assigning guardian — the GU seam's shape, §D).
 - **No email notification** to the assigned guardian — the durable outbox
   / M1's verification lane is unchanged; the assigned guardian simply has
   standing on their next read.
@@ -370,7 +371,20 @@ authors) with exactly these **5**:
 7. `Assign_DuplicateAssignment_IsIdempotentNoOp`
 8. `Assign_KnownEmail_CallsCreateGuardianLinkAsync`
 
+And the **9th** (the acceptance gate's **handoff** leg, promoted from
+inference to a test on 2026-09-17 — see `## GA — Closed (recorded)`;
+ADR 0038 §Amendment): `tests/Kumunita.Core.Tests/` (the same Core file)
+
+9. `Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild` — after the GA
+   lane confers standing (a second active `GuardianLink` over the child,
+   via the same `CreateGuardianLinkAsync` seam `Assign` calls), the
+   assigned guardian drives `SuspendChildAsync` / `UnsuspendChildAsync`
+   over the child (G-A·3 — identical in kind to the creator's, no content
+   read). The suspension row's `ActorId` is the **assigned** guardian.
+
 A test whose exact name is not in this list is a `## U<m> — Drift pause`.
+(A test added under this list — #9 — is an ADR 0038 amendment, not a
+drift pause; the lane's own rule.
 
 ### Acceptance gate (U07 records)
 
@@ -382,8 +396,10 @@ The three tests:
   resolve the new row).
 - **handoff** — the assigned guardian, now a full guardian, can suspend /
   un-suspend / curate / approve over the child — the five GU actions, no
-  content read.
-- **part-vs-whole** — the 8-test list is the whole; closed-loop + handoff
+  content read. **Proven** by the pinned test #9
+  (`Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild`), not inferred
+  (2026-09-17, ADR 0038 §Amendment).
+- **part-vs-whole** — the 9-test list is the whole; closed-loop + handoff
   are the parts; all must pass together.
 
 ### Drift-guard (frozen once written)
@@ -392,9 +408,32 @@ The `IIdentityService.FindSubjectByEmailAsync` seam + its doc-comment, the
 `GuardianController.Assign` action + its doc-comment, the
 `AssignGuardianForm` shape, the `GuardianItem` record, the
 `MembershipEditorModel.GuardianItems` field, the `Detail.cshtml` two
-appends, the localization key set, the 8 pinned test names, the
+appends, the localization key set, the 9 pinned test names (#1–#9, #9
+added 2026-09-17), the
 G-A·1–G-A·6 invariants, and the acceptance gate — all frozen pins; any
 mismatch is a `## U<m> — Drift pause`.
+
+## Verification + reconciliation (2026-09-17)
+
+A full code-vs-docs pass (plus the Fractal-Integration lens) confirmed the
+lane is complete and green and reconciled two drifts (ADR 0038 §Amendment
+(2026-09-17)):
+
+- **Gate (re-run 2026-09-17): 9/9 PASS** — 4 Core (`FindSubjectByEmail_*` ×3
+  + **`Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild`**, the handoff
+  leg now proven) + 5 Web (`Assign_*`); the full `Kumunita.Web.Tests` suite
+  is 200/200. The **handoff** leg is now a test, not an inference.
+- **Reconciled (docs corrected to the shipped code, which G-A·3 keeps
+  authoritative):** the `guardian.create` row's `ActorId` /
+  `EffectivePrincipalId` record the **assigned** guardian (the
+  standing-holder) — the GU byte-identical seam's shape. The earlier prose
+  ("both the assigning guardian") in this doc's §Scope / §D and in ADR 0038
+  §D/§E did not match the code and is superseded; the **assigning**
+  guardian's identity is **not persisted** on the row (named legibility
+  limitation).
+- **Carried (unchanged):** the `name="Email"` (not `asp-for`) note and the
+  `Kumunita.Web.Tests` own-`PostgresFixture` note from the U06 drift pauses
+  — both still hold.
 
 ## GA — Closed (recorded) (2026-09-17)
 

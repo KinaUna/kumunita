@@ -94,6 +94,54 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal(principal.SubjectId, await identity.FindSubjectByEmailAsync("user@example.com"));
     }
 
+    // ── 9 (2026-09-17) — the gate's HANDOFF leg, promoted from inference to a test ──
+    // G-A·3 — the assigned guardian's standing is identical in kind to the
+    // creator's: after the GA lane confers standing (a second active
+    // GuardianLink over the child, via the same CreateGuardianLinkAsync seam
+    // GuardianController.Assign calls), the assigned guardian can drive the GU
+    // supervisory lanes over the child — here, SuspendChildAsync /
+    // UnsuspendChildAsync. This is the acceptance gate's second leg (closed
+    // loop / HANDOFF / part-vs-whole), now proven, not inferred.
+
+    [Fact]
+    public async Task Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild()
+    {
+        var (_, userInfo, store) = await BootIdentityAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        const string assigningGuardian = "ga-handoff-assigning";
+        const string assignedGuardian = "ga-handoff-assigned";
+        const string child = "ga-handoff-child";
+
+        // Seed a minimal child profile (SuspendChildAsync loads the child's
+        // Profile by SubjectId) + the assigning guardian's active link (their
+        // standing basis, G-A·1).
+        await SeedChildProfileAsync(store, child, ct);
+        await userInfo.CreateGuardianLinkAsync(child, assigningGuardian);
+
+        // The GA lane: the assigning guardian assigns the second guardian —
+        // exactly the seam GuardianController.Assign calls
+        // (CreateGuardianLinkAsync(childId, assignedId)).
+        var link = await userInfo.CreateGuardianLinkAsync(child, assignedGuardian);
+        Assert.Equal(GuardianLinkStatus.Active, link.Status);
+
+        // HANDOFF: the assigned guardian, now a full guardian, suspends +
+        // un-suspends the child — the GU lanes resolve the new row (G-A·3 —
+        // identical in kind to the creator's, no content read).
+        await userInfo.SuspendChildAsync(child, assignedGuardian);
+        Assert.True((await userInfo.GetProfileAsync(child))!.Blocked);
+
+        await userInfo.UnsuspendChildAsync(child, assignedGuardian);
+        Assert.False((await userInfo.GetProfileAsync(child))!.Blocked);
+
+        // The suspension audit row records the ASSIGNED guardian as the actor
+        // (the GU seam's standing-holder-as-actor shape; ADR 0038 §D, as
+        // reconciled 2026-09-17).
+        var row = await LastAuditAsync(store, "guardian.suspend", child, ct);
+        Assert.Equal(assignedGuardian, row.ActorId);
+        Assert.Equal(AccessVia.Guardian, row.Via);
+    }
+
     // ── Shared harness ────────────────────────────────────────────────────────
 
     /// <summary>
@@ -212,5 +260,47 @@ public class GuardianAssignmentTests(PostgresFixture fixture) : IClassFixture<Po
     {
         public static readonly EmptyServiceProvider Instance = new();
         public object? GetService(Type serviceType) => null;   // unregistered → null (the IServiceProvider contract); ProtectPersonalData is off, so no manager path resolves anything
+    }
+
+    // ── Handoff-leg helpers (2026-09-17) ──────────────────────────────────────
+
+    /// <summary>
+    /// Seeds a minimal verified, un-blocked <see cref="Profile"/> for the child so
+    /// <c>SuspendChildAsync</c> (which loads the child's profile by
+    /// <c>SubjectId</c>) has something to read (the GU lane's
+    /// <c>SeedChildProfileAsync</c> shape, for the handoff leg).
+    /// </summary>
+    private static async Task SeedChildProfileAsync(IDocumentStore store, string childId, CancellationToken ct)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        session.Store(new Profile
+        {
+            SubjectId = childId,
+            DisplayName = "Child",
+            Verified = true,
+            Blocked = false,
+            Visibility = new Audience(),
+        });
+        await session.SaveChangesAsync(ct);
+    }
+
+    /// <summary>The most recent <see cref="AccessAudit"/> row for an action + target
+    /// (the GU lane's <c>LastAuditAsync</c> shape) — the handoff leg reads the
+    /// suspension row's <c>ActorId</c> + <c>Via</c>.</summary>
+    private static async Task<AccessAudit> LastAuditAsync(
+        IDocumentStore store, string action, string targetId, CancellationToken ct)
+    {
+        await using var session = store.QuerySession();
+        // Fully-qualified: both Marten and EF Core expose a FirstOrDefaultAsync(IQueryable<T>)
+        // extension here; this is the Marten (mt-schema) query (the existing
+        // VerifySeededAccountAsync precedent).
+        var row = await Marten.QueryableExtensions
+            .FirstOrDefaultAsync(
+                session.Query<AccessAudit>()
+                    .Where(a => a.Action == action && a.TargetId == targetId)
+                    .OrderByDescending(a => a.At),
+                ct);
+        Assert.NotNull(row);
+        return row!;
     }
 }

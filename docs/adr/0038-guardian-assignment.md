@@ -73,13 +73,18 @@ deferral).
 ### D. The audit
 
 The **existing** `guardian.create` verb (no new verb). The `ActorId` and
-`EffectivePrincipalId` are both the **assigning** guardian (the one who
-called the seam); the `TargetId` is the new `GuardianLink` row's id; the
-`TargetKind` is `"guardian-link"`; the `Via` is
-`AccessVia.Guardian`. The audit row answers "who conferred the standing"
-(the assigning guardian); the assigned guardian's identity is on the row's
-`GuardianId` field, not the audit row. This is the GU lane's existing audit
-shape (ADR 0028 §E), unchanged.
+`EffectivePrincipalId` are both the **assigned** guardian — the
+standing-holder. The lane reuses the GU byte-identical seam
+`CreateGuardianLinkAsync(childId, guardianId)`, which sets
+`ActorId = guardianId`; the `Assign` action passes the **assigned**
+guardian's id as that argument. The `TargetId` is the new `GuardianLink`
+row's id; the `TargetKind` is `"guardian-link"`; the `Via` is
+`AccessVia.Guardian`. The row answers **"who now holds standing over this
+child"** (the assigned guardian) and targets **what** (the link row over
+the child); the **assigning** guardian's identity is **not persisted** on
+the row — a legibility limitation accepted because G-A·3 forbids a new
+seam (a seam that threaded the conferrer in would be a GU-surface change).
+This is the GU lane's existing audit shape (ADR 0028 §E), unchanged.
 
 ### E. The non-decisions (the "for now")
 
@@ -91,7 +96,9 @@ shape (ADR 0028 §E), unchanged.
   is from the active link, not from an acceptance.
 - **No bulk assign** — one email per form.
 - **No self-assignment** — refused (G-A·5), not a lane.
-- **No second audit verb** — `guardian.create` is the one verb.
+- **No second audit verb** — `guardian.create` is the one verb (its
+  `ActorId` records the **assigned** guardian as standing-holder, not the
+  assigning guardian — the GU seam's shape, §D).
 - **No email notification** to the assigned guardian — the durable outbox
   / M1's verification lane is unchanged; the assigned guardian simply has
   standing on their next read.
@@ -114,10 +121,17 @@ amendment when it earns its keep.
   family that later wants a *remove* lane or an *acceptance* step is told
   that is an ADR 0038 amendment, not a toggle.
 
-- **The `Authority` chain gains a co-supervision legibility row:** the
-  audit log now answers "this guardian assigned this guardian over this
-  child's account" — traceable forward and backward (the ADR 0028 family
-  legibility row, extended one step).
+- **The `Authority` chain gains a co-supervision standing row:** the
+  `guardian.create` audit row records the **assigned** guardian as the
+  standing-holder over the child's account (the GU seam's shape, §D), so
+  "who now holds standing over this child" is legible and traceable (the
+  ADR 0028 family legibility row, extended one step). **Named
+  limitation:** the row does **not** persist the *assigning* guardian —
+  "who conferred the standing" is not on the row (the assigning
+  guardian's id is the actor of the web `POST`, recoverable only from the
+  web layer's own request log, if any). If a future family wants the
+  conferring guardian on the row, that is an ADR 0038 amendment (a
+  deliberate GU-surface change), not a toggle.
 
 - **The roadmap trio moves together** (AGENTS.md contract): `README.md`
   Features + Roadmap and `Milestones.cs` gain the `GA` named lane (pulled
@@ -132,3 +146,26 @@ amendment when it earns its keep.
   new; the `Detail.cshtml` appends are additive; no stored row's meaning
   changes. Re-deploying an older image over a forward-migrated database is
   safe.
+
+## Amendment (2026-09-17)
+
+Two corrections, made by reconciling this ADR to the shipped code (which is
+authoritative per G-A·3) and by promoting one acceptance-gate leg from
+inference to a test. Both are additive/rectifying — no `GuardianLink`
+POCO, GU seam, or enforcement-path change (G-A·3 held); the §E
+non-decisions are unchanged.
+
+1. **§D corrected** — the `guardian.create` row's `ActorId` /
+   `EffectivePrincipalId` record the **assigned** guardian (the
+   standing-holder), not the assigning guardian; the assigning
+   guardian's identity is not persisted (legibility limitation named in
+   §D). The pre-amendment prose ("both the assigning guardian") did not
+   match the GU byte-identical seam and is superseded.
+2. **Acceptance gate: the handoff leg is now a test, not an inference.**
+   The design doc pins a 9th seam test,
+   `Handoff_AssignedGuardian_CanSuspendAndUnsuspendChild`
+   (`tests/Kumunita.Core.Tests/GuardianAssignmentTests.cs`): after the GA
+   lane confers standing, the assigned guardian drives
+   `SuspendChildAsync` / `UnsuspendChildAsync` over the child (G-A·3,
+   identical in kind, no content read). The gate is now 4 Core + 5 Web =
+   **9 pinned seam tests**, and the handoff leg is proven, not inferred.
