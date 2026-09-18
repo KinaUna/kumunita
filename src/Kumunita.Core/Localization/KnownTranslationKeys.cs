@@ -752,6 +752,42 @@ public static class KnownTranslationKeys
             ["rc.editor.attach"]  = "Attach file",
             ["rc.editor.source"]      = "</>",
             ["rc.editor.showPreview"] = "Preview",
+
+            // ── about (the About product surface, ADR 0042 D5 — the LS U01
+            // registers the closed `about.*` set with the exact current
+            // English copy of Views/StaticPages/About.cshtml; U05 wraps the
+            // view in kw-l against these names. The TODO(counts) stats
+            // values, the @Model.CommunityName hero heading, the
+            // @Model.SupportEmail contact strings (C#-built) and the
+            // RepositoryInfo.Links labels are data, not keys — D5.) ──────
+            ["about.eyebrow"]             = "Private by default",
+            ["about.lead"] =
+                "One home for everything your neighborhood does — the feed, " +
+                "the groups, and the notes that deserve better than a group " +
+                "chat. Private, plain-language, and yours.",
+            ["about.cta_feed"]            = "See the feed",
+            ["about.cta_notes"]           = "Read the pinned notes",
+            ["about.features.one.title"]  = "One feed for the street",
+            ["about.features.one.body"] =
+                "Posts and threads from your blocks and lanes, in one quiet " +
+                "place — no algorithm, no noise.",
+            ["about.features.groups.title"]  = "Groups that fit",
+            ["about.features.groups.body"] =
+                "Garden swap, book club, street watch — a group for whatever " +
+                "the neighbourhood already does.",
+            ["about.features.pinned.title"]  = "Pinned where it matters",
+            ["about.features.pinned.body"] =
+                "Water cuts, roadworks, the new speed bumps — notes that stay " +
+                "put instead of scrolling away.",
+            ["about.stats.neighbors"]  = "neighbors on board",
+            ["about.stats.groups"]     = "groups & communities",
+            ["about.stats.posts"]      = "posts & threads this month",
+            ["about.stats.pinned"]     = "pinned notes out now",
+            ["about.project.eyebrow"]  = "Open source",
+            ["about.project.heading"]  = "The code, the decisions, the design docs",
+            ["about.project.lead"] =
+                "If you're curious how it works — or if you're about to host " +
+                "it for your neighbourhood — everything is public.",
         };
 
     /// <summary>
