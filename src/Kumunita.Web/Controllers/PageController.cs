@@ -262,7 +262,7 @@ public sealed class PageController(
         var model = new PageComposeViewModel
         {
             IsPublic = false,
-            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
             // ADR 0040 — the kind is role-derived: an admin opens on a system
             // page (the platform namespace); a resident opens on a blog page
             // (their personal namespace). A resident CANNOT author a system
@@ -272,15 +272,11 @@ public sealed class PageController(
             IsAdmin = isAdmin,
         };
         await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
-        // The community branch (Decide() branch 4) allows a reader only when
-        // BOTH Audience.Community is true AND the reader's community set
-        // contains the page's ComponentId — so seed the first reachable
-        // community as the scope (the posts composer's `ComponentId = first.Id`
-        // precedent). Without a ComponentId the empty audience would deny
-        // *everyone* (Invariant C1 — including residents), so the community
-        // scope is what keeps residents in. An admin can still flip the page
-        // public, or pick a different community / grant specific people.
-        model.CommunityId = model.Components.FirstOrDefault().Id;
+        // ADR 0041 — the default scope is "All residents" (every signed-in
+        // resident sees the page, no community required — the announcement
+        // lane's flat scope analog). The view's scope dropdown lets the author
+        // narrow to a specific community or open the "Individual access" editor.
+        model.Scope = PageComposeViewModel.ScopeAllResidents;
         return View(model);
     }
 
@@ -314,6 +310,10 @@ public sealed class PageController(
             return View(model);
         }
 
+        // ADR 0041 — resolve the Scope dropdown to the (Audience, ComponentId)
+        // pair the service stores (the single write-side mapping).
+        var (audience, componentId) = ResolveAudience(model);
+
         var page = new Page
         {
             // ADR 0040 — the page kind (System = a platform page under the
@@ -332,13 +332,12 @@ public sealed class PageController(
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
             // IsPublic (the composer's toggle, off by default — ADR 0039 §3.4
             // amended 2026-09-17) ⇒ null audience + null component
-            // (world-readable, the public *capability*); a non-public page
-            // carries the editor's audience + community scope verbatim (the
-            // ADR 0036 single-source BuildAudience path).
-            Audience = model.IsPublic ? null : model.Audience.BuildAudience(),
-            ComponentId = model.IsPublic
-                ? null
-                : (string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId),
+            // (world-readable, the public *capability*); a non-public page's
+            // scope is resolved from the Scope dropdown (ADR 0041) — All
+            // residents, a specific community, or the "Individual access"
+            // editor's explicit grants.
+            Audience = audience,
+            ComponentId = componentId,
             MountPoint = string.IsNullOrWhiteSpace(model.MountPoint) ? null : model.MountPoint,
             LanguageCode = model.LanguageCode ?? string.Empty,
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
@@ -416,7 +415,11 @@ public sealed class PageController(
             ParentId = page.ParentId,
             IsPublic = page.Audience is null,
             Audience = AudienceEditorModel.FromAudience(page.Audience),
-            CommunityId = page.ComponentId,
+            // ADR 0041 — the Scope round-trips from the stored page's
+            // (Audience, ComponentId): null = public; AllResidents flag = All
+            // residents; Community flag + ComponentId = that community id;
+            // anything else (explicit grants) = Individual access.
+            Scope = DeriveScope(page),
             MountPoint = page.MountPoint,
             LanguageCode = page.LanguageCode,
             IsAdmin = KumunitaPrincipal.RoleSet(User).Contains(Roles.GlobalAdmin),
@@ -471,6 +474,10 @@ public sealed class PageController(
         if (!HasEditStanding(existing, actorId, KumunitaPrincipal.RoleSet(User)))
             return new ForbidResult();
 
+        // ADR 0041 — the same scope → (Audience, ComponentId) resolution as
+        // New POST (the ResolveAudience helper is the single source).
+        var (audience, componentId) = ResolveAudience(model);
+
         var updated = new Page
         {
             Id = existing.Id,
@@ -482,10 +489,8 @@ public sealed class PageController(
             IsDraft = existing.IsDraft,
             Title = model.Title!.Trim(),
             Body = model.Body ?? string.Empty,
-            Audience = model.IsPublic ? null : model.Audience.BuildAudience(),
-            ComponentId = model.IsPublic
-                ? null
-                : (string.IsNullOrWhiteSpace(model.CommunityId) ? null : model.CommunityId),
+            Audience = audience,
+            ComponentId = componentId,
             MountPoint = string.IsNullOrWhiteSpace(model.MountPoint) ? null : model.MountPoint,
             LanguageCode = model.LanguageCode ?? string.Empty,
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
@@ -751,6 +756,58 @@ public sealed class PageController(
     }
 
     // ── shared seeding + helpers ─────────────────────────────────────────────
+
+    /// <summary>
+    /// ADR 0041 — derives the view model's <see
+    /// cref="PageComposeViewModel.Scope"/> from a stored page's
+    /// <c>(Audience, ComponentId)</c> pair (the inverse of the write-side
+    /// mapping): <c>null</c> audience ⇒ <c>IsPublic</c> (no scope, the view
+    /// gates on <c>IsPublic</c>); <c>Audience.AllResidents</c> ⇒
+    /// <see cref="PageComposeViewModel.ScopeAllResidents"/>;
+    /// <c>Audience.Community</c> + a non-empty <c>ComponentId</c> ⇒ that
+    /// community id; anything else (explicit user/group grants) ⇒
+    /// <see cref="PageComposeViewModel.ScopeIndividual"/> (reveal the
+    /// editor).
+    /// </summary>
+    private static string? DeriveScope(Page page)
+    {
+        if (page.Audience is null) return null;
+        if (page.Audience.AllResidents) return PageComposeViewModel.ScopeAllResidents;
+        if (page.Audience.Community && !string.IsNullOrWhiteSpace(page.ComponentId))
+            return page.ComponentId;
+        return PageComposeViewModel.ScopeIndividual;
+    }
+
+    /// <summary>
+    /// ADR 0041 — resolves the composer's <see
+    /// cref="PageComposeViewModel.Scope"/> dropdown to the
+    /// <c>(Audience, ComponentId)</c> pair the service stores (the write-side
+    /// inverse of <see cref="DeriveScope"/>). The 4 cases:
+    /// <list type="bullet">
+    /// <item><c>IsPublic = true</c> ⇒ <c>(null, null)</c> — world-readable,
+    /// unauthenticated included.</item>
+    /// <item><c>Scope = "AllResidents"</c> ⇒
+    /// <c>(Audience { AllResidents = true }, null)</c> — the new frozen
+    /// <c>Decide()</c> resident branch (any signed-in reader, no community
+    /// required).</item>
+    /// <item><c>Scope = a component id</c> ⇒
+    /// <c>(Audience { Community = true }, that id)</c> — the existing
+    /// community branch (readers in that community).</item>
+    /// <item><c>Scope = "Individual"</c> ⇒
+    /// <c>(model.Audience.BuildAudience(), null)</c> — the editor's explicit
+    /// user/group grants.</item>
+    /// </list>
+    /// </summary>
+    private static (Kumunita.Core.Authorization.Audience? Audience, string? ComponentId) ResolveAudience(PageComposeViewModel model)
+    {
+        if (model.IsPublic)
+            return (null, null);
+        if (string.Equals(model.Scope, PageComposeViewModel.ScopeAllResidents, StringComparison.Ordinal))
+            return (new Kumunita.Core.Authorization.Audience(Authorization.AudienceMode.Any, []) { AllResidents = true }, null);
+        if (string.Equals(model.Scope, PageComposeViewModel.ScopeIndividual, StringComparison.Ordinal))
+            return (model.Audience.BuildAudience(), null);
+        return (new Kumunita.Core.Authorization.Audience(Authorization.AudienceMode.Any, []) { Community = true }, model.Scope);
+    }
 
     /// <summary>
     /// Resolves a language code to its native name for a confirmation banner

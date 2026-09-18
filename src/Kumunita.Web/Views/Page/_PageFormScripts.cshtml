@@ -1,0 +1,42 @@
+@*
+    The _PageForm composer's client-side scripts (rich editor + grant-picker
+    sync + the ADR 0041 visibility-block toggling).
+
+    Kept in its OWN partial (not inside _PageForm.cshtml) because a `@section`
+    declared in a partial is a known Razor gotcha: the section is not reliably
+    registered with the layout's `RenderSectionAsync`, so the whole block
+    (including the `change` listener that reveals #page-individual-block) can
+    be silently dropped. The two consuming views (New.cshtml / Edit.cshtml)
+    declare `@section Scripts` in the VIEW file and include this partial —
+    matching every other view in the app (Login, Signup, Posts, Profile,
+    Groups all declare their `@section` in the view, never in a partial).
+*@
+<script type="module" src="~/js/lib/rich-editor.js"></script>
+<partial name="_GrantPickerScripts" />
+<script>
+(function () {
+    'use strict';
+    // ADR 0041 — two visibility blocks, both hidden when IsPublic is on:
+    // 1. The scope dropdown (hidden when IsPublic is on).
+    // 2. The detailed audience editor (hidden when IsPublic is on OR
+    //    the scope dropdown is not "Individual").
+    var publicBox = document.getElementById('is-public');
+    var scopeBlock = document.getElementById('page-scope-block');
+    var individualBlock = document.getElementById('page-individual-block');
+    var scopeSelect = document.getElementById('scope');
+
+    function refresh() {
+        var isPublic = publicBox.checked;
+        scopeBlock.classList.toggle('d-none', isPublic);
+        var showIndividual = !isPublic && scopeSelect.value === 'Individual';
+        individualBlock.classList.toggle('d-none', !showIndividual);
+    }
+
+    if (publicBox) {
+        publicBox.addEventListener('change', refresh);
+    }
+    if (scopeSelect) {
+        scopeSelect.addEventListener('change', refresh);
+    }
+})();
+</script>

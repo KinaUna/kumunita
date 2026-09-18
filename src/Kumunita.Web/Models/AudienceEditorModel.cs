@@ -93,6 +93,22 @@ public sealed class AudienceEditorModel
     /// </summary>
     public bool CommunityVisible { get; set; }
 
+    /// <summary>
+    /// The ADR 0041 "all residents" flag as a form-bound checkbox. When
+    /// checked, the resource is visible to every signed-in resident (any
+    /// authenticated reader, no community required) — via the new 4.5 decision
+    /// branch (after the community branch, before the public branch). A
+    /// simple bool model-binds from a checkbox's absence (<c>false</c>) and
+    /// presence (the posted value), no extra validation needed.
+    /// <para>
+    /// The page composer's "All residents" scope (ADR 0041) sets this flag on
+    /// the document via the controller's write-side mapping; the editor's own
+    /// checkbox round-trips the stored value. A <c>null</c> audience (a public
+    /// page) has no flag (the public branch wins unconditionally).
+    /// </para>
+    /// </summary>
+    public bool AllResidentsVisible { get; set; }
+
     /// <summary>true when the editor's grant list is empty (an empty audience — the
     /// C1 deny shape). Used by the partial's inline hint (an "empty audience denies
     /// everyone, including you — see the M1 bootstrap default" note). A *parse
@@ -198,6 +214,9 @@ public sealed class AudienceEditorModel
         // the grants list), so it is set after the audience is built; the
         // editor's checkbox state is carried verbatim onto the document.
         audience.Community = CommunityVisible;
+        // ADR 0041 — the "all residents" flag is likewise a distinct grant
+        // (the new 4.5 branch), carried verbatim from the editor's checkbox.
+        audience.AllResidents = AllResidentsVisible;
         return audience;
     }
 
@@ -225,6 +244,7 @@ public sealed class AudienceEditorModel
         var grantsJson = JsonSerializer.Serialize(audience.Grants?.ToArray() ?? Array.Empty<AudienceGrant>(), JsonOptions);
         return new AudienceEditorModel
         {
+            AllResidentsVisible = audience.AllResidents,
             Mode = mode,
             Grants = grantsJson,
             CommunityVisible = audience.Community,

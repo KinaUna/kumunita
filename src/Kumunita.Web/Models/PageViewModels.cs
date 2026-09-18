@@ -224,39 +224,70 @@ public sealed class PageComposeViewModel
     /// The <b>public</b> toggle. <c>true</c> ⇒ the page is written with
     /// <see cref="Kumunita.Core.Pages.Page.Audience"/> <c>null</c> (world-readable,
     /// unauthenticated included) and <see cref="Kumunita.Core.Pages.Page.ComponentId"/>
-    /// <c>null</c>; <c>false</c> ⇒ the <see cref="Audience"/> editor +
-    /// <see cref="CommunityId"/> are stored verbatim. Round-trips from a stored
+    /// <c>null</c>; <c>false</c> ⇒ the <see cref="Scope"/> dropdown +
+    /// <see cref="Audience"/> editor are stored (the controller's
+    /// <c>ResolveAudience</c> mapping, ADR 0041). Round-trips from a stored
     /// page as <c>page.Audience is null</c>. Defaulted <c>false</c> — a fresh
-    /// page is **non-public** (community-visible, matching posts — ADR 0039 §3.4
-    /// amended 2026-09-17); an admin can still opt a page into the public
-    /// capability. (The seeded <c>about</c>/<c>terms</c>/<c>help</c> pages are
-    /// written public by the seeder, not by this default.)
+    /// page is **non-public** (all-residents by default, ADR 0041); an admin
+    /// can still opt a page into the public capability. (The seeded
+    /// <c>about</c>/<c>terms</c>/<c>help</c> pages are written public by the
+    /// seeder, not by this default.)
     /// </summary>
     public bool IsPublic { get; set; } = false;
+
+    /// <summary>
+    /// The <b>"All residents"</b> scope (ADR 0041) — the page's
+    /// <c>who-can-see-this</c> dropdown value meaning *every signed-in
+    /// resident* (any authenticated reader, no community required), written
+    /// as <c>Audience.AllResidents = true</c> + <c>ComponentId = null</c>
+    /// (the new frozen <c>Decide()</c> resident branch). The <b>default</b>
+    /// for a fresh composer, and the analog of the announcement's flat
+    /// <c>Scope = Community, CommunityId = null</c> shape.
+    /// </summary>
+    public const string ScopeAllResidents = "AllResidents";
+
+    /// <summary>
+    /// The <b>"Individual access"</b> scope (ADR 0041) — the dropdown value
+    /// that reveals the detailed <see cref="Audience"/> editor (explicit
+    /// user/group grants). Any other non-blank <see cref="Scope"/> value is a
+    /// <see cref="Kumunita.Core.UserInfo.Component"/> id (a specific
+    /// community, written as <c>Audience.Community = true</c> + that
+    /// <c>ComponentId</c>).
+    /// </summary>
+    public const string ScopeIndividual = "Individual";
+
+    /// <summary>
+    /// The <b>"who can see this"</b> scope (ADR 0041) — one of
+    /// <see cref="ScopeAllResidents"/> (the default), <see
+    /// cref="ScopeIndividual"/> (reveal the editor), or a
+    /// <see cref="Kumunita.Core.UserInfo.Component"/> id (a specific
+    /// community). Binds from the <c>&lt;select&gt;</c> the view renders from
+    /// <see cref="Components"/>. Inert while <see cref="IsPublic"/> is
+    /// <c>true</c> (a public page is world-readable, no scope).
+    /// </summary>
+    public string? Scope { get; set; } = ScopeAllResidents;
+
+    /// <summary>
+    /// Whether the <see cref="Scope"/> is <see cref="ScopeIndividual"/> (the
+    /// view's pin for revealing the detailed <see cref="Audience"/> editor —
+    /// it is shown only when this is <c>true</c>, matching the announcement
+    /// lane's audience visibility rules). A <c>null</c>/"AllResidents" / community scope is <c>false</c>.
+    /// </summary>
+    public bool IsIndividualAccess =>
+        string.Equals(Scope, ScopeIndividual, StringComparison.Ordinal);
 
     /// <summary>
     /// The page's <b>audience</b> editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the
     /// <see cref="Kumunita.Core.Authorization.Audience"/> form-bound shape),
-    /// reused verbatim (the "one audience, one binder" pin). Inert (not
-    /// stored) while <see cref="IsPublic"/> is <c>true</c> — a public page
-    /// has a <c>null</c> audience; consulted only when <see cref="IsPublic"/>
-    /// is <c>false</c>.
+    /// reused verbatim (the "one audience, one binder" pin). Consulted only
+    /// when <see cref="IsIndividualAccess"/> is <c>true</c> (the
+    /// "Individual access" scope); inert (not stored) while <see
+    /// cref="IsPublic"/> is <c>true</c> or the scope is a community / All
+    /// residents (the controller writes those scopes directly, not through
+    /// the editor).
     /// </summary>
     public AudienceEditorModel Audience { get; set; } = new();
-
-    /// <summary>
-    /// The community this page is scoped to (<see cref="Component"/> id) —
-    /// the target of the audience's <c>Community</c> flag (all members of
-    /// that component may read it). A <c>null</c>/empty value is a
-    /// flat/public page (no community scope). Binds from a
-    /// <c>&lt;select&gt;</c> of <see cref="Components"/>. Inert while
-    /// <see cref="IsPublic"/> is <c>true</c> (a public page has no component
-    /// scope). ADR 0040 retires the ADR 0039 §3.7 use of this as a
-    /// community-Moderator standing key — a Moderator has no page standing;
-    /// this is a *read* scope only.
-    /// </summary>
-    public string? CommunityId { get; set; }
 
     /// <summary>
     /// The UI slot this page is mounted at (ADR 0039 §3.8 — e.g.
@@ -313,7 +344,11 @@ public sealed class PageComposeViewModel
         get
         {
             if (string.IsNullOrWhiteSpace(Title)) return false;
-            if (!IsPublic && (Audience is null || !Audience.IsValid)) return false;
+            // ADR 0041 — the editor is only consulted for the "Individual
+            // access" scope (the other scopes are written directly by the
+            // controller), so only that scope requires a well-formed editor.
+            if (!IsPublic && IsIndividualAccess && (Audience is null || !Audience.IsValid))
+                return false;
             return true;
         }
     }

@@ -64,7 +64,8 @@ namespace Kumunita.Web.Tests;
 ///       page is written with <c>Audience = null</c> + <c>ComponentId =
 ///       null</c> (the public capability); when <c>false</c> (the default),
 ///       the editor's <c>BuildAudience()</c> + the <see
-///       cref="PageComposeViewModel.CommunityId"/> are the stored values.
+///       cref="PageComposeViewModel.Scope"/> dropdown are the stored values
+///       (ADR 0041 — the Scope → (Audience, ComponentId) mapping).
 ///       <see cref="PageController.Edit"/> (POST) round-trips the same way
 ///       through <see cref="IPageService.UpdateAsync"/>.</item>
 /// <item><b>403 on a standing re-check (C3)</b>: <see
@@ -448,7 +449,7 @@ public class PageControllerTests
             // A non-null editor (it would be inert — IsPublic=true) — the
             // pin is that the editor's output is NOT what gets stored.
             Audience = new AudienceEditorModel { Mode = "All", Grants = "[\"some-grant\"]", CommunityVisible = false },
-            CommunityId = "community-001",
+            Scope = "community-001",
             LanguageCode = "en",
         };
 
@@ -500,22 +501,21 @@ public class PageControllerTests
         var result = Assert.IsType<ViewResult>(await controller.New());
         var model = Assert.IsType<PageComposeViewModel>(result.ViewData.Model);
 
-        // Non-public + community-visible, with a community scope seeded so
-        // residents aren't denied by the otherwise-empty audience.
+        // Non-public + the default scope is "All residents" (ADR 0041 —
+        // every signed-in resident sees the page, no community required).
         Assert.False(model.IsPublic);
-        Assert.True(model.Audience.CommunityVisible);
+        Assert.Equal(PageComposeViewModel.ScopeAllResidents, model.Scope);
         Assert.Equal("[]", model.Audience.Grants);
-        Assert.Equal("comp-default", model.CommunityId);
     }
 
     /// <summary>
     /// <see cref="PageController.New"/> (POST, <see
     /// cref="PageComposeViewModel.IsPublic"/> = <c>false</c>) writes the
     /// page with the editor's <see cref="AudienceEditorModel.BuildAudience"/>
-    /// output + the <see cref="PageComposeViewModel.CommunityId"/> (the
-    /// non-public shape — the ADR 0036 single-source pin: the editor is the
-    /// only deserialization site, the <c>BuildAudience()</c> output is the
-    /// stored <see cref="Kumunita.Core.Authorization.Audience"/>).
+    /// output + the <see cref="PageComposeViewModel.Scope"/> dropdown's
+    /// community id (the non-public shape — the ADR 0041 single-source pin:
+    /// the Scope is the single write-side source, the <c>ResolveAudience</c>
+    /// mapping materializes the <c>(Audience, ComponentId)</c> pair).
     /// </summary>
     [Fact]
     public async Task New_Post_IsNotPublic_WritesEditorAudienceAndCommunity()
@@ -531,7 +531,7 @@ public class PageControllerTests
             Body = "Restricted content.",
             IsPublic = false,
             Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]", CommunityVisible = true },
-            CommunityId = "community-002",
+            Scope = "community-002",
             LanguageCode = "en",
         };
 
@@ -547,6 +547,55 @@ public class PageControllerTests
                              && p.Audience.Grants.Count == 0
                              && p.ComponentId == "community-002"
                              && p.Slug == "a-restricted-page" && p.Title == "A restricted page"),
+            Arg.Is<string>(s => s == "subj-admin-001"),
+            Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <see cref="PageController.New"/> (POST, <see
+    /// cref="PageComposeViewModel.IsPublic"/> = <c>false</c>, <see
+    /// cref="PageComposeViewModel.Scope"/> = <see
+    /// cref="PageComposeViewModel.ScopeAllResidents"/>) writes the page with
+    /// <c>Audience.AllResidents = true</c> + empty grants + <c>ComponentId =
+    /// null</c> (the ADR 0041 "all residents" scope — every signed-in
+    /// resident may read, no community required, the new frozen
+    /// <c>Decide()</c> resident branch). The pin: this scope is written as
+    /// a non-null audience (so the public branch does NOT win), the
+    /// AllResidents flag is on, and the ComponentId is <c>null</c> (no
+    /// community scope).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_ScopeAllResidents_WritesAllResidentsFlag()
+    {
+        var pages = Substitute.For<IPageService>();
+        pages.CreateAsync(Arg.Any<Page>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call => { var p = call.ArgAt<Page>(0); p.Id = "page-new-004"; p.AuthorId = call.ArgAt<string>(1); return Task.FromResult(p); });
+        var controller = Build(pages, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
+
+        var model = new PageComposeViewModel
+        {
+            Title = "An all-residents page",
+            Body = "Visible to every signed-in resident.",
+            IsPublic = false,
+            Scope = PageComposeViewModel.ScopeAllResidents,
+            // The editor is inert for this scope (the controller writes the
+            // AllResidents flag directly, not through BuildAudience).
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            LanguageCode = "en",
+        };
+
+        var result = await controller.New(model);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await pages.Received(1).CreateAsync(
+            Arg.Is<Page>(p => p.Audience != null
+                             && p.Audience.Mode == AudienceMode.Any
+                             && p.Audience.AllResidents == true
+                             && p.Audience.Community == false
+                             && p.Audience.Grants.Count == 0
+                             && p.ComponentId == null
+                             && p.Slug == "an-all-residents-page" && p.Title == "An all-residents page"),
             Arg.Is<string>(s => s == "subj-admin-001"),
             Arg.Any<IReadOnlySet<string>>(),
             Arg.Any<IDocumentSession>());
@@ -574,8 +623,12 @@ public class PageControllerTests
             Slug = "existing",
             Title = "Existing title",
             Body = "Existing body.",
-            Audience = new Kumunita.Core.Authorization.Audience { Mode = AudienceMode.Any, Grants = new List<AudienceGrant> { new AudienceGrant(GrantKind.User, "grant-1") }, Community = true },
-            ComponentId = "community-003",
+            // ADR 0041 — an "All residents" page: non-null audience, the
+            // AllResidents flag is on, no community, empty grants (the
+            // scope the new branch 4.5 reads). This is the scope a
+            // round-trip must preserve.
+            Audience = new Kumunita.Core.Authorization.Audience { Mode = AudienceMode.Any, Grants = new List<AudienceGrant>(), AllResidents = true },
+            ComponentId = null,
             LanguageCode = "en",
             AuthorId = "subj-admin-001",
             IsDraft = false,
@@ -605,27 +658,29 @@ public class PageControllerTests
 
         var controller = Build(pages, store: store, IsAuthenticated: true, subjectId: "subj-admin-001", roles: new[] { Roles.GlobalAdmin });
 
-        // The GET lane's model is the round-trip start: FromAudience(existing.Audience).
+        // The GET lane's model is the round-trip start: DeriveScope(existing)
+        // + FromAudience(existing.Audience). An "All residents" page
+        // (ADR 0041) round-trips to Scope = "AllResidents" + a non-public IsPublic.
         var get = (await controller.Edit(pageId)) as ViewResult;
         Assert.NotNull(get);
         var getModel = get!.ViewData.Model as PageComposeViewModel;
         Assert.NotNull(getModel);
         Assert.False(getModel!.IsPublic);    // existing.Audience is non-null
+        Assert.Equal(PageComposeViewModel.ScopeAllResidents, getModel.Scope);
         Assert.Equal("Any", getModel.Audience.Mode);
-        Assert.True(getModel.Audience.CommunityVisible);
 
         // A no-op edit (the model is re-posted unchanged) round-trips to a
-        // BuildAudience() output equal in Mode/Community (the Grants are the
-        // JSON array the editor's hidden textarea posts — the same shape the
-        // FromAudience call produced, re-emitted on POST).
+        // BuildAudience() output with the AllResidents flag preserved (the
+        // single ResolveAudience write-side mapping is the pin).
         var post = (await controller.Edit(pageId, getModel)) as RedirectToActionResult;
         Assert.NotNull(post);
 
         await pages.Received(1).UpdateAsync(
             Arg.Is<Page>(p => p.Audience != null
                              && p.Audience.Mode == AudienceMode.Any
-                             && p.Audience.Community == true
-                             && p.ComponentId == "community-003"
+                             && p.Audience.AllResidents == true
+                             && p.Audience.Community == false
+                             && p.ComponentId == null
                              && p.Slug == "existing"
                              && p.ParentId == existing.ParentId
                              && p.IsDraft == existing.IsDraft),

@@ -441,6 +441,22 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
             return new Decision(true, via, effectivePrincipalId);
         }
 
+        // 4.5 All-residents branch (ADR 0041) — the resource's
+        //     Audience.AllResidents flag is true AND the actor is signed in
+        //     (a non-empty actorId). This is the pages-lane equivalent of
+        //     the announcement's flat Scope=Community, CommunityId=null
+        //     (any signed-in resident sees it). Placed after the Community
+        //     branch (a community-scoped page is more specific) and before
+        //     the Public branch (public is world-readable, this is
+        //     resident-only). No ComponentId required — the flag is the
+        //     whole decision, unlike the Community branch.
+        if (target.Audience is { AllResidents: true } &&
+            !string.IsNullOrEmpty(actorId))
+        {
+            var via = isDelegated ? AccessVia.Delegation : AccessVia.Resident;
+            return new Decision(true, via, effectivePrincipalId);
+        }
+
         // 5. Public resource (Audience null — not audience-restricted).
         if (target.Audience is null)
         {

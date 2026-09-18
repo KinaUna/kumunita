@@ -142,30 +142,37 @@
                             Public — visible to everyone (including visitors who aren't signed in)
                         </label>
                         <div class="text-muted small ms-4">
-                            Off by default — visible to signed-in residents (community-visible, like posts). Turn on to make it visible to everyone, including visitors who aren't signed in.
+                            Off by default. When off, choose a scope below (all residents, a specific community, or individual grants).
                         </div>
                     </div>
 
-                    <div id="page-audience-block" class="@(Model.IsPublic ? "d-none" : null)">
+                    @* ADR 0041 — the scope dropdown (hidden when Public is on) *@
+                    <div id="page-scope-block" class="@(Model.IsPublic ? "d-none" : null)">
                         <div class="row g-2">
                             <div class="col-md-6">
-                                <label class="form-label" for="community" style="font-weight:600;">Community (optional scope)</label>
-                                <select class="form-control" id="community" name="CommunityId">
-                                    <option value="">No community (flat)</option>
+                                <label class="form-label" for="scope" style="font-weight:600;">Who can see this page</label>
+                                <select class="form-control" id="scope" name="Scope">
+                                    <option value="AllResidents"
+                                            selected="@(Model.Scope == "AllResidents" ? "selected" : null)">
+                                        All residents
+                                    </option>
                                     @foreach (var (id, name) in Model.Components)
                                     {
-                                        <option value="@id" selected="@(id == Model.CommunityId ? "selected" : null)">@name</option>
+                                        <option value="@id"
+                                                selected="@(Model.Scope == id ? "selected" : null)">
+                                            @name
+                                        </option>
                                     }
+                                    <option value="Individual"
+                                            selected="@(Model.Scope == "Individual" ? "selected" : null)">
+                                        Individual access
+                                    </option>
                                 </select>
                                 <div class="text-muted small mt-1">
-                                    A community scope makes "everyone in this community" a grantable audience.
+                                    All residents — every signed-in resident (default). A community — only members of that community. Individual access — explicit user/group grants.
                                 </div>
                             </div>
-                            @* ADR 0040 — MountPoint is a *system-page* concept (a UI
-                               slot such as footer/community or help/account). A
-                               resident's blog page only surfaces in its own /blog
-                               feed, so the mount-point field is hidden for blog
-                               pages (the service also clears it server-side). *@
+                            @* ADR 0040 — MountPoint is a *system-page* concept *@
                             @if (Model.Kind != "User")
                             {
                                 <div class="col-md-6">
@@ -179,7 +186,11 @@
                                 </div>
                             }
                         </div>
+                    </div>
 
+                    @* ADR 0041 — the detailed editor is shown ONLY when
+                       Scope = "Individual" AND IsPublic is off *@
+                    <div id="page-individual-block" class="@(Model.IsPublic || Model.Scope != "Individual" ? "d-none" : null)">
                         <hr class="my-3" />
 
                         <div class="form-label" style="font-weight:600;">Audience — who can see this page</div>
@@ -192,22 +203,11 @@
                                        value="@m" @checkedMark required />
                                 <label class="form-check-label" for="@($"aud-mode-{m}")">
                                     @m @(" — " + (m == "Any"
-                                        ? "a viewer matches if they're on any of the picks (or a community member, below)"
+                                        ? "a viewer matches if they're on any of the picks"
                                         : "a viewer must be on every pick — an empty list denies everyone"))
                                 </label>
                             </div>
                         }
-
-                        <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox"
-                                   name="Audience.CommunityVisible"
-                                   id="aud-community"
-                                   value="true"
-                                   @(Model.Audience?.CommunityVisible == true ? "checked" : null) />
-                            <label class="form-check-label" for="aud-community">
-                                Everyone in the community above (if a community is picked)
-                            </label>
-                        </div>
 
                         <partial name="_GrantPickers" model="@(new GrantPickersModel
                         {
@@ -230,22 +230,3 @@
         </form>
     </div>
 </div>
-
-@section Scripts {
-    <script type="module" src="~/js/lib/rich-editor.js"></script>
-    <partial name="_GrantPickerScripts" />
-    <script>
-    (function () {
-        'use strict';
-        // Toggle the audience block on the IsPublic switch (pure CSS-class
-        // flip, no server-side re-render — the ADR 0036 posts pattern).
-        var publicBox = document.getElementById('is-public');
-        var block     = document.getElementById('page-audience-block');
-        if (publicBox && block) {
-            publicBox.addEventListener('change', function () {
-                block.classList.toggle('d-none', publicBox.checked);
-            });
-        }
-    })();
-    </script>
-}

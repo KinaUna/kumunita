@@ -507,6 +507,116 @@ public class AuthorizationServiceTests(PostgresFixture fixture) : IClassFixture<
         Assert.Equal(AccessVia.Audience, grantedDecision.Via);
     }
 
+    // ── ADR 0041 — All-residents branch ──────────────────────────────
+    //
+    // The 4.5 decision branch (after the community branch, before the
+    // public branch): a resource whose Audience.AllResidents is true is
+    // visible to ANY signed-in actor (a non-empty actorId), regardless of
+    // community membership or grants. Anonymous (empty actorId) is denied
+    // (the public branch is the world-readable shape; this is resident-only).
+    // The owner branch (1) still wins — an owner of an AllResidents resource
+    // is allowed via Owner, not via Resident (the branch ordering is the
+    // pin: the more specific branch fires first).
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_SignedInActor_Allows_ViaResident()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-resident-0041";
+        const string owner = "u-owner-0041";
+
+        // AllResidents flag on, empty grants, NO ComponentId (the flag is
+        // the whole decision — no community membership required). A signed-in
+        // actor who is NOT the owner and NOT a member of any community sees
+        // it via the new Resident branch (not Audience: the grants list is
+        // empty, so the MatchGroups branch would deny).
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-resident",
+            TargetKind = "post",
+            OwnerId = owner,
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Resident, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_AnonymousActor_Denies()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+
+        // Anonymous (empty actorId) is denied — the AllResidents branch
+        // requires a signed-in actor. The public branch (audience = null)
+        // is the world-readable shape; a non-null audience with
+        // AllResidents = true is resident-only.
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-anon",
+            TargetKind = "post",
+            OwnerId = "u-other-0041",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync("", AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_OwnerStillWins_ViaOwner()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string owner = "u-owner-0041b";
+
+        // The owner branch (1) fires before the AllResidents branch (4.5) —
+        // the owner is allowed via Owner, not via Resident (the branch
+        // ordering is the pin: the more specific branch wins).
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-owner",
+            TargetKind = "post",
+            OwnerId = owner,
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(owner, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Owner, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlagFalse_EmptyGrants_Denies()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-nonmember-0041c";
+
+        // AllResidents flag OFF, empty grants, no ComponentId — the pre-ADR-0041
+        // shape. A signed-in actor who is NOT the owner gets no branch match
+        // (owner fails, community fails, AllResidents fails, public fails
+        // because the audience is non-null, MatchGroups denies on empty
+        // grants) → Deny.
+        var audience = new Audience(AudienceMode.Any, []); // AllResidents defaults false
+        var target = new TestResource
+        {
+            Id = "post-0041-off",
+            TargetKind = "post",
+            OwnerId = "u-other-0041c",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
     // ── Invariant C6 — bulk equals per-CanAsync aggregate ───────────────
 
     [Fact]

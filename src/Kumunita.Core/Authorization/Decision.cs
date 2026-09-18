@@ -47,7 +47,17 @@ public enum AccessVia
     /// <see cref="Group"/> / ADR 0028 <see cref="Guardian"/> append precedent:
     /// an additive enum value, the nine frozen values untouched.
     /// </summary>
-    Community
+    Community,
+    /// <summary>
+    /// The all-residents standing (ADR 0041): the resource's
+    /// <see cref="Audience.AllResidents"/> flag is <c>true</c> and the actor
+    /// is signed in (a non-empty <c>actorId</c>). This is the pages-lane
+    /// equivalent of the announcement's flat <c>Scope = Community</c>,
+    /// <c>CommunityId = null</c> (visible to any signed-in resident, no
+    /// community required). The ADR 0036 <see cref="Community"/> append
+    /// precedent: an additive enum value, the ten frozen values untouched.
+    /// </summary>
+    Resident
 }
 
 /// <summary>The outcome an audited decision produced.</summary>
