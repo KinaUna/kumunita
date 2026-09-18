@@ -1407,14 +1407,17 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     [Fact]
-    public async Task PG5_Seeder_PrivacyAndConduct_UnderSystemRoot_NoTranslations_AtU01()
+    public async Task PG5_Seeder_PrivacyAndConduct_UnderSystemRoot_DeFrBaselines_AtU02()
     {
-        // ADR 0043 D1/D2/D5 (SP U01) — the two new pages are part of the exact
+        // ADR 0043 D1/D3 (SP U02) — the two new pages are part of the exact
         // seeded set under the `system` root (system/privacy + system/conduct
-        // path shape), and their `PageTranslation` tables are EMPTY at U01:
-        // the de/fr baselines land in U02 (the SeedPageTranslationsAsync loop is
-        // generic over the De/FrDefaultPages() arrays, which U01 leaves at two).
-        // This pins the intermediate state; U02 will flip the emptiness asserts.
+        // path shape), and each now carries exactly one `de` and one `fr`
+        // PageTranslation row, attached to the page's **own** Id (the read
+        // path GetTranslationsAsync(page.Id) finds them) — NOT on the
+        // `system` root container (the ADR 0042 D6 parentage distinction).
+        // The body parity with De/FrDefaultPages() is the structural pin:
+        // the seeder flows the new rows from the baseline arrays (ADR 0043
+        // D3 — generic loop, no seeder-branch change).
         var store = await BootStoreAsync();
         var defaultPages = FirstBootSeeder.EnDefaultPages();
         var ct = TestContext.Current.CancellationToken;
@@ -1452,13 +1455,50 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             Assert.Equal(expected.Body, page.Body);
             Assert.Equal(expected.Title, page.Title);
 
-            // U01 intermediate state: no de/fr PageTranslation rows yet (U02
-            // adds them — the loop is generic over the baseline arrays, which
-            // stay at terms/help in U01).
-            var translations = await q.Query<PageTranslation>()
-                .Where(t => t.PageId == page.Id)
-                .ToListAsync(ct);
-            Assert.Empty(translations);
+            // U02 final state: exactly one `de` + one `fr` PageTranslation row
+            // on the page's own Id, body non-empty, parity with the canonical
+            // De/FrDefaultPages() sources (ADR 0043 D3 — the loop is generic
+            // over the baseline arrays, which U02 extends with these two slugs).
+            var de = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
+                .FirstOrDefaultAsync(ct);
+            var fr = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "fr")
+                .FirstOrDefaultAsync(ct);
+            Assert.NotNull(de);
+            Assert.NotNull(fr);
+            Assert.False(string.IsNullOrWhiteSpace(de!.Body));
+            Assert.False(string.IsNullOrWhiteSpace(fr!.Body));
+            Assert.False(string.IsNullOrWhiteSpace(de.Title));
+            Assert.False(string.IsNullOrWhiteSpace(fr.Title));
+
+            // Baseline parity with the canonical sources (structure preserved —
+            // the ADR 0042 D2 bar holds for the two new pages too).
+            var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
+            var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
+            Assert.Equal(deBaseline.Body, de.Body);
+            Assert.Equal(deBaseline.Title, de.Title);
+            Assert.Equal(frBaseline.Body, fr.Body);
+            Assert.Equal(frBaseline.Title, fr.Title);
+
+            // Exactly one row per (page, language) — no duplicates from the
+            // create-if-missing idiom (ADR 0042 D1).
+            var deCount = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
+                .CountAsync(ct);
+            var frCount = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "fr")
+                .CountAsync(ct);
+            Assert.Equal(1, deCount);
+            Assert.Equal(1, frCount);
+
+            // The `system` root itself carries NO translations (ADR 0042 D6
+            // parentage — the root is a container; the read path queries the
+            // page's own id, never the root's).
+            var onRoot = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == systemRoot.Id)
+                .CountAsync(ct);
+            Assert.Equal(0, onRoot);
         }
     }
 

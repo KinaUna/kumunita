@@ -224,11 +224,16 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
     }
 
     // ── 6 — the PageTranslation pin (ADR 0042 D2; the PG U06 lane shape) ─────
-    // terms + help each have a `de` and a `fr` PageTranslation whose PageId is
-    // the CORRECT page (the page under the `system` root — NOT the root's own
-    // Id), body non-empty.
+    // All four seeded pages (terms / help / privacy / conduct — the ADR 0043
+    // D1 four-page set, the four `Page`-backed surfaces of the five-surface
+    // set) each have a `de` and a `fr` PageTranslation whose PageId is the
+    // CORRECT page (the page under the `system` root — NOT the root's own Id),
+    // body non-empty, parity with the canonical De/FrDefaultPages() sources.
+    // (SP U02 — extended from the U04 two-page terms/help shape to the full
+    // four-page set; the loop is generic over the baseline arrays, ADR 0043
+    // D3 — no seeder-branch change.)
 
-    [Fact(DisplayName = "U04 terms + help each have a de and a fr PageTranslation on the page's own Id (not the system root)")]
+    [Fact(DisplayName = "U04 the four seeded pages each have a de and a fr PageTranslation on the page's own Id (not the system root)")]
     public async Task U04_PageTranslations_AttachedToPageOwnId_NonEmptyBody()
     {
         var store = await BootStoreAsync();
@@ -249,20 +254,21 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
             .FirstAsync(ct);
 
-        var terms = await q.Query<Page>()
-            .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
-            .FirstAsync(ct);
-        var help = await q.Query<Page>()
-            .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
-            .FirstAsync(ct);
+        var slugs = new[] { "terms", "help", "privacy", "conduct" };   // ADR 0043 D1 four-page set
+        var pages = new Dictionary<string, Page>();
+        foreach (var slug in slugs)
+        {
+            pages[slug] = await q.Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+        }
 
         // The CRITICAL parentage: the PageTranslations attach to the page's
         // OWN id (the read path GetTranslationsAsync(page.Id) finds them),
         // never to the `system` root container's id.
-        Assert.NotEqual(systemRoot.Id, terms.Id);
-        Assert.NotEqual(systemRoot.Id, help.Id);
+        Assert.All(slugs, slug => Assert.NotEqual(systemRoot.Id, pages[slug].Id));
 
-        foreach (var (page, slug) in new[] { (terms, "terms"), (help, "help") })
+        foreach (var (slug, page) in slugs.Select(s => (s, pages[s])))
         {
             var de = await q.Query<PageTranslation>()
                 .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
@@ -277,14 +283,15 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             Assert.False(string.IsNullOrWhiteSpace(fr!.Body));
             Assert.False(string.IsNullOrWhiteSpace(de.Title));
             Assert.False(string.IsNullOrWhiteSpace(fr.Title));
-            // Baseline parity with the canonical sources (structure preserved).
+            // Baseline parity with the canonical sources (structure preserved —
+            // the ADR 0042 D2 bar holds for all four pages).
             var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
             var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
             Assert.Equal(deBaseline.Body, de.Body);
             Assert.Equal(frBaseline.Body, fr.Body);
 
             // Exactly one row per (page, language) — no duplicates from the
-            // create-if-missing idiom.
+            // create-if-missing idiom (ADR 0042 D1).
             var deCount = await q.Query<PageTranslation>()
                 .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
                 .CountAsync(ct);
@@ -292,18 +299,22 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         }
 
         // And NO PageTranslation is attached to the `system` root itself
-        // (the root is a container — no content, no translations).
+        // (the root is a container — no content, no translations; ADR 0042 D6
+        // parentage).
         var onRoot = await q.Query<PageTranslation>()
             .Where(t => t.PageId == systemRoot.Id)
             .CountAsync(ct);
         Assert.Equal(0, onRoot);
 
-        // The read path (IPageService) resolves the terms page's translations
-        // for both baselines — the exact seam the Web renders through.
+        // The read path (IPageService) resolves each page's translations for
+        // both baselines — the exact seam the Web renders through.
         var svc = new PageService(store);
-        var termsTranslations = await svc.GetTranslationsAsync(terms.Id);
-        Assert.Contains(termsTranslations, t => t.LanguageCode == "de");
-        Assert.Contains(termsTranslations, t => t.LanguageCode == "fr");
+        foreach (var slug in slugs)
+        {
+            var translations = await svc.GetTranslationsAsync(pages[slug].Id);
+            Assert.Contains(translations, t => t.LanguageCode == "de");
+            Assert.Contains(translations, t => t.LanguageCode == "fr");
+        }
     }
 
     // ─── Shared helpers ─────────────────────────────────────────────────────

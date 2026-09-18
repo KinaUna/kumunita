@@ -61,8 +61,8 @@ namespace Kumunita.Core.Bootstrap;
 /// 0039/0040 PG U06 lane shape — attached to the pages' <b>own</b>
 /// ids, never the <c>system</c> root container's; the read path
 /// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries by the page's own
-/// id; at U01 the de/fr baselines cover terms + help, with privacy/conduct
-/// arriving in U02 per ADR 0043 D1). <c>about</c> is intentionally not seeded
+/// id; the de/fr baselines now cover all four pages per ADR 0043 D1).
+/// <c>about</c> is intentionally not seeded
 /// as a page (a fresh
 /// <c>/about</c> is the product-story view, not a Markdown body — it is the
 /// registry-key surface: the <c>about.*</c> keys). Makes the M·9 <c>en</c>
@@ -469,9 +469,9 @@ public static class FirstBootSeeder
         // pages ride along as `PageTranslation` rows (the ADR 0039/0040 PG
         // U06 lane shape) — attached to the pages' **own** Ids
         // (the read path, `IPageService.GetTranslationsAsync(page.Id)`,
-        // queries by the page's own id — never the `system` root's). At U01
-        // only the terms/help pages carry de/fr baselines (privacy/conduct
-        // land in U02, ADR 0043 D1).
+        // queries by the page's own id — never the `system` root's). The de/fr
+        // baselines now cover all four pages (terms/help/privacy/conduct) per
+        // ADR 0043 D1.
         var seededPageIds = await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
         await SeedPageTranslationsAsync(session, seededPageIds, now, ct).ConfigureAwait(false);
 
@@ -484,8 +484,7 @@ public static class FirstBootSeeder
             KnownTranslationKeys.EnValues.Count,
             KnownTranslationKeys.DeValues.Count,
             enPages.Length,
-            enPages.Length * 2);   // four pages × de + fr (the final-state count; at U01 only terms/help
-                                    // carry de/fr baselines — privacy/conduct land in U02, ADR 0043 D1)
+            enPages.Length * 2);   // four pages (terms/help/privacy/conduct) × de + fr (ADR 0043 D1)
     }
 
     /// <summary>
@@ -713,11 +712,12 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
-    /// LS U04 (ADR 0042 D2) — the curated <c>de</c> baseline for the seeded
-    /// default pages (terms + help — the de/fr baselines; privacy/conduct land in U02
-    /// per ADR 0043 D1). A full translation of the
+    /// LS U04 (ADR 0042 D2); SP U02 (ADR 0043 D1/D3) — the curated <c>de</c>
+    /// baseline for the seeded default pages (terms + help + privacy +
+    /// conduct — the full four-page set of the ADR 0043 D1 five-surface
+    /// set). A full translation of the
     /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
-    /// (heading, intro, the four bullets, the closing line), idiomatic
+    /// (heading, intro, the bullets, the closing line), idiomatic
     /// German UI copy at the ADR 0042 D2 bar (the <c>du</c> register held,
     /// sentence case, no word-for-word calques). These ship as
     /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine
@@ -759,15 +759,49 @@ public static class FirstBootSeeder
              "Moderator) den Feed einen sicheren Ort halten.\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
+            ("privacy", "Datenschutz",
+             "## Datenschutz\n\n" +
+             "Kumunita ist eine selbst gehostete Plattform für genau ein Viertel. Der " +
+             "Betreiber führt die Instanz und ist der Verantwortliche für alles, was " +
+             "darauf liegt.\n\n" +
+             "- **Was die Plattform speichert:** die Konten, Beiträge, Gruppen, Seiten " +
+             "und Medien des Viertels — die Datenbank plus die hochgeladenen Dateien. " +
+             "Was nicht gespeichert wird, kann nicht verloren gehen.\n" +
+             "- **Die Zielgruppenprüfung ist der Schutzmechanismus:** Inhalte sind " +
+             "standardmäßig nicht öffentlich; der Autor wählt für jeden Beitrag die " +
+             "Zielgruppe, und die Plattform erzwingt sie bei jeder Anfrage.\n" +
+             "- **Standardmäßig protokolliert:** Zugriffe auf Inhalte mit eingeschränkter " +
+             "Zielgruppe sowie Moderations- und Admin-Aktionen werden immer protokolliert.\n" +
+             "- **Sicherung, Migration und Stilllegung sind Sache des Betreibers:** " +
+             "Datenbank und hochgeladene Dateien kannst du sichern, migrieren und " +
+             "stilllegen.\n" +
+             "- **Der eine Browser-Cookie:** die bevorzugte Sprache — das ist der einzige " +
+             "Cookie, den die Plattform setzt. Cookies von Dritten gibt es nicht, und " +
+             "es sind auch keine geplant.\n\n" +
+             "Diese Seite verzichtet bewusst auf betreiberspezifische Angaben — " +
+             "Aufbewahrungsfristen, Kontakt zur Datenschutzbeauftragten, " +
+             "Sub-Verarbeiter. Das fügst du hier in der App nach dem ersten Start " +
+             "hinzu; das ist so gedacht, kein Mangel.\n"),
+            ("conduct", "Verhaltenskodex",
+             "## Verhaltenskodex\n\n" +
+             "Das ist ein abgegrenztes Viertel. Behandle deine Nachbarn so, wie du auf " +
+             "deiner Straße behandelt werden möchtest.\n\n" +
+             "- Keine Belästigung.\n" +
+             "- Kein Doxxing (private Angaben preisgeben).\n" +
+             "- Kein Spam.\n\n" +
+             "Ob und wie durchgegriffen wird, liegt im Ermessen von Betreiber und " +
+             "Moderatoren — die Moderation läuft über Berichte und wird protokolliert. " +
+             "Diese Seite benennt die Erwartung, nicht das Verfahren.\n"),
         ];
     }
 
     /// <summary>
-    /// LS U04 (ADR 0042 D2) — the curated <c>fr</c> baseline for the seeded
-    /// default pages (terms + help — the de/fr baselines; privacy/conduct land in U02
-    /// per ADR 0043 D1). A full translation of the
+    /// LS U04 (ADR 0042 D2); SP U02 (ADR 0043 D1/D3) — the curated <c>fr</c>
+    /// baseline for the seeded default pages (terms + help + privacy +
+    /// conduct — the full four-page set of the ADR 0043 D1 five-surface
+    /// set). A full translation of the
     /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
-    /// (heading, intro, the four bullets, the closing line), idiomatic
+    /// (heading, intro, the bullets, the closing line), idiomatic
     /// French UI copy at the ADR 0042 D2 bar (the <c>tu</c> register held,
     /// accents and typography per French convention, no word-for-word
     /// calques). These ship as
@@ -812,17 +846,50 @@ public static class FirstBootSeeder
              "concédé, un modérateur) garder le fil un lieu sûr.\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
+            ("privacy", "Vie privée",
+             "## Vie privée\n\n" +
+             "Kumunita est une plateforme auto-hébergée pour un seul quartier. Le " +
+             "porteur exploite l'instance et est le responsable des données de " +
+             "tout ce qu'elle contient.\n\n" +
+             "- **Ce que la plateforme stocke :** les comptes, messages, groupes, " +
+             "pages et médias du quartier — la base de données, plus le volume de " +
+             "médias. Ce qu'elle ne stocke pas, elle ne peut pas le fuir.\n" +
+             "- **L'application des audiences est le mécanisme de protection :** " +
+             "le contenu est privé par défaut ; l'auteur choisit l'audience de " +
+             "chaque message, et la plateforme l'applique à chaque requête.\n" +
+             "- **Le journal par défaut :** les accès aux contenus réservés et les " +
+             "actions de modération et d'administration sont toujours journalisés.\n" +
+             "- **La sauvegarde, la migration et la fermeture sont l'affaire du " +
+             "porteur :** la base de données et les fichiers que tu as téléversés " +
+             "sont à toi de les sauvegarder, migrer, ou mettre à la retraite.\n" +
+             "- **Le seul cookie du navigateur :** la langue préférée — c'est le " +
+             "seul cookie que la plateforme pose. Il n'existe aucun cookie " +
+             "tiers, et il n'en est prévu aucun.\n\n" +
+             "Cette page omet volontairement les détails propres au porteur — " +
+             "délais de conservation, contact DPO, sous-traitants. C'est à toi de " +
+             "les ajouter ici, dans l'application, après le premier démarrage ; " +
+             "c'est le design, pas un manque.\n"),
+            ("conduct", "Code de conduite",
+             "## Code de conduite\n\n" +
+             "C'est un quartier borné. Traite tes voisins comme tu voudrais être " +
+             "traité·e sur ta rue.\n\n" +
+             "- Pas de harcèlement.\n" +
+             "- Pas de doxxing (révéler des informations privées).\n" +
+             "- Pas de spam.\n\n" +
+             "L'application relève du jugement du porteur et des modérateurs — " +
+             "la modération passe par les signalements et est journalisée. Cette " +
+             "page énonce l'attente, pas la procédure.\n"),
         ];
     }
 
     /// <summary>
     /// LS U04 (ADR 0042 D2) — seed the <c>de</c> / <c>fr</c>
     /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows for the seeded default
-    /// pages (terms + help — the de/fr baselines; privacy/conduct arrive in U02 per
-    /// ADR 0043 D1), into the **caller's** in-flight
+    /// pages (terms / help / privacy / conduct — the four-page set per ADR 0043
+    /// D1), into the **caller's** in-flight
     /// <see cref="IDocumentSession"/> (the C3 invariant — same session, one
     /// commit). <paramref name="pageIds"/> is the slug → page-Id map
-    /// <see cref="SeedDefaultPagesAsync"/> returns (the terms / help pages'
+    /// <see cref="SeedDefaultPagesAsync"/> returns (the seeded pages'
     /// **own** ids — the read path
     /// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries
     /// <c>PageTranslation.PageId == page.Id</c>, so the <c>system</c> root
