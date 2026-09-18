@@ -138,3 +138,19 @@ overwritten by a later deploy. **`en` remains the only code-owned language**
 (code-wins upsert + provider floor, ADR 0015 D1/D2, unchanged). See
 **ADR 0042** for the full locked text (ownership semantics, the register
 choice, the `about`-via-registry decision, the `about.*` key contract).
+
+### 2026-09-18 — system pages shipped + discoverable (ADR 0043)
+
+§B's **static-page coverage** scope is widened: on a fresh instance the
+seeded platform-page set is now the **five-surface set** — the `about`
+product-story **view** (not a `Page` doc, the ADR 0039 U05 drift pin carried
+forward) plus the four `Page`-backed surfaces **Terms**, **Help**, **Privacy
+Policy**, and **Code of Conduct** (the last two new in ADR 0043, D1) — each
+of the four `Page` docs carrying `en` / `de` / `fr` bodies. The `de` / `fr`
+bodies of the two new pages follow the **same** ADR 0042 D1 ownership
+semantics (seeded once, then community-owned; `en` code-owned). The two new
+routes (`/privacy` / `/conduct`) join the hard-coded static set with the 404
+floor (ADR 0043 D2). See **ADR 0043** for the full locked text (the
+five-surface set, the route contract, the ownership re-statement, the
+discoverability decision, the content scope, and the unchanged standing
+matrix).
