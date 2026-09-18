@@ -31,11 +31,11 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M4_Is_The_Single_InProgress_Milestone()
+    public void PG_Is_The_Single_InProgress_Milestone()
     {
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Single(next);
-        Assert.Equal("M4", next[0].Id);
+        Assert.Equal("PG", next[0].Id);
     }
 
     [Fact]

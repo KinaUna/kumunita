@@ -10,12 +10,13 @@ namespace Kumunita.Web.Tests;
 
 /// <summary>
 /// PG U07 (ADR 0039 §3.8/§3.9) — the <see cref="StaticPagesController"/> is
-/// now **tree-only**: each route (<c>/terms</c>, <c>/help</c>, <c>/about</c>)
-/// reads <see cref="IPageService.GetByPathAsync"/> (one store — the absorb,
-/// complete). A path absent from the tree is a 404 (the page floor), except
-/// <c>/about</c>, which degrades to the product-story view. The legacy
-/// fallback seam was retired in U07 — the controller no longer takes an
-/// <c>ITranslationProvider</c>.
+/// now **tree-only**: each route (<c>/terms</c>, <c>/help</c>,
+/// <c>/privacy</c>, <c>/conduct</c> — SP U01, ADR 0043 D2 — and
+/// <c>/about</c>) reads <see cref="IPageService.GetByPathAsync"/> (one store —
+/// the absorb, complete). A path absent from the tree is a 404 (the page
+/// floor), except <c>/about</c>, which degrades to the product-story view.
+/// The legacy fallback seam was retired in U07 — the controller no longer
+/// takes an <c>ITranslationProvider</c>.
 /// <para>
 /// The pins this harness owns:
 /// <list type="number">
@@ -130,6 +131,96 @@ public class StaticPagesControllerPgTests
         var (controller, _) = Build("help"); // absent
 
         var result = await controller.Help();
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    // ── SP U01 (ADR 0043 D2) — /privacy + /conduct join the hard-coded set ──
+    // Both routes are 404-floor: a page absent from the tree is a clean 404,
+    // NOT the product-story view (that seam is /about's only, ADR 0043 D1).
+
+    [Fact(DisplayName = "SP U01 privacy: tree-present renders the shared Page view (the absorb)")]
+    public async Task Get_Privacy_TreePresent_RendersPageView()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var (controller, pages) = Build(
+            "privacy",
+            pageFactory: s => new Page
+            {
+                Id = "page-privacy-001",
+                ParentId = "system-root",
+                Slug = "privacy",
+                Title = "Privacy",
+                Body = "The privacy body (markdown).",
+                LanguageCode = "en",
+                Audience = null,
+                Created = now,
+                Modified = now
+            });
+
+        var result = await controller.Privacy();
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Page", view.ViewName);
+        Assert.Equal("privacy", view.ViewData["Slug"]);
+        var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
+        Assert.Equal("privacy", model.Slug);
+        Assert.Equal("Privacy", model.Title);
+        Assert.Equal("The privacy body (markdown).", model.Body);
+
+        // ADR 0043 D2 — resolved via the `system/privacy` primary path.
+        await pages.Received(1).GetByPathAsync("system/privacy");
+    }
+
+    [Fact(DisplayName = "SP U01 privacy: tree-absent → 404 (the page floor, NOT the product-story)")]
+    public async Task Get_Privacy_TreeAbsent_Returns404()
+    {
+        var (controller, _) = Build("privacy"); // absent
+
+        var result = await controller.Privacy();
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact(DisplayName = "SP U01 conduct: tree-present renders the shared Page view (the absorb)")]
+    public async Task Get_Conduct_TreePresent_RendersPageView()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var (controller, pages) = Build(
+            "conduct",
+            pageFactory: s => new Page
+            {
+                Id = "page-conduct-001",
+                ParentId = "system-root",
+                Slug = "conduct",
+                Title = "Code of conduct",
+                Body = "The conduct body (markdown).",
+                LanguageCode = "en",
+                Audience = null,
+                Created = now,
+                Modified = now
+            });
+
+        var result = await controller.Conduct();
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("Page", view.ViewName);
+        Assert.Equal("conduct", view.ViewData["Slug"]);
+        var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
+        Assert.Equal("conduct", model.Slug);
+        Assert.Equal("Code of conduct", model.Title);
+        Assert.Equal("The conduct body (markdown).", model.Body);
+
+        // ADR 0043 D2 — resolved via the `system/conduct` primary path.
+        await pages.Received(1).GetByPathAsync("system/conduct");
+    }
+
+    [Fact(DisplayName = "SP U01 conduct: tree-absent → 404 (the page floor, NOT the product-story)")]
+    public async Task Get_Conduct_TreeAbsent_Returns404()
+    {
+        var (controller, _) = Build("conduct"); // absent
+
+        var result = await controller.Conduct();
 
         Assert.IsType<NotFoundResult>(result);
     }

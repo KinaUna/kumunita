@@ -49,16 +49,21 @@ namespace Kumunita.Core.Bootstrap;
 /// <see cref="Localization.KnownTranslationKeys.DeValues"/> /
 /// <see cref="Localization.KnownTranslationKeys.FrValues"/> (create-if-missing —
 /// first-boot-only by construction; after first boot an admin's in-app edit is
-/// the only write path and is never overwritten). The <c>en</c> <c>terms</c> /
-/// <c>help</c> <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039
-/// §3.9 — the absorb: the <c>Page</c> surface is the single source for
-/// <c>/terms</c> / <c>/help</c>, so a fresh instance is byte-identical to today)
-/// carry their <c>de</c> / <c>fr</c> bodies as
+/// only write path and is never overwritten). The <c>en</c>
+/// <c>terms</c> / <c>help</c> / <c>privacy</c> / <c>conduct</c>
+/// <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039
+/// §3.9 — the absorb; the two added in SP U01 per ADR 0043 D2/D5 — the
+/// <c>Page</c> surface is the single source for
+/// <c>/terms</c> / <c>/help</c> / <c>/privacy</c> / <c>/conduct</c>, so a
+/// fresh instance is byte-identical to today) carry their <c>de</c> /
+/// <c>fr</c> bodies as
 /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows (ADR 0042 D2; the ADR
-/// 0039/0040 PG U06 lane shape — attached to the terms / help pages' <b>own</b>
+/// 0039/0040 PG U06 lane shape — attached to the pages' <b>own</b>
 /// ids, never the <c>system</c> root container's; the read path
 /// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries by the page's own
-/// id). <c>about</c> is intentionally not seeded as a page (a fresh
+/// id; at U01 the de/fr baselines cover terms + help, with privacy/conduct
+/// arriving in U02 per ADR 0043 D1). <c>about</c> is intentionally not seeded
+/// as a page (a fresh
 /// <c>/about</c> is the product-story view, not a Markdown body — it is the
 /// registry-key surface: the <c>about.*</c> keys). Makes the M·9 <c>en</c>
 /// floor and the M·12 completeness view real on first boot (100% for all three
@@ -118,8 +123,9 @@ public static class FirstBootSeeder
         // 4. Language catalog (ADR 0005: source-language row + instance default).
         await SeedLanguageCatalogAsync(mt, logger, ct);
 
-        // 5. Canonical `en` UI strings + the `en` terms/help pages (ML-UI U1 — D2):
-        // materializes the M·9 `en` floor + the M·12 completeness universe. Runs
+        // 5. Canonical `en` UI strings + the `en` terms/help/privacy/conduct pages
+        // (ML-UI U1 — D2; the four-page set per ADR 0043 D1/D5): materializes the
+        // M·9 `en` floor + the M·12 completeness universe. Runs
         // AFTER the catalog/default (step 4) so the `en` language row already exists;
         // `about` is intentionally NOT seeded (a fresh instance's /about keeps its
         // product-story view — an admin creates an `about` page at runtime).
@@ -336,15 +342,17 @@ public static class FirstBootSeeder
 
     /// <summary>
     /// Step 5 — the canonical <c>en</c> UI-string floor + the <c>de</c> / <c>fr</c>
-    /// baselines (LS U04, ADR 0042 D1) + the <c>en</c> terms/help pages with their
+    /// baselines (LS U04, ADR 0042 D1) + the <c>en</c> terms/help/privacy/conduct
+    /// pages with their
     /// <c>de</c> / <c>fr</c> <see cref="Kumunita.Core.Pages.PageTranslation"/> rows
-    /// (ML-UI U1, D2; ADR 0042 D2). Materializes, as <c>en</c> rows, every key in
+    /// (ML-UI U1, D2; ADR 0042 D2; the four-page set per ADR 0043 D1). Materializes, as <c>en</c> rows, every key in
     /// <see cref="KnownTranslationKeys"/> (one <see cref="TranslationResource"/>
     /// per key), plus the <c>de</c> and <c>fr</c> <see cref="TranslationResource"/>
     /// rows per key from <see cref="KnownTranslationKeys.DeValues"/> /
     /// <see cref="KnownTranslationKeys.FrValues"/>, plus the <c>en</c>
-    /// <see cref="Kumunita.Core.Pages.Page"/> docs for <c>terms</c> and
-    /// <c>help</c> carrying their <c>de</c> / <c>fr</c> bodies. This is what makes
+    /// <see cref="Kumunita.Core.Pages.Page"/> docs for <c>terms</c>, <c>help</c>,
+    /// <c>privacy</c> and <c>conduct</c> (the four-page set, ADR 0043 D1) carrying
+    /// their <c>de</c> / <c>fr</c> bodies. This is what makes
     /// M·9's "<c>en</c> floor is always seeded", M·12's completeness view
     /// (missing = <c>en</c>-present minus <c>code</c>-present — 100% for all three
     /// languages on a fresh boot), and ADR 0042's "the platform demonstrates its
@@ -440,15 +448,17 @@ public static class FirstBootSeeder
             }
         }
 
-        // Static pages: the `en` terms + help `Page` docs (PG U05/U07, ADR 0039
+        // Static pages: the `en` terms/help/privacy/conduct `Page` docs (PG U05/U07, ADR 0039
         // §3.9). `about` is deliberately NOT seeded — a fresh instance's /about
         // keeps its product-story view, and an admin can create an `about` page
         // at runtime (the seeder never writes it).
         var enPages = EnDefaultPages();
 
-        // PG U05 (ADR 0039 §3.9): the `Page` docs for the seeded default pages —
-        // the `en` terms/help bodies, so a fresh instance is byte-identical for
-        // /terms and /help read from the tree (`StaticPagesController` reading
+        // PG U05 (ADR 0039 §3.9; SP U01, ADR 0043 D2/D5): the `Page` docs for
+        // the seeded default pages — the `en` terms/help/privacy/conduct
+        // bodies, so a fresh instance is byte-identical for
+        // /terms /help /privacy /conduct read from the tree
+        // (`StaticPagesController` reading
         // `IPageService.GetByPathAsync`). The legacy static-page store was
         // retired in U07 — this is now the single source.
         //
@@ -457,9 +467,11 @@ public static class FirstBootSeeder
         //
         // LS U04 (ADR 0042 D2): the `de` / `fr` bodies of these same seeded
         // pages ride along as `PageTranslation` rows (the ADR 0039/0040 PG
-        // U06 lane shape) — attached to the terms/help pages' **own** Ids
+        // U06 lane shape) — attached to the pages' **own** Ids
         // (the read path, `IPageService.GetTranslationsAsync(page.Id)`,
-        // queries by the page's own id — never the `system` root's).
+        // queries by the page's own id — never the `system` root's). At U01
+        // only the terms/help pages carry de/fr baselines (privacy/conduct
+        // land in U02, ADR 0043 D1).
         var seededPageIds = await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
         await SeedPageTranslationsAsync(session, seededPageIds, now, ct).ConfigureAwait(false);
 
@@ -467,12 +479,13 @@ public static class FirstBootSeeder
 
         logger.LogInformation(
             "First boot: canonical `en` UI strings seeded ({0} keys) + `de`/`fr` baselines " +
-            "({1} keys each — ADR 0042 D1) + `en` terms/help pages ({2} Page docs) with `de`/`fr` " +
+            "({1} keys each — ADR 0042 D1) + `en` terms/help/privacy/conduct pages ({2} Page docs) with `de`/`fr` " +
             "bodies ({3} PageTranslation rows); `about` is not seeded (admin-created at runtime).",
             KnownTranslationKeys.EnValues.Count,
             KnownTranslationKeys.DeValues.Count,
             enPages.Length,
-            enPages.Length * 2);   // terms + help × de + fr
+            enPages.Length * 2);   // four pages × de + fr (the final-state count; at U01 only terms/help
+                                    // carry de/fr baselines — privacy/conduct land in U02, ADR 0043 D1)
     }
 
     /// <summary>
@@ -504,7 +517,7 @@ public static class FirstBootSeeder
     /// </para>
     /// <para>
     /// LS U04 (ADR 0042 D2): returns the <c>slug → page Id</c> map for the
-    /// seeded pages (the terms/help pages under the <c>system</c> root) so
+    /// seeded pages (the terms/help/privacy/conduct pages under the <c>system</c> root) so
     /// the caller can attach the <c>de</c> / <c>fr</c>
     /// <see cref="PageTranslation"/> rows to the pages' **own** ids (the
     /// read path queries <c>PageTranslation.PageId == page.Id</c> — the
@@ -554,7 +567,7 @@ public static class FirstBootSeeder
             session.Store(systemRoot);
         }
 
-        // 2. Seed the platform pages under the `system` root (terms + help).
+        // 2. Seed the platform pages under the `system` root (terms/help/privacy/conduct).
         foreach (var (slug, title, body) in defaultPages)
         {
             var existingPage = await session
@@ -618,11 +631,13 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
-    /// The canonical <c>en</c> default-page bodies (terms + help). The single
-    /// source of the seed text: the <see cref="Kumunita.Core.Pages.Page"/> docs
-    /// (PG U05, ADR 0039 §3.9) carry <em>exactly</em> this text, so a fresh
-    /// instance is byte-identical to today for <c>/terms</c> and <c>/help</c>
-    /// read from the tree.
+    /// The canonical <c>en</c> default-page bodies (terms + help + privacy +
+    /// conduct — the four <c>Page</c>-backed surfaces of the ADR 0043 D1
+    /// five-surface set). The single source of the seed text: the
+    /// <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039 §3.9; the
+    /// two added in SP U01 per ADR 0043 D2/D5) carry <em>exactly</em> this
+    /// text, so a fresh instance is byte-identical for <c>/terms</c> /
+    /// <c>/help</c> / <c>/privacy</c> / <c>/conduct</c> read from the tree.
     /// <para>
     /// <b><c>about</c> is deliberately absent</b> (the U05 drift pin): a fresh
     /// instance's <c>/about</c> is the <em>full-bleed product-story view</em>
@@ -664,12 +679,43 @@ public static class FirstBootSeeder
              "keep the feed a safe place.\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
+            ("privacy", "Privacy",
+             "## Privacy\n\n" +
+             "Kumunita is a self-hosted platform for one neighborhood. The operator " +
+             "runs the instance and is the data controller for everything on it.\n\n" +
+             "- **What the platform stores:** the neighborhood's accounts, posts, " +
+             "groups, pages, and media — the database plus the media volume. What we " +
+             "don't store, we can't leak.\n" +
+             "- **Audience enforcement is the privacy mechanism:** content is " +
+             "deny-by-default; the author chooses each post's audience, and the " +
+             "platform enforces it on every request.\n" +
+             "- **Audit-by-default:** access to audience-restricted content, and " +
+             "moderation and admin actions, are always logged.\n" +
+             "- **Backups, migration, and retirement are the operator's job:** the " +
+             "database and the uploaded files are yours to back up, migrate, and " +
+             "retire.\n" +
+             "- **The one browser cookie:** the locale preference — that is the only " +
+             "cookie the platform sets. No third-party cookies exist or are planned.\n\n" +
+             "This page deliberately withholds operator-specific details — retention " +
+             "periods, DPO contact, sub-processors. Those are the operator's to add " +
+             "here, in-app, after first boot; that is the design, not a gap.\n"),
+            ("conduct", "Code of conduct",
+             "## Code of conduct\n\n" +
+             "This is a bounded neighborhood. Treat your neighbors the way you'd want " +
+             "to be treated on your street.\n\n" +
+             "- No harassment.\n" +
+             "- No doxxing (revealing private details).\n" +
+             "- No spam.\n\n" +
+             "Enforcement is the operator's and the moderators' judgment — the " +
+             "moderation lane is report-gated and audited. This page states the " +
+             "expectation, not the procedure.\n"),
         ];
     }
 
     /// <summary>
     /// LS U04 (ADR 0042 D2) — the curated <c>de</c> baseline for the seeded
-    /// default pages (terms + help). A full translation of the
+    /// default pages (terms + help — the de/fr baselines; privacy/conduct land in U02
+    /// per ADR 0043 D1). A full translation of the
     /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
     /// (heading, intro, the four bullets, the closing line), idiomatic
     /// German UI copy at the ADR 0042 D2 bar (the <c>du</c> register held,
@@ -718,7 +764,8 @@ public static class FirstBootSeeder
 
     /// <summary>
     /// LS U04 (ADR 0042 D2) — the curated <c>fr</c> baseline for the seeded
-    /// default pages (terms + help). A full translation of the
+    /// default pages (terms + help — the de/fr baselines; privacy/conduct land in U02
+    /// per ADR 0043 D1). A full translation of the
     /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
     /// (heading, intro, the four bullets, the closing line), idiomatic
     /// French UI copy at the ADR 0042 D2 bar (the <c>tu</c> register held,
@@ -770,8 +817,9 @@ public static class FirstBootSeeder
 
     /// <summary>
     /// LS U04 (ADR 0042 D2) — seed the <c>de</c> / <c>fr</c>
-    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows for the seeded
-    /// default pages (terms + help), into the **caller's** in-flight
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows for the seeded default
+    /// pages (terms + help — the de/fr baselines; privacy/conduct arrive in U02 per
+    /// ADR 0043 D1), into the **caller's** in-flight
     /// <see cref="IDocumentSession"/> (the C3 invariant — same session, one
     /// commit). <paramref name="pageIds"/> is the slug → page-Id map
     /// <see cref="SeedDefaultPagesAsync"/> returns (the terms / help pages'

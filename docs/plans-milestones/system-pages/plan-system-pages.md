@@ -305,3 +305,11 @@ links. **No Core change in this unit.**
 ## Handoff notes
 
 (One appended `## U#` section per unit, never rewritten — the scratch tier.)
+
+> **Note (2026-09-18):** the roadmap's active-lane pointer has moved from
+> **M4** to **PG** (Pages) — `Milestones.cs` now shows `PG` as
+> `StatusNext` and `M4` as `StatusPlanned`, and the
+> `MilestonesTests` pin is `PG_Is_The_Single_InProgress_Milestone`.
+> The references above to "M4 stays the single `StatusNext`" describe
+> the state *before* this flip; U05's ship will still add `SP` as
+> `StatusDone` and the single-in-progress pin will keep asserting `PG`.

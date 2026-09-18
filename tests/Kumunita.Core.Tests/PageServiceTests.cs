@@ -1277,8 +1277,9 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
 
     // ─── PG U05 (ADR 0039 §3.9, amended by ADR 0040) — the seeder's Page docs ─
     //
-    // The seeder seeds the new Page docs for the canonical default pages (terms +
-    // help) under a `system` namespace root (ADR 0040), straight into the
+    // The seeder seeds the new Page docs for the canonical default pages (terms /
+    // help / privacy / conduct — the four-page set, ADR 0043 D1) under a `system`
+    // namespace root (ADR 0040), straight into the
     // caller's IDocumentSession, idempotently. The seeder's Page-upsert is a
     // public static (SeedDefaultPagesAsync) + a public page-data source
     // (EnDefaultPages), so these tests pin idempotency + the exact set across
@@ -1316,17 +1317,21 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         Assert.NotNull(systemRoot);
         Assert.Equal(PageKind.System, systemRoot!.Kind);
 
-        // terms + help are nested under the `system` root (not roots themselves).
+        // The four seeded pages are nested under the `system` root (not roots
+        // themselves). ADR 0043 D1 — the exact seeded set is terms / help /
+        // privacy / conduct (SP U01 moved this pin from two to four pages).
         var children = await q.Query<Page>()
             .Where(p => p.ParentId == systemRoot.Id && p.IsDeleted == false)
             .ToListAsync(ct);
-        Assert.Equal(new[] { "help", "terms" },
+        Assert.Equal(new[] { "conduct", "help", "privacy", "terms" },
             children.Select(p => p.Slug).OrderBy(s => s, StringComparer.Ordinal).ToArray());
 
         // Exactly one child per slug (no duplicate from the second boot).
-        Assert.Equal(2, children.Count);
+        Assert.Equal(4, children.Count);   // ADR 0043 D1: terms/help/privacy/conduct
         Assert.Equal(1, children.Count(p => p.Slug == "terms"));
         Assert.Equal(1, children.Count(p => p.Slug == "help"));
+        Assert.Equal(1, children.Count(p => p.Slug == "privacy"));
+        Assert.Equal(1, children.Count(p => p.Slug == "conduct"));
 
         // No other roots exist (the `system` root is the only root-level page).
         var allRoots = await q.Query<Page>()
@@ -1399,6 +1404,62 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         var expected = defaultPages.Single(p => p.Slug == "terms");
         Assert.Equal(expected.Body, terms.Body);
         Assert.Equal(expected.Title, terms.Title);
+    }
+
+    [Fact]
+    public async Task PG5_Seeder_PrivacyAndConduct_UnderSystemRoot_NoTranslations_AtU01()
+    {
+        // ADR 0043 D1/D2/D5 (SP U01) — the two new pages are part of the exact
+        // seeded set under the `system` root (system/privacy + system/conduct
+        // path shape), and their `PageTranslation` tables are EMPTY at U01:
+        // the de/fr baselines land in U02 (the SeedPageTranslationsAsync loop is
+        // generic over the De/FrDefaultPages() arrays, which U01 leaves at two).
+        // This pins the intermediate state; U02 will flip the emptiness asserts.
+        var store = await BootStoreAsync();
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        var ct = TestContext.Current.CancellationToken;
+
+        await using (var s = newSession(store))
+        {
+            var pageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+            await FirstBootSeeder.SeedPageTranslationsAsync(s, pageIds, DateTimeOffset.UtcNow, ct);
+            await s.SaveChangesAsync(ct);
+        }
+
+        await using var q = store.QuerySession();
+        var systemRoot = await q.Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstAsync(ct);
+
+        foreach (var slug in new[] { "privacy", "conduct" })
+        {
+            var page = await q.Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+
+            // The system/{slug} path shape: nested under the `system` root, the
+            // same standing shape as terms/help (public, en, no resident author,
+            // a system page — ADR 0040 §2 matrix inherited).
+            Assert.Equal(systemRoot.Id, page.ParentId);
+            Assert.Null(page.Audience);
+            Assert.Equal(FirstBootSeeder.SourceLanguage, page.LanguageCode);
+            Assert.Equal(string.Empty, page.AuthorId);
+            Assert.Equal(PageKind.System, page.Kind);
+
+            // The en body + title carried verbatim from EnDefaultPages() (the
+            // byte-identical gate for the two new pages).
+            var expected = defaultPages.Single(p => p.Slug == slug);
+            Assert.Equal(expected.Body, page.Body);
+            Assert.Equal(expected.Title, page.Title);
+
+            // U01 intermediate state: no de/fr PageTranslation rows yet (U02
+            // adds them — the loop is generic over the baseline arrays, which
+            // stay at terms/help in U01).
+            var translations = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id)
+                .ToListAsync(ct);
+            Assert.Empty(translations);
+        }
     }
 
     // ─── Shared helpers ─────────────────────────────────────────────────────

@@ -7,8 +7,9 @@ using Microsoft.Extensions.Options;
 namespace Kumunita.Web.Controllers;
 
 /// <summary>
-/// The static-page routes (ADR 0005 A; M5 FACES) — <c>/terms</c>, <c>/help</c>
-/// and <c>/about</c>. PG U05 (ADR 0039 §3.8/§3.9) retargeted these onto the
+/// The static-page routes (ADR 0005 A; M5 FACES) — <c>/terms</c>, <c>/help</c>,
+/// <c>/privacy</c>, <c>/conduct</c> (SP U01, ADR 0043 D2) and <c>/about</c>.
+/// PG U05 (ADR 0039 §3.8/§3.9) retargeted these onto the
 /// new <see cref="Page"/> tree; **PG U07 (this unit) completes the absorb** —
 /// the legacy fallback seam is gone, so each route reads **only** the tree
 /// (<see cref="IPageService.GetByPathAsync"/> — one store, not two). A path
@@ -22,17 +23,19 @@ namespace Kumunita.Web.Controllers;
 /// <c>about</c> <see cref="Page"/> (the tree) wins when present.
 /// </para>
 /// <para>
-/// The three hard-coded routes are **kept** (backward-compatible) and read
+/// The five hard-coded routes are **kept** (backward-compatible) and read
 /// from the tree. They remain un-audited public readers (the static-page
 /// contract — these resolve to the seeded canonical pages, which are public,
-/// <see cref="Page.Audience"/> = <c>null</c>).
+/// <see cref="Page.Audience"/> = <c>null</c>). <c>/privacy</c> and
+/// <c>/conduct</c> are 404-floor routes (the page floor, no product-story
+/// fallback — ADR 0043 D2: that seam is <c>/about</c>'s only).
 /// </para>
 /// </summary>
 public sealed class StaticPagesController(
     IPageService pages,
     IOptions<CommunityOptions> community) : Controller
 {
-    private static readonly string[] Slugs = { "terms", "help", "about" };
+    private static readonly string[] Slugs = { "terms", "help", "about", "privacy", "conduct" };
 
     /// <summary>
     /// <c>GET /terms</c> — the terms-of-use static page (M5 FACES). Reads the
@@ -48,6 +51,22 @@ public sealed class StaticPagesController(
     /// </summary>
     [HttpGet("/help")]
     public Task<IActionResult> Help() => Page("help");
+
+    /// <summary>
+    /// <c>GET /privacy</c> — the privacy-policy static page (SP U01, ADR 0043
+    /// D2). Same tree-read + 404 floor as <see cref="Terms"/> — the
+    /// <c>fallBackToProductStory</c> seam is <c>/about</c>'s only.
+    /// </summary>
+    [HttpGet("/privacy")]
+    public Task<IActionResult> Privacy() => Page("privacy");
+
+    /// <summary>
+    /// <c>GET /conduct</c> — the code-of-conduct static page (SP U01, ADR 0043
+    /// D2). Same tree-read + 404 floor as <see cref="Terms"/> — the
+    /// <c>fallBackToProductStory</c> seam is <c>/about</c>'s only.
+    /// </summary>
+    [HttpGet("/conduct")]
+    public Task<IActionResult> Conduct() => Page("conduct");
 
     /// <summary>
     /// <c>GET /about</c> — the product story (ML-UI U7, D7-4; FACES L9). The
@@ -119,10 +138,10 @@ public sealed class StaticPagesController(
 
     /// <summary>
     /// The static-page render model for <c>/terms</c> / <c>/help</c> /
-    /// <c>/about</c> — the (Slug, Title, Body, Updated) shape the
-    /// <c>Views/StaticPages/Page</c> view binds (Title + rendered Body +
-    /// last-updated line). <see cref="Updated"/> is the page's
-    /// <see cref="Page.Modified"/> (falling back to
+    /// <c>/privacy</c> / <c>/conduct</c> / <c>/about</c> — the (Slug, Title,
+    /// Body, Updated) shape the <c>Views/StaticPages/Page</c> view binds
+    /// (Title + rendered Body + last-updated line). <see cref="Updated"/> is
+    /// the page's <see cref="Page.Modified"/> (falling back to
     /// <see cref="Page.Created"/>).
     /// </summary>
     public sealed record StaticPageViewModel(
