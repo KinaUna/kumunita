@@ -167,6 +167,150 @@ public class PublicLocaleAndAboutTests
         Assert.IsType<NotFoundResult>(result);
     }
 
+    // ── (f) LS U06: the Web surface pins the first-boot catalog end-to-end ──
+    // ADR 0042 D4: a fresh instance boots with the catalog en(sort 0) / de(sort
+    // 1) / fr(sort 2), all enabled, default en. The Web surface must list all
+    // three in SortOrder — the public /language picker AND the settings page —
+    // and the admin completeness view (M·12) must report 100% present for de
+    // and fr. The Core half (the seeder state + provider resolution) is pinned
+    // in LS_U04_SeederTests; these pins close the Web read path.
+
+    /// <summary>
+    /// The first-boot catalog exactly as the seeder writes it (LS U04, ADR
+    /// 0042 D4) — the same shape the <see cref="FirstBootSeeder"/>
+    /// <c>SeedLanguageCatalogAsync</c> step materializes.
+    /// </summary>
+    private static IReadOnlyList<LanguageCatalog> FirstBootCatalog() =>
+    [
+        new LanguageCatalog { Id = "en", NativeName = "English",  Enabled = true, SortOrder = 0 },
+        new LanguageCatalog { Id = "de", NativeName = "Deutsch",  Enabled = true, SortOrder = 1 },
+        new LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 2 },
+    ];
+
+    [Fact(DisplayName = "LS U06 the public /language picker lists en/de/fr in SortOrder for the first-boot catalog")]
+    public async Task LS_U06_PublicPicker_ListsFirstBootCatalog_InSortOrder()
+    {
+        var controller = BuildPicker(FirstBootCatalog(),
+            settings: new LocaleSettings { DefaultLanguageCode = "en" });
+
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<LocaleController.LocaleSettingsViewModel>(view.ViewData.Model);
+
+        // All three enabled rows, in SortOrder (en 0 / de 1 / fr 2) — the ADR
+        // 0042 D4 first-boot catalog, native names intact.
+        Assert.Equal(new[] { "en", "de", "fr" }, model.Languages.Select(l => l.Code).ToArray());
+        Assert.Equal(new[] { "English", "Deutsch", "Français" }, model.Languages.Select(l => l.NativeName).ToArray());
+
+        // The default stays `en` (ADR 0042 D4 — the lane is about *available*
+        // languages, not switching the default).
+        Assert.Equal("en", model.DefaultCode);
+    }
+
+    // ── The settings page (/settings/language) lists the same catalog ───────
+    // (LocaleController.Index — the [Authorize]d settings surface; the
+    // language section shares the exact model shape with the public picker.)
+
+    private static LocaleController BuildSettingsController(
+        IEnumerable<LanguageCatalog> catalog, LocaleSettings? settings)
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.ListLanguagesAsync()
+            .Returns(Task.FromResult<IReadOnlyList<LanguageCatalog>>(catalog.ToList()));
+        // The timezone / date-format sections read these even for a
+        // signed-out subject (the arguments are evaluated before the
+        // null-subject short-circuit inside the build helpers).
+        localization.GetDefaultTimezoneAsync().Returns(Task.FromResult("UTC"));
+        localization.GetDefaultDateFormatAsync()
+            .Returns(Task.FromResult(Kumunita.Core.Localization.DateFormat.FloorFormat));
+
+        var userInfo = Substitute.For<Kumunita.Core.UserInfo.IUserInfoService>();
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(settings));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new LocaleController(localization, userInfo, store);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        return controller;
+    }
+
+    [Fact(DisplayName = "LS U06 the settings language surface lists en/de/fr in SortOrder for the first-boot catalog")]
+    public async Task LS_U06_SettingsSurface_ListsFirstBootCatalog_InSortOrder()
+    {
+        var controller = BuildSettingsController(FirstBootCatalog(),
+            settings: new LocaleSettings { DefaultLanguageCode = "en" });
+
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<LocaleController.LocaleSettingsViewModel>(view.ViewData.Model);
+
+        Assert.Equal(new[] { "en", "de", "fr" }, model.Languages.Select(l => l.Code).ToArray());
+        Assert.Equal("en", model.DefaultCode);
+    }
+
+    // ── The admin completeness view (M·12) reports de / fr at 100% ──────────
+    // (LanguagesController.Index — the one admin surface a resident's gap is
+    // surfaced before they hit it; the LS lane's direct pin for "it clearly
+    // shows how the language features work from the first bootup".)
+
+    private static LanguagesController BuildAdminShell(
+        IEnumerable<LanguageCatalog> catalog,
+        Dictionary<string, (IReadOnlyList<string> present, IReadOnlyList<string> missing)> completeness)
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.ListLanguagesAsync()
+            .Returns(Task.FromResult<IReadOnlyList<LanguageCatalog>>(catalog.ToList()));
+        localization.GetCompletenessAsync(Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                var code = callInfo.Arg<string>();
+                var (present, missing) = completeness[code];
+                return Task.FromResult(new LanguageCompleteness(code, present, missing));
+            });
+
+        var controller = new LanguagesController(localization);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        return controller;
+    }
+
+    [Fact(DisplayName = "LS U06 the admin completeness view reports en/de/fr at 100% on the first-boot catalog")]
+    public async Task LS_U06_AdminCompleteness_ReportsFirstBootAt100Percent()
+    {
+        var allKeys = KnownTranslationKeys.AllKeys.ToList();
+
+        // A fresh boot: every language has every registered key (0 missing —
+        // the completeness universe equals the registry exactly).
+        var completeness = new Dictionary<string, (IReadOnlyList<string>, IReadOnlyList<string>)>
+        {
+            ["en"] = (allKeys, []),
+            ["de"] = (allKeys, []),
+            ["fr"] = (allKeys, []),
+        };
+
+        var controller = BuildAdminShell(FirstBootCatalog(), completeness);
+
+        var result = await controller.Index();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var rows = Assert.IsAssignableFrom<IEnumerable<LanguagesController.LanguageRowViewModel>>(view.ViewData.Model);
+        var list = rows.ToList();
+
+        // The shell lists the catalog in SortOrder — en / de / fr.
+        Assert.Equal(new[] { "en", "de", "fr" }, list.Select(r => r.Code).ToArray());
+
+        // 100% present for each — the direct first-boot pin.
+        Assert.All(list, r =>
+        {
+            Assert.Empty(r.MissingKeys);
+            Assert.Equal(KnownTranslationKeys.AllKeys.Count, r.PresentKeys.Count);
+        });
+    }
+
     // ── (e) U05: the about view wraps exactly the 17 D5 keys ─────────────────
 
     /// <summary>

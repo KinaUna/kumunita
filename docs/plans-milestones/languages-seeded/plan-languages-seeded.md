@@ -316,3 +316,68 @@ parity with the `De/FrDefaultPages()` sources.
 `dotnet exec …Kumunita.Core.Tests.dll -class LS_U04_SeederTests` → 6/6 pass. Full Core
 assembly → **Total: 529, Errors: 0, Failed: 0** (Testcontainers, ~53 s). No view or Web
 code changed; no new doc type; no schema/migration.
+
+## U06
+
+The final unit — the Web-surface pins, the fresh-boot manual pass, and the doc trio.
+No app code beyond Part A's tests changed.
+
+- **Part A — Web surface pins** (`tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs`):
+  three new pins against the U04 first-boot catalog (en sort 0 / de sort 1 / fr sort 2,
+  all enabled, default `en`):
+  - `LS_U06_PublicPicker_ListsFirstBootCatalog_InSortOrder` — the public `/language`
+    picker (`PublicLocaleController.Index`) lists all three in SortOrder with native names
+    (English / Deutsch / Français) and `DefaultCode == "en"`.
+  - `LS_U06_SettingsSurface_ListsFirstBootCatalog_InSortOrder` — the signed-in settings
+    language surface (`LocaleController`) lists the same three in order, default `en`.
+  - `LS_U06_AdminCompleteness_ReportsFirstBootAt100Percent` — the admin `/admin/languages`
+    completeness view (`LanguagesController`) reports `de` and `fr` each at 100%
+    (0 missing, present count == `KnownTranslationKeys.AllKeys`), alongside `en`, in
+    `en`/`de`/`fr` order.
+  - New NSubstitute helpers: `FirstBootCatalog()`, `BuildSettingsController(...)`,
+    `BuildAdminShell(...)`. Build → 0 warnings / 0 errors; class run → **8/8 pass**
+    (5 pre-existing + 3 new).
+
+- **Part B — fresh-boot manual pass** (Docker, pristine `kumunita_kumunita_pgdata`
+  volume wiped, `docker compose up -d --build`):
+  - **(a)** First-boot log shows the `de` / `fr` seed lines **exactly once**:
+    - `First boot: language catalog seeded (source language 'en' enabled, sort 0; bundled initial pack 'de' sort 1, 'fr' sort 2 — ADR 0042 D4); instance default stays 'en'.`
+    - `First boot: canonical `en` UI strings seeded (392 keys) + `de`/`fr` baselines (392 keys each — ADR 0042 D1) + `en` terms/help pages (2 Page docs) with `de`/`fr` bodies (4 PageTranslation rows); `about` is not seeded (admin-created at runtime).`
+  - **(b)** Cookie-less `GET /` renders English (nav: Home / Announcements / Community /
+    Groups / Pages / Directory; "Private by default" about eyebrow).
+  - **(c)** Picker shows English ✓ / Deutsch / Français (SortOrder). Selecting each renders
+    nav, footer, Home, settings and `/about` in that language. `/terms` / `/help` carry the
+    full `de` / `fr` `td-variant` chip-swap variants (Nutzungsbedingungen / Conditions
+    d'utilisation + full bodies) — correct per ADR 0027 (display is never auto-switched by
+    the cookie; explicit click-to-swap only).
+  - **(d)** Admin `/admin/languages` shows all three rows — `en` / `de` / `fr`, each
+    **392 present** (100% complete), in SortOrder.
+  - **(e)** Edited one `de` string in-app (`nav.home`: "Start" → "Start (U06 edit)") via
+    `/admin/languages/de/translations` → saved ("Translation for "nav.home" in "de" saved"),
+    visible live in the nav on the next request, and **survived a true container restart**
+    (`docker stop` + `docker start`, RestartCount confirmed 0 before) with **0 "First boot"
+    lines** in the fresh boot logs — i.e. no reseed; the community edit is preserved
+    (ADR 0042 D1).
+  - **(f)** `/about` renders the DE / FR product-story surface (eyebrow "Privat per
+    Vorgabe" / "Privé par défaut", lead in each language).
+
+- **Part C — doc trio:**
+  - `README.md` Roadmap: new `LS` row after the `ML-UI` row — "**Languages seeded** (`LS`,
+    ADR 0042) — a first-boot instance ships German and French enabled with complete
+    UI-string and about/terms/help baselines (English stays the default and the only
+    code-owned language); per-string fallback still lands on the en floor. **Done.**"
+  - `README.md` Multilingual feature-bullet: appended one sentence about the bundled
+    `de` / `fr` initial pack (ADR 0042).
+  - `Milestones.cs`: new `new("LS", "Languages seeded — German & French ship enabled on
+    first boot with complete UI + about/terms/help baselines (en stays default & the only
+    code-owned language; ADR 0042)", StatusDone)` after the `ML-UI` row.
+  - `MilestonesTests.cs`: `"LS"` inserted after `"ML-UI"` in the ordered-ids list and added
+    to the shipped-done list; `M4_Is_The_Single_InProgress_Milestone` stays green (LS is
+    `StatusDone`).
+  - `ADR 0005` amendment note for the bundled initial pack (2026-09-18, ADR 0042) was
+    already present — no edit needed.
+
+**Exit (green):** `dotnet build Kumunita.slnx -c Debug` → 0 errors / 0 warnings. Full
+`Kumunita.Web.Tests` and `Kumunita.Core.Tests` assemblies both green via `dotnet exec`
+(see the U06 exit run below). No app code changed beyond Part A's tests; no new doc type;
+no schema/migration.
