@@ -38,8 +38,11 @@ namespace Kumunita.Core.Localization;
 /// announcement body, or an author's display name is authored and rendered as
 /// written — it is <b>not</b> here.</li>
 /// <li><b>Not the setup flow</b> (<c>AdminSetup/Setup</c> — first-boot,
-/// single-admin, pre-community), the product-story landing, or the FAQ
-/// placeholder — recorded in ADR 0015 (full-sweep amendment).</li>
+/// single-admin, pre-community) or the FAQ placeholder — recorded in ADR
+/// 0015 (full-sweep amendment). The <c>about</c> product-story landing was
+/// likewise excluded there but is now <b>in scope</b>: its 17 <c>about.*</c>
+/// keys are registered below (ADR 0042 D5, 2026-09-18 — the exclusion is
+/// superseded for <c>about</c>, held for the FAQ placeholder).</li>
 /// <li><b>Not HTML attributes, JS strings, or C#-built markup</b>:
 /// <c>placeholder</c>/<c>aria-label</c>/<c>title</c> attributes,
 /// <c>confirm()</c> dialogs, and strings embedding inline <c>&lt;code&gt;</c>

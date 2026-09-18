@@ -116,9 +116,12 @@ read as drift:
 
 - **The setup flow** (`AdminSetup/Setup`) — first-boot, single-admin,
   pre-community; ADR 0005's seam never claimed it.
-- **The product-story landing** (`StaticPages/About`) and the **FAQ
-  placeholder** accordion — not platform UI yet (the FAQ content is still
-  `TODO(faq)`).
+- **The `about` product surface** (`StaticPages/About`) — *superseded for
+  this surface by ADR 0042 (2026-09-18), D3/D5*: its 17 `about.*` keys are
+  now registered and the view is wrapped in `<kw-l>` through the existing
+  mechanism; the exclusions below still hold for it.
+- **The FAQ placeholder** accordion — not platform UI yet (the FAQ content
+  is still `TODO(faq)`) — this exclusion stands.
 - **HTML attributes** (`placeholder`, `aria-label`, `title`) — the TagHelper
   emits element *content*; attributes are out of its reach by design and are
   left hardcoded.
