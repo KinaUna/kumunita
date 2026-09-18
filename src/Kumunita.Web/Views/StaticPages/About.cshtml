@@ -12,19 +12,17 @@
     <div class="container">
         <div class="row justify-content-center text-center">
             <div class="col-12 col-lg-9">
-                <div class="eyebrow">Private by default</div>
+                <div class="eyebrow"><kw-l key="about.eyebrow">Private by default</kw-l></div>
                 <h1 class="display-5 mb-4">@Model.CommunityName</h1>
                 <p class="kmb-hero-lead mx-auto mb-4" style="max-width: 42rem;">
-                    One home for everything your neighborhood does — the feed,
-                    the groups, and the notes that deserve better than a group
-                    chat. Private, plain-language, and yours.
+                    <kw-l key="about.lead">One home for everything your neighborhood does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.</kw-l>
                 </p>
                 <div class="d-flex flex-wrap justify-content-center gap-3 kmb-hero-actions">
                     <a asp-controller="Posts" asp-action="AllSections" class="btn btn-pill btn-primary">
-                        See the feed
+                        <kw-l key="about.cta_feed">See the feed</kw-l>
                     </a>
                     <a href="/announcements" class="btn btn-pill btn-hero-ghost">
-                        Read the pinned notes
+                        <kw-l key="about.cta_notes">Read the pinned notes</kw-l>
                     </a>
                 </div>
             </div>
@@ -44,9 +42,8 @@
                                 <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 1 1 16.1-3.8z"/>
                             </svg>
                         </div>
-                        <h3 class="kmb-feat-title">One feed for the street</h3>
-                        <p>Posts and threads from your blocks and lanes, in one
-                           quiet place — no algorithm, no noise.</p>
+                        <h3 class="kmb-feat-title"><kw-l key="about.features.one.title">One feed for the street</kw-l></h3>
+                        <p><kw-l key="about.features.one.body">Posts and threads from your blocks and lanes, in one quiet place — no algorithm, no noise.</kw-l></p>
                     </div>
                 </div>
                 <div class="col-12 col-sm-8 col-md-4">
@@ -59,9 +56,8 @@
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                             </svg>
                         </div>
-                        <h3 class="kmb-feat-title">Groups that fit</h3>
-                        <p>Garden swap, book club, street watch — a group for
-                           whatever the neighbourhood already does.</p>
+                        <h3 class="kmb-feat-title"><kw-l key="about.features.groups.title">Groups that fit</kw-l></h3>
+                        <p><kw-l key="about.features.groups.body">Garden swap, book club, street watch — a group for whatever the neighbourhood already does.</kw-l></p>
                     </div>
                 </div>
                 <div class="col-12 col-sm-8 col-md-4">
@@ -72,9 +68,8 @@
                                 <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/>
                             </svg>
                         </div>
-                        <h3 class="kmb-feat-title">Pinned where it matters</h3>
-                        <p>Water cuts, roadworks, the new speed bumps — notes
-                           that stay put instead of scrolling away.</p>
+                        <h3 class="kmb-feat-title"><kw-l key="about.features.pinned.title">Pinned where it matters</kw-l></h3>
+                        <p><kw-l key="about.features.pinned.body">Water cuts, roadworks, the new speed bumps — notes that stay put instead of scrolling away.</kw-l></p>
                     </div>
                 </div>
             </div>
@@ -97,19 +92,19 @@
         <div class="row kmb-stats g-4 justify-content-center text-center">
             <div class="col-6 col-md-3">
                 <div class="kmb-stat-value">42</div><!-- TODO(counts): real neighbor count -->
-                <div class="kmb-stat-label">neighbors on board</div>
+                <div class="kmb-stat-label"><kw-l key="about.stats.neighbors">neighbors on board</kw-l></div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="kmb-stat-value">6</div><!-- TODO(counts): real community/group count -->
-                <div class="kmb-stat-label">groups &amp; communities</div>
+                <div class="kmb-stat-label"><kw-l key="about.stats.groups">groups &amp; communities</kw-l></div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="kmb-stat-value">128</div><!-- TODO(counts): real this-month posts + threads -->
-                <div class="kmb-stat-label">posts &amp; threads this month</div>
+                <div class="kmb-stat-label"><kw-l key="about.stats.posts">posts &amp; threads this month</kw-l></div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="kmb-stat-value">9</div><!-- TODO(counts): real pinned-note count -->
-                <div class="kmb-stat-label">pinned notes out now</div>
+                <div class="kmb-stat-label"><kw-l key="about.stats.pinned">pinned notes out now</kw-l></div>
             </div>
         </div>
     </div>
@@ -120,11 +115,10 @@
     <div class="container">
         <div class="row justify-content-center text-center">
             <div class="col-12 col-lg-8">
-                <div class="eyebrow">Open source</div>
-                <h2 class="h3 mt-2">The code, the decisions, the design docs</h2>
+                <div class="eyebrow"><kw-l key="about.project.eyebrow">Open source</kw-l></div>
+                <h2 class="h3 mt-2"><kw-l key="about.project.heading">The code, the decisions, the design docs</kw-l></h2>
                 <p class="kmb-section-lead mx-auto mt-3" style="max-width: 42rem;">
-                    If you're curious how it works — or if you're about to host
-                    it for your neighbourhood — everything is public.
+                    <kw-l key="about.project.lead">If you're curious how it works — or if you're about to host it for your neighbourhood — everything is public.</kw-l>
                 </p>
             </div>
         </div>

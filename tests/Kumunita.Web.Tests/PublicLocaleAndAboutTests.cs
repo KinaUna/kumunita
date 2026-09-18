@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Kumunita.Core;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
@@ -164,5 +165,96 @@ public class PublicLocaleAndAboutTests
         var result = await controller.Terms();
 
         Assert.IsType<NotFoundResult>(result);
+    }
+
+    // ── (e) U05: the about view wraps exactly the 17 D5 keys ─────────────────
+
+    /// <summary>
+    /// The ADR 0042 D5 closed contract: the 17 <c>about.*</c> keys are the
+    /// stable key list U01–U05 code against. U01 registered them in
+    /// <see cref="KnownTranslationKeys.EnValues"/>, U02/U03 translated them,
+    /// and U05 wraps the view against exactly these names. The
+    /// <see cref="KwLRegistryConsistencyTests"/> cover the *registry-side*
+    /// half (every key the views emit is registered); this test covers the
+    /// *view-side* half (every D5 key the contract names is wrapped in
+    /// About.cshtml), so a future view edit that drops a wrap is caught
+    /// immediately.
+    /// </summary>
+    [Fact(DisplayName = "About.cshtml wraps all 17 ADR 0042 D5 about.* keys in kw-l")]
+    public void About_View_Wraps_All_D5_Keys()
+    {
+        var aboutView = ResolveAboutView();
+        var text = File.ReadAllText(aboutView);
+
+        // The closed D5 key list — exactly these 17, in order (ADR 0042 D5).
+        var d5Keys = new[]
+        {
+            "about.eyebrow",
+            "about.lead",
+            "about.cta_feed",
+            "about.cta_notes",
+            "about.features.one.title",
+            "about.features.one.body",
+            "about.features.groups.title",
+            "about.features.groups.body",
+            "about.features.pinned.title",
+            "about.features.pinned.body",
+            "about.stats.neighbors",
+            "about.stats.groups",
+            "about.stats.posts",
+            "about.stats.pinned",
+            "about.project.eyebrow",
+            "about.project.heading",
+            "about.project.lead",
+        };
+
+        Assert.True(d5Keys.Length == 17,
+            "The D5 list length changed — update this test to match ADR 0042 D5.");
+
+        // Every D5 key must appear as kw-l key="…" in the view.
+        var missing = d5Keys
+            .Where(k => !Regex.IsMatch(text, $@"kw-l\b[^>]*\bkey=""{Regex.Escape(k)}"""))
+            .ToList();
+
+        Assert.True(missing.Count == 0,
+            "D5 about.* key(s) not wrapped in kw-l in About.cshtml:\n" +
+            string.Join("\n", missing.Select(k => $"  {k}")));
+
+        // The view must NOT wrap any about.* key beyond the 17 D5 keys —
+        // a stray wrap of an unregistered key would render the raw key to
+        // the resident (the PG-lane regression KwLRegistryConsistencyTests
+        // guards against, checked here for the about.* namespace specifically).
+        var allAboutKeys = Regex
+            .Matches(text, @"kw-l\b[^>]*\bkey=""(about\.[^""]+)""")
+            .Select(m => m.Groups[1].Value)
+            .Distinct()
+            .ToList();
+
+        var stray = allAboutKeys.Except(d5Keys).ToList();
+        Assert.True(stray.Count == 0,
+            "About.cshtml wraps about.* key(s) not in the ADR 0042 D5 contract:\n" +
+            string.Join("\n", stray.Select(k => $"  {k}")));
+    }
+
+    /// <summary>
+    /// Locates <c>Views/StaticPages/About.cshtml</c> by walking up from the
+    /// test assembly's output directory to the repo root (the dir that holds
+    /// <c>Kumunita.slnx</c>) — the same pattern as
+    /// <see cref="KwLRegistryConsistencyTests"/>.
+    /// </summary>
+    private static string ResolveAboutView()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Kumunita.slnx")))
+        {
+            dir = dir.Parent;
+        }
+
+        Assert.True(dir is not null,
+            "Could not locate the repo root (Kumunita.slnx) above the test output directory.");
+
+        var about = Path.Combine(dir!.FullName, "src", "Kumunita.Web", "Views", "StaticPages", "About.cshtml");
+        Assert.True(File.Exists(about), $"About.cshtml not found at {about}.");
+        return about;
     }
 }
