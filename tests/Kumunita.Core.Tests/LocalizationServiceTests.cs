@@ -54,7 +54,7 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("Strona główna", await provider.GetAsync(key, "pl"));
 
         // No preference → the instance default is "en" (M1 seed) → the en row.
-        Assert.Equal("Home", await provider.GetAsync(key, null));
+        Assert.Equal("Home", await provider.GetAsync(key, (string?)null));
     }
 
     // ── M2 — per-string fallback (not a view-flip) ──────────────────────────
@@ -102,7 +102,7 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         var provider = new TranslationProvider(store);
 
         // No preference → the instance default is "pl" (M·1).
-        Assert.Equal("Strona główna", await provider.GetAsync("nav.home", null));
+        Assert.Equal("Strona główna", await provider.GetAsync("nav.home", (string?)null));
     }
 
     // ── M4 — fresh instance, default en, en floor ───────────────────────────
@@ -121,8 +121,8 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         var provider = new TranslationProvider(store);
 
-        Assert.Equal("Home", await provider.GetAsync("nav.home", null));
-        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(null));
+        Assert.Equal("Home", await provider.GetAsync("nav.home", (string?)null));
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync((string?)null));
     }
 
     // ── M6 — UGC renders as authored, never translated ──────────────────────
@@ -274,7 +274,7 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
 
         // M·1: the default is picked up live — no preference → pl.
         var provider = new TranslationProvider(store);
-        Assert.Equal("Strona główna", await provider.GetAsync("nav.home", null));
+        Assert.Equal("Strona główna", await provider.GetAsync("nav.home", (string?)null));
 
         // M·6: exactly one audit row with the pinned shape.
         var audits = await AuditRows(store, action: "language.set-default");
@@ -380,6 +380,118 @@ public class LocalizationServiceTests(PostgresFixture fixture) : IClassFixture<P
         var zz = await svc.GetTranslationsForAsync("zz");
         Assert.NotNull(zz);
         Assert.Empty(zz);
+    }
+
+    // ── ADR 0046 — browser Accept-Language as the default-language step ─────
+    // The provider's candidate-list overload: the caller supplies an ordered
+    // candidate list (explicit preference first, then the browser's
+    // Accept-Language tags) and the first **enabled** catalog language wins.
+    // A null candidate set keeps the frozen legacy chain (M·1/M·9 unchanged).
+
+    [Fact]
+    public async Task ADR0046_BrowserCandidate_ResolvesWhenEnabled()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+        await AddLanguage(store, "pl", "Polski");
+
+        await UpsertTranslation(store, "nav.home", "en", "Home");
+        await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
+
+        var provider = new TranslationProvider(store);
+
+        // Browser header offers pl (enabled) → pl wins over the default en.
+        Assert.Equal("pl", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "pl" }));
+        Assert.Equal("Strona główna", await provider.GetAsync(
+            "nav.home", new[] { "pl" }));
+    }
+
+    [Fact]
+    public async Task ADR0046_BrowserCandidateDisabled_FallsBackToDefault()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+        await AddLanguage(store, "pl", "Polski");
+        var svc = new LocalizationService(store);
+        await svc.SetLanguageEnabledAsync("pl", false, "admin-a46");
+
+        await UpsertTranslation(store, "nav.home", "en", "Home");
+        await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
+
+        var provider = new TranslationProvider(store);
+
+        // pl in the header but **disabled** in the catalog → skipped → the
+        // instance default (en) applies (M·7's enabled-gate holds for the
+        // browser step exactly as it does for an explicit preference).
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "pl" }));
+        Assert.Equal("Home", await provider.GetAsync("nav.home", new[] { "pl" }));
+    }
+
+    [Fact]
+    public async Task ADR0046_BrowserCandidateNotInCatalog_FallsBackToDefault()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+
+        await UpsertTranslation(store, "nav.home", "en", "Home");
+
+        var provider = new TranslationProvider(store);
+
+        // fr is not in the catalog at all → no enabled match → the default.
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "fr", "pl" }));
+    }
+
+    [Fact]
+    public async Task ADR0046_CandidateOrderFirstEnabledWins()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+        await AddLanguage(store, "pl", "Polski");
+        await AddLanguage(store, "zz", "Zazulu");
+
+        await UpsertTranslation(store, "nav.home", "en", "Home");
+        await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
+        await UpsertTranslation(store, "nav.home", "zz", "Izikhaya");
+
+        var provider = new TranslationProvider(store);
+
+        // Header order is honored: the first enabled tag wins, the next one
+        // is only fallback-chain material.
+        Assert.Equal("pl", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "pl", "zz" }));
+        Assert.Equal("zz", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "zz", "pl" }));
+
+        // A key pl lacks but zz has → the per-string chain (pl → zz → en)
+        // resolves it to the zz row, not the en floor.
+        await UpsertTranslation(store, "feed.reply", "zz", "Phendula");
+        await UpsertTranslation(store, "feed.reply", "en", "Reply");
+        Assert.Equal("Phendula", await provider.GetAsync("feed.reply", new[] { "pl", "zz" }));
+    }
+
+    [Fact]
+    public async Task ADR0046_NullAndEmptyCandidates_LegacyChain()
+    {
+        var store = await BootStoreAsync();
+        await SeedM1RowAsync(store);
+        await AddLanguage(store, "pl", "Polski");
+
+        await UpsertTranslation(store, "nav.home", "en", "Home");
+        await UpsertTranslation(store, "nav.home", "pl", "Strona główna");
+
+        var provider = new TranslationProvider(store);
+
+        // null / empty / all-blank candidate lists resolve exactly like the
+        // legacy null-preference chain (M·1/M·9 unchanged).
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(
+            (System.Collections.Generic.IReadOnlyCollection<string>?)null));
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(
+            new[] { "" }));
+        Assert.Equal("Home", await provider.GetAsync(
+            "nav.home", new[] { "" }));
     }
 
     // ── Audit-row-shape tests (6) ────────────────────────────────────────────

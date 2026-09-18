@@ -32,10 +32,44 @@ public interface ITranslationProvider
     Task<string> GetAsync(string key, string? preferredLanguageCode);
 
     /// <summary>
+    /// One UI string resolved against an **ordered candidate list** (ADR 0046).
+    /// Same per-string fallback discipline as the <c>preferredLanguageCode</c>
+    /// overload (M·2), but the fallback chain is built from the ordered
+    /// candidates — so a key the top candidate lacks but a later candidate has
+    /// resolves to that later row, not the <c>en</c> floor. The Web layer uses
+    /// this to pass the browser's <c>Accept-Language</c> tags in priority order
+    /// while keeping the provider HTTP-free (M·8).
+    /// </summary>
+    Task<string> GetAsync(string key, IReadOnlyCollection<string>? candidates);
+
+    /// <summary>
     /// Batch UI strings in **one** query (the view path — no N round-trips, M·2).
     /// Each key falls back **independently** (per-string, M·2). Returns a map from
     /// each requested key to its resolved text.
     /// </summary>
     Task<IReadOnlyDictionary<string, string>> GetManyAsync(
         IReadOnlyCollection<string> keys, string? preferredLanguageCode);
+
+    /// <summary>
+    /// Batch UI strings against an **ordered candidate list** (ADR 0046) — the
+    /// batch form of <see cref="GetAsync(string, IReadOnlyCollection{string}?)"/>.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, string>> GetManyAsync(
+        IReadOnlyCollection<string> keys, IReadOnlyCollection<string>? candidates);
+
+    /// <summary>
+    /// Resolve the effective language for an **ordered candidate list**
+    /// (ADR 0046 — the per-request default-language chain). The Web layer
+    /// supplies the candidates in priority order: the explicit preference
+    /// (the <c>kumunita.locale</c> cookie) first, then the browser's
+    /// <c>Accept-Language</c> tags — the provider stays **HTTP-free** (M·8)
+    /// and never reads a header or a cookie itself. The **first** candidate
+    /// present and **enabled** in <see cref="LanguageCatalog"/> becomes the
+    /// effective language; the rest only participate in the per-string
+    /// fallback chain (M·2). <c>null</c> / empty / all-disabled candidates
+    /// resolve exactly like <c>preferredLanguageCode == null</c> (instance
+    /// default → <c>"en"</c>, M·1/M·9), so a caller that has no signal
+    /// degrades to the frozen resolution order.
+    /// </summary>
+    Task<string> ResolveEffectiveLanguageAsync(IReadOnlyCollection<string>? candidates);
 }

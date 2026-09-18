@@ -640,6 +640,13 @@ public static class KnownTranslationKeys
             ["locale.reset"] = "Reset to instance default",
             ["locale.public_title"] = "Choose your language",
             ["locale.instance_default"] = "— instance default",
+            // ADR 0046 — the browser-match suggestion (pre-selection + marker).
+            ["locale.browser_matched"] = "— matched from your browser",
+            ["locale.browser_note"] =
+                "We picked ",
+            ["locale.browser_note_tail"] =
+                " from your browser settings. Saving makes it your preferred " +
+                "language — it stays until you change it.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Who sees this?",
@@ -1361,6 +1368,14 @@ public static class KnownTranslationKeys
             ["locale.reset"] = "Auf die Instanz-Voreinstellung zurücksetzen",
             ["locale.public_title"] = "Wähle deine Sprache",
             ["locale.instance_default"] = "— Instanz-Voreinstellung",
+            // ADR 0046 — the browser-match suggestion (pre-selection + marker).
+            ["locale.browser_matched"] = "— aus deinen Browser-Einstellungen",
+            ["locale.browser_note"] =
+                "Wir haben ",
+            ["locale.browser_note_tail"] =
+                " anhand deiner Browser-Einstellungen ausgewählt. " +
+                "Speichern macht es zu deiner Wunschsprache — sie bleibt " +
+                "bestehen, bis du sie änderst.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Wer sieht dies?",
@@ -2064,6 +2079,14 @@ public static class KnownTranslationKeys
             ["locale.reset"] = "Réinitialiser au défaut de l'instance",
             ["locale.public_title"] = "Choisis ta langue",
             ["locale.instance_default"] = "— défaut de l'instance",
+            // ADR 0046 — the browser-match suggestion (pre-selection + marker).
+            ["locale.browser_matched"] = "— d'après ton navigateur",
+            ["locale.browser_note"] =
+                "Nous avons choisi ",
+            ["locale.browser_note_tail"] =
+                " d'après les réglages de ton navigateur. L'enregistrer en " +
+                "fait ta langue préférée — elle reste telle quelle jusqu'à " +
+                "ce que tu la changes.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Qui voit cela ?",
@@ -2769,6 +2792,13 @@ public static class KnownTranslationKeys
             ["locale.reset"] = "Nulstil til instansstandard",
             ["locale.public_title"] = "Vælg dit sprog",
             ["locale.instance_default"] = "— instansstandard",
+            // ADR 0046 — the browser-match suggestion (pre-selection + marker).
+            ["locale.browser_matched"] = "— fra dine browserindstillinger",
+            ["locale.browser_note"] =
+                "Vi har valgt ",
+            ["locale.browser_note_tail"] =
+                " ud fra dine browserindstillinger. Gemmer du det, bliver det " +
+                "dit foretrukne sprog — det bliver ved, indtil du ændrer det.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Hvem ser dette?",

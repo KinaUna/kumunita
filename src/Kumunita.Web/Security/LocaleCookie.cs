@@ -7,8 +7,16 @@ namespace Kumunita.Web.Security;
 /// BCP-47 code (a <see cref="Kumunita.Core.Localization.LanguageCatalog.Id"/>).
 /// **Not** a claim (thin-token rule — ADR 0001-B): read here, passed to
 /// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> as a plain string;
-/// it is never part of the identity or the authorization decision. This is the
-/// **only** place the cookie is read or written (M·8 — Core stays HTTP-free).
+/// it is never part of the identity or the authorization decision.
+/// <para>
+/// <b>ADR 0046:</b> the cookie remains the **only write path** — an explicit
+/// pick pins the resident's choice — and it stays the **first** preference the
+/// per-request resolution consults. The read for the provider chain now flows
+/// through <see cref="RequestLanguage"/> (cookie first, then the browser's
+/// <c>Accept-Language</c> as the fallback step); this class keeps
+/// <see cref="Read"/> for the picker pages' UI echo only (M·8 — Core stays
+/// HTTP-free either way).
+/// </para>
 /// </summary>
 public static class LocaleCookie
 {

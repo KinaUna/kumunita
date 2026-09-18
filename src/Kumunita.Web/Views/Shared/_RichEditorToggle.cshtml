@@ -15,9 +15,16 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Web.Security
 @inject ITranslationProvider Translation
+@inject ILocalizationService Localization
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
-    var pref = HttpContextAccessor?.HttpContext?.Request is var req ? (req is null ? null : LocaleCookie.Read(req)) : null;
+    // ADR 0046: the per-request language signal is the preference cookie
+    // first, then the browser's Accept-Language match against the enabled
+    // catalog (suggested, not persisted).
+    var req = HttpContextAccessor?.HttpContext?.Request;
+    var pref = req is null ? null : LocaleCookie.Read(req);
+    if (string.IsNullOrWhiteSpace(pref) && req is not null)
+        pref = RequestLanguage.Browser(req, await Localization.ListLanguagesAsync());
     var labels = await Translation.GetManyAsync(
         new[] { "rc.editor.source", "rc.editor.showPreview" }, pref);
     var labelSource   = labels.TryGetValue("rc.editor.source",      out var s) ? s : "</>";

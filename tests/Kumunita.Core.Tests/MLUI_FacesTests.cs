@@ -124,11 +124,11 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         var provider = new TranslationProvider(store);
 
         // No preference → the instance default is "en".
-        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync(null));
+        Assert.Equal("en", await provider.ResolveEffectiveLanguageAsync((string?)null));
 
         // Every registry key resolves to its `en` reference (the seeded floor).
         foreach (var (key, enText) in KnownTranslationKeys.EnValues)
-            Assert.Equal(enText, await provider.GetAsync(key, null));
+            Assert.Equal(enText, await provider.GetAsync(key, (string?)null));
     }
 
     // ── L5 (Core half) — the closed list of canonical keys is the registry ──
@@ -337,9 +337,9 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         var provider = new TranslationProvider(store);
 
         // No preference → default is now pl. The no-pl key falls back per string to en.
-        Assert.Equal(KnownTranslationKeys.EnValues[noPlKey], await provider.GetAsync(noPlKey, null));
+        Assert.Equal(KnownTranslationKeys.EnValues[noPlKey], await provider.GetAsync(noPlKey, (string?)null));
         // The sibling has a pl row → it resolves pl.
-        Assert.Equal("pl-sibling", await provider.GetAsync(siblingKey, null));
+        Assert.Equal("pl-sibling", await provider.GetAsync(siblingKey, (string?)null));
     }
 
     // ── Gate: Part-vs-whole (the inherited anchors still pass in the same run) ───
@@ -365,7 +365,7 @@ public class MLUI_FacesTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         await UpsertTranslation(store, k1, "pl", "pl-one");
         var provider = new TranslationProvider(store);
         Assert.Equal("pl-one", await provider.GetAsync(k1, "pl"));
-        Assert.Equal(KnownTranslationKeys.EnValues[k1], await provider.GetAsync(k1, null));
+        Assert.Equal(KnownTranslationKeys.EnValues[k1], await provider.GetAsync(k1, (string?)null));
 
         // M9 (registry key): an admin save is visible next request + one audit row.
         var svc = new LocalizationService(store);

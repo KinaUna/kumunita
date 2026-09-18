@@ -56,10 +56,14 @@ bodies, seeded first-boot-only), editable in-app by a GlobalAdmin / Translator
 the locked ownership semantics.
 
 **Resolution order per request:** user's saved preference (cookie + settings
-page) → instance default (`LocaleSettings`) → source language (`en`).
-Fallback is per-string / per-page, so a partially translated UI degrades
-gracefully: a resident never sees a blank label. The preference is a cookie —
-it is *not* a claim, per the thin-token rule (ADR 0001-B).
+page) → **browser `Accept-Language` match** (amended 2026-09-25, ADR 0046 —
+a *suggestion*, matched against the enabled catalog, never persisted, only
+when no cookie preference is saved) → instance default (`LocaleSettings`) →
+source language (`en`). Fallback is per-string / per-page, so a partially
+translated UI degrades gracefully: a resident never sees a blank label. The
+preference is a cookie — it is *not* a claim, per the thin-token rule
+(ADR 0001-B); the browser match is a per-request read signal, not a claim or
+a write path (ADR 0046).
 
 ### C. User-generated content: optional, opt-in, deferred
 

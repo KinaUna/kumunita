@@ -71,14 +71,26 @@ public sealed class LocaleController(
         if (settings is not null)
             defaultCode = settings.DefaultLanguageCode;
 
+        // ADR 0046: the pre-selection = the saved preference (the cookie) or,
+        // failing that, the browser's Accept-Language match against the
+        // enabled catalog — a suggestion only, never persisted (the cookie
+        // stays the only write path).
+        var enabledRows = catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .ToList();
+        var saved = LocaleCookie.Read(Request);
+        var browserCode = string.IsNullOrWhiteSpace(saved)
+            ? RequestLanguage.Browser(Request, enabledRows)
+            : null;
+
         var model = new LocaleSettingsViewModel
         {
-            Languages = catalog
-                .Where(l => l.Enabled)
-                .OrderBy(l => l.SortOrder)
+            Languages = enabledRows
                 .Select(l => new LocaleOption(l.Id, l.NativeName))
                 .ToList(),
-            CurrentCode = LocaleCookie.Read(Request),
+            CurrentCode = saved,
+            BrowserCode = browserCode,
             DefaultCode = defaultCode,
 
             // The time-zone section (ADR 0019): the OS zones (the shared
@@ -281,6 +293,14 @@ public sealed class LocaleController(
     {
         public List<LocaleOption> Languages { get; init; } = new();
         public string? CurrentCode { get; init; }
+
+        /// <summary>ADR 0046 — the browser's <c>Accept-Language</c> matched
+        /// against the enabled catalog, pre-selected when
+        /// <see cref="CurrentCode"/> is <c>null</c> (no saved preference).
+        /// A suggestion only: it is never persisted, and an explicit save
+        /// (the cookie write) always wins over it.</summary>
+        public string? BrowserCode { get; init; }
+
         public string DefaultCode { get; init; } = "en";
 
         /// <summary>The time-zone section (ADR 0019), or <c>null</c> when the

@@ -54,6 +54,11 @@ public sealed class PublicLocaleController(
                 .Select(l => new LocaleController.LocaleOption(l.Id, l.NativeName))
                 .ToList(),
             CurrentCode = LocaleCookie.Read(Request),
+            // ADR 0046: no saved preference → pre-select the browser's
+            // Accept-Language match (suggested, never persisted).
+            BrowserCode = string.IsNullOrWhiteSpace(LocaleCookie.Read(Request))
+                ? RequestLanguage.Browser(Request, catalog)
+                : null,
             DefaultCode = defaultCode,
         };
 

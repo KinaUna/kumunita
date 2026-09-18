@@ -1,6 +1,7 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Web.Security
 @inject ILocalizationService Localization
+@inject ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @*
     Right-hand nav actions (the public section links live in the layout's
@@ -20,13 +21,27 @@
     // The nav-bar language switcher: the enabled catalog (in SortOrder), and the
     // resident's current preference (the kumunita.locale cookie) to mark the
     // active choice. A read — never a write, never a claim (the thin-token rule).
+    // ADR 0046 — the effective choice is the cookie when set, else the browser's
+    // Accept-Language match (suggested, not persisted); a browser match is
+    // rendered with a "(matched)" suffix so it is never mistaken for a saved
+    // preference.
     var httpReq = HttpContextAccessor.HttpContext?.Request;
     var navLanguages = (await Localization.ListLanguagesAsync())
         .Where(l => l.Enabled)
         .OrderBy(l => l.SortOrder)
         .ToList();
-    var currentLang = httpReq is null ? null : LocaleCookie.Read(httpReq);
+    var cookieLang = httpReq is null ? null : LocaleCookie.Read(httpReq);
+    var browserLang = httpReq is null ? null : RequestLanguage.Browser(httpReq, navLanguages);
+    var currentLang = cookieLang ?? browserLang;
+    var browserMatched = string.IsNullOrEmpty(cookieLang) && browserLang is not null;
     var returnUrl = httpReq is null ? null : httpReq.Path + httpReq.QueryString;
+    // The "(matched)" marker: a browser-matched active language is a
+    // suggestion, not a saved preference — the label says so (ADR 0046).
+    string LangMatchedLabel = "matched";
+    var matchedMap = await Translation.GetManyAsync(
+        new[] { "locale.browser_matched" }, currentLang);
+    if (matchedMap.TryGetValue("locale.browser_matched", out var m))
+        LangMatchedLabel = m;
 }
 
 <ul class="navbar-nav">
@@ -38,7 +53,7 @@
     <li class="nav-item dropdown">
         <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
            id="languageMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false"
-           title="@("Language — " + (currentLang is null ? "instance default" : currentLang))">
+           title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
                  fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="8" cy="8" r="6.2"/>
@@ -60,6 +75,7 @@
                         <button type="submit" class="dropdown-item text-start @(isActive ? "fw-semibold" : "")">
                             @lang.NativeName
                             @(isActive ? " ✓" : "")
+                            @(isActive && browserMatched ? " (" + LangMatchedLabel + ")" : "")
                         </button>
                     </form>
                 </li>

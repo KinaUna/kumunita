@@ -19,9 +19,14 @@ namespace Kumunita.Core.Localization;
 /// and rendered as written).
 /// </para>
 /// <para>
-/// <b>Resolution order (M·1, M·9):</b> preferred (if enabled in the catalog)
-/// → instance default (if enabled) → <c>"en"</c> (the source-language floor —
-/// always seeded by the first-run seeder). Never returns null or empty.
+/// <b>Resolution order (M·1, M·9; ADR 0046):</b> the caller's ordered
+/// candidates — the explicit preference (if enabled in the catalog) first,
+/// then the browser's <c>Accept-Language</c> tags (if enabled) — → instance
+/// default (if enabled) → <c>"en"</c> (the source-language floor — always
+/// seeded by the first-run seeder). A <c>null</c> candidate set is the
+/// legacy two-step chain (preference → default → <c>"en"</c>); the
+/// candidates overload keeps both, so the browser-match step is opt-in
+/// per caller. Never returns null or empty.
 /// </para>
 /// <para>
 /// <b>Per-string fallback (M·2):</b> a partially translated language
@@ -48,7 +53,7 @@ public sealed class TranslationProvider : ITranslationProvider
     /// fallback chain (M·2): effective → default → <c>"en"</c>.
     /// </summary>
     private async Task<(string effective, string[] chain)> ResolveChainAsync(
-        string? preferredLanguageCode)
+        string? preferredLanguageCode, IReadOnlyCollection<string>? candidates = null)
     {
         await using var session = _store.QuerySession();
         var ct = CancellationToken.None;
@@ -63,12 +68,30 @@ public sealed class TranslationProvider : ITranslationProvider
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        // M·1: preferred (if enabled) → default (if enabled) → "en" (M·9 floor).
-        string effective;
-        if (!string.IsNullOrWhiteSpace(preferredLanguageCode)
-            && catalog.Any(c => c.Id == preferredLanguageCode && c.Enabled))
+        // M·1 (ADR 0046): the ordered candidate list — the explicit preference
+        // first, then the browser's Accept-Language tags — is tried in order;
+        // the first one enabled in the catalog wins. A null/blank candidate is
+        // skipped (a disabled preference falls through — M·7). No candidates
+        // supplied → the legacy two-step chain (M·1, unchanged for existing
+        // callers).
+        var ordered = new List<string>();
+        if (!string.IsNullOrWhiteSpace(preferredLanguageCode))
+            ordered.Add(preferredLanguageCode);
+        if (candidates is not null)
         {
-            effective = preferredLanguageCode;
+            foreach (var c in candidates)
+            {
+                if (!string.IsNullOrWhiteSpace(c) && !ordered.Contains(c))
+                    ordered.Add(c);
+            }
+        }
+
+        string effective;
+        var match = ordered.FirstOrDefault(c =>
+            catalog.Any(x => x.Id == c && x.Enabled));
+        if (match is not null)
+        {
+            effective = match;
         }
         else if (catalog.Any(c => c.Id == defaultCode && c.Enabled))
         {
@@ -81,7 +104,12 @@ public sealed class TranslationProvider : ITranslationProvider
 
         // M·2: the per-string / per-page fallback chain (deduplicated, priority order).
         var chain = new List<string> { effective };
-        if (defaultCode != effective)
+        foreach (var candidate in ordered)
+        {
+            if (candidate != effective && !chain.Contains(candidate))
+                chain.Add(candidate);
+        }
+        if (defaultCode != effective && !chain.Contains(defaultCode))
             chain.Add(defaultCode);
         if (!chain.Contains("en"))
             chain.Add("en");
@@ -92,6 +120,11 @@ public sealed class TranslationProvider : ITranslationProvider
     /// <inheritdoc />
     public async Task<string> ResolveEffectiveLanguageAsync(string? preferredLanguageCode)
         => (await ResolveChainAsync(preferredLanguageCode).ConfigureAwait(false)).effective;
+
+    /// <inheritdoc />
+    public async Task<string> ResolveEffectiveLanguageAsync(
+        IReadOnlyCollection<string>? candidates)
+        => (await ResolveChainAsync(null, candidates).ConfigureAwait(false)).effective;
 
     /// <inheritdoc />
     public async Task<string> GetAsync(string key, string? preferredLanguageCode)
@@ -119,6 +152,64 @@ public sealed class TranslationProvider : ITranslationProvider
         // this makes the floor upgrade-safe), else the key itself. A resident never
         // sees a blank label.
         return KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key;
+    }
+
+    /// <inheritdoc />
+    public async Task<string> GetAsync(string key, IReadOnlyCollection<string>? candidates)
+    {
+        var (_, chain) = await ResolveChainAsync(null, candidates).ConfigureAwait(false);
+        await using var session = _store.QuerySession();
+        var ct = CancellationToken.None;
+
+        var rows = await session
+            .Query<TranslationResource>()
+            .Where(t => t.Key == key && chain.Contains(t.LanguageCode))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        foreach (var lang in chain)
+        {
+            var match = rows.FirstOrDefault(r => r.LanguageCode == lang);
+            if (match != null)
+                return match.Text;
+        }
+        return KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyDictionary<string, string>> GetManyAsync(
+        IReadOnlyCollection<string> keys, IReadOnlyCollection<string>? candidates)
+    {
+        if (keys.Count == 0)
+            return new Dictionary<string, string>();
+
+        var (_, chain) = await ResolveChainAsync(null, candidates).ConfigureAwait(false);
+        var keySet = keys.ToHashSet();
+
+        await using var session = _store.QuerySession();
+        var ct = CancellationToken.None;
+        var rows = await session
+            .Query<TranslationResource>()
+            .Where(t => keySet.Contains(t.Key) && chain.Contains(t.LanguageCode))
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var result = new Dictionary<string, string>(keySet.Count);
+        foreach (var key in keySet)
+        {
+            string? text = null;
+            foreach (var lang in chain)
+            {
+                var match = rows.FirstOrDefault(r => r.Key == key && r.LanguageCode == lang);
+                if (match is not null)
+                {
+                    text = match.Text;
+                    break;
+                }
+            }
+            result[key] = text ?? (KnownTranslationKeys.EnValues.TryGetValue(key, out var en) ? en : key);
+        }
+        return result;
     }
 
     /// <inheritdoc />

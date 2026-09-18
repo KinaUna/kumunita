@@ -26,12 +26,26 @@
             <select class="form-select" name="code" id="languageCode">
                 @foreach (var lang in Model.Languages)
                 {
-                    var selected = lang.Code == Model.CurrentCode;
+                    // ADR 0046: the pre-selection is the saved preference, or
+                    // the browser match when none is saved (suggested only —
+                    // saving is what makes it the preference).
+                    var selected = lang.Code == Model.CurrentCode
+                        || (Model.CurrentCode is null && lang.Code == Model.BrowserCode);
                     <option value="@lang.Code" selected="@(selected ? "selected" : null)">
                         @lang.NativeName (@lang.Code)
+                        @if (Model.CurrentCode is null && lang.Code == Model.BrowserCode)
+                        {
+                            <span class="text-muted small"><kw-l key="locale.browser_matched">— matched from your browser</kw-l></span>
+                        }
                     </option>
                 }
             </select>
+            @if (Model.CurrentCode is null && Model.BrowserCode is not null)
+            {
+                <div class="form-text small">
+                    <kw-l key="locale.browser_note">We picked </kw-l><strong>@Model.BrowserCode</strong><kw-l key="locale.browser_note_tail"> from your browser settings. Saving makes it your preferred language — it stays until you change it.</kw-l>
+                </div>
+            }
         </div>
         <div class="col-sm-4">
             <button type="submit" class="btn btn-primary"><kw-l key="locale.save">Save</kw-l></button>

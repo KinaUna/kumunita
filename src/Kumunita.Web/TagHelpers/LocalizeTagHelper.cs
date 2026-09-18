@@ -39,15 +39,24 @@ namespace Kumunita.Web.TagHelpers;
 public sealed class LocalizeTagHelper : TagHelper
 {
     private readonly ITranslationProvider _provider;
+    private readonly ILocalizationService _localization;
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     /// <param name="provider">The per-request translation read seam (DI).</param>
+    /// <param name="localization">The enabled-catalog read (ADR 0046 — the
+    /// <c>Accept-Language</c> match is only valid against an enabled
+    /// catalog language). A read — never an audit row.</param>
     /// <param name="httpContextAccessor">Reaches the request's <c>kumunita.locale</c>
-    /// cookie (registered via <c>AddHttpContextAccessor</c>, <c>Program.cs</c> — the
-    /// same seam <c>ClaimsSource</c> uses).</param>
-    public LocalizeTagHelper(ITranslationProvider provider, IHttpContextAccessor httpContextAccessor)
+    /// cookie + <c>Accept-Language</c> header (registered via
+    /// <c>AddHttpContextAccessor</c>, <c>Program.cs</c> — the same seam
+    /// <c>ClaimsSource</c> uses).</param>
+    public LocalizeTagHelper(
+        ITranslationProvider provider,
+        ILocalizationService localization,
+        IHttpContextAccessor httpContextAccessor)
     {
         _provider = provider;
+        _localization = localization;
         _httpContextAccessor = httpContextAccessor;
     }
 
@@ -60,16 +69,33 @@ public sealed class LocalizeTagHelper : TagHelper
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
-        // M·5/M·8: read the preference cookie here (the Web layer) and pass it as a
-        // plain string to the provider — the provider never touches a cookie. A
-        // missing context degrades to "no preference" (null) so the provider still
-        // resolves via its default/en chain — never a throw.
+        // M·5/M·8: read the per-request language signal here (the Web layer)
+        // M·5/M·8: read the per-request language signal here (the Web layer)
+        // and pass it to the provider as a plain value — the provider never
+        // touches a cookie or a header. A missing context degrades to "no
+        // preference" so the provider still resolves via its default/en chain.
+        // ADR 0046: an explicit cookie pick wins (the frozen two-step chain);
+        // otherwise the browser's Accept-Language tags, matched against the
+        // enabled catalog, supply an ordered candidate list — the per-string
+        // fallback chain (M·2) walks all of them, so a key the top tag lacks
+        // but a later one has resolves to that later row, not the en floor.
         var request = _httpContextAccessor.HttpContext?.Request;
+        string text;
         var pref = request is null ? null : LocaleCookie.Read(request);
-
-        // M·1/M·2: per-string fallback chain, last-resort the key itself (a blank
-        // Key yields the empty string — never a blank label, never a throw).
-        var text = await _provider.GetAsync(Key, pref);
+        if (!string.IsNullOrWhiteSpace(pref))
+        {
+            text = await _provider.GetAsync(Key, pref).ConfigureAwait(false);
+        }
+        else if (request is not null)
+        {
+            var enabled = await _localization.ListLanguagesAsync().ConfigureAwait(false);
+            var candidates = RequestLanguage.BrowserCandidates(request, enabled);
+            text = await _provider.GetAsync(Key, candidates).ConfigureAwait(false);
+        }
+        else
+        {
+            text = await _provider.GetAsync(Key, (string?)null).ConfigureAwait(false);
+        }
 
         // The value is platform copy (not UGC); emit it. SetContent auto-escapes
         // (the safer choice — the plan allows either; recorded in the U2 handoff
