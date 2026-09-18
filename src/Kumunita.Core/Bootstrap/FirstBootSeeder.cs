@@ -36,18 +36,33 @@ namespace Kumunita.Core.Bootstrap;
 /// idempotency-guarded (only <c>SetComponentModeratorAccessAsync</c> may flip the
 /// <c>ModeratorAccess</c> flag — invariant C5).</li>
 /// <li><b>Language catalog</b>: the source-language <c>en</c> row (enabled, sort 0)
-/// + the instance default (<see cref="LocaleSettings.DefaultLanguageCode"/>) set to
-/// <c>en</c> (ADR 0005 B — the "source language ships with the code" clause).</li>
-/// <li><b>Canonical <c>en</c> UI strings + pages</b> (ML-UI U1, D2): the closed set
+/// + the bundled initial pack's <c>de</c> (enabled, sort 1) / <c>fr</c> (enabled,
+/// sort 2) rows (LS U04, ADR 0042 D4) + the instance default
+/// (<see cref="LocaleSettings.DefaultLanguageCode"/>) set to
+/// <c>en</c> (ADR 0005 B — the "source language ships with the code" clause;
+/// the default stays <c>en</c> — ADR 0042 D4).</li>
+/// <li><b>Canonical <c>en</c> UI strings + the <c>de</c> / <c>fr</c> baselines
+/// + pages</b> (ML-UI U1, D2; LS U04, ADR 0042 D1/D2): the closed set
 /// in <see cref="Localization.KnownTranslationKeys"/> materialized as <c>en</c>
-/// <c>TranslationResource</c> rows, plus the <c>en</c> <c>terms</c> / <c>help</c>
-/// <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039 §3.9 — the
-/// absorb: the <c>Page</c> surface is the single source for <c>/terms</c> /
-/// <c>/help</c>, so a fresh instance is byte-identical to today). Code-wins
-/// upsert for <c>en</c> only (never touches a non-<c>en</c> row); <c>about</c>
-/// is intentionally not seeded (a fresh <c>/about</c> is the product-story view,
-/// not a Markdown page). Makes the M·9 <c>en</c> floor and the M·12
-/// completeness view real on first boot.</li>
+/// <c>TranslationResource</c> rows (code-wins, <c>en</c>-only — never touches a
+/// non-<c>en</c> row), plus <c>de</c> and <c>fr</c> rows per key from
+/// <see cref="Localization.KnownTranslationKeys.DeValues"/> /
+/// <see cref="Localization.KnownTranslationKeys.FrValues"/> (create-if-missing —
+/// first-boot-only by construction; after first boot an admin's in-app edit is
+/// the only write path and is never overwritten). The <c>en</c> <c>terms</c> /
+/// <c>help</c> <see cref="Kumunita.Core.Pages.Page"/> docs (PG U05, ADR 0039
+/// §3.9 — the absorb: the <c>Page</c> surface is the single source for
+/// <c>/terms</c> / <c>/help</c>, so a fresh instance is byte-identical to today)
+/// carry their <c>de</c> / <c>fr</c> bodies as
+/// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows (ADR 0042 D2; the ADR
+/// 0039/0040 PG U06 lane shape — attached to the terms / help pages' <b>own</b>
+/// ids, never the <c>system</c> root container's; the read path
+/// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries by the page's own
+/// id). <c>about</c> is intentionally not seeded as a page (a fresh
+/// <c>/about</c> is the product-story view, not a Markdown body — it is the
+/// registry-key surface: the <c>about.*</c> keys). Makes the M·9 <c>en</c>
+/// floor and the M·12 completeness view real on first boot (100% for all three
+/// languages).</li>
 /// <li><b>First-boot setup email</b> to the seed admin (OPS §2 handoff — staged on
 /// the session, dispatched by the durable handler in M1 step 7). Honors absence:
 /// no seed admin ⇒ no email (the lane is skipped end-to-end).</li>
@@ -238,12 +253,17 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
-    /// Step 4 — the language-catalog source-language row + the instance default
-    /// (ADR 0005 B: "The source language (en) ships with the code"). Two documents:
-    /// <see cref="LanguageCatalog"/> (id = BCP-47 code) and
-    /// <see cref="LocaleSettings"/> (id = "singleton"). Idempotent: a re-run is a
-    /// no-op-or-refresh (the admin's additions/reordering of the other languages are
-    /// untouched — only the source row and the singleton default are the two keys).
+    /// Step 4 — the language-catalog rows + the instance default (ADR 0005 B:
+    /// "The source language (en) ships with the code"; ADR 0042 D4: the bundled
+    /// initial pack's <c>de</c> / <c>fr</c> rows ship too). Three
+    /// <see cref="LanguageCatalog"/> rows (id = BCP-47 code: <c>en</c> sort 0,
+    /// <c>de</c> sort 1, <c>fr</c> sort 2, all enabled) + one
+    /// <see cref="LocaleSettings"/> (id = "singleton") whose
+    /// <see cref="LocaleSettings.DefaultLanguageCode"/> stays <c>en</c> (the
+    /// lane is about *available* languages, not about switching the default).
+    /// Idempotent: a re-run is a no-op-or-refresh (the admin's
+    /// additions/reordering of the other languages are untouched — only these
+    /// rows and the singleton default are the keys the seeder owns).
     /// </summary>
     private static async Task SeedLanguageCatalogAsync(
         IDocumentStore mt, ILogger logger, CancellationToken ct)
@@ -259,6 +279,30 @@ public static class FirstBootSeeder
             NativeName = "English",
             Enabled = true,
             SortOrder = 0   // first in the selector
+        });
+
+        // LS U04 (ADR 0042 D4): the bundled initial pack — the `de` / `fr`
+        // catalog rows (enabled, sort 1 / 2, the picker's second and third
+        // entries). The singleton default below STAYS `en` — ADR 0042 D4:
+        // this lane is about *available* languages at first boot, not about
+        // switching the default. Same load-then-Store idempotent shape as
+        // the `en` row.
+        var existingDe = await session.LoadAsync<LanguageCatalog>("de", ct);
+        session.Store(existingDe ?? new LanguageCatalog
+        {
+            Id = "de",
+            NativeName = "Deutsch",
+            Enabled = true,
+            SortOrder = 1
+        });
+
+        var existingFr = await session.LoadAsync<LanguageCatalog>("fr", ct);
+        session.Store(existingFr ?? new LanguageCatalog
+        {
+            Id = "fr",
+            NativeName = "Français",
+            Enabled = true,
+            SortOrder = 2
         });
 
         var existingSettings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
@@ -284,18 +328,27 @@ public static class FirstBootSeeder
 
         await session.SaveChangesAsync();
 
-        logger.LogInformation("First boot: language catalog seeded (source language '{Lang}' enabled, default '{Lang}').",
+        logger.LogInformation(
+            "First boot: language catalog seeded (source language '{Lang}' enabled, sort 0; bundled initial pack " +
+            "'de' sort 1, 'fr' sort 2 — ADR 0042 D4); instance default stays '{Lang}'.",
             SourceLanguage, SourceLanguage);
     }
 
     /// <summary>
-    /// Step 5 — the canonical <c>en</c> UI-string floor + the <c>en</c> terms/help
-    /// pages (ML-UI U1, D2). Materializes, as <c>en</c> rows, every key in
+    /// Step 5 — the canonical <c>en</c> UI-string floor + the <c>de</c> / <c>fr</c>
+    /// baselines (LS U04, ADR 0042 D1) + the <c>en</c> terms/help pages with their
+    /// <c>de</c> / <c>fr</c> <see cref="Kumunita.Core.Pages.PageTranslation"/> rows
+    /// (ML-UI U1, D2; ADR 0042 D2). Materializes, as <c>en</c> rows, every key in
     /// <see cref="KnownTranslationKeys"/> (one <see cref="TranslationResource"/>
-    /// per key) plus the <c>en</c> <see cref="Kumunita.Core.Pages.Page"/> docs for
-    /// <c>terms</c> and <c>help</c>. This is what makes M·9's "<c>en</c> floor is
-    /// always seeded" and M·12's completeness view (missing = <c>en</c>-present
-    /// minus <c>code</c>-present) real the moment a fresh instance boots.
+    /// per key), plus the <c>de</c> and <c>fr</c> <see cref="TranslationResource"/>
+    /// rows per key from <see cref="KnownTranslationKeys.DeValues"/> /
+    /// <see cref="KnownTranslationKeys.FrValues"/>, plus the <c>en</c>
+    /// <see cref="Kumunita.Core.Pages.Page"/> docs for <c>terms</c> and
+    /// <c>help</c> carrying their <c>de</c> / <c>fr</c> bodies. This is what makes
+    /// M·9's "<c>en</c> floor is always seeded", M·12's completeness view
+    /// (missing = <c>en</c>-present minus <c>code</c>-present — 100% for all three
+    /// languages on a fresh boot), and ADR 0042's "the platform demonstrates its
+    /// headline feature from first bootup" real the moment a fresh instance boots.
     /// <para>
     /// <b>Upsert semantics (code-wins, <c>en</c>-only).</b> Each key is upserted
     /// by its business key <c>(Key, "en")</c> / <c>(Slug, "en")</c> — the same
@@ -355,6 +408,38 @@ public static class FirstBootSeeder
             }
         }
 
+        // LS U04 (ADR 0042 D1): the bundled `de` / `fr` baselines — one
+        // TranslationResource row per key, **create-if-missing** (plain
+        // query-then-Store idiom, the same shape as the `en` loop above, but
+        // existing rows are skipped — never refreshed). First-boot-only BY
+        // CONSTRUCTION: the outer IsPristineAsync gate means this method never
+        // runs on a warm instance, so an admin's later in-app edit of a `de` /
+        // `fr` row (the ADR 0021 editor) is never overwritten; the skip branch
+        // makes that invariant hold even if the gate ever changed.
+        foreach (var (code, baseline) in new[] { ("de", KnownTranslationKeys.DeValues), ("fr", KnownTranslationKeys.FrValues) })
+        {
+            foreach (var (key, text) in baseline)
+            {
+                var existing = await session
+                    .Query<TranslationResource>()
+                    .Where(t => t.Key == key && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new TranslationResource
+                    {
+                        Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                        Key = key,
+                        LanguageCode = code,
+                        Text = text
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
+
         // Static pages: the `en` terms + help `Page` docs (PG U05/U07, ADR 0039
         // §3.9). `about` is deliberately NOT seeded — a fresh instance's /about
         // keeps its product-story view, and an admin can create an `about` page
@@ -369,14 +454,25 @@ public static class FirstBootSeeder
         //
         // Extracted to a public static so the Core test can pin idempotency
         // across two sessions (boot twice, no duplicate root pages).
-        await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
+        //
+        // LS U04 (ADR 0042 D2): the `de` / `fr` bodies of these same seeded
+        // pages ride along as `PageTranslation` rows (the ADR 0039/0040 PG
+        // U06 lane shape) — attached to the terms/help pages' **own** Ids
+        // (the read path, `IPageService.GetTranslationsAsync(page.Id)`,
+        // queries by the page's own id — never the `system` root's).
+        var seededPageIds = await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
+        await SeedPageTranslationsAsync(session, seededPageIds, now, ct).ConfigureAwait(false);
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         logger.LogInformation(
-            "First boot: canonical `en` UI strings seeded ({0} keys) + `en` terms/help pages " +
-            "({1} Page docs); `about` is not seeded (admin-created at runtime).",
-            KnownTranslationKeys.EnValues.Count, enPages.Length);
+            "First boot: canonical `en` UI strings seeded ({0} keys) + `de`/`fr` baselines " +
+            "({1} keys each — ADR 0042 D1) + `en` terms/help pages ({2} Page docs) with `de`/`fr` " +
+            "bodies ({3} PageTranslation rows); `about` is not seeded (admin-created at runtime).",
+            KnownTranslationKeys.EnValues.Count,
+            KnownTranslationKeys.DeValues.Count,
+            enPages.Length,
+            enPages.Length * 2);   // terms + help × de + fr
     }
 
     /// <summary>
@@ -406,13 +502,22 @@ public static class FirstBootSeeder
     /// <c>InternalsVisibleTo</c> (the repo's Core test constraint — only
     /// <c>public</c> members are reachable).
     /// </para>
+    /// <para>
+    /// LS U04 (ADR 0042 D2): returns the <c>slug → page Id</c> map for the
+    /// seeded pages (the terms/help pages under the <c>system</c> root) so
+    /// the caller can attach the <c>de</c> / <c>fr</c>
+    /// <see cref="PageTranslation"/> rows to the pages' **own** ids (the
+    /// read path queries <c>PageTranslation.PageId == page.Id</c> — the
+    /// <c>system</c> root container's id is not a valid parent).
+    /// </para>
     /// </summary>
-    public static async Task SeedDefaultPagesAsync(
+    public static async Task<Dictionary<string, string>> SeedDefaultPagesAsync(
         IDocumentSession session,
         IReadOnlyList<(string Slug, string Title, string Body)> defaultPages,
         DateTimeOffset now,
         CancellationToken ct)
     {
+        var pageIds = new Dictionary<string, string>(StringComparer.Ordinal);
         // 1. Ensure the `system` namespace root (ADR 0040: the standing
         //    discriminator — a kind=System container for the platform pages;
         //    admins may add sub-levels under it, e.g. system/about).
@@ -477,10 +582,11 @@ public static class FirstBootSeeder
                     orphan.Body = body;
                     orphan.Modified = now;
                     session.Store(orphan);
+                    pageIds[slug] = orphan.Id;   // LS U04 — the de/fr translations attach here
                     continue;
                 }
 
-                session.Store(new Page
+                var newPage = new Page
                 {
                     Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
                     Slug = slug,
@@ -493,7 +599,9 @@ public static class FirstBootSeeder
                     AuthorId = string.Empty,    // platform content — no resident author
                     Created = now,
                     Modified = now,
-                });
+                };
+                session.Store(newPage);
+                pageIds[slug] = newPage.Id;    // LS U04 — the de/fr translations attach here
             }
             else
             {
@@ -502,8 +610,11 @@ public static class FirstBootSeeder
                 existingPage.Body = body;   // code wins: refresh the `en` page body
                 existingPage.Modified = now;
                 session.Store(existingPage);
+                pageIds[slug] = existingPage.Id;   // LS U04 — the de/fr translations attach here
             }
         }
+
+        return pageIds;
     }
 
     /// <summary>
@@ -554,6 +665,176 @@ public static class FirstBootSeeder
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
         ];
+    }
+
+    /// <summary>
+    /// LS U04 (ADR 0042 D2) — the curated <c>de</c> baseline for the seeded
+    /// default pages (terms + help). A full translation of the
+    /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
+    /// (heading, intro, the four bullets, the closing line), idiomatic
+    /// German UI copy at the ADR 0042 D2 bar (the <c>du</c> register held,
+    /// sentence case, no word-for-word calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine
+    /// DB (ADR 0042 D1 — seeded once, then community-owned; the in-app
+    /// editor supersedes them and no later deploy reverts an admin edit).
+    /// <para>
+    /// <b><c>about</c> is deliberately absent</b>, exactly as in
+    /// <see cref="EnDefaultPages"/>() — it is the registry-key surface
+    /// (the <c>about.*</c> keys in <see cref="KnownTranslationKeys"/>),
+    /// not a Markdown body.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] DeDefaultPages()
+    {
+        return
+        [
+            ("terms", "Nutzungsbedingungen",
+             "## Nutzungsbedingungen\n\n" +
+             "Kumunita ist eine selbst gehostete Plattform für genau ein Viertel. Als " +
+             "Betreiber bist du dafür verantwortlich, wie deine Gemeinschaft sie nutzt: " +
+             "wer dabei ist, was sie postet und wie du moderierst.\n\n" +
+             "- **Nachbarschaft by design.** Die Plattform geht von genau einem, " +
+             "abgegrenzten Viertel aus — nicht von einem öffentlichen Feed.\n" +
+             "- **Die Zielgruppen wählt der Autor.** Jeder Beitrag trägt die Zielgruppe, " +
+             "die sein Autor gewählt hat; die Plattform erzwingt sie.\n" +
+             "- **Deine Daten gehören dir.** Datenbank und hochgeladene Dateien darfst " +
+             "du sichern, migrieren und stilllegen, wie du willst.\n"),
+            ("help", "Hilfe",
+             "## Erste Schritte\n\n" +
+             "Kumunita ist ein privater Ort für genau ein Viertel — der Feed, die " +
+             "Gruppen und die angepinnten Notizen.\n\n" +
+             "- **Beiträge** in einen Gemeinschafts-Feed posten und wählen, wer sie " +
+             "sehen darf (eine Person, eine Gruppe oder das ganze Viertel).\n" +
+             "- **Gruppen** helfen dir, die Nachbarn um ein Gebäude, ein Projekt oder " +
+             "ein gemeinsames Interesse zu organisieren.\n" +
+             "- **Das Verzeichnis** zeigt die Menschen auf der Plattform und die " +
+             "Angaben, die jeder von ihnen teilen möchte.\n" +
+             "- **Moderation** lässt einen Global-Admin (und, wo zugewiesen, einen " +
+             "Moderator) den Feed einen sicheren Ort halten.\n\n" +
+             "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
+             "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
+        ];
+    }
+
+    /// <summary>
+    /// LS U04 (ADR 0042 D2) — the curated <c>fr</c> baseline for the seeded
+    /// default pages (terms + help). A full translation of the
+    /// <see cref="EnDefaultPages"/>() bodies — the same Markdown structure
+    /// (heading, intro, the four bullets, the closing line), idiomatic
+    /// French UI copy at the ADR 0042 D2 bar (the <c>tu</c> register held,
+    /// accents and typography per French convention, no word-for-word
+    /// calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine
+    /// DB (ADR 0042 D1 — seeded once, then community-owned; the in-app
+    /// editor supersedes them and no later deploy reverts an admin edit).
+    /// <para>
+    /// <b><c>about</c> is deliberately absent</b>, exactly as in
+    /// <see cref="EnDefaultPages"/>() — it is the registry-key surface
+    /// (the <c>about.*</c> keys in <see cref="KnownTranslationKeys"/>),
+    /// not a Markdown body.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] FrDefaultPages()
+    {
+        return
+        [
+            ("terms", "Conditions d'utilisation",
+             "## Conditions d'utilisation\n\n" +
+             "Kumunita est une plateforme auto-hébergée pour un seul quartier. En tant " +
+             "que porteur, tu assumes la responsabilité de la façon dont ta communauté " +
+             "l'utilise : qui en fait partie, ce qu'elle publie, et comment tu la " +
+             "modères.\n\n" +
+             "- **Le voisinage par conception.** La plateforme part du principe d'un " +
+             "quartier unique et borné — pas d'un fil public.\n" +
+             "- **Les audiences sont choisies par l'auteur.** Chaque message porte " +
+             "l'audience choisie par son auteur ; la plateforme l'applique.\n" +
+             "- **Tes données t'appartiennent.** La base de données et les fichiers " +
+             "téléversés sont à toi de les sauvegarder, migrer et mettre à la " +
+             "retraite.\n"),
+            ("help", "Aide",
+             "## Premiers pas\n\n" +
+             "Kumunita est un foyer privé pour un seul quartier — le fil, les groupes " +
+             "et les notes épinglées.\n\n" +
+             "- **Publier** dans un fil communautaire et choisir qui peut voir ton " +
+             "message (une personne, un groupe, ou tout le quartier).\n" +
+             "- **Les groupes** permettent d'organiser les riverains autour d'un " +
+             "bâtiment, d'un projet ou d'un intérêt partagé.\n" +
+             "- **L'annuaire** montre les résidents de la plateforme et les détails " +
+             "que chacun a choisi de partager.\n" +
+             "- **La modération** laisse un administrateur global (et, si c'est " +
+             "concédé, un modérateur) garder le fil un lieu sûr.\n\n" +
+             "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
+             "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
+        ];
+    }
+
+    /// <summary>
+    /// LS U04 (ADR 0042 D2) — seed the <c>de</c> / <c>fr</c>
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows for the seeded
+    /// default pages (terms + help), into the **caller's** in-flight
+    /// <see cref="IDocumentSession"/> (the C3 invariant — same session, one
+    /// commit). <paramref name="pageIds"/> is the slug → page-Id map
+    /// <see cref="SeedDefaultPagesAsync"/> returns (the terms / help pages'
+    /// **own** ids — the read path
+    /// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries
+    /// <c>PageTranslation.PageId == page.Id</c>, so the <c>system</c> root
+    /// container's id is *not* a valid parent; the ADR 0042 D6 text records
+    /// the distinction).
+    /// <para>
+    /// Idempotent (query-then-Store, one row per (page, language) pair,
+    /// <b>create-if-missing</b> — an existing row is skipped, never
+    /// refreshed): a pristine DB has no rows yet (create); a warm re-run (the
+    /// outer <c>IsPristineAsync</c> gate normally blocks this) leaves existing
+    /// rows exactly as written — no duplicates, no overwrite. The rows are
+    /// <b>first-boot-only by construction</b> (ADR 0042 D1): after first
+    /// boot the in-app editor (GlobalAdmin ∪ Translator, ADR 0021) is the
+    /// only write path, and an admin's edit is never overwritten by a later
+    /// deploy.
+    /// </para>
+    /// <para>
+    /// <see cref="PageTranslation.AuthorId"/> is empty (platform content —
+    /// no resident author, the same convention as the
+    /// <see cref="Kumunita.Core.Pages.Page"/> docs the rows attach to).
+    /// </para>
+    /// </summary>
+    public static async Task SeedPageTranslationsAsync(
+        IDocumentSession session,
+        IReadOnlyDictionary<string, string> pageIds,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        foreach (var (code, baselines) in new[]
+        {
+            ("de", DeDefaultPages()),
+            ("fr", FrDefaultPages()),
+        })
+        {
+            foreach (var (slug, title, body) in baselines)
+            {
+                if (!pageIds.TryGetValue(slug, out var pageId))
+                    continue;   // defensive — EnDefaultPages/DeDefaultPages/FrDefaultPages slugs agree; skip rather than throw
+                var existing = await session
+                    .Query<PageTranslation>()
+                    .Where(t => t.PageId == pageId && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new PageTranslation
+                    {
+                        Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                        PageId = pageId,
+                        LanguageCode = code,
+                        Title = title,
+                        Body = body,
+                        AuthorId = string.Empty,   // platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
     }
 
     private static string SeedAdminBody(string email, string userId, string token) =>

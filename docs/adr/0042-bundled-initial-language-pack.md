@@ -175,7 +175,11 @@ the two new dictionaries); the `de` / `fr` catalog rows in the seeder
 (D4); the `de` / `fr` `TranslationResource` rows in the seeder (D1); the
 `de` / `fr` bodies of the seeded `terms` / `help` system pages (D2, via
 `PageTranslation` rows in the ADR 0039/0040 PG U06 lane shape, attached to
-the system root page's id); the `about` view wrapped in `<kw-l>` (D3); and
+the **terms / help page's own `Id`** — the read path
+`PageController` → `IPageService.GetTranslationsAsync(page.Id)` queries by
+the page's own id, so the `system` root container's id is *not* a valid
+parent; see the `U04` handoff in the lane plan); the `about` view wrapped
+in `<kw-l>` (D3); and
 the test pins (first-boot state, completeness 100%, provider resolution,
 per-string fallback, warm-boot no-op, Web surface).
 

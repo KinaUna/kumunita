@@ -269,3 +269,50 @@ assemblies green.
 ## Handoff notes
 
 (One appended `## U#` section per unit, never rewritten — the scratch tier.)
+
+## U04
+
+The seeder (`FirstBootSeeder`) now ships the bundled initial pack (ADR 0042 D1/D2/D4):
+
+- **Catalog** (`SeedLanguageCatalogAsync`): `de` ("Deutsch", enabled, sort 1) and
+  `fr` ("Français", enabled, sort 2) added alongside the existing `en` (sort 0) row —
+  same load-then-Store idempotent shape. `LocaleSettings.DefaultLanguageCode` stays
+  `en` (D4).
+- **UI strings** (`SeedTranslationResourcesAsync`): the existing `en` code-wins loop is
+  untouched; new `de` / `fr` loops upsert one `TranslationResource` row per key from
+  `KnownTranslationKeys.DeValues` / `FrValues`, **create-if-missing** (existing rows are
+  skipped, never refreshed — an admin edit is never overwritten, ADR 0042 D1; first-boot
+  only by construction under the outer `IsPristineAsync` gate).
+- **System pages** (`SeedDefaultPagesAsync` + new `SeedPageTranslationsAsync`): the
+  `terms` / `help` pages now carry `de` / `fr` bodies as `PageTranslation` rows (the PG
+  U06 lane shape), from new `DeDefaultPages()` / `FrDefaultPages()` public statics
+  (full translations of the `EnDefaultPages()` bodies, structure preserved).
+  `about` is NOT a `PageTranslation` (the registry-key surface — no Markdown body).
+
+**Parentage (auditable):** `PageTranslation.PageId` is the **terms / help page's own
+`Id`** — the `Page` doc under the `system` root — *not* the `system` root container's
+`Id`. `SeedDefaultPagesAsync` now returns a `slug → page.Id` map (captured in the
+new-page, orphan-re-parent, and existing-page branches) which `SeedPageTranslationsAsync`
+attaches the rows to. The read path (`PageController` → `IPageService
+.GetTranslationsAsync(page.Id)`) queries `PageTranslation.PageId == page.Id`, so the
+system-root id is *not* a valid parent. The U06 test pins this directly (including a
+`count == 0` for any row on the system root itself).
+
+**Body lengths** (terms / help, chars): `en` 522 / 638; `de` 610 / 740; `fr` 647 / 715.
+
+**ADR 0042 D6** was corrected to record the page-own-Id parentage (it had said "the
+system root page's id" — the ambiguous reading; now explicit).
+
+**Tests added** (`tests/Kumunita.Core.Tests/LS_U04_SeederTests.cs`, 6 pins): catalog
+`en`/`de`/`fr` (sort 0/1/2, all enabled, default stays `en`); completeness 100% for `de`
+and `fr` on a fresh boot; `TranslationProvider.GetAsync` resolves every key to the
+`de` / `fr` baseline (not the `en` floor); per-string fallback lands on `en` when one
+`de` row is deleted (the rest stays `de`); warm re-run leaves an admin-edited `de` value
+unchanged (no duplicate row); `terms` + `help` each have a `de` and a `fr`
+`PageTranslation` on the page's own `Id` (not the system root), body non-empty,
+parity with the `De/FrDefaultPages()` sources.
+
+**Exit (green):** `dotnet build Kumunita.slnx -c Debug` → 0 errors / 0 warnings.
+`dotnet exec …Kumunita.Core.Tests.dll -class LS_U04_SeederTests` → 6/6 pass. Full Core
+assembly → **Total: 529, Errors: 0, Failed: 0** (Testcontainers, ~53 s). No view or Web
+code changed; no new doc type; no schema/migration.
