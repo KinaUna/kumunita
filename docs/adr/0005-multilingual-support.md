@@ -48,7 +48,12 @@ No env var, no rebuild, no new service.
 The **source language (`en`) ships with the code**: its catalog row and UI
 strings are embedded in the image and materialized into `mt` by the first-run
 seeder (ARCHITECTURE.md §8). Every other language is community-provided —
-typed in or imported by the admin.
+typed in or imported by the admin — **with one bundled exception** (amended
+2026-09-18, ADR 0042): `de` and `fr` additionally ship as **bundled initial
+values** (catalog rows + full UI-string baselines + `terms` / `help` page
+bodies, seeded first-boot-only), editable in-app by a GlobalAdmin / Translator
+(ADR 0021); **`en` remains the only code-owned language.** See ADR 0042 for
+the locked ownership semantics.
 
 **Resolution order per request:** user's saved preference (cookie + settings
 page) → instance default (`LocaleSettings`) → source language (`en`).
@@ -117,3 +122,19 @@ Negative / accepted risks
   boundary**, not a feature flag, and update SECURITY.md §5/§6.
 - Federation arrives (ADR 0001-B): the *platform* language catalog may move
   with the IdP, but per-instance languages and translations stay local.
+
+## Amendments
+
+### 2026-09-18 — bundled initial language pack (ADR 0042)
+
+§B's "every other language is community-provided" is amended: **`de` and
+`fr` additionally ship as bundled initial values** — the pristine-boot
+seeder (the `IsPristineAsync` gate, ADR 0015) materializes the `de` / `fr`
+catalog rows, the full UI-string baselines from the code's
+`KnownTranslationKeys` registries, and the `de` / `fr` bodies of the seeded
+`terms` / `help` system pages. They are **seeded once, then community-
+owned** — an in-app edit (GlobalAdmin ∪ Translator, ADR 0021) is never
+overwritten by a later deploy. **`en` remains the only code-owned language**
+(code-wins upsert + provider floor, ADR 0015 D1/D2, unchanged). See
+**ADR 0042** for the full locked text (ownership semantics, the register
+choice, the `about`-via-registry decision, the `about.*` key contract).
