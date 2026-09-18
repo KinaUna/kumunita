@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Kumunita.Core.Bootstrap;
+using Kumunita.Core.Pages;
 using Marten;
 using Marten.Services;
 
@@ -162,6 +164,112 @@ public sealed class LocalizationService : ILocalizationService
             missingStringKeys);
     }
 
+    // ── ADR 0044: the bundled baseline read + the create-if-missing seed ──
+
+    /// <inheritdoc />
+    public Task<BundledLanguageBaseline?> GetBundledBaselineAsync(string code)
+    {
+        // A pure read of the code's per-language sources — no database access.
+        // Only the two bundled baseline languages (de / fr) have one; en is the
+        // source language (a row, not a baseline) and any other code is
+        // admin-authored (no code baseline) — both return null.
+        IReadOnlyDictionary<string, string> uiStrings;
+        (string Slug, string Title, string Body)[] pages;
+        switch (code)
+        {
+            case "de":
+                uiStrings = KnownTranslationKeys.DeValues;
+                pages = FirstBootSeeder.DeDefaultPages();
+                break;
+            case "fr":
+                uiStrings = KnownTranslationKeys.FrValues;
+                pages = FirstBootSeeder.FrDefaultPages();
+                break;
+            default:
+                return Task.FromResult<BundledLanguageBaseline?>(null);
+        }
+
+        var pageBaselines = pages
+            .Select(p => (p.Slug, p.Title, p.Body))
+            .ToList();
+        return Task.FromResult<BundledLanguageBaseline?>(
+            new BundledLanguageBaseline(code, uiStrings, pageBaselines));
+    }
+
+    /// <summary>
+    /// ADR 0044 — write a bundled baseline into the instance, **create-
+    /// if-missing** (an existing row is skipped, never refreshed — the same
+    /// ownership invariant the first-boot seeder holds, ADR 0042 D1). Runs in
+    /// the **caller's** in-flight session, so it commits in the caller's single
+    /// <c>SaveChangesAsync</c>. No audit row of its own: it is part of
+    /// <see cref="AddLanguageAsync"/>'s single audited action.
+    /// </summary>
+    private static async Task SeedBaselineAsync(
+        IDocumentSession session,
+        BundledLanguageBaseline baseline,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        // 1. UI strings — one TranslationResource row per key, create-if-missing.
+        foreach (var (key, text) in baseline.UiStrings)
+        {
+            var existing = await session
+                .Query<TranslationResource>()
+                .Where(t => t.Key == key && t.LanguageCode == baseline.LanguageCode)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new TranslationResource
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Key = key,
+                    LanguageCode = baseline.LanguageCode,
+                    Text = text
+                });
+            }
+            // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+        }
+
+        // 2. System pages — one PageTranslation row per slug, create-if-missing.
+        // The page is looked up by slug (the en doc the baseline text belongs
+        // to); a missing page is skipped (the en seed is the single source —
+        // in practice always present, since en is the source language).
+        foreach (var (slug, title, body) in baseline.PageBaselines)
+        {
+            var page = await session
+                .Query<Page>()
+                .Where(p => p.Slug == slug && p.Kind == PageKind.System && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (page is null)
+                continue;   // defensive — the en page is seeded first; skip rather than throw.
+
+            var existing = await session
+                .Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == baseline.LanguageCode)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new PageTranslation
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    PageId = page.Id,
+                    LanguageCode = baseline.LanguageCode,
+                    Title = title,
+                    Body = body,
+                    AuthorId = string.Empty,   // platform content — no resident author
+                    Created = now,
+                });
+            }
+            // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+        }
+    }
+
     // ── Catalog mutations (M·6: one session + one SaveChangesAsync + one audit row) ──
 
     /// <inheritdoc />
@@ -187,6 +295,13 @@ public sealed class LocalizationService : ILocalizationService
             Enabled = true,
             SortOrder = nextSort
         });
+
+        // ADR 0044: seed the bundled baseline (create-if-missing) in the same
+        // session, so the catalog row and its baseline data commit together. A
+        // non-bundled code (null baseline) gets only the catalog row.
+        var baseline = await GetBundledBaselineAsync(code).ConfigureAwait(false);
+        if (baseline is not null)
+            await SeedBaselineAsync(session, baseline, now, ct).ConfigureAwait(false);
 
         session.Store(new Authorization.AccessAudit
         {
@@ -310,8 +425,33 @@ public sealed class LocalizationService : ILocalizationService
         if (catalog is null)
             throw new InvalidOperationException($"Language not found: {code}");
 
-        // M·7: content rows (TranslationResource) are **retained**
-        // — only the catalog row is deleted. Re-adding the language restores them.
+        // M·7: a **custom** code's content rows are **retained** — re-adding the
+        // language restores them. ADR 0044: a **bundled** code's rows are the
+        // exception — they are *deleted* (the reset), because re-adding re-seeds
+        // them from the code baseline. An admin's edit of a bundled baseline is
+        // intentionally discardable this way (see ADR 0044).
+        var isBundled = GetBundledBaselineAsync(code).GetAwaiter().GetResult() is not null;
+        if (isBundled)
+        {
+            // Delete every TranslationResource row for this code (UI strings).
+            var uiRows = await session
+                .Query<TranslationResource>()
+                .Where(t => t.LanguageCode == code)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+            foreach (var row in uiRows)
+                session.Delete<TranslationResource>(row.Id);
+
+            // Delete every PageTranslation row attached to a page in this code.
+            var pageTranslationRows = await session
+                .Query<PageTranslation>()
+                .Where(t => t.LanguageCode == code)
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+            foreach (var row in pageTranslationRows)
+                session.Delete<PageTranslation>(row.Id);
+        }
+
         session.Delete<LanguageCatalog>(catalog.Id);
 
         session.Store(new Authorization.AccessAudit

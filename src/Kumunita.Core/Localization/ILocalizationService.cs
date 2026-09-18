@@ -42,8 +42,22 @@ public interface ILocalizationService
     /// </summary>
     Task<string> GetDefaultTimezoneAsync();
 
-    /// <summary>Adds a language (BCP-47 code + native name) — audited
-    /// <c>language.add</c>, TargetKind "language", TargetId = code (M·6).</summary>
+    /// <summary>
+    /// Adds a language (BCP-47 code + native name) — audited
+    /// <c>language.add</c>, TargetKind "language", TargetId = code (M·6).
+    /// <para>
+    /// <b>Seed-baseline auto-apply (ADR 0044):</b> if the code is a bundled
+    /// baseline language (the <see cref="KnownTranslationKeys"/> /
+    /// <see cref="Bootstrap.FirstBootSeeder"/> per-language sources) the
+    /// bundled UI-string baseline AND the bundled system-page baselines are
+    /// materialized into the instance <b>create-if-missing</b> (an admin edit
+    /// is never overwritten — the same ADR 0042 D1 ownership invariant the
+    /// first-boot seeder holds). This closes the warm-instance gap where a
+    /// language added after first boot had an empty translation set, and makes
+    /// delete-then-re-add the reset path for a baseline language. A
+    /// non-bundled code is added exactly as before (catalog row only).
+    /// </para>
+    /// </summary>
     Task AddLanguageAsync(string code, string nativeName, string actorId);
 
     /// <summary>Enables / disables a language — audited <c>language.enable</c> /
@@ -56,7 +70,18 @@ public interface ILocalizationService
 
     /// <summary>
     /// Removes a language — audited <c>language.remove</c>, TargetId = code (M·6).
-    /// <see cref="TranslationResource"/> rows for the code are **retained** (M·7).
+    /// <see cref="TranslationResource"/> rows for a **custom** code are
+    /// **retained** (M·7) so re-adding restores them.
+    /// <para>
+    /// <b>Seed-baseline reset (ADR 0044):</b> for a <b>bundled</b> baseline
+    /// language the code's <see cref="TranslationResource"/> rows AND
+    /// <see cref="Pages.PageTranslation"/> rows are **deleted** (the catalog row
+    /// is removed either way). This is what makes delete-then-re-add the reset
+    /// path: <see cref="AddLanguageAsync"/> re-applies the bundled baseline
+    /// create-if-missing. Admin edits to a bundled baseline are intentionally
+    /// discardable this way — that is the reset the ADR 0042 D1 "never
+    /// overwrite" rule is paired with (see ADR 0044).
+    /// </para>
     /// </summary>
     /// <exception cref="System.InvalidOperationException">
     /// <paramref name="code"/> is the current
@@ -67,6 +92,19 @@ public interface ILocalizationService
     /// <summary>Sets the instance default — audited <c>language.set-default</c>,
     /// TargetId = code (M·6; M10 FACES).</summary>
     Task SetDefaultLanguageAsync(string code, string actorId);
+
+    /// <summary>
+    /// <b>Read seam (ADR 0044):</b> the bundled seed baseline for a BCP-47
+    /// code, or <c>null</c> when the code has no bundled baseline (a custom
+    /// language). The baseline is the **code's** per-language source
+    /// (<see cref="KnownTranslationKeys.DeValues"/> /
+    /// <see cref="KnownTranslationKeys.FrValues"/>) for UI strings and
+    /// <see cref="Bootstrap.FirstBootSeeder.DeDefaultPages"/> /
+    /// <see cref="Bootstrap.FirstBootSeeder.FrDefaultPages"/>) — the exact text
+    /// the first-boot seeder writes on a pristine DB, so re-applying it to a
+    /// warm instance is byte-identical to first-boot. No audit row (a read).
+    /// </summary>
+    Task<BundledLanguageBaseline?> GetBundledBaselineAsync(string code);
 
     // ── Timezone — the instance default (ADR 0019; the admin platform-default
     // write lane, mirroring SetDefaultLanguageAsync's audited shape) ──────
@@ -151,3 +189,28 @@ public interface ILocalizationService
     /// present vs. missing for a language.</summary>
     Task<LanguageCompleteness> GetCompletenessAsync(string languageCode);
 }
+
+/// <summary>
+/// One bundled seed baseline per language (ADR 0044). The closed set of
+/// baseline data a language ships with in the code:
+/// </summary>
+/// <list type="bullet">
+/// <item><see cref="UiStrings"/> — one <see cref="TranslationResource"/>-shape
+/// text per UI-string key (the <see cref="KnownTranslationKeys.DeValues"/> /
+/// <see cref="KnownTranslationKeys.FrValues"/> per-language source).</item>
+/// <item><see cref="PageBaselines"/> — one (slug, title, body) per seeded
+/// system page (the <c>FirstBootSeeder.DeDefaultPages</c> /
+/// <c>FrDefaultPages</c> per-language source in
+/// <c>Kumunita.Core.Bootstrap</c>).</item>
+/// </list>
+/// <para>
+/// <b>A closed, code-owned value</b> — not a database row: it is read from the
+/// code's per-language sources and written into the instance (create-if-missing)
+/// by <see cref="AddLanguageAsync"/> on a warm instance. The
+/// <see cref="LanguageCompleteness"/> analog is a *stored* completeness view;
+/// this is a *seed* baseline.
+/// </para>
+public sealed record BundledLanguageBaseline(
+    string LanguageCode,
+    IReadOnlyDictionary<string, string> UiStrings,
+    IReadOnlyList<(string Slug, string Title, string Body)> PageBaselines);
