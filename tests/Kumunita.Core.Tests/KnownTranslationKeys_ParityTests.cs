@@ -110,4 +110,44 @@ public class KnownTranslationKeys_ParityTests
         Assert.Equal(d5Keys.OrderBy(k => k).ToList(),
             registryAboutKeys.OrderBy(k => k).ToList());
     }
+
+    // ── LS U02 — the de baseline at full registry parity (ADR 0042 D2/D5) ──
+
+    [Fact(DisplayName = "DeValues keys exactly match AllKeys — no missing, no extra, no empty values")]
+    public void DeValues_Keys_Match_AllKeys_Exactly_NoEmptyValues()
+    {
+        var deKeys = KnownTranslationKeys.DeValues.Keys.ToList();
+        var allKeys = KnownTranslationKeys.AllKeys.ToList();
+
+        // Same cardinality — a missing or extra key is a registry-shape
+        // defect (the completeness view would report a mismatch against the
+        // admin editor's closed list).
+        Assert.Equal(allKeys.Count, deKeys.Count);
+
+        // Set equality in both directions.
+        Assert.Equal(allKeys.OrderBy(k => k), deKeys.OrderBy(k => k));
+
+        // No key declared twice (a Dictionary would silently collapse a
+        // duplicate, so pin the shape — same as the en test above).
+        Assert.Equal(allKeys.Count, new HashSet<string>(allKeys).Count);
+
+        // Every de value is non-empty — a blank baseline would make the
+        // provider resolve to nothing for that key under a de preference,
+        // and the M·12 completeness view would count it "present" while
+        // rendering blank.
+        foreach (var (key, value) in KnownTranslationKeys.DeValues)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(value),
+                $"registry key '{key}' has an empty/whitespace de value — " +
+                "the provider would resolve it to nothing under a de preference");
+        }
+
+        // The D5 about.* contract is translated (every D5 key is present in
+        // the de dictionary with a non-empty value).
+        foreach (var key in KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("about.")))
+        {
+            Assert.True(KnownTranslationKeys.DeValues.ContainsKey(key),
+                $"ADR 0042 D5 key '{key}' is missing from DeValues");
+        }
+    }
 }

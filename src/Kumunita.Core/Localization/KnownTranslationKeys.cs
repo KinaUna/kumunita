@@ -791,6 +791,697 @@ public static class KnownTranslationKeys
         };
 
     /// <summary>
+    /// The curated German (<c>de</c>) baseline (LS U02, ADR 0042 D2/D5). One
+    /// entry per key in <see cref="AllKeys"/> — full registry parity, the ADR
+    /// 0015 honesty invariant extended to this dictionary. Idioms per ADR 0042
+    /// D2: the familiar <c>du</c> register held everywhere, sentence case, no
+    /// trailing period on button labels, <c>ß</c> allowed, and every inlined
+    /// data token (<c>yyyy-MM-dd HH:mm</c>, <c>§6.4</c>, <c>Allow</c>/<c>Deny</c>,
+    /// the <c>rc.editor.*</c> glyph labels, the on-screen <c>Select all</c>
+    /// label that the kw-l TagHelper cannot reach) preserved token-for-token
+    /// with the <c>en</c> value. These are <b>initial values</b> — seeded once
+    /// on a pristine DB (LS U04), then community-owned via the in-app editor
+    /// (ADR 0021); an admin edit is never overwritten (ADR 0042 D1).
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> DeValues { get; } =
+        new Dictionary<string, string>
+        {
+            // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
+            ["nav.home"]          = "Start",
+            ["nav.announcements"] = "Ankündigungen",
+            ["nav.community"]     = "Gemeinschaft",
+            ["nav.groups"]        = "Gruppen",
+            ["nav.pages"]         = "Seiten",
+            ["nav.directory"]     = "Verzeichnis",
+            ["nav.sign_in"]       = "Anmelden",
+            ["nav.sign_up"]       = "Registrieren",
+            ["nav.profile"]       = "Profil",
+            ["nav.admin"]         = "Verwaltung",
+            ["nav.translations"]  = "Übersetzungen",
+            ["nav.sign_out"]      = "Abmelden",
+            ["nav.children"]      = "Kinder",
+            ["nav.my_drafts"]     = "Meine Entwürfe",
+
+            // ── guardian (the /me/children child-accounts surface) ─────────
+            ["guardian.title"]        = "Deine Kinder",
+            ["guardian.lead"]         = "Die Konten, die du für ein Kind eingerichtet hast, und die Kontrollen, die du über jedes davon hast.",
+            ["guardian.empty"]        = "Noch keine Kinder.",
+            ["guardian.add"]          = "Kinderkonto hinzufügen",
+            ["guardian.manage_title"] = "Kinderkonto verwalten",
+
+            // ── guardian assignment (GA ADR 0038) ───────────────────────────
+            ["guardian.otherGuardians.title"] = "Weitere Vormünder",
+            ["guardian.otherGuardians.empty"] = "Keine weiteren Vormünder zugewiesen.",
+            ["guardian.assign.title"]        = "Vormund zuweisen",
+            ["guardian.assign.email"]        = "E-Mail-Adresse des Vormunds, den du zuweisen möchtest",
+            ["guardian.assign.submit"]       = "Zuweisen",
+            ["guardian.assign.noAccount"]    = "Kein Konto mit dieser E-Mail.",
+            ["guardian.assign.self"]         = "Du bist bereits Vormund dieses Kindes.",
+            ["guardian.assign.success"]      = "Vormund zugewiesen.",
+
+            // ── footer (the shared footer, _Layout) ─────────────────────────
+            ["footer.tagline"]  =
+                "Ein privater Ort für eine Nachbarschaft — der Feed, die Gruppen und die gepinnten Notizen. " +
+                "Was auf eurer Straße passiert, bleibt auf eurer Straße.",
+            ["footer.copyright"] = "· selbst gehostet von eurer Gemeinschaft",
+            ["footer.gtk_heading"] = "Gut zu wissen",
+            ["footer.gtk_privacy"] =
+                "Privat per Vorgabe: Das Publikum jedes Beitrags wählt dessen Autor:in, " +
+                "und alles ist für dich, nicht für die Welt, lesbar.",
+            ["footer.gtk_oss"] =
+                "Kumunita ist Open Source — der Code, die Entscheidungen, die Doku.",
+
+            // ── settings (the language-picker labels) ───────────────────────
+            ["settings.settings"]       = "Einstellungen",
+            ["settings.choose_language"] = "Wähle deine Sprache",
+
+            // ── settings — account help ─────────────────────────────────────
+            ["settings.help_heading"]     = "Hilfe zu deinem Konto",
+            ["settings.help_lede"]        =
+                "Klemmt bei deinem Konto etwas — ein Passwort, dein Zugriff oder sonst etwas? " +
+                "Dieser Leitfaden führt dich Schritt für Schritt durch.",
+
+            // ── settings — timezone (ADR 0019) ──────────────────────────────
+            ["settings.timezone_title"]        = "Zeitzone",
+            ["settings.timezone_lede"]         =
+                "Wähle die Zeitzone, die dir die Plattform anzeigt. Deine Auswahl wird in deinem Konto gespeichert — " +
+                "sie wird beim nächsten Seitenaufruf wirksam und betrifft nie andere Anwohner:innen.",
+            ["settings.timezone_label"]        = "Deine Zeitzone",
+            ["settings.timezone_default_marker"] = "— Plattform-Vorgabe",
+            ["settings.timezone_default_note"] = "Die Plattform-Voreinstellung ist ",
+            ["settings.timezone_default_tail"] =
+                ". Wenn du deine Einstellung zurücksetzt, wird die Plattform-Voreinstellung verwendet.",
+            ["settings.timezone_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
+            ["settings.timezone_save"]         = "Speichern",
+            ["settings.timezone_unknown"]      = "Unbekannte Zeitzone",
+
+            // ── settings — date format (ADR 0020) ───────────────────────────
+            ["settings.dateformat_title"]        = "Datum- und Zeitformat",
+            ["settings.dateformat_lede"]         =
+                "Wähle, wie dir Datum und Zeit angezeigt werden. Deine Auswahl wird in deinem Konto gespeichert — " +
+                "sie wird beim nächsten Seitenaufruf wirksam und betrifft nie andere Anwohner:innen.",
+            ["settings.dateformat_label"]        = "Dein Datum- und Zeitformat",
+            ["settings.dateformat_default_marker"] = "— Plattform-Vorgabe",
+            ["settings.dateformat_default_note"] = "Die Plattform-Voreinstellung ist ",
+            ["settings.dateformat_default_tail"] =
+                ". Wenn du deine Einstellung zurücksetzt, wird die Plattform-Voreinstellung verwendet.",
+            ["settings.dateformat_custom_label"] = "Eigenes Format",
+            ["settings.dateformat_custom_hint"]  =
+                "Eine .NET-Zeitreihenformatzeichenfolge (z. B. yyyy-MM-dd HH:mm). Leer lassen, um eine Voreinstellung zu verwenden.",
+            ["settings.dateformat_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
+            ["settings.dateformat_save"]         = "Speichern",
+
+            // ── admin — the platform-default timezone ───────────────────────
+            ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
+            ["admin.timezone_lede"]     =
+                "Die Zeitzone, auf die die Zeitstempel der Anwohner:innen zurückfallen, " +
+                "wenn sie keine persönliche Vorgabe gesetzt haben.",
+            ["admin.timezone_label"]    = "Vorgabe-Zeitzone",
+            ["admin.timezone_save"]     = "Speichern",
+
+            // ── admin — the platform-default date format (ADR 0020) ─────────
+            ["admin.dateformat_title"]    = "Plattform-Vorgabe: Datum- und Zeitformat",
+            ["admin.dateformat_lede"]     =
+                "Das Datum- und Zeitformat, auf das die Zeitstempel der Anwohner:innen zurückfallen, " +
+                "wenn sie keine persönliche Vorgabe gesetzt haben.",
+            ["admin.dateformat_label"]    = "Vorgabe-Datum- und Zeitformat",
+            ["admin.dateformat_custom_label"] = "Eigenes Format",
+            ["admin.dateformat_custom_hint"]  =
+                "Eine .NET-Zeitreihenformatzeichenfolge (z. B. yyyy-MM-dd HH:mm). Leer lassen, um eine Voreinstellung zu verwenden.",
+            ["admin.dateformat_save"]     = "Speichern",
+
+            // ── home (the hero + section lead) ──────────────────────────────
+            ["home.eyebrow"] = "Wo das Projekt steht",
+            ["home.lead"] =
+                "Ein privater Ort für eine Nachbarschaft — in der offenen Entwicklung, Meilenstein für Meilenstein. " +
+                "Dies ist dieselbe Liste wie in der README, und der Code hinter jedem Eintrag liegt im öffentlichen Repository.",
+            ["home.support"] = "Fragen oder Feedback? Schreibe an",
+
+            // ── account (Login / Signup — titles + primary actions) ─────────
+            ["account.login_title"]   = "Anmelden",
+            ["account.login_submit"]  = "Anmelden",
+            ["account.login_no_account"] = "Noch kein Konto?",
+            ["account.signup_title"]  = "Registrieren",
+            ["account.signup_submit"] = "Registrieren",
+            ["account.signup_has_account"] = "Du hast schon ein Konto?",
+
+            // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.write"]        = "Beitrag schreiben",
+            ["posts.new_title"]    = "Beitrag schreiben",
+            ["posts.new_intro"] =
+                "Standardmäßig kann jede:r in der Gemeinschaft, die du unten wählst, " +
+                "deinen Beitrag sehen. Schalte das in der Publikums-Sektion nur aus, " +
+                "wenn du einengen möchtest, wer ihn sehen darf — bestimmte Personen oder Gruppen.",
+            ["posts.community_hint"] =
+                "Die Gemeinschaft bestimmt, in welchem Feed dein Beitrag erscheint — und, " +
+                "standardmäßig, wer ihn sehen darf (jedes Mitglied dieser Gemeinschaft). " +
+                "Um das Publikum einzuschränken, schalte „Alle in dieser Gemeinschaft“ " +
+                "in der Publikums-Sektion unten aus.",
+            ["posts.new_submit"]   = "Veröffentlichen",
+            ["posts.edit_title"]   = "Beitrag bearbeiten",
+            ["posts.edit_save"]    = "Änderungen speichern",
+            ["posts.save_as_draft"] =
+                "Als Entwurf speichern",
+            ["posts.save_as_draft_hint"] =
+                "Ein Entwurf wird gespeichert, ist aber für niemanden sichtbar — auch nicht für Admins — " +
+                "bis du ihn veröffentlichst. Du findest ihn unter „Meine Entwürfe“.",
+            ["posts.draft_badge"]   = "Entwurf",
+            ["posts.draft_note"] =
+                "Dieser Beitrag ist ein Entwurf — nur du kannst ihn sehen. Veröffentliche " +
+                "ihn, um ihn sichtbar zu machen.",
+            ["posts.publish"]       = "Veröffentlichen",
+            ["my_drafts.title"]     = "Meine Entwürfe",
+            ["my_drafts.empty"]     = "Du hast keine Entwürfe.",
+            ["posts.audience_all_members"] =
+                "Alle in dieser Gemeinschaft",
+            ["posts.audience_all_members_hint"] =
+                "Die Vorgabe — jedes Mitglied der Gemeinschaft oben kann " +
+                "diesen Beitrag sehen. Schalte es nur aus, wenn du einengen möchtest, wer " +
+                "ihn sehen darf.",
+            ["posts.audience_all_members_hint_edit"] =
+                "Wenn aktiv, kann jedes Mitglied dieser Gemeinschaft den Beitrag sehen. " +
+                "Schalte es aus, um das Publikum auf bestimmte Personen oder " +
+                "Gruppen einzuschränken.",
+            ["posts.audience_combine"] =
+                "Wie die Auswahl kombiniert wird",
+            ["posts.audience_restrict_hint"] =
+                "Diese Auswahl ist zusätzlich — „Alle in dieser Gemeinschaft“ " +
+                "bleibt an, solange du es nicht ausschaltest, der Beitrag ist also " +
+                "für die ganze Gemeinschaft und die hier gewählten Personen sichtbar.",
+            ["posts.audience_only_picks"] =
+                "Was du hier wählst, wird das Publikum des Beitrags — es wird " +
+                "nichts darüber oder darunter hinzugefügt. Eine leere Auswahl (mit " +
+                "„Alle in dieser Gemeinschaft“ aus) bedeutet, dass nur du den " +
+                "Beitrag sehen kannst.",
+            ["posts.empty_can_post"] =
+                "Noch keine Beiträge hier. Schreibe den ersten — er ist nur für das Publikum sichtbar, das du " +
+                "im Editor unterhalb der Überschrift wählst.",
+            ["posts.empty"]        = "Noch keine Beiträge hier.",
+
+            // ── groups (Index / Detail / New / PostDetail) ──────────────────
+            ["groups.title"]          = "Gruppen",
+            ["groups.lead"]           = "Die Gemeinschaften, die du betreibst oder denen du angehörst.",
+            ["groups.create"]         = "Gruppe erstellen",
+            ["groups.empty"]          = "Noch keine Gruppen.",
+            ["groups.back_all"]       = "← Alle Gruppen",
+            ["groups.posts_heading"]  = "Beiträge",
+            ["groups.new_post"]       = "Neuer Beitrag",
+            ["groups.posts_empty_can"] =
+                "Noch keine Beiträge. Schreibe den ersten — er ist für die aktuellen Mitglieder sichtbar.",
+            ["groups.posts_empty"]    = "Noch keine Beiträge hier.",
+            ["groups.new_title"]      = "Beitrag in dieser Gruppe",
+            ["groups.new_back"]       = "zurück zur Gruppe",
+            ["groups.new_submit"]     = "In die Gruppe posten",
+
+            // ── ADR 0026 — group name/description translations ───────────
+            ["groups.translations_label"] = "Übersetzungen",
+            ["groups.translations_none"] = "Noch keine",
+            ["groups.translation_add"] = "Hinzufügen",
+            ["groups.translation_name_label"] = "Name",
+            ["groups.translation_desc_label"] = "Beschreibung",
+            ["groups.translation_optional"] = "optional",
+            ["groups.translation_min_one"] = "Mindestens Name oder Beschreibung ist erforderlich.",
+            ["groups.translation_save"] = "Übersetzung speichern",
+
+            // ── directory (page heading + lead) ─────────────────────────────
+            ["directory.title"] = "Verzeichnis",
+            ["directory.lead"]  = "Alle in der Nachbarschaft — jede:r Anwohner:in auf der Plattform.",
+            ["directory.empty"] = "Noch keine Anwohner:innen in dieser Nachbarschaft.",
+
+            // ── profile (page heading + primary action) ─────────────────────
+            ["profile.title"]      = "Dein Profil",
+            ["profile.save_avatar"] = "Avatar speichern",
+
+            // ── profile (Edit page) ─────────────────────────────────────────
+            ["profile.edit_lede"] =
+                "Hier bestimmst du, was andere Anwohner:innen über dich sehen. " +
+                "Was du hier wählst, zeigt das Nachbarnverzeichnis " +
+                "genau so — ohne Überraschungen.",
+            ["profile.avatar_heading"] = "Dein Avatar",
+            ["profile.avatar_hint"] =
+                "JPEG, PNG, WebP oder GIF · bis zu 5 MB. Speichern ersetzt den " +
+                "aktuell im Verzeichnis gezeigten Avatar.",
+            ["profile.name_email_heading"] = "Dein Name + E-Mail",
+            ["profile.address_heading"] = "Deine Adresse + Telefon (optional)",
+            ["profile.address_hint"] =
+                "Wird in der Verzeichnisliste und im Detail nur angezeigt, wenn du unten " +
+                "auch den Kontaktkasten aktiviert hast; leer lassen, um deine " +
+                "Straße für dieses Profil privat zu halten.",
+            ["profile.phone_hint"] =
+                "Wird im Verzeichnis-Detail nur angezeigt, wenn du unten " +
+                "den Kontaktkasten aktiviert hast; leer lassen, um deine Nummer " +
+                "für dieses Profil privat zu halten.",
+            ["profile.who_heading"] = "Wer was sehen kann",
+            ["profile.optin_contact"] = "Meine Kontaktdaten teilen (Adresse, E-Mail, Telefon)",
+            ["profile.optin_contact_note"] =
+                "Lass dies aus, wenn du deine Adresse, " +
+                "E-Mail und Telefon komplett vor dem " +
+                "Verzeichnis verbergen möchtest. Wenn es an ist, wählst du " +
+                "unten aus, wer es sehen darf.",
+            ["profile.save"] = "Speichern",
+            ["profile.preview_link"] = "Vorschau — so erscheine ich",
+
+            // ── profile (Preview page) ───────────────────────────────────────
+            ["profile.preview_back"] = "← Zurück zum Editor",
+            ["profile.preview_title"] = "Vorschau — so erscheine ich",
+            ["profile.preview_avatar_note"] =
+                "Dein Avatar, wie er neben deinem Namen im " +
+                "Nachbarnverzeichnis erscheint.",
+            ["profile.preview_readonly_lead"] =
+                "Das ist eine schreibgeschützte Vorschau. Sie zeigt, wie dein Profil " +
+                "für ",
+            ["profile.preview_readonly_tail"] =
+                " im Nachbarnverzeichnis erscheint. Es ändert nichts an deinem " +
+                "gespeicherten Profil — um etwas zu ändern, ",
+            ["profile.preview_edit_link"] = "bearbeite dein Profil",
+            ["profile.preview_visible_badge"] = "Sichtbar.",
+            ["profile.preview_visible_tail"] =
+                "sichtest du diesen Kontaktkasten im Nachbarnverzeichnis.",
+            ["profile.preview_hidden_badge"] = "Kontaktdaten verborgen.",
+            ["profile.preview_hidden_tail"] =
+                "sieht keinen Kontaktkasten. Dein Name (und " +
+                "das Verifizierungs-Abzeichen, falls vorhanden) erscheint " +
+                "weiterhin im Verzeichnis — nur die Kontaktdaten sind verborgen.",
+            ["profile.contact_address"] = "Adresse",
+            ["profile.contact_email"] = "E-Mail",
+            ["profile.contact_phone"] = "Telefon",
+            ["profile.edit_profile_btn"] = "Profil bearbeiten",
+
+            // ── profile (the _AudienceEditor shared partial) ────────────────
+            ["profile.audience_visibility"] = "Wer dein Profil sehen kann",
+            ["profile.audience_contact"] = "Wer deine Kontaktdaten sehen kann",
+            ["profile.audience_off_note"] =
+                "Deine Kontaktdaten sind aktuell für alle verborgen. " +
+                "Um das zu ändern, schalte oben „Meine Kontaktdaten teilen“ ein.",
+            ["profile.audience_match_mode"] = "Abgleichmodus",
+            ["profile.audience_mode_any"] =
+                "eine Person ist erlaubt, wenn sie eine der gewählten Personen/Gruppen erfüllt",
+            ["profile.audience_mode_all"] =
+                "eine Person ist nur erlaubt, wenn sie alle gewählten Personen/Gruppen erfüllt",
+
+            // ── posts (Detail page) ──────────────────────────────────────────
+            ["posts.back_to"] = "zurück zu",
+            ["posts.detail_edit"] = "Bearbeiten",
+            ["posts.edited"] = "bearbeitet",
+            ["posts.detail_why"] =
+                "Du kannst diesen Beitrag sehen, weil du auf sein Publikum " +
+                "zutrifft (ein Recht von dir, oder du bist Autor:in — der „owner branch“ " +
+                "der C1-Regel „leeres Publikum = Verweigerung“).",
+            ["posts.report_button"] = "Diesen Beitrag melden",
+            ["posts.reply_report_button"] = "Diese Antwort melden",
+            ["posts.report_reason_label"] = "Was ist schiefgelaufen?",
+            ["posts.report_optional"] = "optional",
+            ["posts.report_note"] =
+                "Eine Meldung ist nur eine Eingangsaktion — sie ändert " +
+                "nichts daran, was du sehen kannst, und ein Moderator kann nachfassen.",
+            ["posts.report_submit"] = "Melden",
+            ["posts.replies_heading"] = "Antworten",
+            ["posts.replies_empty"] =
+                "Noch keine Antworten. Wenn du diesen Beitrag sehen kannst, kannst du auch darauf antworten.",
+            ["posts.reply_heading_author"] = "Antwort (du bist Autor:in dieses Beitrags)",
+            ["posts.reply_heading"] = "Antwort",
+            ["posts.reply_label"] = "Antwort",
+            ["posts.reply_language_label"] = "Sprache",
+            ["posts.reply_language_note"] =
+                "Die Sprache, in der du antwortest — ein Tag, keine " +
+                "Übersetzung.",
+            ["posts.reply_audience_note"] =
+                "Antworten haben kein eigenes Publikum — sie sind unter " +
+                "der einzelnen Publikumsentscheidung dieses Beitrags sichtbar (die " +
+                "C-M3·1-Regel „reply-inherits“). Du antwortest nur dort, " +
+                "wo der Beitrag selbst sichtbar ist.",
+            ["posts.reply_submit"] = "Antworten",
+            ["posts.reply_edit"] = "Bearbeiten",
+            ["posts.reply_save"] = "Speichern",
+            ["posts.reply_edited"] = "bearbeitet",
+
+            // ── posts (Detail page) — author soft-delete (ADR 0024) ──
+            ["posts.delete"] = "Löschen",
+            ["posts.reply_delete"] = "Löschen",
+            ["posts.deleted_placeholder"] =
+                "Dieser Beitrag wurde von dessen Autor:in gelöscht.",
+            ["posts.reply_deleted_placeholder"] =
+                "Diese Antwort wurde von dessen Autor:in gelöscht.",
+
+            // ── posts (Detail page) — user-added translations (ADR 0022) ──
+            ["posts.translations_label"] = "Übersetzungen",
+            ["posts.translations_none"] = "noch keine",
+            ["posts.translation_add"] = "Hinzufügen",
+            ["posts.translation_title_label"] = "Überschrift",
+            ["posts.translation_body_label"] = "Text",
+            ["posts.translation_optional"] = "optional",
+            ["posts.translation_save"] = "Übersetzung speichern",
+
+            // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
+            ["pages.title"]       = "Seiten",
+            ["pages.new_button"]  = "Neue Seite",
+            ["pages.none"] =
+                "Noch keine Seiten. Global-Admins können die erste Systemseite " +
+                "erstellen — eine „Über uns“-Seite ist ein üblicher Einstieg — und " +
+                "jede:r Anwohner:in kann einen eigenen Blog (eine eigene Seite) starten.",
+            ["pages.back"]        = "← Zurück zu den Seiten",
+            ["pages.by"]          = "von",
+            ["pages.delete"]      = "Löschen",
+            ["pages.untitled"]    = "Unbenannte Seite",
+
+            // ── blog (per-resident page feed, ADR 0040) ─────────────────────
+            ["blog.new_page"]     = "Neue Blogseite",
+            ["blog.empty_own"] =
+                "Du hast noch keine Blogseiten. Erstelle die erste — sie wird die " +
+                "Wurzel deines Blogs, und du kannst weitere darunter anordnen.",
+            ["blog.empty_other"]  = "Diese:r Anwohner:in hat noch keine Blogseiten.",
+            ["blog.draft"]        = "Entwurf",
+
+            // ── groups (Create page) ─────────────────────────────────────────
+            ["groups.create_back"] = "← Zurück zu den Gruppen",
+            ["groups.create_title"] = "Gruppe erstellen",
+            ["groups.create_lede"] =
+                "Ein Name für eine Gemeinschaft von Anwohner:innen (z. B. „Gebäude 4“, " +
+                "„Ehrenamtliche“, „Fahrradbesitzer“). " +
+                "Du bist Inhaber:in der Gruppe — du kannst Mitglieder über die " +
+                "Detailseite der Gruppe hinzufügen und entfernen (M2, Plan U10).",
+            ["groups.create_desc_hint"] = "Optional — eine kurze Notiz, die andere Anwohner:innen sehen.",
+            ["groups.create_private_hint"] =
+                "Eine private Gruppe (z. B. eine Familie) ist aus allen anderen " +
+                "Genehmigungs-/Zugriffslisten ausgeblendet — nur Personen, die du " +
+                "als Mitglieder hinzufügst, können sie nutzen. " +
+                "Eine öffentliche Gruppe (z. B. „Pilzesammler“) erscheint als " +
+                "Option in den Auswahlmenüs anderer Anwohner:innen.",
+            ["groups.create_submit"] = "Gruppe erstellen",
+
+            // ── groups (Edit page) ───────────────────────────────────────────
+            ["groups.edit_back"] = "zurück zum Beitrag",
+            ["groups.edit_title"] = "Deinen Beitrag bearbeiten",
+            ["groups.edit_lede"] =
+                "Du bearbeitest deinen eigenen Beitrag. Nur du kannst ihn bearbeiten — die " +
+                "Gruppenmitgliedschaft bestimmt, wer ihn sehen kann, aber nur die " +
+                "Autor:in kann ihn ändern. Die Gruppe, in der dieser Beitrag erscheint, " +
+                "ist festgelegt; nur Titel, Text und Sprache unten sind editierbar.",
+            ["groups.edit_title_label"] = "Titel",
+            ["groups.edit_title_hint"] =
+                "Eine kurze Überschrift (≤ 120 Zeichen). Leer lassen für einen " +
+                "reinen Text-Beitrag — die Liste zeigt stattdessen " +
+                "deine erste Zeile des Textes.",
+            ["groups.edit_body_label"] = "Text",
+            ["groups.edit_language_label"] = "Sprache",
+            ["groups.edit_language_hint"] =
+                "Die Sprache, in der du diesen Beitrag schreibst. Das ist nur ein " +
+                "Tag — er wird nicht übersetzt — und hält den Text " +
+                "später auffindbar und lässt Leser:innen eine eigene " +
+                "Sprachversion hinzufügen, wenn sie wollen.",
+            ["groups.edit_submit"] = "Änderungen speichern",
+            ["groups.edit_cancel"] = "Abbrechen",
+
+            // ── directory (Detail page) ──────────────────────────────────────
+            ["directory.detail_back"] = "← Zurück zum Verzeichnis",
+            ["directory.detail_verified"] = "Verifiziert",
+            ["directory.detail_contact_address"] = "Adresse",
+            ["directory.detail_contact_email"] = "E-Mail",
+            ["directory.detail_contact_phone"] = "Telefon",
+            ["directory.detail_no_contact"] =
+                "Diese:r Anwohner:in hat dir (noch) keine Kontaktmöglichkeit geteilt. Du " +
+                "kannst aber immer noch die Profilseite sehen.",
+
+            // ── community (Manage page) ──────────────────────────────────────
+            ["community.manage_back"] = "← Zurück zum Feed",
+            ["community.manage_lede"] = "Verwalte die Mitgliedschaft in dieser Gemeinschaft.",
+            ["community.manage_moderate"] = "Du moderierst diese Gemeinschaft",
+            ["community.manage_disabled"] = "Deaktiviert",
+            ["community.manage_availability"] = "Verfügbarkeit",
+            ["community.manage_mandatory_label"] =
+                "Pflichtgemeinschaft — alle in der Nachbarschaft sind Mitglieder",
+            ["community.manage_mandatory_hint"] =
+                "In einer Pflichtgemeinschaft können keine Mitglieder entfernt und nicht " +
+                "ausgetreten werden; das Häkchen entfernen, um die " +
+                "Mitgliedschaft wieder optional zu machen.",
+            ["community.manage_make_optional"] = "Optional machen",
+            ["community.manage_make_mandatory"] = "Zur Pflicht machen",
+            ["community.manage_members"] = "Mitglieder",
+            ["community.manage_mandatory_note"] =
+                "Diese Gemeinschaft ist eine Pflichtgemeinschaft — alle sind Mitglieder, also " +
+                "gibt es keine:r zu entfernen. Die aufgeführten Zeilen sind " +
+                "explizite Mitgliedschaften, die behalten werden, falls die " +
+                "Gemeinschaft wieder optional wird.",
+            ["community.manage_no_members"] = "Noch keine expliziten Mitglieder — füge unten welche hinzu.",
+            ["community.manage_you"] = "Du",
+            ["community.manage_remove"] = "Entfernen",
+            ["community.manage_add_member"] = "Mitglied hinzufügen",
+            ["community.manage_all_members"] =
+                "Alle in der Nachbarschaft sind bereits hier Mitglieder.",
+            ["community.manage_pick_resident"] = "Wähle eine:n Anwohner:in zum Hinzufügen…",
+
+            // ── ADR 0026 — community name/description translations ────────
+            ["community.translations_label"] = "Übersetzungen",
+            ["community.translations_none"] = "Noch keine",
+            ["community.translation_add"] = "Hinzufügen",
+            ["community.translation_name_label"] = "Name",
+            ["community.translation_desc_label"] = "Beschreibung",
+            ["community.translation_optional"] = "optional",
+            ["community.translation_min_one"] = "Mindestens Name oder Beschreibung ist erforderlich.",
+            ["community.translation_save"] = "Übersetzung speichern",
+
+            // ── moderation (Index page) ──────────────────────────────────────
+            ["moderation.title"] = "Moderation",
+            ["moderation.empty"] = "Noch keine Meldungen. Die Warteschlange ist leer.",
+            ["moderation.th_status"] = "Status",
+            ["moderation.th_post"] = "Beitrag",
+            ["moderation.th_component"] = "Komponente",
+            ["moderation.th_reporter"] = "Melder",
+            ["moderation.th_filed"] = "Eingereicht",
+            ["moderation.th_action"] = "Aktion",
+            ["moderation.review"] = "Prüfen →",
+
+            // ── moderation (Resolve page) ────────────────────────────────────
+            ["moderation.resolve_title"] = "Moderation — Meldung prüfen",
+            ["moderation.details"] = "Meldungsdetails",
+            ["moderation.th_post_label"] = "Beitrag",
+            ["moderation.th_component_label"] = "Komponente",
+            ["moderation.th_reporter_label"] = "Melder",
+            ["moderation.th_author_label"] = "Autor:in des Beitrags",
+            ["moderation.th_filed_label"] = "Eingereicht",
+            ["moderation.th_reason_label"] = "Grund",
+            ["moderation.no_reason"] = "(kein Grund angegeben)",
+            ["moderation.th_body_label"] = "Beitragstext",
+            ["moderation.body_preview"] = "Vorschau des Beitrags",
+            ["moderation.assign_header"] = "An einen festen Moderator zuweisen",
+            ["moderation.assign_label"] =
+                "Fester Moderator für die Komponente dieser Meldung",
+            ["moderation.assign_pick"] = "Wähle einen festen Moderator …",
+            ["moderation.assign_submit"] = "Zuweisen",
+            ["moderation.cancel"] = "Abbrechen",
+            ["moderation.unlock_submit"] = "Entsperren",
+            ["moderation.resolve_header"] = "Auflösen (diese Meldung schließen)",
+            ["moderation.resolve_submit"] = "Auflösen",
+            ["moderation.back_to_queue"] = "← Zurück zur Warteschlange",
+
+            // ── reply-report-target lane (ADR 0023) ─────────────────────────
+            ["moderation.queue_reply_by"] = "Antwort von",
+            ["moderation.resolve_reply_label"] = "Antwort (Ziel dieser Meldung)",
+            ["moderation.resolve_reply_by"] = "Antwort von",
+
+            // ── account (Verify / Resend / AccessDenied) ─────────────────────
+            ["account.verify_title"] = "Bestätige dein Konto",
+            ["account.verify_pending"] =
+                "Wir bestätigen dein Konto — in einem Moment bist du angemeldet.",
+            ["account.verify_again"] = "Erneut registrieren",
+            ["account.resend_title"] = "Bestätigungs-E-Mail neu senden",
+            ["account.resend_lede"] =
+                "Gib die E-Mail ein, mit der du dich registriert hast, und wir senden dir einen frischen Bestätigungslink.",
+            ["account.resend_submit"] = "Neu senden",
+            ["account.resend_create"] = "Erstmal dein Konto anlegen?",
+            ["account.resend_signup"] = "Registrieren",
+            ["account.denied_title"] = "Zugriff verweigert",
+            ["account.denied_lede"] = "Du hast keine Berechtigung, diese Seite zu sehen.",
+            ["account.denied_home"] = "Zurück zur Startseite",
+
+            // ── admin (Audit page) ───────────────────────────────────────────
+            ["admin.audit_title"] = "Zugriffs-Audit",
+            ["admin.audit_lede"] =
+                "Jede Zugriffsentscheidung auf inhaltsbeschränkte Inhalte — Allow und Deny — plus " +
+                "Adminaktionen und aggregierte Gesamtzeilen. Immer aktiv; je nach " +
+                "Instanz-Tier gelöscht (§6.4).",
+            ["admin.audit_filter"] = "Filter",
+            ["admin.audit_th_at"] = "Zeitpunkt (UTC)",
+            ["admin.audit_th_actor"] = "Aktor:in",
+            ["admin.audit_th_effective"] = "Effektiv",
+            ["admin.audit_th_action"] = "Aktion",
+            ["admin.audit_th_target"] = "Ziel",
+            ["admin.audit_th_aggregate"] = "Aggregat",
+            ["admin.audit_th_via"] = "Über",
+            ["admin.audit_th_outcome"] = "Ergebnis",
+
+            // ── admin (Break-glass page) ─────────────────────────────────────
+            ["admin.breakglass_title"] = "Break-glass",
+            ["admin.breakglass_granted"] = "Gewährt am (UTC)",
+            ["admin.breakglass_expires"] = "Läuft ab am (UTC)",
+            ["admin.breakglass_status"] = "Status",
+            ["admin.breakglass_consumed"] = "verbraucht — Erhöhung bis zum Ablauf aktiv",
+            ["admin.breakglass_presented"] = "vorgelegt, aber noch nicht verbraucht",
+            ["admin.breakglass_token_label"] = "Einmal-Token (vom Operator)",
+            ["admin.breakglass_token_hint"] =
+                "Das Verwenden dieses Tokens ist eine Einmalaktion. Es aktiviert die " +
+                "Erhöhung bis zum Ablauf.",
+            ["admin.breakglass_consume"] = "Token verwenden",
+
+            // ── locale (settings + public picker) ────────────────────────────
+            ["locale.settings_title"] = "Deine Einstellungen",
+            ["locale.language_heading"] = "Sprache",
+            ["locale.lede"] =
+                "Wähle die Sprache, die dir die Plattform anzeigt. Deine Auswahl wird in einem " +
+                "Browser-Cookie gespeichert — sie wird beim nächsten Request wirksam " +
+                "und betrifft nie andere Anwohner:innen.",
+            ["locale.preferred_label"] = "Bevorzugte Sprache",
+            ["locale.default_note"] =
+                "Die Instanz-Voreinstellung ist ",
+            ["locale.default_note_tail"] =
+                ". Wenn deine Wunschsprache später vom Admin entfernt wird, " +
+                "fällt die Plattform still auf die Instanz-Voreinstellung zurück.",
+            ["locale.save"] = "Speichern",
+            ["locale.reset"] = "Auf die Instanz-Voreinstellung zurücksetzen",
+            ["locale.public_title"] = "Wähle deine Sprache",
+            ["locale.instance_default"] = "— Instanz-Voreinstellung",
+
+            // ── announcements (shared labels + New/Edit compose) ─────────────
+            ["announcements.scope_label"] = "Wer sieht dies?",
+            ["announcements.scope_public"] =
+                "Alle (öffentlich) — für Besucher und Anwohner:innen sichtbar",
+            ["announcements.scope_resident"] =
+                "Anwohner:innen — nur bei Anmeldung sichtbar",
+            ["announcements.community_label"] = "An eine bestimmte Gemeinschaft senden (optional)",
+            ["announcements.all_residents"] = "Alle Anwohner:innen",
+            ["announcements.community_hint"] =
+                "Lass „Alle Anwohner:innen“, um an alle zu senden, oder wähle eine Gemeinschaft, um einzuschränken, wer es sieht.",
+            ["announcements.title_label"] = "Titel",
+            ["announcements.title_hint"] = "Eine kurze Überschrift (bis zu 120 Zeichen).",
+            ["announcements.body_label"] = "Text",
+            ["announcements.pin_label"] = "Oben auf allen Seiten anpinnen",
+            ["announcements.cancel"] = "Abbrechen",
+            ["announcements.new_title"] = "Neue Ankündigung",
+            ["announcements.new_lede"] =
+                "Ankündigungen sind Hinweise, die für sich allein erscheinen, " +
+                "getrennt vom Gemeinschafts-Feed. Eine öffentliche " +
+                "Ankündigung ist für alle sichtbar, auch für Menschen, die " +
+                "nicht angemeldet sind (z. B. ein Wartungsfenster). Eine " +
+                "Anwohner-Ankündigung ist nur für angemeldete " +
+                "Anwohner:innen sichtbar (z. B. ein „Hilf uns bei X“-Aufruf).",
+            ["announcements.new_scope_hint"] =
+                "Öffentliche Ankündigungen sind für alle sichtbar, auch " +
+                "für Besucher, die nicht angemeldet sind (z. B. ein Wartungsfenster " +
+                "oder ein Störungshinweis). Anwohner-Ankündigungen " +
+                "sind nur für angemeldete Anwohner:innen sichtbar.",
+            ["announcements.new_submit"] = "Ankündigung erstellen",
+            ["announcements.edit_title"] = "Ankündigung bearbeiten",
+            ["announcements.edit_lede"] =
+                "Aktualisiere Titel, Text und Sichtbarkeit dieser " +
+                "Ankündigung. Eine öffentliche Ankündigung ist für alle " +
+                "sichtbar, auch für Menschen, die nicht angemeldet sind " +
+                "(z. B. ein Wartungsfenster). Eine Anwohner-Ankündigung ist " +
+                "nur für angemeldete Anwohner:innen sichtbar (z. B. ein „Hilf uns bei X“-Aufruf).",
+            ["announcements.edit_scope_hint"] =
+                "Eine Änderung, wer dies sieht, wirkt sofort für den nächsten Leser.",
+            ["announcements.edit_submit"] = "Änderungen speichern",
+            ["announcements.pin_hint"] =
+                "Eine gepinnte Ankündigung erscheint zusätzlich als Banner " +
+                "ganz oben auf jeder Seite (einschließlich Startseite), " +
+                "neben der üblichen Ankündigungsliste. Ihre Sichtbarkeit " +
+                "folgt weiter dem Publikum, das du oben gewählt hast: ein öffentlicher " +
+                "Pin zeigt allen Besuchern; ein Anwohner-Pin nur, wenn ein Nutzer " +
+                "angemeldet ist. Wenn mehrere gepinnt sind, " +
+                "gewinnt der zuletzt gepinnte.",
+            ["announcements.language_note"] =
+                "Die Sprache, in der du diese Ankündigung schreibst. Das ist nur ein " +
+                "Tag — er wird nicht übersetzt — und hält den Text später " +
+                "auffindbar und lässt Leser:innen eine eigene Sprachversion " +
+                "hinzufügen, wenn sie wollen.",
+
+            // ── announcements (Index + Detail + pinned banner) ───────────────
+            ["announcements.index_title"] = "Ankündigungen",
+            ["announcements.index_lede"] =
+                "Plattform-Hinweise: öffentliche sind für alle sichtbar (z. B. " +
+                "geplante Wartung); nur für Anwohner:innen sind sie für alle " +
+                "angemeldeten Nutzer sichtbar (z. B. „Hilf uns bei X“-Aufrufe).",
+            ["announcements.all"] = "Alle Ankündigungen",
+            ["announcements.new_button"] = "Neue Ankündigung",
+            ["announcements.empty"] = "Noch keine Ankündigungen.",
+            ["announcements.read_more"] = "Mehr lesen…",
+            ["announcements.scope_everyone"] = "alle",
+            ["announcements.scope_residents"] = "Anwohner:innen",
+            ["announcements.pinned_badge"] = "gepinnt",
+            ["announcements.edit_button"] = "Bearbeiten",
+            ["announcements.delete"] = "Löschen",
+            ["announcements.detail_back"] = "← Zurück zu den Ankündigungen",
+            ["announcements.detail_untitled"] = "Unbenannte Ankündigung",
+            ["announcements.by"] = "von",
+            ["announcements.edited"] = "bearbeitet",
+            ["announcements.banner_read_more"] = "Mehr lesen",
+            ["announcements.banner_all"] = "Alle Ankündigungen",
+
+            // ── static pages (Page — the terms/help shell) ───────────────────
+            ["static.last_updated"] = "Zuletzt aktualisiert:",
+
+            // ── shared (the _GrantPickers partial — static markup only) ─────
+            ["grant.heading"] = "Wem zugewiesen",
+            ["grant.hint"] =
+                "Eine oder mehrere auswählen — oder nutze die „Select all“-Zeile " +
+                "über jeder Liste als Kurzbefehl.",
+            ["grant.empty_users"] =
+                "Du bist der/die einzige:r verifizierte Anwohner:in, also gibt es noch " +
+                "niemanden, dem/der hier zugewiesen werden kann.",
+            ["grant.empty_groups"] =
+                "Auf der Plattform existieren noch keine Gruppen — erstelle eine " +
+                "unter „Gruppen“, um gruppenbezogene Sichtbarkeit hinzuzufügen.",
+
+            // ── admin (page heading + primary action) ───────────────────────
+            ["admin.title"]  = "Verwaltung",
+            ["admin.verify"] = "Verifizieren",
+
+            // ── rich editor (the RE toolbar button labels, ADR 0031) ────────
+            ["rc.editor.bold"]    = "B",
+            ["rc.editor.italic"]  = "I",
+            ["rc.editor.code"]    = "C",
+            ["rc.editor.h1"]      = "H1",
+            ["rc.editor.h2"]      = "H2",
+            ["rc.editor.h3"]      = "H3",
+            ["rc.editor.list"]    = "•",
+            ["rc.editor.olist"]   = "1.",
+            ["rc.editor.link"]    = "Link",
+            ["rc.editor.image"]   = "Bild",
+            ["rc.editor.attach"]  = "Datei anhängen",
+            ["rc.editor.source"]      = "</>",
+            ["rc.editor.showPreview"] = "Vorschau",
+
+            // ── about (the About product surface, ADR 0042 D5) ──────────────
+            ["about.eyebrow"]             = "Privat per Vorgabe",
+            ["about.lead"] =
+                "Ein Ort für alles, was eure Nachbarschaft macht — " +
+                "der Feed, die Gruppen und die Notizen, die besser verdienen " +
+                "als eine Gruppen-Chats. Privat, in einfacher Sprache und euer.",
+            ["about.cta_feed"]            = "Zum Feed",
+            ["about.cta_notes"]           = "Gepinnte Notizen lesen",
+            ["about.features.one.title"]  = "Ein Feed für die Straße",
+            ["about.features.one.body"] =
+                "Beiträge und Threads aus euren Blöcken und Gassen, an einem " +
+                "ruhigen Ort — kein Algorithmus, kein Lärm.",
+            ["about.features.groups.title"]  = "Gruppen, die passen",
+            ["about.features.groups.body"] =
+                "Garten-Tausch, Buchclub, Streifenwache — eine Gruppe für alles, " +
+                "was die Nachbarschaft schon tut.",
+            ["about.features.pinned.title"]  = "Gepinnt, wo es zählt",
+            ["about.features.pinned.body"] =
+                "Wasserschnitt, Straßenarbeiten, die neuen Poller — " +
+                "Notizen, die stehen bleiben statt wegzuscrollen.",
+            ["about.stats.neighbors"]  = "Anwohner:innen an Bord",
+            ["about.stats.groups"]     = "Gruppen & Gemeinschaften",
+            ["about.stats.posts"]      = "Beiträge & Threads diesen Monat",
+            ["about.stats.pinned"]     = "gepinnte Notizen aktuell",
+            ["about.project.eyebrow"]  = "Open Source",
+            ["about.project.heading"]  = "Der Code, die Entscheidungen, die Design-Doku",
+            ["about.project.lead"] =
+                "Wenn du neugierig bist, wie es funktioniert — oder wenn du es " +
+                "gleich für deine Nachbarschaft hosten willst — ist alles öffentlich.",
+        };
+
+    /// <summary>
     /// The closed key set (the admin editor's list, the seeder's loop bound, and
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
