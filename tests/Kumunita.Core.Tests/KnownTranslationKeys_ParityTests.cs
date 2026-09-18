@@ -150,4 +150,44 @@ public class KnownTranslationKeys_ParityTests
                 $"ADR 0042 D5 key '{key}' is missing from DeValues");
         }
     }
+
+    // ── LS U03 — the fr baseline at full registry parity (ADR 0042 D2/D5) ──
+
+    [Fact(DisplayName = "FrValues keys exactly match AllKeys — no missing, no extra, no empty values")]
+    public void FrValues_Keys_Match_AllKeys_Exactly_NoEmptyValues()
+    {
+        var frKeys = KnownTranslationKeys.FrValues.Keys.ToList();
+        var allKeys = KnownTranslationKeys.AllKeys.ToList();
+
+        // Same cardinality — a missing or extra key is a registry-shape
+        // defect (the completeness view would report a mismatch against the
+        // admin editor's closed list).
+        Assert.Equal(allKeys.Count, frKeys.Count);
+
+        // Set equality in both directions.
+        Assert.Equal(allKeys.OrderBy(k => k), frKeys.OrderBy(k => k));
+
+        // No key declared twice (a Dictionary would silently collapse a
+        // duplicate, so pin the shape — same as the en test above).
+        Assert.Equal(allKeys.Count, new HashSet<string>(allKeys).Count);
+
+        // Every fr value is non-empty — a blank baseline would make the
+        // provider resolve to nothing for that key under a fr preference,
+        // and the M·12 completeness view would count it "present" while
+        // rendering blank.
+        foreach (var (key, value) in KnownTranslationKeys.FrValues)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(value),
+                $"registry key '{key}' has an empty/whitespace fr value — " +
+                "the provider would resolve it to nothing under a fr preference");
+        }
+
+        // The D5 about.* contract is translated (every D5 key is present in
+        // the fr dictionary with a non-empty value).
+        foreach (var key in KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("about.")))
+        {
+            Assert.True(KnownTranslationKeys.FrValues.ContainsKey(key),
+                $"ADR 0042 D5 key '{key}' is missing from FrValues");
+        }
+    }
 }

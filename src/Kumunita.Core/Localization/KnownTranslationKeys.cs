@@ -1482,6 +1482,702 @@ public static class KnownTranslationKeys
         };
 
     /// <summary>
+    /// The curated French (<c>fr</c>) baseline (LS U03, ADR 0042 D2/D5). One
+    /// entry per key in <see cref="AllKeys"/> — full registry parity, the ADR
+    /// 0015 honesty invariant extended to this dictionary. Idioms per ADR 0042
+    /// D2: the familiar <c>tu</c> register held everywhere, sentence case,
+    /// no trailing period on button labels, accents and typography per French
+    /// convention (plain space before <c>:</c> <c>;</c> <c>?</c> <c>!</c>),
+    /// and every inlined data token (<c>yyyy-MM-dd HH:mm</c>,
+    /// <c>§6.4</c>, <c>Allow</c>/<c>Deny</c>, the <c>rc.editor.*</c> glyph
+    /// labels, the on-screen <c>Select all</c> label that the kw-l TagHelper
+    /// cannot reach) preserved token-for-token with the <c>en</c> value.
+    /// These are <b>initial values</b> — seeded once on a pristine DB (LS U04),
+    /// then community-owned via the in-app editor (ADR 0021); an admin edit is
+    /// never overwritten (ADR 0042 D1).
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> FrValues { get; } =
+        new Dictionary<string, string>
+        {
+            // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
+            ["nav.home"]          = "Accueil",
+            ["nav.announcements"] = "Annonces",
+            ["nav.community"]     = "Communauté",
+            ["nav.groups"]        = "Groupes",
+            ["nav.pages"]         = "Pages",
+            ["nav.directory"]     = "Annuaire",
+            ["nav.sign_in"]       = "Se connecter",
+            ["nav.sign_up"]       = "S'inscrire",
+            ["nav.profile"]       = "Profil",
+            ["nav.admin"]         = "Administration",
+            ["nav.translations"]  = "Traductions",
+            ["nav.sign_out"]      = "Se déconnecter",
+            ["nav.children"]      = "Enfants",
+            ["nav.my_drafts"]     = "Mes brouillons",
+
+            // ── guardian (the /me/children child-accounts surface) ─────────
+            ["guardian.title"]        = "Tes enfants",
+            ["guardian.lead"]         = "Les comptes que tu as créés pour un enfant, et les contrôles que tu exerces sur chacun.",
+            ["guardian.empty"]        = "Pas encore d'enfants.",
+            ["guardian.add"]          = "Ajouter un compte enfant",
+            ["guardian.manage_title"] = "Gérer un compte enfant",
+
+            // ── guardian assignment (GA ADR 0038) ───────────────────────────
+            ["guardian.otherGuardians.title"] = "Autres tuteurs",
+            ["guardian.otherGuardians.empty"] = "Aucun autre tuteur assigné.",
+            ["guardian.assign.title"]        = "Assigner un tuteur",
+            ["guardian.assign.email"]        = "E-mail du tuteur à assigner",
+            ["guardian.assign.submit"]       = "Assigner",
+            ["guardian.assign.noAccount"]    = "Aucun compte avec cet e-mail.",
+            ["guardian.assign.self"]         = "Tu es déjà tuteur de cet enfant.",
+            ["guardian.assign.success"]      = "Tuteur assigné.",
+
+            // ── footer (the shared footer, _Layout) ─────────────────────────
+            ["footer.tagline"]  =
+                "Un chez-soi privé pour un quartier — le fil, les groupes et les notes épinglées. " +
+                "Ce qui se passe dans ta rue reste dans ta rue.",
+            ["footer.copyright"] = "· auto-hébergé par ta communauté",
+            ["footer.gtk_heading"] = "Bon à savoir",
+            ["footer.gtk_privacy"] =
+                "Privé par défaut : le public de chaque publication est choisi par son auteur, " +
+                "et tout est lisible par toi, pas par le monde.",
+            ["footer.gtk_oss"] =
+                "Kumunita est open source — le code, les décisions, la documentation.",
+
+            // ── settings (the language-picker labels) ───────────────────────
+            ["settings.settings"]       = "Paramètres",
+            ["settings.choose_language"] = "Choisis ta langue",
+
+            // ── settings — account help ─────────────────────────────────────
+            ["settings.help_heading"]     = "Aide pour ton compte",
+            ["settings.help_lede"]        =
+                "Bloqué sur ton compte — un mot de passe, ton accès, ou autre chose ? " +
+                "Ce guide t'accompagne.",
+
+            // ── settings — timezone (ADR 0019) ──────────────────────────────
+            ["settings.timezone_title"]        = "Fuseau horaire",
+            ["settings.timezone_lede"]         =
+                "Choisis le fuseau horaire que la plateforme t'affiche. Ton choix est enregistré sur ton compte — " +
+                "il prend effet au prochain chargement de page, et n'affecte jamais les autres habitants.",
+            ["settings.timezone_label"]        = "Ton fuseau horaire",
+            ["settings.timezone_default_marker"] = "— défaut de la plateforme",
+            ["settings.timezone_default_note"] = "Le défaut de la plateforme est ",
+            ["settings.timezone_default_tail"] =
+                ". Si tu réinitialises ta préférence, le défaut de la plateforme est utilisé.",
+            ["settings.timezone_reset"]        = "Réinitialiser au défaut de la plateforme",
+            ["settings.timezone_save"]         = "Enregistrer",
+            ["settings.timezone_unknown"]      = "Fuseau horaire inconnu",
+
+            // ── settings — date format (ADR 0020) ───────────────────────────
+            ["settings.dateformat_title"]        = "Format de date et d'heure",
+            ["settings.dateformat_lede"]         =
+                "Choisis le format de date et d'heure que la plateforme t'affiche. Ton choix est enregistré sur ton compte — " +
+                "il prend effet au prochain chargement de page, et n'affecte jamais les autres habitants.",
+            ["settings.dateformat_label"]        = "Ton format de date et d'heure",
+            ["settings.dateformat_default_marker"] = "— défaut de la plateforme",
+            ["settings.dateformat_default_note"] = "Le défaut de la plateforme est ",
+            ["settings.dateformat_default_tail"] =
+                ". Si tu réinitialises ta préférence, le défaut de la plateforme est utilisé.",
+            ["settings.dateformat_custom_label"] = "Format personnalisé",
+            ["settings.dateformat_custom_hint"]  =
+                "Une chaîne de format de date/heure personnalisée .NET (p. ex. yyyy-MM-dd HH:mm). Laisser vide pour utiliser un préréglage.",
+            ["settings.dateformat_reset"]        = "Réinitialiser au défaut de la plateforme",
+            ["settings.dateformat_save"]         = "Enregistrer",
+
+            // ── admin — the platform-default timezone ───────────────────────
+            ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
+            ["admin.timezone_lede"]     =
+                "Le fuseau horaire par défaut pour les horodatages des habitants " +
+                "qui n'ont pas défini de préférence personnelle.",
+            ["admin.timezone_label"]    = "Fuseau horaire par défaut",
+            ["admin.timezone_save"]     = "Enregistrer",
+
+            // ── admin — the platform-default date format (ADR 0020) ─────────
+            ["admin.dateformat_title"]    = "Format de date et d'heure par défaut de la plateforme",
+            ["admin.dateformat_lede"]     =
+                "Le format de date et d'heure par défaut pour les horodatages des habitants " +
+                "qui n'ont pas défini de préférence personnelle.",
+            ["admin.dateformat_label"]    = "Format de date et d'heure par défaut",
+            ["admin.dateformat_custom_label"] = "Format personnalisé",
+            ["admin.dateformat_custom_hint"]  =
+                "Une chaîne de format de date/heure personnalisée .NET (p. ex. yyyy-MM-dd HH:mm). Laisser vide pour utiliser un préréglage.",
+            ["admin.dateformat_save"]     = "Enregistrer",
+
+            // ── home (the hero + section lead) ──────────────────────────────
+            ["home.eyebrow"] = "Où en est ce projet",
+            ["home.lead"] =
+                "Un chez-soi privé pour un quartier — construit en public, un jalon à la fois. " +
+                "C'est la même liste que dans le README, et le code derrière chaque élément est dans le dépôt public.",
+            ["home.support"] = "Des questions ou des retours ? Écris à",
+
+            // ── account (Login / Signup — titles + primary actions) ─────────
+            ["account.login_title"]   = "Se connecter",
+            ["account.login_submit"]  = "Se connecter",
+            ["account.login_no_account"] = "Pas encore de compte ?",
+            ["account.signup_title"]  = "S'inscrire",
+            ["account.signup_submit"] = "S'inscrire",
+            ["account.signup_has_account"] = "Tu as déjà un compte ?",
+
+            // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.write"]        = "Écrire une publication",
+            ["posts.new_title"]    = "Écrire une publication",
+            ["posts.new_intro"] =
+                "Par défaut, tout le monde dans la communauté que tu choisis ci-dessous peut voir " +
+                "ta publication. Désactive-le dans la section audience uniquement si tu " +
+                "veux restreindre qui peut la voir à des personnes ou groupes spécifiques.",
+            ["posts.community_hint"] =
+                "La communauté décide dans quel fil ta publication apparaît — et, " +
+                "par défaut, qui peut la voir (tous les membres de cette communauté). " +
+                "Pour restreindre l'audience, désactive « Tout le monde dans cette communauté » " +
+                "dans la section audience ci-dessous.",
+            ["posts.new_submit"]   = "Publier",
+            ["posts.edit_title"]   = "Modifier la publication",
+            ["posts.edit_save"]    = "Enregistrer les modifications",
+            ["posts.save_as_draft"] =
+                "Enregistrer en brouillon",
+            ["posts.save_as_draft_hint"] =
+                "Un brouillon est enregistré mais visible par personne — même les admins — " +
+                "jusqu'à ce que tu le publies. Tu le trouveras sous « Mes brouillons ».",
+            ["posts.draft_badge"]   = "Brouillon",
+            ["posts.draft_note"] =
+                "Cette publication est un brouillon — seul tu peux la voir. Publie-la " +
+                "pour la rendre visible selon son audience.",
+            ["posts.publish"]       = "Publier",
+            ["my_drafts.title"]     = "Mes brouillons",
+            ["my_drafts.empty"]     = "Tu n'as pas de brouillons.",
+            ["posts.audience_all_members"] =
+                "Tout le monde dans cette communauté",
+            ["posts.audience_all_members_hint"] =
+                "Le défaut — tout membre de la communauté ci-dessus peut " +
+                "voir cette publication. Désactive-le uniquement si tu veux restreindre qui peut " +
+                "la voir.",
+            ["posts.audience_all_members_hint_edit"] =
+                "Quand actif, tout membre de cette communauté peut voir la publication. " +
+                "Désactive-le pour restreindre l'audience à des personnes ou " +
+                "groupes spécifiques.",
+            ["posts.audience_combine"] =
+                "Combinaison des sélections",
+            ["posts.audience_restrict_hint"] =
+                "Ces sélections sont additionnelles — « Tout le monde dans cette communauté » " +
+                "reste actif sauf si tu le désactives, donc la publication est visible par " +
+                "toute la communauté et les sélections que tu fais ici.",
+            ["posts.audience_only_picks"] =
+                "Ce que tu sélectionnes ici devient l'audience de la publication — rien " +
+                "au-dessus ou en dessous de ce formulaire n'y est ajouté. Une sélection vide (avec " +
+                "« Tout le monde dans cette communauté » désactivé) signifie que seul tu peux " +
+                "voir la publication.",
+            ["posts.empty_can_post"] =
+                "Pas encore de publications ici. Écris la première — elle sera visible uniquement par l'audience que " +
+                "tu choisis dans le composeur sous le titre.",
+            ["posts.empty"]        = "Pas encore de publications ici.",
+
+            // ── groups (Index / Detail / New / PostDetail) ──────────────────
+            ["groups.title"]          = "Groupes",
+            ["groups.lead"]           = "Les communautés que tu gères ou auxquelles tu appartiens.",
+            ["groups.create"]         = "Créer un groupe",
+            ["groups.empty"]          = "Pas encore de groupes.",
+            ["groups.back_all"]       = "← Tous les groupes",
+            ["groups.posts_heading"]  = "Publications",
+            ["groups.new_post"]       = "Nouvelle publication",
+            ["groups.posts_empty_can"] =
+                "Pas encore de publications. Écris la première — elle sera visible par les membres actuels.",
+            ["groups.posts_empty"]    = "Pas encore de publications ici.",
+            ["groups.new_title"]      = "Publier dans ce groupe",
+            ["groups.new_back"]       = "retour au groupe",
+            ["groups.new_submit"]     = "Publier dans le groupe",
+
+            // ── ADR 0026 — group name/description translations ───────────
+            ["groups.translations_label"] = "Traductions",
+            ["groups.translations_none"] = "Pas encore",
+            ["groups.translation_add"] = "Ajouter",
+            ["groups.translation_name_label"] = "Nom",
+            ["groups.translation_desc_label"] = "Description",
+            ["groups.translation_optional"] = "optionnel",
+            ["groups.translation_min_one"] = "Au moins un nom ou une description est requis.",
+            ["groups.translation_save"] = "Enregistrer la traduction",
+
+            // ── directory (page heading + lead) ─────────────────────────────
+            ["directory.title"] = "Annuaire",
+            ["directory.lead"]  = "Tout le monde dans le quartier — chaque habitant sur la plateforme.",
+            ["directory.empty"] = "Pas encore d'habitants dans ce quartier.",
+
+            // ── profile (page heading + primary action) ─────────────────────
+            ["profile.title"]      = "Ton profil",
+            ["profile.save_avatar"] = "Enregistrer l'avatar",
+
+            // ── profile (Edit page) ─────────────────────────────────────────
+            ["profile.edit_lede"] =
+                "C'est ici que tu décides ce que les autres habitants peuvent voir sur toi. " +
+                "Ce que tu choisis ici est exactement ce que l'annuaire des voisins " +
+                "affiche — aucune surprise.",
+            ["profile.avatar_heading"] = "Ton avatar",
+            ["profile.avatar_hint"] =
+                "JPEG, PNG, WebP ou GIF · jusqu'à 5 Mo. Enregistrer remplace " +
+                "l'avatar actuellement affiché dans l'annuaire.",
+            ["profile.name_email_heading"] = "Ton nom + e-mail",
+            ["profile.address_heading"] = "Ton adresse + téléphone (optionnel)",
+            ["profile.address_hint"] =
+                "Affiché dans la liste et le détail de l'annuaire uniquement si tu as " +
+                "aussi activé le bloc contact ci-dessous ; laisser vide pour garder ta " +
+                "rue privée pour ce profil.",
+            ["profile.phone_hint"] =
+                "Affiché dans le détail de l'annuaire uniquement si tu as " +
+                "activé le bloc contact ci-dessous ; laisser vide pour garder ton numéro " +
+                "privé pour ce profil.",
+            ["profile.who_heading"] = "Qui peut voir quoi",
+            ["profile.optin_contact"] = "Partager mes coordonnées (adresse, e-mail, téléphone)",
+            ["profile.optin_contact_note"] =
+                "Laisse désactivé si tu préfères garder ton adresse, " +
+                "ton e-mail et ton téléphone complètement masqués de " +
+                "l'annuaire. Quand c'est actif, tu choisis " +
+                "qui peut les voir dans le bloc ci-dessous.",
+            ["profile.save"] = "Enregistrer",
+            ["profile.preview_link"] = "Aperçu — comment je me présente",
+
+            // ── profile (Preview page) ───────────────────────────────────────
+            ["profile.preview_back"] = "← Retour à l'éditeur",
+            ["profile.preview_title"] = "Aperçu — comment je me présente",
+            ["profile.preview_avatar_note"] =
+                "Ton avatar, tel qu'il apparaît à côté de ton nom dans " +
+                "l'annuaire des voisins.",
+            ["profile.preview_readonly_lead"] =
+                "C'est un aperçu en lecture seule. Il montre comment ton profil " +
+                "apparaît à ",
+            ["profile.preview_readonly_tail"] =
+                " dans l'annuaire des voisins. Il ne change rien dans ton " +
+                "profil enregistré — pour apporter un changement, ",
+            ["profile.preview_edit_link"] = "édite ton profil",
+            ["profile.preview_visible_badge"] = "Visible.",
+            ["profile.preview_visible_tail"] =
+                "verra ce bloc de contact dans l'annuaire des voisins.",
+            ["profile.preview_hidden_badge"] = "Contact masqué.",
+            ["profile.preview_hidden_tail"] =
+                "ne verra pas de bloc de contact. Ton nom (et " +
+                "le badge de vérification, si tu en as un) s'affiche " +
+                "toujours dans l'annuaire — seules les coordonnées sont masquées.",
+            ["profile.contact_address"] = "Adresse",
+            ["profile.contact_email"] = "E-mail",
+            ["profile.contact_phone"] = "Téléphone",
+            ["profile.edit_profile_btn"] = "Modifier le profil",
+
+            // ── profile (the _AudienceEditor shared partial) ────────────────
+            ["profile.audience_visibility"] = "Qui peut voir ton profil",
+            ["profile.audience_contact"] = "Qui peut voir tes coordonnées",
+            ["profile.audience_off_note"] =
+                "Tes coordonnées sont actuellement masquées pour tout le monde. " +
+                "Pour changer, active « Partager mes coordonnées » ci-dessus.",
+            ["profile.audience_match_mode"] = "Mode de correspondance",
+            ["profile.audience_mode_any"] =
+                "une personne est autorisée si elle correspond à l'une des personnes/groupes que tu as sélectionnés",
+            ["profile.audience_mode_all"] =
+                "une personne est autorisée uniquement si elle correspond à toutes les personnes/groupes que tu as sélectionnés",
+
+            // ── posts (Detail page) ──────────────────────────────────────────
+            ["posts.back_to"] = "retour à",
+            ["posts.detail_edit"] = "Modifier",
+            ["posts.edited"] = "modifié",
+            ["posts.detail_why"] =
+                "Tu peux voir cette publication parce que tu correspondes à son audience " +
+                "(une autorisation de ta part, ou tu es l'auteur — la « branche propriétaire » " +
+                "de la règle C1 de refus d'audience vide).",
+            ["posts.report_button"] = "Signaler cette publication",
+            ["posts.reply_report_button"] = "Signaler cette réponse",
+            ["posts.report_reason_label"] = "Quel est le problème ?",
+            ["posts.report_optional"] = "optionnel",
+            ["posts.report_note"] =
+                "Signaler est une action d'intake — cela ne change " +
+                "pas ce que tu peux voir, et un modérateur peut suivre.",
+            ["posts.report_submit"] = "Signaler",
+            ["posts.replies_heading"] = "Réponses",
+            ["posts.replies_empty"] =
+                "Pas encore de réponses. Si tu peux voir cette publication, tu peux y répondre.",
+            ["posts.reply_heading_author"] = "Répondre (tu es l'auteur de cette publication)",
+            ["posts.reply_heading"] = "Répondre",
+            ["posts.reply_label"] = "Réponse",
+            ["posts.reply_language_label"] = "Langue",
+            ["posts.reply_language_note"] =
+                "La langue dans laquelle tu réponds — un tag, pas une " +
+                "traduction.",
+            ["posts.reply_audience_note"] =
+                "Les réponses n'ont pas d'audience propre — elles sont visibles " +
+                "selon la décision d'audience unique de cette publication (la " +
+                "règle « reply-inherits » C-M3·1). Tu réponds uniquement là où " +
+                "la publication elle-même est visible.",
+            ["posts.reply_submit"] = "Répondre",
+            ["posts.reply_edit"] = "Modifier",
+            ["posts.reply_save"] = "Enregistrer",
+            ["posts.reply_edited"] = "modifié",
+
+            // ── posts (Detail page) — author soft-delete (ADR 0024) ──
+            ["posts.delete"] = "Supprimer",
+            ["posts.reply_delete"] = "Supprimer",
+            ["posts.deleted_placeholder"] =
+                "Cette publication a été supprimée par son auteur.",
+            ["posts.reply_deleted_placeholder"] =
+                "Cette réponse a été supprimée par son auteur.",
+
+            // ── posts (Detail page) — user-added translations (ADR 0022) ──
+            ["posts.translations_label"] = "Traductions",
+            ["posts.translations_none"] = "pas encore",
+            ["posts.translation_add"] = "Ajouter",
+            ["posts.translation_title_label"] = "Titre",
+            ["posts.translation_body_label"] = "Corps",
+            ["posts.translation_optional"] = "optionnel",
+            ["posts.translation_save"] = "Enregistrer la traduction",
+
+            // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
+            ["pages.title"]       = "Pages",
+            ["pages.new_button"]  = "Nouvelle page",
+            ["pages.none"] =
+                "Pas encore de pages. Les admins globaux peuvent créer la première " +
+                "page système — une page À propos est un bon point de départ — et " +
+                "tout habitant peut démarrer son propre blog (une page à lui).",
+            ["pages.back"]        = "← Retour aux pages",
+            ["pages.by"]          = "par",
+            ["pages.delete"]      = "Supprimer",
+            ["pages.untitled"]    = "Page sans titre",
+
+            // ── blog (per-resident page feed, ADR 0040) ─────────────────────
+            ["blog.new_page"]     = "Nouvelle page de blog",
+            ["blog.empty_own"] =
+                "Tu n'as pas encore de pages de blog. Crée la première — elle devient " +
+                "la racine de ton blog, et tu peux en imbriquer d'autres sous elle.",
+            ["blog.empty_other"]  = "Cet habitant n'a pas encore de pages de blog.",
+            ["blog.draft"]        = "Brouillon",
+
+            // ── groups (Create page) ─────────────────────────────────────────
+            ["groups.create_back"] = "← Retour aux groupes",
+            ["groups.create_title"] = "Créer un groupe",
+            ["groups.create_lede"] =
+                "Un nom pour une communauté d'habitants (p. ex. « Bâtiment 4 », " +
+                "« Bénévoles », « Cyclistes »). " +
+                "Tu possèdes le groupe — tu peux ajouter et retirer des membres " +
+                "depuis la page de détail du groupe (M2, plan U10).",
+            ["groups.create_desc_hint"] = "Optionnel — une courte note que les autres habitants verront.",
+            ["groups.create_private_hint"] =
+                "Un groupe privé (p. ex. une famille) est masqué des listes " +
+                "d'autorisation/d'accès de tous les autres — seules les personnes que " +
+                "tu ajoutes comme membres peuvent l'utiliser. " +
+                "Un groupe public (p. ex. « Champignonnistes ») apparaît comme " +
+                "option dans les sélecteurs des autres habitants.",
+            ["groups.create_submit"] = "Créer le groupe",
+
+            // ── groups (Edit page) ───────────────────────────────────────────
+            ["groups.edit_back"] = "retour à la publication",
+            ["groups.edit_title"] = "Modifier ta publication",
+            ["groups.edit_lede"] =
+                "Tu modifies ta propre publication. Seul tu peux la modifier — " +
+                "l'adhésion au groupe décide qui peut la voir, mais seul son " +
+                "auteur peut la changer. Le groupe dans lequel cette publication " +
+                "apparaît est fixé ; seul le titre, le corps et la langue " +
+                "ci-dessous sont éditables.",
+            ["groups.edit_title_label"] = "Titre",
+            ["groups.edit_title_hint"] =
+                "Un court titre (≤ 120 caractères). Laisser vide pour " +
+                "une publication sans titre — la liste affichera " +
+                "ta première ligne du corps à la place.",
+            ["groups.edit_body_label"] = "Corps",
+            ["groups.edit_language_label"] = "Langue",
+            ["groups.edit_language_hint"] =
+                "La langue dans laquelle tu écris cette publication. C'est seulement " +
+                "un tag — elle n'est pas traduite — et elle garde le " +
+                "texte trouvable plus tard et permet à un lecteur d'ajouter " +
+                "sa propre version dans sa langue s'il le veut.",
+            ["groups.edit_submit"] = "Enregistrer les modifications",
+            ["groups.edit_cancel"] = "Annuler",
+
+            // ── directory (Detail page) ──────────────────────────────────────
+            ["directory.detail_back"] = "← Retour à l'annuaire",
+            ["directory.detail_verified"] = "Vérifié",
+            ["directory.detail_contact_address"] = "Adresse",
+            ["directory.detail_contact_email"] = "E-mail",
+            ["directory.detail_contact_phone"] = "Téléphone",
+            ["directory.detail_no_contact"] =
+                "Cet habitant ne t'a pas (encore) partagé de moyen de contact. Tu " +
+                "peux toujours voir sa page de profil.",
+
+            // ── community (Manage page) ──────────────────────────────────────
+            ["community.manage_back"] = "← Retour au fil",
+            ["community.manage_lede"] = "Gérer l'adhésion à cette communauté.",
+            ["community.manage_moderate"] = "Tu modères cette communauté",
+            ["community.manage_disabled"] = "Désactivé",
+            ["community.manage_availability"] = "Disponibilité",
+            ["community.manage_mandatory_label"] =
+                "Communauté obligatoire — tout le monde dans le quartier est membre",
+            ["community.manage_mandatory_hint"] =
+                "Une communauté obligatoire ne peut pas voir ses membres retirés ni " +
+                "être quittée ; décoche la case pour " +
+                "rendre l'adhésion optionnelle à nouveau.",
+            ["community.manage_make_optional"] = "Rendre optionnel",
+            ["community.manage_make_mandatory"] = "Rendre obligatoire",
+            ["community.manage_members"] = "Membres",
+            ["community.manage_mandatory_note"] =
+                "Cette communauté est obligatoire — tout le monde est membre, donc " +
+                "il n'y a personne à retirer. Les lignes listées sont " +
+                "des adhésions explicites, conservées au cas où la " +
+                "communauté redeviendrait optionnelle.",
+            ["community.manage_no_members"] = "Pas encore de membres explicites — ajoute-en ci-dessous.",
+            ["community.manage_you"] = "Toi",
+            ["community.manage_remove"] = "Retirer",
+            ["community.manage_add_member"] = "Ajouter un membre",
+            ["community.manage_all_members"] =
+                "Tout le monde dans le quartier est déjà membre ici.",
+            ["community.manage_pick_resident"] = "Choisis un habitant à ajouter…",
+
+            // ── ADR 0026 — community name/description translations ────────
+            ["community.translations_label"] = "Traductions",
+            ["community.translations_none"] = "Pas encore",
+            ["community.translation_add"] = "Ajouter",
+            ["community.translation_name_label"] = "Nom",
+            ["community.translation_desc_label"] = "Description",
+            ["community.translation_optional"] = "optionnel",
+            ["community.translation_min_one"] = "Au moins un nom ou une description est requis.",
+            ["community.translation_save"] = "Enregistrer la traduction",
+
+            // ── moderation (Index page) ──────────────────────────────────────
+            ["moderation.title"] = "Modération",
+            ["moderation.empty"] = "Pas encore de signalements. La file est vide.",
+            ["moderation.th_status"] = "Statut",
+            ["moderation.th_post"] = "Publication",
+            ["moderation.th_component"] = "Composant",
+            ["moderation.th_reporter"] = "Signaleur",
+            ["moderation.th_filed"] = "Déposé",
+            ["moderation.th_action"] = "Action",
+            ["moderation.review"] = "Examiner →",
+
+            // ── moderation (Resolve page) ────────────────────────────────────
+            ["moderation.resolve_title"] = "Modération — Examiner un signalement",
+            ["moderation.details"] = "Détails du signalement",
+            ["moderation.th_post_label"] = "Publication",
+            ["moderation.th_component_label"] = "Composant",
+            ["moderation.th_reporter_label"] = "Signaleur",
+            ["moderation.th_author_label"] = "Auteur de la publication",
+            ["moderation.th_filed_label"] = "Déposé",
+            ["moderation.th_reason_label"] = "Raison",
+            ["moderation.no_reason"] = "(aucune raison donnée)",
+            ["moderation.th_body_label"] = "Corps de la publication",
+            ["moderation.body_preview"] = "aperçu de la publication",
+            ["moderation.assign_header"] = "Assigner à un modérateur permanent",
+            ["moderation.assign_label"] =
+                "Modérateur permanent du composant de ce signalement",
+            ["moderation.assign_pick"] = "Choisir un modérateur permanent…",
+            ["moderation.assign_submit"] = "Assigner",
+            ["moderation.cancel"] = "Annuler",
+            ["moderation.unlock_submit"] = "Déverrouiller",
+            ["moderation.resolve_header"] = "Réoudre (clôturer ce signalement)",
+            ["moderation.resolve_submit"] = "Réoudre",
+            ["moderation.back_to_queue"] = "← Retour à la file",
+
+            // ── reply-report-target lane (ADR 0023) ─────────────────────────
+            ["moderation.queue_reply_by"] = "réponse de",
+            ["moderation.resolve_reply_label"] = "Réponse (cible de ce signalement)",
+            ["moderation.resolve_reply_by"] = "Réponse de",
+
+            // ── account (Verify / Resend / AccessDenied) ─────────────────────
+            ["account.verify_title"] = "Vérifier ton compte",
+            ["account.verify_pending"] =
+                "Nous confirmons ton compte — tu seras connecté dans un instant.",
+            ["account.verify_again"] = "S'inscrire à nouveau",
+            ["account.resend_title"] = "Renvoyer l'e-mail de confirmation",
+            ["account.resend_lede"] =
+                "Entre l'e-mail avec lequel tu t'es inscrit et nous enverrons un nouveau lien de vérification.",
+            ["account.resend_submit"] = "Renvoyer",
+            ["account.resend_create"] = "Tu crées ton compte ?",
+            ["account.resend_signup"] = "S'inscrire",
+            ["account.denied_title"] = "Accès refusé",
+            ["account.denied_lede"] = "Tu n'as pas la permission de voir cette page.",
+            ["account.denied_home"] = "Retour à l'accueil",
+
+            // ── admin (Audit page) ───────────────────────────────────────────
+            ["admin.audit_title"] = "Audit d'accès",
+            ["admin.audit_lede"] =
+                "Chaque décision d'accès au contenu restreint — Allow et Deny — plus " +
+                "les actions admin et les lignes agrégées de listes par lot. " +
+                "Toujours actif ; purgé selon le niveau de l'instance (§6.4).",
+            ["admin.audit_filter"] = "Filtrer",
+            ["admin.audit_th_at"] = "À (UTC)",
+            ["admin.audit_th_actor"] = "Acteur",
+            ["admin.audit_th_effective"] = "Effectif",
+            ["admin.audit_th_action"] = "Action",
+            ["admin.audit_th_target"] = "Cible",
+            ["admin.audit_th_aggregate"] = "Agrégat",
+            ["admin.audit_th_via"] = "Via",
+            ["admin.audit_th_outcome"] = "Résultat",
+
+            // ── admin (Break-glass page) ─────────────────────────────────────
+            ["admin.breakglass_title"] = "Break-glass",
+            ["admin.breakglass_granted"] = "Accordé à (UTC)",
+            ["admin.breakglass_expires"] = "Expire à (UTC)",
+            ["admin.breakglass_status"] = "Statut",
+            ["admin.breakglass_consumed"] = "consommé — élévation active jusqu'à expiration",
+            ["admin.breakglass_presented"] = "présenté mais pas encore consommé",
+            ["admin.breakglass_token_label"] = "Jeton unique (de l'opérateur)",
+            ["admin.breakglass_token_hint"] =
+                "Consommer ce jeton est une action unique. Il active l'élévation " +
+                "jusqu'à son expiration.",
+            ["admin.breakglass_consume"] = "Consommer le jeton",
+
+            // ── locale (settings + public picker) ────────────────────────────
+            ["locale.settings_title"] = "Tes paramètres",
+            ["locale.language_heading"] = "Langue",
+            ["locale.lede"] =
+                "Choisis la langue que la plateforme t'affiche. Ton choix est enregistré dans " +
+                "un cookie du navigateur — il prend effet à la prochaine requête, et " +
+                "n'affecte jamais les autres habitants.",
+            ["locale.preferred_label"] = "Langue préférée",
+            ["locale.default_note"] =
+                "Le défaut de l'instance est ",
+            ["locale.default_note_tail"] =
+                ". Si ta langue préférée est supprimée par un admin plus tard, " +
+                "la plateforme bascule silencieusement sur le défaut de l'instance.",
+            ["locale.save"] = "Enregistrer",
+            ["locale.reset"] = "Réinitialiser au défaut de l'instance",
+            ["locale.public_title"] = "Choisis ta langue",
+            ["locale.instance_default"] = "— défaut de l'instance",
+
+            // ── announcements (shared labels + New/Edit compose) ─────────────
+            ["announcements.scope_label"] = "Qui voit cela ?",
+            ["announcements.scope_public"] =
+                "Tout le monde (public) — visible par les visiteurs et les habitants",
+            ["announcements.scope_resident"] =
+                "Habitants — visible uniquement quand connecté",
+            ["announcements.community_label"] = "Envoyer à une communauté spécifique (optionnel)",
+            ["announcements.all_residents"] = "Tous les habitants",
+            ["announcements.community_hint"] =
+                "Laisser sur « Tous les habitants » pour envoyer à tout le monde, ou choisir une communauté pour restreindre qui le voit.",
+            ["announcements.title_label"] = "Titre",
+            ["announcements.title_hint"] = "Un court titre (jusqu'à 120 caractères).",
+            ["announcements.body_label"] = "Corps",
+            ["announcements.pin_label"] = "Épingler en haut de toutes les pages",
+            ["announcements.cancel"] = "Annuler",
+            ["announcements.new_title"] = "Nouvelle annonce",
+            ["announcements.new_lede"] =
+                "Les annonces sont des avis qui apparaissent en propre, " +
+                "séparés du fil de la communauté. Une annonce publique " +
+                "est visible par tout le monde, y compris les personnes non " +
+                "connectées (p. ex. une fenêtre de maintenance). Une annonce " +
+                "habitant n'est visible que par les habitants connectés " +
+                "(p. ex. un appel « aide-nous avec X »).",
+            ["announcements.new_scope_hint"] =
+                "Les annonces publiques sont visibles par tout le monde, y compris " +
+                "les visiteurs non connectés (p. ex. une fenêtre de maintenance " +
+                "ou un avis de panne). Les annonces habitants " +
+                "ne sont visibles que par les habitants connectés.",
+            ["announcements.new_submit"] = "Créer l'annonce",
+            ["announcements.edit_title"] = "Modifier l'annonce",
+            ["announcements.edit_lede"] =
+                "Mets à jour le titre, le corps et la visibilité de cette " +
+                "annonce. Une annonce publique est visible par tout le monde, " +
+                "y compris les personnes non connectées " +
+                "(p. ex. une fenêtre de maintenance). Une annonce habitant " +
+                "n'est visible que par les habitants connectés " +
+                "(p. ex. un appel « aide-nous avec X »).",
+            ["announcements.edit_scope_hint"] =
+                "Changer qui voit cela s'applique immédiatement pour le prochain lecteur.",
+            ["announcements.edit_submit"] = "Enregistrer les modifications",
+            ["announcements.pin_hint"] =
+                "Une annonce épinglée apparaît aussi comme bannière " +
+                "en haut de chaque page (y compris l'accueil), " +
+                "en plus de la liste habituelle des annonces. Sa " +
+                "visibilité suit toujours l'audience que tu as choisie ci-dessus : " +
+                "un épinglage public s'affiche à tout visiteur ; un épinglage " +
+                "habitant uniquement quand un utilisateur est connecté. Si plus " +
+                "d'une est épinglée, la plus récemment épinglée l'emporte.",
+            ["announcements.language_note"] =
+                "La langue dans laquelle tu écris cette annonce. C'est seulement " +
+                "un tag — elle n'est pas traduite — et elle garde le texte " +
+                "trouvable plus tard et permet à un lecteur d'ajouter sa propre " +
+                "version dans sa langue s'il le veut.",
+
+            // ── announcements (Index + Detail + pinned banner) ───────────────
+            ["announcements.index_title"] = "Annonces",
+            ["announcements.index_lede"] =
+                "Avis de la plateforme : les annonces publiques sont visibles par tout le monde (p. ex. " +
+                "maintenance planifiée) ; les annonces réservées aux habitants " +
+                "sont visibles par tous les utilisateurs connectés " +
+                "(p. ex. appels « aide-nous avec X »).",
+            ["announcements.all"] = "Toutes les annonces",
+            ["announcements.new_button"] = "Nouvelle annonce",
+            ["announcements.empty"] = "Pas encore d'annonces.",
+            ["announcements.read_more"] = "Lire la suite…",
+            ["announcements.scope_everyone"] = "tout le monde",
+            ["announcements.scope_residents"] = "habitants",
+            ["announcements.pinned_badge"] = "épinglée",
+            ["announcements.edit_button"] = "Modifier",
+            ["announcements.delete"] = "Supprimer",
+            ["announcements.detail_back"] = "← Retour aux annonces",
+            ["announcements.detail_untitled"] = "Annonce sans titre",
+            ["announcements.by"] = "par",
+            ["announcements.edited"] = "modifiée",
+            ["announcements.banner_read_more"] = "Lire la suite",
+            ["announcements.banner_all"] = "Toutes les annonces",
+
+            // ── static pages (Page — the terms/help shell) ───────────────────
+            ["static.last_updated"] = "Dernière mise à jour :",
+
+            // ── shared (the _GrantPickers partial — static markup only) ─────
+            ["grant.heading"] = "À qui accorder",
+            ["grant.hint"] =
+                "Coche une ou plusieurs — ou utilise la ligne « Select all » " +
+                "au-dessus de chaque liste comme raccourci.",
+            ["grant.empty_users"] =
+                "Tu es le seul habitant vérifié, donc il n'y a encore " +
+                "personne à qui accorder.",
+            ["grant.empty_groups"] =
+                "Aucun groupe n'existe encore sur la plateforme — crée-en un " +
+                "sous « Groupes » pour ajouter une visibilité par groupe.",
+
+            // ── admin (page heading + primary action) ───────────────────────
+            ["admin.title"]  = "Administration",
+            ["admin.verify"] = "Vérifier",
+
+            // ── rich editor (the RE toolbar button labels, ADR 0031) ────────
+            ["rc.editor.bold"]    = "B",
+            ["rc.editor.italic"]  = "I",
+            ["rc.editor.code"]    = "C",
+            ["rc.editor.h1"]      = "H1",
+            ["rc.editor.h2"]      = "H2",
+            ["rc.editor.h3"]      = "H3",
+            ["rc.editor.list"]    = "•",
+            ["rc.editor.olist"]   = "1.",
+            ["rc.editor.link"]    = "Lien",
+            ["rc.editor.image"]   = "Image",
+            ["rc.editor.attach"]  = "Joindre un fichier",
+            ["rc.editor.source"]      = "</>",
+            ["rc.editor.showPreview"] = "Aperçu",
+
+            // ── about (the About product surface, ADR 0042 D5) ──────────────
+            ["about.eyebrow"]             = "Privé par défaut",
+            ["about.lead"] =
+                "Un chez-soi pour tout ce que ton quartier fait — " +
+                "le fil, les groupes et les notes qui méritent mieux " +
+                "qu'un groupe de chat. Privé, en langage clair, et à toi.",
+            ["about.cta_feed"]            = "Voir le fil",
+            ["about.cta_notes"]           = "Lire les notes épinglées",
+            ["about.features.one.title"]  = "Un fil pour la rue",
+            ["about.features.one.body"] =
+                "Publications et fils de discussion de tes blocs et ruelles, en " +
+                "un seul endroit calme — pas d'algorithme, pas de bruit.",
+            ["about.features.groups.title"]  = "Des groupes qui collent",
+            ["about.features.groups.body"] =
+                "Échange de jardin, club de lecture, ronde de nuit — un " +
+                "groupe pour tout ce que le quartier fait déjà.",
+            ["about.features.pinned.title"]  = "Épinglées là où ça compte",
+            ["about.features.pinned.body"] =
+                "Coupures d'eau, travaux de rue, les nouveaux " +
+                "ralentisseurs — des notes qui restent en place au lieu de défiler.",
+            ["about.stats.neighbors"]  = "habitants à bord",
+            ["about.stats.groups"]     = "groupes & communautés",
+            ["about.stats.posts"]      = "publications & fils ce mois-ci",
+            ["about.stats.pinned"]     = "notes épinglées en cours",
+            ["about.project.eyebrow"]  = "Open source",
+            ["about.project.heading"]  = "Le code, les décisions, la doc de design",
+            ["about.project.lead"] =
+                "Si tu es curieux de savoir comment ça marche — ou si tu " +
+                "t'apprêtes à l'héberger pour ton quartier — tout est public.",
+        };
+
+    /// <summary>
     /// The closed key set (the admin editor's list, the seeder's loop bound, and
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
