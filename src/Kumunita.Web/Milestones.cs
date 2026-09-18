@@ -28,6 +28,7 @@ public static class Milestones
         new("ML", "Multilingual — UI & platform texts (terms, about, help) translatable; admin manages languages (ADR 0005)", StatusDone),
         new("ML-UI", "Multilingual — live UI: every in-scope view resolves per request; seeded en floor; key-managed admin editor; public language picker (ADR 0015)", StatusDone),
         new("LS", "Languages seeded — German & French ship enabled on first boot with complete UI + about/terms/help baselines (en stays default & the only code-owned language; ADR 0042)", StatusDone),
+        new("SP", "System pages shipped — the five platform surfaces (About, Terms, Help, Privacy, Code of conduct) ship complete in en/de/fr and are reachable from the UI: an unconditional footer Platform column (all five) + the /admin Platform pages section (preview + edit); Privacy and Code of conduct are the two new seeded pages, and about stays the product-story view, not a Markdown page (ADR 0043)", StatusDone),
         new("TZ", "Timezone — platform default (admin) + per-resident override; timestamps rendered in the effective zone (ADR 0019)", StatusDone),
         new("DF", "Date & time format — platform default (admin) + per-resident override + custom; timestamps rendered in the effective format (ADR 0020)", StatusDone),
         new("TR", "Translator role — delegate translation editing to non-admin residents; UI strings + static pages open to GlobalAdmin ∪ Translator (ADR 0021)", StatusDone),

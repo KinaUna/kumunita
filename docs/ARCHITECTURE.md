@@ -569,7 +569,14 @@ resolves per request through a `<kw-l>` TagHelper against the provider, the
 the floor — the first-boot seeder's `en` rows are a stored copy, no reseed is
 ever needed), the admin editor is key-managed (a closed list, no hand-typed
 key), and the picker is public (signed-out residents can choose a language) —
-closing the `/about` follow-on the `ML` record had left open.
+closing the `/about` follow-on the `ML` record had left open. The `SP` lane
+(ADR 0043) widened the static-page routes from three to the **five-surface
+set**: `/privacy` + `/conduct` join the hard-coded routes (404 floor, ADR
+0043 D2) alongside `/terms` / `/help`; the four `Page`-backed surfaces (terms
+/ help / privacy / conduct) are seeded under the `system/` root, `/about`
+stays the product-story **view** (not a seeded page, ADR 0043 D1), and the
+footer now carries an unconditional "Platform" column linking all five (ADR
+0043 D4).
 
 - **What is translatable:** UI strings and platform static pages (terms, about,
   help) — §5 documents. UGC is always rendered **as authored**; machine

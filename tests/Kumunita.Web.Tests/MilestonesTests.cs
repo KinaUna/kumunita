@@ -16,14 +16,14 @@ public class MilestonesTests
     public void Roadmap_Covers_M0_Through_M6_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "PG", "M4", "M5", "M6" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "PG", "M4", "M5", "M6" },
             Ids.ToList());
     }
 
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "TZ", "DF", "TR", "RC", "GU", "GA", "RE" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);

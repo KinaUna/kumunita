@@ -288,6 +288,14 @@ ships** (U05 owns it — the Consequences below).
   are element content only; the `kw-l` registry gains six `footer.platform.*`
   keys at full `EnValues` / `DeValues` / `FrValues` parity (the
   `KwLRegistryConsistencyTests` pin holds).
+- **2026-09-18 (U05) — the hard-coded routes are en-body by contract.** A
+  reader of D2 should not expect translated bodies on the hard-coded routes:
+  under a `de` / `fr` preference, `/privacy` / `/terms` / `/help` / `/conduct`
+  render the **`en` body with no `td-variant` chip-swap containers** (nav /
+  footer / "last updated" localize, but the body stays `en`), because
+  `StaticPageViewModel` carries no translations and reads no cookie — exactly
+  as designed. The ADR 0027 chip-swap is a **Show-surface
+  (`/pages/{path}`) mechanic**, not a property of the hard-coded routes.
 
 ## Revisit when
 

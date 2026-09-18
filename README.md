@@ -122,7 +122,10 @@ roadmap table in `docs/ARCHITECTURE.md`); **M5**: projects.
   (ADR 0042) then ships a **bundled initial pack**: a first-boot instance has
   German and French enabled with complete UI-string and about/terms/help
   baselines (English stays the default and the only code-owned language);
-  per-string fallback still lands on the en floor.
+  per-string fallback still lands on the en floor. The `SP` lane (ADR 0043)
+  then ships the **platform-page set as five surfaces** — About / Terms / Help
+  / Privacy / Code of conduct — complete in en/de/fr and reachable from the
+  footer + the admin shell.
 - **Timezone** — the platform carries a **default time zone** the admin sets
   once (`/admin/timezone`, audited); each resident can override it in their
   own settings page (the time-zone section of `/settings/language`). Every
@@ -196,6 +199,7 @@ stays trivial and the authorization rules can grow freely.
   surface + `/terms`/`/help` static pages. **Done.**
 - **Multilingual — live UI** (`ML-UI`, ADR 0015) — in-scope views resolve per request; seeded en floor; key-managed admin editor; public language picker; /about static page. **Done.**
 - **Languages seeded** (`LS`, ADR 0042) — a first-boot instance ships German and French enabled with complete UI-string and about/terms/help baselines (English stays the default and the only code-owned language); per-string fallback still lands on the en floor. **Done.**
+- **System pages** (`SP`, ADR 0043) — the five platform surfaces (About, Terms, Help, Privacy, Code of conduct) ship complete in en/de/fr and are reachable: an unconditional footer "Platform" column (all five) + a /admin "Platform pages" section (preview + edit). Privacy and Code of conduct are the two new seeded pages (privacy is a platform-level statement from the operator's data-controller position — the operator completes it in-app; the single locale cookie is named, no third-party cookies); about stays the product-story view, not a Markdown page. **Done.**
 - **Timezone** (`TZ`, ADR 0019) — platform-default time zone (admin-set); per-resident override in personal settings; all timestamps rendered in the effective zone (`kw-dt`). **Done.**
 - **Date & time format** (`DF`, ADR 0020) — platform-default date-time format (admin-set); per-resident override in personal settings; presets (Long / Short / ISO / Day-first) + custom format; all timestamps rendered in the effective format (`kw-dt`). **Done.**
 - **Translator** (`TR`, ADR 0021) — a GlobalAdmin can grant the `Translator` role to a resident, who then may edit the platform's UI strings and static pages; catalog management (add/enable/reorder/set-default/remove) stays GlobalAdmin-only. **Done.**

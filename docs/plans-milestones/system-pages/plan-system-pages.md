@@ -313,3 +313,41 @@ links. **No Core change in this unit.**
 > The references above to "M4 stays the single `StatusNext`" describe
 > the state *before* this flip; U05's ship will still add `SP` as
 > `StatusDone` and the single-in-progress pin will keep asserting `PG`.
+
+## U05
+
+**Shipped (docs + the two roadmap files only — no app behavior):** the doc
+trio and the ARCHITECTURE note. Concretely: the `SP` row in `Milestones.cs`
+as `StatusDone` (immediately after the `LS` row); `"SP"` inserted after
+`"LS"` in both `MilestonesTests` lists (the ordered-ids pin + the
+shipped-done pin), with `PG_Is_The_Single_InProgress_Milestone` left
+unchanged and still passing; the README Roadmap gains the one-line `SP`
+entry after the `LS` line, and the Multilingual feature bullet names the `SP`
+five-surface follow-on; `docs/ARCHITECTURE.md`'s static-page routes note now
+names the five-surface set (`/privacy` + `/conduct` joining the hard-coded
+routes, the four `Page`-backed surfaces seeded under `system/`, `/about`
+staying the product-story view, the unconditional footer "Platform" column);
+and ADR 0043 gains the dated en-body-by-contract clarification bullet below.
+ADR 0005 §B's amendment note (added in U00) was verified present and
+consistent with the five-surface set — **not touched**.
+
+**Reconciliation recorded (verbatim), not a defect to "fix":**
+
+> Under a `de`/`fr` preference, the **hard-coded routes** (`/privacy`,
+> `/terms`, `/help`, `/conduct`) render the **`en` body with no `td-variant`
+> chip-swap containers** — the nav / footer / "last updated" localize, but the
+> body stays `en`. The chip-swap (en/de/fr, authored-in language
+> default-active, the cookie never auto-switching) is a feature of the
+> **Show surface** (`/pages/system/{slug}`), not the hard-coded routes. This
+> is **by contract**: ADR 0043 D2 says the routes read the `en` `Page` doc,
+> and ADR 0027 makes the chip-swap a detail-surface mechanic.
+> `StaticPagesController`'s `StaticPageViewModel` carries no translations and
+> reads no cookie — exactly as designed.
+
+**Supersession note:** this unit's plan part-(c) wording ("each of
+`/about`, `/terms`, `/help`, `/privacy`, `/conduct` … with a `de` / `fr`
+preference the page bodies are in that language, the chip-swap variants
+present") was written against the Show surface and is **superseded by this
+record for the hard-coded routes** — the shipped behavior (en body on the
+hard-coded routes, chip-swap only on the Show surface) is the contract,
+per ADR 0027 + ADR 0043 D2.
