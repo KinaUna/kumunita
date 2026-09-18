@@ -69,4 +69,24 @@ public sealed class AdminIndexViewModel
 
     public IReadOnlyList<CommunityRow> Communities { get; init; } = [];
     public int DisabledCommunityCount => Communities.Count(c => !c.Enabled);
+
+    /// <summary>
+    /// SP U03 (ADR 0043 D4) — one row of the <c>/admin</c> "Platform pages"
+    /// affordance: the five shipped platform surfaces. Every row carries the
+    /// hard-coded <see cref="Route"/> (the preview link, which renders
+    /// unconditionally — floor-honesty); the four <c>Page</c>-backed
+    /// surfaces additionally resolve a <see cref="PageId"/> (the edit
+    /// link, <c>/pages/{id}/edit</c>). <c>about</c> normally has
+    /// <c>PageId == null</c> (ADR 0043 D1 — it is a view, not a seeded
+    /// page) and renders preview-only; a missing slug on the other four is
+    /// absence-tolerant (a row with no id), not an error.
+    /// </summary>
+    public sealed class PlatformPageRow
+    {
+        public string Slug { get; init; } = string.Empty;
+        public string Route { get; init; } = string.Empty;
+        public string? PageId { get; init; }
+    }
+
+    public IReadOnlyList<PlatformPageRow> PlatformPages { get; init; } = [];
 }

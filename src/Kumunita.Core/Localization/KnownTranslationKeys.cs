@@ -114,6 +114,15 @@ public static class KnownTranslationKeys
                 "readable by you, not the world.",
             ["footer.gtk_oss"] =
                 "Kumunita is open source — the code, the decisions, the docs.",
+            // SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
+            // shipped platform surfaces (about view + the four Page docs),
+            // linked unconditionally for every visitor.
+            ["footer.platform.heading"] = "Platform",
+            ["footer.platform.about"]   = "About",
+            ["footer.platform.terms"]   = "Terms of use",
+            ["footer.platform.help"]    = "Help",
+            ["footer.platform.privacy"] = "Privacy",
+            ["footer.platform.conduct"] = "Code of conduct",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Settings",
@@ -853,6 +862,15 @@ public static class KnownTranslationKeys
                 "und alles ist für dich, nicht für die Welt, lesbar.",
             ["footer.gtk_oss"] =
                 "Kumunita ist Open Source — der Code, die Entscheidungen, die Doku.",
+            // SP U03 (ADR 0043 D4) — die Footer-Spalte "Plattform": die fünf
+            // ausgelieferten Plattform-Oberflächen (About-View + die vier
+            // Page-Dokumente), für jede:n Besucher:in verlinkt.
+            ["footer.platform.heading"] = "Plattform",
+            ["footer.platform.about"]   = "Über uns",
+            ["footer.platform.terms"]   = "Nutzungsbedingungen",
+            ["footer.platform.help"]    = "Hilfe",
+            ["footer.platform.privacy"] = "Datenschutz",
+            ["footer.platform.conduct"] = "Verhaltenskodex",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Einstellungen",
@@ -1546,6 +1564,15 @@ public static class KnownTranslationKeys
                 "et tout est lisible par toi, pas par le monde.",
             ["footer.gtk_oss"] =
                 "Kumunita est open source — le code, les décisions, la documentation.",
+            // SP U03 (ADR 0043 D4) — la colonne "Plateforme" du pied de page :
+            // les cinq surfaces livrées (la vue à propos + les quatre
+            // documents Page), liées pour chaque visiteur·se.
+            ["footer.platform.heading"] = "Plateforme",
+            ["footer.platform.about"]   = "À propos",
+            ["footer.platform.terms"]   = "Conditions d'utilisation",
+            ["footer.platform.help"]    = "Aide",
+            ["footer.platform.privacy"] = "Confidentialité",
+            ["footer.platform.conduct"] = "Règles de conduite",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Paramètres",

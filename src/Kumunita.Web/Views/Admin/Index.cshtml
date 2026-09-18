@@ -29,6 +29,57 @@
     <a asp-action="BreakGlass" class="btn btn-outline-secondary">Break-glass</a>
 </div>
 
+@* SP U03 (ADR 0043 D4) — the "Platform pages" affordance: the five shipped
+   platform surfaces, each with a preview link (the route — always present)
+   and, for the four Page-backed surfaces, an edit link (id-based,
+   /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
+   view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
+<h3>Platform pages</h3>
+<p class="text-muted">
+    The five surfaces a fresh instance ships (ADR 0043 D1). Preview opens the
+    resident-facing route; edit opens the page composer (GlobalAdmin-only
+    standing, ADR 0040 §2). "About" is the product-story view — preview only.
+</p>
+<table class="table table-sm align-middle mb-4">
+    <thead>
+        <tr>
+            <th>Surface</th>
+            <th>Route</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @* Row labels are plain text (the admin view's local convention — mostly
+           non-kw-l English; an interpolated kw-l key would break the
+           KwLRegistryConsistencyTests static key scan). The labels match the
+           footer.platform.* registry values by design. *@
+        @{
+            var platformLabels = new Dictionary<string, string>
+            {
+                ["about"]   = "About",
+                ["terms"]   = "Terms of use",
+                ["help"]    = "Help",
+                ["privacy"] = "Privacy",
+                ["conduct"] = "Code of conduct",
+            };
+        }
+        @foreach (var row in Model.PlatformPages)
+        {
+            <tr>
+                <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
+                <td><code>@row.Route</code></td>
+                <td class="text-end">
+                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
+                    @if (row.PageId is not null)
+                    {
+                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-primary">Edit</a>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
 <h2>Accounts</h2>
 <p class="text-muted">
     @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.

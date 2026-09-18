@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -22,8 +23,70 @@ public sealed class AdminController(
     AppDbContext identities,
     IDocumentStore store,
     IIdentityService identity,
-    IUserInfoService userInfo) : Controller
+    IUserInfoService userInfo,
+    IPageService pages) : Controller
 {
+    // SP U03 (ADR 0043 D4) — the five shipped platform surfaces, in the
+    // footer-column order (about view first, then the four Page docs). The
+    // slugs are the ADR 0040 canonical `system/{slug}` paths; the bare-slug
+    // fallback mirrors StaticPagesController.Page (ADR 0040's pre-migration
+    // re-parent seam). `about` normally resolves to no id (ADR 0043 D1 — it
+    // is a view, not a seeded page): that is correct, not a defect.
+    private static readonly (string Slug, string Route)[] PlatformSurfaceRows =
+    {
+        ("about",   "/about"),
+        ("terms",   "/terms"),
+        ("help",    "/help"),
+        ("privacy", "/privacy"),
+        ("conduct", "/conduct"),
+    };
+
+    public static async Task<string?> ResolvePageIdAsync(IPageService pages, string slug)
+    {
+        Page? page;
+        try
+        {
+            page = await pages.GetByPathAsync($"system/{slug}");
+        }
+        catch (KeyNotFoundException)
+        {
+            try
+            {
+                page = await pages.GetByPathAsync(slug);
+            }
+            catch (KeyNotFoundException)
+            {
+                page = null;
+            }
+        }
+        return page?.Id;
+    }
+
+    /// <summary>
+    /// SP U03 (ADR 0043 D4) — composes the five <see cref="AdminIndexViewModel
+    /// .PlatformPageRow"/> rows in footer order, resolving each slug to a page id
+    /// (the edit target) via <see cref="ResolvePageIdAsync"/>. Pure: no EF Core
+    /// round-trip, no <see cref="AdminController"/> instance state — callable from
+    /// <see cref="Index"/> and from the test harness without a database.
+    /// <c>about</c> is a view, not a seeded page (ADR 0043 D1), so it normally
+    /// yields <c>PageId == null</c>; the other four resolve to their seeded
+    /// <c>system/{slug}</c> ids (or <c>null</c> if absent — preview-only).
+    /// </summary>
+    public static async Task<IReadOnlyList<AdminIndexViewModel.PlatformPageRow>>
+        BuildPlatformPagesAsync(IPageService pages)
+    {
+        var ids = await Task.WhenAll(
+            PlatformSurfaceRows.Select(r => ResolvePageIdAsync(pages, r.Slug)));
+        return ids
+            .Select((pageId, i) => new AdminIndexViewModel.PlatformPageRow
+            {
+                Slug   = PlatformSurfaceRows[i].Slug,
+                Route  = PlatformSurfaceRows[i].Route,
+                PageId = pageId
+            })
+            .ToList();
+    }
+
     private static string? AdminSubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
@@ -118,11 +181,18 @@ public sealed class AdminController(
             })
             .ToList();
 
+        // SP U03 (ADR 0043 D4) — the "Platform pages" affordance (the five rows,
+        // in footer order, each with its resolved page id or null — see
+        // <see cref="BuildPlatformPagesAsync"/>). `about` is a view, not a page
+        // (ADR 0043 D1), so it lands as a preview-only row.
+        var platformPages = await BuildPlatformPagesAsync(pages);
+
         return View(new AdminIndexViewModel
         {
             Accounts    = accountsWithRoles,
             Components  = componentOptions,
-            Communities = communityRows
+            Communities = communityRows,
+            PlatformPages = platformPages
         });
     }
 

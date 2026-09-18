@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Marten;
@@ -129,7 +130,10 @@ public class AdminControllerBlockTests
             identities: db,
             store:      Substitute.For<IDocumentStore>(),
             identity:   identity,
-            userInfo:   Substitute.For<IUserInfoService>());
+            userInfo:   Substitute.For<IUserInfoService>(),
+            // SP U03 — these lanes never touch the Platform-pages resolution;
+            // a default (unconfigured) stub is fine.
+            pages:      Substitute.For<IPageService>());
 
         // Controller.User is read-only (derives from Controller.Context.User). Set the
         // DefaultHttpContext's User to a principal whose Subject claim is the admin's —

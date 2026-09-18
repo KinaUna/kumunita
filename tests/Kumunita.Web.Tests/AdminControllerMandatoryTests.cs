@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -130,7 +131,10 @@ public class AdminControllerMandatoryTests
             identities: db,
             store:      Substitute.For<IDocumentStore>(),
             identity:   Substitute.For<IIdentityService>(),
-            userInfo:   userInfo);
+            userInfo:   userInfo,
+            // SP U03 — these lanes never touch the Platform-pages resolution;
+            // a default (unconfigured) stub is fine.
+            pages:      Substitute.For<IPageService>());
 
         // Principal from raw claims: the AdminSubject claim is what
         // AdminSubjectId reads, and the role claim carries GlobalAdmin into

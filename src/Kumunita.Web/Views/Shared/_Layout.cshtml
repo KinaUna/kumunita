@@ -104,6 +104,21 @@
                         <li><a asp-controller="Posts" asp-action="AllSections">The feed</a></li>
                     </ul>
                 </div>
+                @* SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
+                   shipped platform surfaces, linked **unconditionally** for every
+                   visitor (floor-honesty — no existence probe, no @if: a link whose
+                   page is absent from the tree lands on its existing floor). The
+                   navbar is deliberately untouched (the recorded D4 decision). *@
+                <div class="col-6 col-md-4 col-lg-2">
+                    <h3><kw-l key="footer.platform.heading">Platform</kw-l></h3>
+                    <ul class="list-unstyled d-grid gap-2">
+                        <li><a href="/about"><kw-l key="footer.platform.about">About</kw-l></a></li>
+                        <li><a href="/terms"><kw-l key="footer.platform.terms">Terms of use</kw-l></a></li>
+                        <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
+                        <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
+                        <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
+                    </ul>
+                </div>
                 <div class="col-6 col-md-4 col-lg-3">
                     <h3>The project</h3>
                     <ul class="list-unstyled d-grid gap-2">

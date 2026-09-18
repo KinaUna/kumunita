@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -120,7 +121,10 @@ public class AdminControllerSetRoleTests
             identities: db,
             store:      Substitute.For<IDocumentStore>(),
             identity:   identity,
-            userInfo:   Substitute.For<IUserInfoService>());
+            userInfo:   Substitute.For<IUserInfoService>(),
+            // SP U03 — these lanes never touch the Platform-pages resolution;
+            // a default (unconfigured) stub is fine.
+            pages:      Substitute.For<IPageService>());
 
         var claims = new List<Claim>
         {

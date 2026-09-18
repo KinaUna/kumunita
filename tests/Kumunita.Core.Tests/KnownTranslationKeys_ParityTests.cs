@@ -190,4 +190,48 @@ public class KnownTranslationKeys_ParityTests
                 $"ADR 0042 D5 key '{key}' is missing from FrValues");
         }
     }
+
+    // ── SP U03 — the footer.platform.* contract (ADR 0043 D4) ──
+
+    [Fact(DisplayName = "SP U03: the six footer.platform.* keys (ADR 0043 D4) are registered with non-empty en/de/fr values")]
+    public void Footer_Platform_Keys_From_Adr_0043_D4_Are_Registered_NonEmpty_AllThree_Dictionaries()
+    {
+        // The D4 closed contract — the footer "Platform" column's heading +
+        // the five shipped surfaces (the about view + the four Page docs).
+        var d4Keys = new[]
+        {
+            "footer.platform.heading",
+            "footer.platform.about",
+            "footer.platform.terms",
+            "footer.platform.help",
+            "footer.platform.privacy",
+            "footer.platform.conduct",
+        };
+
+        Assert.Equal(6, d4Keys.Length);
+
+        foreach (var key in d4Keys)
+        {
+            foreach (var (label, dict) in new[]
+            {
+                ("en", KnownTranslationKeys.EnValues),
+                ("de", KnownTranslationKeys.DeValues),
+                ("fr", KnownTranslationKeys.FrValues),
+            })
+            {
+                Assert.True(dict.ContainsKey(key),
+                    $"ADR 0043 D4 key '{key}' is not registered in the {label} dictionary");
+                Assert.False(string.IsNullOrWhiteSpace(dict[key]),
+                    $"ADR 0043 D4 key '{key}' has an empty {label} value");
+                Assert.Contains(key, KnownTranslationKeys.AllKeys);
+            }
+        }
+
+        // The D4 list is closed: every footer.platform.* key in the registry
+        // is one of the six contract keys (no drift in either direction).
+        var registryPlatformKeys =
+            KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("footer.platform.")).ToList();
+        Assert.Equal(d4Keys.OrderBy(k => k).ToList(),
+            registryPlatformKeys.OrderBy(k => k).ToList());
+    }
 }
