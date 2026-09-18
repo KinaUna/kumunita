@@ -170,9 +170,11 @@ public sealed class LocalizationService : ILocalizationService
     public Task<BundledLanguageBaseline?> GetBundledBaselineAsync(string code)
     {
         // A pure read of the code's per-language sources — no database access.
-        // Only the two bundled baseline languages (de / fr) have one; en is the
+        // Only the bundled baseline languages (de / fr / da) have one; en is the
         // source language (a row, not a baseline) and any other code is
-        // admin-authored (no code baseline) — both return null.
+        // admin-authored (no code baseline) — both return null. `da` ships
+        // disabled in the catalog (the pre-seeded lane) but still carries a full
+        // baseline, so adding it back after a remove re-seeds from this source.
         IReadOnlyDictionary<string, string> uiStrings;
         (string Slug, string Title, string Body)[] pages;
         switch (code)
@@ -184,6 +186,10 @@ public sealed class LocalizationService : ILocalizationService
             case "fr":
                 uiStrings = KnownTranslationKeys.FrValues;
                 pages = FirstBootSeeder.FrDefaultPages();
+                break;
+            case "da":
+                uiStrings = KnownTranslationKeys.DaValues;
+                pages = FirstBootSeeder.DaDefaultPages();
                 break;
             default:
                 return Task.FromResult<BundledLanguageBaseline?>(null);

@@ -2208,6 +2208,709 @@ public static class KnownTranslationKeys
         };
 
     /// <summary>
+    /// The curated Danish (<c>da</c>) baseline. One entry per key in
+    /// <see cref="AllKeys"/> — full registry parity, the ADR 0015 honesty
+    /// invariant extended to this dictionary. Idioms per ADR 0042 D2: the
+    /// familiar <c>dig</c> register held everywhere, sentence case, no trailing
+    /// period on button labels, and every inlined data token
+    /// (<c>yyyy-MM-dd HH:mm</c>, <c>§6.4</c>, <c>Allow</c>/<c>Deny</c>, the
+    /// <c>rc.editor.*</c> glyph labels, the on-screen <c>Select all</c> label
+    /// that the kw-l TagHelper cannot reach) preserved token-for-token with the
+    /// <c>en</c> value. These are <b>initial values</b> — seeded once on a
+    /// pristine DB (the seeder's create-if-missing baseline loop), then
+    /// community-owned via the in-app editor (ADR 0021); an admin edit is never
+    /// overwritten (ADR 0042 D1). The <c>da</c> catalog row is seeded
+    /// <b>disabled</b> (ADR 0042 D4 / the Danish lane): the lane is about making
+    /// Danish *available* at first boot, not about switching the default.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> DaValues { get; } =
+        new Dictionary<string, string>
+        {
+            // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
+            ["nav.home"]          = "Forside",
+            ["nav.announcements"] = "Meddelelser",
+            ["nav.community"]     = "Fællesskab",
+            ["nav.groups"]        = "Grupper",
+            ["nav.pages"]         = "Sider",
+            ["nav.directory"]     = "Kontaktliste",
+            ["nav.sign_in"]       = "Log ind",
+            ["nav.sign_up"]       = "Opret konto",
+            ["nav.profile"]       = "Profil",
+            ["nav.admin"]         = "Administration",
+            ["nav.translations"]  = "Oversættelser",
+            ["nav.sign_out"]      = "Log ud",
+            ["nav.children"]      = "Børn",
+            ["nav.my_drafts"]     = "Mine udkast",
+
+            // ── guardian (the /me/children child-accounts surface) ─────────
+            ["guardian.title"]        = "Dine børn",
+            ["guardian.lead"]         = "De konti, du har oprettet til et barn, og de kontroller, du har over hver af dem.",
+            ["guardian.empty"]        = "Ingen børn endnu.",
+            ["guardian.add"]          = "Tilføj en barnkonto",
+            ["guardian.manage_title"] = "Administer en barnkonto",
+
+            // ── guardian assignment (GA ADR 0038) ───────────────────────────
+            ["guardian.otherGuardians.title"] = "Andre værgemænd",
+            ["guardian.otherGuardians.empty"] = "Ingen andre værgemænd tildelt.",
+            ["guardian.assign.title"]        = "Tildel en værgemand",
+            ["guardian.assign.email"]        = "E-mail-adresse på den værgemand, du ønsker at tildelte",
+            ["guardian.assign.submit"]       = "Tildel",
+            ["guardian.assign.noAccount"]    = "Ingen konto med den e-mail.",
+            ["guardian.assign.self"]         = "Du er allerede dette barns værgemand.",
+            ["guardian.assign.success"]      = "Værgemand tildelt.",
+
+            // ── footer (the shared footer, _Layout) ─────────────────────────
+            ["footer.tagline"]  =
+                "Et privat hjem for ét nabolag — feeden, grupperne og de faste noter. " +
+                "Det, der sker på din gade, bliver på din gade.",
+            ["footer.copyright"] = "· selv-hostet af jeres fællesskab",
+            ["footer.gtk_heading"] = "Godt at vide",
+            ["footer.gtk_privacy"] =
+                "Privat som udgangspunkt: hvert indlægs modtagerkreds vælges af dets forfatter, " +
+                "og alt kan læses af dig — ikke af verden.",
+            ["footer.gtk_oss"] =
+                "Kumunita er open source — koden, beslutningerne, dokumentationen.",
+            // SP U03 (ADR 0043 D4) — footer-søjlen "Platform": de fem
+            // leverede platform-overflader (Om-view + de fire
+            // Page-dokumenter), linket for enhver besøger.
+            ["footer.platform.heading"] = "Platform",
+            ["footer.platform.about"]   = "Om os",
+            ["footer.platform.terms"]   = "Brugsbetingelser",
+            ["footer.platform.help"]    = "Hjælp",
+            ["footer.platform.privacy"] = "Privatliv",
+            ["footer.platform.conduct"] = "Adfærdskodeks",
+
+            // ── settings (the language-picker labels) ───────────────────────
+            ["settings.settings"]       = "Indstillinger",
+            ["settings.choose_language"] = "Vælg dit sprog",
+
+            // ── settings — account help ─────────────────────────────────────
+            ["settings.help_heading"]     = "Hjælp til din konto",
+            ["settings.help_lede"]        =
+                "Stå du fast ved din konto — et kodeord, din adgang eller noget andet? " +
+                "Denne guide tager dig igennem det.",
+
+            // ── settings — timezone (ADR 0019) ──────────────────────────────
+            ["settings.timezone_title"]        = "Tidszone",
+            ["settings.timezone_lede"]         =
+                "Vælg den tidszone, platformen viser dig. Dit valg gemmes på din konto — " +
+                "det træder i kraft næste gang, du indlæser en side, og påvirker aldrig andre beboere.",
+            ["settings.timezone_label"]        = "Din tidszone",
+            ["settings.timezone_default_marker"] = "— platformstandard",
+            ["settings.timezone_default_note"] = "Plattformens standard er ",
+            ["settings.timezone_default_tail"] =
+                ". Hvis du nulstiller dit valg, bruges platformstandarden.",
+            ["settings.timezone_reset"]        = "Nulstil til platformstandard",
+            ["settings.timezone_save"]         = "Gem",
+            ["settings.timezone_unknown"]      = "Ukendt tidszone",
+
+            // ── settings — date format (ADR 0020) ───────────────────────────
+            ["settings.dateformat_title"]        = "Dato- og tidsformat",
+            ["settings.dateformat_lede"]         =
+                "Vælg, hvordan datoer og tidspunkter vises for dig. Dit valg gemmes på din konto — " +
+                "det træder i kraft næste gang, du indlæser en side, og påvirker aldrig andre beboere.",
+            ["settings.dateformat_label"]        = "Dit dato- og tidsformat",
+            ["settings.dateformat_default_marker"] = "— platformstandard",
+            ["settings.dateformat_default_note"] = "Plattformens standard er ",
+            ["settings.dateformat_default_tail"] =
+                ". Hvis du nulstiller dit valg, bruges platformstandarden.",
+            ["settings.dateformat_custom_label"] = "Tilpasset format",
+            ["settings.dateformat_custom_hint"]  =
+                "En tilpasset .NET-dato-/tidsformatstreng (f.eks. yyyy-MM-dd HH:mm). Lad stå tom for at bruge et standardformat.",
+            ["settings.dateformat_reset"]        = "Nulstil til platformstandard",
+            ["settings.dateformat_save"]         = "Gem",
+
+            // ── admin — the platform-default timezone ───────────────────────
+            ["admin.timezone_title"]    = "Platformstandard: tidszone",
+            ["admin.timezone_lede"]     =
+                "Den tidszone, beboernes tidstempel falder tilbage til, " +
+                "når de ikke har sat et personligt valg.",
+            ["admin.timezone_label"]    = "Standard tidszone",
+            ["admin.timezone_save"]     = "Gem",
+
+            // ── admin — the platform-default date format (ADR 0020) ─────────
+            ["admin.dateformat_title"]    = "Platformstandard: dato- og tidsformat",
+            ["admin.dateformat_lede"]     =
+                "Det dato- og tidsformat, beboernes tidstempel falder tilbage til, " +
+                "når de ikke har sat et personligt valg.",
+            ["admin.dateformat_label"]    = "Standard dato- og tidsformat",
+            ["admin.dateformat_custom_label"] = "Tilpasset format",
+            ["admin.dateformat_custom_hint"]  =
+                "En tilpasset .NET-dato-/tidsformatstreng (f.eks. yyyy-MM-dd HH:mm). Lad stå tom for at bruge et standardformat.",
+            ["admin.dateformat_save"]     = "Gem",
+
+            // ── home (the hero + section lead) ──────────────────────────────
+            ["home.eyebrow"] = "Hvor projektet står",
+            ["home.lead"] =
+                "Et privat hjem for ét nabolag — bygget i det åbne, ét milepæl ad gangen. " +
+                "Det er den samme liste, du finder i README'en, og koden bag hver post ligger i det offentlige repository.",
+            ["home.support"] = "Spørgsmål eller feedback? Skriv til",
+
+            // ── account (Login / Signup — titles + primary actions) ─────────
+            ["account.login_title"]   = "Log ind",
+            ["account.login_submit"]  = "Log ind",
+            ["account.login_no_account"] = "Ingen konto endnu?",
+            ["account.signup_title"]  = "Opret konto",
+            ["account.signup_submit"] = "Opret konto",
+            ["account.signup_has_account"] = "Har du allerede en konto?",
+
+            // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.write"]        = "Skriv et indlæg",
+            ["posts.new_title"]    = "Skriv et indlæg",
+            ["posts.new_intro"] =
+                "Som udgangspunkt kan alle i det fællesskab, du vælger nedenfor, se " +
+                "dit indlæg. Slå det fra i modtagerkreds-sektionen kun, hvis du " +
+                "vil indskrænke, hvem der kan se det — specifikke personer eller grupper.",
+            ["posts.community_hint"] =
+                "Fællesskabet afgør, i hvilken feed dit indlæg vises — og, " +
+                "som udgangspunkt, hvem der kan se det (alle medlemmer af fællesskabet). " +
+                "Vil du indskrænke modtagerkredsen, så slår du \"Alle i dette fællesskab\" " +
+                "fra i modtagerkreds-sektionen nedenfor.",
+            ["posts.new_submit"]   = "Udgiv",
+            ["posts.edit_title"]   = "Rediger indlæg",
+            ["posts.edit_save"]    = "Gem ændringer",
+            ["posts.save_as_draft"] =
+                "Gem som udkast",
+            ["posts.save_as_draft_hint"] =
+                "Et udkast gemmes, men er usynligt for alle — også adminer — " +
+                "indtil du udgiver det. Du finder det under \"Mine udkast\".",
+            ["posts.draft_badge"]   = "Udkast",
+            ["posts.draft_note"] =
+                "Dette indlæg er et udkast — kun du kan se det. Udgiv det " +
+                "for at gøre det synligt for dets modtagerkreds.",
+            ["posts.publish"]       = "Udgiv",
+            ["my_drafts.title"]     = "Mine udkast",
+            ["my_drafts.empty"]     = "Du har ingen udkast.",
+            ["posts.audience_all_members"] =
+                "Alle i dette fællesskab",
+            ["posts.audience_all_members_hint"] =
+                "Udgangspunktet — alle medlemmer af fællesskabet ovenfor kan " +
+                "se dette indlæg. Slå det fra kun, hvis du vil indskrænke, hvem der kan " +
+                "se det.",
+            ["posts.audience_all_members_hint_edit"] =
+                "Når tændt, kan alle medlemmer af dette fællesskab se indlægget. " +
+                "Slå det fra for at indskrænke modtagerkredsen til specifikke personer " +
+                "eller grupper.",
+            ["posts.audience_combine"] =
+                "Sådan kombineres valgene",
+            ["posts.audience_restrict_hint"] =
+                "Disse valg er yderligere — \"Alle i dette fællesskab\" " +
+                "bliver tændt, medmindre du slår det fra, så indlægget er synligt " +
+                "for hele fællesskabet og de valg, du træffer her.",
+            ["posts.audience_only_picks"] =
+                "Det, du vælger her, bliver indlæggets modtagerkreds — der " +
+                "tilføjes intet ovenfor eller nedenfor denne formular. Et tomt valg (med " +
+                "\"Alle i dette fællesskab\" slukket) betyder, at kun du kan se " +
+                "indlægget.",
+            ["posts.empty_can_post"] =
+                "Ingen indlæg her endnu. Skriv det første — det vises kun for den modtagerkreds, " +
+                "du vælger i editoren under overskriften.",
+            ["posts.empty"]        = "Ingen indlæg her endnu.",
+
+            // ── groups (Index / Detail / New / PostDetail) ──────────────────
+            ["groups.title"]          = "Grupper",
+            ["groups.lead"]           = "De fællesskaber, du ejer eller tilhører.",
+            ["groups.create"]         = "Opret en gruppe",
+            ["groups.empty"]          = "Ingen grupper endnu.",
+            ["groups.back_all"]       = "← Alle grupper",
+            ["groups.posts_heading"]  = "Indlæg",
+            ["groups.new_post"]       = "Nyt indlæg",
+            ["groups.posts_empty_can"] =
+                "Ingen indlæg endnu. Skriv det første — det vises for de nuværende medlemmer.",
+            ["groups.posts_empty"]    = "Ingen indlæg her endnu.",
+            ["groups.new_title"]      = "Skriv til denne gruppe",
+            ["groups.new_back"]       = "tilbage til gruppen",
+            ["groups.new_submit"]     = "Skriv til gruppen",
+
+            // ── ADR 0026 — group name/description translations ───────────
+            ["groups.translations_label"] = "Oversættelser",
+            ["groups.translations_none"] = "Ingen endnu",
+            ["groups.translation_add"] = "Tilføj",
+            ["groups.translation_name_label"] = "Navn",
+            ["groups.translation_desc_label"] = "Beskrivelse",
+            ["groups.translation_optional"] = "valgfrit",
+            ["groups.translation_min_one"] = "Mindst navnet eller beskrivelsen skal udfyldes.",
+            ["groups.translation_save"] = "Gem oversættelse",
+
+            // ── directory (page heading + lead) ─────────────────────────────
+            ["directory.title"] = "Kontaktliste",
+            ["directory.lead"]  = "Alle i nabolaget — alle beboere på platformen.",
+            ["directory.empty"] = "Ingen beboere i dette nabolag endnu.",
+
+            // ── profile (page heading + primary action) ─────────────────────
+            ["profile.title"]      = "Din profil",
+            ["profile.save_avatar"] = "Gem avatar",
+
+            // ── profile (Edit page) ─────────────────────────────────────────
+            ["profile.edit_lede"] =
+                "Her bestemmer du, hvad andre beboere kan se om dig. " +
+                "Det, du vælger her, er præcis det, kontaktlisten " +
+                "viser — ingen overraskelser.",
+            ["profile.avatar_heading"] = "Din avatar",
+            ["profile.avatar_hint"] =
+                "JPEG, PNG, WebP eller GIF · op til 5 MB. Gemning erstatter " +
+                "avatar'en, der aktuelt vises i kontaktlisten.",
+            ["profile.name_email_heading"] = "Dit navn + e-mail",
+            ["profile.address_heading"] = "Din adresse + telefon (valgfrit)",
+            ["profile.address_hint"] =
+                "Vises kun i kontaktlisten og detaljen, hvis du også har slået " +
+                "kontaktfeltet nedenfor til; lad stå tom for at holde din " +
+                "gade privat for denne profil.",
+            ["profile.phone_hint"] =
+                "Vises kun i kontaktlistens detalje, hvis du har slået " +
+                "kontaktfeltet nedenfor til; lad stå tom for at holde dit nummer " +
+                "privat for denne profil.",
+            ["profile.who_heading"] = "Hvem kan se hvad",
+            ["profile.optin_contact"] = "Del mine kontaktoplysninger (adresse, e-mail, telefon)",
+            ["profile.optin_contact_note"] =
+                "Lad stå slukket, hvis du hellere vil holde din adresse, " +
+                "din e-mail og din telefon fuldstændig skjult for " +
+                "kontaktlisten. Når den er tændt, vælger du " +
+                "nedenfor, hvem der kan se den.",
+            ["profile.save"] = "Gem",
+            ["profile.preview_link"] = "Forhåndsvisning — sådan ser jeg ud",
+
+            // ── profile (Preview page) ───────────────────────────────────────
+            ["profile.preview_back"] = "← Tilbage til editoren",
+            ["profile.preview_title"] = "Forhåndsvisning — sådan ser jeg ud",
+            ["profile.preview_avatar_note"] =
+                "Din avatar, som den vises ved siden af dit navn i " +
+                "kontaktlisten.",
+            ["profile.preview_readonly_lead"] =
+                "Dette er en skrivebeskyttet forhåndsvisning. Den viser, hvordan din profil " +
+                "ser ud for ",
+            ["profile.preview_readonly_tail"] =
+                " i kontaktlisten. Den ændrer intet i din " +
+                "gemte profil — for at foretage en ændring, ",
+            ["profile.preview_edit_link"] = "rediger din profil",
+            ["profile.preview_visible_badge"] = "Synlig.",
+            ["profile.preview_visible_tail"] =
+                "ville se dette kontaktfelt i kontaktlisten.",
+            ["profile.preview_hidden_badge"] = "Kontakt skjult.",
+            ["profile.preview_hidden_tail"] =
+                "ville ikke se et kontaktfelt. Dit navn (og " +
+                "verificeringstegnet, hvis du har et) vises stadig " +
+                "i kontaktlisten — kun kontaktoplysningerne er skjult.",
+            ["profile.contact_address"] = "Adresse",
+            ["profile.contact_email"] = "E-mail",
+            ["profile.contact_phone"] = "Telefon",
+            ["profile.edit_profile_btn"] = "Rediger profil",
+
+            // ── profile (the _AudienceEditor shared partial) ────────────────
+            ["profile.audience_visibility"] = "Hvem kan se din profil",
+            ["profile.audience_contact"] = "Hvem kan se dine kontaktoplysninger",
+            ["profile.audience_off_note"] =
+                "Dine kontaktoplysninger er i øjeblikket skjult for alle. " +
+                "Vil du ændre det, så slå \"Del mine kontaktoplysninger\" til ovenfor.",
+            ["profile.audience_match_mode"] = "Sammenligningstilstand",
+            ["profile.audience_mode_any"] =
+                "en person er tilladt, hvis de opfylder én af de personer/grupper, du har valgt",
+            ["profile.audience_mode_all"] =
+                "en person er kun tilladt, hvis de opfylder alle de personer/grupper, du har valgt",
+
+            // ── posts (Detail page) ──────────────────────────────────────────
+            ["posts.back_to"] = "tilbage til",
+            ["posts.detail_edit"] = "Rediger",
+            ["posts.edited"] = "redigeret",
+            ["posts.detail_why"] =
+                "Du kan se dette indlæg, fordi du matcher dets modtagerkreds " +
+                "(et af dine tilladelser, eller du er forfatteren — \"ejer-grenen\" " +
+                "i C1-reglen om afvisning af tom modtagerkreds).",
+            ["posts.report_button"] = "Rapportér dette indlæg",
+            ["posts.reply_report_button"] = "Rapportér dette svar",
+            ["posts.report_reason_label"] = "Hvad er der galt?",
+            ["posts.report_optional"] = "valgfrit",
+            ["posts.report_note"] =
+                "En rapportering er en indtagningshandling — den ændrer " +
+                "ikke, hvad du kan se, og en moderator kan følge op.",
+            ["posts.report_submit"] = "Rapportér",
+            ["posts.replies_heading"] = "Svar",
+            ["posts.replies_empty"] =
+                "Ingen svar endnu. Hvis du kan se dette indlæg, kan du også svare på det.",
+            ["posts.reply_heading_author"] = "Svar (du er forfatteren på dette indlæg)",
+            ["posts.reply_heading"] = "Svar",
+            ["posts.reply_label"] = "Svar",
+            ["posts.reply_language_label"] = "Sprog",
+            ["posts.reply_language_note"] =
+                "Det sprog, du svarer på — en markering, ikke en " +
+                "oversættelse.",
+            ["posts.reply_audience_note"] =
+                "Svar har ingen egen modtagerkreds — de er synlige under " +
+                "dette indlægs ene modtagerkredsbeslutning (C-M3·1-reglen " +
+                "\"svaret arver\"). Du svarer kun der, hvor " +
+                "indlægget selv er synligt.",
+            ["posts.reply_submit"] = "Svar",
+            ["posts.reply_edit"] = "Rediger",
+            ["posts.reply_save"] = "Gem",
+            ["posts.reply_edited"] = "redigeret",
+
+            // ── posts (Detail page) — author soft-delete (ADR 0024) ──
+            ["posts.delete"] = "Slet",
+            ["posts.reply_delete"] = "Slet",
+            ["posts.deleted_placeholder"] =
+                "Dette indlæg er slettet af forfatteren.",
+            ["posts.reply_deleted_placeholder"] =
+                "Dette svar er slettet af forfatteren.",
+
+            // ── posts (Detail page) — user-added translations (ADR 0022) ──
+            ["posts.translations_label"] = "Oversættelser",
+            ["posts.translations_none"] = "ingen endnu",
+            ["posts.translation_add"] = "Tilføj",
+            ["posts.translation_title_label"] = "Overskrift",
+            ["posts.translation_body_label"] = "Tekst",
+            ["posts.translation_optional"] = "valgfrit",
+            ["posts.translation_save"] = "Gem oversættelse",
+
+            // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
+            ["pages.title"]       = "Sider",
+            ["pages.new_button"]  = "Ny side",
+            ["pages.none"] =
+                "Ingen sider endnu. Global adminer kan oprette den første systemside " +
+                "— en Om-siden er et almindeligt udgangspunkt — og " +
+                "enhver beboer kan starte deres egen blog (en side af deres eget).",
+            ["pages.back"]        = "← Tilbage til siderne",
+            ["pages.by"]          = "af",
+            ["pages.delete"]      = "Slet",
+            ["pages.untitled"]    = "Side uden titel",
+
+            // ── blog (per-resident page feed, ADR 0040) ─────────────────────
+            ["blog.new_page"]     = "Ny blogside",
+            ["blog.empty_own"] =
+                "Du har ingen blogsider endnu. Opret den første — den bliver " +
+                "roden af din blog, og du kan stable flere under den.",
+            ["blog.empty_other"]  = "Denne beboer har ingen blogsider endnu.",
+            ["blog.draft"]        = "Udkast",
+
+            // ── groups (Create page) ─────────────────────────────────────────
+            ["groups.create_back"] = "← Tilbage til grupperne",
+            ["groups.create_title"] = "Opret en gruppe",
+            ["groups.create_lede"] =
+                "Et navn til et fællesskab af beboere (f.eks. \"Bygge 4\", " +
+                "\"Frivillige\", \"Cyklejere\"). " +
+                "Du ejer gruppen — du kan tilføje og fjerne medlemmer fra " +
+                "gruppens detailside (M2, plan U10).",
+            ["groups.create_desc_hint"] = "Valgfrit — en kort note, andre beboere vil se.",
+            ["groups.create_private_hint"] =
+                "En privat gruppe (f.eks. en familie) er skjult for alle andres " +
+                "tilladelses-/adgangslister — kun de personer, du " +
+                "tilføjer som medlemmer, kan bruge den. " +
+                "En offentlig gruppe (f.eks. \"Svampesamlere\") vises som et valg " +
+                "i andre beboeres valgmuligheder.",
+            ["groups.create_submit"] = "Opret gruppe",
+
+            // ── groups (Edit page) ───────────────────────────────────────────
+            ["groups.edit_back"] = "tilbage til indlægget",
+            ["groups.edit_title"] = "Rediger dit indlæg",
+            ["groups.edit_lede"] =
+                "Du redigerer dit eget indlæg. Kun du kan redigere det — " +
+                "gruppemedlemskabet afgør, hvem der kan se det, men kun " +
+                "forfatteren kan ændre det. Den gruppe, indlægget vises i, " +
+                "er fast; kun overskrift, tekst og sprog nedenfor kan redigeres.",
+            ["groups.edit_title_label"] = "Overskrift",
+            ["groups.edit_title_hint"] =
+                "En kort overskrift (≤ 120 tegn). Lad stå tom for et " +
+                "kun-tekst-indlæg — listen viser i stedet " +
+                "din første linje af teksten.",
+            ["groups.edit_body_label"] = "Tekst",
+            ["groups.edit_language_label"] = "Sprog",
+            ["groups.edit_language_hint"] =
+                "Det sprog, du skriver dette indlæg på. Det er kun en " +
+                "markering — det oversættes ikke — og holder teksten " +
+                "findbar senere og giver en læser mulighed for at tilføje " +
+                "deres egen sprogversion, hvis de ønsker det.",
+            ["groups.edit_submit"] = "Gem ændringer",
+            ["groups.edit_cancel"] = "Annuller",
+
+            // ── directory (Detail page) ──────────────────────────────────────
+            ["directory.detail_back"] = "← Tilbage til kontaktlisten",
+            ["directory.detail_verified"] = "Verifieret",
+            ["directory.detail_contact_address"] = "Adresse",
+            ["directory.detail_contact_email"] = "E-mail",
+            ["directory.detail_contact_phone"] = "Telefon",
+            ["directory.detail_no_contact"] =
+                "Denne beboer har (endnu) ikke delt en kontaktmulighed med dig. Du " +
+                "kan stadig se deres profilside.",
+
+            // ── community (Manage page) ──────────────────────────────────────
+            ["community.manage_back"] = "← Tilbage til feeden",
+            ["community.manage_lede"] = "Administer medlemskabet i dette fællesskab.",
+            ["community.manage_moderate"] = "Du modererer dette fællesskab",
+            ["community.manage_disabled"] = "Slukket",
+            ["community.manage_availability"] = "Tilgængelighed",
+            ["community.manage_mandatory_label"] =
+                "Påkrevende fællesskab — alle i nabolaget er medlemmer",
+            ["community.manage_mandatory_hint"] =
+                "I et påkrevende fællesskab kan der ikke fjernes medlemmer, og man kan ikke forlade det; " +
+                "fjern afkrydsningsfeltet for at gøre " +
+                "medlemskabet valgfrit igen.",
+            ["community.manage_make_optional"] = "Gør valgfri",
+            ["community.manage_make_mandatory"] = "Gør påkrævende",
+            ["community.manage_members"] = "Medlemmer",
+            ["community.manage_mandatory_note"] =
+                "Dette fællesskab er påkrevende — alle er medlemmer, så der " +
+                "er ingen at fjerne. De listede rækker er " +
+                "eksplicitte medlemskaber, der beholdes, i tilfælde af at " +
+                "fællesskabet igen gøres valgfrit.",
+            ["community.manage_no_members"] = "Ingen eksplicitte medlemmer endnu — tilføj nogle nedenfor.",
+            ["community.manage_you"] = "Dig",
+            ["community.manage_remove"] = "Fjern",
+            ["community.manage_add_member"] = "Tilføj et medlem",
+            ["community.manage_all_members"] =
+                "Alle i nabolaget er allerede medlemmer her.",
+            ["community.manage_pick_resident"] = "Vælg en beboer at tilføje…",
+
+            // ── ADR 0026 — community name/description translations ────────
+            ["community.translations_label"] = "Oversættelser",
+            ["community.translations_none"] = "Ingen endnu",
+            ["community.translation_add"] = "Tilføj",
+            ["community.translation_name_label"] = "Navn",
+            ["community.translation_desc_label"] = "Beskrivelse",
+            ["community.translation_optional"] = "valgfrit",
+            ["community.translation_min_one"] = "Mindst navnet eller beskrivelsen skal udfyldes.",
+            ["community.translation_save"] = "Gem oversættelse",
+
+            // ── moderation (Index page) ──────────────────────────────────────
+            ["moderation.title"] = "Moderation",
+            ["moderation.empty"] = "Ingen rapporteringer endnu. Køen er tom.",
+            ["moderation.th_status"] = "Status",
+            ["moderation.th_post"] = "Indlæg",
+            ["moderation.th_component"] = "Komponent",
+            ["moderation.th_reporter"] = "Rapportør",
+            ["moderation.th_filed"] = "Indgivet",
+            ["moderation.th_action"] = "Handling",
+            ["moderation.review"] = "Gennemgå →",
+
+            // ── moderation (Resolve page) ────────────────────────────────────
+            ["moderation.resolve_title"] = "Moderation — Gennemgå rapport",
+            ["moderation.details"] = "Rapportens detaljer",
+            ["moderation.th_post_label"] = "Indlæg",
+            ["moderation.th_component_label"] = "Komponent",
+            ["moderation.th_reporter_label"] = "Rapportør",
+            ["moderation.th_author_label"] = "Forfatter af indlægget",
+            ["moderation.th_filed_label"] = "Indgivet",
+            ["moderation.th_reason_label"] = "Årsag",
+            ["moderation.no_reason"] = "(ingen årsag angivet)",
+            ["moderation.th_body_label"] = "Indlægstekst",
+            ["moderation.body_preview"] = "indlæg-forhåndsvisning",
+            ["moderation.assign_header"] = "Tildel en stående moderator",
+            ["moderation.assign_label"] =
+                "Stående moderator på rapportens komponent",
+            ["moderation.assign_pick"] = "Vælg en stående moderator …",
+            ["moderation.assign_submit"] = "Tildel",
+            ["moderation.cancel"] = "Annuller",
+            ["moderation.unlock_submit"] = "Lås op",
+            ["moderation.resolve_header"] = "Løs (luk denne rapport)",
+            ["moderation.resolve_submit"] = "Løs",
+            ["moderation.back_to_queue"] = "← Tilbage til køen",
+
+            // ── reply-report-target lane (ADR 0023) ─────────────────────────
+            ["moderation.queue_reply_by"] = "svar af",
+            ["moderation.resolve_reply_label"] = "Svar (mål for denne rapport)",
+            ["moderation.resolve_reply_by"] = "Svar af",
+
+            // ── account (Verify / Resend / AccessDenied) ─────────────────────
+            ["account.verify_title"] = "Bekræft din konto",
+            ["account.verify_pending"] =
+                "Vi bekræfter din konto — du logger ind om et øjeblik.",
+            ["account.verify_again"] = "Tilmeld igen",
+            ["account.resend_title"] = "Send bekræftelsesmail igen",
+            ["account.resend_lede"] =
+                "Indtast den e-mail, du tilmeldte dig med, og vi sender et nyt bekræftelseslink.",
+            ["account.resend_submit"] = "Send igen",
+            ["account.resend_create"] = "Opretter bare din konto?",
+            ["account.resend_signup"] = "Opret konto",
+            ["account.denied_title"] = "Adgang nægtet",
+            ["account.denied_lede"] = "Du har ikke tilladelse til at se denne side.",
+            ["account.denied_home"] = "Tilbage til forsiden",
+
+            // ── admin (Audit page) ───────────────────────────────────────────
+            ["admin.audit_title"] = "Adgangsaudit",
+            ["admin.audit_lede"] =
+                "Alle adgangsbeslutninger om indhold med begrænset modtagerkreds — Allow og Deny — plus " +
+                "admin-handlinger og aggregate rækker for masselister. Altid tændt; slettes pr. " +
+                "instans-niveau (§6.4).",
+            ["admin.audit_filter"] = "Filtrér",
+            ["admin.audit_th_at"] = "Tidspunkt (UTC)",
+            ["admin.audit_th_actor"] = "Aktør",
+            ["admin.audit_th_effective"] = "Virkende",
+            ["admin.audit_th_action"] = "Handling",
+            ["admin.audit_th_target"] = "Mål",
+            ["admin.audit_th_aggregate"] = "Aggregate",
+            ["admin.audit_th_via"] = "Via",
+            ["admin.audit_th_outcome"] = "Resultat",
+
+            // ── admin (Break-glass page) ─────────────────────────────────────
+            ["admin.breakglass_title"] = "Break-glass",
+            ["admin.breakglass_granted"] = "Givet (UTC)",
+            ["admin.breakglass_expires"] = "Udløber (UTC)",
+            ["admin.breakglass_status"] = "Status",
+            ["admin.breakglass_consumed"] = "forbrugt — forhøjelse aktiv indtil udløb",
+            ["admin.breakglass_presented"] = "fremvist, men ikke endnu forbrugt",
+            ["admin.breakglass_token_label"] = "Engangstoken (fra operatøren)",
+            ["admin.breakglass_token_hint"] =
+                "At forbruge denne token er en engangshandling. Den aktiverer forhøjelsen " +
+                "indtil dens udløb.",
+            ["admin.breakglass_consume"] = "Forbrug token",
+
+            // ── locale (settings + public picker) ────────────────────────────
+            ["locale.settings_title"] = "Dine indstillinger",
+            ["locale.language_heading"] = "Sprog",
+            ["locale.lede"] =
+                "Vælg det sprog, platformen viser dig. Dit valg gemmes i en " +
+                "browsercookie — det træder i kraft ved næste anmodning, og " +
+                "påvirker aldrig andre beboere.",
+            ["locale.preferred_label"] = "Foretrukket sprog",
+            ["locale.default_note"] =
+                "Instansstandarden er ",
+            ["locale.default_note_tail"] =
+                ". Hvis dit foretrukne sprog senere fjernes af adminen, " +
+                "falder platformen stille tilbage til instansstandarden.",
+            ["locale.save"] = "Gem",
+            ["locale.reset"] = "Nulstil til instansstandard",
+            ["locale.public_title"] = "Vælg dit sprog",
+            ["locale.instance_default"] = "— instansstandard",
+
+            // ── announcements (shared labels + New/Edit compose) ─────────────
+            ["announcements.scope_label"] = "Hvem ser dette?",
+            ["announcements.scope_public"] =
+                "Alle (offentligt) — synligt for besøgende og beboere",
+            ["announcements.scope_resident"] =
+                "Beboere — kun synligt, når du er logget ind",
+            ["announcements.community_label"] = "Send til et specifikt fællesskab (valgfrit)",
+            ["announcements.all_residents"] = "Alle beboere",
+            ["announcements.community_hint"] =
+                "Lad stå på \"Alle beboere\" for at sende til alle, eller vælg et fællesskab for at begrænse, hvem der ser det.",
+            ["announcements.title_label"] = "Overskrift",
+            ["announcements.title_hint"] = "En kort overskrift (op til 120 tegn).",
+            ["announcements.body_label"] = "Tekst",
+            ["announcements.pin_label"] = "Fastgør øverst på alle sider",
+            ["announcements.cancel"] = "Annuller",
+            ["announcements.new_title"] = "Ny meddelelse",
+            ["announcements.new_lede"] =
+                "Meddelelser er bekendtgørelser, der vises for sig selv, " +
+                "adskilt fra fællesskabsfeeden. En offentlig " +
+                "meddelelse er synlig for alle, også personer, der " +
+                "ikke er logget ind (f.eks. et vedligeholdelsesvindue). En " +
+                "beboermeddelelse er kun synlig for loggede " +
+                "beboere (f.eks. en \"hjælp os med X\"-opfordring).",
+            ["announcements.new_scope_hint"] =
+                "Offentlige meddelelser er synlige for alle, også " +
+                "besøgende, der ikke er logget ind (f.eks. et vedligeholdelsesvindue " +
+                "eller en nedbrudsmeddelelse). Beboermeddelelser " +
+                "er kun synlige for loggede beboere.",
+            ["announcements.new_submit"] = "Opret meddelelse",
+            ["announcements.edit_title"] = "Rediger meddelelse",
+            ["announcements.edit_lede"] =
+                "Opdater denne meddelelses overskrift, tekst og synlighed. En " +
+                "offentlig meddelelse er synlig for alle, også " +
+                "personer, der ikke er logget ind (f.eks. et vedligeholdelsesvindue). En " +
+                "beboermeddelelse er kun synlig for loggede " +
+                "beboere (f.eks. en \"hjælp os med X\"-opfordring).",
+            ["announcements.edit_scope_hint"] =
+                "En ændring af, hvem der ser dette, gælder straks for den næste læser.",
+            ["announcements.edit_submit"] = "Gem ændringer",
+            ["announcements.pin_hint"] =
+                "En fastgjort meddelelse vises også som en banner " +
+                "helt øverst på hver side (inklusive forsiden), " +
+                "udover den sædvanlige meddelelsesliste. Dens synlighed " +
+                "følgere stadig den modtagerkreds, du valgte ovenfor: en offentlig " +
+                "fastgørelse vises for alle besøgende; en beboerfastgørelse kun, når en bruger " +
+                "er logget ind. Hvis flere er fastgjort, " +
+                "vinder den senest fastgjorte.",
+            ["announcements.language_note"] =
+                "Det sprog, du skriver denne meddelelse på. Det er kun en " +
+                "markering — det oversættes ikke — og holder teksten findbar senere " +
+                "og giver en læser mulighed for at tilføje deres egen sprogversion, hvis de ønsker det.",
+
+            // ── announcements (Index + Detail + pinned banner) ───────────────
+            ["announcements.index_title"] = "Meddelelser",
+            ["announcements.index_lede"] =
+                "Platformmeddelelser: de offentlige er synlige for alle (f.eks. " +
+                "planlagt vedligeholdelse); de kun for beboere er synlige for alle " +
+                "loggede brugere (f.eks. \"hjælp os med X\"-opfordringer).",
+            ["announcements.all"] = "Alle meddelelser",
+            ["announcements.new_button"] = "Ny meddelelse",
+            ["announcements.empty"] = "Ingen meddelelser endnu.",
+            ["announcements.read_more"] = "Læs mere…",
+            ["announcements.scope_everyone"] = "alle",
+            ["announcements.scope_residents"] = "beboere",
+            ["announcements.pinned_badge"] = "fastgjort",
+            ["announcements.edit_button"] = "Rediger",
+            ["announcements.delete"] = "Slet",
+            ["announcements.detail_back"] = "← Tilbage til meddelelserne",
+            ["announcements.detail_untitled"] = "Meddelelse uden overskrift",
+            ["announcements.by"] = "af",
+            ["announcements.edited"] = "redigeret",
+            ["announcements.banner_read_more"] = "Læs mere",
+            ["announcements.banner_all"] = "Alle meddelelser",
+
+            // ── static pages (Page — the terms/help shell) ───────────────────
+            ["static.last_updated"] = "Sidst opdateret:",
+
+            // ── shared (the _GrantPickers partial — static markup only) ─────
+            ["grant.heading"] = "Hvem du giver adgang til",
+            ["grant.hint"] =
+                "Afkryds én eller flere — eller brug \"Select all\"-rækken " +
+                "over hver liste som en genvej.",
+            ["grant.empty_users"] =
+                "Du er den eneste verificerede beboer, så der er ingen andre " +
+                "at give adgang til endnu.",
+            ["grant.empty_groups"] =
+                "Der findes ingen grupper på platformen endnu — opret én " +
+                "under \"Grupper\" for at tilføje gruppebaseret synlighed.",
+
+            // ── admin (page heading + primary action) ───────────────────────
+            ["admin.title"]  = "Administration",
+            ["admin.verify"] = "Verificér",
+
+            // ── rich editor (the RE toolbar button labels, ADR 0031) ────────
+            ["rc.editor.bold"]    = "B",
+            ["rc.editor.italic"]  = "I",
+            ["rc.editor.code"]    = "C",
+            ["rc.editor.h1"]      = "H1",
+            ["rc.editor.h2"]      = "H2",
+            ["rc.editor.h3"]      = "H3",
+            ["rc.editor.list"]    = "•",
+            ["rc.editor.olist"]   = "1.",
+            ["rc.editor.link"]    = "Link",
+            ["rc.editor.image"]   = "Billede",
+            ["rc.editor.attach"]  = "Vedhæft fil",
+            ["rc.editor.source"]      = "</>",
+            ["rc.editor.showPreview"] = "Forhåndsvisning",
+
+            // ── about (the About product surface, ADR 0042 D5) ──────────────
+            ["about.eyebrow"]             = "Privat som udgangspunkt",
+            ["about.lead"] =
+                "Ét hjem til alt, hvad dit nabolag gør — " +
+                "feeden, grupperne og de noter, der fortjener bedre " +
+                "end en gruppechat. Privat, i almindeligt sprog, og jeres.",
+            ["about.cta_feed"]            = "Se feeden",
+            ["about.cta_notes"]           = "Læs de faste noter",
+            ["about.features.one.title"]  = "Ét feed til gaden",
+            ["about.features.one.body"] =
+                "Indlæg og tråde fra jeres blokke og gader, ét " +
+                "roligt sted — ingen algoritme, ingen støj.",
+            ["about.features.groups.title"]  = "Grupper, der passer",
+            ["about.features.groups.body"] =
+                "Have-udveksling, bogklub, gadevagt — en gruppe til alt, " +
+                "hvad nabolaget allerede gør.",
+            ["about.features.pinned.title"]  = "Fastgjort, hvor det betyder noget",
+            ["about.features.pinned.body"] =
+                "Vandskæringer, vejarbejder, de nye " +
+                "hastighedsdæmpere — noter, der bliver ved " +
+                "i stedet for at rulle væk.",
+            ["about.stats.neighbors"]  = "beboere om bord",
+            ["about.stats.groups"]     = "grupper & fællesskaber",
+            ["about.stats.posts"]      = "indlæg & tråde denne måned",
+            ["about.stats.pinned"]     = "faste noter lige nu",
+            ["about.project.eyebrow"]  = "Open source",
+            ["about.project.heading"]  = "Koden, beslutningerne, design-dokumentationen",
+            ["about.project.lead"] =
+                "Er du nysgerrig på, hvordan det fungerer — eller om du " +
+                "er ved at hoste det til dit nabolag — så er alt offentligt.",
+        };
+
+    /// <summary>
     /// The closed key set (the admin editor's list, the seeder's loop bound, and
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

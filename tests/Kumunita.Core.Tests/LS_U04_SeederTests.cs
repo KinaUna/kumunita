@@ -42,11 +42,13 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
 {
     // ── 1 — the first-boot catalog state (ADR 0042 D4) ─────────────────────
     // After a seeded boot: the catalog is exactly en(sort 0) / de(sort 1) /
-    // fr(sort 2), all enabled; LocaleSettings.DefaultLanguageCode == "en"
-    // (the default stays `en` — the lane is about *available* languages).
+    // fr(sort 2) / da(sort 3); en/de/fr enabled, da seeded DISABLED (the
+    // pre-seeded lane — available in the supported list, awaiting an admin's
+    // enable). LocaleSettings.DefaultLanguageCode == "en" (the default stays
+    // `en` — the lane is about *available* languages, not switching the default).
 
-    [Fact(DisplayName = "U04 the first-boot catalog is en/de/fr (sort 0/1/2), all enabled, default stays en")]
-    public async Task U04_Catalog_EnDeFr_AllEnabled_DefaultStaysEn()
+    [Fact(DisplayName = "U04 the first-boot catalog is en/de/fr/da (sort 0/1/2/3), en-de-fr enabled, da disabled, default stays en")]
+    public async Task U04_Catalog_EnDeFrDa_DaDisabled_DefaultStaysEn()
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
@@ -54,10 +56,11 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         await using (var session = store.OpenSession(new SessionOptions()))
         {
             // Mirror SeedLanguageCatalogAsync (the catalog rows the seeder
-            // now writes — the LS U04 additions).
+            // now writes — the LS U04 additions + the pre-seeded `da` lane).
             session.Store(new LanguageCatalog { Id = "en", NativeName = "English", Enabled = true, SortOrder = 0 });
             session.Store(new LanguageCatalog { Id = "de", NativeName = "Deutsch", Enabled = true, SortOrder = 1 });
             session.Store(new LanguageCatalog { Id = "fr", NativeName = "Français", Enabled = true, SortOrder = 2 });
+            session.Store(new LanguageCatalog { Id = "da", NativeName = "Dansk", Enabled = false, SortOrder = 3 });
 
             var existingSettings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
             session.Store(existingSettings ?? new LocaleSettings
@@ -71,18 +74,23 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         await using var q = store.QuerySession();
         var catalog = await q.Query<LanguageCatalog>().ToListAsync(ct);
 
-        // Exactly the three rows, in sort order (en 0 / de 1 / fr 2), all enabled.
+        // Exactly the four rows, in sort order (en 0 / de 1 / fr 2 / da 3).
         var ordered = catalog.OrderBy(c => c.SortOrder).ToList();
-        Assert.Equal(3, ordered.Count);
+        Assert.Equal(4, ordered.Count);
         Assert.Equal(
-            new[] { "en", "de", "fr" },
+            new[] { "en", "de", "fr", "da" },
             ordered.Select(c => c.Id).ToArray());
         Assert.Equal(
-            new[] { 0, 1, 2 },
+            new[] { 0, 1, 2, 3 },
             ordered.Select(c => c.SortOrder).ToArray());
-        Assert.All(ordered, c => Assert.True(c.Enabled));
+        // en/de/fr enabled, da seeded DISABLED (the pre-seeded lane).
+        Assert.True(ordered.Single(c => c.Id == "en").Enabled);
+        Assert.True(ordered.Single(c => c.Id == "de").Enabled);
+        Assert.True(ordered.Single(c => c.Id == "fr").Enabled);
+        Assert.False(ordered.Single(c => c.Id == "da").Enabled);
         Assert.Equal("Deutsch", ordered.Single(c => c.Id == "de").NativeName);
         Assert.Equal("Français", ordered.Single(c => c.Id == "fr").NativeName);
+        Assert.Equal("Dansk", ordered.Single(c => c.Id == "da").NativeName);
 
         // The instance default stays `en` (ADR 0042 D4).
         var localeSettings = await q.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
@@ -94,19 +102,19 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
     // (the plan's direct pin for "it clearly shows how the language features
     // work from the first bootup" — 0 missing keys for both baselines).
 
-    [Fact(DisplayName = "U04 the completeness view is 100% present for de and fr on a fresh boot")]
-    public async Task U04_Completeness_100Percent_ForDeAndFr()
+    [Fact(DisplayName = "U04 the completeness view is 100% present for de, fr and da on a fresh boot")]
+    public async Task U04_Completeness_100Percent_ForDeFrDa()
     {
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
 
-        // Mirror SeedTranslationResourcesAsync (en floor + de/fr baselines —
+        // Mirror SeedTranslationResourcesAsync (en floor + de/fr/da baselines —
         // create-if-missing, the seeder's exact shape as of LS U04).
         await SeedFloorAndBaselinesAsync(store);
 
         var svc = new LocalizationService(store);
 
-        foreach (var code in new[] { "de", "fr" })
+        foreach (var code in new[] { "de", "fr", "da" })
         {
             var completeness = await svc.GetCompletenessAsync(code);
             Assert.Empty(completeness.MissingKeys);
@@ -138,6 +146,11 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
 
         foreach (var (key, frText) in KnownTranslationKeys.FrValues)
             Assert.Equal(frText, await provider.GetAsync(key, "fr"));
+        // Note: `da` is seeded DISABLED (the pre-seeded lane) — a disabled
+        // preference does NOT resolve to its rows (the provider gates on
+        // catalog.Enabled), so the da baseline text is exercised via the
+        // completeness pin (test 2) and the PageTranslation parity pin (test 6)
+        // instead of a provider-resolution assertion here.
     }
 
     // ── 4 — per-string fallback still lands on `en` ─────────────────────────
@@ -276,26 +289,38 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             var fr = await q.Query<PageTranslation>()
                 .Where(t => t.PageId == page.Id && t.LanguageCode == "fr")
                 .FirstOrDefaultAsync(ct);
+            var da = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "da")
+                .FirstOrDefaultAsync(ct);
 
             Assert.NotNull(de);
             Assert.NotNull(fr);
+            Assert.NotNull(da);
             Assert.False(string.IsNullOrWhiteSpace(de!.Body));
             Assert.False(string.IsNullOrWhiteSpace(fr!.Body));
+            Assert.False(string.IsNullOrWhiteSpace(da!.Body));
             Assert.False(string.IsNullOrWhiteSpace(de.Title));
             Assert.False(string.IsNullOrWhiteSpace(fr.Title));
+            Assert.False(string.IsNullOrWhiteSpace(da.Title));
             // Baseline parity with the canonical sources (structure preserved —
-            // the ADR 0042 D2 bar holds for all four pages).
+            // the ADR 0042 D2 bar holds for all four pages, all three baselines).
             var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
             var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
+            var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == slug);
             Assert.Equal(deBaseline.Body, de.Body);
             Assert.Equal(frBaseline.Body, fr.Body);
+            Assert.Equal(daBaseline.Body, da.Body);
 
             // Exactly one row per (page, language) — no duplicates from the
             // create-if-missing idiom (ADR 0042 D1).
             var deCount = await q.Query<PageTranslation>()
                 .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
                 .CountAsync(ct);
+            var daCount = await q.Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == "da")
+                .CountAsync(ct);
             Assert.Equal(1, deCount);
+            Assert.Equal(1, daCount);
         }
 
         // And NO PageTranslation is attached to the `system` root itself
@@ -314,6 +339,7 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             var translations = await svc.GetTranslationsAsync(pages[slug].Id);
             Assert.Contains(translations, t => t.LanguageCode == "de");
             Assert.Contains(translations, t => t.LanguageCode == "fr");
+            Assert.Contains(translations, t => t.LanguageCode == "da");
         }
     }
 
@@ -407,12 +433,13 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
             }
         }
 
-        // The `de` / `fr` baselines (create-if-missing — the U04 seeder shape:
-        // an existing row is skipped, never refreshed).
+        // The `de` / `fr` / `da` baselines (create-if-missing — the U04 seeder
+        // shape: an existing row is skipped, never refreshed).
         foreach (var (code, baseline) in new[]
         {
             ("de", KnownTranslationKeys.DeValues),
             ("fr", KnownTranslationKeys.FrValues),
+            ("da", KnownTranslationKeys.DaValues),
         })
         {
             foreach (var (key, text) in baseline)

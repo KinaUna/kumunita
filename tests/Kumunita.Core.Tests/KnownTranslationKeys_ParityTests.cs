@@ -191,10 +191,50 @@ public class KnownTranslationKeys_ParityTests
         }
     }
 
+    // ── the da (Danish) baseline at full registry parity ────────────────────
+    // The pre-seeded lane ships a full da baseline, so the same registry-shape
+    // invariants hold: key-for-key parity with AllKeys and no empty values.
+
+    [Fact(DisplayName = "DaValues keys exactly match AllKeys — no missing, no extra, no empty values")]
+    public void DaValues_Keys_Match_AllKeys_Exactly_NoEmptyValues()
+    {
+        var daKeys = KnownTranslationKeys.DaValues.Keys.ToList();
+        var allKeys = KnownTranslationKeys.AllKeys.ToList();
+
+        // Same cardinality — a missing or extra key is a registry-shape defect.
+        Assert.Equal(allKeys.Count, daKeys.Count);
+
+        // Set equality in both directions.
+        Assert.Equal(allKeys.OrderBy(k => k), daKeys.OrderBy(k => k));
+
+        // No key declared twice (a Dictionary would silently collapse a
+        // duplicate, so pin the shape — same as the en test above).
+        Assert.Equal(allKeys.Count, new HashSet<string>(allKeys).Count);
+
+        // Every da value is non-empty — a blank baseline would make the
+        // provider resolve to nothing for that key under a da preference,
+        // and the M·12 completeness view would count it "present" while
+        // rendering blank.
+        foreach (var (key, value) in KnownTranslationKeys.DaValues)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(value),
+                $"registry key '{key}' has an empty/whitespace da value — " +
+                "the provider would resolve it to nothing under a da preference");
+        }
+
+        // The D5 about.* contract is translated (every D5 key is present in
+        // the da dictionary with a non-empty value).
+        foreach (var key in KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("about.")))
+        {
+            Assert.True(KnownTranslationKeys.DaValues.ContainsKey(key),
+                $"ADR 0042 D5 key '{key}' is missing from DaValues");
+        }
+    }
+
     // ── SP U03 — the footer.platform.* contract (ADR 0043 D4) ──
 
-    [Fact(DisplayName = "SP U03: the six footer.platform.* keys (ADR 0043 D4) are registered with non-empty en/de/fr values")]
-    public void Footer_Platform_Keys_From_Adr_0043_D4_Are_Registered_NonEmpty_AllThree_Dictionaries()
+    [Fact(DisplayName = "SP U03: the six footer.platform.* keys (ADR 0043 D4) are registered with non-empty en/de/fr/da values")]
+    public void Footer_Platform_Keys_From_Adr_0043_D4_Are_Registered_NonEmpty_AllFour_Dictionaries()
     {
         // The D4 closed contract — the footer "Platform" column's heading +
         // the five shipped surfaces (the about view + the four Page docs).
@@ -217,6 +257,7 @@ public class KnownTranslationKeys_ParityTests
                 ("en", KnownTranslationKeys.EnValues),
                 ("de", KnownTranslationKeys.DeValues),
                 ("fr", KnownTranslationKeys.FrValues),
+                ("da", KnownTranslationKeys.DaValues),
             })
             {
                 Assert.True(dict.ContainsKey(key),

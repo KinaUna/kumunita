@@ -49,6 +49,7 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
     [Theory]
     [InlineData("de", "Deutsch")]
     [InlineData("fr", "Français")]
+    [InlineData("da", "Dansk")]
     public async Task ADR0044_Parity_WarmAdd_SeedsFullBaseline_Exact(
         string code, string nativeName)
     {
@@ -70,14 +71,22 @@ public class ADR_0044_BaselineTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.NotNull(catalog);
         Assert.True(catalog!.Enabled);
 
-        // UI strings: the de / fr set equals the code baseline, key-for-key and
-        // value-for-value (the headline parity — no drift).
-        var baselineUi = code == "de"
-            ? KnownTranslationKeys.DeValues
-            : KnownTranslationKeys.FrValues;
-        var baselinePages = code == "de"
-            ? FirstBootSeeder.DeDefaultPages()
-            : FirstBootSeeder.FrDefaultPages();
+        // UI strings: the de / fr / da set equals the code baseline, key-for-key
+        // and value-for-value (the headline parity — no drift).
+        var baselineUi = code switch
+        {
+            "de" => KnownTranslationKeys.DeValues,
+            "fr" => KnownTranslationKeys.FrValues,
+            "da" => KnownTranslationKeys.DaValues,
+            _ => throw new NotSupportedException(code)
+        };
+        var baselinePages = code switch
+        {
+            "de" => FirstBootSeeder.DeDefaultPages(),
+            "fr" => FirstBootSeeder.FrDefaultPages(),
+            "da" => FirstBootSeeder.DaDefaultPages(),
+            _ => throw new NotSupportedException(code)
+        };
 
         var uiRows = await q.Query<TranslationResource>()
             .Where(t => t.LanguageCode == code)

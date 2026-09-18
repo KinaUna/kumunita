@@ -311,6 +311,20 @@ public static class FirstBootSeeder
             SortOrder = 2
         });
 
+        // The Danish (da) pre-seeded lane: seeded DISABLED — available in the
+        // supported-language catalog with a full baseline (see
+        // SeedTranslationResourcesAsync + DaDefaultPages), awaiting an admin's
+        // enable. Sort 3, last in the selector. Same load-then-Store idempotent
+        // shape; ADR 0042 D4 — the default stays `en` either way.
+        var existingDa = await session.LoadAsync<LanguageCatalog>("da", ct);
+        session.Store(existingDa ?? new LanguageCatalog
+        {
+            Id = "da",
+            NativeName = "Dansk",
+            Enabled = false,
+            SortOrder = 3
+        });
+
         var existingSettings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct);
         session.Store(existingSettings ?? new LocaleSettings
         {
@@ -336,7 +350,7 @@ public static class FirstBootSeeder
 
         logger.LogInformation(
             "First boot: language catalog seeded (source language '{Lang}' enabled, sort 0; bundled initial pack " +
-            "'de' sort 1, 'fr' sort 2 — ADR 0042 D4); instance default stays '{Lang}'.",
+            "'de' sort 1, 'fr' sort 2 — ADR 0042 D4; pre-seeded 'da' DISABLED, sort 3); instance default stays '{Lang}'.",
             SourceLanguage, SourceLanguage);
     }
 
@@ -423,8 +437,15 @@ public static class FirstBootSeeder
         // CONSTRUCTION: the outer IsPristineAsync gate means this method never
         // runs on a warm instance, so an admin's later in-app edit of a `de` /
         // `fr` row (the ADR 0021 editor) is never overwritten; the skip branch
-        // makes that invariant hold even if the gate ever changed.
-        foreach (var (code, baseline) in new[] { ("de", KnownTranslationKeys.DeValues), ("fr", KnownTranslationKeys.FrValues) })
+        // makes that invariant hold even if the gate ever changed. The `da`
+        // baseline (the pre-seeded lane) rides the same loop, seeded with the
+        // catalog row disabled — the strings exist regardless of enable state.
+        foreach (var (code, baseline) in new[]
+        {
+            ("de", KnownTranslationKeys.DeValues),
+            ("fr", KnownTranslationKeys.FrValues),
+            ("da", KnownTranslationKeys.DaValues)
+        })
         {
             foreach (var (key, text) in baseline)
             {
@@ -478,13 +499,13 @@ public static class FirstBootSeeder
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         logger.LogInformation(
-            "First boot: canonical `en` UI strings seeded ({0} keys) + `de`/`fr` baselines " +
-            "({1} keys each — ADR 0042 D1) + `en` terms/help/privacy/conduct pages ({2} Page docs) with `de`/`fr` " +
+            "First boot: canonical `en` UI strings seeded ({0} keys) + `de`/`fr`/`da` baselines " +
+            "({1} keys each — ADR 0042 D1) + `en` terms/help/privacy/conduct pages ({2} Page docs) with `de`/`fr`/`da` " +
             "bodies ({3} PageTranslation rows); `about` is not seeded (admin-created at runtime).",
             KnownTranslationKeys.EnValues.Count,
             KnownTranslationKeys.DeValues.Count,
             enPages.Length,
-            enPages.Length * 2);   // four pages (terms/help/privacy/conduct) × de + fr (ADR 0043 D1)
+            enPages.Length * 3);   // four pages (terms/help/privacy/conduct) × de + fr + da (ADR 0043 D1)
     }
 
     /// <summary>
@@ -883,6 +904,89 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
+    /// The Danish (<c>da</c>) baseline — the curated <c>da</c> translation of
+    /// the seeded default pages (terms + help + privacy + conduct). A full
+    /// translation of the <see cref="EnDefaultPages"/>() bodies — the same
+    /// Markdown structure (heading, intro, the bullets, the closing line),
+    /// idiomatic Danish UI copy (the familiar <c>dig</c> register held,
+    /// sentence case, no word-for-word calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine
+    /// DB (seeded once, then community-owned; the in-app editor supersedes
+    /// them and no later deploy reverts an admin edit). The <c>da</c> catalog
+    /// row is seeded disabled (the pre-seeded lane), but its page baseline is
+    /// present so the moment an admin enables Danish, the pages are ready.
+    /// <para>
+    /// <b><c>about</c> is deliberately absent</b>, exactly as in
+    /// <see cref="EnDefaultPages"/>() — it is the registry-key surface
+    /// (the <c>about.*</c> keys in <see cref="KnownTranslationKeys"/>),
+    /// not a Markdown body.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] DaDefaultPages()
+    {
+        return
+        [
+            ("terms", "Brugsbetingelser",
+             "## Brugsbetingelser\n\n" +
+             "Kumunita er en selv-hostet platform til præcis ét nabolag. Som " +
+             "operatør er du ansvarlig for, hvordan dit fællesskab bruger den: " +
+             "hvem der deltager, hvad de skriver, og hvordan du modererer.\n\n" +
+             "- **Nabolag i udformningen.** Platformen udgår fra præcis ét " +
+             "afgrænset nabolag — ikke fra en offentlig feed.\n" +
+             "- **Modtagerkredsen vælges af forfatteren.** Hvert indlæg bærer den " +
+             "modtagerkreds, som dens forfatter har valgt; platformen håndhæver den.\n" +
+             "- **Dine data tilhører dig.** Database og uploadede filer kan du " +
+             "sikkerhedskopiere, migrere og lukke ned, som du vil.\n"),
+            ("help", "Hjælp",
+             "## Første skridt\n\n" +
+             "Kumunita er et privat hjem til præcis ét nabolag — feeden, grupperne " +
+             "og de fastgjorte noter.\n\n" +
+             "- **Skriv** i en fælles feed og vælg, hvem der kan se dine indlæg " +
+             "(en person, en gruppe eller hele nabolaget).\n" +
+             "- **Grupper** hjælper dig med at organisere naboer om en bygning, " +
+             "et projekt eller et fælles interesseområde.\n" +
+             "- **Kontaktlisten** viser de beboere på platformen og de oplysninger, " +
+             "hver af dem har valgt at dele.\n" +
+             "- **Moderation** lader en global admin (og, hvor tildelt, en " +
+             "moderator) holde feeden et sikkert sted.\n\n" +
+             "Problemer med selve instansen? Det er en sag for operatøren — " +
+             "se dokumentationen om selv-hosting, linket i footeren.\n"),
+            ("privacy", "Privatliv",
+             "## Privatliv\n\n" +
+             "Kumunita er en selv-hostet platform til præcis ét nabolag. " +
+             "Operatøren driver instansen og er ansvarlig for alt, hvad den indeholder.\n\n" +
+             "- **Hvad platformen gemmer:** nabolagets konti, indlæg, grupper, " +
+             "sider og medier — databasen plus de uploadede filer. Hvad der ikke " +
+             "gemes, kan ikke gå tabt.\n" +
+             "- **Modtagerkreds-tjekket er beskyttelsesmekanismen:** indhold er " +
+             "privat som udgangspunkt; forfatteren vælger modtagerkredsen for hvert " +
+             "indlæg, og platformen håndhæver det ved hver anmodning.\n" +
+             "- **Audit som udgangspunkt:** adgang til indhold med begrænset " +
+             "modtagerkreds samt moderations- og admin-handlinger logges altid.\n" +
+             "- **Sikkerhedskopiering, migration og lukning er operatørens sag:** " +
+             "databasen og de filer, du har uploadet, kan du selv gemme, migrere " +
+             "og lukke ned.\n" +
+             "- **Den ene browsercookie:** det foretrukne sprog — det er den eneste " +
+             "cookie, platformen sætter. Der er ingen tredjepartscookies, og det " +
+             "planlægges heller ikke.\n\n" +
+             "Denne side udelader bevidst operatørspecifikke oplysninger — " +
+             "bevaringsfrister, kontakt til databeskyttelsesansvarlig, underbehandler. " +
+             "Det tilføjer du her i appen efter første start; det er designet, " +
+             "ikke en mangel.\n"),
+            ("conduct", "Adfærdskodeks",
+             "## Adfærdskodeks\n\n" +
+             "Det her er et afgrænset nabolag. Behandle dine naboer, som du vil " +
+             "blive behandlet på din gade.\n\n" +
+             "- Ingen mobning.\n" +
+             "- Intet doxxing (at afsløre private oplysninger).\n" +
+             "- Ingen spam.\n\n" +
+             "Hvordan det håndhæves er op til operatøren og moderatorerne — " +
+             "moderationen kører via rapporter og logges. Denne side opstiller " +
+             "forventningen, ikke proceduren.\n"),
+        ];
+    }
+
+    /// <summary>
     /// LS U04 (ADR 0042 D2) — seed the <c>de</c> / <c>fr</c>
     /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows for the seeded default
     /// pages (terms / help / privacy / conduct — the four-page set per ADR 0043
@@ -922,12 +1026,13 @@ public static class FirstBootSeeder
         {
             ("de", DeDefaultPages()),
             ("fr", FrDefaultPages()),
+            ("da", DaDefaultPages()),
         })
         {
             foreach (var (slug, title, body) in baselines)
             {
                 if (!pageIds.TryGetValue(slug, out var pageId))
-                    continue;   // defensive — EnDefaultPages/DeDefaultPages/FrDefaultPages slugs agree; skip rather than throw
+                    continue;   // defensive — EnDefaultPages/DeDefaultPages/FrDefaultPages/DaDefaultPages slugs agree; skip rather than throw
                 var existing = await session
                     .Query<PageTranslation>()
                     .Where(t => t.PageId == pageId && t.LanguageCode == code)
