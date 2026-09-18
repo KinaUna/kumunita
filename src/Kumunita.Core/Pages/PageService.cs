@@ -490,6 +490,12 @@ public sealed class PageService : IPageService
         await EnsureCreateNamespaceAsync(page.Kind, parent, session).ConfigureAwait(false);
         await EnsureBlogOwnershipAsync(page.Kind, parent, actorId, session).ConfigureAwait(false);
 
+        // ADR 0040: MountPoint is a *system*-page concept (a UI slot such as
+        // footer/community or help/account). A resident's blog page only
+        // surfaces in its own /blog feed, so it never mounts to a UI slot —
+        // clear it server-side (C3) so a client cannot set it on a blog page.
+        ClearMountPointForBlog(page);
+
         // Root-slug guard (the index does not cover it — Postgres treats NULLs
         // as distinct, the U01 drift note): if ParentId is null, no *other*
         // root page may already carry this slug **in the same namespace**.
@@ -596,6 +602,11 @@ public sealed class PageService : IPageService
         existing.MountPoint = updated.MountPoint;
         existing.ImageIds = updated.ImageIds ?? [];          // RC ADR 0025 — caller-parsed
         existing.AttachmentIds = updated.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed
+
+        // ADR 0040: MountPoint is a *system*-page concept (a UI slot) — a blog
+        // page only surfaces in its own /blog feed, so an edit may not (re)mount
+        // it; clear it server-side (C3).
+        ClearMountPointForBlog(existing);
 
         // The audit Via tag (narrowest standing that applied): Owner if the
         // actor is the author (a blog page), else Admin (a GlobalAdmin). ADR
@@ -1046,6 +1057,21 @@ public sealed class PageService : IPageService
             throw new UnauthorizedAccessException(
                 $"A blog page may only be nested under the actor's own blog root " +
                 $"(found root author '{root.AuthorId}', actor '{actorId}').");
+    }
+
+    /// <summary>
+    /// The <b>mount-point guard</b> (ADR 0040): a <see cref="Page.MountPoint"/>
+    /// is a <b>system-page</b> concept — a UI slot such as
+    /// <c>footer/community</c> or <c>help/account</c>. A resident's
+    /// <see cref="PageKind.User"/> (blog) page only surfaces in its own
+    /// <c>/blog</c> feed, so it never mounts to a UI slot. The write lane
+    /// clears it (server-side, C3) so a client cannot (re)mount a blog page.
+    /// A <see cref="PageKind.System"/> page keeps its slot untouched.
+    /// </summary>
+    private static void ClearMountPointForBlog(Page page)
+    {
+        if (page.Kind == PageKind.User)
+            page.MountPoint = null;
     }
 
     // ─── Private helpers ───────────────────────────────────────────────────

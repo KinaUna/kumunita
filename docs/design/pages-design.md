@@ -173,7 +173,7 @@ public sealed class Page
 | `Audience` | `Post.Audience` (ADR 0001-B / 0036) | **`null` = public** (Decide branch 5); non-null = grant list / `Community` flag. Reuses the `AudienceEditorModel` form surface verbatim. |
 | `Kind` | *new, ADR 0040* | `System` (a platform page) vs `User` (a resident's blog) — the standing matrix in §3.7 keys off this. |
 | `AuthorId` / `ComponentId` | `Post` / `Announcement` | the `Owner` branch (a blog page's author) + a community-scoped audience's `ComponentId` — a *read* scope, **not** a standing seam (ADR 0040 retires the Moderator lane). |
-| `MountPoint` | *new, this lane* | a **nullable string tag** (e.g. `"footer/community"`). A UI slot reads "the page mounted at X". It is a *display* concern (where to surface a link), **not** an access boundary — access is always the `Audience` + `CanAsync(Read)`. |
+| `MountPoint` | *new, this lane* | a **nullable string tag** (e.g. `"footer/community"`). A UI slot reads "the page mounted at X". It is a *display* concern (where to surface a link), **not** an access boundary — access is always the `Audience` + `CanAsync(Read)`. **ADR 0040:** a **system-page** concept only — a blog page surfaces solely in its own `/blog` feed, so the write lane clears it on `Kind = User` pages and the composer hides the field. |
 | `IsDraft` | `Announcement.IsDraft` (ADR 0037) | the author-only draft pin, reused for "admin drafting a blog post before publishing". |
 | `ImageIds` / `AttachmentIds` | `Announcement` (RC U03 / ATT U3) | the content-image + attachment idiom, byte-store + reverse-lookup serving reused. |
 

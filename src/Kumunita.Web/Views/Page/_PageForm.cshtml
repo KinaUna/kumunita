@@ -158,18 +158,26 @@
                                     }
                                 </select>
                                 <div class="text-muted small mt-1">
-                                    A community scope makes "everyone in this community" a grantable audience, and gives a community moderator standing to edit this page.
+                                    A community scope makes "everyone in this community" a grantable audience.
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label" for="mount" style="font-weight:600;">Mount point (optional)</label>
-                                <input class="form-control" type="text" id="mount" name="MountPoint"
-                                       maxlength="64" value="@(Model.MountPoint)"
-                                       placeholder="footer/community · help/account" />
-                                <div class="text-muted small mt-1">
-                                    ADR 0039 §3.8 — a display slot the layout can surface a link from. A display concern, not an access boundary.
+                            @* ADR 0040 — MountPoint is a *system-page* concept (a UI
+                               slot such as footer/community or help/account). A
+                               resident's blog page only surfaces in its own /blog
+                               feed, so the mount-point field is hidden for blog
+                               pages (the service also clears it server-side). *@
+                            @if (Model.Kind != "User")
+                            {
+                                <div class="col-md-6">
+                                    <label class="form-label" for="mount" style="font-weight:600;">Mount point (optional)</label>
+                                    <input class="form-control" type="text" id="mount" name="MountPoint"
+                                           maxlength="64" value="@(Model.MountPoint)"
+                                           placeholder="footer/community · help/account" />
+                                    <div class="text-muted small mt-1">
+                                        ADR 0039 §3.8 — a display slot the layout can surface a link from (system pages only). A display concern, not an access boundary.
+                                    </div>
                                 </div>
-                            </div>
+                            }
                         </div>
 
                         <hr class="my-3" />

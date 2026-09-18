@@ -248,13 +248,13 @@ public sealed class PageComposeViewModel
     /// <summary>
     /// The community this page is scoped to (<see cref="Component"/> id) —
     /// the target of the audience's <c>Community</c> flag (all members of
-    /// that component may read it) and the scoping key a community
-    /// <c>Moderator</c>'s create/edit/move/delete standing checks against
-    /// (<see cref="Kumunita.Core.Identity.Roles.ModeratorComponent"/>, ADR
-    /// 0039 §3.7). A <c>null</c>/empty value is a flat/public page (no
-    /// community to moderate). Binds from a <c>&lt;select&gt;</c> of
-    /// <see cref="Components"/>. Inert while <see cref="IsPublic"/> is
-    /// <c>true</c> (a public page has no component scope).
+    /// that component may read it). A <c>null</c>/empty value is a
+    /// flat/public page (no community scope). Binds from a
+    /// <c>&lt;select&gt;</c> of <see cref="Components"/>. Inert while
+    /// <see cref="IsPublic"/> is <c>true</c> (a public page has no component
+    /// scope). ADR 0040 retires the ADR 0039 §3.7 use of this as a
+    /// community-Moderator standing key — a Moderator has no page standing;
+    /// this is a *read* scope only.
     /// </summary>
     public string? CommunityId { get; set; }
 

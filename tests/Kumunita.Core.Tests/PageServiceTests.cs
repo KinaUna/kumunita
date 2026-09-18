@@ -883,6 +883,68 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
                 "u-admin", RolesSet(Roles.GlobalAdmin), session));
     }
 
+    // ─── 10.2b — MountPoint guard (ADR 0040 — MountPoint is a system-page
+    // concept; a resident's blog page only surfaces in its own /blog feed, so
+    // the write lane clears it server-side; a system page keeps its slot). ──
+
+    [Fact]
+    public async Task PG3_Create_BlogPage_ClearsMountPoint()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        // A client-supplied MountPoint on a blog page must be stripped.
+        var page = new Page { Slug = "b-mount", Title = "T", Body = "b", Kind = PageKind.User, MountPoint = "footer/community" };
+
+        await using var session = newSession(store);
+        var saved = await svc.CreateAsync(page, "u-resident", RolesSet(Roles.Member), session);
+
+        Assert.Null(saved.MountPoint);
+    }
+
+    [Fact]
+    public async Task PG3_Create_SystemPage_KeepsMountPoint()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        // A system page may mount to a UI slot — the guard must not touch it.
+        var page = new Page { Slug = "sys-mount", Title = "About", Body = "b", MountPoint = "footer/community" };
+
+        await using var session = newSession(store);
+        var saved = await svc.CreateAsync(page, "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.Equal("footer/community", saved.MountPoint);
+    }
+
+    [Fact]
+    public async Task PG3_Update_BlogPage_ClearsMountPoint()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-mu-blog", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-author", Kind = PageKind.User });
+
+        await using var session = newSession(store);
+        var saved = await svc.UpdateAsync(
+            new Page { Id = "pg3-mu-blog", Slug = "u", Title = "New", Body = "nb", MountPoint = "help/account" },
+            "u-author", RolesSet(Roles.Member), session);
+
+        Assert.Null(saved.MountPoint);
+    }
+
+    [Fact]
+    public async Task PG3_Update_SystemPage_KeepsMountPoint()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-mu-sys", Slug = "u", Title = "Old", Body = "ob", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        var saved = await svc.UpdateAsync(
+            new Page { Id = "pg3-mu-sys", Slug = "u", Title = "New", Body = "nb", MountPoint = "help/account" },
+            "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.Equal("help/account", saved.MountPoint);
+    }
+
     // ─── 10.3 — PublishAsync (ADR 0037 author-only pin) ────────────────────
 
     [Fact]

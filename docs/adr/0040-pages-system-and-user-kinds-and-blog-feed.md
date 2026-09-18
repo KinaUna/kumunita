@@ -121,6 +121,17 @@ the new `User` kind.
      actor's own blog root by construction (the write lane sets
      `AuthorId = actor`), so the guard is a no-op for it.
 
+- **`MountPoint` is a system-page concept only.** A resident's blog page
+  surfaces solely in its own `/blog` feed — it is not a platform UI element
+  and therefore never mounts to a layout slot (`footer/community`,
+  `help/account`, etc.). The write lane (`CreateAsync` / `UpdateAsync`)
+  **clears `MountPoint` to `null`** on a `Kind = User` page (server-side,
+  C3), so a client cannot set it. The composer **hides the MountPoint
+  field** for blog pages. A `System` page keeps its slot untouched (the
+  ADR 0039 §3.8 layout-partials / `PageMountResolver` are unaffected —
+  they resolve `System` pages only by construction, since a `User` page
+  can never carry a `MountPoint`).
+
 - **The root-slug collision guard is scoped by `(Kind, AuthorId)`** (the
   ADR 0039 guard, narrowed): Postgres treats `NULL` `ParentId`s as distinct,
   so the unique index does not cover two roots sharing a slug — this lane
