@@ -91,6 +91,12 @@ var marten = builder.Services.AddMarten(opts =>
     // indexes: (ParentId, Slug) and (PageId, LanguageCode)). Without this call
     // the docs are invisible to Marten (the M3/Media precedent).
     PageDocTypes.Configure(opts);
+
+    // TG (ADR 0044 D1, plan U3): the Tags bounded context's documents (Tag +
+    // TagTranslation, ADR 0004 §B.1 additive — the (TagId, LanguageCode)
+    // business-key unique index, tg_tr_uidx_tag_lang). Without this call
+    // the docs are invisible to Marten (the M3/Media/Page precedent).
+    TagDocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
