@@ -12,6 +12,14 @@
     Groups all declare their `@section` in the view, never in a partial).
 *@
 <script type="module" src="~/js/lib/rich-editor.js"></script>
+@* TG U8 — the composer tag-input autocomplete (client/lib/tag-suggest.ts,
+   tsc-built, no editor dependency — the RE·3 idiom). Self-wires any
+   input[data-tag-suggest]; on a `PageKind.User` blog page that is the Tags
+   field the _PageForm renders (the `System`-page composer renders **no**
+   input, C-TG·6 — the module self-wire finds nothing and is a no-op there).
+   The filter + ≤ 10 cap are server-side via POST /api/tags/suggest
+   (the SuggestAsync seam, C-TG·2 / C-TG·4). *@
+<script type="module" src="~/js/lib/tag-suggest.js"></script>
 <partial name="_GrantPickerScripts" />
 <script>
 (function () {

@@ -130,6 +130,34 @@
                 </div>
             </div>
 
+            @* TG U8 — the composer tag field, **blog pages only** (C-TG·6, D6):
+               `Page.TagIds` is non-empty only on `PageKind.User` pages — a
+               `PageKind.System` page **refuses** a non-empty set (the
+               `PageService` write-lane refusal landed in U4), so its composer
+               must **not** render the field at all (the `System`-page refusal
+               branch, C-TG·6). `Model.Kind` is the ADR 0040 page-kind
+               discriminator the form already uses (the "system namespace is
+               not available to blog pages" branch above). The field is the
+               same free-text + autocomplete as the post composers —
+               `data-tag-suggest` is self-wired by client/lib/tag-suggest.ts
+               (tsc-only, no editor dependency — RE·3); the filter + ≤ 10 cap
+               are server-side via POST /api/tags/suggest (C-TG·2 / C-TG·4). *@
+            @if (Model.Kind == "User")
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                        <input class="form-control" type="text" id="tags"
+                               data-tag-suggest
+                               maxlength="64"
+                               placeholder="e.g. sanitation, budget, maple-street" />
+                        <div class="text-muted small mt-1">
+                            <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
+                        </div>
+                    </div>
+                </div>
+            }
+
             <div class="card mb-4">
                 <div class="card-body">
                     <h6 class="card-title" style="font-weight:600;">Visibility</h6>

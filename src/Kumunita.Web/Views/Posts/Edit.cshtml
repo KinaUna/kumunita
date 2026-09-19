@@ -137,8 +137,33 @@
             </div>
 
             <div class="card mb-4">
-                <div class="card-body">
-                    <h6 class="card-title" style="font-weight:600;">
+                <div class="card-body">                    <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                    @* TG U8 — the composer tag input (a free-text field +
+                       autocomplete dropdown). `data-tag-suggest` is the
+                       self-wire selector for client/lib/tag-suggest.ts
+                       (tsc-only, no editor dependency — RE·3); the module
+                       creates the chips, the dropdown, and the hidden
+                       `TagIds` submission field around this input. The
+                       filter (starts_with(displayName) OR starts_with(slug),
+                       ≤ 10) is **server-side** via POST /api/tags/suggest
+                       (the SuggestAsync seam, C-TG·2 / C-TG·4); this input
+                       only commits the author's typed text. The label +
+                       placeholder are plain text (the `_PageForm`
+                       field-label convention — a `placeholder` is an HTML
+                       attribute, and the kw-l TagHelper renders an element,
+                       so it cannot wrap an attribute). *@
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           maxlength="64"
+                           placeholder="e.g. sanitation, budget, maple-street" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">                    <h6 class="card-title" style="font-weight:600;">
                         Audience — who can see this post
                     </h6>
 
@@ -256,6 +281,14 @@
        the toolbar + live preview pane. Self-wires the .rc-editor surface.
        RE·3: no editor dependency. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+
+    @* TG U8 — the composer tag-input autocomplete (client/lib/tag-suggest.ts,
+       tsc-built, no editor dependency — the RE·3 idiom). Self-wires any
+       input[data-tag-suggest] (the Tags field above); the filter + ≤ 10 cap
+       are server-side via POST /api/tags/suggest (the SuggestAsync seam,
+       C-TG·2 / C-TG·4; the privacy-pin holds because the server returns only
+       the actor-readable set). *@
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
 
     @* The grant-picker sync (shared with Profile/Edit — the
        <c>_GrantPickerScripts</c> partial): keeps the hidden
