@@ -570,6 +570,34 @@ public interface IUserInfoService
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
 
     /// <summary>
+    /// **Updates** an existing user-added translation of a group's name and/or
+    /// description (ADR 0048). Standing is the same as
+    /// <see cref="AddGroupTranslationAsync"/> (the group's owner, a GlobalAdmin,
+    /// or a Translator); a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. At least one of name / description
+    /// must be non-blank. One <c>SaveChangesAsync</c>; a hand-written
+    /// <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.update</c>) is stored in the caller's session.
+    /// </summary>
+    Task<GroupTranslation> UpdateGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of a group's name and/or
+    /// description (ADR 0048). Standing is the same as
+    /// <see cref="AddGroupTranslationAsync"/>; a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>; a
+    /// hand-written <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.remove</c>) is stored in the caller's session.
+    /// </summary>
+    Task RemoveGroupTranslationAsync(
+        string groupId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
     /// The public ADR 0026 standing probe the Web layer calls to decide
     /// whether to render the group "add a translation" affordance (a
     /// <b>display</b> pin, not a gate — the real deny is
@@ -614,6 +642,34 @@ public interface IUserInfoService
     /// the GlobalAdmin nor the Translator standing.</exception>
     Task<CommunityTranslation> AddCommunityTranslationAsync(
         string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Updates** an existing user-added translation of a community's name
+    /// and/or description (ADR 0048). Standing is the same as
+    /// <see cref="AddCommunityTranslationAsync"/> (a GlobalAdmin or a
+    /// Translator); a denied actor throws <see cref="UnauthorizedAccessException"/>;
+    /// a missing component or row is a <see cref="KeyNotFoundException"/>. At
+    /// least one of name / description must be non-blank. One
+    /// <c>SaveChangesAsync</c>; a hand-written <see cref="Authorization
+    /// .AccessAudit"/> row (action <c>communitytranslation.update</c>) is
+    /// stored in the caller's session.
+    /// </summary>
+    Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of a community's name
+    /// and/or description (ADR 0048). Standing is the same as
+    /// <see cref="AddCommunityTranslationAsync"/>; a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing component or row is
+    /// a <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>; a
+    /// hand-written <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>communitytranslation.remove</c>) is stored in the caller's session.
+    /// </summary>
+    Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
 
     /// <summary>

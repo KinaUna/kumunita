@@ -1368,6 +1368,304 @@ public sealed class PostService
         return translation;
     }
 
+    // ─── ADR 0048 — edit + delete lane for post/reply translations ───────
+    // The ADR 0022 write lane was add-only (one row per (parent, language)
+    // pair, enforced by the unique index in M3DocTypes). ADR 0048 lifts the
+    // "add-only" pin: a standing-holder (the same matrix as the add lane —
+    // author / GlobalAdmin / (community-lane) component-moderator) may now
+    // **update** the existing (parent, language) row in place, or **remove**
+    // it. Update is a field-write on the existing row (same Title/Body
+    // shape as the add, the parent re-validated by load); Remove is a hard
+    // `session.Delete` of the row (the trail is preserved by the
+    // <c>AccessAudit</c> row written in the same session — ADR 0024's
+    // soft-delete rationale does not apply to a translation: it has no
+    // children to keep visible, and a soft-delete would block re-adding the
+    // same language via the unique index). Standing is re-derived from the
+    // **parent** (the row's own <c>AuthorId</c> is the adder, which may be a
+    // different standing-holder — the post's author, a GlobalAdmin, or a
+    // community moderator). Both lanes write a hand-written
+    // <c>AccessAudit</c> row in the caller's session (C3) and commit
+    // atomically (one <c>SaveChangesAsync</c>).
+
+    /// <summary>
+    /// **Updates** the existing <see cref="PostTranslation"/> row for
+    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing (ADR 0048, same as
+    /// the ADR 0022 add lane): the post's **author**
+    /// (<see cref="AccessVia.Owner"/>), a <see cref="Identity
+    /// .Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>), and — on the
+    /// community lane only — a <c>Moderator</c> scoped to the post's
+    /// component (<see cref="AccessVia.Moderator"/>). The group lane has no
+    /// component-moderator standing (ADR 0007). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is written.
+    /// <para>
+    /// The row's <see cref="PostTranslation.Title"/> /
+    /// <see cref="PostTranslation.Body"/> are replaced verbatim (a blank
+    /// <paramref name="title"/> clears the title, matching the add lane's
+    /// null-coalescing; a blank <paramref name="body"/> is a caller error —
+    /// a translation with no body is not a translation). The parent
+    /// <see cref="Post"/> and the <c>(PostId, LanguageCode)</c> row are both
+    /// loaded in the same session: a missing parent is a
+    /// <see cref="KeyNotFoundException"/> (the parent was deleted after the
+    /// translation was added, or the id is a hallucination), a missing row
+    /// is a <see cref="KeyNotFoundException"/> (a shape error for this
+    /// route — the Web layer offers this route only for languages that
+    /// already have a row). One <c>SaveChangesAsync</c>.
+    /// </para>
+    /// </summary>
+    public async Task<PostTranslation> UpdatePostTranslationAsync(
+        string postId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<PostTranslation>()
+            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Post '{postId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveTranslationStanding(
+            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the post's author (or a moderator of the community, or an admin) " +
+                "may edit a translation of it.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = body;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "posttranslation.update",
+            TargetKind = "post",
+            TargetId = postId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="PostTranslation"/> row for
+    /// (<paramref name="postId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same matrix
+    /// as <see cref="UpdatePostTranslationAsync"/> — the ADR 0048
+    /// author / GlobalAdmin / (community) component-moderator rule,
+    /// re-derived from the parent post. A hard <c>session.Delete</c> of the
+    /// row; the trail is preserved by the <see cref="Authorization
+    /// .AccessAudit"/> row written in the same session (action
+    /// <c>posttranslation.remove</c>). A missing parent or a missing row is
+    /// a <see cref="KeyNotFoundException"/> (a double-remove is a shape
+    /// error for this route — the Web layer offers the delete affordance
+    /// only for languages that have a row). One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemovePostTranslationAsync(
+        string postId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var post = await session.LoadAsync<Post>(postId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Post '{postId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<PostTranslation>()
+            .Where(t => t.PostId == postId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Post '{postId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveTranslationStanding(
+            post.GroupId.Length > 0, post.ComponentId, post.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the post's author (or a moderator of the community, or an admin) " +
+                "may remove a translation of it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "posttranslation.remove",
+            TargetKind = "post",
+            TargetId = postId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// **Updates** the existing <see cref="ReplyTranslation"/> row for
+    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
+    /// post's lane (community vs group) and the parent's component scope —
+    /// the reply itself has no component (C-M3·1), so the scope comes from
+    /// the parent. A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is
+    /// written. A missing parent post, a missing reply, or a missing
+    /// (ReplyId, LanguageCode) row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<ReplyTranslation> UpdateReplyTranslationAsync(
+        string replyId, string languageCode, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to update.");
+
+        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
+        if (parent is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to update.");
+
+        var row = await session.Query<ReplyTranslation>()
+            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveTranslationStanding(
+            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the reply's author (or a moderator of the community, or an admin) " +
+                "may edit a translation of it.");
+
+        row.Body = body;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "replytranslation.update",
+            TargetKind = "reply",
+            TargetId = replyId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="ReplyTranslation"/> row for
+    /// (<paramref name="replyId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing mirrors the parent
+    /// post's lane and component scope (the ADR 0048 author / GlobalAdmin /
+    /// (community) component-moderator rule). A hard
+    /// <c>session.Delete</c>; the trail is preserved by the
+    /// <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>replytranslation.remove</c>). A missing parent post, reply, or
+    /// row is a <see cref="KeyNotFoundException"/>. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveReplyTranslationAsync(
+        string replyId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found in the session; nothing to remove.");
+
+        var parent = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
+        if (parent is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' has no parent post; nothing to remove.");
+
+        var row = await session.Query<ReplyTranslation>()
+            .Where(t => t.ReplyId == replyId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Reply '{replyId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveTranslationStanding(
+            parent.GroupId.Length > 0, parent.ComponentId, reply.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the reply's author (or a moderator of the community, or an admin) " +
+                "may remove a translation of it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "replytranslation.remove",
+            TargetKind = "reply",
+            TargetId = replyId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     /// <summary>
     /// The public ADR 0022 standing probe the Web layer calls to decide whether
     /// to render the "add a translation" affordance (a <b>display</b> pin, not a
@@ -1377,7 +1675,11 @@ public sealed class PostService
     /// detail controllers — is the ADR 0006-D "the service owns the decision,
     /// not the Web" shape; it delegates to the same
     /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the
-    /// display and the gate can never drift apart.
+    /// display and the gate can never drift apart. ADR 0048: the edit /
+    /// remove lanes (the same standing matrix, re-derived from the parent)
+    /// reuse this exact display pin, so the "add a …" / "edit …" / "remove …"
+    /// affordances render under the same standing — the display and the
+    /// three gates can never drift apart.
     /// </summary>
     public static bool CanAddTranslation(
         bool isGroupLane, string componentId, string rowAuthorId, string actorId, IReadOnlySet<string> actorRoles)

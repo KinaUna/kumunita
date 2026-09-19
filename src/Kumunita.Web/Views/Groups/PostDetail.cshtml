@@ -151,12 +151,52 @@
                                 }
                             </div>
 
-                            @* The "add a translation" lane — one form per supported
-                               language that has no translation yet. The authored-in
-                               language is excluded (missingLanguages). The form
-                               markup and the ADR 0022 route action are unchanged. *@
+                            @* ADR 0048 — edit + remove lane for existing
+                               translations. For each language that already has a
+                               row, offer an "Edit" (pre-filled) + "Remove"
+                               (confirm) control. The add lane below is
+                               unchanged. *@
                             @if (Model.CanTranslate)
                             {
+                                @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <details class="mb-1">
+                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                        </summary>
+                                        <div class="ms-2">
+                                            <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/translations/update")">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <label class="form-label small">
+                                                    @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                                </label>
+                                                <input class="form-control form-control-sm mb-2" name="title"
+                                                       value="@existing.Title" />
+                                                <label class="form-label small">
+                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                </label>
+                                                <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary">
+                                                    <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/translations/remove")"
+                                                  class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </details>
+                                }
+
+                                @* The "add a translation" lane — one form per supported
+                                   language that has no translation yet. The authored-in
+                                   language is excluded (missingLanguages). *@
                                 @foreach (var lang in missingLanguages)
                                 {
                                     <details class="mb-1">
@@ -301,13 +341,41 @@
                                         }
                                     </div>
 
-                                    @* The "add a translation" lane — the
-                                       authored-in language is excluded
-                                       (l.Code != r.OriginalLanguageCode). The form
-                                       markup and the ADR 0022 route action are
-                                       unchanged. *@
+                                    @* ADR 0048 — edit + remove lane for the
+                                       reply's existing translations. The add
+                                       lane below is unchanged. *@
                                     @if (r.CanTranslate)
                                     {
+                                        @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <details class="mb-1">
+                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                                    <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                </summary>
+                                                <div class="ms-2">
+                                                    <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations/update")">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                        <label class="form-label small">
+                                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                        </label>
+                                                        <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                                        <button type="submit" class="btn btn-sm btn-primary">
+                                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                        </button>
+                                                    </form>
+                                                    <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations/remove")"
+                                                          class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </details>
+                                        }
+
                                         @* Drive "has a translation yet" from the reply's own
                                            r.Translations rows (not the post's l.HasTranslation),
                                            so a post's translation never suppresses a reply's

@@ -566,6 +566,147 @@ public sealed class AnnouncementService : IAnnouncementService
         return translation;
     }
 
+    // ─── ADR 0048 — edit + delete lane for announcement translations ─────
+    // ADR 0029 was add-only (one row per (announcement, language) pair,
+    // enforced by the unique index `ann_tr_uidx_ann_lang`). ADR 0048 lifts
+    // the "add-only" pin: the same standing matrix (GlobalAdmin / Translator /
+    // targeted-community Moderator) may now **update** the existing
+    // (announcementId, languageCode) row in place, or **remove** it. Standing
+    // is re-derived from the announcement (scope + communityId), not from the
+    // row's AuthorId (which is the adder). Both write a hand-written
+    // <c>AccessAudit</c> row in the caller's session (C3) and commit
+    // atomically.
+
+    /// <summary>
+    /// **Updates** the existing <see cref="AnnouncementTranslation"/> row for
+    /// (<paramref name="announcementId"/>, <paramref name="languageCode"/>)
+    /// in the <b>caller's</b> in-flight session (C3). Standing (ADR 0048,
+    /// same as the ADR 0029 add lane): a
+    /// <see cref="Roles.GlobalAdmin"/> or a <see cref="Roles.Translator"/>
+    /// (both <see cref="AccessVia.Admin"/>); and — for a
+    /// <see cref="AnnouncementScope.Community"/> announcement <em>targeted</em>
+    /// at one community — a <see cref="Roles.Moderator"/> scoped to that
+    /// community (<see cref="AccessVia.Moderator"/>). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is written.
+    /// A missing announcement or a missing row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<AnnouncementTranslation> UpdateAnnouncementTranslationAsync(
+        string announcementId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(announcementId))
+            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<AnnouncementTranslation>()
+            .Where(t => t.AnnouncementId == announcementId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Announcement '{announcementId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only an admin, a translator, or a moderator of the targeted community " +
+                "may edit a translation of this announcement.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = body;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementtranslation.update",
+            TargetKind = "announcement",
+            TargetId = announcementId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="AnnouncementTranslation"/> row for
+    /// (<paramref name="announcementId"/>, <paramref name="languageCode"/>)
+    /// in the <b>caller's</b> in-flight session (C3). Standing is the same
+    /// matrix as the add lane (ADR 0029). A hard <c>session.Delete</c>; the
+    /// trail is preserved by the <see cref="Authorization.AccessAudit"/> row
+    /// (action <c>announcementtranslation.remove</c>). A missing announcement
+    /// or row is a <see cref="KeyNotFoundException"/>. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveAnnouncementTranslationAsync(
+        string announcementId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(announcementId))
+            throw new ArgumentException("An announcement id is required.", nameof(announcementId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var announcement = await session.LoadAsync<Announcement>(announcementId).ConfigureAwait(false);
+        if (announcement is null)
+            throw new KeyNotFoundException($"Announcement '{announcementId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<AnnouncementTranslation>()
+            .Where(t => t.AnnouncementId == announcementId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Announcement '{announcementId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveTranslationStanding(announcement.Scope, announcement.CommunityId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only an admin, a translator, or a moderator of the targeted community " +
+                "may remove a translation of this announcement.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "announcementtranslation.remove",
+            TargetKind = "announcement",
+            TargetId = announcementId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     /// <summary>
     /// The public ADR 0029 standing probe the Web layer calls to decide
     /// whether to render the "add a translation" affordance (a
@@ -575,6 +716,10 @@ public sealed class AnnouncementService : IAnnouncementService
     /// <see cref="ResolveTranslationStanding"/> the write lane uses, so the
     /// display and the gate can never drift apart (the
     /// <see cref="Kumunita.Core.Posts.PostService.CanAddTranslation"/> shape).
+    /// ADR 0048: the edit / remove lanes (the same standing matrix,
+    /// re-derived from the announcement) reuse this display pin, so the
+    /// "add a …" / "edit …" / "remove …" affordances render under the same
+    /// standing.
     /// </summary>
     public static bool CanTranslateAnnouncement(
         AnnouncementScope scope, string? communityId, string actorId, IReadOnlySet<string> actorRoles)

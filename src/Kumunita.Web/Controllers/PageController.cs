@@ -740,6 +740,166 @@ public sealed class PageController(
         return RedirectToAction(nameof(Show), new { path });
     }
 
+    // ── ADR 0048 — edit + delete lanes for page translations ───────────────
+    // ADR 0029 (carried over) was add-only; ADR 0048 lifts the "add-only" pin
+    // on the same standing matrix (GlobalAdmin ∪ Translator). Failure shapes
+    // mirror <see cref="AddTranslation"/> (denied → 403; missing → 404).
+
+    /// <summary>
+    /// <c>POST /pages/{id}/translations/update</c> — **updates** the existing
+    /// user-added translation of the page (ADR 0048). Standing is the same as
+    /// <see cref="AddTranslation"/> (a GlobalAdmin or a Translator, server-side
+    /// authority via <see cref="IPageService.UpdateTranslationAsync"/>); the
+    /// <c>[Authorize(Roles)]</c> gate is the convenience pre-gate (C3).
+    /// Failure shapes mirror <see cref="AddTranslation"/> (denied → 403;
+    /// missing page or row → 404).
+    /// </summary>
+    [HttpPost("{id:guid}/translations/update")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "GlobalAdmin,Moderator,Translator")]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        Page page;
+        try
+        {
+            await using var readSession = store.QuerySession();
+            page = (await readSession.LoadAsync<Page>(id).ConfigureAwait(false))!;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        if (page is null || page.IsDeleted)
+            return NotFound();
+
+        if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            return new ForbidResult();
+
+        var decision = await authz.CanAsync(
+            actorId, Authorization.AccessAction.Read, new PageToAuditableResource(page)).ConfigureAwait(false);
+        if (!decision.Allowed)
+            return new ForbidResult();
+
+        var path = await DerivePathAsync(page).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Show), new { path });
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return RedirectToAction(nameof(Show), new { path });
+        }
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await pages.UpdateTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                KumunitaPrincipal.RoleSet(User),
+                session).ConfigureAwait(false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
+        TempData["info"] = $"Translation updated ({name}).";
+        return RedirectToAction(nameof(Show), new { path });
+    }
+
+    /// <summary>
+    /// <c>POST /pages/{id}/translations/remove</c> — **removes** the existing
+    /// user-added translation of the page (ADR 0048). Standing is the same as
+    /// <see cref="AddTranslation"/>; the service is the authority (C3).
+    /// Failure shapes mirror <see cref="AddTranslation"/> (denied → 403;
+    /// missing page or row → 404).
+    /// </summary>
+    [HttpPost("{id:guid}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "GlobalAdmin,Moderator,Translator")]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        Page page;
+        try
+        {
+            await using var readSession = store.QuerySession();
+            page = (await readSession.LoadAsync<Page>(id).ConfigureAwait(false))!;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        if (page is null || page.IsDeleted)
+            return NotFound();
+
+        if (page.IsDraft && !string.Equals(page.AuthorId, actorId, StringComparison.Ordinal))
+            return new ForbidResult();
+
+        var decision = await authz.CanAsync(
+            actorId, Authorization.AccessAction.Read, new PageToAuditableResource(page)).ConfigureAwait(false);
+        if (!decision.Allowed)
+            return new ForbidResult();
+
+        var path = await DerivePathAsync(page).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Show), new { path });
+        }
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await pages.RemoveTranslationAsync(
+                id, languageCode, actorId, KumunitaPrincipal.RoleSet(User), session)
+                .ConfigureAwait(false);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode).ConfigureAwait(false);
+        TempData["info"] = $"Translation removed ({name}).";
+        return RedirectToAction(nameof(Show), new { path });
+    }
+
     /// <summary>
     /// The <see cref="Page"/>'s post-view route value (ADR 0039 §3.3) for the
     /// <c>Show</c> redirect — the <see cref="PagePaths.Href"/> the tree browse

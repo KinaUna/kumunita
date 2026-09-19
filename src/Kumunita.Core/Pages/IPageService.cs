@@ -234,4 +234,31 @@ public interface IPageService
     Task<PageTranslation> AddTranslationAsync(
         string pageId, string languageCode, string? title, string body,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
+
+    /// <summary>
+    /// **Updates** an existing user-added translation of a page (ADR 0048).
+    /// Standing is the same as <see cref="AddTranslationAsync"/> (a GlobalAdmin
+    /// or a Translator); a denied actor is a
+    /// <see cref="UnauthorizedAccessException"/> (403); a missing page or row is
+    /// a <see cref="KeyNotFoundException"/> (404). One
+    /// <c>SaveChangesAsync</c>; a hand-written <see cref="Authorization
+    /// .AccessAudit"/> row (action <c>page.translation.update</c>) is stored in
+    /// the caller's session.
+    /// </summary>
+    Task<PageTranslation> UpdateTranslationAsync(
+        string pageId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of a page (ADR 0048).
+    /// Standing is the same as <see cref="AddTranslationAsync"/>; a denied
+    /// actor is a <see cref="UnauthorizedAccessException"/> (403); a missing
+    /// page or row is a <see cref="KeyNotFoundException"/> (404). One
+    /// <c>SaveChangesAsync</c>; a hand-written <see cref="Authorization
+    /// .AccessAudit"/> row (action <c>page.translation.remove</c>) is stored in
+    /// the caller's session.
+    /// </summary>
+    Task RemoveTranslationAsync(
+        string pageId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
 }

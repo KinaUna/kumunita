@@ -71,6 +71,12 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
         return await action(session);
     }
 
+    private static async Task RunInSession(IDocumentStore store, Func<IDocumentSession, Task> action)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        await action(session);
+    }
+
     private static async Task<IReadOnlyList<AccessAudit>> AuditsFor(IDocumentStore store, string action)
     {
         var ct = TestContext.Current.CancellationToken;
@@ -359,6 +365,250 @@ public class PostTranslationTests(PostgresFixture fixture) : IClassFixture<Postg
 
         Assert.Empty((await posts.GetReplyTranslationsAsync(new[] { "a022-r" })).ToList());
         Assert.Empty(await AuditsFor(store, "replytranslation.add"));
+    }
+
+    // ── ADR 0048 — edit + remove lane (same standing matrix, in-place row) ──
+
+    [Fact]
+    public async Task UpdatePostTranslation_Author_Allows_UpdatesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostTranslation
+        {
+            Id = "a022-t1", PostId = "a022-p", LanguageCode = "pl",
+            Title = "Tyt", Body = "ciało", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        var updated = await RunInSession(store, s =>
+            posts.UpdatePostTranslationAsync("a022-p", "pl", "Nowy", "nowe ciało", author, RoleSet(), s));
+
+        Assert.Equal("a022-t1", updated.Id);
+        Assert.Equal("Nowy", updated.Title);
+        Assert.Equal("nowe ciało", updated.Body);
+
+        // A single row (in-place update, not a second row — the unique index
+        // on (PostId, LanguageCode) would have blocked a duplicate).
+        var rows = await posts.GetPostTranslationsAsync("a022-p");
+        Assert.Single(rows);
+
+        var audit = Assert.Single(await AuditsFor(store, "posttranslation.update"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("post", audit.TargetKind);
+        Assert.Equal("a022-p", audit.TargetId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    [Fact]
+    public async Task UpdatePostTranslation_BlankTitle_ClearsTitle()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostTranslation
+        {
+            Id = "a022-t2", PostId = "a022-p", LanguageCode = "pl",
+            Title = "Tyt", Body = "ciało", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        var updated = await RunInSession(store, s =>
+            posts.UpdatePostTranslationAsync("a022-p", "pl", null, "ciało", author, RoleSet(), s));
+
+        Assert.Null(updated.Title);
+    }
+
+    [Fact]
+    public async Task UpdatePostTranslation_MissingRow_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => RunInSession(store, s =>
+            posts.UpdatePostTranslationAsync("a022-p", "pl", "T", "ciało", author, RoleSet(), s)));
+
+        Assert.Empty(await AuditsFor(store, "posttranslation.update"));
+    }
+
+    [Fact]
+    public async Task UpdatePostTranslation_OrdinaryResident_Denied_NoWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+        const string stranger = "u-a022-stranger";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostTranslation
+        {
+            Id = "a022-t3", PostId = "a022-p", LanguageCode = "pl",
+            Body = "ciało", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
+            posts.UpdatePostTranslationAsync("a022-p", "pl", "X", "ciało", stranger, RoleSet(Roles.Member), s)));
+
+        Assert.Single(await posts.GetPostTranslationsAsync("a022-p")); // untouched
+        Assert.Empty(await AuditsFor(store, "posttranslation.update"));
+    }
+
+    [Fact]
+    public async Task RemovePostTranslation_Author_Allows_DeletesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostTranslation
+        {
+            Id = "a022-t4", PostId = "a022-p", LanguageCode = "pl",
+            Body = "ciało", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            posts.RemovePostTranslationAsync("a022-p", "pl", author, RoleSet(), s));
+
+        Assert.Empty(await posts.GetPostTranslationsAsync("a022-p"));
+
+        // The trail survives the hard delete — the audit row is the record.
+        var audit = Assert.Single(await AuditsFor(store, "posttranslation.remove"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("post", audit.TargetKind);
+        Assert.Equal("a022-p", audit.TargetId);
+    }
+
+    [Fact]
+    public async Task RemovePostTranslation_MissingRow_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => RunInSession(store, s =>
+            posts.RemovePostTranslationAsync("a022-p", "pl", author, RoleSet(), s)));
+
+        Assert.Empty(await AuditsFor(store, "posttranslation.remove"));
+    }
+
+    [Fact]
+    public async Task RemovePostTranslation_OrdinaryResident_Denied_RowKept()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+        const string stranger = "u-a022-stranger";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostTranslation
+        {
+            Id = "a022-t5", PostId = "a022-p", LanguageCode = "pl",
+            Body = "ciało", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
+            posts.RemovePostTranslationAsync("a022-p", "pl", stranger, RoleSet(Roles.Member), s)));
+
+        Assert.Single(await posts.GetPostTranslationsAsync("a022-p")); // untouched
+        Assert.Empty(await AuditsFor(store, "posttranslation.remove"));
+    }
+
+    [Fact]
+    public async Task UpdateReplyTranslation_Author_Allows_UpdatesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostReply
+        {
+            Id = "a022-r", PostId = "a022-p", AuthorId = author,
+            Body = "reply body", Created = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new ReplyTranslation
+        {
+            Id = "a022-rt1", ReplyId = "a022-r", LanguageCode = "pl",
+            Body = "odpowiedź", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        var updated = await RunInSession(store, s =>
+            posts.UpdateReplyTranslationAsync("a022-r", "pl", "nowa odpowiedź", author, RoleSet(), s));
+
+        Assert.Equal("nowa odpowiedź", updated.Body);
+
+        var rows = (await posts.GetReplyTranslationsAsync(new[] { "a022-r" })).ToList();
+        Assert.Single(rows);
+
+        var audit = Assert.Single(await AuditsFor(store, "replytranslation.update"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("reply", audit.TargetKind);
+        Assert.Equal("a022-r", audit.TargetId);
+    }
+
+    [Fact]
+    public async Task RemoveReplyTranslation_Author_Allows_DeletesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostReply
+        {
+            Id = "a022-r", PostId = "a022-p", AuthorId = author,
+            Body = "reply body", Created = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new ReplyTranslation
+        {
+            Id = "a022-rt2", ReplyId = "a022-r", LanguageCode = "pl",
+            Body = "odpowiedź", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            posts.RemoveReplyTranslationAsync("a022-r", "pl", author, RoleSet(), s));
+
+        Assert.Empty((await posts.GetReplyTranslationsAsync(new[] { "a022-r" })).ToList());
+
+        var audit = Assert.Single(await AuditsFor(store, "replytranslation.remove"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("reply", audit.TargetKind);
+        Assert.Equal("a022-r", audit.TargetId);
+    }
+
+    [Fact]
+    public async Task UpdateReplyTranslation_NonAuthor_NonAdmin_Denied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, posts) = Services(store);
+        const string author = "u-a022-author";
+        const string stranger = "u-a022-stranger";
+
+        await Plant(store, CommunityPost("a022-p", author));
+        await Plant(store, new PostReply
+        {
+            Id = "a022-r", PostId = "a022-p", AuthorId = author,
+            Body = "reply body", Created = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new ReplyTranslation
+        {
+            Id = "a022-rt3", ReplyId = "a022-r", LanguageCode = "pl",
+            Body = "odpowiedź", AuthorId = author, Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => RunInSession(store, s =>
+            posts.UpdateReplyTranslationAsync("a022-r", "pl", "x", stranger, RoleSet(Roles.Member), s)));
+
+        Assert.Empty(await AuditsFor(store, "replytranslation.update"));
     }
 
     // ── The public display probe (CanAddTranslation) ─────────────────────────

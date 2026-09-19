@@ -420,6 +420,8 @@ public static class KnownTranslationKeys
             ["posts.translation_body_label"] = "Body",
             ["posts.translation_optional"] = "optional",
             ["posts.translation_save"] = "Save translation",
+            ["posts.translation_edit"] = "Edit",
+            ["posts.translation_remove"] = "Remove",
 
             // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
             // ADR 0039 §3.8 — the pages surface's UI copy. Plain text only:
@@ -1159,6 +1161,8 @@ public static class KnownTranslationKeys
             ["posts.translation_body_label"] = "Text",
             ["posts.translation_optional"] = "optional",
             ["posts.translation_save"] = "Übersetzung speichern",
+            ["posts.translation_edit"] = "Bearbeiten",
+            ["posts.translation_remove"] = "Entfernen",
 
             // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
             ["pages.title"]       = "Seiten",
@@ -1869,6 +1873,8 @@ public static class KnownTranslationKeys
             ["posts.translation_body_label"] = "Corps",
             ["posts.translation_optional"] = "optionnel",
             ["posts.translation_save"] = "Enregistrer la traduction",
+            ["posts.translation_edit"] = "Modifier",
+            ["posts.translation_remove"] = "Supprimer",
 
             // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
             ["pages.title"]       = "Pages",
@@ -2583,6 +2589,8 @@ public static class KnownTranslationKeys
             ["posts.translation_body_label"] = "Tekst",
             ["posts.translation_optional"] = "valgfrit",
             ["posts.translation_save"] = "Gem oversættelse",
+            ["posts.translation_edit"] = "Rediger",
+            ["posts.translation_remove"] = "Fjern",
 
             // ── pages (the PG lane — tree browse + post view, ADR 0039) ──────
             ["pages.title"]       = "Sider",

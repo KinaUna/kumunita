@@ -1275,6 +1275,184 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             svc.AddTranslationAsync("pg3-t-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
     }
 
+    // ─── 10.7 — ADR 0048 — UpdateTranslationAsync / RemoveTranslationAsync ──
+
+    [Fact]
+    public async Task PG3_Update_ByGlobalAdmin_UpdatesRow_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-ga", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-u-ga-t1", PageId = "pg3-u-ga", LanguageCode = "fr",
+            Title = "T", Body = "Corps", AuthorId = "u-admin", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        var updated = await svc.UpdateTranslationAsync(
+            "pg3-u-ga", "fr", "Nouveau", "Nouveau corps", "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        Assert.Equal("pg3-u-ga-t1", updated.Id);
+        Assert.Equal("Nouveau", updated.Title);
+        Assert.Equal("Nouveau corps", updated.Body);
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<PageTranslation>()
+            .Where(t => t.PageId == "pg3-u-ga")
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, count); // in-place, not a second row
+
+        var row = Assert.Single(await AuditsFor(store, "pg3-u-ga", "page.translation.update"));
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+    }
+
+    [Fact]
+    public async Task PG3_Update_ByTranslator_Persists_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-tr", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-u-tr-t1", PageId = "pg3-u-tr", LanguageCode = "de",
+            Title = "T", Body = "Körper", AuthorId = "u-translator", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await svc.UpdateTranslationAsync(
+            "pg3-u-tr", "de", "T", "Neuer Körper", "u-translator", RolesSet(Roles.Translator), session);
+
+        var row = (await AuditsFor(store, "pg3-u-tr", "page.translation.update")).Single();
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal("u-translator", row.ActorId);
+    }
+
+    [Fact]
+    public async Task PG3_Update_ByPlainMember_Denied()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-mem", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-u-mem-t1", PageId = "pg3-u-mem", LanguageCode = "fr",
+            Title = "T", Body = "Corps", AuthorId = "u-admin", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateTranslationAsync(
+                "pg3-u-mem", "fr", "X", "Corps", "u-member", RolesSet(Roles.Member), session));
+
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.update").ToList());
+    }
+
+    [Fact]
+    public async Task PG3_Update_MissingRow_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-u-miss", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.UpdateTranslationAsync("pg3-u-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.update"));
+    }
+
+    [Fact]
+    public async Task PG3_Remove_ByGlobalAdmin_DeletesRow_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-r-ga", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-r-ga-t1", PageId = "pg3-r-ga", LanguageCode = "fr",
+            Title = "T", Body = "Corps", AuthorId = "u-admin", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await svc.RemoveTranslationAsync(
+            "pg3-r-ga", "fr", "u-admin", RolesSet(Roles.GlobalAdmin), session);
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<PageTranslation>()
+            .Where(t => t.PageId == "pg3-r-ga")
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, count);
+
+        // The trail survives the hard delete — the audit row is the record.
+        var row = (await AuditsFor(store, "pg3-r-ga", "page.translation.remove")).Single();
+        Assert.Equal("page", row.TargetKind);
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+    }
+
+    [Fact]
+    public async Task PG3_Remove_ByTranslator_DeletesRow_WithAdminAudit()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-r-tr", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-r-tr-t1", PageId = "pg3-r-tr", LanguageCode = "de",
+            Title = "T", Body = "Körper", AuthorId = "u-translator", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await svc.RemoveTranslationAsync(
+            "pg3-r-tr", "de", "u-translator", RolesSet(Roles.Translator), session);
+
+        var row = (await AuditsFor(store, "pg3-r-tr", "page.translation.remove")).Single();
+        Assert.Equal(AccessVia.Admin, row.Via);
+        Assert.Equal("u-translator", row.ActorId);
+    }
+
+    [Fact]
+    public async Task PG3_Remove_ByPlainMember_Denied_RowKept()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-r-mem", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+        await Plant(store, new PageTranslation
+        {
+            Id = "pg3-r-mem-t1", PageId = "pg3-r-mem", LanguageCode = "fr",
+            Title = "T", Body = "Corps", AuthorId = "u-admin", Created = DateTimeOffset.UtcNow,
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.RemoveTranslationAsync("pg3-r-mem", "fr", "u-member", RolesSet(Roles.Member), session));
+
+        await using var q = store.QuerySession();
+        var count = await q.Query<PageTranslation>()
+            .Where(t => t.PageId == "pg3-r-mem")
+            .CountAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, count); // untouched
+
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove"));
+    }
+
+    [Fact]
+    public async Task PG3_Remove_MissingRow_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        await Plant(store, new Page { Id = "pg3-r-miss", Slug = "t", Title = "T", Body = "b", AuthorId = "u-someone" });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.RemoveTranslationAsync("pg3-r-miss", "fr", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove"));
+    }
+
     // ─── PG U05 (ADR 0039 §3.9, amended by ADR 0040) — the seeder's Page docs ─
     //
     // The seeder seeds the new Page docs for the canonical default pages (terms /

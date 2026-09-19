@@ -205,4 +205,34 @@ public interface IAnnouncementService
         string actorId,
         IReadOnlySet<string> actorRoles,
         IDocumentSession session);
-}
+    /// <summary>
+    /// **Updates** an existing user-added translation of an announcement (ADR
+    /// 0048). Standing is the same as <see cref="AddAnnouncementTranslationAsync"/>;
+    /// a denied actor is a <see cref="UnauthorizedAccessException"/>; a missing
+    /// id or row is a <see cref="KeyNotFoundException"/>. One
+    /// <c>SaveChangesAsync</c>; a hand-written <c>AccessAudit</c> row (action
+    /// <c>announcementtranslation.update</c>) is stored in the caller's session.
+    /// </summary>
+    Task<AnnouncementTranslation> UpdateAnnouncementTranslationAsync(
+        string announcementId,
+        string languageCode,
+        string? title,
+        string body,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of an announcement (ADR
+    /// 0048). Standing is the same as <see cref="AddAnnouncementTranslationAsync"/>;
+    /// a denied actor is a <see cref="UnauthorizedAccessException"/>; a missing
+    /// id or row is a <see cref="KeyNotFoundException"/>. One
+    /// <c>SaveChangesAsync</c>; a hand-written <c>AccessAudit</c> row (action
+    /// <c>announcementtranslation.remove</c>) is stored in the caller's session.
+    /// </summary>
+    Task RemoveAnnouncementTranslationAsync(
+        string announcementId,
+        string languageCode,
+        string actorId,
+        IReadOnlySet<string> actorRoles,
+        IDocumentSession session);}

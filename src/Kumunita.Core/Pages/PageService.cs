@@ -932,6 +932,132 @@ public sealed class PageService : IPageService
         return translation;
     }
 
+    // ─── ADR 0048 — edit + delete lane for page translations ───────────────
+    // ADR 0029 (carried over to ADR 0040) was add-only. ADR 0048 lifts the
+    // "add-only" pin: a GlobalAdmin or a Translator (the same standing as
+    // the add lane) may now **update** the existing (page, languageCode)
+    // row in place, or **remove** it. A hard <c>session.Delete</c>; the
+    // trail is preserved by the <c>AccessAudit</c> row.
+
+    /// <summary>
+    /// **Updates** the existing <see cref="PageTranslation"/> row for
+    /// (<paramref name="pageId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing (ADR 0048, same as
+    /// the add lane): a <see cref="Roles.GlobalAdmin"/> or a
+    /// <see cref="Roles.Translator"/> — a community Moderator has no
+    /// translation standing. A missing page or row is a
+    /// <see cref="KeyNotFoundException"/>; a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<PageTranslation> UpdateTranslationAsync(
+        string pageId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId))
+            throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<PageTranslation>()
+            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to update.");
+
+        CheckTranslateStanding(actorId, actorRoles, page);
+
+        row.Title = title;
+        row.Body = body;
+
+        var now = DateTimeOffset.UtcNow;
+        var via = ResolveTranslationStandingVia(page.Kind, page.ComponentId, actorId, actorRoles);
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.translation.update",
+            TargetKind = "page",
+            TargetId = pageId,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="PageTranslation"/> row for
+    /// (<paramref name="pageId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the
+    /// add lane. A hard <c>session.Delete</c>; the trail is preserved by the
+    /// <see cref="AccessAudit"/> row (action <c>page.translation.remove</c>).
+    /// A missing page or row is a <see cref="KeyNotFoundException"/>. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveTranslationAsync(
+        string pageId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId))
+            throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<PageTranslation>()
+            .Where(t => t.PageId == pageId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Page '{pageId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        CheckTranslateStanding(actorId, actorRoles, page);
+
+        var now = DateTimeOffset.UtcNow;
+        var via = ResolveTranslationStandingVia(page.Kind, page.ComponentId, actorId, actorRoles);
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.translation.remove",
+            TargetKind = "page",
+            TargetId = pageId,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
 
     /// <summary>

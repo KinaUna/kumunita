@@ -617,6 +617,126 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
+    // ── ADR 0048 — edit + delete lanes for group translations ─────────────
+    // ADR 0026 was add-only; ADR 0048 lifts the "add-only" pin on the same
+    // standing matrix (group owner / GlobalAdmin / Translator). Failure
+    // shapes mirror the add lane (denied → 403; missing → 404).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the group's name
+    /// and/or description (ADR 0048):
+    /// <c>POST /groups/{id}/translations/update</c>. Thin Web lane; delegates
+    /// to <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .UpdateGroupTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? name,
+        [FromForm] string? description)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+        {
+            TempData["error"] = "A translation needs a name and/or description.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.UpdateGroupTranslationAsync(
+                resolved.Group.Id,
+                languageCode,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(description) ? null : description,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name2 = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name2}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the group's name
+    /// and/or description (ADR 0048):
+    /// <c>POST /groups/{id}/translations/remove</c>. Thin Web lane; delegates
+    /// to <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .RemoveGroupTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.RemoveGroupTranslationAsync(resolved.Group.Id, languageCode, actor, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name2 = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name2}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
     // ── ADR 0009: the group's description (resident-facing display + the
     // owner ∪ GlobalAdmin write lane) ──────────────────────────────────
 
@@ -1670,6 +1790,217 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         }
 
         TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── ADR 0048 — edit + delete lanes for group post / reply translations ─
+    // ADR 0022 (group lane) was add-only; ADR 0048 lifts the "add-only" pin on
+    // the same standing matrix (author ∪ GlobalAdmin, no community moderator).
+    // Failure shapes mirror the add lane: the group lane's 404 fail-closed
+    // posture (a 403 would advertise a gate the group lane does not expose).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of a group post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/translations/update</c>. Failure
+    /// shapes mirror <see cref="AddPostTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePostTranslation(
+        string id, string postId, [FromForm] string? languageCode, [FromForm] string? title, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdatePostTranslationAsync(
+                postId, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of a group post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/translations/remove</c>. Failure
+    /// shapes mirror <see cref="AddPostTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemovePostTranslation(
+        string id, string postId, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemovePostTranslationAsync(postId, languageCode, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of a group post's reply
+    /// (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations/update</c>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of a group post's reply
+    /// (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations/remove</c>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
         return Redirect($"/groups/{id}/posts/{postId}");
     }
 

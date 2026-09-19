@@ -127,17 +127,56 @@
                             }
                         </div>
 
-                        @* ADR 0029 — the "add a translation" lane (U06): one
-                           form per supported language that has no translation
-                           yet, offered only to a standing-holder (GlobalAdmin /
-                           Translator / a community Moderator of the page's
-                           scope). The authored-in language + any already-
-                           translated code are excluded (missingLanguages, the
-                           ADR 0027 "candidate list excludes the item's own
-                           language" rule). The route action is the service's
-                           write seam (AddTranslationAsync — C3 server-side). *@
+                        @* ADR 0048 — edit + remove lane for the page's
+                           existing translations. Pre-filled from the existing
+                           row; the add lane below is unchanged. The standing
+                           gate (Model.CanTranslate) is the same for both. *@
                         @if (Model.CanTranslate)
                         {
+                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <details class="mb-1">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                    </summary>
+                                    <div class="ms-2">
+                                        <form method="post" action="@($"/pages/{Model.Id}/translations/update")">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <label class="form-label small">
+                                                @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" name="title"
+                                                   value="@existing.Title" />
+                                            <label class="form-label small">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="@($"/pages/{Model.Id}/translations/remove")"
+                                              class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </details>
+                            }
+
+                            @* ADR 0029 — the "add a translation" lane (U06): one
+                               form per supported language that has no translation
+                               yet, offered only to a standing-holder (GlobalAdmin /
+                               Translator / a community Moderator of the page's
+                               scope). The authored-in language + any already-
+                               translated code are excluded (missingLanguages, the
+                               ADR 0027 "candidate list excludes the item's own
+                               language" rule). *@
                             @foreach (var lang in missingLanguages)
                             {
                                 <details class="mb-1">

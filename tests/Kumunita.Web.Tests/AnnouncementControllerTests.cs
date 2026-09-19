@@ -1062,6 +1062,210 @@ public class AnnouncementControllerTests
             Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
     }
 
+    // ── ADR 0048 — UpdateTranslation / RemoveTranslation ────────────────────
+
+    [Fact]
+    public async Task UpdateTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-u-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation(id, "fr", "Nouveau", "Corps");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).UpdateAnnouncementTranslationAsync(
+            id, "fr", "Nouveau", "Corps", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_Denied_Forbid()
+    {
+        const string id = "ann-u-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.UpdateAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Kumunita.Core.Announcements.AnnouncementTranslation>(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.UpdateTranslation(id, "fr", "X", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-u-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation("ann-u-missing", "fr", "T", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().UpdateAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_MissingRow_NotFound()
+    {
+        const string id = "ann-u-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.UpdateAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Kumunita.Core.Announcements.AnnouncementTranslation>(new KeyNotFoundException("No row.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation(id, "fr", "T", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-r-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).RemoveAnnouncementTranslationAsync(
+            id, "fr", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_Denied_Forbid()
+    {
+        const string id = "ann-r-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.RemoveAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-r-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation("ann-r-missing", "fr");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().RemoveAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_MissingRow_NotFound()
+    {
+        const string id = "ann-r-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.RemoveAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new KeyNotFoundException("No row.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.RemoveTranslation("ann-r-001", "fr");
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().RemoveAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
     /// <summary>
     /// An anonymous caller (no authenticated principal): the controller's
     /// <c>SubjectId(User)</c> is <c>null</c> and the lane short-circuits to a

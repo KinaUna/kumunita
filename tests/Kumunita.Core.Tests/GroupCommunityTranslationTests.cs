@@ -64,6 +64,12 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
         return await action(session);
     }
 
+    private static async Task RunInSession(IDocumentStore store, Func<IDocumentSession, Task> action)
+    {
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        await action(session);
+    }
+
     private static async Task<IReadOnlyList<AccessAudit>> AuditsFor(IDocumentStore store, string action)
     {
         var ct = TestContext.Current.CancellationToken;
@@ -371,6 +377,275 @@ public class GroupCommunityTranslationTests(PostgresFixture fixture) : IClassFix
                 svc.AddCommunityTranslationAsync("a026-missing-comp", "pl", "X", null, "u-a026", RoleSet(Roles.GlobalAdmin), s)));
 
         Assert.Empty(await AuditsFor(store, "communitytranslation.add"));
+    }
+
+    // ── ADR 0048 — edit + remove lane (same standing matrix, in-place row) ──
+
+    [Fact]
+    public async Task UpdateGroupTranslation_Owner_Allows_UpdatesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+
+        await Plant(store, NewGroup(owner));
+        await Plant(store, new GroupTranslation
+        {
+            Id = "a026-t1", GroupId = GroupId, LanguageCode = "pl",
+            Name = "Wolontariusze rowerów", AuthorId = owner, Created = DateTimeOffset.UtcNow
+        });
+
+        var updated = await RunInSession(store, s =>
+            svc.UpdateGroupTranslationAsync(GroupId, "pl", "Nowa nazwa", null, owner, RoleSet(), s));
+
+        Assert.Equal("a026-t1", updated.Id);
+        Assert.Equal("Nowa nazwa", updated.Name);
+        Assert.Null(updated.Description);
+
+        // A single row (in-place update — the unique index on (GroupId,
+        // LanguageCode) would have blocked a second row).
+        var rows = await svc.GetGroupTranslationsAsync(GroupId);
+        Assert.Single(rows);
+
+        var audit = Assert.Single(await AuditsFor(store, "grouptranslation.update"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("group", audit.TargetKind);
+        Assert.Equal(GroupId, audit.TargetId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    [Fact]
+    public async Task UpdateGroupTranslation_Translator_Allows_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+        const string translator = "u-a026-translator";
+
+        await Plant(store, NewGroup(owner));
+        await Plant(store, new GroupTranslation
+        {
+            Id = "a026-t2", GroupId = GroupId, LanguageCode = "pl",
+            Name = "Wolontariusze rowerów", AuthorId = owner, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            svc.UpdateGroupTranslationAsync(GroupId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
+
+        var audit = Assert.Single(await AuditsFor(store, "grouptranslation.update"));
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal(translator, audit.ActorId);
+    }
+
+    [Fact]
+    public async Task UpdateGroupTranslation_PlainMember_Denied_RowKept()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+        const string member = "u-a026-member";
+
+        await Plant(store, NewGroup(owner));
+        await Plant(store, new GroupTranslation
+        {
+            Id = "a026-t3", GroupId = GroupId, LanguageCode = "pl",
+            Name = "Wolontariusze rowerów", AuthorId = owner, Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            RunInSession(store, s =>
+                svc.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+
+        Assert.Single(await svc.GetGroupTranslationsAsync(GroupId)); // untouched
+        Assert.Empty(await AuditsFor(store, "grouptranslation.update"));
+    }
+
+    [Fact]
+    public async Task UpdateGroupTranslation_MissingRow_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+
+        await Plant(store, NewGroup(owner));
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            RunInSession(store, s =>
+                svc.UpdateGroupTranslationAsync(GroupId, "pl", "X", null, owner, RoleSet(), s)));
+
+        Assert.Empty(await AuditsFor(store, "grouptranslation.update"));
+    }
+
+    [Fact]
+    public async Task RemoveGroupTranslation_Owner_Allows_DeletesRow_ViaOwner()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+
+        await Plant(store, NewGroup(owner));
+        await Plant(store, new GroupTranslation
+        {
+            Id = "a026-t4", GroupId = GroupId, LanguageCode = "pl",
+            Name = "Wolontariusze rowerów", AuthorId = owner, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            svc.RemoveGroupTranslationAsync(GroupId, "pl", owner, RoleSet(), s));
+
+        Assert.Empty(await svc.GetGroupTranslationsAsync(GroupId));
+
+        // The trail survives the hard delete — the audit row is the record.
+        var audit = Assert.Single(await AuditsFor(store, "grouptranslation.remove"));
+        Assert.Equal(AccessVia.Owner, audit.Via);
+        Assert.Equal("group", audit.TargetKind);
+        Assert.Equal(GroupId, audit.TargetId);
+    }
+
+    [Fact]
+    public async Task RemoveGroupTranslation_PlainMember_Denied_RowKept()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string owner = "u-a026-owner";
+        const string member = "u-a026-member";
+
+        await Plant(store, NewGroup(owner));
+        await Plant(store, new GroupTranslation
+        {
+            Id = "a026-t5", GroupId = GroupId, LanguageCode = "pl",
+            Name = "Wolontariusze rowerów", AuthorId = owner, Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            RunInSession(store, s =>
+                svc.RemoveGroupTranslationAsync(GroupId, "pl", member, RoleSet(Roles.Member), s)));
+
+        Assert.Single(await svc.GetGroupTranslationsAsync(GroupId)); // untouched
+        Assert.Empty(await AuditsFor(store, "grouptranslation.remove"));
+    }
+
+    [Fact]
+    public async Task UpdateCommunityTranslation_GlobalAdmin_Allows_UpdatesRow_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string admin = "u-a026-admin";
+
+        await Plant(store, NewComponent());
+        await Plant(store, new CommunityTranslation
+        {
+            Id = "a026-c1", ComponentId = ComponentId, LanguageCode = "pl",
+            Name = "Osiedle", AuthorId = admin, Created = DateTimeOffset.UtcNow
+        });
+
+        var updated = await RunInSession(store, s =>
+            svc.UpdateCommunityTranslationAsync(ComponentId, "pl", "Nowa nazwa", null, admin, RoleSet(Roles.GlobalAdmin), s));
+
+        Assert.Equal("a026-c1", updated.Id);
+        Assert.Equal("Nowa nazwa", updated.Name);
+
+        var rows = await svc.GetCommunityTranslationsAsync(ComponentId);
+        Assert.Single(rows);
+
+        var audit = Assert.Single(await AuditsFor(store, "communitytranslation.update"));
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal("component", audit.TargetKind);
+        Assert.Equal(ComponentId, audit.TargetId);
+        Assert.Equal(AccessOutcome.Allow, audit.Outcome);
+    }
+
+    [Fact]
+    public async Task UpdateCommunityTranslation_Translator_Allows_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string translator = "u-a026-translator";
+
+        await Plant(store, NewComponent());
+        await Plant(store, new CommunityTranslation
+        {
+            Id = "a026-c2", ComponentId = ComponentId, LanguageCode = "pl",
+            Description = "opis", AuthorId = translator, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            svc.UpdateCommunityTranslationAsync(ComponentId, "pl", null, "nowy opis", translator, RoleSet(Roles.Translator), s));
+
+        var audit = Assert.Single(await AuditsFor(store, "communitytranslation.update"));
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal(translator, audit.ActorId);
+    }
+
+    [Fact]
+    public async Task UpdateCommunityTranslation_PlainMember_Denied_RowKept()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string member = "u-a026-member";
+
+        await Plant(store, NewComponent());
+        await Plant(store, new CommunityTranslation
+        {
+            Id = "a026-c3", ComponentId = ComponentId, LanguageCode = "pl",
+            Name = "Osiedle", AuthorId = "u-a026-admin", Created = DateTimeOffset.UtcNow
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            RunInSession(store, s =>
+                svc.UpdateCommunityTranslationAsync(ComponentId, "pl", "X", null, member, RoleSet(Roles.Member), s)));
+
+        Assert.Single(await svc.GetCommunityTranslationsAsync(ComponentId)); // untouched
+        Assert.Empty(await AuditsFor(store, "communitytranslation.update"));
+    }
+
+    [Fact]
+    public async Task RemoveCommunityTranslation_GlobalAdmin_Allows_DeletesRow_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string admin = "u-a026-admin";
+
+        await Plant(store, NewComponent());
+        await Plant(store, new CommunityTranslation
+        {
+            Id = "a026-c4", ComponentId = ComponentId, LanguageCode = "pl",
+            Name = "Osiedle", AuthorId = admin, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            svc.RemoveCommunityTranslationAsync(ComponentId, "pl", admin, RoleSet(Roles.GlobalAdmin), s));
+
+        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+
+        var audit = Assert.Single(await AuditsFor(store, "communitytranslation.remove"));
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal("component", audit.TargetKind);
+        Assert.Equal(ComponentId, audit.TargetId);
+    }
+
+    [Fact]
+    public async Task RemoveCommunityTranslation_Translator_Allows_DeletesRow_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var svc = Services(store);
+        const string translator = "u-a026-translator";
+
+        await Plant(store, NewComponent());
+        await Plant(store, new CommunityTranslation
+        {
+            Id = "a026-c5", ComponentId = ComponentId, LanguageCode = "pl",
+            Description = "opis", AuthorId = translator, Created = DateTimeOffset.UtcNow
+        });
+
+        await RunInSession(store, s =>
+            svc.RemoveCommunityTranslationAsync(ComponentId, "pl", translator, RoleSet(Roles.Translator), s));
+
+        Assert.Empty(await svc.GetCommunityTranslationsAsync(ComponentId));
+
+        var audit = Assert.Single(await AuditsFor(store, "communitytranslation.remove"));
+        Assert.Equal(AccessVia.Admin, audit.Via);
+        Assert.Equal(translator, audit.ActorId);
     }
 
     // ── Display probes: the Can* rules mirror the write gates ───────────────

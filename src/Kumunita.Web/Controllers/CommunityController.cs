@@ -294,4 +294,109 @@ public sealed class CommunityController : Controller
         TempData["info"] = $"Translation added ({langName}).";
         return RedirectToAction(nameof(Manage), new { componentId });
     }
+
+    // ── ADR 0048 — edit + delete lanes for community translations ────────
+    // ADR 0026 was add-only; ADR 0048 lifts the "add-only" pin on the same
+    // standing matrix (GlobalAdmin ∪ Translator). Failure shapes mirror the
+    // add lane (denied → 403; missing → 404).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the community's
+    /// name and/or description (ADR 0048):
+    /// <c>POST /community/manage/{componentId}/translations/update</c>.
+    /// Thin Web lane; delegates to
+    /// <see cref="IUserInfoService.UpdateCommunityTranslationAsync"/>.
+    /// Failure shapes mirror <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("/community/manage/{componentId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        string componentId, [FromForm] string? languageCode, [FromForm] string? name, [FromForm] string? description)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (actorId is null)
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Manage), new { componentId });
+        }
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+        {
+            TempData["error"] = "A translation needs a name and/or description.";
+            return RedirectToAction(nameof(Manage), new { componentId });
+        }
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.UpdateCommunityTranslationAsync(
+                componentId,
+                languageCode,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(description) ? null : description,
+                actorId,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var catalog = await localization.ListLanguagesAsync();
+        var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
+        TempData["info"] = $"Translation updated ({langName}).";
+        return RedirectToAction(nameof(Manage), new { componentId });
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the community's
+    /// name and/or description (ADR 0048):
+    /// <c>POST /community/manage/{componentId}/translations/remove</c>.
+    /// Thin Web lane; delegates to
+    /// <see cref="IUserInfoService.RemoveCommunityTranslationAsync"/>.
+    /// Failure shapes mirror <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("/community/manage/{componentId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        string componentId, [FromForm] string? languageCode)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (actorId is null)
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Manage), new { componentId });
+        }
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.RemoveCommunityTranslationAsync(componentId, languageCode, actorId, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var catalog = await localization.ListLanguagesAsync();
+        var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
+        TempData["info"] = $"Translation removed ({langName}).";
+        return RedirectToAction(nameof(Manage), new { componentId });
+    }
 }

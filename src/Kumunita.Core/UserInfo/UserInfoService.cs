@@ -539,6 +539,137 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     public bool CanTranslateGroup(string ownerId, string actorId, IReadOnlySet<string> actorRoles)
         => ResolveGroupTranslationStanding(ownerId, actorId, actorRoles) is not null;
 
+    // ─── ADR 0048 — edit + delete lane for group / community translations ─
+    // ADR 0026 was add-only (one row per (parent, language) pair). ADR 0048
+    // lifts the "add-only" pin: the same standing matrix (group owner /
+    // GlobalAdmin / Translator for a group; GlobalAdmin / Translator for the
+    // community — no owner on the component) may now **update** the existing
+    // (parent, languageCode) row in place, or **remove** it. Standing is
+    // re-derived from the parent's current owner/scope, not from the row's
+    // AuthorId (which is the adder). Both write a hand-written
+    // <c>AccessAudit</c> row and commit atomically (one <c>SaveChangesAsync</c>).
+
+    /// <summary>
+    /// **Updates** the existing <see cref="GroupTranslation"/> row for
+    /// (<paramref name="groupId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane (group owner → Owner; GlobalAdmin / Translator → Admin).
+    /// A missing group or a missing row is a <see cref="KeyNotFoundException"/>;
+    /// a denied actor throws <see cref="UnauthorizedAccessException"/>. The new
+    /// name / description must have at least one non-blank field. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<GroupTranslation> UpdateGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId))
+            throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("A group translation requires a name or a description (at least one non-blank).", nameof(name));
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group owner, an admin, or a translator may edit a group's translation.");
+
+        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.update",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="GroupTranslation"/> row for
+    /// (<paramref name="groupId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane. A hard <c>session.Delete</c>; the trail is preserved by
+    /// the <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.remove</c>). A missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveGroupTranslationAsync(
+        string groupId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId))
+            throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group owner, an admin, or a translator may remove a group's translation.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.remove",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     /// <summary>
     /// The ADR 0026 group-translation standing resolver (shared by
     /// <see cref="AddGroupTranslationAsync"/> and <see
@@ -1666,6 +1797,132 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         session.Store(audit);
         await session.SaveChangesAsync().ConfigureAwait(false);
         return translation;
+    }
+
+    /// <summary>
+    /// **Updates** the existing <see cref="CommunityTranslation"/> row for
+    /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane (GlobalAdmin / Translator → Admin; the community has no
+    /// owner). A missing component or row is a <see cref="KeyNotFoundException"/>;
+    /// a denied actor throws <see cref="UnauthorizedAccessException"/>. The new
+    /// name / description must have at least one non-blank field. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may edit a translation of " +
+                "the community's name or description.");
+
+        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.update",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="CommunityTranslation"/> row for
+    /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane. A hard <c>session.Delete</c>; the trail is preserved by
+    /// the <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>communitytranslation.remove</c>). A missing component or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may remove a translation of " +
+                "the community's name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.remove",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />

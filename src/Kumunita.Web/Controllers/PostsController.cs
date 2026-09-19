@@ -1380,6 +1380,235 @@ public sealed class PostsController(
         return Redirect($"/posts/{id}");
     }
 
+    // ── ADR 0048 — edit + delete lanes for post / reply translations ─────
+    // ADR 0022 was add-only; ADR 0048 lifts the "add-only" pin on the same
+    // standing matrix (author / community moderator / GlobalAdmin), keyed
+    // by the (parentId, languageCode) pair the unique index enforces.
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /posts/{id}/translations/update</c>. Thin Web lane; delegates
+    /// to <see cref="PostService.UpdatePostTranslationAsync"/>. Precondition +
+    /// failure shapes mirror <see cref="AddTranslation"/> (denied standing →
+    /// 403 <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
+    /// </summary>
+    [HttpPost("/posts/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        var existing = await posts.GetPostAsync(id, actor);
+        if (existing.Post is null)
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdatePostTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /posts/{id}/translations/remove</c>. Thin Web lane; delegates
+    /// to <see cref="PostService.RemovePostTranslationAsync"/>. Failure
+    /// shapes mirror <see cref="AddTranslation"/> (denied standing → 403
+    /// <c>Forbid</c>; missing post/row → 404 <c>NotFound</c>).
+    /// </summary>
+    [HttpPost("/posts/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+
+        var existing = await posts.GetPostAsync(id, actor);
+        if (existing.Post is null)
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemovePostTranslationAsync(id, languageCode, actor, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of a reply in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /posts/{id}/replies/{replyId}/translations/update</c>. Thin Web
+    /// lane; delegates to <see cref="PostService.UpdateReplyTranslationAsync"/>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateReplyTranslation(
+        [FromRoute] string id, [FromRoute] string replyId,
+        [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/posts/{id}");
+        }
+
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of a reply in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /posts/{id}/replies/{replyId}/translations/remove</c>. Thin Web
+    /// lane; delegates to <see cref="PostService.RemoveReplyTranslationAsync"/>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/>.
+    /// </summary>
+    [HttpPost("/posts/{id}/replies/{replyId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveReplyTranslation(
+        [FromRoute] string id, [FromRoute] string replyId, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/posts/{id}");
+        }
+
+        var parent = await posts.GetPostAsync(id, actor);
+        if (parent.Post is null)
+            return Forbid();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return Forbid();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
+        return Redirect($"/posts/{id}");
+    }
+
     /// <summary>
     /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
     /// <c>TempData</c> confirmation message (a display convenience — a

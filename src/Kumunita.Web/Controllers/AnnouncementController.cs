@@ -268,8 +268,8 @@ public sealed class AnnouncementController(
     /// standing-holder roles reach the service; the service is the authority.
     ///
     /// The add is **add-only**: a (announcement, language) already translated
-    /// is a shape error (the unique index is the DB-layer backstop) — there is
-    /// no edit / replace lane (the ADR 0022 contract).
+    /// is a shape error (the unique index is the DB-layer backstop). The
+    /// ADR 0048 edit / remove lanes are the sibling routes below this one.
     /// </summary>
     [HttpPost("/announcements/{id}/translations")]
     [ValidateAntiForgeryToken]
@@ -327,6 +327,126 @@ public sealed class AnnouncementController(
 
         var name = SeedLanguageName(languageCode);
         TempData["info"] = $"Translation added ({name}).";
+        return RedirectToAction("Detail", "Announcement", new { id });
+    }
+
+    // ── ADR 0048 — edit + delete lanes for announcement translations ─────
+    // ADR 0029 was add-only; ADR 0048 lifts the "add-only" pin on the same
+    // standing matrix (GlobalAdmin ∪ Translator ∪ targeted-community
+    // Moderator). Failure shapes mirror the add lane (denied → 403; missing →
+    // 404).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the announcement in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /announcements/{id}/translations/update</c>. Thin Web lane;
+    /// delegates to <see cref="IAnnouncementService
+    /// .UpdateAnnouncementTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/> (denied → 403; missing → 404).
+    /// </summary>
+    [HttpPost("/announcements/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+
+        var a = await announcements.GetAsync(id, actorId, RoleSet(User));
+        if (a is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.UpdateAnnouncementTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                RoleSet(User),
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return RedirectToAction("Detail", "Announcement", new { id });
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the announcement in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /announcements/{id}/translations/remove</c>. Thin Web lane;
+    /// delegates to <see cref="IAnnouncementService
+    /// .RemoveAnnouncementTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/> (denied → 403; missing → 404).
+    /// </summary>
+    [HttpPost("/announcements/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction("Detail", "Announcement", new { id });
+        }
+
+        var a = await announcements.GetAsync(id, actorId, RoleSet(User));
+        if (a is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await announcements.RemoveAnnouncementTranslationAsync(
+                id, languageCode, actorId, RoleSet(User), session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
         return RedirectToAction("Detail", "Announcement", new { id });
     }
 

@@ -197,6 +197,46 @@
                             {
                                 <p class="mb-0">@t.Description</p>
                             }
+
+                            @* ADR 0048 — edit + remove lane. Offered only to
+                               standing-holders (the same gate as the add lane
+                               below). *@
+                            @if (Model.CanTranslate)
+                            {
+                                <hr class="my-2" />
+                                <form method="post"
+                                      action="@($"/community/manage/{Model.ComponentId}/translations/update")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <label class="form-label small">
+                                        <kw-l key="community.translation_name_label">Name</kw-l>
+                                        <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <input class="form-control form-control-sm mb-2" name="name"
+                                           value="@t.Name" />
+                                    <label class="form-label small">
+                                        <kw-l key="community.translation_desc_label">Description</kw-l>
+                                        <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <textarea class="form-control form-control-sm mb-2"
+                                              name="description" rows="3" placeholder="…">@t.Description</textarea>
+                                    <div class="form-text mb-2">
+                                        <kw-l key="community.translation_min_one">At least one of name or description is required.</kw-l>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <kw-l key="community.translation_save">Save translation</kw-l>
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      action="@($"/community/manage/{Model.ComponentId}/translations/remove")"
+                                      class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <kw-l key="posts.translation_remove">Remove</kw-l>
+                                    </button>
+                                </form>
+                            }
                         </div>
                     </details>
                 }
