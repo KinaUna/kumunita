@@ -36,6 +36,20 @@
 //       pin). The mixed-audience fixture makes the privacy-pin visible in
 //       the HTML.
 //
+// U10 extension (the full pin set):
+//   (e) Group-lane by-tag exclusion (C-TG·3, test (d) below): a tag used
+//       only on a group post the viewer is not a member of is absent from
+//       the list / by-tag / suggest surfaces for that viewer — the
+//       privacy-pin at the group-lane boundary, distinct from the
+//       community-post audience gate in (d).
+//   (f) ADR 0006-D lane pin — **not re-pinned here**: the tag lane
+//       composes only `IAuthorizationService` + the frozen
+//       `IUserInfoService` read seams and never opens a new seam. That
+//       pin is a Core-layer property, re-verified by
+//       `Kumunita.Core.Tests/TagServiceTests.cs`
+//       `PostService_MakesNoNewModerateCall` (U10 deliverable, §2.4 #24);
+//       the Web surface has no seam-level assertion it could add.
+//
 // Route / selector pins (from the shipped views + client/lib/tag-suggest.ts —
 // read the .cshtml / .ts first before "improving" them):
 //   GET    /tags                        (U7; the tag list — `.list-group-item
@@ -121,6 +135,21 @@ import { test as baseTest, expect, type Page } from '@playwright/test';
 //       optional ADR 0013 group-lane marker (a group post's
 //       `TagIds` never surface in a non-member's by-tag results —
 //       the C-TG·3 pin).
+//
+//   createGroup(ownerId, name) ⇒ Promise<string>  (U10 — the group id)
+//   addGroupMember(groupId, userId) ⇒ Promise<void>   (U10)
+//     · Core-level setup: the ADR 0007 group-ownership seam
+//       (`UserInfoService.CreateGroupAsync` + the ADR 0008 self-join
+//       / `AddMemberAsync` shape). Used by the group-lane pin (e)
+//       to build a group `viewer` is **not** a member of.
+//
+//   createGroupPost(groupId, authorId, title, tagIds)
+//   ⇒ Promise<string>  (U10 — the group post id)
+//     · Core-level setup: a `Post` with `GroupId = groupId`
+//       (the ADR 0013 group-lane marker) + the tag attached
+//       (the C-TG·3 exclusion target — the tag surfaces **only**
+//       in the group feed for members, never in the by-tag list
+//       for non-members).
 //
 //   createBlogPage(userId, title, tagIds, isSystem?)
 //   ⇒ Promise<string>  (returns the page id)
@@ -210,6 +239,15 @@ interface Kumunita {
     authorId: string,
     groupId?: string,
   ): Promise<void>;
+  // U10 — the group-lane pin (e) helpers (the C-TG·3 boundary):
+  createGroup(ownerId: string, name: string): Promise<string>;
+  addGroupMember(groupId: string, userId: string): Promise<void>;
+  createGroupPost(
+    groupId: string,
+    authorId: string,
+    title: string,
+    tagIds: string[],
+  ): Promise<string>;
   createBlogPage(
     userId: string,
     title: string,
@@ -232,19 +270,23 @@ interface Kumunita {
 const extended = baseTest.extend<{ kumunita: Kumunita }>({
   kumunita: async ({}, use) => {
     throw new Error(
-      'kumunita fixture not implemented (TG U9 re-confirmed). ' +
-      'U9 authored the spec (the selector + route pins are frozen ' +
-      'in the header of e2e-tags.spec.ts); the Playwright runtime ' +
-      'unit must land the implementation of `signup / ' +
+      'kumunita fixture not implemented (TG U9 authored, U10 ' +
+      'extended — re-confirmed). ' +
+      'U9 + U10 authored the spec (the selector + route pins are ' +
+      'frozen in the header of e2e-tags.spec.ts); the Playwright ' +
+      'runtime unit must land the implementation of `signup / ' +
       'signupGlobalAdmin / login / plantTag / attachTagToPost / ' +
       'createBlogPage / getSuggestResults / getTagListForActor / ' +
-      'getPostsByTag / getPagesByTag` per the fixture contract above. ' +
+      'getPostsByTag / getPagesByTag / createGroup / addGroupMember ' +
+      '/ createGroupPost` per the fixture contract above. ' +
       'Reuse the M2 U13 fixture contract (e2e-m2.spec.ts) for the ' +
-      'signup/login shape; the six new helpers (plantTag, ' +
+      'signup/login shape; the six U9 helpers (plantTag, ' +
       'attachTagToPost, createBlogPage, getSuggestResults, ' +
-      'getTagListForActor, getPostsByTag, getPagesByTag) are TG ' +
-      'ADDs. See docs/plans-milestones/in-progress/tags/' +
-      'tags-handoff-notes.md § U9.',
+      'getTagListForActor, getPostsByTag, getPagesByTag) and the ' +
+      'three U10 group-lane helpers (createGroup, addGroupMember, ' +
+      'createGroupPost) are TG ADDs. See ' +
+      'docs/plans-milestones/in-progress/tags/' +
+      'tags-handoff-notes.md § U9 + § U10.',
     );
     // `use` is required by the Playwright fixture API. The throw
     // above fires first (before `use` is ever called), so there is
@@ -519,5 +561,64 @@ test.describe('TG e2e — autocomplete, composer-input, browse-page', () => {
     //    a 403 would confirm the tag exists, C-TG·1).
     const secretResponse = await page.request.get('/tags/secret');
     expect(secretResponse.status()).toBe(404);
+  });
+
+  // ── (d) Group-lane by-tag exclusion — the C-TG·3 pin (U10) ──────
+  // The privacy-pin at the **group-lane boundary** (distinct from
+  // (c)'s community-audience gate): a tag used *only* on a group
+  // post (ADR 0013, the `Post.GroupId` marker) that `viewer` is
+  // **not** a member of is absent from `viewer`'s list / by-tag /
+  // suggest surfaces — and present to a member of the same group.
+  // (Core-pinned by `TagServiceTests.F3_GroupPostTagInvisibleToNonMember_ByTag`
+  // + `F3_GroupPostTagInvisibleToNonMember_Suggest`;
+  // this is the Web-surface re-statement.)
+  test('d. group-lane by-tag exclusion — a non-member never sees the tag', async ({ page, kumunita }) => {
+    const owner = await kumunita.signup(
+      'Group Lane Owner', 'glo@example.com', 'Passw0rd!',
+    );
+    const member = await kumunita.signup(
+      'Group Lane Member', 'glm@example.com', 'Passw0rd!',
+    );
+    const viewer = await kumunita.signup(
+      'Group Lane Viewer', 'glv@example.com', 'Passw0rd!',
+    );
+
+    // 1) `owner` creates the group + adds `member` (the ADR 0007 /
+    //    ADR 0008 seams). `viewer` is **not** added.
+    const groupId = await kumunita.createGroup(owner.subjectId, 'TG lane family');
+    await kumunita.addGroupMember(groupId, member.subjectId);
+
+    // 2) Plant `family-internal` + attach it to a **group post** in
+    //    the group (the C-TG·3 exclusion target). The group post's
+    //    `Read` decision is the membership gate — the tag on it is
+    //    as invisible to a non-member as the post is.
+    const familyTagId = await kumunita.plantTag(
+      'family-internal', 'Family internal', 'en', owner.subjectId,
+    );
+    await kumunita.createGroupPost(
+      groupId, owner.subjectId, 'Internal only', [familyTagId],
+    );
+
+    // 3) `viewer` (the non-member) — the tag is **absent** from all
+    //    three surfaces (the privacy-pin, C-TG·3):
+    await kumunita.login(page, 'glv@example.com', 'Passw0rd!');
+    await page.goto('/tags');
+    const listTexts = await page.locator('.list-group-item a').allTextContents();
+    expect(listTexts.some((t) => t.includes('Family internal'))).toBe(false);
+
+    const byTag = await page.request.get('/tags/family-internal');
+    // 404-floor pin (U7): the group post is invisible to `viewer`,
+    // so both lists are empty → 404 (not 403, not a blank page).
+    expect(byTag.status()).toBe(404);
+
+    const suggest = await kumunita.getSuggestResults('family', viewer.subjectId);
+    expect(suggest.some((s) => s.slug === 'family-internal')).toBe(false);
+
+    // 4) `member` (a member of the group) — the positive control:
+    //    the tag **is** present (the membership lane's Allow branch).
+    await kumunita.login(page, 'glm@example.com', 'Passw0rd!');
+    await page.goto('/tags');
+    const memberListTexts = await page.locator('.list-group-item a').allTextContents();
+    expect(memberListTexts.some((t) => t.includes('Family internal'))).toBe(true);
   });
 });

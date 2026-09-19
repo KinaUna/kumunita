@@ -758,6 +758,119 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         Assert.DoesNotContain(all, a => a.TargetKind == "tag");
     }
 
+    // ─── U10 — ADR 0006-D lane pin (design doc §2.4 #24) ─────────────────
+    //
+    // <c>PostService_MakesNoNewModerateCall</c> — the tag lane composes only
+    // the **frozen** seams (<c>IAuthorizationService</c> + the frozen
+    // <c>IUserInfoService</c> read seams (reached through
+    // <c>AuthorizationService</c>, never directly by <c>TagService</c>) +
+    // <c>ITranslationProvider</c>) and **never opens a new seam** on any
+    // frozen interface, and writes only <c>AccessVia.Owner</c> /
+    // <c>AccessVia.Admin</c> audit rows. Pinned three ways (the
+    // GroupPostServiceTests #19 / PostServiceTests #16 "seam-level absence"
+    // idiom, carried to the tag lane):
+    // (1) **seam level** — a recorder over the **real**
+    // <c>AuthorizationService</c> drives the *whole* tag surface (attach
+    // create/reuse, attach page, translate owner + admin, all four read
+    // lanes, the group-lane read for a member **and** a non-member) and
+    // **no** <c>AccessAction.Moderate</c> call reaches the seam;
+    // (2) **audit level** — every tag-family row (<c>tag.attach</c> /
+    // <c>tag.create</c> / <c>tagtranslation.add</c>) carries
+    // <c>Via = Owner</c> or <c>Via = Admin</c> — never <c>Moderator</c> or
+    // any other value (C-TG·9's two permitted Vias, U5 handoff note (f));
+    // (3) **surface level** — reflection: neither <c>IAuthorizationService</c>
+    // nor <c>IUserInfoService</c> exposes a <c>*Moderate*</c> seam (no new
+    // seam), and <c>TagService</c>'s composition is exactly the frozen trio.
+
+    [Fact]
+    public async Task PostService_MakesNoNewModerateCall()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        var recorder = new RecordingAuthz(new AuthorizationService(store, userInfo));
+        var svc = new TagService(store, recorder, new TranslationProvider(store));
+        var ct = TestContext.Current.CancellationToken;
+        const string author = "u-lane-author";
+        const string globalAdm = "u-lane-admin";
+        const string stranger = "u-lane-stranger";
+
+        // ── Drive the write lanes (all three) ────────────────────────────
+        await Plant(store, NewPost("lane-post", author));
+        await Plant(store, new Page
+        {
+            Id = "lane-page", Slug = "lane-page", Title = "t", Body = "b",
+            AuthorId = author, Kind = PageKind.User,
+            Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            Created = DateTimeOffset.UtcNow,
+        });
+
+        await using (var s1 = store.OpenSession(new SessionOptions()))
+            await svc.AttachToPostAsync("lane-post", ["sanitation"], author, RolesSet(Roles.Member), s1);
+        // Reuse on the same post with the GlobalAdmin standing (the Admin Via branch).
+        await using (var s2 = store.OpenSession(new SessionOptions()))
+            await svc.AttachToPostAsync("lane-post", ["sanitation"], globalAdm, RolesSet(Roles.GlobalAdmin), s2);
+        // The page write lane (ADR 0040 standing, author).
+        await using (var s3 = store.OpenSession(new SessionOptions()))
+            await svc.AttachToPageAsync("lane-page", ["budget"], author, RolesSet(Roles.Member), s3);
+
+        await using (var q = store.QuerySession())
+        {
+            var tag = await q.Query<Tag>().Where(t => t.Slug == "sanitation").FirstAsync(ct);
+            Assert.NotNull(tag);
+            var tagId = tag!.Id;
+            // Translate — the creator (Owner) and a non-creator GlobalAdmin (Admin).
+            await using (var s4 = store.OpenSession(new SessionOptions()))
+                await svc.AddTagTranslationAsync(tagId, "de", "Hygiene", author, RolesSet(Roles.Member), s4);
+            await using (var s5 = store.OpenSession(new SessionOptions()))
+                await svc.AddTagTranslationAsync(tagId, "fr", "Assainissement", globalAdm, RolesSet(Roles.GlobalAdmin), s5);
+        }
+
+        // ── Drive the read lanes (all four, C-TG·2 base query) ───────────
+        await svc.ListForActorAsync(author);
+        await svc.ListPostsByTagAsync("sanitation", author);
+        await svc.ListPagesByTagAsync("budget", author);
+        await svc.SuggestAsync("san", author);
+
+        // ── Drive the group-lane read (C-TG·3 — the membership lane) ─────
+        var group = await userInfo.CreateGroupAsync(author, "TG lane family", null);
+        await Plant(store, new Tag { Id = "tag-lane-g", Slug = "family", Name = "Family", LanguageCode = "en", CreatedBy = author });
+        await Plant(store, TaggedGroupPost("lane-gpost", group.Id, author, "tag-lane-g"));
+        await svc.ListPostsByTagAsync("family", stranger);   // non-member — the Deny branch
+        await svc.ListPostsByTagAsync("family", author);      // member — the Allow branch
+        await svc.SuggestAsync("fam", stranger);
+        await svc.SuggestAsync("fam", author);
+        await svc.ListForActorAsync(stranger);
+
+        // ── Pin 1 — seam level: no Moderate call reached the seam ────────
+        // (The reads call the seam once per tagged post/page — the C-TG·2
+        // base query; ≥ 5 is the count the driven surface actually reaches,
+        // but the pin is the **absence** of a Moderate call, not the count.)
+        Assert.True(recorder.TotalCalls >= 5,
+            $"expected ≥ 5 authorization calls across the tag surface, got {recorder.TotalCalls}");
+        Assert.Equal(0, recorder.ModerateCalls);
+
+        // ── Pin 2 — audit level: tag-family rows only Owner / Admin ──────
+        await using (var qa = store.QuerySession())
+        {
+            var tagRows = await qa.Query<AccessAudit>()
+                .Where(a => a.Action == "tag.attach" || a.Action == "tag.create" || a.Action == "tagtranslation.add")
+                .ToListAsync(ct);
+            Assert.NotEmpty(tagRows);
+            Assert.All(tagRows, r => Assert.True(
+                r.Via == AccessVia.Owner || r.Via == AccessVia.Admin,
+                $"tag-family audit row '{r.Action}' carried Via {r.Via} — only Owner/Admin are permitted by the ADR 0006-D lane pin"));
+        }
+
+        // ── Pin 3 — surface level: no new seam on a frozen interface; the
+        //    TagService's composition is exactly the frozen trio ─────────
+        Assert.DoesNotContain(typeof(IAuthorizationService).GetMethods(), m => m.Name.Contains("Moderate"));
+        Assert.DoesNotContain(typeof(IUserInfoService).GetMethods(), m => m.Name.Contains("Moderate"));
+        var ctor = typeof(TagService).GetConstructors().Single();
+        Assert.Equal(
+            new[] { typeof(IDocumentStore), typeof(IAuthorizationService), typeof(ITranslationProvider) },
+            ctor.GetParameters().Select(p => p.ParameterType).ToList());
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page + **Tag** doc
@@ -905,4 +1018,72 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
         Created = DateTimeOffset.UtcNow,
     };
+
+    /// <summary>Test double **over the real** <see cref="AuthorizationService"/>
+    /// (decision behavior unchanged — only the *call surface* is recorded):
+    /// counts total authorization calls and <c>AccessAction.Moderate</c>
+    /// invocations. The U10 ADR 0006-D lane pin's spy — the
+    /// <see cref="GroupPostServiceTests.RecordingAuthz"/> idiom, carried to
+    /// the tag lane (the tag surface only ever needs <c>Read</c> decisions;
+    /// the reserved <c>Moderate</c> action id must never be invoked through
+    /// it).</summary>
+    private sealed class RecordingAuthz(IAuthorizationService inner) : IAuthorizationService
+    {
+        public int TotalCalls { get; private set; }
+        public int ModerateCalls { get; private set; }
+
+        private void Note(AccessAction action)
+        {
+            TotalCalls++;
+            if (action == AccessAction.Moderate) ModerateCalls++;
+        }
+
+        public Task<Decision> CanAsync(string actorId, AccessAction action, IAuditableResource target)
+        {
+            Note(action);
+            return inner.CanAsync(actorId, action, target);
+        }
+
+        public Task<Decision> CanAsync(string actorId, AccessAction action, IAuditableResource target, IDocumentSession session)
+        {
+            Note(action);
+            return inner.CanAsync(actorId, action, target, session);
+        }
+
+        public Task<VisibleSet> CanSeeAsync(string actorId, AccessAction action, IEnumerable<IAuditableResource> candidates)
+        {
+            Note(action);
+            return inner.CanSeeAsync(actorId, action, candidates);
+        }
+
+        public Task<VisibleSet> CanSeeAsync(string actorId, AccessAction action, IEnumerable<IAuditableResource> candidates, IDocumentSession session)
+        {
+            Note(action);
+            return inner.CanSeeAsync(actorId, action, candidates, session);
+        }
+
+        public Task<Decision> CanSeeGroupAsync(string actorId, string groupId, string? targetPostId)
+        {
+            TotalCalls++;
+            return inner.CanSeeGroupAsync(actorId, groupId, targetPostId);
+        }
+
+        public Task<Decision> CanSeeGroupAsync(string actorId, string groupId, string? targetPostId, IDocumentSession session)
+        {
+            TotalCalls++;
+            return inner.CanSeeGroupAsync(actorId, groupId, targetPostId, session);
+        }
+
+        public Task<Decision> CanSeeGroupFeedAsync(string actorId, string groupId, int candidateCount)
+        {
+            TotalCalls++;
+            return inner.CanSeeGroupFeedAsync(actorId, groupId, candidateCount);
+        }
+
+        public Task<Decision> CanSeeGroupFeedAsync(string actorId, string groupId, int candidateCount, IDocumentSession session)
+        {
+            TotalCalls++;
+            return inner.CanSeeGroupFeedAsync(actorId, groupId, candidateCount, session);
+        }
+    }
 }
