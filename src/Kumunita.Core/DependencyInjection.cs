@@ -93,6 +93,21 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
+        // TG (ADR 0044, plan U5): the tags-side write service (bounded context
+        // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
+        // only the frozen seams: IAuthorizationService + the frozen IUserInfoService
+        // read seams + ITranslationProvider, never a new AccessVia value beyond
+        // Owner/Admin). The write lanes (AttachToPostAsync / AttachToPageAsync /
+        // AddTagTranslationAsync) take the caller's IDocumentSession (C3) and the
+        // standing probes are pure, so the only constructor dependency is the
+        // host-registered Marten IDocumentStore (the Pages.IPageService shape).
+        // U6's read lane (ListForActorAsync / ListPostsByTagAsync /
+        // ListPagesByTagAsync / SuggestAsync) composes IUserInfoService +
+        // ITranslationProvider for the C-TG·2 base query and is added here when
+        // it lands — the registration stays minimal (the ADR 0006-D lane pin).
+        services.AddTransient<Tags.ITagService>(sp => new Tags.TagService(
+            sp.GetRequiredService<Marten.IDocumentStore>()));
+
         // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
         // seams with the host-registered Marten IDocumentStore (the same
