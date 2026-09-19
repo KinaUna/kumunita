@@ -1,0 +1,65 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.TagByTagViewModel
+@{
+    ViewData["Title"] = Model.DisplayedName;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <h1>
+            <kw-l key="tags.bytag.heading">Posts and pages about</kw-l>
+            <span class="text-primary">“@Model.DisplayedName”</span>
+        </h1>
+
+        @if (Model.Posts.Count > 0)
+        {
+            <h2 class="mt-4"><kw-l key="tags.bytag.posts_heading">Posts</kw-l></h2>
+            <ul class="list-group">
+                @foreach (var post in Model.Posts)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        @* A group post (GroupId non-empty, ADR 0013) links to its
+                           group-lane detail route; a community post to /posts/{id}. *@
+                        @{
+                            var href = string.IsNullOrEmpty(post.GroupId)
+                                ? $"/posts/{post.Id}"
+                                : $"/groups/{post.GroupId}/posts/{post.Id}";
+                        }
+                        <div>
+                            <a class="fw-semibold text-decoration-none" href="@href">@(string.IsNullOrWhiteSpace(post.Title) ? post.Body[..Math.Min(60, post.Body.Length)] : post.Title)</a>
+                        </div>
+                        <span class="text-muted small text-nowrap">
+                            @post.Created.ToString("g")
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Model.Pages.Count > 0)
+        {
+            <h2 class="mt-4"><kw-l key="tags.bytag.pages_heading">Blog pages</kw-l></h2>
+            <ul class="list-group">
+                @foreach (var page in Model.Pages)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <a class="fw-semibold text-decoration-none" href="@PagePaths.Href(Model.PageById, page)">@(@page.Title)</a>
+                        <span class="text-muted small text-nowrap">
+                            @(page.Modified ?? page.Created).ToString("g")
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Model.Posts.Count == 0 && Model.Pages.Count == 0)
+        {
+            @* The controller 404-floors this shape, so this branch is the
+               defensive empty-state only (a tag with content the viewer may
+               not read is a 404, not a blank page — C-TG·1 / C-TG·2). *@
+            <div class="alert alert-info">
+                <kw-l key="tags.bytag.empty">No readable posts or blog pages carry this tag.</kw-l>
+            </div>
+        }
+    </div>
+</div>

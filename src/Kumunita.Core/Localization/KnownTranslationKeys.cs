@@ -809,6 +809,26 @@ public static class KnownTranslationKeys
             ["about.project.lead"] =
                 "If you're curious how it works — or if you're about to host " +
                 "it for your neighbourhood — everything is public.",
+
+            // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
+            ["tags.list.heading"]       = "Tags",
+            ["tags.list.lede"] =
+                "Subjects your posts and blog pages are tagged with — click one " +
+                "to browse what's been posted about it.",
+            ["tags.list.empty"] =
+                "No tags yet — tags appear here once a resident attaches one to a " +
+                "post or a blog page.",
+            ["tags.bytag.heading"]      = "Posts and pages about",
+            ["tags.bytag.posts_heading"] = "Posts",
+            ["tags.bytag.pages_heading"] = "Blog pages",
+            ["tags.bytag.empty"] =
+                "No readable posts or blog pages carry this tag.",
+            ["tag.input.placeholder"] = "e.g. sanitation, budget, maple-street",
+            ["tag.input.hint"] =
+                "Type to search existing tags, or start a new one — it attaches to " +
+                "this post.",
+            ["tag.suggest.empty"] =
+                "No matching tags — keep typing or start a new one.",
         };
 
     /// <summary>
@@ -1519,6 +1539,26 @@ public static class KnownTranslationKeys
             ["about.project.lead"] =
                 "Wenn du neugierig bist, wie es funktioniert — oder wenn du es " +
                 "gleich für deine Nachbarschaft hosten willst — ist alles öffentlich.",
+
+            // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
+            ["tags.list.heading"]       = "Tags",
+            ["tags.list.lede"] =
+                "Themen, mit denen eure Beiträge und Blogseiten verschlagwortet sind — " +
+                "klicke auf eines, um zu sehen, was dazu geschrieben wurde.",
+            ["tags.list.empty"] =
+                "Noch keine Tags — sie erscheinen hier, sobald eine:r Anwohner:in " +
+                "einem Beitrag oder einer Blogseite ein Tag zuweist.",
+            ["tags.bytag.heading"]      = "Beiträge und Seiten über",
+            ["tags.bytag.posts_heading"] = "Beiträge",
+            ["tags.bytag.pages_heading"] = "Blogseiten",
+            ["tags.bytag.empty"] =
+                "Keine lesbaren Beiträge oder Blogseiten tragen dieses Tag.",
+            ["tag.input.placeholder"] = "z. B. sanitätsdienst, haushalt, maplestreet",
+            ["tag.input.hint"] =
+                "Tippe, um bestehende Tags zu finden, oder starte ein neues — es wird " +
+                "diesem Beitrag zugewiesen.",
+            ["tag.suggest.empty"] =
+                "Keine passenden Tags — weiter tippen oder ein neues starten.",
         };
 
     /// <summary>
@@ -2234,6 +2274,26 @@ public static class KnownTranslationKeys
             ["about.project.lead"] =
                 "Si tu es curieux de savoir comment ça marche — ou si tu " +
                 "t'apprêtes à l'héberger pour ton quartier — tout est public.",
+
+            // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
+            ["tags.list.heading"]       = "Étiquettes",
+            ["tags.list.lede"] =
+                "Les sujets dont vos publications et pages de blog sont étiquetées — " +
+                "clique sur l'une d'elles pour parcourir ce qui en a été publié.",
+            ["tags.list.empty"] =
+                "Pas encore d'étiquettes — elles apparaissent ici dès qu'un habitant " +
+                "en ajoute une à une publication ou à une page de blog.",
+            ["tags.bytag.heading"]      = "Publications et pages à propos de",
+            ["tags.bytag.posts_heading"] = "Publications",
+            ["tags.bytag.pages_heading"] = "Pages de blog",
+            ["tags.bytag.empty"] =
+                "Aucune publication ni page de blog lisible ne porte cette étiquette.",
+            ["tag.input.placeholder"] = "p. ex. salubrité, budget, rue-érable",
+            ["tag.input.hint"] =
+                "Écris pour chercher des étiquettes existantes, ou en créer une " +
+                "nouvelle — elle sera ajoutée à cette publication.",
+            ["tag.suggest.empty"] =
+                "Aucune étiquette correspondante — continue à écrire ou crée-en une.",
         };
 
     /// <summary>
@@ -2946,6 +3006,26 @@ public static class KnownTranslationKeys
             ["about.project.lead"] =
                 "Er du nysgerrig på, hvordan det fungerer — eller om du " +
                 "er ved at hoste det til dit nabolag — så er alt offentligt.",
+
+            // ── tags (the TG lane, ADR 0044 — browse + composer affordances) ──
+            ["tags.list.heading"]       = "Tags",
+            ["tags.list.lede"] =
+                "Emner, jeres indlæg og blogsider er tagget med — klik på ét, " +
+                "for at se, hvad der er skrevet om det.",
+            ["tags.list.empty"] =
+                "Ingen tags endnu — tags dukker op her, når en beboer knytter " +
+                "ét til et indlæg eller en blogside.",
+            ["tags.bytag.heading"]      = "Indlæg og sider om",
+            ["tags.bytag.posts_heading"] = "Indlæg",
+            ["tags.bytag.pages_heading"] = "Blogsider",
+            ["tags.bytag.empty"] =
+                "Ingen læsbare indlæg eller blogsider bærer dette tag.",
+            ["tag.input.placeholder"] = "f.eks. renhold, budget, maplestreet",
+            ["tag.input.hint"] =
+                "Skriv for at søge i eksisterende tags, eller start et nyt — " +
+                "det knyttes til dette indlæg.",
+            ["tag.suggest.empty"] =
+                "Ingen matchende tags — fortsæt med at skrive eller start et nyt.",
         };
 
     /// <summary>
