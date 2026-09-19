@@ -55,6 +55,7 @@
        specs against `dotnet run` (see playwright.config.ts). -->
   <ItemGroup>
     <None Include="e2e-m2.spec.ts" />
+    <None Include="e2e-tags.spec.ts" />
     <None Include="playwright.config.ts" />
     <None Include="package.json" />
     <None Include="package-lock.json" Condition="Exists('package-lock.json')" />
