@@ -66,7 +66,7 @@ public class StaticPagesSP_U04Tests
 
         var pages = Substitute.For<IPageService>();
         // ADR 0040: the canonical page lives under the `system/` root.
-        pages.GetByPathAsync($"system/{slug}").Returns(new Page
+        var page = new Page
         {
             Id = $"page-{slug}-seeded",
             ParentId = "system-root",
@@ -78,16 +78,14 @@ public class StaticPagesSP_U04Tests
             AuthorId = string.Empty,
             Created = DateTimeOffset.UtcNow,
             Modified = DateTimeOffset.UtcNow,
-        });
+        };
+        pages.ResolvePageAsync($"system/{slug}")
+            .Returns(Task.FromResult((page, new List<PageTranslation>() as IReadOnlyList<PageTranslation>)));
         // The bare-slug legacy seam misses (proving the primary path resolves).
-        pages.GetByPathAsync(slug)
-            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+        pages.ResolvePageAsync(slug)
+            .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(new KeyNotFoundException()));
 
-        var controller = new StaticPagesController(
-            pages,
-            Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
+        var controller = StaticPagesControllerHarness.Build(pages);
         return (controller, body);
     }
 
@@ -117,6 +115,71 @@ public class StaticPagesSP_U04Tests
         var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
         Assert.Equal("conduct", model.Slug);
         Assert.Equal(expectedBody, model.Body);
+    }
+
+    // ── (1b) the ADR 0043 D7 localized-body lane: a PageTranslation row for
+    //     the effective language is picked over the authored-in en body ─────
+
+    /// <summary>
+    /// The effective-language read seam (ADR 0043 D7 / ADR 0044 D5) is what
+    /// lets a German-speaking resident see the German body of <c>/privacy</c>
+    /// even on a warm deployment whose page was authored in <c>en</c>. The
+    /// controller resolves the effective language (stubbed here to <c>de</c>)
+    /// and picks the matching <see cref="PageTranslation"/> row's
+    /// (Title, Body) — the authored-in <c>en</c> body is the floor only when
+    /// no row matches.
+    /// </summary>
+    [Fact(DisplayName = "ADR 0043 D7: effective language de → the de PageTranslation body is picked over the en body")]
+    public async Task Privacy_EffectiveLanguageDe_RendersDeTranslationBody()
+    {
+        var (enTitle, enBody) = (FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Title,
+                                FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "privacy").Body);
+        var (deTitle, deBody) = (FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy").Title,
+                                FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy").Body);
+
+        var pages = Substitute.For<IPageService>();
+        var page = new Page
+        {
+            Id = "page-privacy-de",
+            ParentId = "system-root",
+            Slug = "privacy",
+            Title = enTitle,
+            Body = enBody,
+            LanguageCode = "en",
+            Audience = null,
+            AuthorId = string.Empty,
+            Created = DateTimeOffset.UtcNow,
+            Modified = DateTimeOffset.UtcNow,
+        };
+        var deTranslation = new PageTranslation
+        {
+            Id = "t-privacy-de",
+            PageId = page.Id,
+            LanguageCode = "de",
+            Title = deTitle,
+            Body = deBody,
+            AuthorId = string.Empty,
+            Created = DateTimeOffset.UtcNow,
+        };
+        pages.ResolvePageAsync("system/privacy")
+            .Returns(Task.FromResult((page, new List<PageTranslation> { deTranslation } as IReadOnlyList<PageTranslation>)));
+        pages.ResolvePageAsync("privacy")
+            .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(new KeyNotFoundException()));
+
+        // effectiveLanguage "de" — the harness stubs the provider's
+        // ResolveEffectiveLanguageAsync to return it (the cookie-less path:
+        // no Accept-Language on the DefaultHttpContext, so the
+        // IReadOnlyCollection overload is the one the controller calls).
+        var controller = StaticPagesControllerHarness.Build(pages, effectiveLanguage: "de");
+
+        var view = Assert.IsType<ViewResult>(await controller.Privacy());
+
+        var model = Assert.IsType<StaticPagesController.StaticPageViewModel>(view.ViewData.Model);
+        Assert.Equal("privacy", model.Slug);
+        // The de row's (Title, Body) is what the resident sees — not the en
+        // authored-in floor.
+        Assert.Equal(deTitle, model.Title);
+        Assert.Equal(deBody, model.Body);
     }
 
     // ── (2) the ADR 0027 td-variant chip-swap (Show surface) ────────────────

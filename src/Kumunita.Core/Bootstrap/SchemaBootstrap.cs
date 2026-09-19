@@ -76,6 +76,23 @@ public static class SchemaBootstrap
                 seededLogger,
                 ct);
         }
+        else
+        {
+            // Warm boot: backfill the de/fr/da PageTranslation rows for the
+            // canonical static pages (terms/help/privacy/conduct) that a
+            // deployment seeded before those baselines shipped is missing
+            // (ADR 0043 D7 / ADR 0044 D5). Create-if-missing only — an admin's
+            // in-app edit is never clobbered (ADR 0042 D1), and the en page
+            // bodies are left untouched (a warm-boot refresh would clobber an
+            // admin edit, so this lane is read-mostly: it adds the missing
+            // non-en translation rows and nothing else).
+            await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
+            await FirstBootSeeder
+                .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
+            logger.LogInformation(
+                "Warm boot: page-translation backfill complete " +
+                "(de/fr/da rows for the canonical static pages, create-if-missing).");
+        }
     }
 
     /// <summary>

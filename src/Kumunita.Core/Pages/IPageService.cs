@@ -71,6 +71,22 @@ public interface IPageService
     Task<IReadOnlyList<PageTranslation>> GetTranslationsAsync(string pageId);
 
     /// <summary>
+    /// Resolve a page **and** its translations in one read (the ADR 0043 D7 /
+    /// ADR 0044 D5 read seam): the <see cref="Page"/> at
+    /// <paramref name="path"/> plus its <see cref="PageTranslation"/> rows
+    /// (ordered by <see cref="PageTranslation.LanguageCode"/> ascending, the
+    /// <see cref="GetTranslationsAsync"/> shape). A single session, so the
+    /// caller gets a consistent (page, translations) pair — the
+    /// <c>StaticPagesController</c> uses this to pick the body for the
+    /// request's effective language (the provider chain) instead of two
+    /// independent reads that could drift. A missing page is a
+    /// <see cref="KeyNotFoundException"/>; a page with no translation rows
+    /// resolves to an empty list (the authored-in body is the default).
+    /// </summary>
+    Task<(Page Page, IReadOnlyList<PageTranslation> Translations)> ResolvePageAsync(
+        string path);
+
+    /// <summary>
     /// The page mounted at a UI slot (ADR 0039 §3.3/§3.8 — e.g.
     /// <c>"footer/community"</c>, <c>"help/account"</c>): the one non-deleted
     /// page whose <see cref="Page.MountPoint"/> equals <paramref name="slot"/>.

@@ -123,6 +123,46 @@ public sealed class PageService : IPageService
     }
 
     /// <inheritdoc />
+    public async Task<(Page, IReadOnlyList<PageTranslation>)> ResolvePageAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new KeyNotFoundException("A page path is required.");
+
+        var segments = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            throw new KeyNotFoundException("A page path is required.");
+
+        // One session: the page walk and the translation read share it, so the
+        // (page, translations) pair is a single consistent read (the ADR 0043
+        // D7 read seam — one read, not two that could drift). The walk is the
+        // GetByPathAsync contract (missing path / deleted page ⇒ the
+        // KeyNotFoundException the Web layer maps to 404); the translation
+        // read is the ADR 0022 shape (ordered by LanguageCode, empty when the
+        // page is un-translated — the authored-in body is the default).
+        await using var session = _store.QuerySession();
+
+        string? parentId = null;
+        Page? page = null;
+        foreach (var segment in segments)
+        {
+            page = await LoadByParentAndSlugAsync(session, parentId, segment).ConfigureAwait(false);
+            if (page is null)
+                throw new KeyNotFoundException($"No page at path '{path}'.");
+            parentId = page.Id;
+        }
+
+        var resolved = page!;   // non-null: the loop throws KeyNotFoundException otherwise
+        var translations = await session
+            .Query<PageTranslation>()
+            .Where(t => t.PageId == resolved.Id)
+            .OrderBy(t => t.LanguageCode)   // the ADR 0022 read (ordered by LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        return (resolved, translations);
+    }
+
+    /// <inheritdoc />
     public async Task<Page?> GetByMountPointAsync(string slot)
     {
         if (string.IsNullOrWhiteSpace(slot))
@@ -1079,6 +1119,15 @@ public sealed class PageService : IPageService
     private async Task<Page?> LoadByParentAndSlugAsync(string? parentId, string slug)
     {
         await using var session = _store.QuerySession();
+        return await LoadByParentAndSlugAsync(session, parentId, slug).ConfigureAwait(false);
+    }
+
+    // The ResolvePageAsync read seam (ADR 0043 D7) needs the path walk and the
+    // translation read in a **single** session, so the walk runs against a
+    // caller-owned session instead of opening one per segment.
+    private static async Task<Page?> LoadByParentAndSlugAsync(
+        IQuerySession session, string? parentId, string slug)
+    {
         var q = session.Query<Page>()
             .Where(p => p.Slug == slug && p.IsDeleted == false);   // ADR 0024 filter
         if (parentId is null)

@@ -47,8 +47,9 @@ public class StaticPagesControllerPgTests
             // Default: absent from the tree (KeyNotFoundException — the
             // "absent" contract, not an error). Both the ADR 0040 primary
             // path (system/{slug}) and the legacy fallback ({slug}) miss.
-            pages.GetByPathAsync(Arg.Any<string>())
-                .Returns(Task.FromException<Page>(new KeyNotFoundException($"no page at '{slug}'")));
+            pages.ResolvePageAsync(Arg.Any<string>())
+                .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(
+                    new KeyNotFoundException($"no page at '{slug}'")));
         }
         else
         {
@@ -57,16 +58,15 @@ public class StaticPagesControllerPgTests
             // the page there (the primary hit); the bare `{slug}` fallback
             // is a legacy seam that misses (proving the primary path is the
             // one that resolves).
-            pages.GetByPathAsync($"system/{slug}").Returns(pageFactory(slug)!);
-            pages.GetByPathAsync(slug)
-                .Returns(Task.FromException<Page>(new KeyNotFoundException($"no page at '{slug}'")));
+            var page = pageFactory(slug)!;
+            pages.ResolvePageAsync($"system/{slug}")
+                .Returns(Task.FromResult((page, new List<PageTranslation>() as IReadOnlyList<PageTranslation>)));
+            pages.ResolvePageAsync(slug)
+                .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(
+                    new KeyNotFoundException($"no page at '{slug}'")));
         }
 
-        var controller = new StaticPagesController(
-            pages,
-            Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
+        var controller = StaticPagesControllerHarness.Build(pages);
         return (controller, pages);
     }
 
@@ -107,7 +107,7 @@ public class StaticPagesControllerPgTests
         Assert.Equal(now, model.Updated); // Modified ?? Created
 
         // ADR 0040 — resolved via the `system/terms` primary path.
-        await pages.Received(1).GetByPathAsync("system/terms");
+        await pages.Received(1).ResolvePageAsync("system/terms");
     }
 
     [Fact(DisplayName = "U07 about: tree-absent → the product-story view (the U05 drift pin — about is NOT seeded)")]
@@ -169,7 +169,7 @@ public class StaticPagesControllerPgTests
         Assert.Equal("The privacy body (markdown).", model.Body);
 
         // ADR 0043 D2 — resolved via the `system/privacy` primary path.
-        await pages.Received(1).GetByPathAsync("system/privacy");
+        await pages.Received(1).ResolvePageAsync("system/privacy");
     }
 
     [Fact(DisplayName = "SP U01 privacy: tree-absent → 404 (the page floor, NOT the product-story)")]
@@ -212,7 +212,7 @@ public class StaticPagesControllerPgTests
         Assert.Equal("The conduct body (markdown).", model.Body);
 
         // ADR 0043 D2 — resolved via the `system/conduct` primary path.
-        await pages.Received(1).GetByPathAsync("system/conduct");
+        await pages.Received(1).ResolvePageAsync("system/conduct");
     }
 
     [Fact(DisplayName = "SP U01 conduct: tree-absent → 404 (the page floor, NOT the product-story)")]

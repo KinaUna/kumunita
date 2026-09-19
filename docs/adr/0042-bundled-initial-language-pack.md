@@ -14,7 +14,7 @@ Translator edit standing the baselines hand off to). No amendment to 0015,
 written.
 
 This ADR is the **sign-off gate** of the `LS` (Languages Seeded) lane — the
-lane plan is `plans-milestones/languages-seeded/plan-languages-seeded.md`.
+lane plan is `plans-milestones/done/languages-seeded/plan-languages-seeded.md`.
 Every later `LS` unit (U01–U06) codes against the *locked* text here;
 changing a decision below requires an amendment, not a unit-level override.
 
@@ -79,7 +79,16 @@ seeded once, then community-owned
   community-owned" meeting "no warm-reseed mechanism exists" — **a
   recorded decision, not a bug to fix**. The lane deliberately does not add
   a reseed path; the completeness view is the review surface.
-
+  > **Narrow exception recorded 2026-09-28 (ADR 0047 D2):** the *four
+  > canonical system pages'* `de` / `fr` / `da` `PageTranslation` rows
+  > **are** backfilled on a warm boot (create-if-missing, idempotent, never
+  > overwriting an admin edit or the `en` body) — the resident-visible seam
+  > ADR 0043 / 0047 D1 makes user-visible in the effective language. This is
+  > **deliberately scoped to those four pages' page-translation rows**: the
+  > **UI-string** baselines (`TranslationResource` rows) are still **not**
+  > warm-reseeded, and the new-key asymmetry above stands unchanged for
+  > them. The "no warm-reseed mechanism" decision is held for everything
+  > else; the four system pages are the only narrow, recorded exception.
 ### D2 — Register and style: German `du`, French `tu`, held per language
 
 The baselines are a **careful first pass, editable later** — the

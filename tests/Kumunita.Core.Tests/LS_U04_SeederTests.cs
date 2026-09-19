@@ -343,6 +343,120 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         }
     }
 
+    // ── 7 — the warm-boot backfill (ADR 0043 D7 / ADR 0044 D5) ──────────────
+    // A deployment seeded before the de/fr/da baselines shipped has the four
+    // pages but no PageTranslation rows. BackfillPageTranslationsAsync adds
+    // the missing de/fr/da rows (create-if-missing, ADR 0042 D1) and is
+    // idempotent — a second run finds every row and skips.
+
+    [Fact(DisplayName = "Warm-boot backfill: pages seeded en-only gain de/fr/da rows, idempotent on re-run")]
+    public async Task Backfill_CreatesMissingDeFrDaRows_Idempotent()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the en pages ONLY (no translations) — the warm-deployment state
+        // (a pre-LS-U04 deployment had the pages but not the baselines).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(
+                session, FirstBootSeeder.EnDefaultPages(), DateTimeOffset.UtcNow, ct);
+            // Deliberately NOT calling SeedPageTranslationsAsync — the state
+            // a deployment seeded before the de/fr/da baselines shipped has.
+            await session.SaveChangesAsync(ct);
+        }
+
+        // Before the backfill: no PageTranslation rows for the four pages.
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var slugs = new[] { "terms", "help", "privacy", "conduct" };
+            foreach (var slug in slugs)
+            {
+                var page = await q.Query<Page>()
+                    .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
+                    .FirstAsync(ct);
+                var count = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id)
+                    .CountAsync(ct);
+                Assert.Equal(0, count);
+            }
+        }
+
+        // Run the backfill (the warm-boot path in SchemaBootstrap).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            await FirstBootSeeder.BackfillPageTranslationsAsync(session, ct);
+        }
+
+        // After the backfill: each page has exactly de + fr + da rows (3 total),
+        // matching the canonical baselines.
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var slugs = new[] { "terms", "help", "privacy", "conduct" };
+            foreach (var slug in slugs)
+            {
+                var page = await q.Query<Page>()
+                    .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
+                    .FirstAsync(ct);
+
+                var total = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id)
+                    .CountAsync(ct);
+                Assert.Equal(3, total);
+
+                // Baseline parity.
+                var de = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id && t.LanguageCode == "de")
+                    .FirstAsync(ct);
+                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == slug);
+                Assert.Equal(deBaseline.Body, de.Body);
+
+                var fr = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id && t.LanguageCode == "fr")
+                    .FirstAsync(ct);
+                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == slug);
+                Assert.Equal(frBaseline.Body, fr.Body);
+
+                var da = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id && t.LanguageCode == "da")
+                    .FirstAsync(ct);
+                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == slug);
+                Assert.Equal(daBaseline.Body, da.Body);
+            }
+        }
+
+        // Re-run the backfill (idempotency — the ADR 0042 D1 skip path).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            await FirstBootSeeder.BackfillPageTranslationsAsync(session, ct);
+        }
+
+        // After the re-run: still exactly 3 rows per page (no duplicates).
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var slugs = new[] { "terms", "help", "privacy", "conduct" };
+            foreach (var slug in slugs)
+            {
+                var page = await q.Query<Page>()
+                    .Where(p => p.Slug == slug && p.ParentId == systemRoot.Id)
+                    .FirstAsync(ct);
+                var total = await q.Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id)
+                    .CountAsync(ct);
+                Assert.Equal(3, total);
+            }
+        }
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page doc types) — the

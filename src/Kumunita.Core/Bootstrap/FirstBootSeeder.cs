@@ -1057,6 +1057,130 @@ public static class FirstBootSeeder
         }
     }
 
+    /// <summary>
+    /// Warm-boot backfill of the <c>de</c> / <c>fr</c> / <c>da</c>
+    /// <see cref="PageTranslation"/> rows for the four canonical seeded pages
+    /// (terms / help / privacy / conduct) — the lane that closes the ADR 0043
+    /// D7 / ADR 0044 D5 gap: a deployment seeded before the <c>de</c> /
+    /// <c>fr</c> / <c>da</c> baselines shipped (LS U04, SP U02) has the four
+    /// pages but no translation rows, so <c>/terms</c> / <c>/help</c> /
+    /// <c>/privacy</c> / <c>/conduct</c> render the authored-in <c>en</c>
+    /// body even for a German / French / Danish-speaking resident.
+    /// <para>
+    /// **Create-if-missing only** (the ADR 0042 D1 invariant, the same rule
+    /// as <see cref="SeedPageTranslationsAsync"/>): an existing row for a
+    /// (page, language) pair is skipped, never refreshed — an admin's in-app
+    /// edit of a baseline (the GlobalAdmin ∪ Translator lane, ADR 0021) is
+    /// never clobbered by a later deploy. The <c>en</c> page bodies are
+    /// **never** touched here: unlike the first-boot path, this runs on a warm
+    /// DB where an admin may have edited the canonical <c>en</c> body, so a
+    /// code-wins refresh would clobber that edit. A deployment that has the
+    /// pages but no translation rows is exactly the one this lane serves —
+    /// the rows are created from the same <see cref="DeDefaultPages"/> /
+    /// <see cref="FrDefaultPages"/> / <see cref="DaDefaultPages"/> baselines
+    /// the first-boot seeder uses, so a fresh and a backfilled instance are
+    /// byte-identical for these surfaces.
+    /// </para>
+    /// <para>
+    /// Idempotent: a second run finds every row it created on the first run
+    /// and skips (the ADR 0042 D1 skip path). The <c>system/{slug}</c>
+    /// primary resolution mirrors the <c>StaticPagesController</c> read path
+    /// (ADR 0040 — the seeder nests the canonical pages under the
+    /// <c>system</c> root); the bare-<c>{slug}</c> fallback covers a
+    /// pre-ADR-0040 deployment whose pages are still orphan roots (the
+    /// seeder's ADR 0040 lane re-parents them on the next first-boot
+    /// re-seed, but a warm boot does not re-run that lane — the backfill
+    /// finds them where they are).
+    /// </para>
+    /// </summary>
+    public static async Task BackfillPageTranslationsAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        // The slugs that have a de/fr/da baseline in the seed data — the
+        // same set EnDefaultPages() covers (terms / help / privacy /
+        // conduct; `about` is deliberately absent — it is the
+        // registry-key surface, not a Markdown body).
+        var slugs = EnDefaultPages().Select(p => p.Slug).ToList();
+
+        // The system root (ADR 0040) — null when the instance predates ADR
+        // 0040 and the pages are still orphan roots (the fallback below).
+        var systemRoot = await session
+            .Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        foreach (var slug in slugs)
+        {
+            // Primary resolution: system/{slug} (ADR 0040 — the seeder
+            // nests the canonical pages under the system root). The fallback
+            // below is the pre-ADR-0040 orphan: a deployment whose pages are
+            // still root-level, which the ADR 0040 re-parent lane has not
+            // touched on this warm boot.
+            Page? page = null;
+            if (systemRoot is not null)
+            {
+                page = await session
+                    .Query<Page>()
+                    .Where(p => p.Slug == slug
+                                && p.ParentId == systemRoot.Id
+                                && p.IsDeleted == false)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+            }
+            if (page is null)
+            {
+                page = await session
+                    .Query<Page>()
+                    .Where(p => p.Slug == slug && p.ParentId == null && p.IsDeleted == false)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+            }
+
+            if (page is null)
+                continue;   // the page itself is absent; the first-boot path (or the ADR 0040 re-parent lane) owns that gap.
+
+            // The de/fr/da baselines for this page, create-if-missing (ADR 0042 D1).
+            foreach (var (code, baselines) in new[]
+            {
+                ("de", DeDefaultPages()),
+                ("fr", FrDefaultPages()),
+                ("da", DaDefaultPages()),
+            })
+            {
+                var baseline = baselines.FirstOrDefault(b => b.Slug == slug);
+                if (baseline == default)
+                    continue;   // defensive — the slug is not in the baseline set (about, or a future slug).
+
+                var existing = await session
+                    .Query<PageTranslation>()
+                    .Where(t => t.PageId == page.Id && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new PageTranslation
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        PageId = page.Id,
+                        LanguageCode = code,
+                        Title = baseline.Title,
+                        Body = baseline.Body,
+                        AuthorId = string.Empty,   // platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     private static string SeedAdminBody(string email, string userId, string token) =>
         $"Hi,\n\nThis first-boot setup email is the one-time handoff to bring your new Kumunita " +
         $"instance online. When you are ready, present the setup token below at the /admin/setup " +

@@ -1,6 +1,8 @@
 using Kumunita.Core;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Web.Security;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -12,7 +14,7 @@ namespace Kumunita.Web.Controllers;
 /// PG U05 (ADR 0039 §3.8/§3.9) retargeted these onto the
 /// new <see cref="Page"/> tree; **PG U07 (this unit) completes the absorb** —
 /// the legacy fallback seam is gone, so each route reads **only** the tree
-/// (<see cref="IPageService.GetByPathAsync"/> — one store, not two). A path
+/// (<see cref="IPageService.ResolvePageAsync"/> — one store, not two). A path
 /// absent from the tree is a 404 (the page floor), except <c>/about</c>, which
 /// degrades to the product-story view.
 /// <para>
@@ -30,11 +32,43 @@ namespace Kumunita.Web.Controllers;
 /// <c>/conduct</c> are 404-floor routes (the page floor, no product-story
 /// fallback — ADR 0043 D2: that seam is <c>/about</c>'s only).
 /// </para>
+/// <para>
+/// **Localized body (ADR 0043 D7, amended):** the body + title render in the
+/// request's **effective language** — the same frozen chain the
+/// <c>&lt;kw-l&gt;</c> TagHelper resolves with (the ADR 0015 / ADR 0046
+/// per-request default-language chain: the <c>kumunita.locale</c> cookie, else
+/// the browser's <c>Accept-Language</c> tags, else the instance default,
+/// else the <c>en</c> floor). A page translation row
+/// (<see cref="PageTranslation"/>) for that language supplies the body; when
+/// absent, the authored-in (the seeded <c>en</c>) body is the floor — a
+/// resident never sees a blank page. This is what lets the seeded
+/// de/fr/da translations of these pages (the <c>FirstBootSeeder</c> seed
+/// lane) render on a warm deployment where the page itself was authored in
+/// <c>en</c>.
+/// </para>
 /// </summary>
-public sealed class StaticPagesController(
-    IPageService pages,
-    IOptions<CommunityOptions> community) : Controller
+public sealed class StaticPagesController : Controller
 {
+    private readonly IPageService _pages;
+    private readonly ITranslationProvider _translations;
+    private readonly ILocalizationService _localization;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IOptions<CommunityOptions> _community;
+
+    public StaticPagesController(
+        IPageService pages,
+        ITranslationProvider translations,
+        ILocalizationService localization,
+        IHttpContextAccessor httpContextAccessor,
+        IOptions<CommunityOptions> community)
+    {
+        _pages = pages;
+        _translations = translations;
+        _localization = localization;
+        _httpContextAccessor = httpContextAccessor;
+        _community = community;
+    }
+
     private static readonly string[] Slugs = { "terms", "help", "about", "privacy", "conduct" };
 
     /// <summary>
@@ -95,44 +129,75 @@ public sealed class StaticPagesController(
         // terms/help/about were still orphan roots (the seeder re-parents them
         // on next boot, but a page an admin created pre-migration may not have
         // been re-seeded) — keeping the hard-coded routes from 404ing.
-        Page? page;
+        (Page Page, IReadOnlyList<PageTranslation> Translations) resolved;
         try
         {
-            page = await pages.GetByPathAsync($"system/{slug}");
+            resolved = await _pages.ResolvePageAsync($"system/{slug}");
         }
         catch (KeyNotFoundException)
         {
             try
             {
-                page = await pages.GetByPathAsync(slug);
+                resolved = await _pages.ResolvePageAsync(slug);
             }
             catch (KeyNotFoundException)
             {
-                page = null;
+                return FallThrough(fallBackToProductStory);
             }
         }
 
-        if (page is not null)
+        var page = resolved.Page;
+        var pageTranslations = resolved.Translations;
+
+        // Resolve the effective language the same way <kw-l> does (ADR 0015 D1
+        // / ADR 0046 — the frozen per-request default-language chain): the
+        // kumunita.locale cookie if present, else the browser's
+        // Accept-Language tags (matched against the enabled catalog), else
+        // the provider's instance-default → en floor. Core stays HTTP-free
+        // (M·8) — we read the request here (the Web layer) and pass plain
+        // BCP-47 strings to the provider.
+        var request = _httpContextAccessor.HttpContext?.Request;
+        var pref = request is null ? null : LocaleCookie.Read(request);
+        string effective;
+        if (!string.IsNullOrWhiteSpace(pref))
         {
-            ViewData["Slug"] = slug;
-            // The view (Views/StaticPages/Page.cshtml) is the static-page
-            // renderer (Title/Body/Updated); the body renders via the single
-            // MarkdownRenderer. The (Title, Body, Updated) triple is
-            // byte-identical to the retired static-page output (the seeder
-            // wrote both from the same `now`, ADR 0039 §3.9).
-            return View("Page", new StaticPageViewModel(
-                slug,
-                page.Title,
-                page.Body,
-                page.Modified ?? page.Created));
+            effective = await _translations.ResolveEffectiveLanguageAsync(pref);
+        }
+        else if (request is not null)
+        {
+            var enabled = await _localization.ListLanguagesAsync();
+            var candidates = RequestLanguage.BrowserCandidates(request, enabled);
+            effective = await _translations.ResolveEffectiveLanguageAsync(candidates);
+        }
+        else
+        {
+            effective = await _translations.ResolveEffectiveLanguageAsync((string?)null);
         }
 
-        // Truly absent from the tree: /about degrades to the product-story
-        // view (a fresh instance's about page); other slugs keep the 404
-        // floor (the page floor).
+        // Pick the (Title, Body) pair for the effective language. The
+        // authored-in body (the seeded en) is the floor: a page with no
+        // translation row for the effective language renders its own body
+        // (the ADR 0022 read-pin — an un-translated page is not an error).
+        var translation = pageTranslations.FirstOrDefault(
+            t => string.Equals(t.LanguageCode, effective, StringComparison.OrdinalIgnoreCase));
+        var title = translation?.Title ?? page.Title;
+        var body = translation?.Body ?? page.Body;
+
+        ViewData["Slug"] = slug;
+        // The view (Views/StaticPages/Page.cshtml) is the static-page
+        // renderer (Title/Body/Updated); the body renders via the single
+        // MarkdownRenderer. The (Title, Body, Updated) triple is
+        // byte-identical to the retired static-page output (the seeder
+        // wrote both from the same `now`, ADR 0039 §3.9).
+        return View("Page", new StaticPageViewModel(
+            slug, title, body, page.Modified ?? page.Created));
+    }
+
+    private IActionResult FallThrough(bool fallBackToProductStory)
+    {
         if (fallBackToProductStory)
             return View("About",
-                new Models.HomeViewModel(community.Value.Name, community.Value.SupportEmail));
+                new Models.HomeViewModel(_community.Value.Name, _community.Value.SupportEmail));
         return NotFound();
     }
 

@@ -83,23 +83,22 @@ public class PublicLocaleAndAboutTests
             // Absent from the tree (KeyNotFoundException) — the U05 drift pin:
             // a fresh instance has no `about` Page. Both the ADR 0040 primary
             // path (system/about) and the legacy fallback (about) miss.
-            pages.GetByPathAsync(Arg.Any<string>())
-                .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+            pages.ResolvePageAsync(Arg.Any<string>())
+                .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(
+                    new KeyNotFoundException()));
         }
         else
         {
             // ADR 0040: the `about` page lives under the `system/` root, so
             // the controller resolves `system/about` first.
-            pages.GetByPathAsync("system/about").Returns(page);
-            pages.GetByPathAsync("about")
-                .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+            pages.ResolvePageAsync("system/about")
+                .Returns(Task.FromResult((page, new List<PageTranslation>() as IReadOnlyList<PageTranslation>)));
+            pages.ResolvePageAsync("about")
+                .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(
+                    new KeyNotFoundException()));
         }
 
-        var controller = new StaticPagesController(
-            pages,
-            Options.Create(new CommunityOptions { Name = "Maplewood", SupportEmail = "maps@example.com" }));
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
-
+        var controller = StaticPagesControllerHarness.Build(pages);
         return (controller, pages);
     }
 
@@ -154,13 +153,11 @@ public class PublicLocaleAndAboutTests
     public async Task Get_Terms_NoPage_Still_404s()
     {
         var pages = Substitute.For<IPageService>();
-        pages.GetByPathAsync("terms")
-            .Returns(Task.FromException<Page>(new KeyNotFoundException()));
+        pages.ResolvePageAsync(Arg.Any<string>())
+            .Returns(Task.FromException<(Page, IReadOnlyList<PageTranslation>)>(new KeyNotFoundException()));
 
-        var controller = new StaticPagesController(
-            pages,
-            Options.Create(new CommunityOptions { Name = "Kumunita" }));
-        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+        var controller = StaticPagesControllerHarness.Build(pages,
+            community: new CommunityOptions { Name = "Kumunita" });
 
         var result = await controller.Terms();
 
