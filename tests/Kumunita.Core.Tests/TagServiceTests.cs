@@ -1,9 +1,11 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Tags;
+using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
 using Xunit;
@@ -192,7 +194,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F1_AttachFreeOnOwnPost()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f1-post", "u-author"));
@@ -220,7 +222,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F2_SameSlugSecondAuthorReusesTag()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f2-post-a", "u-a"));
@@ -246,7 +248,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F2_SameSlugSecondAuthorNotCreatedBy()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f2b-post-a", "u-a"));
@@ -271,7 +273,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F6_CreatorSetsTranslation()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f6-post", "u-creator"));
@@ -302,7 +304,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F7_NonCreatorAttacherCannotReword()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f7-post-a", "u-creator"));
@@ -334,7 +336,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task F8_GlobalAdminRewordsAnyTag()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("f8-post", "u-creator"));
@@ -365,7 +367,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task Attach_WritesOneAuditRow_tag_attach()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         // Plant an existing tag so **only** tag.attach (no tag.create) is
@@ -397,7 +399,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task Create_WritesOneAuditRow_tag_create()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("create-post", "u-author"));
@@ -421,7 +423,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task Translate_WritesOneAuditRow_tagtranslation_add()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("translate-post", "u-creator"));
@@ -451,7 +453,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     public async Task Slug_Derivation_Lowercase_Trim_Charset()
     {
         var store = await BootStoreAsync();
-        var svc = new TagService(store);
+        var svc = NewTagService(store);
         var ct = TestContext.Current.CancellationToken;
 
         await Plant(store, NewPost("slug-post", "u-author"));
@@ -489,6 +491,271 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
                 svc.AttachToPostAsync(
                     "slug-post", ["bad slug!"], "u-author", RolesSet(Roles.Member), s3));
         }
+    }
+
+    // ─── U6 — the read lane (C-TG·2 base query + the privacy-pin) ─────────
+    //
+    // All four read methods derive from the one C-TG·2 base query over the
+    // actor's readable content; the content's own Read decision (not a tag
+    // grant) is the gate (C-TG·1 / C-TG·3), and the tag lane writes no
+    // tag-family AccessAudit row of its own (C-TG·8 / D7).
+    //
+    // F3 — a group post's tag is invisible to a non-member (C-TG·3): the
+    // post's own Read decision (the ADR 0013 membership lane) is applied
+    // before the post is returned; a non-member's by-tag result is empty,
+    // and the tag is absent from their autocomplete / list.
+
+    [Fact]
+    public async Task F3_GroupPostTagInvisibleToNonMember_ByTag()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        const string owner = "u-f3-owner";
+        const string stranger = "u-f3-stranger";
+
+        var group = await userInfo.CreateGroupAsync(owner, "F3 family", null);
+        await Plant(store, new Tag { Id = "tag-f3", Slug = "sanitation", Name = "Sanitation", LanguageCode = "en", CreatedBy = owner });
+        await Plant(store, TaggedGroupPost("f3-post", group.Id, owner, "tag-f3"));
+        var svc = NewTagService(store);
+
+        // The non-member's by-tag result is **empty** — the group post's own
+        // Read decision (membership) is the gate, applied **before** it is
+        // returned (C-TG·3, D5). The tag grants nothing.
+        Assert.Empty(await svc.ListPostsByTagAsync("sanitation", stranger));
+
+        // Positive control: the member (the owner) **does** see it — the tag
+        // is real, only the non-member's Read is the exclusion.
+        var memberPosts = await svc.ListPostsByTagAsync("sanitation", owner);
+        var memberPost = Assert.Single(memberPosts);
+        Assert.Equal("f3-post", memberPost.Id);
+    }
+
+    [Fact]
+    public async Task F3_GroupPostTagInvisibleToNonMember_Suggest()
+    {
+        var store = await BootStoreAsync();
+        var userInfo = new UserInfoService(store);
+        const string owner = "u-f3b-owner";
+        const string stranger = "u-f3b-stranger";
+
+        var group = await userInfo.CreateGroupAsync(owner, "F3b family", null);
+        await Plant(store, new Tag { Id = "tag-f3b", Slug = "sanitation", Name = "Sanitation", LanguageCode = "en", CreatedBy = owner });
+        await Plant(store, TaggedGroupPost("f3b-post", group.Id, owner, "tag-f3b"));
+        var svc = NewTagService(store);
+
+        // The tag is used **only** on a group post the non-member may not read →
+        // it is absent from their autocomplete (C-TG·1 / C-TG·3, the
+        // anti-leak pin: a tag reveals nothing behind unread content).
+        Assert.Empty(await svc.SuggestAsync("san", stranger));
+        Assert.Empty(await svc.ListForActorAsync(stranger));
+
+        // Positive control: the member sees the tag in autocomplete.
+        var ownerSuggest = await svc.SuggestAsync("san", owner);
+        Assert.Contains(ownerSuggest, i => i.Tag.Id == "tag-f3b");
+    }
+
+    // F4 — a tag used only on unread content is absent from all four shapes
+    // (C-TG·2, D5): the base query is scoped to content the viewer may read,
+    // so a tag whose only use is behind an unread community post never
+    // surfaces (no name, no "hidden" placeholder).
+
+    [Fact]
+    public async Task F4_TagUsedOnlyOnUnreadContentInvisible_List()
+    {
+        var store = await BootStoreAsync();
+        const string other = "u-f4-other";
+        const string viewer = "u-f4-viewer";
+
+        await Plant(store, new Tag { Id = "tag-f4", Slug = "secret", Name = "Secret", LanguageCode = "en", CreatedBy = other });
+        // A community post the viewer is **not** in the audience of (author =
+        // other; audience = other only) → unread by the viewer.
+        await Plant(store, TaggedPost("f4-post", other, "tag-f4"));
+        var svc = NewTagService(store);
+
+        // The tag exists, but only on unread content → the viewer's tag list
+        // is empty (C-TG·2 / D5: a tag behind unread content is as good as
+        // absent to that viewer — no name, no "hidden" placeholder).
+        Assert.Empty(await svc.ListForActorAsync(viewer));
+
+        // Positive control: the author (in the audience) sees the tag.
+        Assert.Contains(await svc.ListForActorAsync(other), i => i.Tag.Id == "tag-f4");
+    }
+
+    [Fact]
+    public async Task F4_TagUsedOnlyOnUnreadContentInvisible_ByTag()
+    {
+        var store = await BootStoreAsync();
+        const string other = "u-f4b-other";
+        const string viewer = "u-f4b-viewer";
+
+        await Plant(store, new Tag { Id = "tag-f4b", Slug = "secret", Name = "Secret", LanguageCode = "en", CreatedBy = other });
+        await Plant(store, TaggedPost("f4b-post", other, "tag-f4b"));
+        var svc = NewTagService(store);
+
+        // The by-tag result is empty for the unread viewer (C-TG·1 / C-TG·2).
+        Assert.Empty(await svc.ListPostsByTagAsync("secret", viewer));
+
+        // Positive control: the author (in the audience) sees the post.
+        var authorPosts = await svc.ListPostsByTagAsync("secret", other);
+        Assert.Contains(authorPosts, p => p.Id == "f4b-post");
+    }
+
+    [Fact]
+    public async Task F4_TagUsedOnlyOnUnreadContentInvisible_Suggest()
+    {
+        var store = await BootStoreAsync();
+        const string other = "u-f4c-other";
+        const string viewer = "u-f4c-viewer";
+
+        await Plant(store, new Tag { Id = "tag-f4c", Slug = "secret", Name = "Secret", LanguageCode = "en", CreatedBy = other });
+        await Plant(store, TaggedPost("f4c-post", other, "tag-f4c"));
+        var svc = NewTagService(store);
+
+        // Autocomplete (the base query filtered) is empty for the unread viewer.
+        Assert.Empty(await svc.SuggestAsync("sec", viewer));
+
+        // Positive control: the author's autocomplete surfaces the tag.
+        Assert.Contains(await svc.SuggestAsync("sec", other), i => i.Tag.Id == "tag-f4c");
+    }
+
+    // F9 — the display name is resolved in the viewer's language (C-TG·4, D3/D5):
+    // a `de`-preferring actor typing `hy` gets the `de` name `hygiène` even
+    // though the Slug is `sanitation`. In Core (no cookie) the ADR 0005
+    // preference order collapses to the instance default, so the test seeds the
+    // default to `de`.
+
+    [Fact]
+    public async Task F9_AutocompleteMatchesViewerLanguage_DisplayName()
+    {
+        var store = await BootStoreAsync();
+        const string author = "u-f9-author";
+
+        await SeedDefaultLanguage(store, "de");
+        // Base name `Sanitation` (authored in en) — but the viewer is `de`,
+        // so the `de` TagTranslation (`hygiène`) is the resolved display name.
+        await Plant(store, new Tag { Id = "tag-f9", Slug = "sanitation", Name = "Sanitation", LanguageCode = "en", CreatedBy = author });
+        await Plant(store, new TagTranslation { Id = "tag-f9-de", TagId = "tag-f9", LanguageCode = "de", Name = "hygiène", AuthorId = author });
+        await Plant(store, TaggedPost("f9-post", author, "tag-f9"));
+        var svc = NewTagService(store);
+
+        // Typing `hy` matches the **displayed** name (`hygiène`), not the slug
+        // (`sanitation`) — the display-name branch of the filter.
+        var hit = Assert.Single(await svc.SuggestAsync("hy", author));
+        Assert.Equal("hygiène", hit.DisplayedName);
+        Assert.Equal("sanitation", hit.Tag.Slug);
+        Assert.Equal("tag-f9", hit.Tag.Id);
+    }
+
+    [Fact]
+    public async Task F9_AutocompleteMatchesViewerLanguage_Slug()
+    {
+        var store = await BootStoreAsync();
+        const string author = "u-f9b-author";
+
+        await SeedDefaultLanguage(store, "de");
+        // The `de` display name (`Hof`) does **not** start with the prefix
+        // `gar`, but the Slug (`garden`) does → the Slug fallback branch of
+        // the filter (C-TG·4: the Slug is identity, the display name is the
+        // viewer's-language name; the prefix can match either).
+        await Plant(store, new Tag { Id = "tag-f9b", Slug = "garden", Name = "Garden", LanguageCode = "en", CreatedBy = author });
+        await Plant(store, new TagTranslation { Id = "tag-f9b-de", TagId = "tag-f9b", LanguageCode = "de", Name = "Hof", AuthorId = author });
+        await Plant(store, TaggedPost("f9b-post", author, "tag-f9b"));
+        var svc = NewTagService(store);
+
+        // The prefix `gar` matches the Slug (`garden`), **not** the displayed
+        // name (`Hof`) — the slug-fallback branch still surfaces the tag, and
+        // the row's display name is the viewer's-language name.
+        var hit = Assert.Single(await svc.SuggestAsync("gar", author));
+        Assert.Equal("Hof", hit.DisplayedName);    // resolved in the viewer's language
+        Assert.Equal("garden", hit.Tag.Slug);       // the prefix matched the Slug
+
+        // And the displayed name itself does **not** match the prefix (the
+        // proof this is the slug branch, not the display-name branch).
+        Assert.False(hit.DisplayedName.StartsWith("gar", StringComparison.Ordinal));
+    }
+
+    // F10 — autocomplete is capped at ≤ 10 (C-TG·2): a blank prefix matches
+    // every readable tag, but only the first 10 are returned.
+
+    [Fact]
+    public async Task F10_AutocompleteCappedAtTen()
+    {
+        var store = await BootStoreAsync();
+        const string author = "u-f10-author";
+
+        var tagIds = new List<string>(15);
+        for (var i = 0; i < 15; i++)
+        {
+            var id = "tag-f10-" + i;
+            tagIds.Add(id);
+            await Plant(store, new Tag
+            {
+                Id = id, Slug = "tag" + i, Name = "Tag " + i,
+                LanguageCode = "en", CreatedBy = author,
+            });
+        }
+        // One post carrying all 15 tag ids → the base query surfaces 15 tags.
+        var multi = NewPost("f10-post", author);
+        multi.TagIds = tagIds;
+        await Plant(store, multi);
+        var svc = NewTagService(store);
+
+        // A blank prefix matches all 15 readable tags → capped at 10.
+        var suggestions = await svc.SuggestAsync(string.Empty, author);
+        Assert.Equal(10, suggestions.Count);
+
+        // The tag list (no cap — the cap is autocomplete-only) still shows all 15.
+        Assert.Equal(15, (await svc.ListForActorAsync(author)).Count);
+    }
+
+    // C-TG·8 (D7) — the read lane emits **no tag-family** AccessAudit row: a
+    // read is not a decision. The content's own Read-decision rows (post /
+    // page / grouppost) are the content's; the tag lane writes none of its
+    // own (no `tag.*` action, no `TargetKind == "tag"` row).
+
+    [Fact]
+    public async Task List_EmitsNoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        const string author = "u-list-audit";
+
+        await Plant(store, new Tag { Id = "tag-la", Slug = "sanitation", Name = "Sanitation", LanguageCode = "en", CreatedBy = author });
+        await Plant(store, TaggedPost("la-post", author, "tag-la"));
+        var svc = NewTagService(store);
+
+        // Exercise the tag-list + by-tag reads (the two read shapes that
+        // return tagged content).
+        await svc.ListForActorAsync(author);
+        await svc.ListPostsByTagAsync("sanitation", author);
+
+        Assert.Empty(await AuditsFor(store, "tag.attach"));
+        Assert.Empty(await AuditsFor(store, "tag.create"));
+        Assert.Empty(await AuditsFor(store, "tagtranslation.add"));
+        // And no tag-family row of any kind (the content's own post Read row
+        // is the content's, not the tag lane's — D7).
+        await using var q = store.QuerySession();
+        var all = await q.Query<AccessAudit>().ToListAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(all, a => a.TargetKind == "tag");
+    }
+
+    [Fact]
+    public async Task Suggest_EmitsNoAuditRow()
+    {
+        var store = await BootStoreAsync();
+        const string author = "u-suggest-audit";
+
+        await Plant(store, new Tag { Id = "tag-sa", Slug = "sanitation", Name = "Sanitation", LanguageCode = "en", CreatedBy = author });
+        await Plant(store, TaggedPost("sa-post", author, "tag-sa"));
+        var svc = NewTagService(store);
+
+        await svc.SuggestAsync("san", author);
+
+        Assert.Empty(await AuditsFor(store, "tag.attach"));
+        Assert.Empty(await AuditsFor(store, "tag.create"));
+        Assert.Empty(await AuditsFor(store, "tagtranslation.add"));
+        await using var q = store.QuerySession();
+        var all = await q.Query<AccessAudit>().ToListAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(all, a => a.TargetKind == "tag");
     }
 
     // ─── Shared helpers ─────────────────────────────────────────────────────
@@ -561,4 +828,81 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
     }
 
     private static HashSet<string> RolesSet(params string[] roles) => roles.ToHashSet();
+
+    // ─── U6 read-lane helpers ─────────────────────────────────────────────
+
+    /// <summary>Build the read-lane trio over the scratch store (the
+    /// <see cref="GroupPostServiceTests.Services"/> precedent, verbatim) and
+    /// return a <see cref="TagService"/> wired to the live
+    /// <see cref="AuthorizationService"/> / <see cref="TranslationProvider"/>
+    /// — the U6 constructor growth (C-TG·2 base query needs the content's own
+    /// <c>Read</c> decision + the display-name resolution). The write-lane
+    /// U5 tests now call this same helper (their <see cref="ITagService"/>
+    /// surface is unchanged; only the constructor grew).</summary>
+    private static TagService NewTagService(IDocumentStore store)
+    {
+        var userInfo = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var translations = new TranslationProvider(store);
+        return new TagService(store, authz, translations);
+    }
+
+    /// <summary>Seed the instance language catalog + default to
+    /// <paramref name="code"/> so
+    /// <see cref="ITranslationProvider.ResolveEffectiveLanguageAsync(string?)"/>
+    /// resolves to <paramref name="code"/> (the F9 "viewer's language" pin —
+    /// in Core there is no cookie, so the ADR 0005 preference order collapses
+    /// to the instance default; the Web layer would pass the
+    /// <c>kumunita.locale</c> cookie as the explicit preference).</summary>
+    private static async Task SeedDefaultLanguage(IDocumentStore store, string code)
+    {
+        await Plant(store, new LanguageCatalog { Id = code, NativeName = code, Enabled = true, SortOrder = 0 });
+        await Plant(store, new LocaleSettings { DefaultLanguageCode = code });
+    }
+
+    /// <summary>A planted community post (audience = the author) carrying the
+    /// given tag id — the U6 read-lane fixture (the
+    /// <see cref="GroupPostServiceTests.GroupPost"/> community-lane shape).</summary>
+    private static Post TaggedPost(string id, string author, string tagId)
+    {
+        var p = NewPost(id, author);
+        p.TagIds = [tagId];
+        return p;
+    }
+
+    /// <summary>A planted group post (non-empty <c>GroupId</c>, empty
+    /// <c>ComponentId</c>, audience non-null empty — the G·8 shape) carrying
+    /// the given tag id — the U6 F3 fixture (the
+    /// <see cref="GroupPostServiceTests.GroupPost"/> group-lane shape).</summary>
+    private static Post TaggedGroupPost(string id, string groupId, string author, string tagId)
+    {
+        var p = new Post
+        {
+            Id = id,
+            ComponentId = string.Empty,
+            GroupId = groupId,
+            AuthorId = author,
+            Body = "group post " + id,
+            Audience = new Audience(),
+            TagIds = [tagId],
+            Created = DateTimeOffset.UtcNow,
+        };
+        return p;
+    }
+
+    /// <summary>A planted <see cref="PageKind.User"/> blog page carrying the
+    /// given tag id — the U6 read-lane page fixture (the ADR 0040 author
+    /// audience).</summary>
+    private static Page TaggedBlogPage(string id, string author, string tagId) => new()
+    {
+        Id = id,
+        Slug = id,
+        Title = "page " + id,
+        Body = "body " + id,
+        AuthorId = author,
+        Kind = PageKind.User,
+        TagIds = [tagId],
+        Audience = new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+        Created = DateTimeOffset.UtcNow,
+    };
 }

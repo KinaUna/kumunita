@@ -1,23 +1,22 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Marten;
+using Marten.Services;
 
 namespace Kumunita.Core.Tags;
 
 /// <summary>
-/// The <c>TG</c> lane's write service (U5: the attach / create / translate
-/// lane + the three standing probes + the <see cref="DeriveSlug"/> helper).
-/// <para>
-/// **U5/U6 split pin:** the read-lane methods (<see cref="ListForActorAsync"/>,
-/// <see cref="ListPostsByTagAsync"/>, <see cref="ListPagesByTagAsync"/>,
-/// <see cref="SuggestAsync"/>) are declared on <see cref="ITagService"/>
-/// (the §2.1 11-member contract) but **not yet implemented** here — the
-/// <see cref="NotImplementedException"/> stubs are the U5→U6 boundary
-/// (the register's U5/U6 split note: U5 declares the full interface +
-/// implements the 6 write-lane members; U6 implements the 4 read-lane members).
-/// </para>
+/// The <c>TG</c> lane's service (U5: the attach / create / translate lane +
+/// the three standing probes + the <see cref="DeriveSlug"/> helper; U6: the
+/// four read-lane methods). <see cref="ListForActorAsync"/> /
+/// <see cref="ListPostsByTagAsync"/> / <see cref="ListPagesByTagAsync"/> /
+/// <see cref="SuggestAsync"/> are all four callers of the one C-TG·2 base
+/// query over the actor's readable content (the content's own <c>Read</c>
+/// decision is the gate, C-TG·1/C-TG·3; the tag lane writes no tag-family
+/// <c>AccessAudit</c> row of its own, C-TG·8/D7).
 /// <para>
 /// **C3 idiom:** every write takes the **caller's**
 /// <see cref="IDocumentSession"/> (the write and the in-session
@@ -44,27 +43,29 @@ namespace Kumunita.Core.Tags;
 public sealed class TagService : ITagService
 {
     private readonly IDocumentStore _store;
+    private readonly IAuthorizationService _authz;
+    private readonly ITranslationProvider _translations;
 
     /// <summary>
-    /// The only constructor dependency is the host-registered
-    /// <see cref="IDocumentStore"/> (the <see cref="Pages.PageService"/> shape —
-    /// U6's read lane needs it for the C-TG·2 base query; the write lane
-    /// (U5) uses the caller's <see cref="IDocumentSession"/> per C3). **No**
-    /// <see cref="IAuthorizationService"/> / <see cref="IUserInfoService"/> /
-    /// <see cref="ITranslationProvider"/> is injected here — the write lane
-    /// resolves standing inline (the <see cref="CanAttachToPost"/> /
-    /// <see cref="CanAttachToPage"/> / <see cref="CanTranslateTag"/> probes +
-    /// the <see cref="ResolveAttachVia"/> / <see cref="ResolveTranslateVia"/>
-    /// helpers, the ADR 0006-D lane pin: composes only the frozen seams,
-    /// never a new <c>AccessVia</c> value beyond <c>Owner</c> / <c>Admin</c>).
-    /// The DI registration (<see cref="DependencyInjection.ServiceCollectionExtensions"/>)
-    /// injects the store; tests construct <see cref="TagService"/> directly
-    /// with a live scratch store (the <see cref="PostService"/> harness idiom
-    /// — not DI).
+    /// The constructor composes the host-registered <see cref="IDocumentStore"/>
+    /// (the write lane's C3 audit rows + the read lane's C-TG·2 base query)
+    /// with the **frozen** seams the read lane needs (the ADR 0006-D lane pin —
+    /// composes only the frozen modules, never opens a new seam, never a new
+    /// <c>AccessVia</c> value beyond <c>Owner</c> / <c>Admin</c>):
+    /// <see cref="IAuthorizationService"/> (the content's own <c>Read</c>
+    /// decision — C-TG·3 group-lane exclusion, C-TG·2 privacy-pin; the
+    /// ADR 0035 <c>PostReadDecision</c> routing applied in Core) and
+    /// <see cref="ITranslationProvider"/> (display-name resolution to the
+    /// viewer's language, ADR 0005 / D5). The write lane (U5) uses the caller's
+    /// <see cref="IDocumentSession"/> per C3 and does not call these seams.
+    /// Tests construct <see cref="TagService"/> directly with a live scratch
+    /// store (the <see cref="PostService"/> harness idiom — not DI).
     /// </summary>
-    public TagService(IDocumentStore store)
+    public TagService(IDocumentStore store, IAuthorizationService authz, ITranslationProvider translations)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _authz = authz ?? throw new ArgumentNullException(nameof(authz));
+        _translations = translations ?? throw new ArgumentNullException(nameof(translations));
     }
 
     // ── Write lane ──────────────────────────────────────────────────────────
@@ -349,32 +350,208 @@ public sealed class TagService : ITagService
         return translation;
     }
 
-    // ── Read lane (U6 — not yet implemented) ────────────────────────────────
-    // The register's U5/U6 split note: U5 declares the full 11-member
-    // ITagService interface + implements the 6 write-lane members + the
-    // TagItem record; U6 implements the 4 read-lane members. These stubs
-    // are the boundary marker — they throw to make any accidental call
-    // fail loudly (not a silent no-op) until U6 lands.
+    // ── Read lane (U6 — the C-TG·2 base query over the actor's readable content) ──
+    //
+    // The one base query (C-TG·2, D5): "the set of Tag rows used on ≥ 1 Post /
+    // PageKind.User Page the actor may already read." All four read-lane methods
+    // derive from it. Scoping to readable content applies the **content's own
+    // Read decision** (the ADR 0035 PostReadDecision routing applied in Core:
+    // group posts → the ADR 0013 membership lane via CanSeeGroupAsync; community
+    // posts / blog pages → the ADR 0001 audience lane via CanAsync(Read)) — the
+    // tag grants nothing and adds no decision of its own (C-TG·1 / C-TG·3).
+    //
+    // **No tag-family audit row (C-TG·8, D7):** a read emits no `tag.*` row and
+    // no TargetKind "tag" row — the tag lane never writes an AccessAudit row of
+    // its own; the content's own Read-decision rows (post / page / grouppost)
+    // are the content's, "rendered on a surface that already required the
+    // referenced content's reach" (D7: "the access decision is the content's
+    // existing Read, not the tag's").
+    //
+    // Each read opens its own QuerySession (the
+    // PostService.GetPostTranslationsAsync read idiom — a read, not a
+    // write-lane transaction).
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId)
-        => throw new NotImplementedException(
-            "U6 — the read lane (ListForActorAsync) is not yet implemented; see the register's U6 unit.");
+    public async Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        var (readablePosts, readablePages) = await LoadActorReadableContentAsync(actorId, session);
+
+        var tagIds = CollectReadableTagIds(readablePosts, readablePages);
+        if (tagIds.Count == 0) return Array.Empty<TagItem>();
+
+        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages);
+        return items
+            .OrderBy(i => i.DisplayedName, StringComparer.Ordinal)
+            .ThenBy(i => i.Tag.Slug, StringComparer.Ordinal)
+            .ToList();
+    }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId)
-        => throw new NotImplementedException(
-            "U6 — the read lane (ListPostsByTagAsync) is not yet implemented; see the register's U6 unit.");
+    public async Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId)
+    {
+        if (string.IsNullOrEmpty(slug))
+            throw new ArgumentException("A tag slug is required.", nameof(slug));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
+        if (tag is null) return Array.Empty<Post>();
+
+        // C-TG·3: the post's own Read decision is applied (in
+        // LoadActorReadableContentAsync) **before** the post is returned.
+        var (readablePosts, _) = await LoadActorReadableContentAsync(actorId, session);
+        return readablePosts
+            .Where(p => p.TagIds.Contains(tag.Id))
+            .OrderBy(p => p.Created)
+            .ToList();
+    }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId)
-        => throw new NotImplementedException(
-            "U6 — the read lane (ListPagesByTagAsync) is not yet implemented; see the register's U6 unit.");
+    public async Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId)
+    {
+        if (string.IsNullOrEmpty(slug))
+            throw new ArgumentException("A tag slug is required.", nameof(slug));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
+        if (tag is null) return Array.Empty<Page>();
+
+        var (_, readablePages) = await LoadActorReadableContentAsync(actorId, session);
+        return readablePages
+            .Where(p => p.TagIds.Contains(tag.Id))
+            .OrderBy(p => p.Created)
+            .ToList();
+    }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId)
-        => throw new NotImplementedException(
-            "U6 — the read lane (SuggestAsync) is not yet implemented; see the register's U6 unit.");
+    public async Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+
+        await using var session = _store.QuerySession();
+        var (readablePosts, readablePages) = await LoadActorReadableContentAsync(actorId, session);
+
+        var tagIds = CollectReadableTagIds(readablePosts, readablePages);
+        if (tagIds.Count == 0) return Array.Empty<TagItem>();
+
+        var pfx = (prefix ?? string.Empty).Trim().ToLowerInvariant();
+        var items = await BuildTagItemsAsync(session, tagIds, readablePosts, readablePages);
+        return items
+            .Where(i => MatchesPrefix(i, pfx))
+            .OrderBy(i => i.DisplayedName, StringComparer.Ordinal)
+            .ThenBy(i => i.Tag.Slug, StringComparer.Ordinal)
+            .Take(10)   // C-TG·2 / F10 — the ≤ 10 cap
+            .ToList();
+    }
+
+    // ── Read-lane helpers (private — not part of the §2.1 11-member surface) ──
+
+    /// <summary>
+    /// The C-TG·2 base query's candidate load + content-Read scoping: the posts
+    /// (community + group) and <c>PageKind.User</c> blog pages carrying ≥ 1 tag,
+    /// each passed through its **own** <c>Read</c> decision (the ADR 0035
+    /// <c>PostReadDecision</c> routing applied in Core: group posts →
+    /// <see cref="IAuthorizationService.CanSeeGroupAsync"/> (the ADR 0013
+    /// membership lane, C-TG·3); community posts / blog pages →
+    /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
+    /// (the ADR 0001 audience lane)). The content's own Read-decision rows are
+    /// the content's (D7); the tag lane adds none (C-TG·8).
+    /// </summary>
+    private async Task<(IReadOnlyList<Post> posts, IReadOnlyList<Page> pages)>
+        LoadActorReadableContentAsync(string actorId, IQuerySession session)
+    {
+        var allPosts = await session.Query<Post>().ToListAsync();
+        var communityPosts = allPosts
+            .Where(p => string.IsNullOrEmpty(p.GroupId) && p.TagIds is { Count: > 0 })
+            .ToList();
+        var groupPosts = allPosts
+            .Where(p => !string.IsNullOrEmpty(p.GroupId) && p.TagIds is { Count: > 0 })
+            .ToList();
+
+        var readablePosts = new List<Post>();
+        foreach (var post in communityPosts)
+        {
+            var decision = await _authz.CanAsync(actorId, AccessAction.Read, new PostToAuditableResource(post));
+            if (decision.Allowed) readablePosts.Add(post);
+        }
+        foreach (var post in groupPosts)
+        {
+            var decision = await _authz.CanSeeGroupAsync(actorId, post.GroupId, post.Id);
+            if (decision.Allowed) readablePosts.Add(post);
+        }
+
+        var allPages = await session.Query<Page>().ToListAsync();
+        var blogPages = allPages
+            .Where(p => p.Kind == PageKind.User && p.TagIds is { Count: > 0 })
+            .ToList();
+
+        var readablePages = new List<Page>();
+        foreach (var page in blogPages)
+        {
+            var decision = await _authz.CanAsync(actorId, AccessAction.Read, new PageToAuditableResource(page));
+            if (decision.Allowed) readablePages.Add(page);
+        }
+
+        return (readablePosts, readablePages);
+    }
+
+    /// <summary>The distinct tag ids used on the readable content (the base query).</summary>
+    private static HashSet<string> CollectReadableTagIds(IReadOnlyList<Post> posts, IReadOnlyList<Page> pages)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var p in posts) foreach (var id in p.TagIds) ids.Add(id);
+        foreach (var p in pages) foreach (var id in p.TagIds) ids.Add(id);
+        return ids;
+    }
+
+    /// <summary>
+    /// Resolves the tags + their translations + the use-count + the display name
+    /// (the ADR 0005 preference order: the viewer's effective language → the
+    /// <see cref="TagTranslation"/> for it → the base <see cref="Tag.Name"/>)
+    /// into <see cref="TagItem"/> rows.
+    /// </summary>
+    private async Task<List<TagItem>> BuildTagItemsAsync(
+        IQuerySession session, HashSet<string> tagIds,
+        IReadOnlyList<Post> readablePosts, IReadOnlyList<Page> readablePages)
+    {
+        var tags = await session.Query<Tag>().Where(t => tagIds.Contains(t.Id)).ToListAsync();
+        var translations = await session.Query<TagTranslation>().Where(t => tagIds.Contains(t.TagId)).ToListAsync();
+        var effective = await _translations.ResolveEffectiveLanguageAsync((string?)null);
+
+        var nameByTag = translations
+            .Where(t => string.Equals(t.LanguageCode, effective, StringComparison.Ordinal))
+            .ToDictionary(t => t.TagId, t => t.Name, StringComparer.Ordinal);
+
+        var useCount = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var id in tagIds) useCount[id] = 0;
+        foreach (var p in readablePosts) foreach (var id in p.TagIds) if (useCount.ContainsKey(id)) useCount[id]++;
+        foreach (var p in readablePages) foreach (var id in p.TagIds) if (useCount.ContainsKey(id)) useCount[id]++;
+
+        return tags
+            .Select(t => new TagItem(t, useCount[t.Id], nameByTag.TryGetValue(t.Id, out var n) ? n : t.Name))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The F9/F10 autocomplete filter — <c>starts_with(displayName, prefix) OR
+    /// starts_with(slug, prefix)</c>, where <c>displayName</c> is the name
+    /// resolved in the viewer's language (D5); a blank prefix matches all (the
+    /// top-of-list autocomplete).
+    /// </summary>
+    private static bool MatchesPrefix(TagItem item, string prefix)
+    {
+        if (prefix.Length == 0) return true;
+        return item.DisplayedName.StartsWith(prefix, StringComparison.Ordinal)
+               || item.Tag.Slug.StartsWith(prefix, StringComparison.Ordinal);
+    }
 
     // ── Standing probes (C-TG·5; a display pin, not a gate — the real deny
     //    is the write-lane re-check, the PostService.CanAddTranslation /

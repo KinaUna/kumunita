@@ -93,20 +93,22 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>()));
 
-        // TG (ADR 0044, plan U5): the tags-side write service (bounded context
+        // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
-        // only the frozen seams: IAuthorizationService + the frozen IUserInfoService
-        // read seams + ITranslationProvider, never a new AccessVia value beyond
-        // Owner/Admin). The write lanes (AttachToPostAsync / AttachToPageAsync /
-        // AddTagTranslationAsync) take the caller's IDocumentSession (C3) and the
-        // standing probes are pure, so the only constructor dependency is the
-        // host-registered Marten IDocumentStore (the Pages.IPageService shape).
+        // only the frozen seams: IAuthorizationService + ITranslationProvider,
+        // never a new AccessVia value beyond Owner/Admin). The write lanes
+        // (AttachToPostAsync / AttachToPageAsync / AddTagTranslationAsync) take
+        // the caller's IDocumentSession (C3) and the standing probes are pure;
         // U6's read lane (ListForActorAsync / ListPostsByTagAsync /
-        // ListPagesByTagAsync / SuggestAsync) composes IUserInfoService +
-        // ITranslationProvider for the C-TG·2 base query and is added here when
-        // it lands — the registration stays minimal (the ADR 0006-D lane pin).
+        // ListPagesByTagAsync / SuggestAsync) composes IAuthorizationService (the
+        // content's own Read decision — C-TG·3 / C-TG·2) + ITranslationProvider
+        // (display-name resolution, ADR 0005 / D5) over the host-registered
+        // Marten IDocumentStore. The registration composes the frozen seams only
+        // (the ADR 0006-D lane pin) — the ADR 0006-D seam is never a new seam.
         services.AddTransient<Tags.ITagService>(sp => new Tags.TagService(
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>()));
 
         // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
