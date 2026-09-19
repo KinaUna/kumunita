@@ -829,6 +829,9 @@ public static class KnownTranslationKeys
                 "this post.",
             ["tag.suggest.empty"] =
                 "No matching tags — keep typing or start a new one.",
+            ["tag.translate.heading"] = "Translations",
+            ["tag.translate.save"] = "Save",
+            ["tag.translate.disabled"] = "Only the tag's creator or a GlobalAdmin can reword it.",
         };
 
     /// <summary>
@@ -1559,6 +1562,9 @@ public static class KnownTranslationKeys
                 "diesem Beitrag zugewiesen.",
             ["tag.suggest.empty"] =
                 "Keine passenden Tags — weiter tippen oder ein neues starten.",
+            ["tag.translate.heading"] = "Übersetzungen",
+            ["tag.translate.save"] = "Speichern",
+            ["tag.translate.disabled"] = "Nur der Ersteller oder ein GlobalAdmin kann den Text ändern.",
         };
 
     /// <summary>
@@ -2294,6 +2300,9 @@ public static class KnownTranslationKeys
                 "nouvelle — elle sera ajoutée à cette publication.",
             ["tag.suggest.empty"] =
                 "Aucune étiquette correspondante — continue à écrire ou crée-en une.",
+            ["tag.translate.heading"] = "Traductions",
+            ["tag.translate.save"] = "Enregistrer",
+            ["tag.translate.disabled"] = "Seul le créateur ou un GlobalAdmin peut la reformuler.",
         };
 
     /// <summary>
@@ -3026,6 +3035,9 @@ public static class KnownTranslationKeys
                 "det knyttes til dette indlæg.",
             ["tag.suggest.empty"] =
                 "Ingen matchende tags — fortsæt med at skrive eller start et nyt.",
+            ["tag.translate.heading"] = "Oversættelser",
+            ["tag.translate.save"] = "Gem",
+            ["tag.translate.disabled"] = "Kun tags' opretter eller en GlobalAdmin kan omformulere den.",
         };
 
     /// <summary>

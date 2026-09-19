@@ -61,5 +61,77 @@
                 <kw-l key="tags.bytag.empty">No readable posts or blog pages carry this tag.</kw-l>
             </div>
         }
+
+        @if (Model.Translation is not null)
+        {
+            @* The U8c reword surface (C-TG·5): one row per available
+               language, pre-filled with the current translation (or the
+               base name — the ADR 0005 preference-order fallback). Rendered
+               disabled for a non-creator attacher; the real deny is the
+               POST lane's standing re-check (the C-TG·5 pin). *@
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h2><kw-l key="tag.translate.heading">Translations</kw-l></h2>
+                    @if (TempData["info"] is string info)
+                    {
+                        <div class="alert alert-success">@info</div>
+                    }
+                    @if (TempData["error"] is string err)
+                    {
+                        <div class="alert alert-warning">@err</div>
+                    }
+                    <form method="post" action="@($"/tags/{Model.Slug}/translate")">
+                        @Html.AntiForgeryToken()
+                        @* One row per available language (C-TG·5 / D4):
+                           a language selector + a name input. The selector
+                           enumerates all available languages (en/de/fr,
+                           the ADR 0005 B shape); each option is
+                           pre-labeled with the current translation (or the
+                           base name — the ADR 0005 preference-order
+                           fallback). The user picks the language they want
+                           to reword, types the new name, and hits Save.
+                           The controller calls AddTagTranslationAsync for
+                           the (languageCode, name) pair. *@
+                        <div class="row mb-2">
+                            <label for="translate-language" class="col-sm-3 col-form-label">
+                                <kw-l key="tag.translate.heading">Language</kw-l>
+                            </label>
+                            <div class="col-sm-9">
+                                <select name="languageCode" id="translate-language" class="form-select"
+                                        @(Model.Translation.CanTranslate ? "" : "disabled")>
+                                    @foreach (var row in Model.Translation.Rows)
+                                    {
+                                        <option value="@row.LanguageCode">
+                                            @row.NativeName — @row.CurrentName
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <label for="translate-name" class="col-sm-3 col-form-label">
+                                <kw-l key="tag.translate.save">Name</kw-l>
+                            </label>
+                            <div class="col-sm-9">
+                                <input type="text" name="name" id="translate-name" class="form-control"
+                                       value="@Model.Translation.Rows.First().CurrentName"
+                                       placeholder="@Model.Translation.Rows.First().NativeName"
+                                       @(Model.Translation.CanTranslate ? "" : "disabled") />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary"
+                                @(Model.Translation.CanTranslate ? "" : "disabled")>
+                            <kw-l key="tag.translate.save">Save</kw-l>
+                        </button>
+                    </form>
+                    @if (!Model.Translation.CanTranslate)
+                    {
+                        <p class="text-muted small mt-2 mb-0">
+                            <kw-l key="tag.translate.disabled">Only the tag's creator or a GlobalAdmin can reword it.</kw-l>
+                        </p>
+                    }
+                </div>
+            </div>
+        }
     </div>
 </div>

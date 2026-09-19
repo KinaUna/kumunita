@@ -1,5 +1,7 @@
 <Solution>
-  <Folder Name="/.tmp/" />
+  <Folder Name="/.tmp/">
+    <Project Path=".tmp/marten_inspect/marten_inspect.csproj" />
+  </Folder>
   <Folder Name="/.tmp/identityprobe/" />
   <Folder Name="/src/">
     <Project Path="src/Kumunita.Core/Kumunita.Core.csproj" />

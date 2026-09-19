@@ -1,3 +1,4 @@
+using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
 using Kumunita.Core.Posts;
 using Kumunita.Core.Tags;
@@ -90,6 +91,22 @@ public sealed class TagByTagViewModel
     /// precedent).</summary>
     public IReadOnlyDictionary<string, Page> PageById { get; set; }
         = new Dictionary<string, Page>(StringComparer.Ordinal);
+
+    /// <summary>The U8c reword surface (ADR 0044 D4, C-TG·5): the tag's
+    /// per-language display name, pre-filled with the current translation
+    /// (or the base name) and editable only when <c>CanTranslate</c> is
+    /// true (the tag's <see cref="Kumunita.Core.Tags.Tag.CreatedBy"/> ∪
+    /// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher sees
+    /// the form rendered **disabled** and a POST to
+    /// <c>POST /tags/{slug}/translate</c> is a 403 from the service's
+    /// standing re-check, C3). The register's U8c "no new seam" pin holds
+    /// (the seam is exactly what U5's <c>AddTagTranslationAsync</c> already
+    /// froze; this is a web-wiring unit, not a seam change). <c>null</c>
+    /// when the tag is not readable to this actor (the 404-floor shape —
+    /// the controller returns a <see cref="Microsoft.AspNetCore.Mvc.NotFoundResult"/>
+    /// before this model is rendered, so this property is only set when a
+    /// readable tag exists).</summary>
+    public TagTranslationForm? Translation { get; set; }
 }
 
 /// <summary>
@@ -106,4 +123,101 @@ public sealed class TagSuggestViewModel
 {
     /// <summary>The matched suggestions (≤ 10, the C-TG·2 cap).</summary>
     public IReadOnlyList<TagItem> Suggestions { get; set; } = [];
+}
+
+/// <summary>
+/// One row of the <see cref="TagTranslationForm"/> (the U8c reword surface,
+/// ADR 0044 D4, C-TG·5): a single enabled <see cref="LanguageCatalog"/>
+/// row the actor may set (or overwrite) on the tag. <see cref="LanguageCode"/>
+/// is the row's identity (the <c>(TagId, LanguageCode)</c> unique index);
+/// <see cref="NativeName"/> is the label displayed in the form (the
+/// language's own name — "English", "Deutsch", "Français"), and
+/// <see cref="CurrentName"/> is the value pre-filled into the <c>&lt;input&gt;</c>
+/// — the current <see cref="Kumunita.Core.Tags.TagTranslation.Name"/> for that
+/// language when a translation row exists, otherwise the tag's base
+/// <see cref="Kumunita.Core.Tags.Tag.Name"/> (the creator's own spelling —
+/// the ADR 0005 preference order, the display fallback when no translation
+/// is set). The row is a **form seed** (a dumb shape carrier); the standing
+/// decision is the <see cref="Kumunita.Core.Tags.ITagService
+/// .CanTranslateTag"/> probe (a display pin, the ADR 0009 / 0026 "the name
+/// is the creator's artifact" rule carried to tags) and the real deny is
+/// the <see cref="Kumunita.Core.Tags.ITagService
+/// .AddTagTranslationAsync"/> standing re-check (C-TG·5, C3).
+/// </summary>
+public sealed class TagTranslationRow
+{
+    /// <summary>The BCP-47 language code (the <c>(TagId, LanguageCode)</c>
+    /// unique index's language half — the row's identity, posted back to the
+    /// controller as the <c>LanguageCode</c> field of the form).
+    /// Read-only on the form (the identity is fixed by the catalog, not
+    /// user-editable).</summary>
+    public string LanguageCode { get; set; } = string.Empty;
+
+    /// <summary>The language's own name ("English", "Deutsch", "Français")
+    /// — the row's label in the form. Read-only (a display value, not
+    /// user-editable).</summary>
+    public string NativeName { get; set; } = string.Empty;
+
+    /// <summary>The value to pre-fill into the <c>&lt;input&gt;</c> — the
+    /// current <see cref="Kumunita.Core.Tags.TagTranslation.Name"/> for this
+    /// language when a translation row exists, otherwise the tag's base
+    /// <see cref="Kumunita.Core.Tags.Tag.Name"/> (the creator's own
+    /// spelling, the ADR 0005 preference-order fallback). The form posts
+    /// this field back to the controller, which passes it verbatim to
+    /// <see cref="Kumunita.Core.Tags.ITagService.AddTagTranslationAsync"/>
+    /// (the C-TG·9 one-audit-row write).</summary>
+    public string CurrentName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// The U8c reword surface's form state (ADR 0044 D4, C-TG·5): the tag's
+/// display name per enabled language, pre-filled with the current translation
+/// (or the base name) and editable **only** when
+/// <see cref="CanTranslate"/> is true (the tag's <c>CreatedBy</c> ∪
+/// GlobalAdmin — the C-TG·5 standing split; a non-creator attacher sees the
+/// form rendered **disabled** and a <c>POST</c> to the translate route is a
+/// 403 from the service's standing re-check). The form is rendered on the
+/// <c>ByTag</c> view (<c>Views/Tag/ByTag.cshtml</c>), one row per enabled
+/// <see cref="LanguageCatalog"/> (the instance catalog, the ADR 0005 B
+/// shape — the U7/U8 read lane already resolves the display name through
+/// this same catalog, so no new catalog surface is opened). The POST lane is
+/// <c>POST /tags/{slug}/translate</c> (the <see cref="Kumunita
+/// .Web.Controllers.TagController"/> action), the single write seam — the
+/// register's U8c "no new seam" pin (the seam is exactly what U5's
+/// <c>AddTagTranslationAsync</c> already froze; this is a web-wiring unit,
+/// not a seam change).
+/// </summary>
+public sealed class TagTranslationForm
+{
+    /// <summary>The tag's base <c>Slug</c> (C-TG·4 — the business key; the
+    /// form's <c>POST</c> route is keyed on it).</summary>
+    public string Slug { get; set; } = string.Empty;
+
+    /// <summary>The tag's base display name (the creator's own spelling —
+    /// the ADR 0018 authored-in fallback the form uses for a language with
+    /// no translation row).</summary>
+    public string BaseName { get; set; } = string.Empty;
+
+    /// <summary>The tag's authored-in <c>LanguageCode</c> (the ADR 0018
+    /// authored-in idiom — the base name's language; display-only on the
+    /// form, never a standing decision).</summary>
+    public string BaseLanguageCode { get; set; } = string.Empty;
+
+    /// <summary>The standing probe (C-TG·5, D4 — creator ∪ GlobalAdmin).
+    /// <see langword="true"/> when the actor is the tag's <c>CreatedBy</c> or
+    /// a GlobalAdmin (the form is rendered editable); <see langword="false"/>
+    /// for a non-creator attacher (the form is rendered **disabled** — the
+    /// view's affordance pin; the real deny is the POST lane's standing
+    /// re-check, the <see cref="Kumunita.Core.Tags.ITagService
+    /// .AddTagTranslationAsync"/> <c>UnauthorizedAccessException</c> →
+    /// <c>403</c>). A display pin (the ADR 0009 / 0026 "the name is the
+    /// creator's artifact" rule carried to tags), not a gate.</summary>
+    public bool CanTranslate { get; set; }
+
+    /// <summary>The per-language rows (one per enabled
+    /// <see cref="LanguageCatalog"/>, sorted by <c>SortOrder</c> then
+    /// <c>Id</c> — the U7/U8 catalog order convention). Each row's
+    /// <c>CurrentName</c> is pre-filled with the current translation or the
+    /// base name (the ADR 0005 preference order).</summary>
+    public IReadOnlyList<TagTranslationRow> Rows { get; set; } = [];
 }
