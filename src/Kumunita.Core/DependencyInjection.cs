@@ -71,7 +71,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Posts.PostService>(sp => new Posts.PostService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // TG (ADR 0044, U8b) — the tag-lane write seam (the
+            // AttachToPostAsync / AttachToPageAsync / AddTagTranslationAsync
+            // lanes). The registration composes the frozen seams only (the
+            // ADR 0006-D lane pin) — the PostService's new ctor param is a
+            // new dependency on PostService, not a new seam on a frozen
+            // interface (§2.6).
+            sp.GetRequiredService<Tags.ITagService>()));
 
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
@@ -91,7 +98,8 @@ public static class ServiceCollectionExtensions
         // as IAnnouncementService above; U02/U03 add the read/write methods —
         // this unit is the seam + registration only).
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Tags.ITagService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes

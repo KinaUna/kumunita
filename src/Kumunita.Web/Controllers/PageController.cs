@@ -342,6 +342,12 @@ public sealed class PageController(
             LanguageCode = model.LanguageCode ?? string.Empty,
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
+            // TG (ADR 0044, U8b) — the tag slugs round-trip through the
+            // TagSlugs helper (the same "raw JSON string → parsed list"
+            // shape as ContentImageIds / AttachmentIds). Null/empty ⇒ no
+            // tags (the additive default-empty pin). A bad slug is an
+            // ArgumentException from DeriveSlug (C-TG·4) — mapped below.
+            TagIds = TagSlugs.Parse(model.TagIds),
         };
 
         await using var session = store.LightweightSession();
@@ -356,6 +362,16 @@ public sealed class PageController(
             // Standing re-check failed (C3) — 403, the page-specific split
             // (NOT folded into a 404).
             return new ForbidResult();
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "input")
+        {
+            // TG (C-TG·4) — a bad slug from DeriveSlug (charset / length /
+            // trim) is a shape violation, not a standing denial. Map it to a
+            // form error on the TagIds field (the same pattern as the
+            // post lane's PostsController).
+            ModelState.AddModelError(nameof(PageComposeViewModel.TagIds), ex.Message);
+            await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
+            return View(model);
         }
         catch (InvalidOperationException ex)
         {
@@ -495,6 +511,8 @@ public sealed class PageController(
             LanguageCode = model.LanguageCode ?? string.Empty,
             ImageIds = ContentImageIds.ExtractContentImageIds(model.Body),
             AttachmentIds = AttachmentIds.ExtractAttachmentIds(model.Body),
+            // TG (ADR 0044, U8b) — same shape as the create lane.
+            TagIds = TagSlugs.Parse(model.TagIds),
         };
 
         await using var session2 = store.LightweightSession();
@@ -511,6 +529,14 @@ public sealed class PageController(
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "input")
+        {
+            // TG (C-TG·4) — a bad slug from DeriveSlug (charset / length /
+            // trim) is a shape violation, not a standing denial. Map it to a
+            // form error on the TagIds field.
+            ModelState.AddModelError(nameof(PageComposeViewModel.TagIds), ex.Message);
+            return View(model);
         }
     }
 

@@ -300,6 +300,32 @@ public sealed class PageComposeViewModel
     public string? MountPoint { get; set; }
 
     /// <summary>
+    /// The composer's <b>tag</b> input (the <c>TG</c> lane, ADR 0044 — U8b
+    /// register patch). A <b>plain form-bound field</b> (no <see
+    /// cref="BindNever"/>): the client (<c>client/lib/tag-suggest.ts</c>
+    /// L106–L110) posts a hidden <c>name="TagIds"</c> field whose value is
+    /// a <b>JSON array of label strings</b> (the author's typed tags — the
+    /// <c>Slug</c> is derived server-side, C-TG·4). The controller re-parses
+    /// + normalizes (trim / dedup / drop-blank) on the <c>POST</c> and writes
+    /// the resolved <c>Slug</c>s onto <c>Page.TagIds</c> before calling
+    /// <c>IPageService.CreateAsync</c> / <c>UpdateAsync</c> — the service's
+    /// write lane then calls <c>TagService.AttachToPageAsync</c> on the
+    /// same session (C3 single-transaction idiom). A <b>bad slug</b> is an
+    /// <c>ArgumentException</c> from <c>TagService.DeriveSlug</c> (C-TG·4)
+    /// — the controller maps it to a form error (the M3 "a form is a
+    /// shape" precedent). <b>Empty / null</b> is the "no tags" state (the U4
+    /// additive default-empty pin). The <see cref="Kumunita.Core.Pages
+    /// .PageKind.System"/> composer <b>does not render the field</b> (the
+    /// <c>_PageForm.cshtml</c> <c>@if (Model.Kind == "User")</c> gate, U8
+    /// note (c), C-TG·6) — and the service's <c>AttachToPageAsync</c>
+    /// write-lane refusal is the second guard (the U4 <c>PageService</c>
+    /// create/update refusal + the U5 <c>AttachToPageAsync</c> System-page
+    /// refusal — two refusals that agree, the write lane is the gate, the
+    /// Web form is the shape).
+    /// </summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>
     /// The page's <b>authored-in language</b> (ADR 0018) — the BCP-47 code
     /// the author is writing this page in. A form-bound <c>&lt;select&gt;</c>
     /// posting <see cref="LanguageCode"/>; empty/unset is materialized from

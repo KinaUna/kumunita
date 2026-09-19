@@ -942,6 +942,100 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
     private static HashSet<string> RolesSet(params string[] roles) => roles.ToHashSet();
 
+    // ─── U8b — the Web submit → PostService.CreatePostAsync tag attach ────
+    //
+    // U8b (the register patch to U8's closed deliverable set) wires the
+    // composer's <c>TagIds</c> form field through the Web layer (the
+    // <c>TagSlugs.Parse</c> helper) into <c>PostDraft.TagSlugs</c>, which
+    // <see cref="PostService.CreatePostAsync"/> hands to
+    // <see cref="TagService.AttachToPostAsync"/> on the **same**
+    // <c>IDocumentSession</c> (C3 single-transaction idiom). This test
+    // exercises that full write path at the Core level: a post created via
+    // <c>CreatePostAsync</c> with <c>TagSlugs = ["sanitation"]</c> must
+    // round-trip with a non-empty <c>TagIds</c> list, the <c>Tag</c> doc
+    // must exist with the derived slug, the audit rows must be
+    // <c>tag.attach</c> + <c>tag.create</c> (exactly one each), and
+    // <c>ListForActorAsync</c> must surface the tag to the author.
+
+    [Fact]
+    public async Task U8b_WebSubmit_AttachesTag_RoundTrips_OnPost()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the language catalog so ResolveLanguageCodeAsync can resolve
+        // a concrete BCP-47 code (the ADR 0018 authored-in idiom).
+        await SeedDefaultLanguage(store, "en");
+
+        // Plant the component (the posting-right gate's target) and
+        // membership for the author (the posting-right bypass via
+        // GlobalAdmin would also work, but a plain Member + membership row
+        // is the canonical M3 path).
+        const string comp = "u8b-comp";
+        const string author = "u8b-author";
+        await Plant(store, new Component { Id = comp, Name = "U8b Test Community", Enabled = true });
+        var userInfo = new UserInfoService(store);
+        await userInfo.SetCommunityMembershipAsync(comp, author, actorId: "u8b-admin");
+
+        // Build the PostService with the live TagService as the 4th ctor
+        // arg (the U8b constructor growth — optional trailing parameter,
+        // so the 7 existing positional call sites in PostServiceTests
+        // compile unchanged).
+        var authz = new AuthorizationService(store, userInfo);
+        var translations = new TranslationProvider(store);
+        var tagSvc = new TagService(store, authz, translations);
+        var postsSvc = new PostService(userInfo, authz, store, tagSvc);
+
+        // The Web layer would parse the form's TagIds JSON string via
+        // TagSlugs.Parse; at the Core level we pass the slug list directly
+        // (the PostDraft.TagSlugs parameter).
+        var draft = new PostDraft(
+            comp,
+            "U8b tag test post",
+            "A post created with a tag through the U8b wire.",
+            new Audience(AudienceMode.Any, [new AudienceGrant(GrantKind.User, author)]),
+            LanguageCode: "en",
+            TagSlugs: ["sanitation"]);
+
+        Post created;
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            created = await postsSvc.CreatePostAsync(
+                draft, author, RolesSet(Roles.Member), session);
+        }
+
+        // (1) The Post doc round-trips with a non-empty TagIds list.
+        Assert.NotNull(created);
+        Assert.Equal(author, created.AuthorId);
+        Assert.Equal(comp, created.ComponentId);
+        Assert.NotNull(created.TagIds);
+        Assert.Single(created.TagIds);
+
+        // (2) The Tag doc exists with the derived slug + the creator.
+        await using (var q = store.QuerySession())
+        {
+            var tag = await q.LoadAsync<Kumunita.Core.Tags.Tag>(created.TagIds[0], ct);
+            Assert.NotNull(tag);
+            Assert.Equal("sanitation", tag.Slug);
+            Assert.Equal(author, tag.CreatedBy);
+        }
+
+        // (3) Audit rows: exactly one tag.attach + one tag.create.
+        var attachRows = await AuditsFor(store, "tag.attach");
+        var createRows = await AuditsFor(store, "tag.create");
+        Assert.Single(attachRows);
+        Assert.Single(createRows);
+        Assert.Equal(author, attachRows[0].ActorId);
+        Assert.Equal(author, createRows[0].ActorId);
+
+        // (4) ListForActorAsync surfaces the tag to the author (the C-TG·2
+        // base query: distinct Tag rows used on ≥ 1 post the actor may
+        // read).
+        var items = await tagSvc.ListForActorAsync(author);
+        var item = Assert.Single(items, i => i.Tag.Slug == "sanitation");
+        Assert.Equal(1, item.UseCount);
+    }
+
     // ─── U6 read-lane helpers ─────────────────────────────────────────────
 
     /// <summary>Build the read-lane trio over the scratch store (the

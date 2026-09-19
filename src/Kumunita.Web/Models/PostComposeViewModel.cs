@@ -119,6 +119,27 @@ public sealed class PostComposeViewModel
     public AudienceEditorModel Audience { get; set; } = new();
 
     /// <summary>
+    /// The composer's <b>tag</b> input (the <c>TG</c> lane, ADR 0044 — U8b
+    /// register patch). A <b>plain form-bound field</b> (no
+    /// <see cref="BindNever"/> attribute): the client
+    /// (<c>client/lib/tag-suggest.ts</c> L106–L110) posts a hidden
+    /// <c>name="TagIds"</c> field whose value is a <b>JSON array of label
+    /// strings</b> (the author's typed tags — the <c>Slug</c> is derived
+    /// server-side, C-TG·4). The value arrives as a JSON string like
+    /// <c>["sanitation", "budget"]</c> (or <c>[]</c> for the empty state);
+    /// the controller re-parses + normalizes (trim / dedup / drop-blank) on
+    /// the <c>POST</c> so the <see cref="Kumunita.Core.Posts.PostService"/>
+    /// write lane receives a clean <c>IReadOnlyList&lt;string&gt;</c> of
+    /// slugs. A <b>bad slug</b> is a <c>ArgumentException</c> from
+    /// <c>TagService.DeriveSlug</c> (the U5 note (c), C-TG·4 pin) — the
+    /// controller maps it to a form error on the <c>TagIds</c> field (the M3
+    /// "a form is a shape" precedent). <b>Empty / null</b> is the "no
+    /// tags" state (the U4 additive default-empty pin) — the write lane
+    /// skips the <c>AttachToPostAsync</c> call.
+    /// </summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>
     /// The composer's shape is well-formed for a <c>POST</c>. <see
     /// cref="ComponentId"/> must be non-empty (a "post for which community?"
     /// post with no component is a malformed post, not a silent default to

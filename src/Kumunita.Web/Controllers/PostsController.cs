@@ -692,7 +692,8 @@ public sealed class PostsController(
             LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 — null/empty ⇒ instance default materialized server-side.
             ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 — server-side parse of the body's /content-image/{id} links; the client never sends the ids (a form field would be spoofable).
             AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (a form field would be spoofable).
-            IsDraft: model.SaveAsDraft); // ADR 0037 — draft mode: saved but invisible to all but the author until published.
+            IsDraft: model.SaveAsDraft, // ADR 0037 — draft mode: saved but invisible to all but the author until published.
+            TagSlugs: TagSlugs.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (client/lib/tag-suggest.ts posts a JSON array of label strings; the server parses + normalizes).
 
         // C3 same-transaction lane: the controller opens the
         // <c>IDocumentStore.LightweightSession()</c>, the
@@ -723,6 +724,17 @@ public sealed class PostsController(
         {
             ModelState.AddModelError(nameof(model.ComponentId),
                 "You are not a member of this community yet. An admin can add you under /admin → Accounts.");
+            return View(model);
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "input")
+        {
+            // TG (ADR 0044, U8b) — a bad tag slug is an ArgumentException
+            // from TagService.DeriveSlug (C-TG·4) — mapped to a form error
+            // on the TagIds field (the M3 "a form is a shape" precedent).
+            // The `when (ex.ParamName == "input")` guard scopes the catch to
+            // the DeriveSlug throws (the `nameof(input)` is "input") and
+            // lets any other `ArgumentException` (a real bug) propagate.
+            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
             return View(model);
         }
 
@@ -866,7 +878,8 @@ public sealed class PostsController(
                 audience,
                 string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
                 session,
-                AttachmentIds.ExtractAttachmentIds(model.Body)); // ATT U12 (C-ATT·4/8) — the post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
+                AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U12 (C-ATT·4/8) — the post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
+                TagSlugs.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (re-parsed on edit; the U4 additive default-empty pin when null/empty).
             TempData["info"] = "Post updated.";
             return Redirect($"/posts/{id}");
         }
@@ -876,6 +889,13 @@ public sealed class PostsController(
             // leak the post's content to a non-author; a 404 would leak which ids
             // are real; the 403 tells the viewer nothing about either).
             return Forbid();
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "input")
+        {
+            // TG (ADR 0044, U8b) — a bad tag slug (C-TG·4) → a form error on
+            // the TagIds field (the M3 "a form is a shape" precedent).
+            ModelState.AddModelError(nameof(model.TagIds), "A tag name is invalid (use letters, digits, hyphens, underscores).");
+            return View(model);
         }
         catch (KeyNotFoundException)
         {

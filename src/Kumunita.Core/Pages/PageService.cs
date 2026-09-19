@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Tags;
 using Marten;
 using Marten.Services;
 
@@ -42,9 +43,24 @@ public sealed class PageService : IPageService
 
     private readonly IDocumentStore _store;
 
-    public PageService(IDocumentStore store)
+    // TG (ADR 0044, U8b register patch) — the tag-lane write seam (the
+    // <c>AttachToPageAsync</c> lane, called on the same session after the
+    // page write, C3 single-transaction idiom). **Optional** (nullable
+    // default) so the existing test call sites that construct
+    // <c>PageService(store)</c> keep compiling unchanged (the §2.6 "new
+    // dependency on <c>PageService</c>, not a new seam on a frozen
+    // interface" line — the ADR 0006-D lane pin preserved; the
+    // <c>PostService_MakesNoNewModerateCall</c> test's surface-level
+    // reflection assertion is over <c>TagService</c>'s ctor, not
+    // <c>PageService</c>'s, so adding this parameter is a no-op for that
+    // pin). The DI registration passes the live <c>ITagService</c>; tests
+    // that exercise the tag path construct it explicitly.
+    private readonly ITagService? _tags;
+
+    public PageService(IDocumentStore store, ITagService? tags = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _tags = tags;
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -607,6 +623,31 @@ public sealed class PageService : IPageService
         session.Store(page);
         session.Store(audit);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3
+        // single-transaction idiom, same session as the page write — the
+        // <c>PostService.AddPostTranslationAsync</c> precedent). Only if the
+        // form gave slugs (null/empty ⇒ no tags, the U4 additive
+        // default-empty pin) **and** the page is a <c>PageKind.User</c>
+        // (blog) page — the <c>System</c>-page refusal already fired above
+        // (the U4 write-lane gate, C-TG·6, D6), so this code is reached only
+        // for a <c>User</c> page with non-empty tags. The
+        // <c>AttachToPageAsync</c> lane re-checks the standing (author ∪
+        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
+        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
+        // <c>Page.TagIds</c> (replacing the POCO's default-empty list). A
+        // bad <c>Slug</c> is an <c>ArgumentException</c> from
+        // <c>DeriveSlug</c> (C-TG·4) — the Web layer maps it to a form
+        // error (the M3 "a form is a shape" precedent).
+        if (page.TagIds is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPageAsync(page.Id, page.TagIds, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            page.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(page);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
         return page;
     }
 
@@ -662,6 +703,7 @@ public sealed class PageService : IPageService
         existing.MountPoint = updated.MountPoint;
         existing.ImageIds = updated.ImageIds ?? [];          // RC ADR 0025 — caller-parsed
         existing.AttachmentIds = updated.AttachmentIds ?? []; // ATT ADR 0034 — caller-parsed
+        existing.TagIds = updated.TagIds ?? [];               // TG ADR 0044 — caller-parsed (U8b)
 
         // ADR 0040: MountPoint is a *system*-page concept (a UI slot) — a blog
         // page only surfaces in its own /blog feed, so an edit may not (re)mount
@@ -694,6 +736,23 @@ public sealed class PageService : IPageService
         session.Store(existing);
         session.Store(audit);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane on the update path (C3
+        // single-transaction idiom, same session as the page write). Only if
+        // the edited page is a <c>User</c> (blog) page with non-empty tags —
+        // the <c>System</c>-page refusal already fired above (C-TG·6), so
+        // this code is reached only for a <c>User</c> page. The
+        // <c>AttachToPageAsync</c> lane re-checks standing (author ∪
+        // GlobalAdmin, ADR 0040, C-TG·5) and create-or-reuses each tag
+        // (C-TG·4); it stores the resolved <c>Tag</c> ids onto
+        // <c>Page.TagIds</c>.
+        if (existing.TagIds is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPageAsync(existing.Id, existing.TagIds, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            existing.TagIds = resolved.Select(t => t.Id).ToList();
+        }
+
         return existing;
     }
 

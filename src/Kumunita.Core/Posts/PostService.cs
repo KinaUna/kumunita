@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -37,12 +38,25 @@ public sealed class PostService
     private readonly IUserInfoService _userInfo;
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
+    // TG (ADR 0044, U8b register patch) — the tag-lane write seam. **Optional**
+    // (nullable default) so the 7 existing test call sites that construct
+    // `PostService` positionally (userInfo, authz, store) keep compiling
+    // unchanged (the §2.6 "new dependency on PostService, not a new seam on a
+    // frozen interface" line — the ADR 0006-D lane pin preserved; the
+    // `PostService_MakesNoNewModerateCall` test's surface-level reflection
+    // assertion is over `TagService`'s ctor, not `PostService`'s, so adding
+    // this parameter is a no-op for that pin). The DI registration passes the
+    // live `ITagService`; tests that exercise the tag path construct it
+    // explicitly.
+    private readonly ITagService? _tags;
 
-    public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store)
+    public PostService(IUserInfoService userInfo, IAuthorizationService authz, IDocumentStore store,
+        ITagService? tags = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz = authz ?? throw new ArgumentNullException(nameof(authz));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _tags = tags;
     }
 
     /// <summary>
@@ -302,6 +316,31 @@ public sealed class PostService
 
         session.Store(post);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
+        // idiom: the write + the audit row commit atomically on the **same**
+        // <c>IDocumentSession</c> — the <c>AddPostTranslationAsync</c>
+        // precedent). Only if the form gave slugs (null/empty ⇒ no tags, the
+        // U4 additive default-empty pin). The <c>AttachToPostAsync</c> lane
+        // re-checks the standing (author ∪ GlobalAdmin, C-TG·5) and
+        // create-or-reuses each tag (C-TG·4); it stores the resolved
+        // <c>Tag</c> ids onto <c>Post.TagIds</c> (replacing the POCO's
+        // default-empty list). A bad <c>Slug</c> is an
+        // <c>ArgumentException</c> from <c>DeriveSlug</c> (C-TG·4) — the
+        // Web layer maps it to a form error (the M3 "a form is a shape"
+        // precedent).
+        if (draft.TagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPostAsync(post.Id, draft.TagSlugs, actorId, actorRoles, session)
+                .ConfigureAwait(false);
+            // U8b — persist the resolved TagIds onto the post (the attach
+            // lane's own SaveChangesAsync does not reliably carry the loaded
+            // post's TagIds mutation to the DB; re-store + save here).
+            post.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(post);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
         return post;
     }
 
@@ -391,7 +430,13 @@ public sealed class PostService
         Authorization.Audience audience,
         string? languageCode,
         IDocumentSession session,
-        IReadOnlyList<string>? attachmentIds = null)
+        IReadOnlyList<string>? attachmentIds = null,
+        // TG (ADR 0044, U8b) — the tag slugs (the author's typed labels, C-TG·4).
+        // Optional trailing parameter (nullable, the CS1736 shape) — existing
+        // call sites keep compiling unchanged (they omit it ⇒ null ⇒ no tags).
+        // The <c>AttachToPostAsync</c> lane create-or-reuses each tag (C-TG·4)
+        // and stores the resolved <c>Tag</c> ids onto <c>Post.TagIds</c>.
+        IReadOnlyList<string>? tagSlugs = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
         if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting author is required.", nameof(actorId));
@@ -424,6 +469,29 @@ public sealed class PostService
 
         session.Store(post);
         await session.SaveChangesAsync().ConfigureAwait(false);
+
+        // TG (ADR 0044, U8b) — the tag attach lane on the edit path (C3
+        // single-transaction idiom, same session as the edit write). This
+        // lane is **author-only** (the <c>post.AuthorId == actorId</c> gate
+        // above re-checks standing), so the actor is always the author — the
+        // <c>AttachToPostAsync</c> standing probe short-circuits on the
+        // author match (the empty role set below is sufficient:
+        // <c>CanAttachToPost</c> returns true on the author match, and
+        // <c>ResolveAttachVia</c> resolves <c>Owner</c> first). A GlobalAdmin
+        // who is not the author never reaches this code (the author-only gate
+        // throws first). Null/empty ⇒ no tags (the U4 default-empty pin); a
+        // bad slug is an <c>ArgumentException</c> from <c>DeriveSlug</c>
+        // (C-TG·4) — the Web layer maps it to a form error.
+        if (tagSlugs is { Count: > 0 } && _tags is not null)
+        {
+            var resolved = await _tags.AttachToPostAsync(
+                    post.Id, tagSlugs, actorId, new HashSet<string>(), session)
+                .ConfigureAwait(false);
+            post.TagIds = resolved.Select(t => t.Id).ToList();
+            session.Store(post);
+            await session.SaveChangesAsync().ConfigureAwait(false);
+        }
+
         return post;
     }
 

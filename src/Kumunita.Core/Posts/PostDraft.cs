@@ -57,4 +57,18 @@ public sealed record PostDraft(
     // except its author (feeds exclude it, the detail lane author-only-gates it).
     // Optional trailing parameter (nullable, CS1736 shape) — existing positional
     // call sites keep compiling unchanged (they omit it ⇒ null ⇒ false).
-    bool? IsDraft = null);
+    bool? IsDraft = null,
+    // TG (ADR 0044, U8b register patch) — the tag <c>slugs</c> (the
+    // author's typed labels, C-TG·4). Populated **server-side** by the
+    // Web layer (the composer form's <c>TagIds</c> field, re-parsed by the
+    // controller before calling <see cref="PostService.CreatePostAsync"/>
+    // / <see cref="PostService.UpdatePostAsync"/>); null/empty means "no
+    // tags" (the U4 additive default-empty pin — the POCO field is
+    // non-null, `= []`). <b>Distinct from</b> <c>ImageIds</c> / <c>
+    // AttachmentIds</c>: this is the tag-lane write seam's input (the
+    // <c>Slug</c> the <c>TagService.AttachToPostAsync</c> lane
+    // create-or-reuses per C-TG·4, then stores the resolved <c>Tag</c>
+    // ids onto <see cref="Post.TagIds"/>). Optional trailing parameter
+    // (nullable, CS1736 shape) — existing positional call sites keep
+    // compiling unchanged (they omit it ⇒ null ⇒ no tags).
+    IReadOnlyList<string>? TagSlugs = null);
