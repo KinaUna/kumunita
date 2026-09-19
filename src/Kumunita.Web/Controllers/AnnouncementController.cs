@@ -271,7 +271,7 @@ public sealed class AnnouncementController(
     /// is a shape error (the unique index is the DB-layer backstop) — there is
     /// no edit / replace lane (the ADR 0022 contract).
     /// </summary>
-    [HttpPost("{id}/translations")]
+    [HttpPost("/announcements/{id}/translations")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddTranslation(
         [FromRoute] string id,
