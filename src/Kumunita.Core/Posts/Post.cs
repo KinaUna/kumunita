@@ -151,4 +151,23 @@ public sealed class Post
     /// draft AND active, or a draft AND hidden by a moderator, simultaneously.
     /// </summary>
     public bool IsDraft { get; set; } = false;
+
+    // TG tag ADD (ADR 0044, ADR 0004 §B.1 additive — the 8th additive Post
+    // field after M3b's Status, ADR 0013's GroupId, ADR 0018's LanguageCode,
+    // ADR 0024's DeletedAt, RC's ImageIds, ATT's AttachmentIds, ADR 0037's
+    // IsDraft):
+    /// <summary>
+    /// The <see cref="Kumunita.Core.Tags.Tag"/> ids attached to this post
+    /// (the <c>TG</c> lane, ADR 0044 D2) — the multi-valued, **non-access**
+    /// subject labels (a label, never a gate, C-TG·1; D5 — a tag grants no
+    /// membership, access, or moderation scope). One field covers **both** the
+    /// community and the group post lane (ADR 0013 — they share this
+    /// <see cref="Post"/> doc). Populated server-side by the tag write lane
+    /// (U5's <c>TagService</c>); the serving browse / autocomplete read seams
+    /// read this computed **over** the content the actor may already read
+    /// (C-TG·2). Default <see cref="IReadOnlyList{T}">empty</see> — existing
+    /// posts read back with no tags (the ADR 0004 §B.1 additive no-reseed
+    /// pin, F11).
+    /// </summary>
+    public IReadOnlyList<string> TagIds { get; set; } = [];
 }

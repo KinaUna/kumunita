@@ -511,6 +511,16 @@ public sealed class PageService : IPageService
         // any signed-in actor (they become the author).
         CheckCreateStanding(actorId, actorRoles, page);
 
+        // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
+        // empty** — the write lane is the guard (the shape permits the field,
+        // the lane refuses it). A shape violation, not a standing denial, so
+        // ArgumentException naming the offending parameter — consistent with
+        // the UpdateAsync lane.
+        if (page.Kind == PageKind.System && page.TagIds is { Count: > 0 })
+            throw new ArgumentException(
+                "A system page cannot carry tags (C-TG·6); only a PageKind.User (blog) page may.",
+                nameof(page.TagIds));
+
         // A blog page is authored by the actor (they own it) — the web
         // composer pre-gate is a convenience, the write lane is the source of
         // truth (C3). A system page may have an empty AuthorId (a platform
@@ -624,6 +634,16 @@ public sealed class PageService : IPageService
 
         // Standing re-check (server-side, C3 single-source pin).
         CheckEditStanding(actorId, actorRoles, existing);
+
+        // TG (C-TG·6, D6, F5): a PageKind.System page's TagIds is **always
+        // empty** — the write lane is the guard (the shape permits the field,
+        // the lane refuses it). A shape violation, not a standing denial, so
+        // ArgumentException naming the offending parameter — consistent with
+        // the CreateAsync lane.
+        if (existing.Kind == PageKind.System && updated.TagIds is { Count: > 0 })
+            throw new ArgumentException(
+                "A system page cannot carry tags (C-TG·6); only a PageKind.User (blog) page may.",
+                nameof(updated.TagIds));
 
         // Capture the **stored** page's author + component scope *before* the
         // field-copy below overwrites them: the standing decision (and the

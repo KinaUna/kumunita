@@ -215,4 +215,22 @@ public sealed class Page
     /// <see cref="ImageIds"/>, its files in <see cref="AttachmentIds"/>).
     /// </summary>
     public IReadOnlyList<string> AttachmentIds { get; set; } = [];
+
+    // TG tag ADD (ADR 0044, ADR 0004 §B.1 additive — the page analogue of
+    // Post.TagIds):
+    /// <summary>
+    /// The <see cref="Kumunita.Core.Tags.Tag"/> ids attached to this page
+    /// (the <c>TG</c> lane, ADR 0044 D2/D6) — the multi-valued, **non-access**
+    /// subject labels (a label, never a gate, C-TG·1; D5). Populated **only**
+    /// on <see cref="PageKind.User"/> (blog) pages (C-TG·6, D6): a
+    /// <see cref="PageKind.System"/> page's <c>TagIds</c> is **always empty**.
+    /// The **shape permits the field** on both kinds (the ADR 0004 §B.1
+    /// additive field); the **write lane is the guard** —
+    /// <see cref="PageService.CreateAsync"/> / <see cref
+    /// "PageService.UpdateAsync"/> refuse a non-empty <c>TagIds</c> set on a
+    /// <c>System</c> page (C-TG·6, F5). Default <see cref
+    /// "IReadOnlyList{T}">empty</see> — existing pages read back with no tags
+    /// (the ADR 0004 §B.1 additive no-reseed pin, F11).
+    /// </summary>
+    public IReadOnlyList<string> TagIds { get; set; } = [];
 }
