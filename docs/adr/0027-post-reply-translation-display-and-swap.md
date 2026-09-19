@@ -76,3 +76,20 @@ from the ADR 0018 fields the detail result already returns.
   tag" to "the first, always-present, default-visible variant on the detail
   surface." ADR 0005 §C, ADR 0022, and the M4/M5/M6 roadmap letters are
   untouched.
+
+## Amendments
+
+### 2026-09-19 — default-visible variant is the viewer's current language (ADR 0049)
+
+Decision (a)'s "default-visible" clause is amended: the **default-visible**
+variant on the post/reply detail surfaces (and, mirroring, the announcement
+detail surface and the pinned-announcement banner) is now the **viewer's
+current language** — the ADR 0005 §B resolution order as amended by ADR 0046
+(cookie → `Accept-Language` match → instance default → `en`) — **when a
+user-added translation of the item exists in it**; otherwise the authored-in
+variant stays default-visible exactly as locked above. The rest of (a) is
+unchanged: every variant remains in the DOM, the chip row is the same, and
+the click-to-swap + guaranteed path back (now starting from a different
+initial variant) is untouched. Display-only; zero Core / schema / view-model
+change; the JS-off degradation path is preserved. See **ADR 0049** for the
+full locked text.

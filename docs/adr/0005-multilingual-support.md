@@ -158,3 +158,18 @@ floor (ADR 0043 D2). See **ADR 0043** for the full locked text (the
 five-surface set, the route contract, the ownership re-statement, the
 discoverability decision, the content scope, and the unchanged standing
 matrix).
+### 2026-09-19 — UGC default variant selection (ADR 0049)
+
+§C's "never automatic" clause is **re-scoped**: the default-*visible*
+variant on the post/reply/announcement detail surfaces and the
+pinned-announcement banner is now the **viewer's current language**
+(§B's resolution order, as amended by ADR 0046) **when a human-added
+translation of the item exists in it** — otherwise the authored-in
+variant remains default-visible (the ADR 0027 floor). This is a
+display-only *default selection* of content that already exists in the
+DOM; it is not, and does not enable, machine translation: the
+deferred-MT clause, the no-third-party-send rule, and the "never
+silently translated" guarantee for *generated* text are all unchanged.
+See **ADR 0049** for the full locked text (the surface list, the
+resolution chain it reuses, the ADR 0027 swap/return path that stays
+touched, and the out-of-scope surfaces).

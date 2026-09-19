@@ -1,6 +1,9 @@
 @model Kumunita.Web.Models.AnnouncementDetailViewModel
 @using Kumunita.Core.Announcements
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Announcement" : Model.Title;
 
@@ -18,6 +21,13 @@
     var missingLanguages = Model.Languages
         .Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // ADR 0049 — the announcement's **default-visible** variant is the
+    // viewer's current language when a translation exists in it, else the
+    // authored-in language (the ADR 0027 floor). The ADR 0027 click-to-swap +
+    // return path are untouched — only *which* variant shows first changes.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool originalHidden = Model.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
 }
 
 <div class="row justify-content-center">
@@ -85,8 +95,12 @@
                    variant; the chip row is a selector that swaps them. The
                    title + body are the announcement's toggle scope. *@
                 <div data-td-group="announcement">
-                    @* Original variant (default-visible — no display:none). *@
-                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                    @* Original variant — default-visible unless ADR 0049
+                       auto-selects a translation of it into the viewer's
+                       language (originalHidden); the swap + return path
+                       (ADR 0027) are unchanged either way. *@
+                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                         @(originalHidden ? " style=\"display:none\"" : null)>
                         <h1 class="mb-1">
                             @if (string.IsNullOrWhiteSpace(Model.Title))
                             {
@@ -103,10 +117,15 @@
                         <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
                     </div>
 
-                    @* One hidden variant per user-added translation. *@
+                    @* One variant per user-added translation — hidden by
+                       default, EXCEPT the one matching the viewer's current
+                       language, which ADR 0049 shows first (in place of the
+                       original); the rest stay hidden behind their chip. *@
                     @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                     {
-                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                             @(tDefault ? null : " style=\"display:none\"")>
                             @if (!string.IsNullOrWhiteSpace(t.Title))
                             {
                                 <h1 class="mb-1">@t.Title</h1>

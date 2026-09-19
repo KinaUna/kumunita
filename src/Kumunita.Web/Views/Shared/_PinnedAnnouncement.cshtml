@@ -1,6 +1,9 @@
 @using Kumunita.Core.Announcements
 @using Kumunita.Web.Security
 @inject Kumunita.Core.Announcements.IAnnouncementService Announcements
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     // Render the single pinned announcement as a banner at the top of every
     // page (see the layout, Views/Shared/_Layout.cshtml). The visibility gate
@@ -13,6 +16,16 @@
 
     if (pinned is not null)
     {
+        // ADR 0049 — the banner prefers a translation of the pinned
+        // announcement into the viewer's current language (same chain as the
+        // detail views: cookie → Accept-Language → instance default → en),
+        // falling back to the authored-in title/body when none exists.
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        var translations = await Announcements.GetAnnouncementTranslationsAsync(pinned.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        string? shownTitle = match is not null && !string.IsNullOrWhiteSpace(match.Title) ? match.Title : pinned.Title;
+        string shownBody = match is not null ? match.Body : pinned.Body;
+
         string dismissKey = "kumunita-pinned-announcement-dismissed-" + pinned.Id;
         string badgeClass = pinned.Scope == AnnouncementScope.Public
             ? "text-bg-secondary"
@@ -36,11 +49,11 @@
                        body (a pinned announcement can run to pages) — the
                        full text is one click away at the detail view. *@
                     <span class="me-auto me-2">
-                        @if (!string.IsNullOrWhiteSpace(pinned.Title))
+                        @if (!string.IsNullOrWhiteSpace(shownTitle))
                         {
-                            <strong class="me-1">@pinned.Title</strong>
+                            <strong class="me-1">@shownTitle</strong>
                         }
-                        @MarkdownRenderer.PlainTextPreview(pinned.Body, 150)
+                        @MarkdownRenderer.PlainTextPreview(shownBody, 150)
                     </span>
                     <a class="btn btn-sm btn-link text-nowrap p-0"
                        href="/announcements/@pinned.Id"

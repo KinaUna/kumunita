@@ -1,5 +1,8 @@
 @model Kumunita.Web.Models.PostDetailViewModel
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = Model.Post.Title ?? "Post";
     string postId = Model.Post.Id;
@@ -20,6 +23,14 @@
     var originalCode = Model.OriginalLanguageCode;
     var missingLanguages = Model.Languages.Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // ADR 0049 — the post's **default-visible** variant is the viewer's current
+    // language when a translation exists in it, else the authored-in language
+    // (the ADR 0027 floor). One computation, shared by the post block and every
+    // reply block below (in scope for both). The ADR 0027 click-to-swap +
+    // return path are untouched — only *which* variant shows first changes.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool originalHidden = Model.PostTranslations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
 }
 
 <div class="row justify-content-center">
@@ -107,8 +118,12 @@
                        hidden variant; the chip row is a selector that swaps
                        them. This group wrapper is the post's toggle scope. *@
                     <div data-td-group="post">
-                        @* Original variant (default-visible — no display:none). *@
-                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                        @* Original variant — default-visible unless ADR 0049
+                           auto-selects a translation of it into the viewer's
+                           language (originalHidden); the swap + return path
+                           (ADR 0027) are unchanged either way. *@
+                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                             @(originalHidden ? " style=\"display:none\"" : null)>
                             <h4>
                                 @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                     ? Model.Post.Title
@@ -119,10 +134,15 @@
                             </div>
                         </div>
 
-                        @* One hidden variant per user-added translation. *@
+                        @* One variant per user-added translation — hidden by
+                           default, EXCEPT the one matching the viewer's current
+                           language, which ADR 0049 shows first (in place of the
+                           original); the rest stay hidden behind their chip. *@
                         @foreach (var t in Model.PostTranslations)
                         {
-                            <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                            bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                            <div class="td-variant" data-td-variant="@t.LanguageCode"
+                                 @(tDefault ? null : " style=\"display:none\"")>
                                 @if (!string.IsNullOrWhiteSpace(t.Title))
                                 {
                                     <h4>@t.Title</h4>
@@ -329,16 +349,29 @@
                         <div class="d-flex justify-content-between align-items-start">
                             @if (r.DeletedAt is null)
                             {
+                                @* ADR 0049 — the reply's default-visible variant
+                                   is its translation into the viewer's current
+                                   language (when one exists), else the authored-in
+                                   original (the ADR 0027 floor). Declared at the
+                                   top of this block (before any markup) so it is in
+                                   scope for the variant below. *@
+                                bool replyOriginalHidden = r.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
                                 <div data-td-group="reply-@r.Id" class="pe-3">
-                                    @* Original variant (default-visible). *@
-                                    <div class="td-variant" data-td-variant="@r.OriginalLanguageCode">
+                                    @* Original variant (default-visible unless ADR 0049
+                                       auto-selects a translation of it). *@
+                                    <div class="td-variant" data-td-variant="@r.OriginalLanguageCode"
+                                         @(replyOriginalHidden ? " style=\"display:none\"" : null)>
                                         <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
                                     </div>
 
-                                    @* One hidden variant per user-added translation. *@
+                                    @* One variant per user-added translation — hidden by
+                                       default, EXCEPT the one matching the viewer's
+                                       current language, which ADR 0049 shows first. *@
                                     @foreach (var t in r.Translations)
                                     {
-                                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                                             @(tDefault ? null : " style=\"display:none\"")>
                                             <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
                                         </div>
                                     }
