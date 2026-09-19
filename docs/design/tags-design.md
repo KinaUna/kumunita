@@ -175,3 +175,397 @@ the test names Part 2 pins must reference those pins by id.
 **FACES count: 12.** This count (and the invariant-pin per row) is the input
 U2 needs to name the 24 pinned seam tests and the three-test acceptance gate
 (closed-loop / handoff / part-vs-whole) without re-deriving them.
+
+## Seams & contracts (Part 2, written by U2)
+
+### 2.0 Preambles — what this section pins, and what wins on conflict
+
+Every C# fragment below is **exact**: parameter lists, return types, and
+namespaces are the contract U3–U12 must implement against. If a later unit
+discovers an implemented signature that does not exist verbatim here, the
+drift-guard (§2.6) applies: **this file wins**; the unit updates this file in
+the same commit and appends a `## U<m> — Drift pause` note to
+`docs/plans-milestones/in-progress/tags/tags-handoff-notes.md` (unit-series
+rule §6 in the register).
+
+Namespace conventions:
+
+- New bounded context: **`Kumunita.Core.Tags`** (`Tag`, `TagTranslation`,
+  `ITagService` / `TagService`, `TagItem`) — the ADR 0011 shared-id-doc
+  shape, exactly the ADR 0011 `MediaObject` model (D1).
+- Registration surface: `Kumunita.Core.TagDocTypes` (the `M3DocTypes` /
+  `PageDocTypes` pattern; U3 lands it).
+- Frozen surfaces the lane *calls but does not modify*:
+  `Kumunita.Core.Authorization.IAuthorizationService`, the
+  `Kumunita.Core.UserInfo.IUserInfoService` read seams, and
+  `Kumunita.Core.Localization.ITranslationProvider` (display-name resolution,
+  ADR 0005). **U2 adds no method to any frozen interface** (the
+  `PostService_MakesNoNewModerateCall` pin, §2.4 #24).
+- Web-side composition: `Kumunita.Web.Controllers` / `Kumunita.Web.Models`
+  (never in `Kumunita.Core`).
+
+**Count reconciliation (U1 → U2):** U1's body pins **12 invariants**
+(nine TG-owned C-TG·1…C-TG·9 + C1, C3, ADR 0004 §B.1) and **12 FACES**
+(F1–F12). U2 confirms both counts and pins the §2.4 test list accordingly —
+**24 named tests**, each anchored to an invariant id and/or FACES row from
+Part 1. No C-TG·10 is introduced by this section.
+
+**Roles idiom:** the seam signatures below write `IReadOnlySet<Role>`
+(register U2 verbatim); in this repo `Role` is the claim-string type
+(`Kumunita.Core.Identity.Roles` constants — `Member` / `Moderator` /
+`GlobalAdmin` / `Translator`), and the established codebase idiom is
+`IReadOnlySet<string> actorRoles` (e.g.
+`PostService.AddPostTranslationAsync`, `PageService.CheckEditStanding`).
+U5 lands the signatures against the repo idiom; the *member set* (11 members)
+and the *standing rules* are what §2.6 freezes.
+
+### 2.1 Frozen seam list (exact C#)
+
+Namespace `Kumunita.Core.Tags`. The `TagService` public surface — **11
+members** (7 async lane methods + 3 standing probes + the `TagItem` record
+type it returns), verbatim:
+
+```csharp
+namespace Kumunita.Core.Tags;
+
+/// <summary>
+/// The single feature service for the <c>TG</c> lane (ADR 0006-D: the service
+/// owns the decision, not the Web). Composes **only** the frozen modules —
+/// <see cref="Kumunita.Core.Authorization.IAuthorizationService"/> (the
+/// content's existing <c>Read</c> decision, never a new branch), the frozen
+/// <see cref="Kumunita.Core.UserInfo.IUserInfoService"/> read seams, and
+/// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> (display-name
+/// resolution, ADR 0005) — plus its own <c>IDocumentStore</c> for the write
+/// lanes' C3 audit rows. Never opens a new seam on any frozen interface.
+/// </summary>
+public interface ITagService
+{
+    // ── Write lane (C-TG·9: one AccessAudit row per write; C-TG·5 standing) ──
+
+    /// <summary>
+    /// Attach / detach the <paramref name="slugs"/> set on a post in the
+    /// caller's in-flight session (C3). Standing = the post's existing edit
+    /// lane (ADR 0014 / 0016 author-only; ADR 0013 group lane — D4). A
+    /// not-yet-existing <c>Slug</c> is created: the actor becomes
+    /// <c>CreatedBy</c>, the typed string (lowercased + trimmed, C-TG·4) the
+    /// base <c>Name</c>. Writes one <c>tag.attach</c> row (and one
+    /// <c>tag.create</c> row per newly created tag) — nothing else.
+    /// </summary>
+    Task<IReadOnlyList<Tag>> AttachToPostAsync(
+        string postId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<Role> roles, IDocumentSession session);
+
+    /// <summary>
+    /// Same shape for a <c>PageKind.User</c> blog page (the ADR 0040 author ∪
+    /// GlobalAdmin standing). A <c>PageKind.System</c> page with a
+    /// non-empty <paramref name="slugs"/> set is **refused**
+    /// (<c>UnauthorizedAccessException</c> / <c>ArgumentException</c>) —
+    /// C-TG·6, D6.
+    /// </summary>
+    Task<IReadOnlyList<Tag>> AttachToPageAsync(
+        string pageId, IReadOnlyList<string> slugs,
+        string actorId, IReadOnlySet<Role> roles, IDocumentSession session);
+
+    /// <summary>
+    /// Add / overwrite the <paramref name="languageCode"/> translation row of
+    /// tag <paramref name="tagId"/> (the <c>(TagId, LanguageCode)</c>
+    /// business key — overwrites on conflict). Standing: the tag's
+    /// <c>CreatedBy</c> ∪ GlobalAdmin only (C-TG·5, D4). One
+    /// <c>tagtranslation.add</c> row, <c>Via</c> = <c>Owner</c> / <c>Admin</c>.
+    /// </summary>
+    Task<TagTranslation> AddTagTranslationAsync(
+        string tagId, string languageCode, string name,
+        string actorId, IReadOnlySet<Role> roles, IDocumentSession session);
+
+    // ── Read lane (C-TG·8: plain reads, no audit row; C-TG·2 base query) ──
+
+    /// <summary>
+    /// The tag list (F12 empty on a fresh instance): distinct
+    /// <see cref="Tag"/> rows used on ≥ 1 post / <c>PageKind.User</c> page
+    /// the actor may already read (the C-TG·2 base query), each with a
+    /// use-count and the display name resolved to the actor's language
+    /// (ADR 0005 preference order, D5). No <c>AccessAudit</c> row (C-TG·8).
+    /// </summary>
+    Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId);
+
+    /// <summary>
+    /// The by-tag post results (F3 / F4): the actor-readable posts whose
+    /// <c>TagIds</c> contains the tag resolved from <paramref name="slug"/>;
+    /// the post's own <c>Read</c> decision is applied **before** the post is
+    /// returned (C-TG·3, D5). No <c>AccessAudit</c> row (C-TG·8).
+    /// </summary>
+    Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId);
+
+    /// <summary>
+    /// The by-tag blog-page results: the actor-readable
+    /// <c>PageKind.User</c> pages whose <c>TagIds</c> contains the tag.
+    /// No <c>AccessAudit</c> row (C-TG·8).
+    /// </summary>
+    Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId);
+
+    /// <summary>
+    /// Autocomplete (F9 / F10): the C-TG·2 base query filtered by
+    /// <c>starts_with(displayName, prefix) OR starts_with(slug, prefix)</c>,
+    /// where <c>displayName</c> is the name resolved in the viewer's language;
+    /// **capped at ≤ 10**. No <c>AccessAudit</c> row (C-TG·8).
+    /// </summary>
+    Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId);
+
+    // ── Standing probes (C-TG·5; a display pin, not a gate — the real deny
+    //    is the write-lane re-check, the <c>PostService.CanAddTranslation</c>
+    //    / <c>PageService.CanTranslatePage</c> idiom) ──
+
+    bool CanAttachToPost(Post post, string actorId, IReadOnlySet<Role> roles);
+    bool CanAttachToPage(Page page, string actorId, IReadOnlySet<Role> roles);
+    bool CanTranslateTag(Tag tag, string actorId, IReadOnlySet<Role> roles);
+}
+
+/// <summary>
+/// The read-lane result row (the tag list / autocomplete shape, D5): the tag,
+/// its use-count over the actor's readable content, and the display name
+/// resolved to the actor's language.
+/// </summary>
+public sealed record TagItem(Tag Tag, int UseCount, string DisplayedName);
+```
+
+**The two object services gain no new public methods.** The tag lane is
+*inside* their existing edit lanes: U4 adds the `TagIds` field to the
+`Post` / `Page` POCOs and threads it through `PostService`'s and
+`PageService`'s existing create / update paths (plus the `System`-page
+refusal on `PageService`'s write lane, C-TG·6) — **without adding any new
+public method to `PostService` or `PageService`**. Standing for *attach* is
+the object's own existing edit standing (D4); the tag-specific standing
+(translate) lives in `TagService` only.
+
+**Registration surface** (U3 lands it, mirroring `M3DocTypes` /
+`PageDocTypes`):
+
+```csharp
+namespace Kumunita.Core;
+
+/// <summary>
+/// The <c>TG</c> bounded context's Marten-native document registration
+/// surface (ADR 0004 §B.1, D1) — the parallel surface to
+/// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> /
+/// <see cref="MediaDocTypes"/> / <see cref="PageDocTypes"/> for the new
+/// <c>Kumunita.Core.Tags</c> context (ADR 0011 shared-id-doc shape). Both
+/// documents use the conventional <c>string</c> <c>Id</c> identity; the
+/// <c>(TagId, LanguageCode)</c> pair is the DB-enforced business key
+/// (D1; the ADR 0026 <c>PostTranslation</c> / <c>PageTranslation</c>
+/// convention).
+/// </summary>
+public static class TagDocTypes
+{
+    public static void Configure(StoreOptions opts)
+    {
+        opts.Schema.For<Tags.Tag>();
+        opts.Schema.For<Tags.TagTranslation>()
+               .UniqueIndex("tg_tr_uidx_tag_lang",
+                            t => t.TagId, t => t.LanguageCode);
+    }
+}
+```
+
+### 2.2 New TG-owned Core types (exact C#)
+
+Namespace `Kumunita.Core.Tags`. Both documents are **Marten-native** POCOs
+with the conventional `string Id` identity (ADR 0004 §B.1, D1; the
+`FeatureSchemaBase` carve-out is **not** used — it is reserved for
+operator-written tables).
+
+```csharp
+namespace Kumunita.Core.Tags;
+
+/// <summary>
+/// A tag (TG, D1/D3): a shared id-doc referenced by <see
+/// cref="Kumunita.Core.Posts.Post"/> and <see
+/// cref="Kumunita.Core.Pages.Page"/> via their <c>TagIds</c> fields (the ADR
+/// 0011 <c>MediaObject</c> shape). <see cref="Slug"/> is the **business
+/// key** — the label's language-neutral identity (C-TG·4, D3).
+/// <see cref="Name"/> is the **base** display name (the creator's own
+/// spelling); <see cref="LanguageCode"/> is the BCP-47 code the creator
+/// **authored** it in (ADR 0018 authored-in idiom). <b>No
+/// <c>Audience</c>, no standing surface of its own</b> (D5) — the tag's
+/// visibility is derived from the content that references it.
+/// </summary>
+public sealed class Tag
+{
+    public string Id { get; set; } = string.Empty;            // surrogate PK
+    public string Slug { get; set; } = string.Empty;          // business key (C-TG·4) — non-blank
+    public string Name { get; set; } = string.Empty;          // base display name — non-blank
+    public string LanguageCode { get; set; } = string.Empty;  // authored-in (ADR 0018) — non-blank
+    public string CreatedBy { get; set; } = string.Empty;     // translation-standing owner (C-TG·5) — non-blank
+    public DateTimeOffset Created { get; set; }
+}
+
+/// <summary>
+/// A per-language display name for a tag (D1):
+/// <b><c>GroupTranslation</c> (ADR 0026) minus <c>Description</c></b> — a tag
+/// has a name only, no description. One row per <c>(TagId, LanguageCode)</c>
+/// pair (the <c>TagDocTypes</c> unique index enforces it at the DB layer;
+/// re-adding overwrites — the D4 translate lane).
+/// </summary>
+public sealed class TagTranslation
+{
+    public string Id { get; set; } = string.Empty;         // surrogate PK
+    public string TagId { get; set; } = string.Empty;      // parent Tag — non-blank
+    public string LanguageCode { get; set; } = string.Empty; // — non-blank
+    public string Name { get; set; } = string.Empty;       // — non-blank
+    public string AuthorId { get; set; } = string.Empty;   // the actor who set it — non-blank
+    public DateTimeOffset Created { get; set; }
+}
+```
+
+**Additive fields on existing documents** (ADR 0004 §B.1, D2 — the
+`Post.Status` / `GroupId` / `LanguageCode` / `ImageIds` history):
+
+```csharp
+// Kumunita.Core.Posts.Post — additive, default empty; one field covers both
+// the community and the group post lane (ADR 0013):
+public IReadOnlyList<string> TagIds { get; set; } = [];
+
+// Kumunita.Core.Pages.Page — additive, default empty; populated **only** on
+// PageKind.User (blog) pages (C-TG·6, D6) — a PageKind.System page's
+// TagIds is **always empty** (the shape permits it, the write lane refuses it).
+public IReadOnlyList<string> TagIds { get; set; } = [];
+```
+
+> **Shape note:** the register's U2 §2.2 shorthand says `string[]`; this repo's
+> additive array fields (`Post.ImageIds`, ADR 0025) are
+> `IReadOnlyList<string>` with an empty-collection initializer — U4 lands the
+> field in the repo idiom (the *additive, default-empty* pin is what §2.6
+> freezes, not the literal array type).
+
+### 2.3 Standing + privacy rule (the 5-state table)
+
+**Attach / translate standing matrix** (D4 — "attach is free; a tag's
+translations belong to its creator"). "Free" = the object's *existing* edit
+standing; a denied actor throws `UnauthorizedAccessException` **before**
+anything is stored (C-TG·9).
+
+| # | Action | Standing that qualifies | Denied outcome | Via (audit tag) |
+|---|---|---|---|---|
+| 1 | Attach to a **community post** | The post's **author** (ADR 0014 / 0016 author-only lane) ∪ GlobalAdmin (the ADR 0016 edit-lane shape) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 2 | Attach to a **group post** | The post's **author** (ADR 0013 group lane); no component-moderator standing (ADR 0007) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 3 | Attach to a **`PageKind.User` blog page** | The page's **author** ∪ GlobalAdmin (ADR 0040) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+| 4 | Attach to a **`PageKind.System` page** with a non-empty `TagIds` set | **Refused outright** (C-TG·6, D6) — no standing qualifies | `UnauthorizedAccessException` (or `ArgumentException`) | — (no write, no row) |
+| 5 | **Translate** (add / overwrite a `TagTranslation`) | The tag's **`CreatedBy`** ∪ **GlobalAdmin** (break-glass) — the ADR 0009 / 0026 "the name is the creator's artifact" rule (C-TG·5, D4) | `UnauthorizedAccessException` | `Owner` / `Admin` |
+
+Attach on a *new* `Slug` additionally writes the `tag.create` row (the actor
+becomes `CreatedBy`) — the C-TG·9 two-row shape pinned by F1.
+
+**Reads — the 4-shape table** (C-TG·1 / C-TG·2 / C-TG·3, D5). All four
+shapes reduce to the **one** base query: *"the set of `Tag` rows used on ≥ 1
+`Post` / `PageKind.User` `Page` the actor may already read."* No shape emits
+an `AccessAudit` row (C-TG·8); no shape widens a content's audience (C1).
+
+| # | Surface | Shape (over the base query) |
+|---|---|---|
+| 1 | **Tag list** (`ListForActorAsync`) | Distinct `Tag` rows of the base query, each with a use-count and the display name resolved to the actor's language (ADR 0005 order: preferred → `TagTranslation` → base `Name`). Empty on a fresh instance (C-TG·7, F12). |
+| 2 | **Posts by tag** (`ListPostsByTagAsync`) | The base query's posts whose `TagIds` contains the tag; each post passed through its **own** `Read` decision (the ADR 0013 group lane / ADR 0035 `PostReadDecision` seam) **before** it is returned (C-TG·3, F3/F4). |
+| 3 | **Pages by tag** (`ListPagesByTagAsync`) | The base query's `PageKind.User` pages whose `TagIds` contains the tag; same per-page `Read` decision (C-TG·3). |
+| 4 | **Autocomplete** (`SuggestAsync`) | The base query filtered by `starts_with(displayName, prefix) OR starts_with(slug, prefix)` — `displayName` resolved in the viewer's language (F9); **capped at ≤ 10** (F10). |
+
+A tag used only on content the viewer cannot read is **absent from all four
+shapes** — no title, no name, no "hidden" placeholder (F4, the anti-leak pin
+of D5).
+
+### 2.4 Pinned seam tests (exact names)
+
+File: `tests/Kumunita.Core.Tests/TagServiceTests.cs`. All **24** names below
+are **pinned** by this section (the register's U4–U10 units land them; none
+may be renamed, renumbered, added to, or dropped). Each name carries the
+FACES row and/or invariant anchor from Part 1:
+
+1. `F1_AttachFreeOnOwnPost` — F1, C-TG·9, C-TG·4.
+2. `F2_SameSlugSecondAuthorReusesTag` — F2, C-TG·4 (D3).
+3. `F2_SameSlugSecondAuthorNotCreatedBy` — F2, C-TG·5 (D4).
+4. `F3_GroupPostTagInvisibleToNonMember_ByTag` — F3, C-TG·3 (D5).
+5. `F3_GroupPostTagInvisibleToNonMember_Suggest` — F3, C-TG·1, C-TG·3.
+6. `F4_TagUsedOnlyOnUnreadContentInvisible_List` — F4, C-TG·2.
+7. `F4_TagUsedOnlyOnUnreadContentInvisible_ByTag` — F4, C-TG·1, C-TG·2.
+8. `F4_TagUsedOnlyOnUnreadContentInvisible_Suggest` — F4, C-TG·1, C-TG·2.
+9. `F5_SystemPageRefusesNonEmptyTagIds` — F5, C-TG·6 (D6).
+10. `F6_CreatorSetsTranslation` — F6, C-TG·5, C-TG·9.
+11. `F7_NonCreatorAttacherCannotReword` — F7, C-TG·5.
+12. `F8_GlobalAdminRewordsAnyTag` — F8, C-TG·5 (break-glass), C-TG·9.
+13. `F9_AutocompleteMatchesViewerLanguage_DisplayName` — F9, C-TG·4 (D3/D5 display).
+14. `F9_AutocompleteMatchesViewerLanguage_Slug` — F9, C-TG·4 (the slug fallback branch).
+15. `F10_AutocompleteCappedAtTen` — F10, C-TG·2 (the ≤ 10 cap).
+16. `F11_PreExistingPostTagIdsReadBackEmptyAfterReboot` — F11, ADR 0004 §B.1 (D2, no re-seed).
+17. `F12_FreshInstanceHasZeroTags` — F12, C-TG·7 (D8).
+18. `Attach_WritesOneAuditRow_tag_attach` — C-TG·9 (D7), F1.
+19. `Create_WritesOneAuditRow_tag_create` — C-TG·9 (D7), F1, C-TG·4.
+20. `Translate_WritesOneAuditRow_tagtranslation_add` — C-TG·9 (D7), F6/F8.
+21. `List_EmitsNoAuditRow` — C-TG·8 (D7).
+22. `Suggest_EmitsNoAuditRow` — C-TG·8 (D7).
+23. `Slug_Derivation_Lowercase_Trim_Charset` — C-TG·4 (D3).
+24. `PostService_MakesNoNewModerateCall` — the ADR 0006-D lane pin: the tag
+    lane composes only `IAuthorizationService` + the frozen `IUserInfoService`
+    read seams, never a new seam on a frozen interface.
+
+> **Note to U4 → U12 (unit numbers from the plan register):** U4 lands the
+> F5 / F11 / F12 group, U5 the F1 / F2 / F6 / F7 / F8 + audit-row +
+> `Slug`-derivation group, U6 the F3 / F4 / F9 / F10 + no-audit-row + lane-pin
+> group, and U10 re-verifies the full list at the Web layer. **Renaming any
+> of the 24 after the owning unit lands it is a drift event** (§2.6).
+
+### 2.5 Acceptance gate (U12 records)
+
+The three-test shape (mirroring M3 §2.5):
+
+| # | Test | Shape (the TG reading of the M2/M3 lane) |
+|---|---|---|
+| 1 | **Closed loop** | The author attaches `sanitation` to a post → the tag appears in the author's tag list **and** by-tag view on the next request; the audit trail gains exactly one `tag.attach` row + one `tag.create` row (C-TG·9, F1). |
+| 2 | **Handoff** | A group member is **added after the post was created** and sees the tag on the **next** request — strong consistency (the ADR 0004 §B.1 / Marten live-read shape, F3's flip); the *creator reword* case (a second language name set by the creator surfaces to all viewers on their next read) is the "handoff to the creator" reading of the same pin (F6, C-TG·5). |
+| 3 | **Part-vs-whole** | The 24-test list in §2.4 is the **whole**; closed-loop + handoff are the **parts**; all — plus the ADR 0006 (C1 / C3) and ADR 0004 §B.1 inherited anchors re-run unchanged — must pass together for the gate to record. U12's record cites the *actual* landed test names (drift lane: if a U2-pinned name did not land verbatim, U12 updates §2.4 in the same commit and records a one-line drift in the handoff note). |
+
+**The gate is recorded by U12** (per the register: U11 is the fresh-boot
+manual pass; U12 is "run + record the acceptance gate"; U13 is the docs-sync
+close unit).
+
+### 2.6 Drift-guard (frozen once written)
+
+The following pins are **frozen** in this doc, and any mismatch is a
+`## U<m> — Drift pause` per unit-series rule §6 (unit-series rules in the
+register): **this file wins** — the unit that finds a mismatch pauses,
+records the pause (what it found, the exact lines/files, and what it needs),
+and does not guess.
+
+- The **12** invariants from Part 1 (C-TG·1 … C-TG·9, C1, C3, ADR 0004 §B.1) —
+  the *numbers* (not the prose) are stable for the rest of the lane; rename /
+  renumber is a breaking change. Part 2's §2.4 / §2.5 names hang off them.
+- The **12** FACES rows (F1–F12) in Part 1 — the *count* is a handoff field
+  (U1 → U2, and forward); a new FACES row (F13+) is added **only** by the
+  unit that ships the outcome it pins, in the same commit as the feature.
+- The **`TagService` 11-member public surface** (§2.1: `AttachToPostAsync`,
+  `AttachToPageAsync`, `AddTagTranslationAsync`, `ListForActorAsync`,
+  `ListPostsByTagAsync`, `ListPagesByTagAsync`, `SuggestAsync`,
+  `CanAttachToPost`, `CanAttachToPage`, `CanTranslateTag` + the `TagItem`
+  record) — names + signatures + the `TagItem(Tag, int, string)` shape,
+  frozen once U5 / U6 land them. Renaming a method or reshaping a record is a
+  drift event (U5/U6 own the shapes; U7–U10 consume them, no re-shaping).
+- The **`Tag`** 6-field shape (Id, Slug, Name, LanguageCode, CreatedBy,
+  Created) + the **`TagTranslation`** 6-field shape (Id, TagId, LanguageCode,
+  Name, AuthorId, Created) + the **absence of any `Audience` field** on both
+  (D1/D5) — frozen once U3 lands them.
+- The **`Post.TagIds` / `Page.TagIds`** additive-field pin (default empty;
+  `PageKind.System` pages always empty — C-TG·6) + the **`TagDocTypes`**
+  `(TagId, LanguageCode)` unique-index pin — frozen once U3 / U4 land them.
+- The **§2.3 tables** (the 5-row standing matrix + the 4-shape read table) —
+  frozen once written (U2's commit); a new row is a drift event **or** a new
+  FACES row (F13+), whichever the unit's change actually pins, in the same
+  commit + the same drift note.
+- The **24 test names** in §2.4 — frozen once the owning unit (U4 / U5 / U6)
+  lands the file. Renaming or re-scoping a name is a drift event; the unit
+  updates §2.4 in the same commit and appends a drift note to the handoff.
+- The **`PostService` / `PageService` no-new-methods** pin (§2.1) — the tag
+  lane gains no public method on either service; a new method is a drift
+  event (D4 — attach is *inside* their existing edit lanes).
+
+> **U2 records, here, the frozen counts of Part 2:** the 12 invariants (not 11,
+> not 13), the 12 FACES (F1–F12), the **11-member** `TagService` surface
+> (7 lane methods + 3 probes + 1 record), the **24** test names (not a smaller
+> or larger set), the **2** tables (5 + 4 rows), and the **3** acceptance-gate
+> tests (closed-loop / handoff / part-vs-whole) are the *frozen counts* of
+> Part 2.
