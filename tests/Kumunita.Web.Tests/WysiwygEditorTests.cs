@@ -323,6 +323,40 @@ public class WysiwygEditorTests
                 "<img src=\"/content-image/deadbeef\" alt=\"x\" class=\"rc-image\" loading=\"lazy\" />"));
     }
 
+    /// <summary>
+    /// Regression — the <c>&lt;!--StartFragment--&gt;</c> /
+    /// <c>&lt;!--EndFragment--&gt;</c> comments that browsers inject when
+    /// a partial text selection is copied must be stripped by both the
+    /// sanitizer and the serializer, not leaked into the saved body as
+    /// visible text. Before the fix, the tag regex did not match
+    /// <c>&lt;!--</c> so the comments were tokenized as plain text nodes
+    /// and survived into the Markdown output.
+    /// </summary>
+    [Fact]
+    public void WY6_Sanitizer_StripsBrowserFragmentComments()
+    {
+        // sanitizeHtml strips the comment markers.
+        Assert.Equal(
+            "<p>Hello</p><p>World</p>",
+            WysiwygSpec.SanitizeHtml(
+                "<!--StartFragment--><p>Hello</p><p>World</p><!--EndFragment-->"));
+
+        // toMarkdown also strips them (the serializer path).
+        Assert.Equal(
+            "Hello\n\nWorld",
+            WysiwygSpec.ToMarkdown(
+                "<!--StartFragment--><p>Hello</p><p>World</p><!--EndFragment-->"));
+
+        // Comments that span multiple lines (the reported case: German
+        // announcement text wrapped in fragment markers).
+        const string paneHtml =
+            "<!--StartFragment-->\n" +
+            "<p>Line one</p>\n" +
+            "<p>Line two</p>\n" +
+            "<!--EndFragment-->";
+        Assert.Equal("Line one\n\nLine two", WysiwygSpec.ToMarkdown(paneHtml));
+    }
+
     // ── WY U4 — artifact-string pins (§2.7 items 13–14, verbatim names) ──
 
     /// <summary>
@@ -543,7 +577,7 @@ internal static class WysiwygSpec
     public static string ToMarkdown(string html)
     {
         if (string.IsNullOrWhiteSpace(html)) return string.Empty;
-        var root = Parse(html);
+        var root = Parse(StripComments(html));
         var s = SerializeNode(root);
         return s ?? string.Empty;
     }
@@ -551,7 +585,7 @@ internal static class WysiwygSpec
     public static string SanitizeHtml(string html)
     {
         if (string.IsNullOrEmpty(html)) return string.Empty;
-        var root = Parse(html);
+        var root = Parse(StripComments(html));
         return SanitizeNode(root);
     }
 
@@ -578,6 +612,12 @@ internal static class WysiwygSpec
 
     private static readonly HashSet<string> VoidTags = new()
     { "br", "img", "hr", "input", "meta", "link" };
+
+    private static readonly Regex CommentRe =
+        new(@"<!--[\s\S]*?-->", RegexOptions.Compiled);
+
+    private static string StripComments(string html) =>
+        CommentRe.Replace(html, "");
 
     private static readonly Regex TagRe =
         new(@"<\/?([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^\u003c\u003e]*?)?)(\/?)>", RegexOptions.Compiled);

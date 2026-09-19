@@ -352,7 +352,7 @@ function serializeNode(node: HtmlElement): string | null {
  */
 export function toMarkdown(html: string): string {
   if (!html || !html.trim()) return '';
-  const root = parse(html);
+  const root = parse(stripComments(html));
   const s = serializeNode(root);
   return s ?? '';
 }
@@ -365,7 +365,7 @@ export function toMarkdown(html: string): string {
  */
 export function sanitizeHtml(html: string): string {
   if (!html) return '';
-  const root = parse(html);
+  const root = parse(stripComments(html));
   return sanitizeNode(root);
 }
 
@@ -417,4 +417,16 @@ function sanitizeNode(node: HtmlNode): string {
 
 function escAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Remove HTML comments (`<!-- … -->`) from the input before parsing.
+ * Browsers inject `<!--StartFragment-->` / `<!--EndFragment-->` markers
+ * when a partial selection is copied — if the user pastes that text into
+ * the contenteditable pane, the markers would otherwise survive as text
+ * nodes (the tag regex doesn't match `<!--`), leaking into the saved body
+ * as visible `<!--StartFragment-->` text.
+ */
+function stripComments(html: string): string {
+  return html.replace(/<!--[\s\S]*?-->/g, '');
 }
