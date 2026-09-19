@@ -1308,7 +1308,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation added ({name}).";
         return Redirect($"/posts/{id}");
     }
@@ -1375,7 +1375,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation added ({name}).";
         return Redirect($"/posts/{id}");
     }
@@ -1445,7 +1445,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation updated ({name}).";
         return Redirect($"/posts/{id}");
     }
@@ -1496,7 +1496,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation removed ({name}).";
         return Redirect($"/posts/{id}");
     }
@@ -1553,7 +1553,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation updated ({name}).";
         return Redirect($"/posts/{id}");
     }
@@ -1604,7 +1604,7 @@ public sealed class PostsController(
             return NotFound();
         }
 
-        var name = SeedLanguageName(languageCode);
+        var name = await SeedLanguageName(languageCode);
         TempData["info"] = $"Translation removed ({name}).";
         return Redirect($"/posts/{id}");
     }
