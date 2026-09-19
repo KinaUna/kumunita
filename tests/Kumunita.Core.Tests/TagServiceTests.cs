@@ -871,6 +871,252 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
             ctor.GetParameters().Select(p => p.ParameterType).ToList());
     }
 
+    // ─── U12 — the three-test acceptance gate (design doc §2.5) ─────────────
+    //
+    // Mirrors the M2 / ML-UI lane's gate-test shape (the
+    // <see cref="MLUI_FacesTests.MLUI_U8_Gate_ClosedLoop_RegistryKeySave"/>
+    // precedent): one <c>[Fact]</c> per leg — closed-loop, handoff,
+    // part-vs-whole. The real part-vs-whole evidence is the full
+    // <c>dotnet exec …Kumunita.Core.Tests.dll</c> run count (the 24-test
+    // §2.4 list **and** these three gate tests) recorded in the handoff
+    // note; the thin <c>[Fact]</c> here re-runs a representative subset of
+    // the §2.4 anchors in a single test to prove they pass *together*.
+
+    // ── Gate 1 — Closed loop ───────────────────────────────────────────────
+    // The author attaches `sanitation` to a post → the tag appears in the
+    // author's tag list **and** by-tag view; exactly one <c>tag.attach</c>
+    // + one <c>tag.create</c> audit row (C-TG·9, F1).
+
+    [Fact(DisplayName = "GATE closed-loop — attach → tag list + by-tag + 1 tag.attach + 1 tag.create")]
+    public async Task U12_Gate_ClosedLoop_Attach_VisibleInBothReadSurfaces_TwoAuditRows()
+    {
+        var store = await BootStoreAsync();
+        var svc = NewTagService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        await SeedDefaultLanguage(store, "en");
+        await Plant(store, NewPost("cl-post", "u-cl-author"));
+
+        // Write lane: attach `sanitation` (a new slug → creates the Tag doc +
+        // writes the audit rows).
+        var tags = new List<Tag>();
+        await using (var session = store.OpenSession(new SessionOptions()))
+            tags.AddRange(await svc.AttachToPostAsync("cl-post", ["sanitation"], "u-cl-author", RolesSet(Roles.Member), session));
+
+        // U8b call-site idiom: persist the resolved TagIds onto the content
+        // doc in a **fresh** session (the AttachToPostAsync lane's own
+        // SaveChangesAsync does not carry the loaded post's TagIds mutation
+        // to the DB — the U8b change-tracking quirk).
+        await using (var persist = store.OpenSession(new SessionOptions()))
+        {
+            var p = await persist.LoadAsync<Post>("cl-post", ct);
+            Assert.NotNull(p);
+            p!.TagIds = tags.Select(t => t.Id).ToList();
+            persist.Store(p);
+            await persist.SaveChangesAsync(ct);
+        }
+
+        // Exactly one tag.attach + one tag.create (the C-TG·9 two-row shape).
+        var attachRows = await AuditsFor(store, "tag.attach");
+        var createRows = await AuditsFor(store, "tag.create");
+        Assert.Single(attachRows);
+        Assert.Single(createRows);
+        Assert.Equal("u-cl-author", attachRows[0].ActorId);
+        Assert.Equal("u-cl-author", createRows[0].ActorId);
+        Assert.Equal(AccessVia.Owner, attachRows[0].Via);
+        Assert.Equal(AccessVia.Owner, createRows[0].Via);
+
+        // The read surfaces (the *next* request — strong consistency): the
+        // author's tag list shows the tag with UseCount 1.
+        var list = await svc.ListForActorAsync("u-cl-author");
+        var item = Assert.Single(list, i => i.Tag.Slug == "sanitation");
+        Assert.Equal(1, item.UseCount);
+
+        // The by-tag view shows the post.
+        var posts = await svc.ListPostsByTagAsync("sanitation", "u-cl-author");
+        Assert.Contains(posts, p => p.Id == "cl-post");
+    }
+
+    // ── Gate 2 — Handoff ───────────────────────────────────────────────────
+    // Two legs (the design doc §2.5 pin):
+    // (a) **Strong consistency (C4):** a group member added *after* the post
+    //     sees the tag on the *very next* request (the F3 flip — the
+    //     membership row is live, no projection lag).
+    // (b) **Creator-reword ("handoff to the creator"):** the creator sets a
+    //     `de` TagTranslation; a viewer whose effective language is `de`
+    //     sees the `de` name on the next read (the F6 / C-TG·5 pin; the
+    //     translation is live, no cache).
+
+    [Fact(DisplayName = "GATE handoff — membership add is live + creator reword is live")]
+    public async Task U12_Gate_Handoff_MembershipLive_CreatorRewordLive()
+    {
+        var store = await BootStoreAsync();
+        var svc = NewTagService(store);
+        var userInfo = new UserInfoService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        await SeedDefaultLanguage(store, "en");
+        const string owner = "u-ho-owner";
+        const string member = "u-ho-member";
+
+        // ── Leg (a): strong consistency on the group-lane read ─────────────
+        var group = await userInfo.CreateGroupAsync(owner, "Ho family", null);
+        await Plant(store, new Tag
+        {
+            Id = "tag-ho", Slug = "sanitation", Name = "Sanitation",
+            LanguageCode = "en", CreatedBy = owner,
+        });
+        await Plant(store, TaggedGroupPost("ho-post", group.Id, owner, "tag-ho"));
+
+        // Before the membership add: the member (not yet in the group) sees
+        // **nothing** — the group post's own Read decision denies.
+        Assert.Empty(await svc.ListPostsByTagAsync("sanitation", member));
+        Assert.Empty(await svc.ListForActorAsync(member));
+
+        // The membership lands through the frozen write seam (C4 live row).
+        await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: owner);
+
+        // The **very next** request: the member now sees the post + the tag.
+        var memberPosts = await svc.ListPostsByTagAsync("sanitation", member);
+        Assert.Contains(memberPosts, p => p.Id == "ho-post");
+        Assert.Contains(await svc.ListForActorAsync(member), i => i.Tag.Id == "tag-ho");
+
+        // ── Leg (b): creator-reword is live on the viewer's next read ──────
+        // (The "handoff to the creator" reading of §2.5: the creator's
+        // TagTranslation is visible to all viewers on their next read.)
+        await Plant(store, new Tag
+        {
+            Id = "tag-ho2", Slug = "hygiene", Name = "Hygiene",
+            LanguageCode = "en", CreatedBy = owner,
+        });
+        await Plant(store, TaggedPost("ho2-post", owner, "tag-ho2"));
+
+        // Before the reword: the base name (`Hygiene`) is the display.
+        var before = await svc.ListForActorAsync(owner);
+        var beforeItem = Assert.Single(before, i => i.Tag.Id == "tag-ho2");
+        Assert.Equal("Hygiene", beforeItem.DisplayedName);
+
+        // The creator sets the `de` translation (C-TG·5 standing holds).
+        await using (var session = store.OpenSession(new SessionOptions()))
+            await svc.AddTagTranslationAsync(
+                "tag-ho2", "de", "Reinigung", owner, RolesSet(Roles.Member), session);
+
+        // Switch the instance default to `de` (the viewer's effective
+        // language is now `de` — the ADR 0005 preference order collapses
+        // to the instance default in Core).
+        await SeedDefaultLanguage(store, "de");
+
+        // The **very next** read: the `de` translation is the display name.
+        var after = await svc.ListForActorAsync(owner);
+        var afterItem = Assert.Single(after, i => i.Tag.Id == "tag-ho2");
+        Assert.Equal("Reinigung", afterItem.DisplayedName);
+    }
+
+    // ── Gate 3 — Part-vs-whole ─────────────────────────────────────────────
+    // The 24-test §2.4 list is the **whole**; closed-loop + handoff are the
+    // **parts**; all must pass together. This test re-runs a representative
+    // subset of the §2.4 anchors (F1, F4, F6, F9, F10, the audit-row shape,
+    // the no-audit-row pin, the Slug derivation) in a single execution to
+    // prove they are mutually consistent. The *real* part-vs-whole
+    // evidence is the full `dotnet exec` run count (the 24-test list +
+    // these three gate tests) recorded in the handoff note.
+
+    [Fact(DisplayName = "GATE part-vs-whole — §2.4 anchor subset passes together in one run")]
+    public async Task U12_Gate_PartVsWhole_AnchorSubsetPassesTogether()
+    {
+        var store = await BootStoreAsync();
+        var svc = NewTagService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        await SeedDefaultLanguage(store, "en");
+        const string author = "u-pw-author";
+        const string viewer = "u-pw-viewer";
+
+        // ── F1 anchor (C-TG·9): attach → one tag.attach + one tag.create ──
+        await Plant(store, NewPost("pw-post-a", author));
+        var pwTags = new List<Tag>();
+        await using (var s1 = store.OpenSession(new SessionOptions()))
+            pwTags.AddRange(await svc.AttachToPostAsync("pw-post-a", ["sanitation"], author, RolesSet(Roles.Member), s1));
+        // U8b call-site idiom: persist TagIds in a fresh session (the change-tracking quirk).
+        await using (var s1p = store.OpenSession(new SessionOptions()))
+        {
+            var p = await s1p.LoadAsync<Post>("pw-post-a", ct);
+            Assert.NotNull(p);
+            p!.TagIds = pwTags.Select(t => t.Id).ToList();
+            s1p.Store(p);
+            await s1p.SaveChangesAsync(ct);
+        }
+        Assert.Single(await AuditsFor(store, "tag.attach"));
+        Assert.Single(await AuditsFor(store, "tag.create"));
+
+        // ── F4 anchor (C-TG·1 / C-TG·2): tag behind unread content is absent ─
+        await Plant(store, new Tag
+        {
+            Id = "tag-pw-secret", Slug = "secret", Name = "Secret",
+            LanguageCode = "en", CreatedBy = author,
+        });
+        await Plant(store, TaggedPost("pw-post-b", author, "tag-pw-secret"));
+        Assert.Empty(await svc.ListForActorAsync(viewer));
+        Assert.Empty(await svc.ListPostsByTagAsync("secret", viewer));
+
+        // ── F6 anchor (C-TG·5): creator sets a translation → one row ───────
+        await using var q = store.QuerySession();
+        var tagId = (await q.Query<Tag>().Where(t => t.Slug == "sanitation").FirstAsync(ct)).Id;
+        await using (var s2 = store.OpenSession(new SessionOptions()))
+            await svc.AddTagTranslationAsync(tagId, "de", "Reinigung", author, RolesSet(Roles.Member), s2);
+        Assert.Single(await AuditsFor(store, "tagtranslation.add"));
+
+        // ── F9 anchor (C-TG·4): display name resolves in the viewer's lang ─
+        await SeedDefaultLanguage(store, "de");
+        var list = await svc.ListForActorAsync(author);
+        var item = Assert.Single(list, i => i.Tag.Id == tagId);
+        Assert.Equal("Reinigung", item.DisplayedName);
+
+        // ── F10 anchor (C-TG·2): suggest is capped at ≤ 10 ─────────────────
+        for (var i = 0; i < 12; i++)
+            await Plant(store, new Tag
+            {
+                Id = "tag-pw-" + i, Slug = "cap" + i, Name = "Cap " + i,
+                LanguageCode = "en", CreatedBy = author,
+            });
+        var capPost = NewPost("pw-cap-post", author);
+        capPost.TagIds = Enumerable.Range(0, 12).Select(i => "tag-pw-" + i).ToList();
+        await Plant(store, capPost);
+        Assert.True((await svc.SuggestAsync(string.Empty, author)).Count <= 10);
+
+        // ── No-audit-row pin (C-TG·8): reads emitted no tag-family row ─────
+        // The write rows so far (F1 tag.attach + tag.create, F6
+        // tagtranslation.add, the Slug anchor's tag.attach on the existing
+        // slug) are the writes'; the two reads below must add **zero**
+        // additional tag-family rows (a read is not a decision — D7).
+        int before;
+        await using (var qb = store.QuerySession())
+            before = await qb.Query<AccessAudit>()
+                .Where(a => a.TargetKind == "tag").CountAsync(ct);
+        await svc.ListForActorAsync(author);
+        await svc.SuggestAsync("san", author);
+        await using var qa = store.QuerySession();
+        var after = await qa.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "tag").CountAsync(ct);
+        Assert.Equal(before, after);
+
+        // ── Slug derivation anchor (C-TG·4): lowercase + trim ──────────────
+        await Plant(store, NewPost("pw-slug-post", author));
+        await using (var s3 = store.OpenSession(new SessionOptions()))
+        {
+            var tags = await svc.AttachToPostAsync(
+                "pw-slug-post", ["  Sanitation  "], author, RolesSet(Roles.Member), s3);
+            Assert.Contains(tags, t => t.Slug == "sanitation");
+        }
+
+        // ── F12 anchor (C-TG·7): a fresh store has zero tags ───────────────
+        // (Verified in F12_FreshInstanceHasZeroTags; here we assert the
+        // current store has ≥ 1 tag, proving the anchors above operated on
+        // a non-empty store.)
+        await using var qf = store.QuerySession();
+        Assert.True(await qf.Query<Tag>().CountAsync(ct) >= 1);
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page + **Tag** doc
