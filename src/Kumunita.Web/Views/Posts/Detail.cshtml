@@ -123,7 +123,7 @@
                            language (originalHidden); the swap + return path
                            (ADR 0027) are unchanged either way. *@
                         <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
-                             @(originalHidden ? " style=\"display:none\"" : null)>
+                             @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                             <h4>
                                 @(!string.IsNullOrWhiteSpace(Model.Post.Title)
                                     ? Model.Post.Title
@@ -142,7 +142,7 @@
                         {
                             bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                             <div class="td-variant" data-td-variant="@t.LanguageCode"
-                                 @(tDefault ? null : " style=\"display:none\"")>
+                                 @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                 @if (!string.IsNullOrWhiteSpace(t.Title))
                                 {
                                     <h4>@t.Title</h4>
@@ -360,7 +360,7 @@
                                     @* Original variant (default-visible unless ADR 0049
                                        auto-selects a translation of it). *@
                                     <div class="td-variant" data-td-variant="@r.OriginalLanguageCode"
-                                         @(replyOriginalHidden ? " style=\"display:none\"" : null)>
+                                         @(replyOriginalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                                         <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
                                     </div>
 
@@ -371,7 +371,7 @@
                                     {
                                         bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
                                         <div class="td-variant" data-td-variant="@t.LanguageCode"
-                                             @(tDefault ? null : " style=\"display:none\"")>
+                                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                                             <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
                                         </div>
                                     }
