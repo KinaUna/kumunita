@@ -102,3 +102,75 @@ further open decisions carried into U01.
   M5 / M6 roadmap letters.
 
 **U00 exit gate met. STOP — do NOT start U01.**
+
+## U01 — Event/EventRsvp docs + M4DocTypes
+
+- **(a) Files added:**
+  - `src/Kumunita.Core/Events/Event.cs` — the §3.1 POCO (exact field set,
+    byte-for-byte the design-doc shape; `Body` / `ReminderEnabled` naming).
+  - `src/Kumunita.Core/Events/EventRsvp.cs` — the §3.2 POCO + the
+    `RsvpStatus` enum (`Going` / `Maybe` / `No`).
+  - `src/Kumunita.Core/M4DocTypes.cs` — the new parallel doc surface
+    (the `M3DocTypes` pattern verbatim; root-level file, like
+    `PageDocTypes.cs` / `TagDocTypes.cs`).
+  - `src/Kumunita.Core/Events/IEventService.cs` — the §4 seam (exact
+    signatures; U03/U04 implement the bodies).
+  - `src/Kumunita.Core/Events/EventService.cs` — the store-composing
+    skeleton (ctor composes the **frozen** `IDocumentStore` +
+    `IAuthorizationService` + `IUserInfoService`; every method throws
+    `NotImplementedException` — the "logic lands in U03/U04" pin).
+  - `src/Kumunita.Core/Events/EventRequests.cs` — the `CreateEventRequest`
+    / `UpdateEventRequest` records referenced by the §4 seam (the request
+    payloads the write lanes take; the client never sends `ImageIds` /
+    `AttachmentIds`).
+  - **Modified:** `src/Kumunita.Core/DependencyInjection.cs` —
+    `IEventService → EventService` transient registered next to
+    `IAnnouncementService` / `IPageService` (the "AddTransient with the
+    store injected" shape).
+  - **Modified:** `src/Kumunita.Web/Program.cs` — `M4DocTypes.Configure(opts)`
+    wired into the dev-loop path next to the `TagDocTypes.Configure(opts)`
+    line (one call added). `SchemaBootstrap.cs` was **not** touched: it
+    applies the *storage-feature* steps and never calls the doc surfaces
+    directly — the doc surfaces are registered at the `StoreOptions` level
+    (Program.cs), the same as M1/M3/Media/Page/Tag.
+- **(b) The two indexes confirmed** (in `M4DocTypes.Configure`):
+  - `Event` — a regular composite **feed-ordering** index
+    `(ComponentId, Start)` (the design-doc §4 "feed ordering shape"; a
+    filter-then-sort optimization, not an integrity constraint).
+  - `EventRsvp` — a **unique** `(EventId, UserId)` index (the §3.2
+    last-write-wins concurrency pin — exactly one RSVP row per resident
+    per event, upsert semantics).
+- **(c) Build + test result (U01 exit gate, both green):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0
+    Warning(s), 0 Error(s)**.
+  - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    → **Total: 615, Errors: 0, Failed: 0, Skipped: 0** (the new schema
+    delta applies idempotently against a real Postgres via Testcontainers;
+    the existing `Post` / `Announcement` / `Page` surfaces are untouched).
+  - **One note (not a drift):** the multi-expression
+    `.Index(e => e.ComponentId, e => e.Start)` form used by `UniqueIndex`
+    does **not** exist on Marten 9's `DocumentMapping` (CS1061 — only
+    `UniqueIndex` is `params`-based; the regular composite `Index` takes a
+    single projection). The `(ComponentId, Start)` feed index is therefore
+    declared via the anonymous-object projection
+    `.Index(e => new { e.ComponentId, e.Start })` — the documented
+    composite-index idiom, same column order, non-unique. The
+    `(EventId, UserId)` **unique** index uses the `params` form
+    `.UniqueIndex(r => r.EventId, r => r.UserId)` (the `M3DocTypes` /
+    `PageDocTypes` precedent).
+- **(d) Drift pauses:** **none.** No new `AccessAction` / `AccessVia` /
+  authorization branch; no new audience mechanism (`Event.Audience` is the
+  exact `Kumunita.Core.Authorization.Audience` type, nullable — `null` =
+  public, ADR 0036); no new editor / renderer / email / timezone / tag /
+  language / media mechanism — every field reuses an existing idiom per the
+  §3.1 provenance table. No frozen seam
+  (`IAuthorizationService` / `IUserInfoService` / `IIdentityService` /
+  `IMailerStage`) re-shaped — the `EventService` ctor only *consumes* the
+  existing seams. `Post` / `Announcement` / `Page` untouched. No code
+  beyond the ADR / docs was changed (U00's scope).
+- **Untouched (per scope):** `Milestones.cs` / README / `MilestonesTests`
+  (U00 already flipped PG→done, M4→next), the translation lane (events are
+  authored-in-language only in M4), the `EventToAuditableResource` adapter
+  (U02), the 23 seam tests (U09), and the §6.4 reminder job (U07/U08).
+
+**U01 exit gate met. STOP — do NOT start U02.**

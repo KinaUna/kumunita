@@ -97,6 +97,15 @@ var marten = builder.Services.AddMarten(opts =>
     // business-key unique index, tg_tr_uidx_tag_lang). Without this call
     // the docs are invisible to Marten (the M3/Media/Page precedent).
     TagDocTypes.Configure(opts);
+
+    // M4 (ADR 0054, plan U01): the Events bounded context's documents (Event +
+    // EventRsvp, ADR 0004 §B.1 — the two new docs on a new parallel surface, not
+    // additive on an existing one: the (ComponentId, Start) feed-ordering index on
+    // Event and the (EventId, UserId) UNIQUE index on EventRsvp — the last-write-wins
+    // concurrency exception, the ADR 0054 §3.2 pin). Without this call the docs are
+    // invisible to Marten (the M3/Media/Page/Tag precedent). The Event/EventRsvp
+    // POCOs are new; the existing Post/Announcement/Page surfaces are untouched.
+    M4DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

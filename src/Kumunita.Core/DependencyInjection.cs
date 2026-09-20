@@ -173,6 +173,20 @@ public static class ServiceCollectionExtensions
         // an admin edit takes effect on the next request, no rebuild.
         services.AddTransient<Localization.ITranslationProvider, Localization.TranslationProvider>();
         services.AddTransient<Localization.ILocalizationService, Localization.LocalizationService>();
+
+        // M4 (ADR 0054, plan U01): the Events bounded context's service seam (bounded
+        // context Kumunita.Core.Events — the "coordination" arrow: the Event + EventRsvp
+        // documents, the IEventService read/write surface, and the §6.4 reminder job).
+        // A store-composing service kept behind an interface so the Web-side consumer
+        // (the EventController, U05) can be tested without a live Postgres (the same
+        // "AddTransient with the store injected" shape as IAnnouncementService /
+        // IPageService above). U03/U04 land the read + write lanes; this unit is the
+        // seam + registration only (the EventService skeleton throws
+        // NotImplementedException until then — the "logic lands in U03/U04" pin).
+        services.AddTransient<Events.IEventService>(sp => new Events.EventService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
         return services;
     }
 }
