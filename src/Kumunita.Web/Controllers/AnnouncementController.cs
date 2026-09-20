@@ -71,7 +71,14 @@ public sealed class AnnouncementController(
     IAnnouncementService announcements,
     IUserInfoService userInfo,
     ILocalizationService localization,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // ADR 0051 (extending ADR 0049 to the /announcements list surface) — the
+    // per-request translation read seam, used only to auto-select which of an
+    // announcement's pre-rendered variants (ADR 0029) is default-visible in the
+    // list rows. **Optional** so the 10 existing test-construction sites (which
+    // exercise the as-authored fallback — their original intent) keep compiling
+    // untouched; DI always supplies the seam in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -172,6 +179,34 @@ public sealed class AnnouncementController(
 
         var components = await userInfo.GetComponentsAsync(enabledOnly: true);
         var componentNames = components.ToDictionary(c => c.Id, c => c.Name);
+
+        // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
+        // force on the detail views + the pinned banner) to this list surface: a
+        // row shows the announcement in the viewer's current language when a
+        // translation of it into that language exists, else the authored-in
+        // title/body (the ADR 0029 floor — exactly the fallback the existing
+        // tests pin). The resolution is one read of the shared per-request chain
+        // (cookie → Accept-Language → instance default → en, the same code the
+        // <kw-l> TagHelper and the banner use), so the list's "current
+        // language" can never disagree with the platform text's. A "a read, not
+        // a decision" surface: the per-announcement read inherits the flat scope
+        // gate that already ran in ListVisibleAsync. No Core / schema change —
+        // this is the Web layer picking among the pre-rendered rows ADR 0029
+        // already stores (none is generated, rewritten, or fetched).
+        if (translationProvider is not null)
+        {
+            var effLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContext?.Request, localization, translationProvider);
+            foreach (var a in visible)
+            {
+                var translations = await announcements.GetAnnouncementTranslationsAsync(a.Id);
+                var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+                if (match is null)
+                    continue;
+                a.Title = string.IsNullOrWhiteSpace(match.Title) ? a.Title : match.Title; // blank translation title → the authored-in title (the ADR 0029 floor)
+                a.Body = match.Body; // Body is required on a translation row
+            }
+        }
 
         var rows = visible
             .Select(a => new AnnouncementRow(a.Id, a.Scope, a.Title ?? string.Empty, a.Body, a.Created,

@@ -766,6 +766,69 @@ public class AnnouncementControllerTests
                 Assert.Equal("Community A", row.CommunityDisplayName);
             }
 
+            /// <summary>
+            /// ADR 0051 (extending ADR 0049's default-visible-variant rule from the
+            /// detail views + pinned banner to the <c>/announcements</c> list): a row
+            /// shows the announcement in the viewer's current language when a
+            /// translation into that language exists, else the authored-in text.
+            /// Here the viewer's preference is the <c>kumunita.locale</c> cookie set
+            /// to <c>da</c> (the reported scenario), and the announcement has a
+            /// Danish translation: its body replaces the list's preview, and its
+            /// <em>blank</em> title falls back to the authored title (the ADR 0029
+            /// floor). The as-authored fallback is the sibling test above (no
+            /// provider supplied → the row renders as authored).
+            /// </summary>
+            [Fact]
+            public async Task Index_When_TranslationMatchesViewerLanguage_RowShowsTranslation()
+            {
+                const string author = "subj-admin-001";
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.ListVisibleAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new List<Announcement>
+                    {
+                        new()
+                        {
+                            Id = "ann-da", Scope = AnnouncementScope.Public,
+                            Title = "Community potluck", Body = "Bring a side dish to the potluck this Saturday",
+                            AuthorId = author, Created = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero),
+                        },
+                    });
+                // The Danish translation: a blank title (→ the authored-in title is
+                // kept) and a translated body (→ the list preview shows the Danish).
+                announcements.GetAnnouncementTranslationsAsync("ann-da").Returns(
+                    new List<AnnouncementTranslation>
+                    {
+                        new()
+                        {
+                            Id = "tr-da", AnnouncementId = "ann-da", LanguageCode = "da",
+                            Title = "   ", // blank → the authored-in title is the floor
+                            Body = "Medbring en sideret til potluck denne lørdag",
+                        },
+                    });
+
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Admin" });
+                userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+                var store = Substitute.For<IDocumentStore>();
+                var provider = Substitute.For<ITranslationProvider>();
+                provider.ResolveEffectiveLanguageAsync("da").Returns("da"); // the cookie branch resolves "da" → "da"
+                var controller = new AnnouncementController(announcements, userInfo, DefaultLocalization(), store, provider);
+
+                var httpContext = new DefaultHttpContext();
+                httpContext.Request.Headers.Cookie = "kumunita.locale=da"; // the viewer's explicit preference (M·5)
+                controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+                var result = (await controller.Index()) as ViewResult;
+                var rows = Assert.IsType<List<AnnouncementRow>>((result?.Model as AnnouncementIndexViewModel)?.Announcements!);
+                var row = rows.Single();
+
+                // The list's body/preview is the Danish translation…
+                Assert.Equal("Medbring en sideret til potluck denne lørdag", row.Body);
+                // …and the blank translation title falls back to the authored title (the ADR 0029 floor).
+                Assert.Equal("Community potluck", row.Title);
+            }
+
             // ──── Detail (GET /announcements/{id}) — full-body read ────────────────
 
             /// <summary>

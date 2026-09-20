@@ -77,7 +77,16 @@ public sealed class PostsController(
     ModerationService moderation,
     IUserInfoService userInfo,
     ILocalizationService localization,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // ADR 0051 (extending ADR 0049 to the /community list surfaces) — the
+    // per-request translation read seam, used only to auto-select which of an
+    // item's pre-rendered variants (ADR 0022 posts, ADR 0026 community names)
+    // is default-visible in the feed rows. **Optional** so any test-construction
+    // site exercising the as-authored fallback keeps compiling; DI always
+    // supplies the seam in the app. (PostService is sealed — this controller is
+    // exercised by the integration/FACES lanes, not NSubstitute, per
+    // TranslationDisplayTests.)
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -140,6 +149,22 @@ public sealed class PostsController(
             || KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId));
         var isMandatory = component.Mandatory;
         var canLeave = canPost && !manages && !isMandatory;
+
+        // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
+        // force on the detail views) to this list surface: the feed header shows
+        // the community's name in the viewer's current language when a
+        // translation exists (else the authored name), and each row shows the
+        // post's title/body in the viewer's current language when a translation
+        // exists (else the authored — the ADR 0022 floor). One read of the shared
+        // per-request chain; a "a read, not a decision" surface (the feed's
+        // CanSeeAsync already ran). No Core / schema change.
+        if (translationProvider is not null)
+        {
+            var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            component.Name = await ResolveCommunityNameAsync(component.Id, component.Name, effLang);
+            foreach (var p in feed.Visible)
+                await ApplyTranslationToPostAsync(p, effLang);
+        }
 
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -235,6 +260,20 @@ public sealed class PostsController(
 
         var feed = await posts.ListAllFeedAsync(componentIds, actor, page: 1);
 
+        // ADR 0051 — the all-sections feed shows each post + its section name in
+        // the viewer's current language when a translation exists, else the
+        // authored-in text (the ADR 0022/0026 floor). One read of the shared
+        // per-request chain; a read, not a decision (ListAllFeedAsync's
+        // CanSeeAsync already ran). No Core / schema change.
+        if (translationProvider is not null)
+        {
+            var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var c in components)
+                nameByComponentId[c.Id] = await ResolveCommunityNameAsync(c.Id, nameByComponentId[c.Id], effLang);
+            foreach (var p in feed.Visible)
+                await ApplyTranslationToPostAsync(p, effLang);
+        }
+
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
         {
@@ -263,6 +302,48 @@ public sealed class PostsController(
             // reachable communities renders no pill directory.
             Communities = accessible.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
         });
+    }
+
+    // ── ADR 0051 — list-surface variant selection (the Web-layer helpers) ──
+
+    /// <summary>
+    /// ADR 0051 — pick the community's name in the viewer's current language
+    /// from its user-added name/description translation (ADR 0026), falling
+    /// back to the authored <paramref name="fallbackName"/> when no translation
+    /// row for <paramref name="effLang"/> exists or its name is blank (the
+    /// ADR 0026 floor). A "a read, not a decision" surface — the community's
+    /// enabled-visibility gate already ran; this only chooses which stored,
+    /// human-authored row to show.
+    /// </summary>
+    private async Task<string> ResolveCommunityNameAsync(string componentId, string fallbackName, string effLang)
+    {
+        if (translationProvider is null)
+            return fallbackName;
+        var translations = await userInfo.GetCommunityTranslationsAsync(componentId);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        return match is not null && !string.IsNullOrWhiteSpace(match.Name) ? match.Name : fallbackName;
+    }
+
+    /// <summary>
+    /// ADR 0051 — in place, swap <paramref name="post"/>'s Title/Body to the
+    /// translation row in the viewer's current language when one exists: the
+    /// translation's body (required on the row), and its title when non-blank
+    /// (otherwise the authored title is kept — the ADR 0022 floor). A read, not
+    /// a decision: the post's <c>CanSeeAsync</c> already ran in the feed read.
+    /// No content is generated, rewritten, or fetched — only the exact
+    /// human-authored row (ADR 0018/0022) is selected.
+    /// </summary>
+    private async Task ApplyTranslationToPostAsync(Post post, string effLang)
+    {
+        if (translationProvider is null)
+            return;
+        var translations = await posts.GetPostTranslationsAsync(post.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(match.Title))
+            post.Title = match.Title; // blank translation title → the authored-in title
+        post.Body = match.Body; // Body is required on a translation row
     }
 
     // ── Detail + one-level replies (GET /posts/{id}) ─────────────────────

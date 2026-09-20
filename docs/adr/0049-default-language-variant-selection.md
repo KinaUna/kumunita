@@ -99,7 +99,11 @@ swappable. What is missing is only the *default selection*.
   ADR 0046 resolution chain gains a second consumer (UGC variant
   selection) without its own semantics changing.
 - Surfaces that do *not* carry the variant/chip machinery (post and
-  reply **list** previews, group and community **index** cards) are
-  **out of scope** and still render as authored — they have no
-  translation rows in view today; extending the default there is a
-  separate lane if ever wanted.
+  reply **list** previews, group and community **index** cards) were
+  **out of scope** here and rendered as authored. ADR **0051** has now
+  extended this default to the three list surfaces — the `/announcements`
+  list, the `/community/{id}` feed, and the `/community` all-sections feed
+  (including the community name each shows) — so they no longer render as
+  authored when a translation of the viewer's language exists. The group
+  **index** cards and the community **pill** directory remain out of scope
+  (separate lanes, ADR 0051's scope boundary).
