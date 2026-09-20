@@ -12,7 +12,8 @@ public sealed class LoginViewModel
     [Display(Name = "Password")]
     public string Password { get; set; } = string.Empty;
 
-    [Display(Name = "Remember me")]
+    // Label is rendered by the view via the account.login_remember key (ADR 0015
+    // mechanism) — no [Display(Name)] to mirror.
     public bool RememberMe { get; set; }
 
     public string? ReturnUrl { get; set; }

@@ -35,7 +35,9 @@
 
             <div class="mb-3 form-check">
                 <input asp-for="RememberMe" class="form-check-input" />
-                <label asp-for="RememberMe" class="form-check-label"></label>
+                <label class="form-check-label mb-0">
+                    <kw-l key="account.login_remember">Remember me</kw-l>
+                </label>
             </div>
 
             <button type="submit" class="btn btn-primary"><kw-l key="account.login_submit">Sign in</kw-l></button>
@@ -47,7 +49,8 @@
                closed gate has no self-service signup surface to point at. *@
             @if (Model.SignupOpen)
             {
-                <kw-l key="account.login_no_account">No account yet?</kw-l> <a asp-action="Signup">Sign up</a>
+                <kw-l key="account.login_no_account">No account yet?</kw-l>
+                <a asp-action="Signup"><kw-l key="account.login_signup">Sign up</kw-l></a>
             }
             @if (Model.ShowSetupLink)
             {
@@ -55,8 +58,7 @@
                 {
                     <text> </text>
                 }
-                <text>Received a first-boot setup token? <a asp-controller="AdminSetup" asp-action="Setup"
-                    asp-route-returnUrl="@Model.ReturnUrl">Complete setup</a>.</text>
+                <kw-l key="account.login_setup_hint">Received a first-boot setup token?</kw-l> <a asp-controller="AdminSetup" asp-action="Setup" asp-route-returnUrl="@Model.ReturnUrl"><kw-l key="account.login_setup_link">Complete setup</kw-l></a>
             }
             else if (Model.SignupOpen)
             {
