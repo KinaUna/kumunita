@@ -302,6 +302,73 @@ public sealed class IdentityService(
         return target;
     }
 
+    // ── Signup policy (ADR 0050 — the admin-managed open / invitation-only gate) ──
+
+    /// <inheritdoc />
+    public async Task<bool> IsSignupOpenAsync()
+    {
+        // ADR 0050 read seam: the instance gate (LocaleSettings.IsSignupOpen) with
+        // the `true` floor — a missing singleton or an unset value both yield
+        // `true`, so a fresh instance ships with sign-up open (the development
+        // circle keeps working until an admin tightens it). A read (no audit row),
+        // the same shape as the LocaleSettings reads the Localization lane does.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `true` floor: a null settings row (never seen — but defensively) keeps the
+        // gate open; only an explicit `false` closes sign-up.
+        return settings is null || settings.IsSignupOpen;
+    }
+
+    /// <inheritdoc />
+    public async Task SetSignupOpenAsync(bool open, string adminSubjectId)
+    {
+        // ADR 0050 write seam: the admin-settled instance gate (LocaleSettings singleton,
+        // the same doc the timezone / date-format / editor lanes read and write) + exactly
+        // one audit row (via: Admin, action "signup.set-open", target "signup") in the
+        // same session (C3 — no silent, unaudited access). The gate is the whole point
+        // here — it is *not* an access change, so there is no VisibilityCount to attach
+        // (VisibleCount / HiddenCount stay null, the single-target shape ADR 0006 §B
+        // prescribes for a singleton toggle). `open` is the authoritative new value.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetDefaultTimezoneAsync shape) and set
+        // the gate; the other singleton fields are untouched — this is the signup
+        // gate only.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { IsSignupOpen = open };
+        }
+        else
+        {
+            settings.IsSignupOpen = open;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "signup.set-open",
+            TargetKind = "signup",
+            TargetId = "signup",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task<ThinPrincipal> CompleteSeedAdminSetupAsync(string email, string setupTokenValue, string newPassword)
     {

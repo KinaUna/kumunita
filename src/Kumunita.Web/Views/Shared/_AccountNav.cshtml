@@ -1,8 +1,10 @@
 @using Kumunita.Core.Localization
+@using Kumunita.Core.Identity
 @using Kumunita.Web.Security
 @inject ILocalizationService Localization
 @inject ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IIdentityService Identity
 @*
     Right-hand nav actions (the public section links live in the layout's
     left nav). Signed in: a single account dropdown (toggle labelled with the
@@ -147,8 +149,15 @@
         <li class="nav-item">
             <a class="nav-link text-dark" asp-controller="Account" asp-action="Login"><kw-l key="nav.sign_in">Sign in</kw-l></a>
         </li>
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup"><kw-l key="nav.sign_up">Sign up</kw-l></a>
-        </li>
+        @* ADR 0050 — the sign-up gate (the admin-settled instance value, the `true`
+           floor): when closed (invitation-only), the self-service sign-up surface is
+           gone, so the nav link is suppressed — an invited resident is added by an
+           administrator, not through this link. *@
+        @if (await Identity.IsSignupOpenAsync())
+        {
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup"><kw-l key="nav.sign_up">Sign up</kw-l></a>
+            </li>
+        }
     }
 </ul>

@@ -159,4 +159,30 @@ public interface IIdentityService
     /// <c>(via: Owner | Admin)</c>.
     /// </summary>
     Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin);
+
+    // ── Signup policy (ADR 0050 — the admin-managed open / invitation-only gate) ──
+
+    /// <summary>
+    /// Whether self-service sign-up is currently open on this instance (ADR 0050).
+    /// The Web's <c>AccountController</c> reads this to hide the public <c>Sign up</c>
+    /// surface and to deny the signup write when it is closed (the README's deferred
+    /// "Invitation-only sign-up" item — the long-term default the community should
+    /// run under once it widens beyond the development circle). A read (no audit
+    /// row); the <c>true</c> floor — a missing singleton or a null value both yield
+    /// <c>true</c>, so a fresh instance ships with sign-up open.
+    /// </summary>
+    Task<bool> IsSignupOpenAsync();
+
+    /// <summary>
+    /// Set whether self-service sign-up is open (ADR 0050): a GlobalAdmin flips the
+    /// instance-wide gate — <c>true</c> opens the public <c>Sign up</c> surface
+    /// (the development-circle default), <c>false</c> closes it (the invitation-only
+    /// state: existing residents are unaffected; only new self-service accounts are
+    /// gated). Writes the <see cref="Kumunita.Core.Localization.LocaleSettings.IsSignupOpen"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"signup.set-open"</c>, target "signup") in the
+    /// same session (C3 — no silent, unaudited access). Only a GlobalAdmin may call
+    /// this; the Web's <c>AdminSignupController</c> enforces the gate.
+    /// </summary>
+    Task SetSignupOpenAsync(bool open, string adminSubjectId);
 }

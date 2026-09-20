@@ -41,16 +41,33 @@ public sealed class AccountController(
 
     [AllowAnonymous]
     [HttpGet]
-    public IActionResult Signup() =>
-        User.Identity?.IsAuthenticated == true
-            ? Redirect("/profile/edit")
-            : View(new SignupViewModel());
+    public async Task<IActionResult> Signup()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return Redirect("/profile/edit");
+
+        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
+        // `true` floor). Closed → the invitation-only notice instead of the form;
+        // the gate is authoritative (an authenticated admin still creates accounts
+        // through the Guardian / admin lanes, not this self-service surface).
+        if (!await identity.IsSignupOpenAsync())
+            return View("SignupClosed", new SignupClosedViewModel());
+
+        return View(new SignupViewModel());
+    }
 
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
+        // ADR 0050 — the gate is authoritative on the write path too (the GET hides
+        // the form, but the POST is the actual account-creation surface): a closed
+        // gate denies the self-service write. A resident who is *invited* is added
+        // by an administrator, not through this endpoint.
+        if (!await identity.IsSignupOpenAsync())
+            return View("SignupClosed", new SignupClosedViewModel());
+
         if (!ModelState.IsValid)
             return View(model);
 
@@ -192,7 +209,18 @@ public sealed class AccountController(
         // with a real password.
         var showSetupLink = !await identity.IsFirstBootSetupCompleteAsync();
 
-        return View(new LoginViewModel { ReturnUrl = returnUrl, Error = errorText, ShowSetupLink = showSetupLink });
+        // ADR 0050 — the sign-up gate (the `true` floor): when closed, the view
+        // suppresses the "No account yet? Sign up." affordance (a closed gate has
+        // no self-service signup surface to point at).
+        var signupOpen = await identity.IsSignupOpenAsync();
+
+        return View(new LoginViewModel
+        {
+            ReturnUrl = returnUrl,
+            Error = errorText,
+            ShowSetupLink = showSetupLink,
+            SignupOpen = signupOpen,
+        });
     }
 
     [AllowAnonymous]

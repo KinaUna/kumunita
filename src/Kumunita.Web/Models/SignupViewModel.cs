@@ -33,3 +33,14 @@ public sealed class ResendVerificationViewModel
     [Display(Name = "Email")]
     public string Email { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// The invitation-only notice shown when the admin sign-up gate (ADR 0050) is
+/// closed — the self-service signup surface is replaced by this static notice
+/// (no form, no write). The <c>LinkToLogin</c> affordance is rendered by the view.
+/// </summary>
+public sealed class SignupClosedViewModel
+{
+    // No bindable fields: the surface is a notice, not a form. The model exists
+    // so the view has an explicit @model contract (the repo's Razor convention).
+}

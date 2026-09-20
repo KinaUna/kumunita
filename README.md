@@ -235,14 +235,18 @@ stays trivial and the authorization rules can grow freely.
 - **Cross-neighborhood federation** — a standalone OpenIddict IdP; global identity, local authorization.
 - **Group helpers** — suggest/populate groups (neighbors from addresses, family from household).
 - **MCP**, calendar integration, cross-neighborhood data migration.
-- **Invitation-only sign-up** — self-service sign-up (with the verification
-  email + admin manual-verify valve) is deliberately left open for now so
-  the team can create development accounts without an admin. The long-term
-  default should be **invitation-only accounts** (an invited resident
-  self-serves their password from an admin-sent invitation link; open
-  sign-up is an opt-in, not the default). Decide and land before the
-  community is open beyond the development circle (SECURITY.md §6 open
-  items — the control that answers adversary A2, the signup bot).
+- **Invitation-only sign-up** — the **gate** is now admin-managed (ADR 0050):
+  a GlobalAdmin flips the instance between **open** (residents may
+  self-register, the current development-circle default) and **invitation-only**
+  (closed to new self-service accounts) from `/admin/signup`, with the
+  `/account/signup` write lane and the nav/login sign-up affordances all
+  authoritative — existing residents are unaffected. What remains to land is
+  the **invitation mechanism** the gate closes the door *to*: an invited
+  resident self-serves their password from an admin-sent invitation link
+  (token lifecycle, expiry, admin UX) rather than registering on their own —
+  so "closed" is a place a resident is invited *to*, not a dead end. Land it
+  before the community is open beyond the development circle (SECURITY.md §6
+  open items — the control that answers adversary A2, the signup bot).
 
 ## Running
 

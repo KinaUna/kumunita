@@ -188,6 +188,23 @@ public static class KnownTranslationKeys
                 "A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.",
             ["admin.dateformat_save"]     = "Save",
 
+            // ── admin — the sign-up gate (the /admin/signup surface, the
+            // global-admin control plane; ADR 0050) ─────────────────────────
+            ["admin.signup_title"]    = "Sign-up",
+            ["admin.signup_lede"]     =
+                "Whether new residents may create an account on their own. " +
+                "Closing the gate makes sign-up invitation-only — existing residents are unaffected.",
+            ["admin.signup_open"]     = "Open — residents can sign up",
+            ["admin.signup_invitation_only"] = "Invitation-only — new self-service accounts are gated",
+            ["admin.signup_save"]     = "Save",
+
+            // ── account — sign-up-closed notice (the /account/signup and
+            // /account/login surfaces when the admin gate is closed; ADR 0050) ─
+            ["account.signup_closed_title"] = "Sign-up is closed",
+            ["account.signup_closed_body"]  =
+                "Sign-up is currently invitation-only on this instance. " +
+                "If you have been invited, an administrator will add your account and send you the sign-in link.",
+
             // ── home (the hero + section lead; _Layout-independent) ─────────
             ["home.eyebrow"] = "Where this project stands",
             ["home.lead"] =
@@ -965,6 +982,21 @@ public static class KnownTranslationKeys
                 "Eine .NET-Zeitreihenformatzeichenfolge (z. B. yyyy-MM-dd HH:mm). Leer lassen, um eine Voreinstellung zu verwenden.",
             ["admin.dateformat_save"]     = "Speichern",
 
+            // ── admin — the sign-up gate (ADR 0050) ─────────────────────────
+            ["admin.signup_title"]    = "Registrierung",
+            ["admin.signup_lede"]     =
+                "Ob neue Anwohner:innen ein Konto selbst anlegen dürfen. " +
+                "Wird das Tor geschlossen, ist die Registrierung nur noch per Einladung — bestehende Anwohner:innen sind nicht betroffen.",
+            ["admin.signup_open"]     = "Offen — Anwohner:innen können sich registrieren",
+            ["admin.signup_invitation_only"] = "Nur per Einladung — neue Selbstregistrierungen sind gesperrt",
+            ["admin.signup_save"]     = "Speichern",
+
+            // ── account — sign-up-closed notice (ADR 0050) ─────────────────
+            ["account.signup_closed_title"] = "Die Registrierung ist geschlossen",
+            ["account.signup_closed_body"]  =
+                "Die Registrierung ist auf dieser Instanz derzeit nur per Einladung möglich. " +
+                "Falls du eingeladen wurdest, wird eine:r Administrator:in dein Konto anlegen und dir den Anmelde-Link senden.",
+
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Wo das Projekt steht",
             ["home.lead"] =
@@ -1700,6 +1732,21 @@ public static class KnownTranslationKeys
             ["admin.dateformat_custom_hint"]  =
                 "Une chaîne de format de date/heure personnalisée .NET (p. ex. yyyy-MM-dd HH:mm). Laisser vide pour utiliser un préréglage.",
             ["admin.dateformat_save"]     = "Enregistrer",
+
+            // ── admin — the sign-up gate (ADR 0050) ─────────────────────────
+            ["admin.signup_title"]    = "Inscription",
+            ["admin.signup_lede"]     =
+                "S'il est permis aux nouveaux habitants de créer un compte eux-mêmes. " +
+                "Fermer le portail rend l'inscription réservée aux invitations — les habitants existants ne sont pas affectés.",
+            ["admin.signup_open"]     = "Ouvert — les habitants peuvent s'inscrire",
+            ["admin.signup_invitation_only"] = "Sur invitation — les inscriptions auto-service sont verrouillées",
+            ["admin.signup_save"]     = "Enregistrer",
+
+            // ── account — sign-up-closed notice (ADR 0050) ─────────────────
+            ["account.signup_closed_title"] = "L'inscription est fermée",
+            ["account.signup_closed_body"]  =
+                "L'inscription est actuellement réservée aux invitations sur cette instance. " +
+                "Si vous avez été invité·e, une personne administratrice créera votre compte et vous enverra le lien de connexion.",
 
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Où en est ce projet",
@@ -2440,6 +2487,21 @@ public static class KnownTranslationKeys
             ["admin.dateformat_custom_hint"]  =
                 "En tilpasset .NET-dato-/tidsformatstreng (f.eks. yyyy-MM-dd HH:mm). Lad stå tom for at bruge et standardformat.",
             ["admin.dateformat_save"]     = "Gem",
+
+            // ── admin — the sign-up gate (ADR 0050) ─────────────────────────
+            ["admin.signup_title"]    = "Tilmelding",
+            ["admin.signup_lede"]     =
+                "Om nye beboere må oprette en konto selv. " +
+                "Lukker man porten, er tilmelding kun på invitation — eksisterende beboere er ikke berørt.",
+            ["admin.signup_open"]     = "Åben — beboere kan tilmelde sig",
+            ["admin.signup_invitation_only"] = "Kun på invitation — nye selvtjente-kontoer er låst",
+            ["admin.signup_save"]     = "Gem",
+
+            // ── account — sign-up-closed notice (ADR 0050) ─────────────────
+            ["account.signup_closed_title"] = "Tilmeldingen er lukket",
+            ["account.signup_closed_body"]  =
+                "Tilmeldingen er på nuværende tidspunkt kun på invitation på denne instance. " +
+                "Hvis du har fået invitation, vil en administrator oprette din konto og sende dig logind-linket.",
 
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Hvor projektet står",

@@ -56,4 +56,20 @@ public sealed class LocaleSettings
     /// (the "Long" preset, <see cref="DateFormat.FloorFormat"/>).
     /// </summary>
     public string DefaultDateFormat { get; set; } = DateFormat.FloorFormat;
+
+    /// <summary>
+    /// Whether self-service sign-up is currently open on this instance
+    /// (ADR 0050). The <see cref="Kumunita.Core.Identity"/> signup lane is the
+    /// one that reads this: when <c>true</c> the public <c>Sign up</c> surface
+    /// is live and a new resident may create an account; when <c>false</c> the
+    /// surface is hidden and the signup write is denied (the admin-managed
+    /// "invitation-only" state the README's deferred "Invitation-only sign-up"
+    /// item describes as the long-term default). An *additive* field on the
+    /// singleton (ADR 0004 §B.1), the same shape as <see
+    /// cref="DefaultTimezone"/> / <see cref="DefaultDateFormat"/>. Defaults to
+    /// <c>true</c> so a fresh instance ships with sign-up open (the development
+    /// circle keeps working; an admin tightens it to invitation-only before the
+    /// community widens — SECURITY.md §6, adversary A2).
+    /// </summary>
+    public bool IsSignupOpen { get; set; } = true;
 }

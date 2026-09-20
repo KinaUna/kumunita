@@ -14,6 +14,11 @@
       <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
       <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.4.0" />
+      <!-- NSubstitute: ADR 0050's IdentityServiceSignupPolicyTests substitute the
+           IdentityService ctor seams the signup gate does not touch (UserManager /
+           IUserInfoService / IClaimsSource / IMailerStage) — same version as the
+           Web test project (5.3.0). -->
+      <PackageReference Include="NSubstitute" Version="5.3.0" />
       <PackageReference Include="Npgsql" Version="10.0.3" />
       <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
       <PackageReference Include="Testcontainers" Version="4.14.0" />
