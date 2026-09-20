@@ -324,6 +324,20 @@ public sealed class GroupPostDetailViewModel
 {
     public string GroupId { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The post's **group's name** (the <see cref="GroupId"/>'s stored
+    /// <c>Group.Name</c>), shown in the **viewer's language** when a
+    /// user-added name translation exists for it (the ADR 0026 floor,
+    /// exactly the community-name idiom the feed's
+    /// <c>ResolveCommunityNameAsync</c> uses), and feeding the "back to the
+    /// group" link's label on the detail page. A display pin, not a gate:
+    /// the post's single group-lane decision already ran in
+    /// <c>GetGroupPostAsync</c>. A display gap, not an error: when the group
+    /// cannot be resolved the view falls back to the raw id (the page still
+    /// renders). The link's <b>target</b> is unaffected.
+    /// </summary>
+    public string GroupDisplayName { get; set; } = string.Empty;
+
     public Kumunita.Core.Posts.Post Post { get; set; } = null!;
 
     public string AuthorDisplayName { get; set; } = string.Empty;

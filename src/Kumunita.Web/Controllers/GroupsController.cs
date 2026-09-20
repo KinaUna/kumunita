@@ -35,7 +35,19 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("groups")]
-public sealed class GroupsController(IUserInfoService userInfo, PostService posts, ILocalizationService localization, IDocumentStore store) : Controller
+public sealed class GroupsController(
+    IUserInfoService userInfo,
+    PostService posts,
+    ILocalizationService localization,
+    IDocumentStore store,
+    // Back-link display name (the group name on the post-detail page's
+    // "back to the group" link) — the per-request translation read seam,
+    // used to resolve the group's stored name into the viewer's current
+    // language when a user-added name translation exists (the ADR 0026
+    // floor). **Optional** so the existing test-construction site (which
+    // builds this controller with four arguments) keeps compiling; DI
+    // always supplies the live ITranslationProvider in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -1097,6 +1109,22 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
         // not a form-bound model).
         ViewData["Reply_Languages"] = enabledLanguages;
 
+        // Back-link display name — the group's name in the viewer's language
+        // (the ADR 0026 floor, exactly the idiom the community-name surface
+        // uses; a read, not a decision: the post's single group-lane
+        // decision already ran in GetGroupPostAsync). A display gap, not an
+        // error: when no translation exists for the viewer's language the
+        // stored (authored) name stays.
+        string groupName = group.Name;
+        if (translationProvider is not null)
+        {
+            string gLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            var gTranslations = await userInfo.GetGroupTranslationsAsync(id);
+            var gMatch = gTranslations.FirstOrDefault(t => String.Equals(t.LanguageCode, gLang, StringComparison.OrdinalIgnoreCase));
+            if (gMatch is not null && !string.IsNullOrWhiteSpace(gMatch.Name))
+                groupName = gMatch.Name;
+        }
+
         return View("PostDetail", new GroupPostDetailViewModel
         {
             GroupId = id,
@@ -1109,6 +1137,7 @@ public sealed class GroupsController(IUserInfoService userInfo, PostService post
             Languages = languages,
             CanTranslate = canTranslate,
             OriginalLanguageCode = result.Post.LanguageCode, // TD·1/TD·4 (ADR 0027) — the authored-in code, read from the ADR 0018 field.
+            GroupDisplayName = groupName ?? group.Name,
         });
     }
 

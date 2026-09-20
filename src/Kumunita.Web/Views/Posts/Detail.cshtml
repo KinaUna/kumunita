@@ -36,7 +36,7 @@
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
         <a href="@Url.Action("Index","Posts", new { componentId = Model.Post.ComponentId })" class="text-muted small">
-            &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.Post.ComponentId
+            &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.CommunityDisplayName
         </a>
 
         @if (TempData["info"] is string info)

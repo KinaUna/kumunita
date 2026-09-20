@@ -79,6 +79,21 @@ public sealed class PostDetailViewModel
     /// </summary>
     public IReadOnlyList<(string Slug, string DisplayedName)> Tags { get; set; } = [];
 
+    /// <summary>
+    /// The post's **community's name** (the <see cref="Post"/>'s
+    /// <c>ComponentId</c> resolved to its stored <c>Component.Name</c>),
+    /// shown in the **viewer's language** when a user-added name translation
+    /// exists for it (the ADR 0026 floor, exactly the feed's
+    /// <c>ResolveCommunityNameAsync</c> idiom), feeding the "back to {community}"
+    /// link's label on the detail page. A display pin, not a gate: the
+    /// post's single <c>Read</c> decision already ran in <c>GetPostAsync</c>.
+    /// The link's <b>target</b> still uses <see cref="Post"/>'s
+    /// <c>ComponentId</c> — only the label changes. A display gap, not an
+    /// error: when the component cannot be resolved the raw id is the
+    /// fallback (the page still renders).
+    /// </summary>
+    public string CommunityDisplayName { get; set; } = string.Empty;
+
     // ── ADR 0022 — user-added post translations ──
 
     /// <summary>The post's user-added translations, keyed by their target

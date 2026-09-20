@@ -517,6 +517,24 @@ public sealed class PostsController(
         // model, so it does not carry picker option lists).
         ViewData["Reply_Languages"] = enabledLanguages;
 
+        // Back-link display name — the post's community name in the viewer's
+        // language (the ADR 0026 floor, exactly the feed's
+        // ResolveCommunityNameAsync idiom; a read, not a decision: the
+        // post's single Read decision already ran in GetPostAsync). A
+        // display gap, not an error: when the component cannot be resolved
+        // the raw ComponentId stays the fallback (the page still renders).
+        string? communityName = null;
+        if (result.Post.ComponentId.Length > 0)
+        {
+            communityName = (await userInfo.GetComponentsAsync(enabledOnly: true))
+                .FirstOrDefault(c => c.Id == result.Post.ComponentId)?.Name;
+            if (communityName is not null && translationProvider is not null)
+            {
+                string? backLinkLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+                communityName = await ResolveCommunityNameAsync(result.Post.ComponentId, communityName, backLinkLang);
+            }
+        }
+
         return View(new PostDetailViewModel
         {
             Post = result.Post,
@@ -529,6 +547,7 @@ public sealed class PostsController(
             CanTranslate = canTranslate,
             OriginalLanguageCode = result.Post.LanguageCode, // TD·1/TD·4 (ADR 0027) — the authored-in code, read from the ADR 0018 field.
             Tags = tagRows,
+            CommunityDisplayName = communityName ?? result.Post.ComponentId,
         });
     }
 
