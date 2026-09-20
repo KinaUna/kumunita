@@ -22,15 +22,17 @@
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-8">
-        <div class="d-flex align-items-center gap-2 mb-3">
-            <h1 class="mb-0"><kw-l key="pages.title">Pages</kw-l></h1>
-            @if (User?.Identity?.IsAuthenticated == true)
-            {
-                <a class="btn btn-sm btn-primary ms-auto" href="/pages/new">
-                    <kw-l key="pages.new_button">New page</kw-l>
-                </a>
-            }
-        </div>
+        <header class="airy-head">
+            <div class="head-row">
+                <h1><kw-l key="pages.title">Pages</kw-l></h1>
+                @if (User?.Identity?.IsAuthenticated == true)
+                {
+                    <a class="btn btn-primary" href="/pages/new">
+                        <kw-l key="pages.new_button">New page</kw-l>
+                    </a>
+                }
+            </div>
+        </header>
 
         @if (TempData["info"] is string info)
         {
@@ -60,11 +62,15 @@
         else
         {
             <nav aria-label="Page tree">
-                <ul class="list-unstyled page-tree">
+                <ul class="airy-page-list">
                 @foreach (var (node, depth) in flat)
                 {
-                    <li class="page-tree-item" style="margin-left:@(depth * 1.25)rem">
-                        <a class="page-tree-link" href="@node.Path">@node.Title</a>
+                    @* Indentation encodes the tree depth (parent before
+                       children, pre-order) — the Airy ledger keeps the
+                       original 1.25rem-per-level step, just inside a
+                       bordered container. *@
+                    <li style="padding-left:@(1.5 + depth * 1.25)rem">
+                        <a href="@node.Path">@node.Title</a>
                         @if (node.IsDraft)
                         {
                             <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">

@@ -307,6 +307,24 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Post to this group",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
+            // ── groups list (the Airy layout — the invitation panel + the
+            //    member-count word on each group card) ───────────────────────
+            ["groups.invitations"]    = "Invitations",
+            ["groups.invitations_pending"] = "pending",
+            ["groups.invited_by"]     = "Invited by",
+            ["groups.invite_accept"]  = "Accept",
+            ["groups.invite_decline"] = "Decline",
+            ["groups.members_one"]    = "member",
+            ["groups.members_many"]   = "members",
+            // ── community feed (the Airy layout — the left rail + the
+            //    mandatory-community note) ───────────────────────────────────
+            ["community.browse"]          = "Communities",
+            ["community.all"]             = "All",
+            ["community.mandatory_badge"] =
+                "Everyone — mandatory",
+            ["community.mandatory_note"]  =
+                "This is the neighborhood's mandatory community — everyone " +
+                "here belongs to it; no one can be removed or leave it.",
 
             // ── ADR 0026 — group name/description translations ───────────
             ["groups.translations_label"] = "Translations",
@@ -1093,6 +1111,25 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
+            // ── groups list (the Airy layout — the invitation panel + the
+            //    member-count word on each group card) ───────────────────────
+            ["groups.invitations"]    = "Einladungen",
+            ["groups.invitations_pending"] = "ausstehend",
+            ["groups.invited_by"]     = "Eingeladen von",
+            ["groups.invite_accept"]  = "Annehmen",
+            ["groups.invite_decline"] = "Ablehnen",
+            ["groups.members_one"]    = "Mitglied",
+            ["groups.members_many"]   = "Mitglieder",
+            // ── community feed (the Airy layout — the left rail + the
+            //    mandatory-community note) ───────────────────────────────────
+            ["community.browse"]          = "Gemeinschaften",
+            ["community.all"]             = "Alle",
+            ["community.mandatory_badge"] =
+                "Alle — verbindlich",
+            ["community.mandatory_note"]  =
+                "Das ist die verbindliche Gemeinschaft des Viertels — alle " +
+                "hier sind Teil davon; niemand kann entfernt oder „Austritt“ " +
+                "gewählt werden.",
 
             // ── ADR 0026 — group name/description translations ───────────
             ["groups.translations_label"] = "Übersetzungen",
@@ -1850,6 +1887,25 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Publier dans ce groupe",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
+            // ── groups list (the Airy layout — the invitation panel + the
+            //    member-count word on each group card) ───────────────────────
+            ["groups.invitations"]    = "Invitations",
+            ["groups.invitations_pending"] = "en attente",
+            ["groups.invited_by"]     = "Invité par",
+            ["groups.invite_accept"]  = "Accepter",
+            ["groups.invite_decline"] = "Refuser",
+            ["groups.members_one"]    = "membre",
+            ["groups.members_many"]   = "membres",
+            // ── community feed (the Airy layout — the left rail + the
+            //    mandatory-community note) ───────────────────────────────────
+            ["community.browse"]          = "Communautés",
+            ["community.all"]             = "Toutes",
+            ["community.mandatory_badge"] =
+                "Toutes — obligatoire",
+            ["community.mandatory_note"]  =
+                "C'est la communauté obligatoire du quartier — tout le monde " +
+                "en fait partie ; personne ne peut en être retiré ou la " +
+                "quitter.",
 
             // ── ADR 0026 — group name/description translations ───────────
             ["groups.translations_label"] = "Traductions",
@@ -2611,6 +2667,24 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Skriv til denne gruppe",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",
+            // ── groups list (the Airy layout — the invitation panel + the
+            //    member-count word on each group card) ───────────────────────
+            ["groups.invitations"]    = "Indladelser",
+            ["groups.invitations_pending"] = "ventende",
+            ["groups.invited_by"]     = "Inviteret af",
+            ["groups.invite_accept"]  = "Acceptér",
+            ["groups.invite_decline"] = "Afvis",
+            ["groups.members_one"]    = "medlem",
+            ["groups.members_many"]   = "medlemmer",
+            // ── community feed (the Airy layout — the left rail + the
+            //    mandatory-community note) ───────────────────────────────────
+            ["community.browse"]          = "Fællesskaber",
+            ["community.all"]             = "Alle",
+            ["community.mandatory_badge"] =
+                "Alle — obligatorisk",
+            ["community.mandatory_note"]  =
+                "Dette er kvarterets obligatoriske fællesskab — alle her er " +
+                "en del af det; ingen kan fjernes eller forlade det.",
 
             // ── ADR 0026 — group name/description translations ───────────
             ["groups.translations_label"] = "Oversættelser",

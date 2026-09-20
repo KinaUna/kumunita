@@ -4,9 +4,15 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-7">
-        <h1><kw-l key="groups.title">Groups</kw-l></h1>
-        <p class="text-muted"><kw-l key="groups.lead">The communities you own or belong to.</kw-l></p>
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="groups.title">Groups</kw-l></h1>
+                    <p class="lede"><kw-l key="groups.lead">The communities you own or belong to.</kw-l></p>
+                </div>
+            </div>
+        </header>
 
         @if (TempData["info"] is string info)
         {
@@ -26,33 +32,31 @@
         *@
         @if (Model.Invitations.Count > 0)
         {
-            <h2>
-                Invitations
-                <span class="badge bg-warning text-dark">@Model.Invitations.Count pending</span>
-            </h2>
-            <div class="list-group mb-3">
+            <section class="airy-invite">
+                <h2>
+                    <kw-l key="groups.invitations">Invitations</kw-l>
+                    <span class="badge bg-warning text-dark">@Model.Invitations.Count <kw-l key="groups.invitations_pending">pending</kw-l></span>
+                </h2>
                 @foreach (var inv in Model.Invitations)
                 {
-                    <div class="list-group-item d-flex align-items-center justify-content-between gap-2">
-                        <div>
-                            <strong>@inv.GroupName</strong>
-                            <div class="text-muted small">Invited by @inv.InvitedByDisplayName</div>
-                        </div>
-                        <div class="d-flex gap-2 flex-shrink-0">
+                    <div class="airy-invite-row">
+                        <span class="name">@inv.GroupName</span>
+                        <span class="by"><kw-l key="groups.invited_by">Invited by</kw-l> @inv.InvitedByDisplayName</span>
+                        <span class="row-actions">
                             <form method="post"
                                   action="@Url.Action("AcceptInvitation", "Groups", new { id = inv.GroupId })">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-primary">Accept</button>
+                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.invite_accept">Accept</kw-l></button>
                             </form>
                             <form method="post"
                                   action="@Url.Action("DeclineInvitation", "Groups", new { id = inv.GroupId })">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">Decline</button>
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.invite_decline">Decline</kw-l></button>
                             </form>
-                        </div>
+                        </span>
                     </div>
                 }
-            </div>
+            </section>
         }
 
         @if (Model.Groups.Count == 0)
@@ -65,23 +69,23 @@
         }
         else
         {
-            <ul class="list-group">
+            <div class="airy-group-grid">
                 @foreach (var g in Model.Groups)
                 {
-                    <li class="list-group-item d-flex align-items-center justify-content-between">
-                        <span>
+                    <div class="airy-group-card">
+                        <span class="gname">
                             <a href="@Url.Action("Detail", "Groups", new { id = g.Id })">@g.Name</a>
                         </span>
-                        <span class="text-muted">
+                        <span class="gcount">
                             @g.MemberCount
                             member@(g.MemberCount == 1 ? "" : "s")
                         </span>
-                    </li>
+                    </div>
                 }
-            </ul>
+            </div>
         }
 
-        <p class="mt-3">
+        <p class="mt-3 mb-0">
             <a href="@Url.Action("Create", "Groups")" class="btn btn-primary"><kw-l key="groups.create">Create a group</kw-l></a>
         </p>
     </div>
