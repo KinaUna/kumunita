@@ -89,6 +89,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
     │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; RC ✓ (ADR 0025) — `LocalizedPage.ImageIds` (R·7); see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
     │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; ADR 0025 ✓ (RC) — the content-image lane (same store, same catalog); ADR 0034 ✓ (ATT) — the file-attachment (download) lane: a separate route + allowlist + `Content-Disposition: attachment` over the same store (one store, one volume, one catalog — C-ATT·1/3); see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11) + design/file-attachments-design.md § File attachments — Closed (recorded) (2026-09-16)
+    │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
     │   │   └── Projects/           # M5 — not yet created
@@ -129,7 +130,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, translated UI
   strings and static pages (ADR 0005); consumed by the presentation layer, never
   by feature authorization.
-- **Feature modules** — Directory, Posts, Events, Projects, Moderation, Media.
+- **Feature modules** — Directory, Posts, Events, Projects, Moderation, Media, Tags.
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
