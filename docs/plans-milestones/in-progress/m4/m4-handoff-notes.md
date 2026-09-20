@@ -210,3 +210,93 @@ further open decisions carried into U01.
   (U03/U04) all untouched.
 
 **U02 exit gate met. STOP — do NOT start U03.**
+
+## U03 — read lanes + standing matrix
+
+- **(a) Files touched:**
+  - `src/Kumunita.Core/Events/EventService.cs` — the **only** existing file
+    edited. Implemented the four **read lanes** on the frozen `IEventService`
+    (U01) + the two **standing-matrix** gate helpers. Restored the dropped
+    `_store` / `_authorization` field declarations alongside `_userInfo` and
+    the `PageSize = 30` constant. The five **write lanes** (`CreateAsync` /
+    `UpdateAsync` / `PublishAsync` / `DeleteAsync` / `RsvpAsync`) are left as
+    `NotImplementedException` — that is **U04** scope and was deliberately not
+    touched.
+  - `tests/Kumunita.Core.Tests/EventServiceTests.cs` — **new** file. 17 `M4_*`
+    tests (read + standing authorization family only; **not** the full 23-test
+    U09 list). Follows the `PostServiceTests` harness template:
+    `PostgresFixture`, `BootStoreAsync` (registers `M4DocTypes.Configure`), a
+    `Services(store)` tuple, a `Plant` helper, an `Audience(GrantKind, id)`
+    helper, and `await_ThrowsUnauthorized`.
+- **(b) The four read lanes + two standing helpers (signatures confirmed
+  against the frozen `IEventService` / `IAuthorizationService`):**
+  - `ListUpcomingAsync(string? componentId, string actorId, int page, ct)` —
+    candidate set `!IsDeleted && !IsDraft`, optional `ComponentId` filter,
+    `OrderBy(Start).Skip((page-1)*PageSize).Take(PageSize)`; feeds are
+    authorization-filtered via `CanSeeAsync` (`Decision` per candidate is
+    **not** used here — this is the feed path) and drafts are excluded
+    unconditionally (ADR 0037).
+  - `GetAsync(string eventId, string actorId, ct)` — missing id / deleted →
+    `KeyNotFoundException` (404); **`IsDraft`** → pure
+    `AuthorId == actorId` ordinal check (non-author is **404**, even a
+    GlobalAdmin — the draft bypasses authorization entirely, ADR 0037, and
+    writes **no** audit row); else published/audience-restricted → the
+    `CanAsync` `Decision` (deny → **403** `UnauthorizedAccessException`).
+  - `GetRsvpsAsync(string eventId, ct)` — **no actor param** (frozen seam);
+    missing / deleted → 404; returns the RSVP rows ordered by `At`.
+  - `GetMyRsvpAsync(string eventId, string actorId, ct)` — the same
+    404-vs-403 split + draft gate as `GetAsync`; returns the actor's own RSVP
+    row or `null`.
+  - `CheckCreateStanding(string actorId, IReadOnlySet<string> actorRoles,
+    Event? @event)` — null event → 404; empty `actorId` → 403; else **pass**
+    (any signed-in resident may create). `actorRoles` is unused on this
+    branch by design (create = any resident; the roles are reserved for the
+    edit matrix).
+  - `CheckEditStanding(string actorId, IReadOnlySet<string> actorRoles,
+    Event? @event)` — null event → 404; empty `actorId` → 403; **GlobalAdmin**
+    → pass; **author** (`@event.AuthorId == actorId`) → pass; else 403
+    "Only the author or a GlobalAdmin may edit an event."
+- **(c) Build + test result (U03 exit gate, both green):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Error(s)**
+    (`Kumunita.Core` clean; `Kumunita.Core.Tests` compiles with 27
+    house-style warnings — 26× xUnit1051 nullable-`CancellationToken`, present
+    across the whole suite, and 1× CS8625 intentional null-actor in
+    `M4_CheckCreateStanding_NoActor_Denies`).
+  - Scoped: `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll -class
+    "Kumunita.Core.Tests.EventServiceTests"` → **Total: 17, Errors: 0,
+    Failed: 0, Skipped: 0, Not Run: 0** (all 17 `M4_*` tests pass).
+  - Full Core suite: `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    → **Total: 632, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (no
+    regressions in the existing `Post` / `Announcement` / `Page` / Identity /
+    UserInfo surfaces).
+  - Full Web suite: `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    → **Total: 332, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (the
+    milestone / roadmap trio untouched, as required).
+  - **The 17 `M4_*` tests** (all PASS): `M4_FeedVisibleToAudienceMember`,
+    `M4_FeedPublicEventVisibleToResident`, `M4_CommunityAudienceVisibleToMember`,
+    `M4_GrantAudienceOnlyGranteeSees`, `M4_DraftInvisibleToNonAuthor`,
+    `M4_FeedOrderedStartAscending`, `M4_SoftDeletedExcludedFromFeedAndDetail`,
+    `M4_GetRsvps_ReturnsRsvps`, `M4_GetMyRsvp_ReturnsOwn`,
+    `M4_GetMyRsvp_DraftNonAuthor_404`, `M4_CheckCreateStanding_SignedIn_Resident_Allows`,
+    `M4_CheckCreateStanding_NoActor_Denies`, `M4_CheckCreateStanding_NullEvent_404`,
+    `M4_CheckEditStanding_Author_Allows`, `M4_CheckEditStanding_GlobalAdmin_Allows`,
+    `M4_CheckEditStanding_Stranger_Denies`, `M4_CheckEditStanding_NullEvent_404`.
+- **(d) Drift pauses (frozen-seam shapes confirmed, no re-shaping):**
+  - The frozen `IAuthorizationService` (ADR 0006 §A) has **no
+    `CancellationToken` overloads** — the 4-param overloads take an
+    `IDocumentSession`, not a `CancellationToken`. All three call sites
+    therefore use the **3-arg standalone form** (`CanAsync` detail /
+    `CanSeeAsync` feed), matching the `PostService` precedent (plain reads, no
+    in-flight transaction) and passing **no** `ct`.
+  - The frozen `IEventService.GetRsvpsAsync(string eventId,
+    CancellationToken ct = default)` has **no actor param** — the read-RSVP
+    list is a public detail read (the actor's own row is exposed separately by
+    `GetMyRsvpAsync`), so no actor was added.
+  - `Decision.Allowed` / `VisibleSet.Visible` are the correct accessors;
+    `M4DocTypes` / `Event` / `EventRsvp` / `EventToAuditableResource` (U02) /
+    `EventRequests` all untouched; **no** `Milestones.cs` / README /
+    `MilestonesTests` change (U12's job); write lanes (U04) and the full
+    U09 23-test list remain out of scope.
+
+**U03 exit gate met. STOP — do NOT start U04.**

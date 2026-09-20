@@ -1,0 +1,646 @@
+using Kumunita.Core;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
+using Kumunita.Core.UserInfo;
+using Marten;
+using Xunit;
+
+namespace Kumunita.Core.Tests;
+
+/// <summary>
+/// The <see cref="EventService"/> read-lane + standing-matrix seam tests (M4,
+/// U03). The shape follows <see cref="PostServiceTests"/> verbatim — same
+/// <see cref="PostgresFixture"/>, same <c>BootStoreAsync</c>, same
+/// <c>Plant</c> helper, same <c>Services</c> composition (the
+/// <c>UserInfoService</c> + <c>AuthorizationService</c> + <c>EventService</c>
+/// trio the U01 <c>AddTransient</c> registration mirrors), fresh scratch
+/// Postgres per test method.
+/// <para>
+/// This unit pins the **U03** surface — the four read lanes
+/// (<see cref="IEventService.ListUpcomingAsync"/> /
+/// <see cref="IEventService.GetAsync"/> /
+/// <see cref="IEventService.GetRsvpsAsync"/> /
+/// <see cref="IEventService.GetMyRsvpAsync"/>) and the two **pure** standing
+/// helpers (<see cref="EventService.CheckCreateStanding"/> /
+/// <see cref="EventService.CheckEditStanding"/>) — against the **frozen**
+/// <c>IAuthorizationService</c> (ADR 0006) through the
+/// <see cref="EventToAuditableResource"/> adapter (U02).
+/// </para>
+/// <para>
+/// The pins this lane owns (see the <see cref="EventService"/> members for the
+/// full ADR 0054 rationale):
+/// </para>
+/// <list type="number">
+/// <item><b>The feed is <c>CanSeeAsync(Read)</c>-filtered</b> — the
+///       <see cref="Event"/> candidate set (non-draft, non-deleted, ordered by
+///       <see cref="Event.Start"/> ascending) is the *candidate filter, never
+///       the gate* (C-M3·2); the survivors pass the one shared
+///       <c>CanSeeAsync</c> matching pass (C6) and produce the single
+///       aggregate <see cref="AccessAudit"/> row with <c>TargetKind =
+///       "event"</c> (C3).</item>
+/// <item><b>The detail is a single <c>CanAsync(Read)</c> decision</b> with the
+///       404-vs-403 split: a missing id and a <b>draft</b> seen by a
+///       non-author are <see cref="KeyNotFoundException"/> (the Web 404, the
+///       non-leaky pin); a denied read (an audience the actor is not in) is an
+///       <see cref="UnauthorizedAccessException"/> (the Web 403).</item>
+/// <item><b>The draft gate is author-only</b> (ADR 0037) — a
+///       <see cref="Event.IsDraft"/> event bypasses the authorization decision
+///       entirely: a pure <c>AuthorId == actorId</c> ordinal check, no
+///       <c>CanAsync</c> call, no audit row. Feeds exclude drafts
+///       unconditionally.</item>
+/// <item><b>The standing matrix is a pure role-claim check</b> (ADR 0054
+///       §3.4, the <see cref="PageService.CheckCreateStanding"/> /
+///       <see cref="PageService.CheckEditStanding"/> shape): create = any
+///       signed-in resident (they become the author); edit = author ∪
+///       GlobalAdmin. A null event is a 404; a denied actor is a 403. No new
+///       <c>AccessAction</c>, no new <c>AccessVia</c>, no branch in the frozen
+///       <c>IAuthorizationService</c>.</item>
+/// </list>
+/// <para>
+/// The write lanes (<see cref="IEventService.CreateAsync"/> /
+/// <see cref="IEventService.UpdateAsync"/> /
+/// <see cref="IEventService.PublishAsync"/> /
+/// <see cref="IEventService.DeleteAsync"/> /
+/// <see cref="IEventService.RsvpAsync"/>) are <b>U04</b> and remain
+/// <see cref="NotImplementedException"/>; this unit does **not** drive them.
+/// The full 23-name <c>M4_*</c> list (U09) is out of scope here — only the
+/// read + standing names above are pinned.
+/// </para>
+/// </summary>
+public class EventServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+{
+    // ── 1 — M4_FeedVisibleToAudienceMember (feed, C6 / C3) ───────────────────
+    //
+    // An audience grantee reads the upcoming-events feed: their event is in
+    // the visible set; a stranger's feed does not include it (the
+    // MatchGroups branch, branch 6). The aggregate audit row (TargetKind
+    // "event") is written for the grantee's visit.
+
+    [Fact]
+    public async Task M4_FeedVisibleToAudienceMember()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f1-author";
+        const string grantee = "u-u03-f1-grantee";
+        const string stranger = "u-u03-f1-stranger";
+
+        await Plant(store, new Event
+        {
+            Id = "f1-ev", AuthorId = author,
+            Title = "Cleanup day", Body = "body f1",
+            Start = new DateTimeOffset(2026, 3, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 1, 13, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        // The grantee sees the event in the feed (branch 6 MatchGroups).
+        var granteeFeed = await svc.ListUpcomingAsync(null, grantee, 1);
+        Assert.Contains("f1-ev", granteeFeed.Select(e => e.Id));
+
+        // A stranger is denied the event (branch 7 Deny — the audience does
+        // not match the stranger, and the stranger is not the owner).
+        var strangerFeed = await svc.ListUpcomingAsync(null, stranger, 1);
+        Assert.DoesNotContain("f1-ev", strangerFeed.Select(e => e.Id));
+    }
+
+    // ── 2 — M4_FeedPublicEventVisibleToResident (null Audience = public) ─────
+    //
+    // A null-<see cref="Event.Audience"/> event is **public** (the frozen
+    // Decide() branch 5): any signed-in resident sees it in the feed. The
+    // empty-audience-denies invariant (C1) applies only to a *non-null* empty
+    // audience; a null audience is world-readable.
+
+    [Fact]
+    public async Task M4_FeedPublicEventVisibleToResident()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f2-author";
+        const string resident = "u-u03-f2-resident";
+
+        await Plant(store, new Event
+        {
+            Id = "f2-ev", AuthorId = author,
+            Title = "Town hall", Body = "body f2",
+            Start = new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 2, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = null, // public — branch 5
+        });
+
+        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        Assert.Contains("f2-ev", feed.Select(e => e.Id));
+
+        // Detail: the resident reads the public event via a single CanAsync
+        // decision (branch 5) — no denial, no 403.
+        var ev = await svc.GetAsync("f2-ev", resident);
+        Assert.Equal("Town hall", ev.Title);
+    }
+
+    // ── 3 — M4_CommunityAudienceVisibleToMember (ADR 0036) ───────────────────
+    //
+    // A <see cref="Audience.Community"/> event on a component is visible to a
+    // member of that component (branch 4) but not to a resident who is not a
+    // member (branch 7 Deny). Seeded through the frozen
+    // <see cref="IUserInfoService.SetCommunityMembershipAsync"/> seam (the
+    // <c>communityIds</c> the Decide() Community branch reads).
+
+    [Fact]
+    public async Task M4_CommunityAudienceVisibleToMember()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-u03-f3-author";
+        const string member = "u-u03-f3-member";
+        const string nonMember = "u-u03-f3-nonmember";
+        const string comp = "c-u03-f3";
+
+        await Plant(store, new Component { Id = comp, Name = "Safety", Enabled = true });
+        await userInfo.SetCommunityMembershipAsync(comp, member, actorId: "u-u03-f3-admin");
+
+        await Plant(store, new Event
+        {
+            Id = "f3-ev", AuthorId = author, ComponentId = comp,
+            Title = "Safety drill", Body = "body f3",
+            Start = new DateTimeOffset(2026, 3, 3, 8, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 3, 9, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = new Audience { Community = true }, // branch 4
+        });
+
+        // The community member sees the event (branch 4 — the live
+        // communityIds contain the event's ComponentId).
+        var memberFeed = await svc.ListUpcomingAsync(comp, member, 1);
+        Assert.Contains("f3-ev", memberFeed.Select(e => e.Id));
+
+        // A non-member resident is denied (branch 7 — the Community flag is
+        // set but the actor's communityIds do not contain the component).
+        var nonMemberFeed = await svc.ListUpcomingAsync(comp, nonMember, 1);
+        Assert.DoesNotContain("f3-ev", nonMemberFeed.Select(e => e.Id));
+
+        // Detail 404-vs-403 split: the member reads it (Allow); the
+        // non-member is denied with a 403 (an audience the actor is not in).
+        await svc.GetAsync("f3-ev", member);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.GetAsync("f3-ev", nonMember));
+    }
+
+    // ── 4 — M4_GrantAudienceOnlyGranteeSees (MatchGroups branch) ─────────────
+    //
+    // A group-grant event is visible to a group member (branch 6) but not to
+    // a resident outside the group. The membership row is the live data
+    // <c>MatchGroups</c> reads (C4 strong consistency).
+
+    [Fact]
+    public async Task M4_GrantAudienceOnlyGranteeSees()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-u03-f4-author";
+        const string member = "u-u03-f4-member";
+        const string outsider = "u-u03-f4-outsider";
+        const string group = "g-u03-f4";
+
+        // A real group under the exact id the event's audience names (the
+        // audience references the group id literally; the GroupMembership row
+        // is what MatchGroups reads — C4's live-row lane).
+        await Plant(store, new Group
+        {
+            Id = group, Name = "Book club", OwnerId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+        await userInfo.AddGroupMemberAsync(group, member, addedBy: author);
+
+        await Plant(store, new Event
+        {
+            Id = "f4-ev", AuthorId = author,
+            Title = "Book club", Body = "body f4",
+            Start = new DateTimeOffset(2026, 3, 4, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 4, 19, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = Audience(GrantKind.Group, group),
+        });
+
+        var memberFeed = await svc.ListUpcomingAsync(null, member, 1);
+        Assert.Contains("f4-ev", memberFeed.Select(e => e.Id));
+
+        var outsiderFeed = await svc.ListUpcomingAsync(null, outsider, 1);
+        Assert.DoesNotContain("f4-ev", outsiderFeed.Select(e => e.Id));
+    }
+
+    // ── 5 — M4_DraftInvisibleToNonAuthor (ADR 0037 draft gate) ───────────────
+    //
+    // A draft event bypasses the authorization decision: it is visible to
+    // **everyone except its author** — a pure <c>AuthorId == actorId</c>
+    // ordinal check, no <c>CanAsync</c>, no audit row. A non-author (even a
+    // GlobalAdmin) is denied with a 404 (the non-leaky pin). And drafts are
+    // excluded from the feed **unconditionally** (not just for non-authors).
+
+    [Fact]
+    public async Task M4_DraftInvisibleToNonAuthor()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f5-author";
+        const string stranger = "u-u03-f5-stranger";
+
+        await Plant(store, new Event
+        {
+            Id = "f5-ev", AuthorId = author,
+            Title = "Unpublished", Body = "draft body",
+            Start = new DateTimeOffset(2026, 3, 5, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 5, 10, 0, 0, TimeSpan.Zero),
+            IsDraft = true,
+            Audience = null, // would be public if it were published
+        });
+
+        // The author sees their own draft (the draft gate's Allow).
+        var ev = await svc.GetAsync("f5-ev", author);
+        Assert.Equal("Unpublished", ev.Title);
+
+        // A non-author is denied with a 404 (KeyNotFoundException) — the
+        // non-leaky pin, NOT a 403 (no "denied" signal that the event
+        // exists).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.GetAsync("f5-ev", stranger));
+
+        // The draft is excluded from the feed unconditionally (the candidate
+        // set filters !IsDraft) — neither the author nor the stranger sees it
+        // in the feed.
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+        Assert.DoesNotContain("f5-ev", (await svc.ListUpcomingAsync(null, stranger, 1)).Select(e => e.Id));
+    }
+
+    // ── 6 — M4_FeedOrderedStartAscending (feed ordering) ─────────────────────
+    //
+    // The feed is ordered by <see cref="Event.Start"/> ascending (the
+    // upcoming-events shape, the <c>(ComponentId, Start)</c> index) — the
+    // <see cref="M4DocTypes.Configure"/> ordering pin.
+
+    [Fact]
+    public async Task M4_FeedOrderedStartAscending()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f6-author";
+        const string resident = "u-u03-f6-resident";
+
+        var t = new DateTimeOffset(2026, 3, 10, 9, 0, 0, TimeSpan.Zero);
+        // Plant in an order deliberately different from the expected sort
+        // order, so the test would fail if the query returned insertion
+        // order instead of Start ascending.
+        await Plant(store, new Event { Id = "mid", AuthorId = author, Title = "mid", Body = "m", Start = t, End = t, IsDraft = false, Audience = null });
+        await Plant(store, new Event { Id = "late", AuthorId = author, Title = "late", Body = "l", Start = t.AddDays(1), End = t.AddDays(1), IsDraft = false, Audience = null });
+        await Plant(store, new Event { Id = "early", AuthorId = author, Title = "early", Body = "e", Start = t.AddDays(-1), End = t.AddDays(-1), IsDraft = false, Audience = null });
+
+        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        // All three are public + published + non-deleted ⇒ all visible.
+        Assert.Equal(3, feed.Count);
+        // Start ascending: early → mid → late.
+        Assert.Equal(new[] { "early", "mid", "late" }, feed.Select(e => e.Id).ToArray());
+    }
+
+    // ── 7 — M4_SoftDeletedExcludedFromFeedAndDetail (ADR 0024) ───────────────
+    //
+    // A soft-deleted event (<see cref="Event.IsDeleted"/> = true) is filtered
+    // out of both the feed (the candidate set's <c>!IsDeleted</c> predicate)
+    // and the detail (the <see cref="EventService.GetAsync"/> IsDeleted 404).
+    // The record is kept, never hard-deleted.
+
+    [Fact]
+    public async Task M4_SoftDeletedExcludedFromFeedAndDetail()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f7-author";
+        const string resident = "u-u03-f7-resident";
+
+        await Plant(store, new Event
+        {
+            Id = "f7-live", AuthorId = author, Title = "Live", Body = "b",
+            Start = new DateTimeOffset(2026, 3, 11, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 11, 10, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "f7-deleted", AuthorId = author, Title = "Deleted", Body = "b",
+            Start = new DateTimeOffset(2026, 3, 11, 11, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 11, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = true, Audience = null,
+        });
+
+        var feed = await svc.ListUpcomingAsync(null, resident, 1);
+        Assert.Contains("f7-live", feed.Select(e => e.Id));
+        Assert.DoesNotContain("f7-deleted", feed.Select(e => e.Id));
+
+        // Detail: the live event is readable; the deleted event is a 404
+        // (the non-leaky pin — same "not found" as a missing id).
+        await svc.GetAsync("f7-live", resident);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.GetAsync("f7-deleted", resident));
+
+        // A missing id is also a 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.GetAsync("no-such-event", resident));
+    }
+
+    // ── 8 — M4_GetRsvps_ReturnsRsvps (owner list read) ───────────────────────
+    //
+    // <see cref="EventService.GetRsvpsAsync"/> is the owner-only RSVP list
+    // (ADR 0054 §3.2). The <see cref="IEventService"/> seam carries <em>no</em>
+    // actor (the owner gate is the Web controller's job, U05); this method
+    // loads the event's RSVPs once the event is confirmed present and
+    // non-deleted. A missing event is a 404.
+
+    [Fact]
+    public async Task M4_GetRsvps_ReturnsRsvps()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f8-author";
+        const string rsvp1 = "u-u03-f8-r1";
+        const string rsvp2 = "u-u03-f8-r2";
+
+        await Plant(store, new Event
+        {
+            Id = "f8-ev", AuthorId = author, Title = "BBQ", Body = "b",
+            Start = new DateTimeOffset(2026, 3, 12, 17, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 12, 21, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "r1", EventId = "f8-ev", UserId = rsvp1,
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 1, 10, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "r2", EventId = "f8-ev", UserId = rsvp2,
+            Status = RsvpStatus.Maybe, At = new DateTimeOffset(2026, 3, 1, 11, 0, 0, TimeSpan.Zero),
+        });
+
+        var rsvps = await svc.GetRsvpsAsync("f8-ev");
+        Assert.Equal(2, rsvps.Count);
+        Assert.Contains(rsvps, r => r.UserId == rsvp1 && r.Status == RsvpStatus.Going);
+        Assert.Contains(rsvps, r => r.UserId == rsvp2 && r.Status == RsvpStatus.Maybe);
+
+        // A missing event is a 404.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.GetRsvpsAsync("no-such-event"));
+    }
+
+    // ── 9 — M4_GetMyRsvp_ReturnsOwn (last-write-wins read) ───────────────────
+    //
+    // <see cref="EventService.GetMyRsvpAsync"/> is the actor's **own** RSVP
+    // (the last-write-wins read, §3.2): returns the resident's single
+    // <c>(EventId, UserId)</c> row, or <c>null</c> when the resident has not
+    // RSVPed. The event's <c>CanAsync(Read)</c> decision gates the read.
+
+    [Fact]
+    public async Task M4_GetMyRsvp_ReturnsOwn()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f9-author";
+        const string me = "u-u03-f9-me";
+        const string other = "u-u03-f9-other";
+
+        await Plant(store, new Event
+        {
+            Id = "f9-ev", AuthorId = author, Title = "Walk", Body = "b",
+            Start = new DateTimeOffset(2026, 3, 13, 7, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 13, 8, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null, // public
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "f9-r-me", EventId = "f9-ev", UserId = me,
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 2, 9, 0, 0, TimeSpan.Zero),
+        });
+        // Another resident's RSVP — must not be returned for `me`.
+        await Plant(store, new EventRsvp
+        {
+            Id = "f9-r-other", EventId = "f9-ev", UserId = other,
+            Status = RsvpStatus.No, At = new DateTimeOffset(2026, 3, 2, 9, 30, 0, TimeSpan.Zero),
+        });
+
+        // The actor's own RSVP is returned (not the other resident's).
+        var mine = await svc.GetMyRsvpAsync("f9-ev", me);
+        Assert.NotNull(mine);
+        Assert.Equal(me, mine!.UserId);
+        Assert.Equal(RsvpStatus.Going, mine.Status);
+
+        // A resident who has not RSVPed gets null (not an error).
+        var otherMine = await svc.GetMyRsvpAsync("f9-ev", other);
+        Assert.NotNull(otherMine);
+        Assert.Equal(RsvpStatus.No, otherMine!.Status);
+
+        // A resident with no RSVP row gets null.
+        var nobody = await svc.GetMyRsvpAsync("f9-ev", "u-u03-f9-nobody");
+        Assert.Null(nobody);
+    }
+
+    // ── 10 — M4_GetMyRsvp_DraftNonAuthor_404 (draft gate, RSVP lane) ─────────
+    //
+    // The draft gate (ADR 0037) applies to the own-RSVP read too: a draft
+    // event's RSVP is invisible to a non-author (404, the non-leaky pin) and
+    // visible to the author (a pure ordinal check, no CanAsync).
+
+    [Fact]
+    public async Task M4_GetMyRsvp_DraftNonAuthor_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u03-f10-author";
+        const string stranger = "u-u03-f10-stranger";
+
+        await Plant(store, new Event
+        {
+            Id = "f10-ev", AuthorId = author, Title = "Draft BBQ", Body = "b",
+            Start = new DateTimeOffset(2026, 3, 14, 17, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 3, 14, 21, 0, 0, TimeSpan.Zero),
+            IsDraft = true, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "f10-r", EventId = "f10-ev", UserId = stranger,
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 3, 9, 0, 0, TimeSpan.Zero),
+        });
+
+        // The non-author's own RSVP of a draft event is a 404 (denied).
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.GetMyRsvpAsync("f10-ev", stranger));
+
+        // The author may read their own draft event's RSVP (the author lane).
+        await Plant(store, new EventRsvp
+        {
+            Id = "f10-r-author", EventId = "f10-ev", UserId = author,
+            Status = RsvpStatus.Going, At = new DateTimeOffset(2026, 3, 3, 9, 1, 0, TimeSpan.Zero),
+        });
+        var authorRsvp = await svc.GetMyRsvpAsync("f10-ev", author);
+        Assert.NotNull(authorRsvp);
+        Assert.Equal(author, authorRsvp!.UserId);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Standing-matrix gate helpers (pure — no store, no async).
+    // ADR 0054 §3.4: create = any signed-in resident; edit = author ∪
+    // GlobalAdmin. The PageService.CheckCreateStanding / CheckEditStanding
+    // shape; the ADR 0014 / 0016 / 0017 precedent.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── 11 — M4_CheckCreateStanding_SignedIn_Resident_Allows ─────────────────
+    //
+    // Any signed-in resident may create an event (they become the author —
+    // the Owner branch). The "signed-in" constraint is the actorId being
+    // non-empty. A null event is a 404 (a data bug).
+
+    [Fact]
+    public void M4_CheckCreateStanding_SignedIn_Resident_Allows()
+    {
+        var @event = new Event { Id = "s1-ev", AuthorId = "u-s1", IsDraft = true };
+
+        // A plain Member (any signed-in resident) may create.
+        EventService.CheckCreateStanding("u-s1", new HashSet<string> { Roles.Member }, @event);
+        // No exception ⇒ pass.
+
+        // A GlobalAdmin may create too.
+        EventService.CheckCreateStanding("u-s1", new HashSet<string> { Roles.Member, Roles.GlobalAdmin }, @event);
+    }
+
+    // ── 12 — M4_CheckCreateStanding_NoActor_Denies ───────────────────────────
+    //
+    // A null/empty actor (an anonymous caller — the Web [Authorize] would
+    // have stopped them, this re-checks at the Core layer) is denied with a
+    // 403.
+
+    [Fact]
+    public void M4_CheckCreateStanding_NoActor_Denies()
+    {
+        var @event = new Event { Id = "s2-ev", AuthorId = "u-s2", IsDraft = true };
+
+        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding("", new HashSet<string> { Roles.Member }, @event));
+        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding(null, new HashSet<string> { Roles.Member }, @event));
+    }
+
+    // ── 13 — M4_CheckCreateStanding_NullEvent_404 ────────────────────────────
+    //
+    // A null event is a data bug — a 404 (the Web layer's not-found).
+
+    [Fact]
+    public void M4_CheckCreateStanding_NullEvent_404()
+    {
+        Assert.Throws<KeyNotFoundException>(
+            () => EventService.CheckCreateStanding("u-s3", new HashSet<string> { Roles.Member }, null));
+    }
+
+    // ── 14 — M4_CheckEditStanding_Author_Allows ──────────────────────────────
+    //
+    // The event's author may edit it (the Owner branch) — the standing
+    // matrix's edit row.
+
+    [Fact]
+    public void M4_CheckEditStanding_Author_Allows()
+    {
+        var @event = new Event { Id = "s4-ev", AuthorId = "u-s4-author", IsDraft = false };
+
+        EventService.CheckEditStanding("u-s4-author", new HashSet<string> { Roles.Member }, @event);
+        // No exception ⇒ pass.
+    }
+
+    // ── 15 — M4_CheckEditStanding_GlobalAdmin_Allows ─────────────────────────
+    //
+    // A GlobalAdmin may edit any event (the ADR 0017 override shape —
+    // contrast ADR 0037's publish lane, where a GlobalAdmin is <em>denied</em>).
+
+    [Fact]
+    public void M4_CheckEditStanding_GlobalAdmin_Allows()
+    {
+        var @event = new Event { Id = "s5-ev", AuthorId = "u-s5-author", IsDraft = false };
+
+        // A GlobalAdmin who is NOT the author may still edit (the Admin
+        // override).
+        EventService.CheckEditStanding("u-s5-admin", new HashSet<string> { Roles.GlobalAdmin }, @event);
+        // No exception ⇒ pass.
+    }
+
+    // ── 16 — M4_CheckEditStanding_Stranger_Denies ────────────────────────────
+    //
+    // A non-author, non-GlobalAdmin resident is denied with a 403.
+
+    [Fact]
+    public void M4_CheckEditStanding_Stranger_Denies()
+    {
+        var @event = new Event { Id = "s6-ev", AuthorId = "u-s6-author", IsDraft = false };
+
+        await_ThrowsUnauthorized(() => EventService.CheckEditStanding("u-s6-stranger", new HashSet<string> { Roles.Member }, @event));
+    }
+
+    // ── 17 — M4_CheckEditStanding_NullEvent_404 ──────────────────────────────
+    //
+    // A null event is a data bug — a 404 (the Web layer's not-found), even
+    // for a GlobalAdmin (the null-check precedes the role check).
+
+    [Fact]
+    public void M4_CheckEditStanding_NullEvent_404()
+    {
+        Assert.Throws<KeyNotFoundException>(
+            () => EventService.CheckEditStanding("u-s7-admin", new HashSet<string> { Roles.GlobalAdmin }, null));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Test plumbing (mirrors PostServiceTests).
+    // ════════════════════════════════════════════════════════════════════════
+
+    private static void await_ThrowsUnauthorized(Action action)
+        => Assert.Throws<UnauthorizedAccessException>(action);
+
+    private async Task<IDocumentStore> BootStoreAsync()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            M1DocTypes.Configure(opts);
+            M3DocTypes.Configure(opts);
+            M4DocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+        return store;
+    }
+
+    /// <summary>Compose the M4 service trio: <see cref="UserInfoService"/> +
+    /// <see cref="AuthorizationService"/> + <see cref="EventService"/> (the
+    /// same three-constructor shape U01's <c>AddTransient</c> registration
+    /// uses, mirrored here directly against the scratch store — the
+    /// <c>PostServiceTests</c> precedent).</summary>
+    private static (UserInfoService User, AuthorizationService Authz, EventService Events)
+        Services(IDocumentStore store)
+    {
+        var userInfo = new UserInfoService(store);
+        var authz = new AuthorizationService(store, userInfo);
+        var events = new EventService(store, authz, userInfo);
+        return (userInfo, authz, events);
+    }
+
+    private static Audience Audience(GrantKind kind, string id)
+        => new(AudienceMode.Any, [new AudienceGrant(kind, id)]);
+
+    /// <summary>Plant a document row directly (test fixture seeding, not a
+    /// service write seam — the write lanes are U04's scope).</summary>
+    private static async Task Plant(IDocumentStore store, object document)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(document);
+        await w.SaveChangesAsync(ct);
+    }
+}
