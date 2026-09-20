@@ -117,9 +117,9 @@
                         <div class="col-md-6">
                             <label class="form-label" for="language" style="font-weight:600;">Language</label>
                             <select class="form-control" id="language" name="LanguageCode">
-                                @foreach (var (code, native) in Model.Languages)
+                                @foreach (var (languageCode, native) in Model.Languages)
                                 {
-                                    <option value="@code" selected="@(code == Model.LanguageCode ? "selected" : null)">@native</option>
+                                    <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">@native</option>
                                 }
                             </select>
                             <div class="text-muted small mt-1">

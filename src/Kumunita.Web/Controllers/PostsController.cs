@@ -176,13 +176,25 @@ public sealed class PostsController(
         // exists (else the authored — the ADR 0022 floor). One read of the shared
         // per-request chain; a "a read, not a decision" surface (the feed's
         // CanSeeAsync already ran). No Core / schema change.
+        string? effLang = null;
         if (translationProvider is not null)
         {
-            var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
             component.Name = await ResolveCommunityNameAsync(component.Id, component.Name, effLang);
             foreach (var p in feed.Visible)
                 await ApplyTranslationToPostAsync(p, effLang);
         }
+        // The sidebar directory (the viewer's own community list, the
+        // airy-side-list rail) shows each community's name in the viewer's
+        // current language when a translation exists (the ADR 0026 floor),
+        // matching the header and the row badges above — the ADR 0051 extension
+        // to the community directory surface (a read, not a decision: the
+        // component's enabled-visibility gate already ran).
+        var accessibleLinks = new List<CommunityLink>(accessible.Count);
+        foreach (var c in accessible)
+            accessibleLinks.Add(new CommunityLink(
+                c.Id,
+                effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -223,7 +235,7 @@ public sealed class PostsController(
             // <see cref="AccessibleComponentsAsync"/> rule driving CanPost). A
             // viewer with no reachable communities renders no pill directory;
             // a GlobalAdmin still sees every enabled community.
-            Communities = accessible.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
+            Communities = accessibleLinks,
         });
     }
 
@@ -284,14 +296,26 @@ public sealed class PostsController(
         // authored-in text (the ADR 0022/0026 floor). One read of the shared
         // per-request chain; a read, not a decision (ListAllFeedAsync's
         // CanSeeAsync already ran). No Core / schema change.
+        string? effLang = null;
         if (translationProvider is not null)
         {
-            var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
             foreach (var c in components)
                 nameByComponentId[c.Id] = await ResolveCommunityNameAsync(c.Id, nameByComponentId[c.Id], effLang);
             foreach (var p in feed.Visible)
                 await ApplyTranslationToPostAsync(p, effLang);
         }
+        // The sidebar directory (the viewer's own community list, the
+        // airy-side-list rail) shows each community's name in the viewer's
+        // current language when a translation exists (the ADR 0026 floor),
+        // matching the row section badges above — the ADR 0051 extension to the
+        // community directory surface (a read, not a decision: the component's
+        // enabled-visibility gate already ran).
+        var accessibleLinks = new List<CommunityLink>(accessible.Count);
+        foreach (var c in accessible)
+            accessibleLinks.Add(new CommunityLink(
+                c.Id,
+                effLang is not null ? await ResolveCommunityNameAsync(c.Id, c.Name, effLang) : c.Name));
 
         var items = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -319,7 +343,7 @@ public sealed class PostsController(
             // set that drives CanPost above (a member sees their communities,
             // a GlobalAdmin sees every enabled one), so a viewer with no
             // reachable communities renders no pill directory.
-            Communities = accessible.Select(c => new CommunityLink(c.Id, c.Name)).ToList(),
+            Communities = accessibleLinks,
         });
     }
 
