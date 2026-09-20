@@ -1361,7 +1361,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.UpdateTranslationAsync("pg3-u-miss", "fr", "T", "Corps", "u-admin", RolesSet(Roles.GlobalAdmin), session));
 
-        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.update"));
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.update").ToList());
     }
 
     [Fact]
@@ -1436,7 +1436,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
             .CountAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, count); // untouched
 
-        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove"));
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove").ToList());
     }
 
     [Fact]
@@ -1450,7 +1450,7 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             svc.RemoveTranslationAsync("pg3-r-miss", "fr", "u-admin", RolesSet(Roles.GlobalAdmin), session));
 
-        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove"));
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.translation.remove").ToList());
     }
 
     // ─── PG U05 (ADR 0039 §3.9, amended by ADR 0040) — the seeder's Page docs ─

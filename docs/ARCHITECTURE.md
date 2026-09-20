@@ -70,7 +70,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0025 (0025 = Rich content — Markdown bodies + in-content images, ADR 0025)
+    │   ├── adr/                    # 0001–0053 (the running decision ledger — append-only, highest number = newest)
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
@@ -87,8 +87,9 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
     │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
-    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource / LocalizedPage content docs + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; RC ✓ (ADR 0025) — `LocalizedPage.ImageIds` (R·7); see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
+    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource (the UI-string content doc) + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; the static-page content lane moved to the Pages context (ADR 0039 retired `LocalizedPage`); see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
     │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; ADR 0025 ✓ (RC) — the content-image lane (same store, same catalog); ADR 0034 ✓ (ATT) — the file-attachment (download) lane: a separate route + allowlist + `Content-Disposition: attachment` over the same store (one store, one volume, one catalog — C-ATT·1/3); see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11) + design/file-attachments-design.md § File attachments — Closed (recorded) (2026-09-16)
+    │   │   ├── Pages/              # ADR 0039–0043 ✓ (PG) — Page + PageTranslation docs (a hierarchical, audience-restricted, translatable knowledge tree) + PageService (mount / read / edit / translate) + PageToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService); ADR 0040 ✓ (PG) — PageKind (System vs blog) + the read-only /blog feeds; ADR 0041 ✓ — the Audience.AllResidents flag; ADR 0043 ✓ (SP) — the four canonical system pages (/terms /help /privacy /conduct) as PageKind.System rows; absorbs + retires the LocalizedPage static-page lane; see design/pages-design.md
     │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 — not yet created
@@ -127,10 +128,10 @@ the seam for later extraction.
 - **IdentityModule** — authentication; issues the thin principal.
 - **UserInfoModule** — who people are: profiles, groups, delegation.
 - **AuthorizationModule** — what they may do: audiences, policy, audit.
-- **LocalizationModule** — language catalog, default language, translated UI
-  strings and static pages (ADR 0005); consumed by the presentation layer, never
-  by feature authorization.
-- **Feature modules** — Directory, Posts, Events, Projects, Moderation, Media, Tags.
+- **LocalizationModule** — language catalog, default language, and translated UI
+  strings (ADR 0005); consumed by the presentation layer, never by feature
+  authorization. (Static pages live in the `Pages` context now, ADR 0039.)
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags. (Events and Projects are M4/M5 — planned, not yet created, per the §3 tree above.)
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
@@ -511,8 +512,8 @@ Explicitly not used: event sourcing, distributed workflows.
   validates it on all non-GET endpoints (enforced, not opt-in — see OPS.md §10).
 - **Strings:** all user-facing text is resolved server-side through the localization
   provider (Razor tag helper over `TranslationResource`); `client/*.ts` holds logic, not
-  display strings. Static pages (terms, about, help) are `LocalizedPage` Markdown rendered
-  by a single page engine (§9, ADR 0005).
+  display strings. Static pages (terms, help, privacy, conduct) are `PageKind.System`
+  page docs rendered by the single page engine (§9, ADR 0039–0043).
 
 ## 8. Deployment & configuration
 
@@ -579,8 +580,8 @@ stays the product-story **view** (not a seeded page, ADR 0043 D1), and the
 footer now carries an unconditional "Platform" column linking all five (ADR
 0043 D4).
 
-- **What is translatable:** UI strings and platform static pages (terms, about,
-  help) — §5 documents. UGC is always rendered **as authored**; machine
+- **What is translatable:** UI strings and platform static pages (terms, help,
+  privacy, conduct — the `PageKind.System` pages, §9) — §5 documents. UGC is always rendered **as authored**; machine
   translation is deferred and, if it ever ships, per-item opt-in with a
   third-party-boundary review (ADR 0005 C, SECURITY.md §6). Separately, each UGC
   document carries an **authored-in language tag** (`LanguageCode` on `Post` /
