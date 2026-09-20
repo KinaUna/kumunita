@@ -2,7 +2,7 @@
 effective language + a warm-boot page-translation backfill
 
 Status: Accepted
-Date: 2026-09-28
+Date: 2026-09-19
 Amends: **0043 Consequences** (the **2026-09-18 "en-body by contract"** note —
 the hard-coded routes are no longer pinned to the `en` body; they now resolve
 the matching `PageTranslation` in the request's effective language) and

@@ -1,7 +1,7 @@
 # ADR 0046 — Default-language fallback: browser `Accept-Language` match
 
 Status: Accepted
-Date: 2026-09-25
+Date: 2026-09-19
 Amends: **0005 §C** (the resolution chain — a step is inserted between the
 preferred-language cookie and the instance default; the cookie keeps first
 place, the instance default + `en` floor keep last). Builds on **0015**

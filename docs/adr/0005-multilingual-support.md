@@ -56,7 +56,7 @@ bodies, seeded first-boot-only), editable in-app by a GlobalAdmin / Translator
 the locked ownership semantics.
 
 **Resolution order per request:** user's saved preference (cookie + settings
-page) → **browser `Accept-Language` match** (amended 2026-09-25, ADR 0046 —
+page) → **browser `Accept-Language` match** (amended 2026-09-19, ADR 0046 —
 a *suggestion*, matched against the enabled catalog, never persisted, only
 when no cookie preference is saved) → instance default (`LocaleSettings`) →
 source language (`en`). Fallback is per-string / per-page, so a partially

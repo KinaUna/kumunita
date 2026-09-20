@@ -1,7 +1,7 @@
 # ADR 0048 — Edit + remove lanes for user-added translations
 
 Status: Accepted
-Date: 2026-09-28
+Date: 2026-09-19
 
 ## Context
 

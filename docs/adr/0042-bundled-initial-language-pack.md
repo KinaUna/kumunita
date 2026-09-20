@@ -79,7 +79,7 @@ seeded once, then community-owned
   community-owned" meeting "no warm-reseed mechanism exists" — **a
   recorded decision, not a bug to fix**. The lane deliberately does not add
   a reseed path; the completeness view is the review surface.
-  > **Narrow exception recorded 2026-09-28 (ADR 0047 D2):** the *four
+  > **Narrow exception recorded 2026-09-19 (ADR 0047 D2):** the *four
   > canonical system pages'* `de` / `fr` / `da` `PageTranslation` rows
   > **are** backfilled on a warm boot (create-if-missing, idempotent, never
   > overwriting an admin edit or the `en` body) — the resident-visible seam

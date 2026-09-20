@@ -63,8 +63,7 @@ public interface ITagService
     /// the actor may already read (the C-TG·2 base query), each with a
     /// use-count and the display name resolved to the actor's language
     /// (ADR 0005 preference order, D5). No <c>AccessAudit</c> row (C-TG·8).
-    /// <para><b>U6</b> — not yet implemented (U5's stub throws
-    /// <see cref="NotImplementedException"/>).</para>
+
     /// </summary>
     Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId);
 
@@ -73,7 +72,6 @@ public interface ITagService
     /// <c>TagIds</c> contains the tag resolved from <paramref name="slug"/>;
     /// the post's own <c>Read</c> decision is applied **before** the post is
     /// returned (C-TG·3, D5). No <c>AccessAudit</c> row (C-TG·8).
-    /// <para><b>U6</b> — not yet implemented.</para>
     /// </summary>
     Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId);
 
@@ -81,7 +79,6 @@ public interface ITagService
     /// The by-tag blog-page results: the actor-readable
     /// <c>PageKind.User</c> pages whose <c>TagIds</c> contains the tag.
     /// No <c>AccessAudit</c> row (C-TG·8).
-    /// <para><b>U6</b> — not yet implemented.</para>
     /// </summary>
     Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId);
 
@@ -90,7 +87,6 @@ public interface ITagService
     /// <c>starts_with(displayName, prefix) OR starts_with(slug, prefix)</c>,
     /// where <c>displayName</c> is the name resolved in the viewer's language;
     /// **capped at ≤ 10**. No <c>AccessAudit</c> row (C-TG·8).
-    /// <para><b>U6</b> — not yet implemented.</para>
     /// </summary>
     Task<IReadOnlyList<TagItem>> SuggestAsync(string prefix, string actorId);
 

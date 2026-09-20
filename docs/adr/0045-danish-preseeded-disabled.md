@@ -1,7 +1,7 @@
 # ADR 0045 — Danish (da) pre-seeded, disabled by default
 
 Status: Accepted
-Date: 2026-09-24
+Date: 2026-09-19
 Amends: **0042** (the bundled initial pack — `de` / `fr` ship on first boot) —
 adds `da` to the bundled baseline set, with the one behavioral difference that
 it ships **disabled**. Builds on the frozen base of **0042 / 0043** (the

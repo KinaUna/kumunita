@@ -297,7 +297,7 @@ ships** (U05 owns it — the Consequences below).
   as designed. The ADR 0027 chip-swap is a **Show-surface
   (`/pages/{path}`) mechanic**, not a property of the hard-coded routes.
 
-  > **Superseded 2026-09-28 by [ADR 0047](0047-static-page-localization-and-backfill.md)
+  > **Superseded 2026-09-19 by [ADR 0047](0047-static-page-localization-and-backfill.md)
   > (D1).** The "en-body by contract" record above was the state at U05 and
   > remains the **floor** (an absent translation still renders the `en`
   > body, and the ADR 0027 chip-swap is still *not* on the hard-coded
