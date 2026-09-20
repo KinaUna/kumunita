@@ -7,7 +7,20 @@
     <div class="col-md-8 col-lg-7">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h1 style="display:inline;">@Model.ComponentName</h1>
+                @* On the all-sections feed (ComponentId empty) the header is
+                   the platform UI string (posts.feed_all_sections); on a
+                   single-community feed it is the community's name (ADR 0026,
+                   UGC — rendered as authored). *@
+                <h1 style="display:inline;">
+                    @if (string.IsNullOrEmpty(Model.ComponentId))
+                    {
+                        <kw-l key="posts.feed_all_sections">Community</kw-l>
+                    }
+                    else
+                    {
+                        @Model.ComponentName
+                    }
+                </h1>
                 <span class="text-muted ms-3">(feed)</span>
                 @* ADR 0012 — the mandatory badge: single-community feeds only
                    (the all-sections feed keeps this false). *@

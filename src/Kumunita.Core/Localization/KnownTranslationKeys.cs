@@ -226,6 +226,9 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Already have an account?",
 
             // ── posts (Index / New / Edit — headings, actions, empty-states) ─
+            // The all-sections feed (/community) header — the single feed
+            // header for the union of every community's posts.
+            ["posts.feed_all_sections"] = "Community",
             ["posts.write"]        = "Write a post",
             ["posts.new_title"]    = "Write a post",
             // ADR 0036 — the composer's lede: the default audience is
@@ -1021,6 +1024,7 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Du hast schon ein Konto?",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.feed_all_sections"] = "Gemeinschaft",
             ["posts.write"]        = "Beitrag schreiben",
             ["posts.new_title"]    = "Beitrag schreiben",
             ["posts.new_intro"] =
@@ -1776,6 +1780,7 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Tu as déjà un compte ?",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.feed_all_sections"] = "Communauté",
             ["posts.write"]        = "Écrire une publication",
             ["posts.new_title"]    = "Écrire une publication",
             ["posts.new_intro"] =
@@ -2535,6 +2540,7 @@ public static class KnownTranslationKeys
             ["account.signup_has_account"] = "Har du allerede en konto?",
 
             // ── posts (Index / New / Edit) ──────────────────────────────────
+            ["posts.feed_all_sections"] = "Fællesskab",
             ["posts.write"]        = "Skriv et indlæg",
             ["posts.new_title"]    = "Skriv et indlæg",
             ["posts.new_intro"] =
