@@ -67,6 +67,19 @@ public sealed class FeedViewModel
     public bool CanManageCommunity { get; set; }
 
     /// <summary>
+    /// The viewer holds the community's translation standing (ADR 0026):
+    /// GlobalAdmin ∪ Translator — the same rule the
+    /// <see cref="Kumunita.Web.Controllers.CommunityController.Translations"/>
+    /// page gate accepts (the page admits manage-standing viewers to *view*
+    /// the rows as well, but the feed only advertises the page to its actors).
+    /// Single-community feeds only; the view renders the "Translations" link
+    /// to <c>/community/translations/{Id}</c> next to the "Manage members"
+    /// link (ADR 0053 — the surface's own page, split off from the manage
+    /// page).
+    /// </summary>
+    public bool CanTranslateCommunity { get; set; }
+
+    /// <summary>
     /// The viewer is a member of the community (posting right, this component)
     /// but does **not** hold its management standing, and the community is
     /// optional (not <see cref="IsMandatory"/>): the self-leave lane (ADR

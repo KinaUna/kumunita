@@ -1,4 +1,5 @@
 // ── /community/manage/{id} — the community-membership management lane (ADR 0012)
+// ── /community/translations/{id} — the name/description translation lane (ADR 0026; ADR 0053)
 //
 // Mirrors the PostsController surface conventions: [Authorize] primary ctor,
 // full-route templates, explicit CTS, and fail-closed standing (never the
@@ -8,7 +9,10 @@
 // the moderator governs its members, not its standing). Standing the actor
 // does NOT have renders/behaves as **404** (ADR 0008 "U10" shape): the
 // community itself stays visible in the feed to reachable viewers; only
-// membership *management* is scoped.
+// membership *management* is scoped. The translation surface (ADR 0026)
+// has its own page since ADR 0053: reach = the manage standing ∪ the
+// translation standing (GlobalAdmin ∪ Translator), the same fail-closed
+// 404 for everyone else.
 namespace Kumunita.Web.Controllers;
 
 using Kumunita.Core.Identity;
@@ -59,7 +63,7 @@ public sealed class CommunityController : Controller
         if (component is null || !Standing(actorId, componentId))
             return NotFound();
         if (actorId is null)
-            return NotFound(); // Standing above implies non-null; pin it for the CanTranslateCommunity call.
+            return NotFound(); // Standing above implies non-null; pin it defensively.
 
         var memberships = await userInfo.GetCommunityMembersAsync(componentId);
         var profiles = await userInfo.GetProfilesAsync(verifiedOnly: false);
@@ -83,28 +87,9 @@ public sealed class CommunityController : Controller
             .OrderBy(r => r.DisplayName ?? "", StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // ── ADR 0026 — community name/description translations ─────────────
-        // Rendered as a "a read, not a decision" surface (the same standing the
-        // ADR 0022 post-detail surface uses for PostTranslation rows): the
-        // manage page already required the community's enabled visibility +
-        // the management standing (the gate above), so the translation rows
-        // inherit that reach. The enabled catalog (ListLanguagesAsync, Enabled
-        // + SortOrder — the same read the ADR 0022 post surface uses) seeds the
-        // chips / "add a translation" candidate list. CanTranslate is the
-        // display convenience mirroring UserInfoService's
-        // AddCommunityTranslationAsync standing check (GlobalAdmin ∪ Translator
-        // — no owner branch, a component-moderator is denied) — the POST
-        // re-checks server-side, so this is not the gate.
-        var communityTranslations = await userInfo.GetCommunityTranslationsAsync(component.Id);
-        var translationCodes = communityTranslations.Select(t => t.LanguageCode).ToHashSet();
-        var catalog = await localization.ListLanguagesAsync();
-        var communityLanguages = catalog
-            .Where(l => l.Enabled)
-            .OrderBy(l => l.SortOrder)
-            .Select(l => new LanguageOption(l.Id, l.NativeName, translationCodes.Contains(l.Id)))
-            .ToList();
-        var canTranslate = userInfo.CanTranslateCommunity(actorId, KumunitaPrincipal.RoleSet(User));
-
+        // The ADR 0026 name/description translation surface has its own page
+        // now (/community/translations/{id}, ADR 0053) — this page is the
+        // ADR 0012 membership surface again.
         return View(new ManageCommunityViewModel
         {
             ComponentId = component.Id,
@@ -116,9 +101,6 @@ public sealed class CommunityController : Controller
             ActorHasScopeClaim = KumunitaPrincipal.HasRole(User, Roles.ModeratorComponent(componentId)),
             Members = members,
             Candidates = candidates,
-            CommunityTranslations = communityTranslations,
-            Languages = communityLanguages,
-            CanTranslate = canTranslate,
         });
     }
 
@@ -235,9 +217,62 @@ public sealed class CommunityController : Controller
         return Redirect("/community");
     }
 
-    // ── ADR 0026: community name/description translations ──────────────────
+    // ── ADR 0026 / ADR 0053: community name/description translations ──────
 
-    // POST /community/manage/{componentId}/translations — a thin Web lane
+    // GET /community/translations/{componentId} — the dedicated surface the
+    // ADR 0026 section split out of the manage page (ADR 0053): the existing
+    // rows as expandable chips, the "add a <lang>" form per enabled language
+    // without a row (offered only to standing-holders), and the ADR 0048
+    // edit/remove lanes on each row. Reach: the community's management
+    // standing (the manage page's gate — a component-moderator may *view*
+    // the rows, the ADR 0026 manage-page behavior preserved) ∪ the
+    // translation standing (GlobalAdmin ∪ Translator — the ones who may
+    // act). Everyone else gets the same fail-closed 404 as the manage page
+    // (the ADR 0008 "U10" shape). The rows are a "a read, not a decision"
+    // surface (the ADR 0022 read pin carried over): the page gate is the
+    // reach decision, so no dedicated Can/audit on the read.
+    [HttpGet("/community/translations/{componentId}")]
+    public async Task<IActionResult> Translations(string componentId, CancellationToken ct = default)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (actorId is null)
+            return NotFound();
+
+        var component = (await userInfo.GetComponentsAsync(enabledOnly: false))
+            .FirstOrDefault(c => c.Id.Equals(componentId, StringComparison.OrdinalIgnoreCase));
+        if (component is null)
+            return NotFound();
+
+        var canManage = Standing(actorId, componentId);
+        var canTranslate = userInfo.CanTranslateCommunity(actorId, KumunitaPrincipal.RoleSet(User));
+        if (!canManage && !canTranslate)
+            return NotFound();
+
+        // The enabled catalog (Enabled + SortOrder — the same source the
+        // group/post translation surfaces read) seeds the chips and the
+        // "add a translation" candidate list; a disabled or non-seeded
+        // language never appears as an option.
+        var translations = await userInfo.GetCommunityTranslationsAsync(component.Id);
+        var translationCodes = translations.Select(t => t.LanguageCode).ToHashSet();
+        var catalog = await localization.ListLanguagesAsync();
+        var languages = catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new LanguageOption(l.Id, l.NativeName, translationCodes.Contains(l.Id)))
+            .ToList();
+
+        return View(new CommunityTranslationViewModel
+        {
+            ComponentId = component.Id,
+            Name = component.Name,
+            Description = component.Description,
+            CommunityTranslations = translations,
+            Languages = languages,
+            CanTranslate = canTranslate,
+        });
+    }
+
+    // POST /community/translations/{componentId} — a thin Web lane
     // (ADR 0006-D: routes + shape) delegating the write + standing decision to
     // UserInfoService.AddCommunityTranslationAsync (standing — GlobalAdmin ∪
     // Translator, no owner branch, component-moderator denied — is re-pinned
@@ -248,7 +283,7 @@ public sealed class CommunityController : Controller
     // Session shape (C3): the controller owns the LightweightSession; the
     // service's SaveChangesAsync is the single write — the CommunityTranslation
     // row and its AccessAudit row commit atomically.
-    [HttpPost("/community/manage/{componentId}/translations")]
+    [HttpPost("/community/translations/{componentId}")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddTranslation(string componentId, [FromForm] string? languageCode, [FromForm] string? name, [FromForm] string? description)
     {
@@ -259,12 +294,12 @@ public sealed class CommunityController : Controller
         if (string.IsNullOrWhiteSpace(languageCode))
         {
             TempData["error"] = "Choose a language for the translation.";
-            return RedirectToAction(nameof(Manage), new { componentId });
+            return RedirectToAction(nameof(Translations), new { componentId });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
             TempData["error"] = "A translation needs a name and/or description.";
-            return RedirectToAction(nameof(Manage), new { componentId });
+            return RedirectToAction(nameof(Translations), new { componentId });
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
@@ -292,7 +327,7 @@ public sealed class CommunityController : Controller
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
         TempData["info"] = $"Translation added ({langName}).";
-        return RedirectToAction(nameof(Manage), new { componentId });
+        return RedirectToAction(nameof(Translations), new { componentId });
     }
 
     // ── ADR 0048 — edit + delete lanes for community translations ────────
@@ -303,12 +338,12 @@ public sealed class CommunityController : Controller
     /// <summary>
     /// **Updates** the existing user-added translation of the community's
     /// name and/or description (ADR 0048):
-    /// <c>POST /community/manage/{componentId}/translations/update</c>.
+    /// <c>POST /community/translations/{componentId}/update</c>.
     /// Thin Web lane; delegates to
     /// <see cref="IUserInfoService.UpdateCommunityTranslationAsync"/>.
     /// Failure shapes mirror <see cref="AddTranslation"/>.
     /// </summary>
-    [HttpPost("/community/manage/{componentId}/translations/update")]
+    [HttpPost("/community/translations/{componentId}/update")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateTranslation(
         string componentId, [FromForm] string? languageCode, [FromForm] string? name, [FromForm] string? description)
@@ -320,12 +355,12 @@ public sealed class CommunityController : Controller
         if (string.IsNullOrWhiteSpace(languageCode))
         {
             TempData["error"] = "Choose a language for the translation.";
-            return RedirectToAction(nameof(Manage), new { componentId });
+            return RedirectToAction(nameof(Translations), new { componentId });
         }
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
         {
             TempData["error"] = "A translation needs a name and/or description.";
-            return RedirectToAction(nameof(Manage), new { componentId });
+            return RedirectToAction(nameof(Translations), new { componentId });
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
@@ -353,18 +388,18 @@ public sealed class CommunityController : Controller
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
         TempData["info"] = $"Translation updated ({langName}).";
-        return RedirectToAction(nameof(Manage), new { componentId });
+        return RedirectToAction(nameof(Translations), new { componentId });
     }
 
     /// <summary>
     /// **Removes** the existing user-added translation of the community's
     /// name and/or description (ADR 0048):
-    /// <c>POST /community/manage/{componentId}/translations/remove</c>.
+    /// <c>POST /community/translations/{componentId}/remove</c>.
     /// Thin Web lane; delegates to
     /// <see cref="IUserInfoService.RemoveCommunityTranslationAsync"/>.
     /// Failure shapes mirror <see cref="AddTranslation"/>.
     /// </summary>
-    [HttpPost("/community/manage/{componentId}/translations/remove")]
+    [HttpPost("/community/translations/{componentId}/remove")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoveTranslation(
         string componentId, [FromForm] string? languageCode)
@@ -376,7 +411,7 @@ public sealed class CommunityController : Controller
         if (string.IsNullOrWhiteSpace(languageCode))
         {
             TempData["error"] = "Choose a language for the translation.";
-            return RedirectToAction(nameof(Manage), new { componentId });
+            return RedirectToAction(nameof(Translations), new { componentId });
         }
 
         var actorRoles = KumunitaPrincipal.RoleSet(User);
@@ -397,6 +432,6 @@ public sealed class CommunityController : Controller
         var catalog = await localization.ListLanguagesAsync();
         var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
         TempData["info"] = $"Translation removed ({langName}).";
-        return RedirectToAction(nameof(Manage), new { componentId });
+        return RedirectToAction(nameof(Translations), new { componentId });
     }
 }

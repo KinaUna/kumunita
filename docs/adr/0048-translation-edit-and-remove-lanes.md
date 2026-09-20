@@ -138,7 +138,10 @@ minted from the signed-in principal, never a form field; the session from
   fail-closed** for both a non-visible group *and* a denied standing; the
   surface advertises no 403.
 - **Community** (`/community/translations/update` + `/…/remove`) —
-  denied → **403 `Forbid`**; missing row → **404 `NotFound`**.
+  denied → **403 `Forbid`**; missing row → **404 `NotFound`**. *(ADR 0053 —
+  the community surface's add/update/remove routes now live exactly here on
+  the `/community/translations/{id}` resource, matching this D5 shape; the
+  read page is `Community/Translations`, off the ADR 0026 manage page.)*
 - **Announcement** (`/announcements/{id}/translations/update` + `/…/remove`)
   — denied → **403 `Forbid`**; missing announcement/row → **404
   `NotFound`**.
@@ -148,7 +151,8 @@ minted from the signed-in principal, never a form field; the session from
 The view affordances (edit + remove forms in the translation
 `<details>` blocks) live on the six surfaces' existing show views
 (`Posts/Detail`, `Groups/PostDetail`, `Groups/Detail`, `Community/Manage`,
-`Announcement/Detail`, `Page/Show`); the two UI labels per surface
+`Announcement/Detail`, `Page/Show`); *(ADR 0053 — the community one is now
+`Community/Translations`.)* The two UI labels per surface
 (`…_translation_edit` / `…_translation_remove` key families) are registered
 in `KnownTranslationKeys` for all four enabled languages.
 

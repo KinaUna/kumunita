@@ -159,6 +159,15 @@ public sealed class PostsController(
         var isMandatory = component.Mandatory;
         var canLeave = canPost && !manages && !isMandatory;
 
+        // ADR 0026 / ADR 0053 — the feed-header "Translations" link (next to
+        // the ADR 0012 "Manage members" link): offered when the viewer holds
+        // the community's translation standing (GlobalAdmin ∪ Translator —
+        // the same rule the dedicated page's gate accepts; a component
+        // moderator may view the rows via the page but the feed only
+        // advertises it to the standing that acts on it).
+        var canTranslate = userInfo.CanTranslateCommunity(
+            actor, KumunitaPrincipal.RoleSet(User));
+
         // ADR 0051 — extend ADR 0049's default-visible-variant rule (already in
         // force on the detail views) to this list surface: the feed header shows
         // the community's name in the viewer's current language when a
@@ -207,6 +216,7 @@ public sealed class PostsController(
             CanPost = canPost,
             IsMandatory = isMandatory,
             CanManageCommunity = manages,
+            CanTranslateCommunity = canTranslate,
             CanLeaveCommunity = canLeave,
             // The viewer's own community directory only: communities they have
             // access to (membership ∪ moderator scope ∪ GlobalAdmin — the same

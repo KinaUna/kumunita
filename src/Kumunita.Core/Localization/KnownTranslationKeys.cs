@@ -575,6 +575,9 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — community name/description translations ────────
             ["community.translations_label"] = "Translations",
             ["community.translations_none"] = "None yet",
+            ["community.translations_page_title"] = "Translations",
+            ["community.translations_page_lede"] = "Name and description translations for this community.",
+            ["community.translations_view_only"] = "You can view the translations; only a GlobalAdmin or a Translator can add, edit, or remove them.",
             ["community.translation_add"] = "Add",
             ["community.translation_name_label"] = "Name",
             ["community.translation_desc_label"] = "Description",
@@ -1373,6 +1376,9 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — community name/description translations ────────
             ["community.translations_label"] = "Übersetzungen",
             ["community.translations_none"] = "Noch keine",
+            ["community.translations_page_title"] = "Übersetzungen",
+            ["community.translations_page_lede"] = "Name und Beschreibung dieser Gemeinschaft in weiteren Sprachen.",
+            ["community.translations_view_only"] = "Sie können die Übersetzungen einsehen; nur ein GlobalAdmin oder ein Übersetzer kann sie hinzufügen, bearbeiten oder entfernen.",
             ["community.translation_add"] = "Hinzufügen",
             ["community.translation_name_label"] = "Name",
             ["community.translation_desc_label"] = "Beschreibung",
@@ -2150,6 +2156,9 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — community name/description translations ────────
             ["community.translations_label"] = "Traductions",
             ["community.translations_none"] = "Pas encore",
+            ["community.translations_page_title"] = "Traductions",
+            ["community.translations_page_lede"] = "Nom et description de cette communauté dans d'autres langues.",
+            ["community.translations_view_only"] = "Vous pouvez consulter les traductions ; seuls un GlobalAdmin ou un Traducteur peuvent les ajouter, modifier ou supprimer.",
             ["community.translation_add"] = "Ajouter",
             ["community.translation_name_label"] = "Nom",
             ["community.translation_desc_label"] = "Description",
@@ -2928,6 +2937,9 @@ public static class KnownTranslationKeys
             // ── ADR 0026 — community name/description translations ────────
             ["community.translations_label"] = "Oversættelser",
             ["community.translations_none"] = "Ingen endnu",
+            ["community.translations_page_title"] = "Oversættelser",
+            ["community.translations_page_lede"] = "Navn og beskrivelse af dette fællesskab på andre sprog.",
+            ["community.translations_view_only"] = "Du kan se oversættelserne; kun en GlobalAdmin eller en Oversætter kan tilføje, redigere eller fjerne dem.",
             ["community.translation_add"] = "Tilføj",
             ["community.translation_name_label"] = "Navn",
             ["community.translation_desc_label"] = "Beskrivelse",

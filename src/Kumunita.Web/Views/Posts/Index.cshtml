@@ -43,6 +43,18 @@
                         Manage members
                     </a>
                 }
+                @* ADR 0053 — the community name/description translation lane,
+                   now on its own page (split off the members page). Offered to
+                   anyone with community-translation standing (GlobalAdmin ∪
+                   Translator); a moderator-only viewer is still admitted to
+                   the page read-only by the route. *@
+                @if (Model.CanTranslateCommunity)
+                {
+                    <a class="btn btn-outline-secondary"
+                       href="@Url.Action("Translations", "Community", new { componentId = Model.ComponentId })">
+                        Translations
+                    </a>
+                }
                 @if (Model.CanPost)
                 {
                     <a class="btn btn-primary"

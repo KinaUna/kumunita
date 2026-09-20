@@ -3,6 +3,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
+using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -169,7 +170,97 @@ public class CommunityControllerTranslationTests
         Assert.IsType<NotFoundResult>(result);
     }
 
+    // ── GET Translations (ADR 0053) — the dedicated surface ────────────────
+
+    [Fact]
+    public async Task Translations_Translator_CanTranslateTrue_View()
+    {
+        var userInfo = BuildForGet(canTranslate: true, component: true);
+
+        var controller = Build(userInfo, roles: new[] { Roles.Translator }, subjectId: "subj-translator");
+
+        var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.IsType<CommunityTranslationViewModel>(view.Model);
+        Assert.True(((CommunityTranslationViewModel)view.Model!).CanTranslate);
+    }
+
+    [Fact]
+    public async Task Translations_GlobalAdmin_CanTranslateTrue_View()
+    {
+        var userInfo = BuildForGet(canTranslate: true, component: true);
+
+        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+
+        var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
+
+        var view = Assert.IsType<ViewResult>(result);
+        Assert.True(((CommunityTranslationViewModel)view.Model!).CanTranslate);
+    }
+
+    [Fact]
+    public async Task Translations_ComponentModerator_ViewOnly_CanTranslateFalse()
+    {
+        // The manage standing (moderator) admits the page, but the translation
+        // standing is denied — CanTranslate must be false (view-only).
+        var userInfo = BuildForGet(canTranslate: false, component: true);
+
+        var controller = Build(userInfo,
+            roles: new[] { Roles.ModeratorComponent(CompId) }, subjectId: "subj-mod");
+
+        var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = (CommunityTranslationViewModel)view.Model!;
+        Assert.False(vm.CanTranslate);
+        Assert.Equal(CompId, vm.ComponentId);
+    }
+
+    [Fact]
+    public async Task Translations_PlaneMember_NoStanding_NotFound()
+    {
+        // Neither manage nor translation standing — fail-closed 404, and the
+        // read seam is never reached (the page gate is the reach decision).
+        var userInfo = BuildForGet(canTranslate: false, component: true);
+
+        var controller = Build(userInfo, roles: new[] { Roles.Member }, subjectId: "subj-member");
+
+        var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<NotFoundResult>(result);
+        await userInfo.DidNotReceive().GetCommunityTranslationsAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task Translations_UnknownCommunity_NotFound()
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>());
+
+        var controller = Build(userInfo, roles: new[] { Roles.GlobalAdmin }, subjectId: "subj-admin");
+
+        var result = await controller.Translations(CompId, TestContext.Current.CancellationToken);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
     // ── Harness ─────────────────────────────────────────────────────────────
+
+    private static IUserInfoService BuildForGet(bool canTranslate, bool component)
+    {
+        var userInfo = Substitute.For<IUserInfoService>();
+        if (component)
+        {
+            userInfo.GetComponentsAsync(enabledOnly: false).Returns(new List<Component>
+            {
+                new() { Id = CompId, Name = "The Club", Enabled = true },
+            });
+        }
+        userInfo.CanTranslateCommunity(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>()).Returns(canTranslate);
+        userInfo.GetCommunityTranslationsAsync(CompId).Returns(new List<CommunityTranslation>());
+        return userInfo;
+    }
 
     private static CommunityController Build(
         IUserInfoService userInfo,

@@ -36,21 +36,9 @@ public class ManageCommunityViewModel
     /// member, excluding the actor.</summary>
     public IReadOnlyList<MemberRow> Candidates { get; init; } = [];
 
-    // ── ADR 0026 — community name/description translations ─────────────────
-    // The same three properties the ADR 0022 post-detail surface carries
-    // (PostDetailViewModel): the row set (a "a read, not a decision" surface —
-    // visibility already inherited the community's enabled visibility), the
-    // enabled catalog language set (with its HasTranslation flag) the chips /
-    // "add a translation" candidate list render from, and the standing pin (a
-    // display convenience, not a gate — the real deny is UserInfoService's
-    // AddCommunityTranslationAsync standing check, which re-runs the same rule
-    // server-side). Reuses the ADR 0022 LanguageOption record (the same
-    // (code, native name, has translation) shape).
-    public IReadOnlyList<Kumunita.Core.UserInfo.CommunityTranslation> CommunityTranslations { get; init; } = [];
-
-    public IReadOnlyList<LanguageOption> Languages { get; init; } = [];
-
-    public bool CanTranslate { get; init; }
+    // ADR 0053 — the ADR 0026 name/description translation surface moved to
+    // its own page (/community/translations/{id}, CommunityTranslationViewModel);
+    // this model is the membership surface only again.
 
     public sealed record MemberRow(string SubjectId, string? DisplayName);
 }

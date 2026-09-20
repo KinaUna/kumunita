@@ -111,8 +111,10 @@ language, without any of the control-plane standing.
 
 - **Web surface — the read side shows what's there; the write side offers
   what's missing.** Mirrors the ADR 0022 post/reply render exactly:
-  - The **group detail** page (`/groups/{id}`) and the **community manage**
-    page (`/community/manage/{id}`) render:
+  - The **group detail** page (`/groups/{id}`) and the **community**
+    translation surface render: *(ADR 0053 — the community half moved off the
+    manage page to its own `/community/translations/{id}` page; the group
+    half is unchanged on `/groups/{id}`.)*
     - the **available translations** as a chip per language, each expandable
       to its (optional) name + description — the "show which translations are
       available" half;
