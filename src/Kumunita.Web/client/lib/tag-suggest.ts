@@ -113,6 +113,30 @@ export function bindTagSuggest(input: HTMLInputElement): void {
 
   const selected = new Set<string>(); // committed labels (dedup by label)
 
+  // ADR 0044 (TG lane) — the edit lane pre-seeds the post's existing tag
+  // slugs as starting chips (each removable; re-saving with fewer chips
+  // detaches, the server-side empty-set detach). The attribute carries a JSON
+  // array of charset-safe slugs (lowercase letters/digits/hyphen/underscore —
+  // never a translated display name, which would throw in the server's
+  // Slug derivation on re-save). A new/untagged post has "[]" or no attribute
+  // ⇒ nothing to seed (the existing free-text behavior is unchanged).
+  // Malformed / missing JSON degrades to no seed (try/catch) — the input still
+  // works as before; this is a display affordance, never a gate.
+  const initialRaw = input.dataset.tagSuggestInitial;
+  if (initialRaw) {
+    try {
+      const initial = JSON.parse(initialRaw);
+      if (Array.isArray(initial)) {
+        for (const slug of initial) {
+          const s = typeof slug === 'string' ? slug.trim() : '';
+          if (s && !selected.has(s)) selected.add(s);
+        }
+      }
+    } catch {
+      // ignore — a broken seed attribute is a display no-op, not an error
+    }
+  }
+
   function syncHidden() {
     hidden.value = JSON.stringify(Array.from(selected));
   }
@@ -231,6 +255,9 @@ export function bindTagSuggest(input: HTMLInputElement): void {
     window.setTimeout(close, 150);
   });
 
+  // Seed the hidden field + render any pre-seeded chips (the edit lane's
+  // existing tags, ADR 0044); a new/untagged post seeds nothing.
+  syncHidden();
   renderChips();
 }
 

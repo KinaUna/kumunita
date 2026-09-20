@@ -66,6 +66,14 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a>
                             </li>
+                            @* ADR 0044 (TG lane) — the tag browse surface (the
+                               distinct tags used on content the viewer may
+                               already read, each linking to its by-tag view).
+                               [Authorize] on the TagController ⇒ resident-only,
+                               so it lives in this signed-in block. *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/tags"><kw-l key="nav.tags">Tags</kw-l></a>
+                            </li>
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a>
                             </li>

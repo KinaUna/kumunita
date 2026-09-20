@@ -2,6 +2,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Moderation;
 using Kumunita.Core.Posts;
+using Kumunita.Core.Tags;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -78,6 +79,14 @@ public sealed class PostsController(
     IUserInfoService userInfo,
     ILocalizationService localization,
     IDocumentStore store,
+    // ADR 0044 (TG lane) — the tag read seam. The Detail action renders the
+    // post's tags (display names resolved in the viewer's language) and the
+    // Edit GET pre-seeds the existing tag slugs for the tag-suggest input.
+    // **Optional** (default null) so the existing test-construction sites
+    // that build this controller without a tag service keep compiling —
+    // the tag display/seed surfaces are no-ops when the seam is absent.
+    // DI always supplies the live <c>ITagService</c> in the app.
+    ITagService? tags = null,
     // ADR 0051 (extending ADR 0049 to the /community list surfaces) — the
     // per-request translation read seam, used only to auto-select which of an
     // item's pre-rendered variants (ADR 0022 posts, ADR 0026 community names)
@@ -413,6 +422,30 @@ public sealed class PostsController(
         var canTranslate = PostService.CanAddTranslation(
             result.Post.GroupId.Length > 0, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
 
+        // ADR 0044 (TG lane) — the post's tags, resolved to display names in
+        // the viewer's language (the ADR 0005 preference order —
+        // ListForActorAsync already does the TagTranslation lookup). A "a
+        // read, not a decision" surface: the post's single Read decision ran
+        // in GetPostAsync above, and the tag seam is access-scoped by
+        // construction (C-TG·1 — a tag is a label, never a gate; a dangling
+        // TagId whose Tag row the actor can't resolve is simply dropped, so
+        // a broken reference renders as *nothing*, not a 404/error). One
+        // read of the shared per-request chain; N+1 not applicable (a single
+        // base-query call, the M2 GroupsController display-name precedent).
+        // No ITagService (test construction site) ⇒ empty list (no-op).
+        var tagRows = new List<(string Slug, string DisplayedName)>();
+        if (tags is not null && result.Post.TagIds.Count > 0)
+        {
+            var postTagIds = result.Post.TagIds.ToHashSet(StringComparer.Ordinal);
+            var readable = await tags.ListForActorAsync(actor);
+            tagRows = readable
+                .Where(t => postTagIds.Contains(t.Tag.Id))
+                .Select(t => (Slug: t.Tag.Slug, DisplayedName: t.DisplayedName))
+                .OrderBy(x => x.DisplayedName, StringComparer.Ordinal)
+                .ThenBy(x => x.Slug, StringComparer.Ordinal)
+                .ToList();
+        }
+
         // Batch-load every reply's translations up front (one query for the
         // whole reply list — the M2 read-lane "one query per surface" preference).
         var replyIds = result.Replies.Select(r => r.Id).ToList();
@@ -461,6 +494,7 @@ public sealed class PostsController(
             Languages = languages,
             CanTranslate = canTranslate,
             OriginalLanguageCode = result.Post.LanguageCode, // TD·1/TD·4 (ADR 0027) — the authored-in code, read from the ADR 0018 field.
+            Tags = tagRows,
         });
     }
 
@@ -883,9 +917,46 @@ public sealed class PostsController(
             // precedent — pre-select the stored value, not the instance default).
             Languages = await SeedLanguagePickerAsync(),
             LanguageCode = post.LanguageCode,
+            // ADR 0044 (TG lane) — the tag-suggest input's starting chips (slugs,
+            // each removable). Rendered as data-tag-suggest-initial on #tags.
+            ExistingTagSlugs = await SeedExistingTagSlugsAsync(post),
         };
         await SeedGrantPickerOptionsAsync();
         return View(model);
+    }
+
+    /// <summary>
+    /// ADR 0044 (TG lane) — the edit form's pre-seeded tag **slugs** (the
+    /// tag-suggest input's starting chips). Slugs are the charset-safe business
+    /// key (C-TG·4) — seeding a *display name* (possibly translated, with
+    /// accents / uppercase) would throw in the service's <c>DeriveSlug</c> on
+    /// re-save, so the seed is the slug, not the display name. The slugs come
+    /// from the <see cref="Tag"/> rows the post's <c>TagIds</c> resolve to
+    /// (<c>TagIds</c> hold Ids, not slugs); a dangling Id whose <see cref="Tag"/>
+    /// row is gone is dropped (the C-TG·1 broken-reference floor — renders as
+    /// nothing, not an error). Opens its own short-lived query session so the
+    /// same call seeds both the edit GET and the POST re-render paths (the
+    /// re-render must re-seed, or a validation-error / bad-slug re-render would
+    /// open the tag input with no chips — and under the U8b empty-set-detach
+    /// semantics a follow-up submit would then silently drop the author's
+    /// intended tags). A missing post is an empty list (fail-closed shape —
+    /// the author-only gate is the real deny).
+    /// </summary>
+    private async Task<IReadOnlyList<string>> SeedExistingTagSlugsAsync(Post? post)
+    {
+        if (post is null || post.TagIds.Count == 0)
+            return [];
+
+        await using var session = store.QuerySession();
+        var postTagIds = post.TagIds.ToHashSet(StringComparer.Ordinal);
+        var tagDocs = await session.Query<Tag>()
+            .Where(t => postTagIds.Contains(t.Id))
+            .ToListAsync();
+        return tagDocs
+            .Select(t => t.Slug)
+            .Where(s => !string.IsNullOrEmpty(s))
+            .OrderBy(s => s, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
@@ -931,6 +1002,15 @@ public sealed class PostsController(
         model.Components = await SeedEditableComponentListAsync(post.ComponentId);
         model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
         await SeedGrantPickerOptionsAsync();
+        // ADR 0044 (TG lane) — the re-render (a validation error, or a bad tag
+        // slug below) must re-seed the tag input's chips from the post's
+        // current tags: the bound model's ExistingTagSlugs is [BindNever] and
+        // therefore [] on POST, so without this the tag input would reopen with
+        // no chips — and under the U8b empty-set-detach semantics a follow-up
+        // submit would silently drop the author's intended tags. Seeded before
+        // both re-render returns (the !ModelState.IsValid path and the
+        // ArgumentException bad-slug path), so both show a well-formed state.
+        model.ExistingTagSlugs = await SeedExistingTagSlugsAsync(post);
 
         if (string.IsNullOrWhiteSpace(model.Body))
             ModelState.AddModelError(nameof(model.Body), "Body is required.");
@@ -960,7 +1040,17 @@ public sealed class PostsController(
                 string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
                 session,
                 AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U12 (C-ATT·4/8) — the post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
-                TagSlugs.Parse(model.TagIds)); // TG (ADR 0044, U8b) — the tag input (re-parsed on edit; the U4 additive default-empty pin when null/empty).
+                // TG (ADR 0044, U8b register patch) — tri-state tag submit: the bound
+                // TagIds field is string? — null means the field was **not posted**
+                // (the client/lib/tag-suggest.ts hidden field only exists when the
+                // tag module wired it, i.e. JS is on) ⇒ preserve the post's existing
+                // tags (a JS-disabled author editing their body must not lose tags);
+                // a **present** field (even an empty `[]` when the author removed
+                // every chip) is authoritative ⇒ empty detaches all, non-empty
+                // attaches (the U8b register patch's detach semantics in
+                // PostService.UpdatePostAsync). TagSlugs.Parse still normalizes
+                // (trim / dedup / drop-blank) the present case.
+                model.TagIds is null ? null : TagSlugs.Parse(model.TagIds));
             TempData["info"] = "Post updated.";
             return Redirect($"/posts/{id}");
         }

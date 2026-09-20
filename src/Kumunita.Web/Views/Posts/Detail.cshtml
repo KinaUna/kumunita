@@ -113,6 +113,22 @@
                         </span>
                     </div>
 
+                    @* ADR 0044 (TG lane) — the post's tags (display names in the
+                       viewer's language, resolved by the controller from the
+                       access-scoped read seam). A label, never a gate (C-TG·1):
+                       each badge links to the by-tag view (/tags/{slug}); a
+                       broken reference is dropped upstream, never an error. *@
+                    @if (Model.Tags.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                            @foreach (var tag in Model.Tags)
+                            {
+                                <a class="badge rounded-pill text-bg-light text-decoration-none border"
+                                   href="/tags/@tag.Slug">@tag.DisplayedName</a>
+                            }
+                        </div>
+                    }
+
                     @* TD (ADR 0027) — the authored-in language is the first,
                        default-visible variant; each added translation is a
                        hidden variant; the chip row is a selector that swaps

@@ -152,8 +152,16 @@
                        field-label convention — a `placeholder` is an HTML
                        attribute, and the kw-l TagHelper renders an element,
                        so it cannot wrap an attribute). *@
+                    @* ADR 0044 (TG lane) — the edit lane pre-seeds the post's
+                       existing tag slugs as starting chips (each removable;
+                       re-saving with fewer chips detaches). Slugs are
+                       charset-safe (lowercase letters/digits/hyphen/underscore),
+                       so the JSON array has no single quotes and is safe to
+                       inline in a single-quoted HTML attribute. Empty list ⇒
+                       "[]" ⇒ no chips (new/untagged post behaves as before). *@
                     <input class="form-control" type="text" id="tags"
                            data-tag-suggest
+                           data-tag-suggest-initial='@System.Text.Json.JsonSerializer.Serialize(Model.ExistingTagSlugs)'
                            maxlength="64"
                            placeholder="e.g. sanitation, budget, maple-street" />
                     <div class="text-muted small mt-1">

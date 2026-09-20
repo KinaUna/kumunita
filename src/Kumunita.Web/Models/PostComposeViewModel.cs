@@ -140,6 +140,24 @@ public sealed class PostComposeViewModel
     public string? TagIds { get; set; }
 
     /// <summary>
+    /// The post's **existing** tags (the <c>TG</c> lane, ADR 0044 — the
+    /// edit-lane pre-seed). A <b>[BindNever]</b> read-only list of the post's
+    /// current tag **slugs** (each charset-valid, C-TG·4 — so a chip seeded
+    /// from it round-trips cleanly through <c>TagService.DeriveSlug</c> on
+    /// re-save, unlike a translated display name which may carry spaces or
+    /// non-ASCII). Seeded on the edit lane's <c>GET</c> from
+    /// <c>Post.TagIds</c> (the tag ids → slug map, loaded from the
+    /// <c>Tag</c> docs) and passed to <c>client/lib/tag-suggest.ts</c> as the
+    /// <c>data-tag-suggest-initial</c> JSON array, which pre-populates the
+    /// chips + the hidden <c>TagIds</c> field so the author **sees** the
+    /// current tags and can remove any (the detach lane — a chip's
+    /// remove-button drops it from the set, and an empty set now detaches all
+    /// on save). A <c>GET /posts/new</c> (no existing tags) leaves this empty.
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
+
+    /// <summary>
     /// The composer's shape is well-formed for a <c>POST</c>. <see
     /// cref="ComponentId"/> must be non-empty (a "post for which community?"
     /// post with no component is a malformed post, not a silent default to

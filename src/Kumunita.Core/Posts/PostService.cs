@@ -433,9 +433,23 @@ public sealed class PostService
         IReadOnlyList<string>? attachmentIds = null,
         // TG (ADR 0044, U8b) — the tag slugs (the author's typed labels, C-TG·4).
         // Optional trailing parameter (nullable, the CS1736 shape) — existing
-        // call sites keep compiling unchanged (they omit it ⇒ null ⇒ no tags).
-        // The <c>AttachToPostAsync</c> lane create-or-reuses each tag (C-TG·4)
-        // and stores the resolved <c>Tag</c> ids onto <c>Post.TagIds</c>.
+        // call sites keep compiling unchanged (they omit it ⇒ null ⇒ **no
+        // change** to the post's existing tags). The <c>AttachToPostAsync</c>
+        // lane create-or-reuses each tag (C-TG·4) and stores the resolved
+        // <c>Tag</c> ids onto <c>Post.TagIds</c>.
+        //
+        // Detach semantics (U8b register patch): the tri-state is
+        //   · null ⇒ preserve the post's existing <c>TagIds</c> (the caller
+        //     carried no tag field — the 7 existing Core call sites that
+        //     omit this parameter keep their prior no-op behavior);
+        //   · an empty (non-null) list ⇒ detach all (clear <c>Post.TagIds</c>);
+        //   · a non-empty list ⇒ attach the given set (create-or-reuse each,
+        //     store the resolved ids).
+        // This makes the edit lane's "editable" surface fully round-trip-
+        // capable: the composer's chips-with-remove affordance
+        // (client/lib/tag-suggest.ts) posts <c>[]</c> when the author has
+        // removed every chip, and that now clears the post's tags rather than
+        // silently preserving them.
         IReadOnlyList<string>? tagSlugs = null)
     {
         if (string.IsNullOrEmpty(postId)) throw new ArgumentException("A post id is required.", nameof(postId));
@@ -470,19 +484,36 @@ public sealed class PostService
         session.Store(post);
         await session.SaveChangesAsync().ConfigureAwait(false);
 
-        // TG (ADR 0044, U8b) — the tag attach lane on the edit path (C3
-        // single-transaction idiom, same session as the edit write). This
-        // lane is **author-only** (the <c>post.AuthorId == actorId</c> gate
-        // above re-checks standing), so the actor is always the author — the
-        // <c>AttachToPostAsync</c> standing probe short-circuits on the
-        // author match (the empty role set below is sufficient:
-        // <c>CanAttachToPost</c> returns true on the author match, and
-        // <c>ResolveAttachVia</c> resolves <c>Owner</c> first). A GlobalAdmin
-        // who is not the author never reaches this code (the author-only gate
-        // throws first). Null/empty ⇒ no tags (the U4 default-empty pin); a
-        // bad slug is an <c>ArgumentException</c> from <c>DeriveSlug</c>
-        // (C-TG·4) — the Web layer maps it to a form error.
-        if (tagSlugs is { Count: > 0 } && _tags is not null)
+        // TG (ADR 0044, U8b) — the tag attach/detach lane on the edit path (C3
+        // single-transaction idiom, same session as the edit write). This lane
+        // is **author-only** (the <c>post.AuthorId == actorId</c> gate above
+        // re-checks standing), so the actor is always the author — the
+        // <c>AttachToPostAsync</c> standing probe short-circuits on the author
+        // match (the empty role set below is sufficient: <c>CanAttachToPost</c>
+        // returns true on the author match, and <c>ResolveAttachVia</c>
+        // resolves <c>Owner</c> first). A GlobalAdmin who is not the author
+        // never reaches this code (the author-only gate throws first).
+        //
+        // Tri-state (the U8b register patch's detach semantics):
+        //   · <c>null</c> ⇒ the caller carried no tag field — leave the post's
+        //     existing <c>TagIds</c> untouched (the U4 default-empty pin for the
+        //     lanes that never wire a tag field, i.e. the 7 existing Core test
+        //     call sites that omit this parameter).
+        //   · non-empty ⇒ attach: create-or-reuse each tag and store the
+        //     resolved ids (a bad slug is an <c>ArgumentException</c> from
+        //     <c>DeriveSlug</c>, C-TG·4 — the Web layer maps it to a form
+        //     error).
+        //   · empty (non-null) ⇒ detach: clear <c>Post.TagIds</c>. The
+        //     <c>AttachToPostAsync</c> lane's standing probe is still the
+        //     authoritative gate (it throws <c>UnauthorizedAccessException</c>
+        //     before anything is written if the actor lacks standing); here the
+        //     author-only lane has already run, so it passes. Calling the lane
+        //     with an empty set is a documented no-op-attach that stores an
+        //     empty id list (its <c>AttachToPostAsync</c> body writes
+        //     <c>post.TagIds = tagIds</c> unconditionally once standing passes,
+        //     so the empty set clears — matching <c>AttachToPageAsync</c>'s
+        //     "no-op detach (empty slugs)" note), which is exactly the detach.
+        if (tagSlugs is not null && _tags is not null)
         {
             var resolved = await _tags.AttachToPostAsync(
                     post.Id, tagSlugs, actorId, new HashSet<string>(), session)

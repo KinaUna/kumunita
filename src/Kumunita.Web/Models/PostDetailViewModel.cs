@@ -52,6 +52,33 @@ public sealed class PostDetailViewModel
     public IReadOnlyList<ReplyItem> Replies { get; set; } = [];
     public bool IsAuthor { get; set; }
 
+    // ── TG (ADR 0044) — the post's tags on the detail surface ──
+
+    /// <summary>
+    /// The post's **tags** (the <c>TG</c> lane, ADR 0044) as a
+    /// <b>(Slug, DisplayedName)</b> projection for the detail surface — one
+    /// row per id in <see cref="Post.TagIds"/> that resolves to a stored
+    /// <c>Tag</c> (a dangling id is dropped silently — the tag was deleted
+    /// out from under the post, and the C-TG·1 "labels, never a gate" pin
+    /// says a tag grants nothing, so a broken reference renders as nothing,
+    /// not a 404 or an error). A post with no tags renders an empty list
+    /// (the detail page simply shows no tag row — the F12 "no tags yet"
+    /// shape, the tag list's empty-list precedent carried to the post). The
+    /// <c>Slug</c> is the link target (<c>/tags/{slug}</c>,
+    /// the by-tag browse surface — discoverability); the <c>DisplayedName</c>
+    /// is resolved in the **viewer's language** (the ADR 0005 preference
+    /// order: the effective language → the <c>TagTranslation</c> for it → the
+    /// base <c>Tag.Name</c>), the exact idiom the tag list's
+    /// <c>BuildTagItemsAsync</c> uses. <b>[BindNever]</b>-equivalent: this is
+    /// a projection on a projection model (the detail page is GET-only), so
+    /// there is no form round-trip to guard. Populated by the
+    /// <see cref="PostsController.Detail"/> / group-detail controllers from
+    /// the post's <c>Tag</c> / <c>TagTranslation</c> docs (a read, not a
+    /// decision — the post's single <c>Read</c> decision already ran in
+    /// <c>GetPostAsync</c>, C-TG·1).
+    /// </summary>
+    public IReadOnlyList<(string Slug, string DisplayedName)> Tags { get; set; } = [];
+
     // ── ADR 0022 — user-added post translations ──
 
     /// <summary>The post's user-added translations, keyed by their target
