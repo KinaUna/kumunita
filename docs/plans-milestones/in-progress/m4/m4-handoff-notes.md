@@ -26,8 +26,79 @@ it). ADR 0054 is the decision record (U00 locks it). The §6.4 scheduled job
    rewrites the ARCHITECTURE.md §5 block.
 2. **Milestones pin handoff.** PG **already shipped** (its lane
    `U00–U07` is green and `LocalizedPage` is retired — see
-   `docs/plans-milestones/pages/pages-handoff-notes.md`), so U00 closes
-   it (`PG → StatusDone`) and opens `M4` (`M4 → StatusNext`) in the same
-   commit (the single `StatusNext` pin moves to M4 — `MilestonesTests`
-   renames its pin to M4). U12 then closes M4 (`M4 → StatusDone`) and
-   hands the single-in-progress pin to the next milestone, `M5`.
+   `docs/plans-milestones/pages/pages-handoff-notes.md`). The roadmap trio
+   is stale: `Milestones.cs` still shows PG as `StatusNext` and M4 as
+   `StatusPlanned`. U00's roadmap step **closes PG (`StatusDone`) and
+   opens M4 (`StatusNext`)** in the same commit, and renames the
+   single-in-progress pin from `PG_...` to `M4_...`. This is **not** a
+   pull-forward over in-flight work — it is a clean close of the finished
+   lane and the open of the next one.
+
+**Both open decisions are resolved by the Lane-open section above** (U00
+resolves #1 in the design doc §3.1 + ADR 0054 Context — keeping the plan's
+`Body` / `ReminderEnabled` names; and resolves #2 in this commit). No
+further open decisions carried into U01.
+
+## U00 — sign-off + ADR 0054
+
+- **ADR:** **0054** — `docs/adr/0054-events-rsvp-reminders.md`, Status
+  **Accepted**, dated **2026-09-20**. The ADR's **Context** records the
+  roadmap order (PG SHIPPED / M4 opened, not a pull-forward) and the
+  **`Body` / `ReminderEnabled` naming decision** (over
+  ARCHITECTURE.md §5's `description` / `rsvpRequired` sketch — the close
+  unit U12 syncs §5).
+- **Design doc:** `docs/design/m4-events-design.md` (primary reference tier)
+  — all §3.x sections marked **[DECIDED — ADR 0054]**; **zero `[PROPOSED]`
+  markers remain** (verified by grep). §4 lists the exact C# seams
+  (`IEventService`, `EventReminderService`, `EventReminderHandler`,
+  `EventReminderTick`, `EventReminderOptions`, the `M4DocTypes` surface).
+- **The 23 pinned seam test names** (design doc §3.7 = the master list, ADR
+  0054 Decision): T01 `M4_MemberSeesUpcomingEventFeed` · T02
+  `M4_NullAudienceEventIsPublic` · T03 `M4_CommunityAudienceSeesFeed` · T04
+  `M4_GrantsAudienceOnlyGranteeSees` · T05 `M4_DraftInvisibleToNonAuthor`
+  · T06 `M4_PlainMemberCreateAllowed` · T07 `M4_AuthorCanEditOwnEvent` ·
+  T08 `M4_PlainMemberEditDenied` · T09 `M4_GlobalAdminOverrideEdit` · T10
+  `M4_PublishAuthorOnly` · T11 `M4_SoftDeleteExcludesFromFeedAndDetail` ·
+  T12 `M4_AuthorSoftDeleteOwnEvent` · T13 `M4_RsvpLastWriteWins` · T14
+  `M4_RsvpUniqueIndexOneRowPerUser` · T15 `M4_RsvpListOwnerOnly` · T16
+  `M4_RsvpWritesNoAccessAuditRow` · T17 `M4_AuditRowShape_Create` · T18
+  `M4_EventToAuditableResourceShape` · T19 `M4_ReminderWindowFiltersOutsideEvents`
+  · T20 `M4_ReminderGoingRsvpsOnly` · T21 `M4_ReminderAuthorAlwaysIncluded`
+  · T22 `M4_ReminderIdempotencyKeyShape` · T23 `M4_ReminderWritesNoAccessAuditRow`.
+- **The three-test acceptance gate** (design doc §3.8, ADR 0054): **1 —
+  closed loop** (author creates a published event → feed shows it, the
+  `TargetKind = "event"` aggregate row; author RSVPs Going → visible in the
+  owner-only list); **2 — handoff** (a user added to `Audience.Grants` after
+  creation sees the event on the next request; the `Delegation` branch is
+  handoff-onto-a-delegate); **3 — part-vs-whole** (the 23 names are the
+  whole; tests 1–2 are the parts; all pass together in the same
+  `Kumunita.Core.Tests` run as the inherited M1–M3 / PG anchors).
+- **Roadmap trio (this commit):** `src/Kumunita.Web/Milestones.cs` — **M4
+  row = `StatusNext`**, **PG now `StatusDone`** (M5 / M6 stay
+  `StatusPlanned` — the M-letter order is untouched); `README.md` — PG
+  `**Next.**` → `**Done.**`, M4 `**Planned.**` → `**In progress.**`; the
+  Events feature bullet now says "M4 — in progress"; the "next is" line now
+  says **PG is done … next is M4** (ADR 0054). `MilestonesTests.cs` —
+  `Shipped` set gains `"PG"`; the pin is renamed
+  `PG_Is_The_Single_InProgress_Milestone` →
+  `M4_Is_The_Single_InProgress_Milestone` (asserts `M4`); the ordered `Ids`
+  list is **unchanged** (`… PG, M4, M5, M6`).
+- **ADR index:** `docs/adr/README.md` — row **0054** added after the
+  existing **0053** row (the index already carried 0051 / 0052 / 0053; this
+  commit adds only 0054). Row **0054** present, `Accepted`; the full index
+  is 0040→0054 with each row exactly once (verified by count).
+- **Exit gate (all green):** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded** (zero warnings); `dotnet exec Kumunita.Web.Tests.dll`
+  → **Total: 332, Errors: 0, Failed: 0** (the renamed `M4_Is_The_Single_InProgress_Milestone` pin passes). The 23 seam tests themselves are
+  implemented by **U09**, not U00 — the gate *names* them; U11 records the
+  first green run of the full set.
+- **Drift pauses:** **none.** Both open decisions resolved cleanly (naming →
+  design doc §3.1 + ADR 0054 Context; pin → this commit). No new ADR was
+  needed, no standing cell was inexpressible with existing role claims,
+  and no existing seam (`IAuthorizationService` / `IUserInfoService` /
+  `IIdentityService` / `IMailerStage`) was re-shaped.
+- **Untouched (per scope):** `Post` / `Announcement` / `Page` surfaces,
+  the translation lane (events are authored-in-language only in M4), and the
+  M5 / M6 roadmap letters.
+
+**U00 exit gate met. STOP — do NOT start U01.**
