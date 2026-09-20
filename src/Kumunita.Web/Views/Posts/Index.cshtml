@@ -40,7 +40,7 @@
                 {
                     <a class="btn btn-outline-secondary"
                        href="@Url.Action("Manage", "Community", new { componentId = Model.ComponentId })">
-                        Manage members
+                        <kw-l key="community.feed_manage_members">Manage members</kw-l>
                     </a>
                 }
                 @* ADR 0053 — the community name/description translation lane,
@@ -52,7 +52,7 @@
                 {
                     <a class="btn btn-outline-secondary"
                        href="@Url.Action("Translations", "Community", new { componentId = Model.ComponentId })">
-                        Translations
+                        <kw-l key="community.feed_translations">Translations</kw-l>
                     </a>
                 }
                 @if (Model.CanPost)

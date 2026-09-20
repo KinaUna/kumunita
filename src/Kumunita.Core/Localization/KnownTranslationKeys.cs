@@ -585,6 +585,10 @@ public static class KnownTranslationKeys
             ["community.translation_min_one"] = "At least one of name or description is required.",
             ["community.translation_save"] = "Save translation",
 
+            // ── community feed buttons (Posts/Index.cshtml) ─────────────
+            ["community.feed_manage_members"] = "Manage members",
+            ["community.feed_translations"] = "Translations",
+
             // ── moderation (Index page) ──────────────────────────────────────
             ["moderation.title"] = "Moderation",
             ["moderation.empty"] = "No reports yet. The queue is empty.",
@@ -1386,6 +1390,10 @@ public static class KnownTranslationKeys
             ["community.translation_min_one"] = "Mindestens Name oder Beschreibung ist erforderlich.",
             ["community.translation_save"] = "Übersetzung speichern",
 
+            // ── community feed buttons (Posts/Index.cshtml) ─────────────
+            ["community.feed_manage_members"] = "Mitglieder verwalten",
+            ["community.feed_translations"] = "Übersetzungen",
+
             // ── moderation (Index page) ──────────────────────────────────────
             ["moderation.title"] = "Moderation",
             ["moderation.empty"] = "Noch keine Meldungen. Die Warteschlange ist leer.",
@@ -2165,6 +2173,10 @@ public static class KnownTranslationKeys
             ["community.translation_optional"] = "optionnel",
             ["community.translation_min_one"] = "Au moins un nom ou une description est requis.",
             ["community.translation_save"] = "Enregistrer la traduction",
+
+            // ── community feed buttons (Posts/Index.cshtml) ─────────────
+            ["community.feed_manage_members"] = "Gérer les membres",
+            ["community.feed_translations"] = "Traductions",
 
             // ── moderation (Index page) ──────────────────────────────────────
             ["moderation.title"] = "Modération",
@@ -2946,6 +2958,10 @@ public static class KnownTranslationKeys
             ["community.translation_optional"] = "valgfrit",
             ["community.translation_min_one"] = "Mindst navnet eller beskrivelsen skal udfyldes.",
             ["community.translation_save"] = "Gem oversættelse",
+
+            // ── community feed buttons (Posts/Index.cshtml) ─────────────
+            ["community.feed_manage_members"] = "Administrer medlemmer",
+            ["community.feed_translations"] = "Oversættelser",
 
             // ── moderation (Index page) ──────────────────────────────────────
             ["moderation.title"] = "Moderation",
