@@ -45,23 +45,29 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
-                        </li>
-                        @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
-                           view). Display, not access — the tree is CanSeeAsync(Read)
-                           -filtered and the composer button is standing-gated. The
-                           full nav redesign is deferred to later milestones; this
-                           makes the knowledge tree reachable for now. *@
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a>
-                        </li>
+                        @* Community/Groups/Pages/Directory are resident-only —
+                           hidden when signed out (the Home + Announcements links
+                           remain public). *@
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
+                            </li>
+                            @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
+                               view). Display, not access — the tree is CanSeeAsync(Read)
+                               -filtered and the composer button is standing-gated. The
+                               full nav redesign is deferred to later milestones; this
+                               makes the knowledge tree reachable for now. *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a>
+                            </li>
+                        }
                     </ul>
 
                     <partial name="_AccountNav" />

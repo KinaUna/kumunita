@@ -5,8 +5,11 @@
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @*
     Right-hand nav actions (the public section links live in the layout's
-    left nav). Signed in: Profile · Admin (global admins only) · Sign out.
-    Signed out: Sign in · Sign up.
+    left nav). Signed in: a single account dropdown (toggle labelled with the
+    resident's display name, falling back to the translated "Account" key)
+    holding Profile · Children · My drafts · Settings · Translations
+    (Translator-only) · Admin (global admins only) · Sign out — collapsed so
+    the navbar stays narrow. Signed out: Sign in · Sign up (still flat links).
 *@
 @{
     bool isAuthenticated = User.Identity?.IsAuthenticated == true;
@@ -45,82 +48,98 @@
 }
 
 <ul class="navbar-nav">
-    @* Language switcher — a globe icon with a Bootstrap dropdown of the enabled
-       languages (visible to signed-in AND signed-out residents, ML-UI U7). Picking
-       a language posts to the same public /language save the quick picker used;
-       the ReturnUrl keeps the resident on the page they were on. The full settings
-       experience (/settings/language) remains the [Authorize]d page. *@
-    <li class="nav-item dropdown">
-        <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
-           id="languageMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false"
-           title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
-                 fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.2"/>
-                <path d="M1.9 8h12.2"/>
-                <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
-                <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
-            </svg>
-            <span class="visually-hidden"><kw-l key="settings.choose_language">Choose your language</kw-l></span>
-        </a>
-        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageMenu">
-            @foreach (var lang in navLanguages)
-            {
-                var isActive = currentLang == lang.Id;
-                <li>
-                    <form method="post" action="/language" class="m-0">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                        <input type="hidden" name="code" value="@lang.Id" />
-                        <button type="submit" class="dropdown-item text-start @(isActive ? "fw-semibold" : "")">
-                            @lang.NativeName
-                            @(isActive ? " ✓" : "")
-                            @(isActive && browserMatched ? " (" + LangMatchedLabel + ")" : "")
-                        </button>
-                    </form>
-                </li>
-            }
-        </ul>
-    </li>
     @if (isAuthenticated)
     {
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
-        </li>
-        @* GU (ADR 0028) — the guardian's child-accounts surface. Every signed-in
-           resident can reach their own /me/children; the list is empty for a
-           non-guardian (the Index view handles that empty state), so no is… flag. *@
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
-        </li>
-        @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
-           group posts, and announcements live here, hidden from every feed. *@
-        <li class="nav-item">
-            <a class="nav-link text-dark" href="/my/drafts"><kw-l key="nav.my_drafts">My drafts</kw-l></a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
-        </li>
-        @if (isGlobalAdmin)
-        {
-            <li class="nav-item">
-                <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
-            </li>
-        }
-        @* ADR 0021 — the Translator's home: the language catalog + translation editors.
-           Shown to Translators only (a GlobalAdmin reaches it via the Admin shell link). *@
-        @if (isTranslator && !isGlobalAdmin)
-        {
-            <li class="nav-item">
-                <a class="nav-link text-dark" href="/admin/languages"><kw-l key="nav.translations">Translations</kw-l></a>
-            </li>
-        }
-        <li class="nav-item">
-            <form class="form-inline" asp-controller="Account" asp-action="Logout" method="post"
-                  style="display:inline;">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn-link nav-link text-dark" style="border:none; background:none;"><kw-l key="nav.sign_out">Sign out</kw-l></button>
-            </form>
+        @* One account dropdown (visible to signed-in residents only): the globe
+           language switcher sits inside it as a sub-section, so the navbar
+           carries a single toggle instead of six flat links. *@
+        <li class="nav-item dropdown">
+            <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
+               id="accountMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <kw-l key="nav.account">Account</kw-l>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
+                </li>
+                @* GU (ADR 0028) — the guardian's child-accounts surface. Every signed-in
+                   resident can reach their own /me/children; the list is empty for a
+                   non-guardian (the Index view handles that empty state), so no is… flag. *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
+                </li>
+                @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
+                   group posts, and announcements live here, hidden from every feed. *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/my/drafts"><kw-l key="nav.my_drafts">My drafts</kw-l></a>
+                </li>
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
+                </li>
+                @if (isGlobalAdmin)
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
+                    </li>
+                }
+                @* ADR 0021 — the Translator's home: the language catalog + translation editors.
+                   Shown to Translators only (a GlobalAdmin reaches it via the Admin shell link). *@
+                @if (isTranslator && !isGlobalAdmin)
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/admin/languages"><kw-l key="nav.translations">Translations</kw-l></a>
+                    </li>
+                }
+                <li><hr class="dropdown-divider" /></li>
+                <li class="nav-item">
+                    <form class="form-inline m-0" asp-controller="Account" asp-action="Logout" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="dropdown-item text-dark"><kw-l key="nav.sign_out">Sign out</kw-l></button>
+                    </form>
+                </li>
+                @* Language switcher — a globe icon + enabled-language list inside the
+                   account menu (ML-UI U7). Picking a language posts to the same public
+                   /language save the quick picker used; the ReturnUrl keeps the resident
+                   on the page they were on. The full settings experience
+                   (/settings/language) remains the [Authorize]d page. *@
+                <li><hr class="dropdown-divider" /></li>
+                @* Language picker — a non-interactive header row (globe + the
+                   current choice as a hint) above the indented language list.
+                   A real nested dropdown would close the parent account menu
+                   when opened, so the list renders inline instead. *@
+                <li class="px-3 pt-2 pb-1 small text-secondary d-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" class="me-2 flex-shrink-0"
+                         fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="8" cy="8" r="6.2"/>
+                        <path d="M1.9 8h12.2"/>
+                        <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
+                        <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
+                    </svg>
+                    <span title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
+                        <kw-l key="settings.choose_language">Choose your language</kw-l>
+                    </span>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var lang in navLanguages)
+                        {
+                            var isActive = currentLang == lang.Id;
+                            <li class="px-3">
+                                <form method="post" action="/language" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="code" value="@lang.Id" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(isActive ? "fw-semibold" : "")">
+                                        @lang.NativeName
+                                        @(isActive ? " ✓" : "")
+                                        @(isActive && browserMatched ? " (" + LangMatchedLabel + ")" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
+            </ul>
         </li>
     }
     else

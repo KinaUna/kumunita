@@ -85,6 +85,7 @@ public static class KnownTranslationKeys
             ["nav.sign_out"]      = "Sign out",
             ["nav.children"]      = "Children",
             ["nav.my_drafts"]     = "My drafts",
+            ["nav.account"]       = "Account",
 
             // ── guardian (the /me/children child-accounts surface, GU ADR 0028) ──
             ["guardian.title"]        = "Your children",
@@ -865,6 +866,7 @@ public static class KnownTranslationKeys
             ["nav.sign_out"]      = "Abmelden",
             ["nav.children"]      = "Kinder",
             ["nav.my_drafts"]     = "Meine Entwürfe",
+            ["nav.account"]       = "Konto",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Deine Kinder",
@@ -1600,6 +1602,7 @@ public static class KnownTranslationKeys
             ["nav.sign_out"]      = "Se déconnecter",
             ["nav.children"]      = "Enfants",
             ["nav.my_drafts"]     = "Mes brouillons",
+            ["nav.account"]       = "Compte",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Tes enfants",
@@ -2339,6 +2342,7 @@ public static class KnownTranslationKeys
             ["nav.sign_out"]      = "Log ud",
             ["nav.children"]      = "Børn",
             ["nav.my_drafts"]     = "Mine udkast",
+            ["nav.account"]       = "Konto",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Dine børn",
