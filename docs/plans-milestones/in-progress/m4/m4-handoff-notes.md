@@ -174,3 +174,39 @@ further open decisions carried into U01.
   (U02), the 23 seam tests (U09), and the §6.4 reminder job (U07/U08).
 
 **U01 exit gate met. STOP — do NOT start U02.**
+
+## U02 — EventToAuditableResource adapter
+
+- **(a) File added:** `src/Kumunita.Core/Events/EventToAuditableResource.cs` —
+  the **only** new file; `public sealed class EventToAuditableResource :
+  IAuditableResource`, the design doc §3.3 shape verbatim. Mirrors
+  `Posts.PostToAuditableResource` / `Pages.PageToAuditableResource` — the
+  constructor takes the `Event`, exposes the `Event` property (not owned), and
+  projects the 6 members. **No** new `AccessAction` / `AccessVia` /
+  authorization branch; compiles against the **frozen**
+  `IAuthorizationService` (ADR 0006 §A) with **no** signature change.
+- **(b) The 6-member projection confirmed** (byte-for-byte the §3.3 pin):
+  `Id` = `Event.Id`; `Name` = `Event.Title ?? (Event.Body.Length < 60 ?
+  Event.Body : Event.Body[..57] + "...")` (the 60-char truncation — 57 + "...");
+  `OwnerId` = `Event.AuthorId`; `Audience` = `Event.Audience` (nullable —
+  `null` = public, the frozen `Decide()` branch 5); `ComponentId` =
+  `Event.ComponentId`; **`TargetKind` = `"event"`** (the **exact** string,
+  not "Event" / "events" — the `AccessAudit.TargetKind` discriminator, C3). A
+  single instance per `Event` is safe to pass into either overload
+  (`CanAsync` detail, `CanSeeAsync` feed).
+- **(c) Build + test result (U02 exit gate, both green, zero warnings):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded in 13.7s, 0
+    Warning(s), 0 Error(s)**.
+  - `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    → **Total: 615, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (the adapter
+    compiles clean against the frozen `IAuthorizationService`; the existing
+    `Post` / `Announcement` / `Page` surfaces and their tests are untouched).
+- **(d) Drift pauses:** **none.** `TargetKind` is the exact `"event"` string;
+  `Audience` is nullable (the `Post`/`Page` precedent — `Post` is non-null by
+  construction, but `Event.Audience` is `Authorization.Audience?`, so the
+  nullable projection is the correct §3.3 shape); no frozen seam
+  re-shaped; `Event` / `EventRsvp` / `M4DocTypes` / `EventService` (U01),
+  `Milestones.cs` / README / `MilestonesTests`, and the read/write lanes
+  (U03/U04) all untouched.
+
+**U02 exit gate met. STOP — do NOT start U03.**
