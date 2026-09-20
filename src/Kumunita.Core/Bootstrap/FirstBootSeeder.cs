@@ -1181,6 +1181,75 @@ public static class FirstBootSeeder
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Warm-boot backfill of the <c>de</c> / <c>fr</c> / <c>da</c>
+    /// <see cref="TranslationResource"/> baseline rows for the closed
+    /// <see cref="Localization.KnownTranslationKeys"/> registry — the lane that
+    /// closes the ADR 0042 D1 / ADR 0047 D2 "new-key asymmetry" for the
+    /// UI-string surface (ADR 0052). A deployment whose first boot predates a
+    /// baseline added to the registry in a later code release has the
+    /// <c>en</c> row (and, for new keys, the provider floor renders its
+    /// English) but no <c>de</c> / <c>fr</c> / <c>da</c> row, so a German /
+    /// French / Danish-speaking resident sees the English floor for that string
+    /// on every boot — the same visible seam ADR 0047 D2 closed for the four
+    /// canonical pages' <see cref="Pages.PageTranslation"/> rows.
+    /// <para>
+    /// **Create-if-missing only** (the ADR 0042 D1 invariant, the same rule as
+    /// <see cref="BackfillPageTranslationsAsync"/>): an existing row for a
+    /// (key, language) pair is skipped, never refreshed — an admin's in-app
+    /// edit of a baseline (the GlobalAdmin ∪ Translator lane, ADR 0021; the
+    /// localization editor updates the row in place, so its <c>Id</c> persists
+    /// and the skip path finds it) is never clobbered by a later deploy.
+    /// </para>
+    /// <para>
+    /// **The <c>en</c> row is never read or written here.** It is the floor,
+    /// owned by code (the ADR 0042 D1 code-wins upsert lives on the
+    /// pristine-boot path only), and a new key's English already renders on a
+    /// warm instance via the provider floor (ADR 0015) — the only gap this
+    /// lane serves is the missing non-<c>en</c> baseline rows.
+    /// </para>
+    /// <para>
+    /// Idempotent: a second run finds every row it created on the first run
+    /// and skips (the ADR 0042 D1 skip path). No tombstones, no deletes —
+    /// create-if-missing is what makes the re-run a no-op.
+    /// </para>
+    /// </summary>
+    public static async Task BackfillUiStringBaselinesAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        foreach (var (code, baseline) in new[]
+        {
+            ("de", KnownTranslationKeys.DeValues),
+            ("fr", KnownTranslationKeys.FrValues),
+            ("da", KnownTranslationKeys.DaValues),
+        })
+        {
+            foreach (var (key, text) in baseline)
+            {
+                var existing = await session
+                    .Query<TranslationResource>()
+                    .Where(t => t.Key == key && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new TranslationResource
+                    {
+                        Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                        Key = key,
+                        LanguageCode = code,
+                        Text = text
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     private static string SeedAdminBody(string email, string userId, string token) =>
         $"Hi,\n\nThis first-boot setup email is the one-time handoff to bring your new Kumunita " +
         $"instance online. When you are ready, present the setup token below at the /admin/setup " +

@@ -78,20 +78,26 @@ public static class SchemaBootstrap
         }
         else
         {
-            // Warm boot: backfill the de/fr/da PageTranslation rows for the
-            // canonical static pages (terms/help/privacy/conduct) that a
-            // deployment seeded before those baselines shipped is missing
-            // (ADR 0043 D7 / ADR 0044 D5). Create-if-missing only — an admin's
-            // in-app edit is never clobbered (ADR 0042 D1), and the en page
-            // bodies are left untouched (a warm-boot refresh would clobber an
-            // admin edit, so this lane is read-mostly: it adds the missing
-            // non-en translation rows and nothing else).
+            // Warm boot: backfill the de/fr/da translation rows that a
+            // deployment seeded before those baselines shipped is missing —
+            // both lanes create-if-missing only (ADR 0042 D1): an admin's
+            // in-app edit is never clobbered, and the en rows are left
+            // untouched (a warm-boot refresh would clobber an admin edit, so
+            // the lanes are read-mostly: they add the missing non-en rows and
+            // nothing else).
+            //   · the canonical static pages (terms/help/privacy/conduct)
+            //     PageTranslation rows (ADR 0043 D7 / ADR 0044 D5 / ADR 0047 D2)
+            //   · the UI-string catalog's de/fr/da TranslationResource baselines
+            //     (the ADR 0042 D1 "new-key asymmetry" gap, closed by ADR 0052)
             await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
             await FirstBootSeeder
                 .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
             logger.LogInformation(
-                "Warm boot: page-translation backfill complete " +
-                "(de/fr/da rows for the canonical static pages, create-if-missing).");
+                "Warm boot: translation backfill complete (de/fr/da rows for the " +
+                "canonical static pages + the UI-string catalog baselines, " +
+                "create-if-missing).");
         }
     }
 

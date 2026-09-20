@@ -457,6 +457,140 @@ public class LS_U04_SeederTests(PostgresFixture fixture) : IClassFixture<Postgre
         }
     }
 
+    // ── 8 — the warm-boot UI-string baseline backfill (ADR 0052) ────────────
+    // A deployment seeded before a baseline was added to the registry has the
+    // `en` row (and the provider floor renders its English) but no de/fr/da
+    // row for that key. BackfillUiStringBaselinesAsync adds the missing
+    // de/fr/da rows (create-if-missing, ADR 0042 D1), never touches an
+    // existing row (an admin's in-place edit keeps its Id and is skipped),
+    // never touches the `en` row, and is idempotent on re-run.
+
+    [Fact(DisplayName = "Warm-boot UI-string backfill: creates missing de/fr/da rows, skips existing, leaves en untouched, idempotent")]
+    public async Task BackfillUiStrings_CreatesMissingDeFrDa_SkipsExisting_Idempotent()
+    {
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        // Simulate the warm-deployment state: the `en` floor for every key
+        // (the pristine-boot `en` upsert), plus de/fr/da baselines EXCEPT two
+        // keys — one missing all three baselines (a brand-new registry key) and
+        // one missing only `fr` (a partial baseline). A de row on the partial
+        // key carries an admin's in-place edit (the editor's update path
+        // refreshes Text in place, keeping the Id — the skip branch must find
+        // it and leave it alone).
+        var missingAll = KnownTranslationKeys.EnValues.Keys.First();
+        var partialKey = KnownTranslationKeys.EnValues.Keys.Skip(1).First();
+        const string adminEditedText = "ADMIN-EDITED — must survive the backfill";
+
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            foreach (var (key, enText) in KnownTranslationKeys.EnValues)
+            {
+                session.Store(new TranslationResource
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Key = key,
+                    LanguageCode = "en",
+                    Text = enText,
+                });
+            }
+
+            foreach (var (code, baseline) in new[]
+            {
+                ("de", KnownTranslationKeys.DeValues),
+                ("fr", KnownTranslationKeys.FrValues),
+                ("da", KnownTranslationKeys.DaValues),
+            })
+            {
+                foreach (var (key, text) in baseline)
+                {
+                    // Skip the two simulated gaps.
+                    if ((key == missingAll) || (key == partialKey && code == "fr"))
+                        continue;
+
+                    session.Store(new TranslationResource
+                    {
+                        Id = Guid.NewGuid().ToString("N"),
+                        Key = key,
+                        LanguageCode = code,
+                        Text = key == partialKey && code == "de" ? adminEditedText : text,
+                    });
+                }
+            }
+            await session.SaveChangesAsync(ct);
+        }
+
+        // Run the backfill (the warm-boot path in SchemaBootstrap).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            await FirstBootSeeder.BackfillUiStringBaselinesAsync(session, ct);
+        }
+
+        await using (var q = store.QuerySession())
+        {
+            // 1. The brand-new key now has all three baselines, each matching
+            //    its language's registry value.
+            var expectedByCode = new Dictionary<string, string>
+            {
+                ["de"] = KnownTranslationKeys.DeValues[missingAll],
+                ["fr"] = KnownTranslationKeys.FrValues[missingAll],
+                ["da"] = KnownTranslationKeys.DaValues[missingAll],
+            };
+            foreach (var (code, expected) in expectedByCode)
+            {
+                var row = await q.Query<TranslationResource>()
+                    .Where(t => t.Key == missingAll && t.LanguageCode == code)
+                    .SingleAsync(ct);
+                Assert.Equal(expected, row.Text);
+            }
+
+            // 2. The partial key's new `fr` row matches the baseline…
+            var fr = await q.Query<TranslationResource>()
+                .Where(t => t.Key == partialKey && t.LanguageCode == "fr")
+                .SingleAsync(ct);
+            Assert.Equal(KnownTranslationKeys.FrValues[partialKey], fr.Text);
+
+            // …while the admin-edited `de` row survived verbatim (never clobbered).
+            var de = await q.Query<TranslationResource>()
+                .Where(t => t.Key == partialKey && t.LanguageCode == "de")
+                .SingleAsync(ct);
+            Assert.Equal(adminEditedText, de.Text);
+
+            // 3. The `en` rows were never touched — count is exactly one per key.
+            var enCount = await q.Query<TranslationResource>()
+                .Where(t => t.LanguageCode == "en")
+                .CountAsync(ct);
+            Assert.Equal(KnownTranslationKeys.EnValues.Count, enCount);
+
+            // 4. No duplicate rows were created anywhere: exactly one row per
+            //    (key, language) pair.
+            var total = await q.Query<TranslationResource>().CountAsync(ct);
+            Assert.Equal(
+                KnownTranslationKeys.EnValues.Count
+                    + KnownTranslationKeys.DeValues.Count
+                    + KnownTranslationKeys.FrValues.Count
+                    + KnownTranslationKeys.DaValues.Count,
+                total);
+        }
+
+        // Re-run the backfill (idempotency — the ADR 0042 D1 skip path).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            await FirstBootSeeder.BackfillUiStringBaselinesAsync(session, ct);
+        }
+
+        await using (var q = store.QuerySession())
+        {
+            var total = await q.Query<TranslationResource>().CountAsync(ct);
+            Assert.Equal(
+                KnownTranslationKeys.EnValues.Count
+                    + KnownTranslationKeys.DeValues.Count
+                    + KnownTranslationKeys.FrValues.Count
+                    + KnownTranslationKeys.DaValues.Count,
+                total);
+        }
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page doc types) — the

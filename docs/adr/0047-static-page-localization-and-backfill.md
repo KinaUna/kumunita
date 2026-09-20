@@ -146,10 +146,19 @@ body.
 - **This is the narrow exception to ADR 0042 D1's "no warm-reseed
   mechanism," recorded as a decision, not a drift.** The standing position is
   unchanged for everything else: the **UI-string** baselines (`de` / `fr`
-  `TranslationResource` rows, ADR 0042 D1 / D2) are **not** backfilled — a
-  new registry key still renders its `en` floor on a warm instance until a
+  `TranslationResource` rows, ADR 0042 D1 / D2) were **not** backfilled — a
+  new registry key still rendered its `en` floor on a warm instance until a
   GlobalAdmin / Translator types it in-app (the M·12 completeness view is
-  the review surface, unchanged). Only the **four canonical pages'**
+  the review surface, unchanged).
+  > **Amended 2026-09-20 (ADR 0052):** the UI-string baselines **are** now
+  > backfilled on a warm boot too — the same create-if-missing, idempotent,
+  > never-overwrite shape (the `en` row stays pristine-boot-only, code-wins).
+  > The exception is two named warm-boot backfill lanes, not one; both close
+  > the same resident-visible seam this D2 closed for the pages. The
+  > "smallest possible exception" bar is preserved in shape (create-
+  > if-missing only, never clobber an admin edit, idempotent), and the
+  > UGC / group / community translation lanes remain untouched by any boot.
+  Before ADR 0052, only the **four canonical pages'**
   `PageTranslation` rows are in scope, because those are the surfaces
   D1 makes user-visible in the effective language. This keeps the exception
   as small as it can be while closing the resident-visible seam.

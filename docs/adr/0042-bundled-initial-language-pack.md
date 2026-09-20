@@ -83,12 +83,17 @@ seeded once, then community-owned
   > canonical system pages'* `de` / `fr` / `da` `PageTranslation` rows
   > **are** backfilled on a warm boot (create-if-missing, idempotent, never
   > overwriting an admin edit or the `en` body) — the resident-visible seam
-  > ADR 0043 / 0047 D1 makes user-visible in the effective language. This is
-  > **deliberately scoped to those four pages' page-translation rows**: the
-  > **UI-string** baselines (`TranslationResource` rows) are still **not**
-  > warm-reseeded, and the new-key asymmetry above stands unchanged for
-  > them. The "no warm-reseed mechanism" decision is held for everything
-  > else; the four system pages are the only narrow, recorded exception.
+> ADR 0043 / 0047 D1 makes user-visible in the effective language.
+>
+> **Second narrow exception recorded 2026-09-20 (ADR 0052):** the
+> **UI-string** baselines (`de` / `fr` / `da` `TranslationResource` rows)
+> **are** likewise backfilled on a warm boot — the same create-if-missing,
+> idempotent, never-overwrite shape; the `en` row stays pristine-boot-only,
+> code-wins. The "new-key asymmetry" above is closed for this surface: a
+> baseline added to the registry in a code release now reaches an existing
+> instance on the next boot, no in-app re-typing.
+> The "no warm-reseed mechanism" decision is held for everything else
+> (the UGC / group / community translation lanes).
 ### D2 — Register and style: German `du`, French `tu`, held per language
 
 The baselines are a **careful first pass, editable later** — the
