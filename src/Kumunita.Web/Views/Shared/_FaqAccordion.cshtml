@@ -18,7 +18,7 @@
     string faqIdPrefix = $"faq-{Guid.NewGuid().ToString("n").Substring(0, 8)}";
 }
 
-<h2 class="text-center h3 mt-2">Frequently asked questions</h2>
+<h2 class="text-center h3 mt-2"><kw-l key="faq.title">Frequently asked questions</kw-l></h2>
 
 <div class="accordion kmb-faq mt-5" id="@faqIdPrefix">
 
@@ -27,15 +27,13 @@
             <button class="accordion-button" type="button"
                 data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q1"
                 aria-expanded="true" aria-controls="@faqIdPrefix-q1">
-                Who can see my posts?
+                <kw-l key="faq.q1">Who can see my posts?</kw-l>
             </button>
         </h3>
         <div id="@faqIdPrefix-q1" class="accordion-collapse collapse show" data-bs-parent="#@faqIdPrefix">
             <div class="accordion-body">
                 <p class="mb-0">
-                    Whoever you choose when you post: just you, your group,
-                    your community, or everyone on the instance. Audience is a
-                    choice you make per post — it's not a global setting.
+                    <kw-l key="faq.a1">Whoever you choose when you post: just you, your group, your community, or everyone on the instance. Audience is a choice you make per post — it's not a global setting.</kw-l>
                 </p>
             </div>
         </div>
@@ -46,15 +44,15 @@
             <button class="accordion-button collapsed" type="button"
                 data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q2"
                 aria-expanded="false" aria-controls="@faqIdPrefix-q2">
-                Where do announcements like water cuts and roadworks live?
+                <kw-l key="faq.q2">Where do announcements like water cuts and roadworks live?</kw-l>
             </button>
         </h3>
         <div id="@faqIdPrefix-q2" class="accordion-collapse collapse" data-bs-parent="#@faqIdPrefix">
             <div class="accordion-body">
                 <p class="mb-0">
-                    Pinned announcements, at <a href="/announcements">/announcements</a> —
-                    the read side is open so nobody has to log in to find out
-                    when the street gets repainted.
+                    <kw-l key="faq.a2_intro">Pinned announcements, at</kw-l>
+                    <a href="/announcements">/announcements</a> —
+                    <kw-l key="faq.a2_outro">the read side is open so nobody has to log in to find out when the street gets repainted.</kw-l>
                 </p>
             </div>
         </div>
@@ -65,16 +63,13 @@
             <button class="accordion-button collapsed" type="button"
                 data-bs-toggle="collapse" data-bs-target="#@faqIdPrefix-q3"
                 aria-expanded="false" aria-controls="@faqIdPrefix-q3">
-                Is this private by default?
+                <kw-l key="faq.q3">Is this private by default?</kw-l>
             </button>
         </h3>
         <div id="@faqIdPrefix-q3" class="accordion-collapse collapse" data-bs-parent="#@faqIdPrefix">
             <div class="accordion-body">
                 <p class="mb-0">
-                    Yes. Every access to audience-restricted content is
-                    recorded, the data stays on a single Postgres instance
-                    owned by the neighbourhood's host, and there is no ads or
-                    analytics side-channel to start with.
+                    <kw-l key="faq.a3">Yes. Every access to audience-restricted content is recorded, the data stays on a single Postgres instance owned by the neighbourhood's host, and there is no ads or analytics side-channel to start with.</kw-l>
                 </p>
             </div>
         </div>

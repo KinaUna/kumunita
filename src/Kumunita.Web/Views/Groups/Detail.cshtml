@@ -83,14 +83,14 @@
 
         @if (canManage)
         {
-            <h2>About this group</h2>
+            <h2><kw-l key="groups.about_heading">About this group</kw-l></h2>
             <form method="post" action="@Url.Action("UpdateDescription", "Groups", new { id = Model.GroupId })">
                 @Html.AntiForgeryToken()
-                <label class="form-label" for="description">Description (optional)</label>
+                <label class="form-label" for="description"><kw-l key="groups.about_desc_label">Description (optional)</kw-l></label>
                 <textarea class="form-control" id="description" name="description" rows="3" maxlength="500"
                           placeholder="What is this group about? (visible to everyone who can reach this page)">@Model.Description</textarea>
-                <div class="form-text mt-1">Leave blank to clear the description.</div>
-                <button type="submit" class="btn btn-primary mt-2">Save description</button>
+                <div class="form-text mt-1"><kw-l key="groups.about_desc_clear_hint">Leave blank to clear the description.</kw-l></div>
+                <button type="submit" class="btn btn-primary mt-2"><kw-l key="groups.about_desc_save">Save description</kw-l></button>
             </form>
 
             @*
@@ -106,20 +106,18 @@
                 directions (the U10 add-member pattern, the actor's subject is
                 minted in the controller, never a field).
             *@
-            <h2 class="mt-4">Privacy</h2>
+            <h2 class="mt-4"><kw-l key="groups.privacy_heading">Privacy</kw-l></h2>
             <form method="post" action="@Url.Action("UpdatePrivacy", "Groups", new { id = Model.GroupId })">
                 @Html.AntiForgeryToken()
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="isPrivate"
                            name="isPrivate" value="true" @(Model.IsPrivate ? "checked" : "") />
-                    <label class="form-check-label" for="isPrivate">Private group</label>
+                    <label class="form-check-label" for="isPrivate"><kw-l key="groups.private_label">Private group</kw-l></label>
                 </div>
                 <div class="form-text mt-1">
-                    Private groups (e.g. a family) are hidden from everyone else's
-                    grant/access lists; only the people you add as members can use
-                    them. Clear the box to make the group public again.
+                    <kw-l key="groups.private_hint">A private group (e.g. a family) is hidden from everyone else; only the people you add as members can see and use it. Clear the box to make the group public again.</kw-l>
                 </div>
-                <button type="submit" class="btn btn-primary mt-2">Save</button>
+                <button type="submit" class="btn btn-primary mt-2"><kw-l key="common.save">Save</kw-l></button>
             </form>
         }
 
@@ -316,10 +314,10 @@
             }
         }
 
-        <h2>Members</h2>
+        <h2><kw-l key="groups.members_heading">Members</kw-l></h2>
         @if (Model.Members.Count == 0)
         {
-            <p class="text-muted">No members yet.</p>
+            <p class="text-muted"><kw-l key="groups.members_empty">No members yet.</kw-l></p>
         }
         else
         {
@@ -361,7 +359,7 @@
                             <form method="post" action="@Url.Action("LeaveGroup", "Groups", new { id = Model.GroupId })">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                    Leave
+                                    <kw-l key="groups.member_leave">Leave</kw-l>
                                 </button>
                             </form>
                         }
@@ -399,7 +397,7 @@
 
         @if (Model.IsOwner)
         {
-            <h2 class="mt-4">Invite a resident</h2>
+            <h2 class="mt-4"><kw-l key="groups.invite_heading">Invite a resident</kw-l></h2>
             @if (Model.ResidentCandidates.Count > 0)
             {
                 <form method="post"

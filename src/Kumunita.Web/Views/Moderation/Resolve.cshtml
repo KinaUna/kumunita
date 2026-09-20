@@ -143,20 +143,14 @@
 {
     <div class="card mb-4">
         <div class="card-header">
-            Unlock (activate <code>Component.ModeratorAccess</code> for this report's component)
+            Unlock (turn on moderation access for this community)
         </div>
         <div class="card-body">
             <p class="text-muted">
-                This is the <b>C5 activation event</b> — it flips the
-                <code>Component.ModeratorAccess</code> flag to <code>true</code>
-                (the ADR 0003 / C5 carve-out going live) and marks the
-                report <code>unlocked</code>. The M1
-                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
-                flag-flip seam opens its own session (a separate commit
-                per the M1 seam's contract — U5's doc-comment); the
-                report's <code>Status</code> write and the
-                <code>AccessAudit</code> row commit atomically in this
-                transaction.
+                This turns on <b>moderation access</b> for the community
+                this report is about and marks the report
+                <code>unlocked</code>. A moderator can then act on its
+                content. Everything you do here is written to the audit log.
             </p>
             <form method="post" action="/moderation/@Model.ReportId/unlock">
                 @Html.AntiForgeryToken()
@@ -173,13 +167,9 @@
         <div class="card-header"><kw-l key="moderation.resolve_header">Resolve (close this report)</kw-l></div>
         <div class="card-body">
             <p class="text-muted">
-                Marks the report <code>resolved</code> (the final
-                state in the §2.3 item-2 four Status literals) and
-                — per U5's behavior note — also calls the M1
-                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
-                flag-flip seam with <code>on = true</code> (the
-                resolve lane's "final close" event; the unlock
-                lane's "activation event" is separate).
+                This closes the report — it is marked as
+                <code>resolved</code>, which is its final state.
+                Everything you do here is written to the audit log.
             </p>
             <form method="post" action="/moderation/@Model.ReportId/resolve">
                 @Html.AntiForgeryToken()

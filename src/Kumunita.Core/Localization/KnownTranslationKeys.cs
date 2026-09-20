@@ -72,6 +72,16 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
+
+            // ── common (shared action/field labels reused across resident-facing views) ──
+            ["common.cancel"]   = "Cancel",
+            ["common.save"]     = "Save",
+            ["common.title"]    = "Title",
+            ["common.body"]     = "Body",
+            ["common.language"] = "Language",
+            ["common.optional"] = "optional",
+            ["common.add"]      = "Add",
+            ["common.remove"]   = "Remove",
             ["nav.announcements"] = "Announcements",
             ["nav.community"]     = "Community",
             ["nav.groups"]        = "Groups",
@@ -94,6 +104,75 @@ public static class KnownTranslationKeys
             ["guardian.empty"]        = "No children yet.",
             ["guardian.add"]          = "Add a child account",
             ["guardian.manage_title"] = "Manage a child account",
+
+            // ── guardian (per-child surface, GU ADR 0028) ─────────────────
+            ["guardian.back"]               = "Back to your children",
+            ["guardian.account_label"]       = "Account",
+            ["guardian.group_memberships"]   = "Group memberships",
+            ["guardian.community_memberships"] = "Community memberships",
+            ["guardian.no_groups"]           = "No group memberships.",
+            ["guardian.no_communities"]      = "No community memberships.",
+            ["guardian.group_id_label"]      = "Group id",
+            ["guardian.community_id_label"]  = "Community id",
+            ["guardian.pending_invitations"] = "Pending group invitations",
+            ["guardian.no_invitations"]      = "No pending invitations.",
+            ["guardian.approve"]             = "Approve",
+            ["guardian.handover"]            = "Hand over the account",
+            ["guardian.handover_hint"]       =
+                "Dissolving the guardianship hands the account to the child. " +
+                "Their memberships are preserved, and their own controls come " +
+                "back on the next read.",
+            ["guardian.dissolve"]            = "Dissolve guardianship",
+            ["guardian.suspended"]           = "Suspended",
+            ["guardian.unsuspend"]           = "Un-suspend",
+            ["guardian.suspend"]             = "Suspend",
+            ["guardian.display_name"]        = "Display name",
+            ["guardian.email"]               = "Email address",
+            ["guardian.password"]            = "Password",
+            ["guardian.child_email_hint"]    =
+                "The child verifies their own email to sign in — the usual sign-up flow.",
+
+            // ── posts (composer helper hints) ──────────────────────────────
+            ["posts.title_hint"] =
+                "A short headline (up to 120 characters). Leave blank for a " +
+                "body-only post — the list will show your first line of the " +
+                "body instead.",
+            ["posts.language_hint"] =
+                "The language you're writing this post in. This is only a tag — " +
+                "it is not translated — and it keeps the text findable later " +
+                "and lets a reader add their own language version if they want.",
+
+            // ── faq (drop-in FAQ section, _FaqAccordion) ──────────────────
+            ["faq.title"]     = "Frequently asked questions",
+            ["faq.q1"]        = "Who can see my posts?",
+            ["faq.a1"]        =
+                "Whoever you choose when you post: just you, your group, your " +
+                "community, or everyone. Audience is a choice " +
+                "you make per post — it's not a global setting.",
+            ["faq.q2"]        = "Where do announcements like water cuts and roadworks live?",
+            ["faq.a2_intro"]  = "Pinned announcements, at",
+            ["faq.a2_link"]   = "/announcements",
+            ["faq.a2_outro"]  =
+                "— the read side is open so nobody has to log in to find out " +
+                "when the street gets repainted.",
+            ["faq.q3"]        = "Is this private by default?",
+            ["faq.a3"]        =
+                "Yes. Every time someone is allowed (or denied) access to " +
+                "restricted content, it's recorded. The data stays on a single " +
+                "database owned by the neighbourhood's host, and there are no " +
+                "ads or tracking built in.",
+
+            // ── error (shared error page, Shared/Error.cshtml) ────────────
+            ["error.title"]           = "Error.",
+            ["error.subtitle"]        = "An error occurred while processing your request.",
+            ["error.development_title"] = "Development Mode",
+            ["error.development_hint"] =
+                "Swapping to the Development environment will display more " +
+                "detailed information about the error that occurred. The " +
+                "Development environment shouldn't be enabled for deployed " +
+                "applications — it can reveal sensitive information from " +
+                "exceptions to end users.",
+            ["error.request_id"]      = "Request ID:",
 
             // ── guardian assignment (GA ADR 0038) ──
             ["guardian.otherGuardians.title"] = "Other guardians",
@@ -209,9 +288,8 @@ public static class KnownTranslationKeys
             // ── home (the hero + section lead; _Layout-independent) ─────────
             ["home.eyebrow"] = "Where this project stands",
             ["home.lead"] =
-                "A private home for one neighbourhood — built in the open, one milestone at a time. " +
-                "This is the same list you'll find in the README, and the code behind every item is on " +
-                "the public repository.",
+                "A private home for one neighbourhood — built step by step, in the open. " +
+                "Everything listed below is part of that plan, and you're welcome to see how it's made.",
             ["home.support"] = "Questions or feedback? Write to",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
@@ -304,6 +382,18 @@ public static class KnownTranslationKeys
             ["groups.posts_empty_can"] =
                 "No posts yet. Write the first one — it will be visible to the current members.",
             ["groups.posts_empty"]    = "No posts here yet.",
+            ["groups.members_heading"]  = "Members",
+            ["groups.members_empty"]    = "No members yet.",
+            ["groups.member_leave"]     = "Leave",
+            ["groups.invite_heading"]   = "Invite a resident",
+            ["groups.about_heading"]        = "About this group",
+            ["groups.about_desc_label"]     = "Description (optional)",
+            ["groups.about_desc_clear_hint"] = "Leave blank to clear the description.",
+            ["groups.about_desc_save"]      = "Save description",
+            ["groups.privacy_heading"]      = "Privacy",
+            ["groups.private_label"]        = "Private group",
+            ["groups.private_hint"]         =
+                "A private group (e.g. a family) is hidden from everyone else; only the people you add as members can see and use it. Clear the box to make the group public again.",
             ["groups.new_title"]      = "Post to this group",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
@@ -417,9 +507,8 @@ public static class KnownTranslationKeys
             ["posts.detail_edit"] = "Edit",
             ["posts.edited"] = "edited",
             ["posts.detail_why"] =
-                "You can see this post because you matched its audience " +
-                "(a grant of yours, or you are the author — the \"owner branch\" " +
-                "of the C1 empty-audience deny rule).",
+                "You can see this post because you were allowed to view it — " +
+                "either you're the author, or it was shared with you or your groups.",
             ["posts.report_button"] = "Report this post",
             ["posts.reply_report_button"] = "Report this reply",
             ["posts.report_reason_label"] = "What's wrong?",
@@ -504,11 +593,11 @@ public static class KnownTranslationKeys
                 "A name for a community of residents (e.g. \"Building 4\", " +
                 "\"Volunteers\", \"Bike owners\"). " +
                 "You own the group — you can add and remove members from the " +
-                "group's detail page (M2, plan U10).",
+                "group's detail page.",
             ["groups.create_desc_hint"] = "Optional — a short note other residents will see.",
             ["groups.create_private_hint"] =
-                "A private group (e.g. a family) is hidden from everyone else's " +
-                "grant/access lists — only people you add as members can use it. " +
+                "A private group (e.g. a family) is hidden from everyone else — " +
+                "only people you add as members can see and use it. " +
                 "A public group (e.g. \"Mushroom hunters\") shows up as an option " +
                 "in other residents' pickers.",
             ["groups.create_submit"] = "Create group",
@@ -612,10 +701,10 @@ public static class KnownTranslationKeys
             ["moderation.no_reason"] = "(no reason given)",
             ["moderation.th_body_label"] = "Post body",
             ["moderation.body_preview"] = "post preview",
-            ["moderation.assign_header"] = "Assign to a standing moderator",
+            ["moderation.assign_header"] = "Assign to a moderator",
             ["moderation.assign_label"] =
-                "Standing moderator on this report's component",
-            ["moderation.assign_pick"] = "Choose a standing moderator …",
+                "A moderator covering this community",
+            ["moderation.assign_pick"] = "Choose a moderator …",
             ["moderation.assign_submit"] = "Assign",
             ["moderation.cancel"] = "Cancel",
             ["moderation.unlock_submit"] = "Unlock",
@@ -651,8 +740,9 @@ public static class KnownTranslationKeys
             // ── admin (Audit page) ───────────────────────────────────────────
             ["admin.audit_title"] = "Access audit",
             ["admin.audit_lede"] =
-                "Every access decision on audience-restricted content — Allow and Deny — plus admin " +
-                "actions and bulk list aggregate rows. Always-on; purged on a per-instance tier (§6.4).",
+                "A record of who was allowed or denied access to restricted content, " +
+                "plus admin actions. This log is always kept and is periodically " +
+                "cleaned up according to the instance's retention policy.",
             ["admin.audit_filter"] = "Filter",
             ["admin.audit_th_at"] = "At (UTC)",
             ["admin.audit_th_actor"] = "Actor",
@@ -668,13 +758,13 @@ public static class KnownTranslationKeys
             ["admin.breakglass_granted"] = "Granted at (UTC)",
             ["admin.breakglass_expires"] = "Expires at (UTC)",
             ["admin.breakglass_status"] = "Status",
-            ["admin.breakglass_consumed"] = "consumed — elevation active until expiry",
-            ["admin.breakglass_presented"] = "presented but not yet consumed",
-            ["admin.breakglass_token_label"] = "One-time token (from the operator)",
+            ["admin.breakglass_consumed"] = "activated — elevation in effect until expiry",
+            ["admin.breakglass_presented"] = "set up, but not yet activated",
+            ["admin.breakglass_token_label"] = "One-time code (from the operator)",
             ["admin.breakglass_token_hint"] =
-                "Consuming this token is a one-time action. It activates the elevation " +
+                "Using this code is a one-time action. It activates the elevation " +
                 "until its expiry.",
-            ["admin.breakglass_consume"] = "Consume token",
+            ["admin.breakglass_consume"] = "Activate",
 
             // ── locale (settings + public picker) ────────────────────────────
             ["locale.settings_title"] = "Your settings",
@@ -903,6 +993,16 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
+
+            // ── common (shared action/field labels reused across resident-facing views) ──
+            ["common.cancel"]   = "Abbrechen",
+            ["common.save"]     = "Speichern",
+            ["common.title"]    = "Titel",
+            ["common.body"]     = "Text",
+            ["common.language"] = "Sprache",
+            ["common.optional"] = "optional",
+            ["common.add"]      = "Hinzufügen",
+            ["common.remove"]   = "Entfernen",
             ["nav.announcements"] = "Ankündigungen",
             ["nav.community"]     = "Gemeinschaft",
             ["nav.groups"]        = "Gruppen",
@@ -925,6 +1025,77 @@ public static class KnownTranslationKeys
             ["guardian.empty"]        = "Noch keine Kinder.",
             ["guardian.add"]          = "Kinderkonto hinzufügen",
             ["guardian.manage_title"] = "Kinderkonto verwalten",
+
+            // ── guardian (per-child surface, GU ADR 0028) ─────────────────
+            ["guardian.back"]               = "Zurück zu deinen Kindern",
+            ["guardian.account_label"]       = "Konto",
+            ["guardian.group_memberships"]   = "Gruppenmitgliedschaften",
+            ["guardian.community_memberships"] = "Gemeinschaftsmitgliedschaften",
+            ["guardian.no_groups"]           = "Keine Gruppenmitgliedschaften.",
+            ["guardian.no_communities"]      = "Keine Gemeinschaftsmitgliedschaften.",
+            ["guardian.group_id_label"]      = "Gruppen-ID",
+            ["guardian.community_id_label"]  = "Gemeinschafts-ID",
+            ["guardian.pending_invitations"] = "Ausstehende Gruppeneinladungen",
+            ["guardian.no_invitations"]      = "Keine ausstehenden Einladungen.",
+            ["guardian.approve"]             = "Genehmigen",
+            ["guardian.handover"]            = "Konto übergeben",
+            ["guardian.handover_hint"]       =
+                "Die Aufhebung der Vormundschaft übergibt das Konto dem Kind. " +
+                "Die Mitgliedschaften bleiben erhalten, und die eigenen " +
+                "Einstellmöglichkeiten kommen beim nächsten Lesen zurück.",
+            ["guardian.dissolve"]            = "Vormundschaft auflösen",
+            ["guardian.suspended"]           = "Gesperrt",
+            ["guardian.unsuspend"]           = "Wieder aktivieren",
+            ["guardian.suspend"]             = "Sperren",
+            ["guardian.display_name"]        = "Anzeigename",
+            ["guardian.email"]               = "E-Mail-Adresse",
+            ["guardian.password"]            = "Passwort",
+            ["guardian.child_email_hint"]    =
+                "Das Kind bestätigt seine eigene E-Mail zur Anmeldung — der gewöhnliche Anmeldevorgang.",
+
+            // ── posts (composer helper hints) ──────────────────────────────
+            ["posts.title_hint"] =
+                "Eine kurze Überschrift (bis zu 120 Zeichen). Leer lassen für " +
+                "einen reinen Textbeitrag — die Liste zeigt stattdessen deine " +
+                "erste Textzeile.",
+            ["posts.language_hint"] =
+                "Die Sprache, in der du diesen Beitrag schreibst. Das ist nur " +
+                "ein Schlagwort — es wird nicht übersetzt — und es hält den " +
+                "Text später auffindbar und erlaubt es Lesern, eigene " +
+                "Sprachversionen hinzuzufügen.",
+
+            // ── faq (drop-in FAQ section, _FaqAccordion) ──────────────────
+            ["faq.title"]     = "Häufig gestellte Fragen",
+            ["faq.q1"]        = "Wer kann meine Beiträge sehen?",
+            ["faq.a1"]        =
+                "Den, den du wählst, wenn du postest: nur du, deine Gruppe, " +
+                "deine Gemeinschaft oder alle. Das Publikum " +
+                "ist eine pro-Beitrag-Entscheidung — keine globale Einstellung.",
+            ["faq.q2"]        = "Wo stehen Ankündigungen wie Wasserausfälle und Straßenerneuerungen?",
+            ["faq.a2_intro"]  = "Feste Ankündigungen unter",
+            ["faq.a2_link"]   = "/announcements",
+            ["faq.a2_outro"]  =
+                " — die Lese-Seite ist offen, damit niemand sich anmelden " +
+                "muss, um herauszufinden, wann die Straße neu gestrichen wird.",
+            ["faq.q3"]        = "Ist das standardmäßig privat?",
+            ["faq.a3"]        =
+                "Ja. Jeder Zugriff, bei dem Zugang zu eingeschränkten Inhalten " +
+                "gewährt oder verweigert wird, wird aufgezeichnet. Die Daten " +
+                "bleiben auf einer einzelnen Datenbank im Besitz des Wirts der " +
+                "Nachbarschaft, und es sind keine Werbung oder Tracking " +
+                "eingebaut.",
+
+            // ── error (shared error page, Shared/Error.cshtml) ────────────
+            ["error.title"]           = "Fehler.",
+            ["error.subtitle"]        = "Bei der Verarbeitung Ihrer Anfrage ist ein Fehler aufgetreten.",
+            ["error.development_title"] = "Entwicklungsmodus",
+            ["error.development_hint"] =
+                "Das Umschalten in die Entwicklungsumgebung zeigt weitere " +
+                "Details zum aufgetretenen Fehler. Die Entwicklungsumgebung " +
+                "sollte für eingesetzte Anwendungen nicht aktiviert sein — " +
+                "sie kann sensible Informationen aus Fehlern an Endnutzer " +
+                "offenlegen.",
+            ["error.request_id"]      = "Anfragen-ID:",
 
             // ── guardian assignment (GA ADR 0038) ───────────────────────────
             ["guardian.otherGuardians.title"] = "Weitere Vormünder",
@@ -1034,8 +1205,8 @@ public static class KnownTranslationKeys
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Wo das Projekt steht",
             ["home.lead"] =
-                "Ein privater Ort für eine Nachbarschaft — in der offenen Entwicklung, Meilenstein für Meilenstein. " +
-                "Dies ist dieselbe Liste wie in der README, und der Code hinter jedem Eintrag liegt im öffentlichen Repository.",
+                "Ein privater Ort für eine Nachbarschaft — Schritt für Schritt und in der offenen Entwicklung. " +
+                "Alles, was unten aufgeführt ist, ist Teil dieses Plans — und du darfst gern einen Blick darauf werfen, wie es entsteht.",
             ["home.support"] = "Fragen oder Feedback? Schreibe an",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
@@ -1115,6 +1286,18 @@ public static class KnownTranslationKeys
             ["groups.posts_empty_can"] =
                 "Noch keine Beiträge. Schreibe den ersten — er ist für die aktuellen Mitglieder sichtbar.",
             ["groups.posts_empty"]    = "Noch keine Beiträge hier.",
+            ["groups.members_heading"]  = "Mitglieder",
+            ["groups.members_empty"]    = "Noch keine Mitglieder.",
+            ["groups.member_leave"]     = "Verlassen",
+            ["groups.invite_heading"]   = "Bewohner:in einladen",
+            ["groups.about_heading"]        = "Über diese Gruppe",
+            ["groups.about_desc_label"]     = "Beschreibung (optional)",
+            ["groups.about_desc_clear_hint"] = "Leer lassen, um die Beschreibung zu löschen.",
+            ["groups.about_desc_save"]      = "Beschreibung speichern",
+            ["groups.privacy_heading"]      = "Privatsphäre",
+            ["groups.private_label"]        = "Private Gruppe",
+            ["groups.private_hint"]         =
+                "Eine private Gruppe (z. B. eine Familie) ist für alle anderen unsichtbar; nur die Menschen, die du als Mitglieder hinzufügst, können sie sehen und nutzen. Das Häkchen aufheben, um die Gruppe wieder öffentlich zu machen.",
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
@@ -1229,9 +1412,8 @@ public static class KnownTranslationKeys
             ["posts.detail_edit"] = "Bearbeiten",
             ["posts.edited"] = "bearbeitet",
             ["posts.detail_why"] =
-                "Du kannst diesen Beitrag sehen, weil du auf sein Publikum " +
-                "zutrifft (ein Recht von dir, oder du bist Autor:in — der „owner branch“ " +
-                "der C1-Regel „leeres Publikum = Verweigerung“).",
+                "Du kannst diesen Beitrag sehen, weil er dir freigegeben wurde — " +
+                "entweder du bist Autor:in, oder er wurde mit dir oder deinen Gruppen geteilt.",
             ["posts.report_button"] = "Diesen Beitrag melden",
             ["posts.reply_report_button"] = "Diese Antwort melden",
             ["posts.report_reason_label"] = "Was ist schiefgelaufen?",
@@ -1306,12 +1488,12 @@ public static class KnownTranslationKeys
                 "Ein Name für eine Gemeinschaft von Anwohner:innen (z. B. „Gebäude 4“, " +
                 "„Ehrenamtliche“, „Fahrradbesitzer“). " +
                 "Du bist Inhaber:in der Gruppe — du kannst Mitglieder über die " +
-                "Detailseite der Gruppe hinzufügen und entfernen (M2, Plan U10).",
+                "Detailseite der Gruppe hinzufügen und entfernen.",
             ["groups.create_desc_hint"] = "Optional — eine kurze Notiz, die andere Anwohner:innen sehen.",
             ["groups.create_private_hint"] =
-                "Eine private Gruppe (z. B. eine Familie) ist aus allen anderen " +
-                "Genehmigungs-/Zugriffslisten ausgeblendet — nur Personen, die du " +
-                "als Mitglieder hinzufügst, können sie nutzen. " +
+                "Eine private Gruppe (z. B. eine Familie) ist für alle anderen " +
+                "unsichtbar — nur Personen, die du als Mitglieder hinzufügst, " +
+                "können sie sehen und nutzen. " +
                 "Eine öffentliche Gruppe (z. B. „Pilzesammler“) erscheint als " +
                 "Option in den Auswahlmenüs anderer Anwohner:innen.",
             ["groups.create_submit"] = "Gruppe erstellen",
@@ -1417,10 +1599,10 @@ public static class KnownTranslationKeys
             ["moderation.no_reason"] = "(kein Grund angegeben)",
             ["moderation.th_body_label"] = "Beitragstext",
             ["moderation.body_preview"] = "Vorschau des Beitrags",
-            ["moderation.assign_header"] = "An einen festen Moderator zuweisen",
+            ["moderation.assign_header"] = "An eine Moderatorin / einen Moderator zuweisen",
             ["moderation.assign_label"] =
-                "Fester Moderator für die Komponente dieser Meldung",
-            ["moderation.assign_pick"] = "Wähle einen festen Moderator …",
+                "Eine:r Moderator:in, die:er diese Gemeinschaft abdeckt",
+            ["moderation.assign_pick"] = "Wähle eine:n Moderator:in …",
             ["moderation.assign_submit"] = "Zuweisen",
             ["moderation.cancel"] = "Abbrechen",
             ["moderation.unlock_submit"] = "Entsperren",
@@ -1451,9 +1633,9 @@ public static class KnownTranslationKeys
             // ── admin (Audit page) ───────────────────────────────────────────
             ["admin.audit_title"] = "Zugriffs-Audit",
             ["admin.audit_lede"] =
-                "Jede Zugriffsentscheidung auf inhaltsbeschränkte Inhalte — Allow und Deny — plus " +
-                "Adminaktionen und aggregierte Gesamtzeilen. Immer aktiv; je nach " +
-                "Instanz-Tier gelöscht (§6.4).",
+                "Ein Protokoll darüber, wer Zugang zu eingeschränkten Inhalten " +
+                "erhalten oder verweigert wurde, plus Adminaktionen. Dieses Protokoll wird immer " +
+                "aufbewahrt und nach der Aufbewahrungsrichtlinie der Instanz regelmäßig aufgeräumt.",
             ["admin.audit_filter"] = "Filter",
             ["admin.audit_th_at"] = "Zeitpunkt (UTC)",
             ["admin.audit_th_actor"] = "Aktor:in",
@@ -1469,13 +1651,13 @@ public static class KnownTranslationKeys
             ["admin.breakglass_granted"] = "Gewährt am (UTC)",
             ["admin.breakglass_expires"] = "Läuft ab am (UTC)",
             ["admin.breakglass_status"] = "Status",
-            ["admin.breakglass_consumed"] = "verbraucht — Erhöhung bis zum Ablauf aktiv",
-            ["admin.breakglass_presented"] = "vorgelegt, aber noch nicht verbraucht",
-            ["admin.breakglass_token_label"] = "Einmal-Token (vom Operator)",
+            ["admin.breakglass_consumed"] = "aktiviert — Erhöhung aktiv bis zum Ablauf",
+            ["admin.breakglass_presented"] = "eingerichtet, aber noch nicht aktiviert",
+            ["admin.breakglass_token_label"] = "Einmalcode (vom Betreiber)",
             ["admin.breakglass_token_hint"] =
-                "Das Verwenden dieses Tokens ist eine Einmalaktion. Es aktiviert die " +
+                "Die Verwendung dieses Codes ist eine Einmalaktion. Er aktiviert die " +
                 "Erhöhung bis zum Ablauf.",
-            ["admin.breakglass_consume"] = "Token verwenden",
+            ["admin.breakglass_consume"] = "Aktivieren",
 
             // ── locale (settings + public picker) ────────────────────────────
             ["locale.settings_title"] = "Deine Einstellungen",
@@ -1686,6 +1868,16 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Accueil",
+
+            // ── common (shared action/field labels reused across resident-facing views) ──
+            ["common.cancel"]   = "Annuler",
+            ["common.save"]     = "Enregistrer",
+            ["common.title"]    = "Titre",
+            ["common.body"]     = "Texte",
+            ["common.language"] = "Langue",
+            ["common.optional"] = "facultatif",
+            ["common.add"]      = "Ajouter",
+            ["common.remove"]   = "Retirer",
             ["nav.announcements"] = "Annonces",
             ["nav.community"]     = "Communauté",
             ["nav.groups"]        = "Groupes",
@@ -1708,6 +1900,75 @@ public static class KnownTranslationKeys
             ["guardian.empty"]        = "Pas encore d'enfants.",
             ["guardian.add"]          = "Ajouter un compte enfant",
             ["guardian.manage_title"] = "Gérer un compte enfant",
+
+            // ── guardian (per-child surface, GU ADR 0028) ─────────────────
+            ["guardian.back"]               = "Retour à vos enfants",
+            ["guardian.account_label"]       = "Compte",
+            ["guardian.group_memberships"]   = "Adhésions aux groupes",
+            ["guardian.community_memberships"] = "Adhésions aux communautés",
+            ["guardian.no_groups"]           = "Pas d'adhesions aux groupes.",
+            ["guardian.no_communities"]      = "Pas d'adhesions aux communautés.",
+            ["guardian.group_id_label"]      = "Identifiant du groupe",
+            ["guardian.community_id_label"]  = "Identifiant de la communauté",
+            ["guardian.pending_invitations"] = "Invitations de groupe en attente",
+            ["guardian.no_invitations"]      = "Pas d'invitations en attente.",
+            ["guardian.approve"]             = "Approuver",
+            ["guardian.handover"]            = "Transférer le compte",
+            ["guardian.handover_hint"]       =
+                "Dissoudre la tutelle remet le compte à l'enfant. Ses " +
+                "adhesions sont conservées, et ses propres réglages reviennent " +
+                "à la prochaine lecture.",
+            ["guardian.dissolve"]            = "Dissoudre la tutelle",
+            ["guardian.suspended"]           = "Suspendé",
+            ["guardian.unsuspend"]           = "Réactiver",
+            ["guardian.suspend"]             = "Suspendre",
+            ["guardian.display_name"]        = "Nom affiché",
+            ["guardian.email"]               = "Adresse e-mail",
+            ["guardian.password"]            = "Mot de passe",
+            ["guardian.child_email_hint"]    =
+                "L'enfant vérifie son propre e-mail pour se connecter — le flux d'inscription habituel.",
+
+            // ── posts (composer helper hints) ──────────────────────────────
+            ["posts.title_hint"] =
+                "Un court titre (jusqu'à 120 caractères). Laisse vide pour un " +
+                "post sans titre — la liste affichera la première ligne du texte.",
+            ["posts.language_hint"] =
+                "La langue dans laquelle tu écris ce post. C'est seulement une " +
+                "étiquette — elle n'est pas traduite — et elle garde le texte " +
+                "trouvable plus tard et permet à un lecteur d'ajouter sa " +
+                "propre version.",
+
+            // ── faq (drop-in FAQ section, _FaqAccordion) ──────────────────
+            ["faq.title"]     = "Questions fréquentes",
+            ["faq.q1"]        = "Qui peut voir mes publications ?",
+            ["faq.a1"]        =
+                "Celui que tu choisis quand tu publies : toi seul, ton " +
+                "groupe, ta communauté ou tout le monde. " +
+                "L'audience est un choix par post — ce n'est pas un réglage " +
+                "global.",
+            ["faq.q2"]        = "Où se trouvent les annonces comme les coupures d'eau et les travaux ?",
+            ["faq.a2_intro"]  = "Les annonces épinglées, sur",
+            ["faq.a2_link"]   = "/announcements",
+            ["faq.a2_outro"]  =
+                " — la lecture est ouverte pour que personne n'ait à se " +
+                "connecter pour savoir quand la rue sera repeinte.",
+            ["faq.q3"]        = "Est-ce privé par défaut ?",
+            ["faq.a3"]        =
+                "Oui. Chaque fois que l'accès à du contenu restreint est accordé " +
+                "ou refusé, c'est enregistré. Les données restent sur une " +
+                "unique base de données appartenant à l'hôte du quartier, et " +
+                "il n'y a ni publicité ni suivi intégré.",
+
+            // ── error (shared error page, Shared/Error.cshtml) ────────────
+            ["error.title"]           = "Erreur.",
+            ["error.subtitle"]        = "Une erreur s'est produite lors du traitement de votre demande.",
+            ["error.development_title"] = "Mode développement",
+            ["error.development_hint"] =
+                "Passer en environnement Développement affiche plus de " +
+                "détails sur l'erreur survenue. Cet environnement ne devrait " +
+                "pas être activé pour des applications déployées — il peut " +
+                "révéler des informations sensibles aux utilisateurs finaux.",
+            ["error.request_id"]      = "Identifiant de la demande :",
 
             // ── guardian assignment (GA ADR 0038) ───────────────────────────
             ["guardian.otherGuardians.title"] = "Autres tuteurs",
@@ -1817,8 +2078,8 @@ public static class KnownTranslationKeys
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Où en est ce projet",
             ["home.lead"] =
-                "Un chez-soi privé pour un quartier — construit en public, un jalon à la fois. " +
-                "C'est la même liste que dans le README, et le code derrière chaque élément est dans le dépôt public.",
+                "Un chez-soi privé pour un quartier — construit pas à pas, en toute transparence. " +
+                "Tout ce qui figure plus bas fait partie de ce plan, et tu es le bienvenu à voir comment il est réalisé.",
             ["home.support"] = "Des questions ou des retours ? Écris à",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
@@ -1898,6 +2159,18 @@ public static class KnownTranslationKeys
             ["groups.posts_empty_can"] =
                 "Pas encore de publications. Écris la première — elle sera visible par les membres actuels.",
             ["groups.posts_empty"]    = "Pas encore de publications ici.",
+            ["groups.members_heading"]  = "Membres",
+            ["groups.members_empty"]    = "Pas encore de membres.",
+            ["groups.member_leave"]     = "Quitter",
+            ["groups.invite_heading"]   = "Inviter un habitant",
+            ["groups.about_heading"]        = "À propos de ce groupe",
+            ["groups.about_desc_label"]     = "Description (optionnelle)",
+            ["groups.about_desc_clear_hint"] = "Laisser vide pour effacer la description.",
+            ["groups.about_desc_save"]      = "Enregistrer la description",
+            ["groups.privacy_heading"]      = "Confidentialité",
+            ["groups.private_label"]        = "Groupe privé",
+            ["groups.private_hint"]         =
+                "Un groupe privé (p. ex. une famille) est masqué à tous les autres ; seules les personnes que tu ajoutes comme membres peuvent le voir et l'utiliser. Décocher la case pour rendre le groupe public à nouveau.",
             ["groups.new_title"]      = "Publier dans ce groupe",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
@@ -2012,9 +2285,8 @@ public static class KnownTranslationKeys
             ["posts.detail_edit"] = "Modifier",
             ["posts.edited"] = "modifié",
             ["posts.detail_why"] =
-                "Tu peux voir cette publication parce que tu correspondes à son audience " +
-                "(une autorisation de ta part, ou tu es l'auteur — la « branche propriétaire » " +
-                "de la règle C1 de refus d'audience vide).",
+                "Tu peux voir cette publication parce qu'elle t'a été accordée — " +
+                "soit tu en es l'auteur, soit elle a été partagée avec toi ou tes groupes.",
             ["posts.report_button"] = "Signaler cette publication",
             ["posts.reply_report_button"] = "Signaler cette réponse",
             ["posts.report_reason_label"] = "Quel est le problème ?",
@@ -2089,12 +2361,11 @@ public static class KnownTranslationKeys
                 "Un nom pour une communauté d'habitants (p. ex. « Bâtiment 4 », " +
                 "« Bénévoles », « Cyclistes »). " +
                 "Tu possèdes le groupe — tu peux ajouter et retirer des membres " +
-                "depuis la page de détail du groupe (M2, plan U10).",
+                "depuis la page de détail du groupe.",
             ["groups.create_desc_hint"] = "Optionnel — une courte note que les autres habitants verront.",
             ["groups.create_private_hint"] =
-                "Un groupe privé (p. ex. une famille) est masqué des listes " +
-                "d'autorisation/d'accès de tous les autres — seules les personnes que " +
-                "tu ajoutes comme membres peuvent l'utiliser. " +
+                "Un groupe privé (p. ex. une famille) est invisible pour tout le monde — " +
+                "seules les personnes que tu ajoutes comme membres peuvent le voir et l'utiliser. " +
                 "Un groupe public (p. ex. « Champignonnistes ») apparaît comme " +
                 "option dans les sélecteurs des autres habitants.",
             ["groups.create_submit"] = "Créer le groupe",
@@ -2201,10 +2472,10 @@ public static class KnownTranslationKeys
             ["moderation.no_reason"] = "(aucune raison donnée)",
             ["moderation.th_body_label"] = "Corps de la publication",
             ["moderation.body_preview"] = "aperçu de la publication",
-            ["moderation.assign_header"] = "Assigner à un modérateur permanent",
+            ["moderation.assign_header"] = "Assigner à un modérateur",
             ["moderation.assign_label"] =
-                "Modérateur permanent du composant de ce signalement",
-            ["moderation.assign_pick"] = "Choisir un modérateur permanent…",
+                "Un modérateur couvrant cette communauté",
+            ["moderation.assign_pick"] = "Choisir un modérateur…",
             ["moderation.assign_submit"] = "Assigner",
             ["moderation.cancel"] = "Annuler",
             ["moderation.unlock_submit"] = "Déverrouiller",
@@ -2235,9 +2506,9 @@ public static class KnownTranslationKeys
             // ── admin (Audit page) ───────────────────────────────────────────
             ["admin.audit_title"] = "Audit d'accès",
             ["admin.audit_lede"] =
-                "Chaque décision d'accès au contenu restreint — Allow et Deny — plus " +
-                "les actions admin et les lignes agrégées de listes par lot. " +
-                "Toujours actif ; purgé selon le niveau de l'instance (§6.4).",
+                "Un journal des accès accordés ou refusés à du contenu restreint, " +
+                "plus les actions admin. Ce journal est toujours conservé et nettoyé " +
+                "périodiquement selon la politique de rétention de l'instance.",
             ["admin.audit_filter"] = "Filtrer",
             ["admin.audit_th_at"] = "À (UTC)",
             ["admin.audit_th_actor"] = "Acteur",
@@ -2253,13 +2524,13 @@ public static class KnownTranslationKeys
             ["admin.breakglass_granted"] = "Accordé à (UTC)",
             ["admin.breakglass_expires"] = "Expire à (UTC)",
             ["admin.breakglass_status"] = "Statut",
-            ["admin.breakglass_consumed"] = "consommé — élévation active jusqu'à expiration",
-            ["admin.breakglass_presented"] = "présenté mais pas encore consommé",
-            ["admin.breakglass_token_label"] = "Jeton unique (de l'opérateur)",
+            ["admin.breakglass_consumed"] = "activé — élévation en cours jusqu'à expiration",
+            ["admin.breakglass_presented"] = "configuré, mais pas encore activé",
+            ["admin.breakglass_token_label"] = "Code unique (de l'opérateur)",
             ["admin.breakglass_token_hint"] =
-                "Consommer ce jeton est une action unique. Il active l'élévation " +
+                "L'utilisation de ce code est une action unique. Il active l'élévation " +
                 "jusqu'à son expiration.",
-            ["admin.breakglass_consume"] = "Consommer le jeton",
+            ["admin.breakglass_consume"] = "Activer",
 
             // ── locale (settings + public picker) ────────────────────────────
             ["locale.settings_title"] = "Tes paramètres",
@@ -2473,6 +2744,16 @@ public static class KnownTranslationKeys
         {
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Forside",
+
+            // ── common (shared action/field labels reused across resident-facing views) ──
+            ["common.cancel"]   = "Annullér",
+            ["common.save"]     = "Gem",
+            ["common.title"]    = "Titel",
+            ["common.body"]     = "Tekst",
+            ["common.language"] = "Sprog",
+            ["common.optional"] = "valgfrit",
+            ["common.add"]      = "Tilføj",
+            ["common.remove"]   = "Fjern",
             ["nav.announcements"] = "Meddelelser",
             ["nav.community"]     = "Fællesskab",
             ["nav.groups"]        = "Grupper",
@@ -2495,6 +2776,74 @@ public static class KnownTranslationKeys
             ["guardian.empty"]        = "Ingen børn endnu.",
             ["guardian.add"]          = "Tilføj en barnkonto",
             ["guardian.manage_title"] = "Administer en barnkonto",
+
+            // ── guardian (per-child surface, GU ADR 0028) ─────────────────
+            ["guardian.back"]               = "Tilbage til dine børn",
+            ["guardian.account_label"]       = "Konto",
+            ["guardian.group_memberships"]   = "Gruppemedlemskaber",
+            ["guardian.community_memberships"] = "Fællesskabsmedlemskaber",
+            ["guardian.no_groups"]           = "Ingen gruppemedlemskaber.",
+            ["guardian.no_communities"]      = "Ingen fællesskabsmedlemskaber.",
+            ["guardian.group_id_label"]      = "Gruppe-ID",
+            ["guardian.community_id_label"]  = "Fællesskab-ID",
+            ["guardian.pending_invitations"] = "Afventende gruppeinvitationer",
+            ["guardian.no_invitations"]      = "Ingen afventende invitationer.",
+            ["guardian.approve"]             = "Godkend",
+            ["guardian.handover"]            = "Overtag kontoen",
+            ["guardian.handover_hint"]       =
+                "Afløsning af værgemodet overgiver kontoen til barnet. " +
+                "Medlemskaberne bevares, og barnets egne kontroller kommer " +
+                "tilbage ved næste læsning.",
+            ["guardian.dissolve"]            = "Afløs værgemodet",
+            ["guardian.suspended"]           = "Suspendert",
+            ["guardian.unsuspend"]           = "Genopret",
+            ["guardian.suspend"]             = "Suspendér",
+            ["guardian.display_name"]        = "Vistnavn",
+            ["guardian.email"]               = "E-mailadresse",
+            ["guardian.password"]            = "Adgangskode",
+            ["guardian.child_email_hint"]    =
+                "Barnet bekræfter sin egen e-mail for at logge ind — den sædvanlige tilmeldingsproces.",
+
+            // ── posts (composer helper hints) ──────────────────────────────
+            ["posts.title_hint"] =
+                "En kort overskrift (op til 120 tegn). Slet for et " +
+                "kun-tekstindlæg — listen viser i stedet din første tekstlinje.",
+            ["posts.language_hint"] =
+                "Det sprog, du skriver dette indlæg på. Det er kun et " +
+                "mærke — det oversættes ikke — og det holder teksten let " +
+                "fundbar senere og giver en læser mulighed for at tilføje " +
+                "sin egen version.",
+
+            // ── faq (drop-in FAQ section, _FaqAccordion) ──────────────────
+            ["faq.title"]     = "Ofte stillede spørgsmål",
+            ["faq.q1"]        = "Hvem kan se mine indlæg?",
+            ["faq.a1"]        =
+                "Den, du vælger, når du poster: kun dig, din gruppe, dit " +
+                "fællesskab eller alle. Modtagerkreds er et " +
+                "valg pr. indlæg — ikke en global indstilling.",
+            ["faq.q2"]        = "Hvor ligger meddelelser som vandmangel og vejarbejde?",
+            ["faq.a2_intro"]  = "Faste meddelelser på",
+            ["faq.a2_link"]   = "/announcements",
+            ["faq.a2_outro"]  =
+                " — læsningen er åben, så ingen behøver at logge ind for at " +
+                "finde ud af, hvornår gaden skal males.",
+            ["faq.q3"]        = "Er dette privat som standard?",
+            ["faq.a3"]        =
+                "Ja. Hver gang, der adgang til begrænset indhold gives eller " +
+                "nægtes, registreres det. Dataene bliver på én database " +
+                "ejet af nabolagets vært, og der er ingen reklame eller " +
+                "tracking indbygget.",
+
+            // ── error (shared error page, Shared/Error.cshtml) ────────────
+            ["error.title"]           = "Fejl.",
+            ["error.subtitle"]        = "Der opstod en fejl under behandling af din anmodning.",
+            ["error.development_title"] = "Udviklingsmodus",
+            ["error.development_hint"] =
+                "Skift til Udviklingsmiljøet viser flere detaljer om den " +
+                "opståede fejl. Udviklingsmiljøet bør ikke aktiveres for " +
+                "udrullede applikationer — det kan afsløre følsomme " +
+                "oplysninger fra fejl til slutbrugere.",
+            ["error.request_id"]      = "Anmodnings-ID:",
 
             // ── guardian assignment (GA ADR 0038) ───────────────────────────
             ["guardian.otherGuardians.title"] = "Andre værgemænd",
@@ -2604,8 +2953,8 @@ public static class KnownTranslationKeys
             // ── home (the hero + section lead) ──────────────────────────────
             ["home.eyebrow"] = "Hvor projektet står",
             ["home.lead"] =
-                "Et privat hjem for ét nabolag — bygget i det åbne, ét milepæl ad gangen. " +
-                "Det er den samme liste, du finder i README'en, og koden bag hver post ligger i det offentlige repository.",
+                "Et privat hjem for ét nabolag — bygget skridt for skridt og i det åbne. " +
+                "Alt, der er angivet nedenfor, er en del af den plan — og du er velkommen til at se, hvordan den bygges.",
             ["home.support"] = "Spørgsmål eller feedback? Skriv til",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
@@ -2685,6 +3034,18 @@ public static class KnownTranslationKeys
             ["groups.posts_empty_can"] =
                 "Ingen indlæg endnu. Skriv det første — det vises for de nuværende medlemmer.",
             ["groups.posts_empty"]    = "Ingen indlæg her endnu.",
+            ["groups.members_heading"]  = "Medlemmer",
+            ["groups.members_empty"]    = "Ingen medlemmer endnu.",
+            ["groups.member_leave"]     = "Forlad",
+            ["groups.invite_heading"]   = "Indbyd en beboer",
+            ["groups.about_heading"]        = "Om denne gruppe",
+            ["groups.about_desc_label"]     = "Beskrivelse (valgfri)",
+            ["groups.about_desc_clear_hint"] = "Slet for at fjerne beskrivelsen.",
+            ["groups.about_desc_save"]      = "Gem beskrivelse",
+            ["groups.privacy_heading"]      = "Fortrolighed",
+            ["groups.private_label"]        = "Privat gruppe",
+            ["groups.private_hint"]         =
+                "En privat gruppe (f. eks. en familie) er skjult for alle andre; kun de mennesker, du tilføjer som medlemmer, kan se og bruge den. Fjern afkrydsningen for at gøre gruppen offentlig igen.",
             ["groups.new_title"]      = "Skriv til denne gruppe",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",
@@ -2798,9 +3159,8 @@ public static class KnownTranslationKeys
             ["posts.detail_edit"] = "Rediger",
             ["posts.edited"] = "redigeret",
             ["posts.detail_why"] =
-                "Du kan se dette indlæg, fordi du matcher dets modtagerkreds " +
-                "(et af dine tilladelser, eller du er forfatteren — \"ejer-grenen\" " +
-                "i C1-reglen om afvisning af tom modtagerkreds).",
+                "Du kan se dette indlæg, fordi det er blevet delt med dig — " +
+                "enten er du forfatteren, eller det er delagt med dig eller dine grupper.",
             ["posts.report_button"] = "Rapportér dette indlæg",
             ["posts.reply_report_button"] = "Rapportér dette svar",
             ["posts.report_reason_label"] = "Hvad er der galt?",
@@ -2875,12 +3235,11 @@ public static class KnownTranslationKeys
                 "Et navn til et fællesskab af beboere (f.eks. \"Bygge 4\", " +
                 "\"Frivillige\", \"Cyklejere\"). " +
                 "Du ejer gruppen — du kan tilføje og fjerne medlemmer fra " +
-                "gruppens detailside (M2, plan U10).",
+                "gruppens detailside.",
             ["groups.create_desc_hint"] = "Valgfrit — en kort note, andre beboere vil se.",
             ["groups.create_private_hint"] =
-                "En privat gruppe (f.eks. en familie) er skjult for alle andres " +
-                "tilladelses-/adgangslister — kun de personer, du " +
-                "tilføjer som medlemmer, kan bruge den. " +
+                "En privat gruppe (f.eks. en familie) er usynlig for alle andre — " +
+                "kun de personer, du tilføjer som medlemmer, kan se og bruge den. " +
                 "En offentlig gruppe (f.eks. \"Svampesamlere\") vises som et valg " +
                 "i andre beboeres valgmuligheder.",
             ["groups.create_submit"] = "Opret gruppe",
@@ -2986,10 +3345,10 @@ public static class KnownTranslationKeys
             ["moderation.no_reason"] = "(ingen årsag angivet)",
             ["moderation.th_body_label"] = "Indlægstekst",
             ["moderation.body_preview"] = "indlæg-forhåndsvisning",
-            ["moderation.assign_header"] = "Tildel en stående moderator",
+            ["moderation.assign_header"] = "Tildel en moderator",
             ["moderation.assign_label"] =
-                "Stående moderator på rapportens komponent",
-            ["moderation.assign_pick"] = "Vælg en stående moderator …",
+                "En moderator, der dækker dette fællesskab",
+            ["moderation.assign_pick"] = "Vælg en moderator …",
             ["moderation.assign_submit"] = "Tildel",
             ["moderation.cancel"] = "Annuller",
             ["moderation.unlock_submit"] = "Lås op",
@@ -3020,9 +3379,9 @@ public static class KnownTranslationKeys
             // ── admin (Audit page) ───────────────────────────────────────────
             ["admin.audit_title"] = "Adgangsaudit",
             ["admin.audit_lede"] =
-                "Alle adgangsbeslutninger om indhold med begrænset modtagerkreds — Allow og Deny — plus " +
-                "admin-handlinger og aggregate rækker for masselister. Altid tændt; slettes pr. " +
-                "instans-niveau (§6.4).",
+                "Et log over, hvem der har fået eller nægtet adgang til begrænset indhold, " +
+                "plus admin-handlinger. Loggen gemmes altid og ryddes periodisk " +
+                "efter instansens opbevaringspolitik.",
             ["admin.audit_filter"] = "Filtrér",
             ["admin.audit_th_at"] = "Tidspunkt (UTC)",
             ["admin.audit_th_actor"] = "Aktør",
@@ -3038,13 +3397,13 @@ public static class KnownTranslationKeys
             ["admin.breakglass_granted"] = "Givet (UTC)",
             ["admin.breakglass_expires"] = "Udløber (UTC)",
             ["admin.breakglass_status"] = "Status",
-            ["admin.breakglass_consumed"] = "forbrugt — forhøjelse aktiv indtil udløb",
-            ["admin.breakglass_presented"] = "fremvist, men ikke endnu forbrugt",
-            ["admin.breakglass_token_label"] = "Engangstoken (fra operatøren)",
+            ["admin.breakglass_consumed"] = "aktiveret — forhøjelse aktiv indtil udløb",
+            ["admin.breakglass_presented"] = "opsat, men ikke endnu aktiveret",
+            ["admin.breakglass_token_label"] = "Engangskode (fra operatøren)",
             ["admin.breakglass_token_hint"] =
-                "At forbruge denne token er en engangshandling. Den aktiverer forhøjelsen " +
+                "Brug af denne kode er en engangshandling. Den aktiverer forhøjelsen " +
                 "indtil dens udløb.",
-            ["admin.breakglass_consume"] = "Forbrug token",
+            ["admin.breakglass_consume"] = "Aktivér",
 
             // ── locale (settings + public picker) ────────────────────────────
             ["locale.settings_title"] = "Dine indstillinger",

@@ -6,11 +6,11 @@
 
 <h1><kw-l key="admin.breakglass_title">Break-glass</kw-l></h1>
 <p class="text-muted">
-    A break-glass elevation is written by the <strong>operator, in psql</strong> (OPS §9),
-    directly into the <code>mt."AdminOverride"</code> table — never by any in-app endpoint.
-    This page only <em>consumes</em> the token once, to activate the elevation that the
-    operator has already written. Consumption is single-use (the row's <code>consumedAt</code>
-    is set on first presentation) and the elevation lapses at its own <code>expiresAt</code>.
+    A break-glass elevation is set up by the <strong>operator outside the app</strong>,
+    not by any button on this page. This page only <em>activates</em> the one-time
+    code the operator has already set up. Using it is a one-time action: once you
+    present the code it cannot be used again, and the elevation ends on its own at
+    its expiry time.
 </p>
 
 @if (TempData["info"] is string info)
@@ -25,8 +25,8 @@
 @if (!Model.HasOverride)
 {
     <div class="alert alert-secondary">
-        No operator-provided break-glass row exists for your account. Ask the operator to
-        write one into <code>mt."AdminOverride"</code> before using this page.
+        No break-glass code has been set up for your account. Ask the operator to
+        set one up before using this page.
     </div>
 }
 else
@@ -54,22 +54,22 @@ else
         <form method="post" asp-action="BreakGlass">
             @Html.AntiForgeryToken()
             <div class="mb-3">
-                <label class="form-label" for="token"><kw-l key="admin.breakglass_token_label">One-time token (from the operator)</kw-l></label>
+                <label class="form-label" for="token"><kw-l key="admin.breakglass_token_label">One-time code (from the operator)</kw-l></label>
                 <input type="text" class="form-control" id="token" name="token" autocomplete="off" required />
                 <div class="form-text">
-                    <kw-l key="admin.breakglass_token_hint">Consuming this token is a one-time action. It activates the elevation until its expiry.</kw-l>
+                    <kw-l key="admin.breakglass_token_hint">Using this code is a one-time action. It activates the elevation until its expiry.</kw-l>
                 </div>
             </div>
-            <button type="submit" class="btn btn-danger"><kw-l key="admin.breakglass_consume">Consume token</kw-l></button>
+            <button type="submit" class="btn btn-danger"><kw-l key="admin.breakglass_consume">Activate</kw-l></button>
         </form>
     }
     else
     {
         <p class="text-muted">
-            Once consumed, the elevation remains in effect until its own
-            <em>expiry</em>; every subsequent privileged decision made under it is audited
-            with <code>via:BreakGlass</code> (see <a asp-action="Audit">the audit log</a>).
-            This page will not re-present a consumed row to the same account.
+            Once activated, the elevation stays in effect until its own
+            <em>expiry</em>; every privileged action taken under it is written
+            to the audit log (see <a asp-action="Audit">the audit log</a>).
+            This page will not let you activate the same code twice.
         </p>
     }
 }

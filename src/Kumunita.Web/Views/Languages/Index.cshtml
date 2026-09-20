@@ -44,9 +44,10 @@
     <form method="post" action="/admin/languages" class="row g-2 align-items-end mb-4">
         @Html.AntiForgeryToken()
         <div class="col-sm-3">
-            <label for="code" class="form-label">BCP-47 code</label>
+            <label for="code" class="form-label">Language code</label>
             <input type="text" class="form-control" name="code" id="code"
                    required placeholder="pl" maxlength="16" />
+            <div class="form-text small">Short code, e.g. pl for Polish, no-NO for Norwegian.</div>
         </div>
         <div class="col-sm-4">
             <label for="nativeName" class="form-label">Native name</label>

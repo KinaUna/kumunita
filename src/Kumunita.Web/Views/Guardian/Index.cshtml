@@ -41,14 +41,14 @@
                             <a href="@Url.Action("Detail", "Guardian", new { childId = item.ChildId })">@item.DisplayName</a>
                             @if (item.Blocked)
                             {
-                                <span class="badge bg-secondary ms-1">Suspended</span>
+                                <span class="badge bg-secondary ms-1"><kw-l key="guardian.suspended">Suspended</kw-l></span>
                             }
                         </span>
                         @if (item.Blocked)
                         {
                             <form method="post" action="@Url.Action("Unsuspend", "Guardian", new { childId = item.ChildId })">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-primary">Un-suspend</button>
+                                <button type="submit" class="btn btn-sm btn-outline-primary"><kw-l key="guardian.unsuspend">Un-suspend</kw-l></button>
                             </form>
                         }
                         else
@@ -57,7 +57,7 @@
                                   action="@Url.Action("Suspend", "Guardian", new { childId = item.ChildId })"
                                   onsubmit="return confirm('Suspend this child account? They will be blocked until you un-suspend them.');">
                                 @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Suspend</button>
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.suspend">Suspend</kw-l></button>
                             </form>
                         }
                     </li>
@@ -73,28 +73,28 @@
             account can never exist. The child's content never reaches this
             form (G·1).
         *@
-        <h2>Add a child account</h2>
+        <h2><kw-l key="guardian.add">Add a child account</kw-l></h2>
         <form method="post" action="@Url.Action("AddChild", "Guardian")">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
             <div class="mb-3">
-                <label for="DisplayName" class="form-label">Display name</label>
+                <label for="DisplayName" class="form-label"><kw-l key="guardian.display_name">Display name</kw-l></label>
                 <input id="DisplayName" name="DisplayName" class="form-control" maxlength="100" required />
             </div>
 
             <div class="mb-3">
-                <label for="Email" class="form-label">Email address</label>
+                <label for="Email" class="form-label"><kw-l key="guardian.email">Email address</kw-l></label>
                 <input id="Email" name="Email" type="email" class="form-control" maxlength="255" required />
             </div>
 
             <div class="mb-3">
-                <label for="Password" class="form-label">Password</label>
+                <label for="Password" class="form-label"><kw-l key="guardian.password">Password</kw-l></label>
                 <input id="Password" name="Password" type="password" class="form-control" minlength="8" required />
             </div>
 
             <button type="submit" class="btn btn-primary"><kw-l key="guardian.add">Add a child account</kw-l></button>
-            <div class="form-text mt-1">The child verifies their own email to sign in — the usual sign-up flow.</div>
+            <div class="form-text mt-1"><kw-l key="guardian.child_email_hint">The child verifies their own email to sign in — the usual sign-up flow.</kw-l></div>
         </form>
     </div>
 </div>

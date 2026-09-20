@@ -64,15 +64,13 @@
                     <div class="row g-2 mb-2">
                         <div class="col">
                             <label class="form-label" for="title" style="font-weight:600;">
-                                Title
+                                <kw-l key="common.title">Title</kw-l>
                             </label>
                             <input class="form-control" type="text" id="title" name="Title"
                                    maxlength="120"
                                    placeholder="optional" />
                             <div class="text-muted small mt-1">
-                                A short headline (up to 120 characters). Leave
-                                blank for a body-only post — the list will show
-                                your first line of the body instead.
+                                <kw-l key="posts.title_hint">A short headline (up to 120 characters). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
                             </div>
                         </div>
                     </div>
@@ -80,7 +78,7 @@
                     <div class="row g-2">
                         <div class="col">
                             <label class="form-label" for="body" style="font-weight:600;">
-                                Body
+                                <kw-l key="common.body">Body</kw-l>
                             </label>
                             <div class="rc-editor">
                                 <div class="rc-editor-toolbar" data-rich-editor>
@@ -109,7 +107,7 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="language" style="font-weight:600;">
-                        Language
+                        <kw-l key="common.language">Language</kw-l>
                     </label>
                     <select class="form-control" id="language" name="LanguageCode">
                         @foreach (var (languageCode, nativeName) in Model.Languages)
@@ -120,10 +118,7 @@
                         }
                     </select>
                     <div class="text-muted small mt-2">
-                        The language you're writing this post in. This is only a
-                        tag — it is not translated — and it keeps the text
-                        findable later and lets a reader add their own language
-                        version if they want.
+                        <kw-l key="posts.language_hint">The language you're writing this post in. This is only a tag — it is not translated — and it keeps the text findable later and lets a reader add their own language version if they want.</kw-l>
                     </div>
                 </div>
             </div>
@@ -288,7 +283,7 @@
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="posts.new_submit">Post it</kw-l></button>
                 <button type="button" class="btn btn-outline-secondary"
-                        onclick="this.form.reset();">Cancel</button>
+                        onclick="this.form.reset();"><kw-l key="common.cancel">Cancel</kw-l></button>
             </div>
         </form>
     </div>

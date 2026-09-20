@@ -5,10 +5,10 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-        <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; Back to your children</a></p>
+        <p><a class="text-muted" href="@Url.Action("Index", "Guardian")">&larr; <kw-l key="guardian.back">Back to your children</kw-l></a></p>
 
         <h1><kw-l key="guardian.manage_title">Manage a child account</kw-l></h1>
-        <p class="text-muted">Account: <code>@Model.ChildId</code></p>
+        <p class="text-muted"><kw-l key="guardian.account_label">Account</kw-l>: <code>@Model.ChildId</code></p>
 
         @if (TempData["info"] is string info)
         {
@@ -29,10 +29,10 @@
             Core seam, not here. The actor is the signed-in principal (the U07
             route), never a form field.
         *@
-        <h2>Group memberships</h2>
+        <h2><kw-l key="guardian.group_memberships">Group memberships</kw-l></h2>
         @if (Model.GroupIds.Count == 0)
         {
-            <p class="text-muted">No group memberships.</p>
+            <p class="text-muted"><kw-l key="guardian.no_groups">No group memberships.</kw-l></p>
         }
         else
         {
@@ -56,13 +56,13 @@
             @Html.AntiForgeryToken()
             <input type="hidden" name="add" value="true" />
             <input type="text" name="groupId" class="form-control" style="max-width: 260px;" placeholder="Group id" required />
-            <button type="submit" class="btn btn-outline-primary">Add</button>
+            <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
         </form>
 
-        <h2 class="mt-4">Community memberships</h2>
+        <h2 class="mt-4"><kw-l key="guardian.community_memberships">Community memberships</kw-l></h2>
         @if (Model.CommunityIds.Count == 0)
         {
-            <p class="text-muted">No community memberships.</p>
+            <p class="text-muted"><kw-l key="guardian.no_communities">No community memberships.</kw-l></p>
         }
         else
         {
@@ -86,13 +86,13 @@
             @Html.AntiForgeryToken()
             <input type="hidden" name="add" value="true" />
             <input type="text" name="communityId" class="form-control" style="max-width: 260px;" placeholder="Community id" required />
-            <button type="submit" class="btn btn-outline-primary">Add</button>
+            <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
         </form>
 
-        <h2 class="mt-4">Pending group invitations</h2>
+        <h2 class="mt-4"><kw-l key="guardian.pending_invitations">Pending group invitations</kw-l></h2>
         @if (Model.PendingInvitations.Count == 0)
         {
-            <p class="text-muted">No pending invitations.</p>
+            <p class="text-muted"><kw-l key="guardian.no_invitations">No pending invitations.</kw-l></p>
         }
         else
         {
@@ -107,7 +107,7 @@
                         <form method="post"
                               action="@Url.Action("ApproveInvitation", "Guardian", new { childId = Model.ChildId, groupId = inv.GroupId })">
                             @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-sm btn-primary">Approve</button>
+                            <button type="submit" class="btn btn-sm btn-primary"><kw-l key="guardian.approve">Approve</kw-l></button>
                         </form>
                     </li>
                 }
@@ -121,12 +121,12 @@
             client-side (a UX nicety — the server gate is the U07 route + the
             Core seam's standing check).
         *@
-        <h2 class="mt-4">Hand over the account</h2>
-        <p class="text-muted">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</p>
+        <h2 class="mt-4"><kw-l key="guardian.handover">Hand over the account</kw-l></h2>
+        <p class="text-muted"><kw-l key="guardian.handover_hint">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</kw-l></p>
         <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
-              onsubmit="return confirm('Hand over this account to the child? This dissolves your guardianship over it.');">
+              onsubmit="return confirm('Hand over this account to the child? This dissolves your guardianship over it.')">
             @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-danger">Dissolve guardianship</button>
+            <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
         </form>
 
         @*
