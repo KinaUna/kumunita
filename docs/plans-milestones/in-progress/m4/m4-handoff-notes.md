@@ -794,6 +794,115 @@ master list) live in two files:
 | T12 | `M4_AuthorSoftDeleteOwnEvent` | PASS |
 | T13 | `M4_RsvpLastWriteWins` | PASS |
 | T14 | `M4_RsvpUniqueIndexOneRowPerUser` | PASS |
+
+## U10 — EventControllerTests
+
+**What landed.** The Web-side controller tests for `EventController`,
+mirroring the `AnnouncementControllerTests` harness (NSubstitute
+`IEventService` + `IUserInfoService` + `ILocalizationService` +
+`IDocumentStore`, a `NoOpTempDataProvider` for the write lanes' `TempData`,
+and a shared `Build(...)` / `DefaultLocalization()` / `SampleEvent(...)`
+triple). The frozen M4 Core seam is consumed as-is — `IEventService`,
+`Event`, `EventRsvp`, `RsvpStatus`, `CreateEventRequest`,
+`UpdateEventRequest`, `EventToAuditableResource`, and the
+`EventService.CheckEditStanding` static helper. No TS touched; no
+`m4-events-design.md` / `README.md` / `Milestones.cs` / `ARCHITECTURE.md`
+edits (those are U11/U12).
+
+**(a) Test file.** `tests/Kumunita.Web.Tests/EventControllerTests.cs`
+
+**(b) Test names (verbatim, in file order).** 19 tests total (18
+`[Fact]` async + 1 `[Fact]` sync route-map):
+
+1. `RouteMap_MatchesDocumentedSurface`
+2. `Detail_When_ServiceReportsAbsent_Returns_404`
+3. `Detail_When_ServiceReportsDenied_Returns_403`
+4. `EditGet_When_ServiceReportsAbsent_Returns_404`
+5. `EditGet_When_NonAuthorNonAdmin_Returns_403`
+6. `Publish_When_ServiceDenies_Returns_403`
+7. `Delete_When_NonAuthorNonAdmin_Returns_403_And_NeverCallsDeleteAsync`
+8. `Rsvp_When_ServiceDenies_Returns_403`
+9. `Index_PassesComponentFilterAndPage_Verbatim_ToService`
+10. `Index_When_AuthorProfileMissing_FallsBackToSubjectId`
+11. `CreateGet_SeesCommunityVisibleDefault_Audience_AndDraftFloor`
+12. `CreatePost_MapsAudience_Verbatim_ViaBuildAudience_AndDraftFlag`
+13. `CreatePost_When_BodyMissing_RendersView_And_NeverCreates`
+14. `EditGet_When_Author_RoundTripsStoredAudience_Verbatim`
+15. `EditPost_When_GlobalAdmin_Updates_And_Redirects`
+16. `EditPost_When_ServiceReportsAbsent_Returns_404`
+17. `Detail_When_Author_RsvpListAndMyRsvp_Loaded`
+18. `Detail_When_NonAuthor_RsvpListNotLoaded_AffordancesOff`
+19. `Rsvp_PassesPostedStatus_Verbatim_And_Redirects`
+
+**(c) Pass/red counts (the U11 gate input).** All **19 PASS / 0 RED**.
+
+| # | Test | Result |
+|---|---|---|
+| T01 | `RouteMap_MatchesDocumentedSurface` | PASS |
+| T02 | `Detail_When_ServiceReportsAbsent_Returns_404` | PASS |
+| T03 | `Detail_When_ServiceReportsDenied_Returns_403` | PASS |
+| T04 | `EditGet_When_ServiceReportsAbsent_Returns_404` | PASS |
+| T05 | `EditGet_When_NonAuthorNonAdmin_Returns_403` | PASS |
+| T06 | `Publish_When_ServiceDenies_Returns_403` | PASS |
+| T07 | `Delete_When_NonAuthorNonAdmin_Returns_403_And_NeverCallsDeleteAsync` | PASS |
+| T08 | `Rsvp_When_ServiceDenies_Returns_403` | PASS |
+| T09 | `Index_PassesComponentFilterAndPage_Verbatim_ToService` | PASS |
+| T10 | `Index_When_AuthorProfileMissing_FallsBackToSubjectId` | PASS |
+| T11 | `CreateGet_SeesCommunityVisibleDefault_Audience_AndDraftFloor` | PASS |
+| T12 | `CreatePost_MapsAudience_Verbatim_ViaBuildAudience_AndDraftFlag` | PASS |
+| T13 | `CreatePost_When_BodyMissing_RendersView_And_NeverCreates` | PASS |
+| T14 | `EditGet_When_Author_RoundTripsStoredAudience_Verbatim` | PASS |
+| T15 | `EditPost_When_GlobalAdmin_Updates_And_Redirects` | PASS |
+| T16 | `EditPost_When_ServiceReportsAbsent_Returns_404` | PASS |
+| T17 | `Detail_When_Author_RsvpListAndMyRsvp_Loaded` | PASS |
+| T18 | `Detail_When_NonAuthor_RsvpListNotLoaded_AffordancesOff` | PASS |
+| T19 | `Rsvp_PassesPostedStatus_Verbatim_And_Redirects` | PASS |
+
+**Notes for U11.**
+
+- **Exit gate (met).** `dotnet build Kumunita.slnx -c Debug` → 0 errors / 0
+  warnings. `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → `Total: 351, Errors: 0, Failed: 1`. The one remaining red is
+  `KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` — a
+  pre-existing M4 red (the `Event\Detail.cshtml` `events.created` /
+  `events.edited` and `Shared\_Layout.cshtml` `nav.events` `kw-l` keys are not
+  yet in `src/Kumunita.Core/Localization/KnownTranslationKeys.cs`). This is a
+  U11/U12 concern (the key registry is the U11 gate input, and the close step
+  is U12); **it is not caused by U10**, and the U10 family is fully green.
+- **NSubstitute `Task.FromException<T>` quirk.** Eight of the 19 initially
+  failed with `CouldNotSetReturnDueToTypeMismatchException` — the
+  non-generic `Task.FromException(ex)` returns `Task`, but the frozen seam
+  returns `Task<Event>` / `Task<EventRsvp>`, and NSubstitute v5 type-checks
+  the `Returns(...)` value. The six offending sites (lines 109, 132, 153, 196,
+  238, 529 in the first iteration) were all switched to the generic form
+  `Task.FromException<Event>(...)` / `Task.FromException<EventRsvp>(...)`.
+  The two remaining failures at that point (the `EditGet` round-trip) were a
+  separate root cause — see next bullet.
+- **`Audience` has no value equality.** `Audience` is a plain `sealed class`
+  (no `Equals` override, no `IEquatable<T>`), so `Assert.Equal(stored,
+  rebuilt)` falls back to reference equality and fails. `T14`
+  (`EditGet_When_Author_RoundTripsStoredAudience_Verbatim`) was rewritten to
+  compare the round-tripped audience property-by-property against the stored
+  one (`Mode`, `Community`, `AllResidents`, `Grants`). The `Grants` list is a
+  `List<AudienceGrant>` of a `sealed record` — `record` value equality holds
+  per grant, so `Assert.Equal(storedAudience.Grants, rebuilt.Grants)` is a
+  real comparison.
+- **`call.ArgAt<T>(index)` idiom.** The payload-capture tests
+  (`T09`, `T12`, `T15`, `T19`) use the NSubstitute v5 `call.ArgAt<T>(index)`
+  form (not the older `request => sent = request` lambda idiom, which does
+  not compile against the frozen seam's generic signature).
+- **`NoOpTempDataProvider`.** The write lanes (`CreatePost`, `EditPost`,
+  `Publish`, `Delete`, `Rsvp`) set `TempData["KumunitaFlash"]` before
+  redirecting; the harness supplies a `NoOpTempDataProvider` so the controller
+  doesn't NRE on `ControllerContext.HttpContext.Session` (mirrors
+  `AnnouncementControllerTests`).
+- **`KumunitaPrincipal` shape.** The harness builds the principal with
+  `ClaimTypes.Subject` + `ClaimTypes.Role` claims (the `KumunitaPrincipal`
+  helper in `src/Kumunita.Web/Models/KumunitaPrincipal.cs`), and the
+  `subjectId` parameter of `Build(...)` defaults to `"subj-resident-001"` to
+  match the U09 Core seam's resident-actor convention.
+
+**U10 exit gate met. STOP — do NOT start U11.**
 | T15 | `M4_RsvpListOwnerOnly` | PASS |
 | T16 | `M4_RsvpWritesNoAccessAuditRow` | PASS |
 | T17 | `M4_AuditRowShape_Create` | PASS |
