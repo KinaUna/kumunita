@@ -1037,3 +1037,71 @@ M2's U13), do not run it, and record the gap in the design doc*"), U11:
 
 **U11 exit gate met (build 0 errors; gate section present + consistent with
 U09/U10 results). STOP — do NOT start U12.**
+
+## U12 — close (the M4→M5 handoff)
+
+**Date: 2026-09-21.** The M4 lane is **closed**: the `Events/` status flip,
+the §5 sync, the M4→M5 deferral note, the roadmap trio (M4 `StatusDone`,
+M5 the single `StatusNext`), the README Roadmap, and the **U11-flagged kw-l
+registry drift fix** (the one code change U12 was scoped to make).
+
+**(a) The U11-flagged drift is fixed (the only code change this unit made).**
+The three missing kw-l keys are now registered in all four dictionaries of
+`src/Kumunita.Core/Localization/KnownTranslationKeys.cs` (en/de/fr/da):
+`nav.events` (the `_Layout` nav entry), `events.created` + `events.edited`
+(the `Views/Event/Detail.cshtml` footer — the exact view fallback text).
+`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` is
+**green**; the `KnownTranslationKeys_ParityTests` family (the
+de/fr/da key-parity pins) passes with the 3 new keys.
+
+**(b) The close (docs).**
+- `docs/ARCHITECTURE.md`: the §3 tree's `Events/` line flipped from "M4 —
+  not yet created" to **M4 ✓ (ADR 0054)** with the gate summary (Core
+  668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests
+  together); the two "not yet created" prose lines now name only
+  `Projects/` (M5); the §3 feature-module list adds Events; the **§5 `Events`
+  block is synced to the design doc's canonical field names** (`Body`,
+  `ReminderEnabled`, + the `IsDraft` / `IsDeleted` / `LanguageCode` /
+  `TagIds` / `ImageIds` / `AttachmentIds` reuse lanes per §3.1 — replacing
+  the pre-decision `description` / `rsvpRequired` sketch; `EventRsvp`'s
+  last-write-wins note kept).
+- The **M4→M5 deferral note** (a new `### M4 → M5 deferrals (carried
+  forward)` under §10) lists the §5 non-decisions verbatim from the design
+  doc: event translations, group events, per-resident reminder settings,
+  iCal export (M6), and the no-admission-queue pin — so M5's OOS close stays
+  honest.
+- `src/Kumunita.Web/Milestones.cs`: **M4 → `StatusDone`**, **M5 →
+  `StatusNext`** (the single-in-progress pin moves to M5; M6 stays
+  `StatusPlanned`; the order is unchanged).
+- `tests/Kumunita.Web.Tests/MilestonesTests.cs`: the `Shipped` set gains
+  `"M4"`; the pin is renamed `M4_Is_...` →
+  **`M5_Is_The_Single_InProgress_Milestone`** (asserts `M5`); the ordered
+  `Ids` list is **unchanged**.
+- `README.md`: the "next is" line now says **M4 is done … next is M5**;
+  the Events feature bullet is now "M4 — done, ADR 0054"; the Projects
+  bullet is now "next — M5"; the Roadmap **M4** row is **Done** (with the
+  lane summary + the four follow-on-lane deferrals), M5 stays a plain row.
+- **No TS build** (no TS touched). **The M4 Core/Web seams (U01–U10) are
+  untouched** — this unit adds 3 registry keys + the close docs only.
+
+**(c) Exit gate (verified, the AGENTS.md `dotnet exec` path).**
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded** (127
+  pre-existing warnings — same set as U09/U11 — **0 Error(s)**).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Total: 351, Errors: 0, Failed: 0** (was 1 red in U11 — the kw-l
+  registry drift — now **0 failed**; the renamed
+  `M5_Is_The_Single_InProgress_Milestone` pin passes).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  → **Total: 668, Errors: 0, Failed: 0** (the `KnownTranslationKeys_ParityTests`
+  family green with the 3 new keys; the 23 M4 seam tests green).
+
+**(d) Carried forward (NOT closed by U12 — out of scope).**
+- **The e2e runtime** is still the documented throw (`e2e-m4.spec.ts`
+  authored in U11, not run). The unit that lands the runtime records the M4
+  e2e pass count in a later `### Run result (M4 e2e — <date>)` design-doc
+  section — not here.
+- **The follow-on lanes** (event translations / group events /
+  per-resident reminders / iCal) are open work for M5+, now pinned in the
+  ARCHITECTURE.md deferral note.
+
+**U12 exit gate met. M4 is DONE — STOP. The next lane is M5 (Projects).**

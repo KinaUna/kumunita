@@ -73,6 +73,11 @@ public static class KnownTranslationKeys
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Home",
 
+            // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
+            ["nav.events"]        = "Events",
+            ["events.created"]    = "Created",
+            ["events.edited"]     = "edited",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Cancel",
             ["common.save"]     = "Save",
@@ -994,6 +999,11 @@ public static class KnownTranslationKeys
             // ── nav (the shared top-nav, _Layout + _AccountNav) ─────────────
             ["nav.home"]          = "Start",
 
+            // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
+            ["nav.events"]        = "Veranstaltungen",
+            ["events.created"]    = "Erstellt",
+            ["events.edited"]     = "bearbeitet",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Abbrechen",
             ["common.save"]     = "Speichern",
@@ -1893,6 +1903,11 @@ public static class KnownTranslationKeys
             ["nav.children"]      = "Enfants",
             ["nav.my_drafts"]     = "Mes brouillons",
             ["nav.account"]       = "Compte",
+            ["nav.events"]        = "Événements",
+
+            // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
+            ["events.created"]    = "Créé le",
+            ["events.edited"]     = "modifié le",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Tes enfants",
@@ -2769,6 +2784,11 @@ public static class KnownTranslationKeys
             ["nav.children"]      = "Børn",
             ["nav.my_drafts"]     = "Mine udkast",
             ["nav.account"]       = "Konto",
+            ["nav.events"]        = "Arrangementer",
+
+            // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
+            ["events.created"]    = "Oprettet",
+            ["events.edited"]     = "redigeret",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Dine børn",

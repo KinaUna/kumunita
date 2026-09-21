@@ -45,8 +45,9 @@ upload lane (ADR 0011's boundary verbatim), and the composer control on all
 four surfaces.
 **GU is done** — guardian controls, the account-scope supervision of a child's
 account (ADR 0028); **PG is done** — the hierarchical, audience-restricted,
-translatable pages tree (ADR 0039); **next is M4** — events, RSVPs, reminders
-(ADR 0054, per the roadmap table in `docs/ARCHITECTURE.md`); **M5**: projects.
+translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
+(ADR 0054); **next is M5** — projects (per the roadmap table in
+`docs/ARCHITECTURE.md`).
 
 ## Principles
 
@@ -63,8 +64,8 @@ translatable pages tree (ADR 0039); **next is M4** — events, RSVPs, reminders
 
 - Resident directory (profiles, opt-in contact details)
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
-- Events with RSVP and reminders *(M4 — in progress; see the "Roadmap" below)*
-- Collaborative projects (goals, tasks, contributors) *(planned — M5, see the "Roadmap" below)*
+- Events with RSVP and reminders *(M4 — done, ADR 0054; see the "Roadmap" below)*
+- Collaborative projects (goals, tasks, contributors) *(next — M5, see the "Roadmap" below)*
 - **Groups** — public groups power reusable access lists; **private groups**
   (ADR 0010) are a membership/organizing unit for a family or circle, and stay
   out of the audience pickers
@@ -222,7 +223,7 @@ stays trivial and the authorization rules can grow freely.
 - **Drafts** (`DM`, ADR 0037) — a post, group post, or announcement can be **saved but not made public yet**: a "Save as draft" option on every composer. A draft is the author's private scratchpad — excluded from every feed and the pinned list, invisible to **everyone else (a `GlobalAdmin` included)** (no audit row, not run through the audience decision), visible only to its author, who edits it, finds it at `/my/drafts`, and publishes it (publishing is author-only too); editing a draft never publishes it. **Done.**
 - **Tags** (`TG`, ADR 0044) — free author-set **subject labels** on posts (community + group) and blog pages: a lightweight, multi-valued, non-access label that closes the "what is a post about" gap (components/groups are *where* content lives, tags are *what it's about*). `Slug` is the language-neutral business key; display names are per-language and creator-owned (the creator ∪ `GlobalAdmin` may reword; a later attacher may not). One **access-scoped** read seam serves the tag list + by-tag browse + autocomplete — a tag is computed *over* content a viewer may already read, so a tag behind unread content **never surfaces** (it grants no access and leaks no subject). **Done.**
 - **Pages** (`PG`, ADR 0039) — a **hierarchical, audience-restricted, translatable** knowledge tree: a `Page` doc with a `ParentId` + `Slug` (a forest of roots, a derived path — not a stored one), the **exact** post `Audience` (`null` = public; non-null = grants / community — ADR 0001-B / 0036, *reused*, not extended), an authored-in language (ADR 0018) + `PageTranslation` rows (the ADR 0022/0026/0029 shape), a `MountPoint` string for UI slots (`footer/community` for the about page, `help/account` for a change-password help page), and a standing matrix (GlobalAdmin ∪ community-Moderator ∪ author). Served by `PageController` (`/pages` tree browse + `/pages/{path}` post view + WYSIWYG composer); the **one** `MarkdownRenderer` + the **one** `bindRichEditor` render/edit it; the **one** `IAuthorizationService` decides access (via a `PageToAuditableResource` adapter — *no* new `AccessAction`, *no* new `AccessVia`, *no* new authorization branch). **Absorbs and retires** the `LocalizedPage` static-page lane (ADR 0005 A) — the old `/about`/`/terms`/`/help` routes keep resolving (now from the tree); the seeded default pages carry the same `en` floor a fresh instance has today. The old `LocalizedPage` surface is retired last (U07), after the new surface is proven. The `LocalizedPage` retirement is the **only** destructive step in the lane, and it is sequenced last. **Done.**
-- **M4** — Events, RSVPs, reminders. **In progress.**
+- **M4** — Events, RSVPs, reminders: a `Event` + `EventRsvp` doc in a new `Kumunita.Core.Events` context; the upcoming-events feed, the detail view (the one `MarkdownRenderer` body, the `kw-dt` timestamps), the WYSIWYG composer, the audience (ADR 0001-B / 0036 *reused*), the draft / soft-delete / tag / media / authored-in-language lanes (*reused*, not extended), the last-write-wins RSVP (owner-only list), and the day-before reminder email through the M1 durable-email trio (the `EventReminders` §6.4 self-rescheduling job). **Done** (ADR 0054). *Deliberately not in M4 (follow-on lanes, own ADRs): event translations, group events, per-resident reminder settings, iCal export (M6).*
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
 

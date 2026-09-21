@@ -92,7 +92,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Pages/              # ADR 0039–0043 ✓ (PG) — Page + PageTranslation docs (a hierarchical, audience-restricted, translatable knowledge tree) + PageService (mount / read / edit / translate) + PageToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService); ADR 0040 ✓ (PG) — PageKind (System vs blog) + the read-only /blog feeds; ADR 0041 ✓ — the Audience.AllResidents flag; ADR 0043 ✓ (SP) — the four canonical system pages (/terms /help /privacy /conduct) as PageKind.System rows; absorbs + retires the LocalizedPage static-page lane; see design/pages-design.md
     │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
-    │   │   ├── Events/             # M4 — not yet created
+    │   │   ├── Events/             # M4 ✓ (ADR 0054) — Event + EventRsvp docs + EventService (feed/detail/compose + last-write-wins RSVP) + EventToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService) + the EventReminders §6.4 job (EventReminderService/Handler/Tick over the M1 durable-email trio); gate 2026-09-21: Core 668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests green together; see design/m4-events-design.md § Run result (M4 acceptance gate — 2026-09-21)
     │   │   └── Projects/           # M5 — not yet created
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
@@ -116,9 +116,9 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
-layer. `Web` is a thin HTTP/Razor/TS shell. `Events/` and `Projects/` (M4 and M5
-respectively) are marked *not yet created* — the next milestone additions per the §3
-feature module list.
+layer. `Web` is a thin HTTP/Razor/TS shell. `Projects/` (M5) is marked *not
+yet created* — the next milestone addition per the §3 feature module list
+(`Events/`, M4, is live — ADR 0054).
 
 ## 3. Modular monolith & bounded contexts
 
@@ -131,7 +131,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, and translated UI
   strings (ADR 0005); consumed by the presentation layer, never by feature
   authorization. (Static pages live in the `Pages` context now, ADR 0039.)
-- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags. (Events and Projects are M4/M5 — planned, not yet created, per the §3 tree above.)
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054). (Projects is M5 — planned, not yet created, per the §3 tree above.)
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
@@ -364,10 +364,13 @@ Content
   PostReply        { id, postId, authorId, body, created }
   Audience         { mode: Any|All, grants: [ { kind: User|Group, id } ] }   (embedded)
 
-Events
-  Event            { id, title, description, componentId?, authorId, start, end, location?,
-                     capacity?, audience, rsvpRequired }
-  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }
+Events (M4 ✓ — ADR 0054; the names below are the canonical field set the
+shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md §3.1)
+  Event            { id, title, body, componentId?, authorId, start, end, location?,
+                     capacity?, audience, reminderEnabled, isDraft, isDeleted,
+                     languageCode, tagIds, imageIds, attachmentIds,
+                     created, modified? }
+  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }   // (eventId, userId) unique — last-write-wins (ADR 0054 §3.2)
 
 Projects
   Project          { id, title, description, componentId?, ownerId, status, audience, created }
@@ -637,7 +640,25 @@ footer now carries an unconditional "Platform" column linking all five (ADR
 - **Geo zones**: metadata on resources/residents; display filtering only, never core access.
 - **Group helpers**: new UserInfoModule methods (SuggestNeighbors, SuggestFamily) that
   populate groups — a convenience, not a new authorization concept.
-- **MCP / API**: `Core` has no HTTP dependency, so a minimal-API or MCP project can call the
+- **MCP / API**: `Core` has no HTTP dependency, so a minimal-API or MCP project can call 
+
+### M4 → M5 deferrals (carried forward — design/m4-events-design.md §5)
+
+M4 shipped the events surface **additively and reusing** (ADR 0054). The
+following were **deliberately not** in M4 and are follow-on lanes (own design
+doc + ADR each) or M6 work — the M5 close should carry this list so the
+out-of-scope boundary stays honest:
+
+- **Event translations** — the `Event` is authored-in-language only (ADR
+  0018); the ADR 0022/0026/0029 translation lane is *not* extended to events
+  yet.
+- **Group events** — a `Group`-scoped event channel (the ADR 0013
+  membership-lane precedent would be the shape).
+- **Per-resident reminder settings** — "remind me N hours before" is a
+  follow-on lane; the single 24-hour-before email is the M4 surface.
+- **iCal export** — the `events.ics` endpoint stays M6 (Portability).
+- **No admission queue** — `Capacity` is display metadata; `Going` RSVPs are
+  the truth (a waitlist/spot-release would be a new ADR).the
   same services later.
 - **Calendar**: an `events.ics` endpoint when needed.
 - **Cross-neighborhood migration**: versioned JSON export/import service (not built yet).
