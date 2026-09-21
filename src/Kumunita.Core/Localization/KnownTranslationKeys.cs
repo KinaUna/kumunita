@@ -1008,6 +1008,26 @@ public static class KnownTranslationKeys
             ["tag.translate.heading"] = "Translations",
             ["tag.translate.save"] = "Save",
             ["tag.translate.disabled"] = "Only the tag's creator or a GlobalAdmin can reword it.",
+
+            // ── platform (scope + the FIG philosophy, home/about) ───────────
+            ["platform.scope_home"] =
+                "Kumunita started out as a home for one neighbourhood — but it is just as at home with a club, a team, or the people behind a big event. The neighbourhood is the default, not the limit.",
+            ["platform.fig_home"] =
+                "It is built on the Fractal Integration Guidelines (FIG): the idea that a group's real value lives in the links between its people and parts, not in the parts themselves. Kumunita is the software that builds and holds those links.",
+            ["platform.scope_heading"] = "Built for a neighbourhood — at home anywhere",
+            ["platform.scope_body1"] =
+                "Kumunita was originally built for one street: a private, shared home for the people who live there. But the core idea is not tied to a street at all. It is a private home for one group of people who want to coordinate, share, and build trust together — a neighbourhood, a club, a sports team, a workplace, a volunteer body, or even the people behind a single event. What changes is only the name and the details.",
+            ["platform.scope_body2"] =
+                "Everything that makes it fit a street — the quiet feed, the groups, the audience-scoped posts, the moderation and its audit trail, the multilingual interface — works the same way for any of those. So adapting it is a matter of configuration: the community name, the components that stand in for 'Safety' and 'Social', the groups that fit your world. Not a redesign.",
+            ["platform.fig_heading"] = "The idea behind it: the Fractal Integration Guidelines",
+            ["platform.fig_body1"] =
+                "Kumunita is built on a small set of open guidelines we call the Fractal Integration Guidelines (FIG). Their central claim is that an integrated system is more than the sum of its parts, and that its quality is the quality of the linkage between those parts — a property no single part has on its own. A bag of features that never connect is just noise; the connections are where the value lives.",
+            ["platform.fig_body2"] =
+                "A neighbourhood is exactly such a system: many different people, households, and concerns, whose linkage — who knows whom, who can rely on whom, how a problem actually gets solved across people — is what produces a community. No single resident is a neighbourhood. Kumunita is the software that builds and holds that linkage.",
+            ["platform.fig_body3"] =
+                "So we develop Kumunita by the same rule we ask of it: quality is the quality of the linkage, not the count of the features. The guidelines repeat at every scale — a module, a feature, a community, the people who build it — which is why the whole project follows them, and why the philosophy is documented in the open.",
+            ["platform.scope_eyebrow"] = "For any group",
+            ["platform.fig_eyebrow"] = "The philosophy",
         };
 
     /// <summary>
@@ -1916,6 +1936,26 @@ public static class KnownTranslationKeys
             ["tag.translate.heading"] = "Übersetzungen",
             ["tag.translate.save"] = "Speichern",
             ["tag.translate.disabled"] = "Nur der Ersteller oder ein GlobalAdmin kann den Text ändern.",
+
+            // ── platform (scope + the FIG philosophy, home/about) ───────────
+            ["platform.scope_home"] =
+                "Kumunita entstand als Zuhause für eine Nachbarschaft — passt aber genauso gut zu einem Verein, einem Team oder den Menschen hinter einem großen Event. Die Nachbarschaft ist der Standard, nicht die Grenze.",
+            ["platform.fig_home"] =
+                "Darin steckt die Idee der Fractal Integration Guidelines (FIG): Der wahre Wert einer Gruppe lebt in den Verbindungen zwischen ihren Menschen und Bausteinen, nicht in den Bausteinen selbst. Kumunita ist die Software, die diese Verbindungen herstellt und hält.",
+            ["platform.scope_heading"] = "Für eine Nachbarschaft gebaut — überall daheim",
+            ["platform.scope_body1"] =
+                "Kumunita wurde ursprünglich für eine Straße gebaut: ein privates, gemeinsames Zuhause für die Menschen, die dort leben. Aber die Kernidee ist gar nicht an eine Straße gebunden. Es ist ein privates Zuhause für eine Gruppe von Menschen, die zusammen koordinieren, teilen und Vertrauen aufbauen wollen — eine Nachbarschaft, ein Verein, ein Sportteam, ein Arbeitsplatz, eine Interessengemeinschaft oder auch nur die Menschen hinter einem einzelnen Event. Was sich ändert, sind nur der Name und die Details.",
+            ["platform.scope_body2"] =
+                "Alles, was es zu einer Straße passt — der ruhige Feed, die Gruppen, die an Zielgruppen gerichteten Beiträge, die Moderation mit ihrer Prüfhistorie, die mehrsprachige Oberfläche — funktioniert bei all diesen Gruppen genau so. Also ist die Anpassung eine Frage der Konfiguration: der Gemeinschaftsname, die Komponenten, die für 'Sicherheit' und 'Soziales' stehen, die Gruppen, die zu eurer Welt passen. Kein Neuentwurf.",
+            ["platform.fig_heading"] = "Die Idee dahinter: die Fractal Integration Guidelines",
+            ["platform.fig_body1"] =
+                "Kumunita folgt einem kleinen Satz offener Richtlinien, den wir Fractal Integration Guidelines (FIG) nennen. Ihr zentraler Gedanke: Ein integriertes System ist mehr als die Summe seiner Teile, und seine Qualität ist die Qualität der Verbindungen zwischen diesen Teilen — eine Eigenschaft, die kein einzelnes Teil für sich allein hat. Ein Haufen Funktionen, der nie miteinander verknüpft ist, ist nur Rauschen; in den Verbindungen lebt der Wert.",
+            ["platform.fig_body2"] =
+                "Eine Nachbarschaft ist genau so ein System: viele verschiedene Menschen, Haushalte und Anliegen, deren Verknüpfung — wer wen kennt, wem man vertrauen kann, wie ein Problem über Menschen hinweg tatsächlich gelöst wird — erst eine Gemeinschaft erzeugt. Keine einzelne Person ist eine Nachbarschaft. Kumunita ist die Software, die diese Verknüpfung herstellt und hält.",
+            ["platform.fig_body3"] =
+                "Also entwickeln wir Kumunita nach derselben Regel, die wir von ihr verlangen: Die Qualität ist die Qualität der Verknüpfung, nicht die Anzahl der Funktionen. Die Richtlinien wiederholen sich in jeder Skalenebene — ein Modul, eine Funktion, eine Gemeinschaft, die Menschen, die sie bauen — deshalb folgt ihnen das ganze Projekt, und deshalb ist die Philosophie öffentlich dokumentiert.",
+            ["platform.scope_eyebrow"] = "Für jede Gruppe",
+            ["platform.fig_eyebrow"] = "Die Philosophie",
         };
 
     /// <summary>
@@ -2826,6 +2866,26 @@ public static class KnownTranslationKeys
             ["tag.translate.heading"] = "Traductions",
             ["tag.translate.save"] = "Enregistrer",
             ["tag.translate.disabled"] = "Seul le créateur ou un GlobalAdmin peut la reformuler.",
+
+            // ── platform (scope + the FIG philosophy, home/about) ───────────
+            ["platform.scope_home"] =
+                "Kumunita est née comme un foyer pour un seul quartier — mais elle se sent tout aussi bien chez un club, une équipe, ou les personnes derrière un grand événement. Le quartier est la valeur par défaut, pas la limite.",
+            ["platform.fig_home"] =
+                "Elle repose sur les Fractal Integration Guidelines (FIG) : l'idée que la vraie valeur d'un groupe vit dans les liens entre ses personnes et ses éléments, pas dans les éléments eux-mêmes. Kumunita est le logiciel qui tisse et maintient ces liens.",
+            ["platform.scope_heading"] = "Conçu pour un quartier — à sa place partout",
+            ["platform.scope_body1"] =
+                "Kumunita a d'abord été construit pour une rue : un foyer privé et partagé pour les gens qui y vivent. Mais l'idée centrale n'est liée à aucune rue. C'est un foyer privé pour un groupe de personnes qui veulent coordonner, partager et tisser la confiance ensemble — un quartier, un club, une équipe sportive, un lieu de travail, une association, ou même les personnes derrière un seul événement. Ce qui change, c'est seulement le nom et les détails.",
+            ["platform.scope_body2"] =
+                "Tout ce qui lui donne un esprit de rue — le fil paisible, les groupes, les posts adressés à des publics, la modération et sa piste d'audit, l'interface multilingue — fonctionne exactement pareil pour chacun d'entre eux. L'adapter est donc une question de configuration : le nom de la communauté, les composants qui tiennent lieu de « Sécurité » et « Social », les groupes qui vont avec votre monde. Pas une refonte.",
+            ["platform.fig_heading"] = "L'idée derrière : les Fractal Integration Guidelines",
+            ["platform.fig_body1"] =
+                "Kumunita repose sur un petit jeu de lignes directrices ouvertes que nous appelons les Fractal Integration Guidelines (FIG). Leur idée centrale : un système intégré est plus que la somme de ses parties, et sa qualité, c'est la qualité des liens entre ces parties — une propriété qu'aucune partie n'a à elle seule. Un sac de fonctions qui ne se relient jamais n'est que du bruit ; c'est dans les liens que vit la valeur.",
+            ["platform.fig_body2"] =
+                "Un quartier est exactement un tel système : de nombreuses personnes, foyers et préoccupations différents, dont le tissage — qui connaît qui, à qui l'on peut se fier, comment un problème se résout réellement entre les personnes — produit une communauté. Une seule personne n'est pas un quartier. Kumunita est le logiciel qui tisse et maintient ce lien.",
+            ["platform.fig_body3"] =
+                "Nous développons donc Kumunita selon la même règle que nous lui demandons : la qualité, c'est la qualité du lien, pas le nombre de fonctions. Les lignes directrices se répètent à chaque échelle — un module, une fonction, une communauté, les gens qui la construisent — c'est pourquoi tout le projet les suit, et pourquoi la philosophie est documentée en public.",
+            ["platform.scope_eyebrow"] = "Pour tout groupe",
+            ["platform.fig_eyebrow"] = "La philosophie",
         };
 
     /// <summary>
@@ -3731,6 +3791,26 @@ public static class KnownTranslationKeys
             ["tag.translate.heading"] = "Oversættelser",
             ["tag.translate.save"] = "Gem",
             ["tag.translate.disabled"] = "Kun tags' opretter eller en GlobalAdmin kan omformulere den.",
+
+            // ── platform (scope + the FIG philosophy, home/about) ───────────
+            ["platform.scope_home"] =
+                "Kumunita startede som et hjem til ét nabolag — men den er til lige så god til en klub, et hold eller de folk bag et stort arrangement. Nabolaget er standarden, ikke grænsen.",
+            ["platform.fig_home"] =
+                "Den er bygget på Fractal Integration Guidelines (FIG): ideen om, at en gruppes virkelige værdi bor i båndene mellem dens mennesker og dele, ikke i delene selv. Kumunita er softwaren, der bygger og holder disse bånd.",
+            ["platform.scope_heading"] = "Bygget til et nabolag — hjemme overalt",
+            ["platform.scope_body1"] =
+                "Kumunita blev oprindeligt bygget til én gade: et privat, fælles hjem til de mennesker, der bor der. Men den kerneide er slet ikke bundet til en gade. Det er et privat hjem for én gruppe mennesker, der vil koordinere, dele og bygge tillid sammen — et nabolag, en klub, et hold, et arbejdssted, en forening eller endda de folk bag ét enkelt arrangement. Det, der ændrer sig, er kun navnet og detaljerne.",
+            ["platform.scope_body2"] =
+                "Alt det, der får det til at passe til en gade — den rodlige feed, grupperne, de målrettede indlæg, moderationen og dens audit-log, den flersprogede grænseflade — virker præcis ligeledes for alle dem. Så tilpasningen er et spørgsmål om konfiguration: fællesskabets navn, de komponenter, der træder i stedet for 'Sikkerhed' og 'Socialt', de grupper, der passer til jeres verden. Ikke et nyt design.",
+            ["platform.fig_heading"] = "Ide bag det: Fractal Integration Guidelines",
+            ["platform.fig_body1"] =
+                "Kumunita er bygget på et lille sæt åbne retningslinjer, vi kalder Fractal Integration Guidelines (FIG). Deres centrale påstand er, at et integreret system er mere end summen af sine dele, og at dets kvalitet er kvaliteten af sammenhængene mellem disse dele — en egenskab, ingen enkelt del har for sig alene. En klump funktioner, der aldrig forbinder, er bare støj; værdien bor i sammenhængene.",
+            ["platform.fig_body2"] =
+                "Et nabolag er netop et sådant system: mange forskellige mennesker, husstande og bekymringer, hvis sammenhæng — hvem kender hvem, hvem man kan stole på, hvordan et problem faktisk løses tværs over mennesker — skaber et fællesskab. Ingen enkelt person er et nabolag. Kumunita er softwaren, der bygger og holder den sammenhæng.",
+            ["platform.fig_body3"] =
+                "Så udvikler vi Kumunita efter den samme regel, vi stiller til den: kvalitet er sammenhængenes kvalitet, ikke funktionernes antal. Retningslinjerne gentager sig i alle skalaer — en modul, en funktion, et fællesskab, de mennesker, der bygger det — derfor følger hele projektet dem, og derfor er filosofien dokumenteret i det åbne.",
+            ["platform.scope_eyebrow"] = "Til enhver gruppe",
+            ["platform.fig_eyebrow"] = "Filosofien",
         };
 
     /// <summary>

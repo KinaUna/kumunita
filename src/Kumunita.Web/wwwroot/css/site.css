@@ -343,6 +343,13 @@ body.kmb-page-fullbleed .navbar {
   font-size: 1.125rem;
   line-height: 1.65;
 }
+/* Supporting hero copy (the scope + FIG lines beneath the main lead): a touch
+   smaller and calmer, so it reads as context rather than a headline. */
+.kmb-hero-sub {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.9;
+}
 .kmb-section-lead {
   color: #46534b;
 }
