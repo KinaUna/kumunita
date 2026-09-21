@@ -768,6 +768,96 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
+    /// UG (ADR 0057) — **warm-boot backfill** of the guide <see cref="Page"/>
+    /// docs for a deployment whose first boot predates the guides: it has the
+    /// canonical <c>help</c> page but not its guide children. Mirrors the
+    /// <see cref="BackfillPageTranslationsAsync"/> /
+    /// <see cref="BackfillUiStringBaselinesAsync"/> shape (ADR 0047 D2 /
+    /// ADR 0052) — **create-if-missing only** (the ADR 0042 D1 invariant): a
+    /// guide that already exists under <c>help</c> (a community-edited guide,
+    /// or a resident-created page that happens to use the same slug) is
+    /// skipped, never refreshed — a code-wins refresh would clobber that edit.
+    /// Only the absent guides are created, from the same
+    /// <see cref="GuidePages"/>() registry the first-boot seeder writes, so a
+    /// fresh and a backfilled instance carry the same <c>en</c> floor.
+    /// <para>
+    /// Idempotent: a second run finds every guide it created on the first run
+    /// and skips (the create-if-missing path). No tombstones, no deletes.
+    /// </para>
+    /// </summary>
+    public static async Task BackfillUserGuidesAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        // Resolve the canonical `help` page (the guides hang from it, ADR
+        // 0057 D1). On a warm boot `help` is committed, so a query finds it —
+        // unlike the first-boot path, where it is still in-flight. Primary
+        // resolution is `system/help` (ADR 0040); the bare-slug fallback
+        // covers a pre-ADR-0040 deployment whose `help` is still an orphan
+        // root (the same fallback shape as BackfillPageTranslationsAsync).
+        var systemRoot = await session
+            .Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        Page? help = null;
+        if (systemRoot is not null)
+        {
+            help = await session
+                .Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+        }
+        if (help is null)
+        {
+            help = await session
+                .Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == null && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+        }
+
+        if (help is null)
+        {
+            return;   // no canonical `help` page to hang the guides from — nothing to backfill.
+        }
+
+        foreach (var (slug, title, body) in GuidePages())
+        {
+            var existing = await session
+                .Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == help.Id && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new Page
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Slug = slug,
+                    ParentId = help.Id,   // under the canonical `help` page (ADR 0057 D1)
+                    Kind = PageKind.System,   // a platform guide (ADR 0040 standing matrix)
+                    Title = title,
+                    Body = body,
+                    LanguageCode = SourceLanguage,   // authored-in `en` (the floor)
+                    Audience = null,            // public — world-readable (the how-to is not gated)
+                    AuthorId = string.Empty,    // platform content — no resident author
+                    Created = now,
+                    Modified = now,
+                });
+            }
+            // else: skip — create-if-missing (never overwrite a community edit; ADR 0042 D1).
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// UG (ADR 0057) — the canonical <c>en</c> guide bodies: the single source
     /// of the resident-facing guide text (the seeder writes exactly this, and
     /// the <c>UG</c> drift-pin test reads exactly this — the ADR 0042 D1

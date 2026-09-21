@@ -89,15 +89,21 @@ public static class SchemaBootstrap
             //     PageTranslation rows (ADR 0043 D7 / ADR 0044 D5 / ADR 0047 D2)
             //   · the UI-string catalog's de/fr/da TranslationResource baselines
             //     (the ADR 0042 D1 "new-key asymmetry" gap, closed by ADR 0052)
+            //   · the user-guide Page docs under the canonical help page
+            //     (a deployment whose first boot predates the UG lane has
+            //     help but no guides — create-if-missing, never clobbering a
+            //     community edit; ADR 0057)
             await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
             await FirstBootSeeder
                 .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
             await FirstBootSeeder
                 .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillUserGuidesAsync(backfillSession, ct).ConfigureAwait(false);
             logger.LogInformation(
-                "Warm boot: translation backfill complete (de/fr/da rows for the " +
-                "canonical static pages + the UI-string catalog baselines, " +
-                "create-if-missing).");
+                "Warm boot: backfill complete (de/fr/da rows for the canonical " +
+                "static pages + the UI-string catalog baselines + the user guides " +
+                "under help, create-if-missing).");
         }
     }
 

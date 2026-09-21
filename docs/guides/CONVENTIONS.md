@@ -61,9 +61,12 @@ ADR 0039 "no roadmap letter moves" discipline applied to the guide set).
 ## The writing rules (the `en` floor)
 
 The `en` body of a guide is **code-owned** (the ADR 0042 D1 shape — the
-seeder's `GuidePages()` array is the single source, and the seeder's upsert
-refreshes it in place on every boot). The writing rules, at the ADR 0042 D2
-bar (idiomatic, register held, sentence case, no word-for-word calques):
+seeder's `GuidePages()` array is the single source). On **first boot** the
+seeder writes it; on an **upgrade (warm) boot** it is written
+**create-if-missing only** — a guide already present (a community edit, or a
+resident page using the slug) is never clobbered (ADR 0057 D2.1, the ADR
+0047 D2 / 0052 backfill shape). The writing rules, at the ADR 0042 D2 bar
+(idiomatic, register held, sentence case, no word-for-word calques):
 
 1. **Plain language, the resident's words.** No code jargon (no "audience",
    no "PostStatus", no "AccessVia", no "component" — the resident's words
@@ -119,6 +122,12 @@ A lane that ships a feature without its guide update is **not done** (the
 ADR 0039 §3.7 C3 invariant shape, applied to docs). The *response* is the
 test suite: the drift pin (below) is the single source the test reads, and a
 feature-without-guide or a guide-without-feature is a red test.
+
+**And across upgrades:** a deployment whose first boot predates the guide is
+covered by the **warm-boot backfill** (`BackfillUserGuidesAsync`, ADR 0057
+D2.1) — the absent guides are created on the upgrade boot, create-if-missing,
+so existing instances get their guides without a reseed; a community-edited
+or retired guide is never clobbered or resurrected.
 
 ### 3. *How often* — the periodic check (the OPS.md §13 procedure)
 
@@ -220,12 +229,14 @@ guides).
 - [x] **The conventions doc** (this file) — the taxonomy, the writing rules,
   the consistency loop, the drift pin, the standing, the adding-a-guide
   procedure.
-- [x] **The seeder** — `SeedUserGuidesAsync` + `GuidePages()` in
-  `FirstBootSeeder.cs` (the guides under `help/`, `en`-only, idempotent, the
-  ADR 0042 D1 shape).
-- [x] **The drift pin** — `UG_U05_GuideRegistryTests` in
+- [x] **The seeder** — `SeedUserGuidesAsync` (first-boot) +
+  `BackfillUserGuidesAsync` (warm-boot, create-if-missing, wired in the
+  `SchemaBootstrap` warm branch) + `GuidePages()` in `FirstBootSeeder.cs`
+  (the guides under `help/`, `en`-only, idempotent, the ADR 0042 D1 shape).
+- [x] **The drift pin** — `UG_GuideRegistryTests` in
   `Kumunita.Core.Tests` (the exact seeded set, the only-root pin, the
-  en-only pin, the body parity, the feature↔guide drift).
+  en-only pin, the body parity, the feature↔guide drift, and the backfill:
+  creates the absent guides, idempotent, never clobbers an existing one).
 - [x] **The OPS.md §13** — the periodic review procedure (the owner, the
   cadence, the checklist, the response).
 - [x] **The `Milestones.cs` + the README Roadmap** — the `UG` row (a

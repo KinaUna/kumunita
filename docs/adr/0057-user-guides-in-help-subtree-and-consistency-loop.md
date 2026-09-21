@@ -133,10 +133,16 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
 ### D2 — The `en` floor is code-owned; the non-`en` bodies are community-owned
 
 - The **`en` body** of a guide is **code-owned** — the seeder's
-  `GuidePages()` array is the single source, and the seeder's upsert
-  (code-wins, the ADR 0042 D1 shape) refreshes it in place on every boot.
-  This is the **floor** of the guide's `en` text: a resident who reads a
-  guide in `en` always reads the code's current view of the feature.
+  `GuidePages()` array is the single source. On the **first-boot** path the
+  seeder upserts (code-wins, the ADR 0042 D1 shape) in place. On the
+  **warm-boot (upgrade)** path the guide is written **create-if-missing
+  only** — a guide that already exists there (a community edit, or a
+  resident page that uses the slug) is **never refreshed**, so an admin's
+  or a community's in-app edit is never clobbered by a later deploy (the
+  ADR 0042 D1 invariant, the ADR 0047 D2 / ADR 0052 backfill shape —
+  see **D2.1**). This is the **floor** of the guide's `en` text: on a
+  fresh instance a resident reading a guide in `en` reads the code's
+  current view of the feature.
 - **A non-`en` guide body is not seeded by this lane.** The guides ship
   `en`-only, and a `de`/`fr`/`da` guide body is added by a **human
   Translator** (the ADR 0021 lane) or a GlobalAdmin in the in-app editor —
@@ -159,6 +165,38 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   guard (a `User` page is never nested under a `System` page, and vice
   versa) applies: a guide is a `System` page under the `System` `help`
   page, and a resident's blog page is never nested under `help`.
+
+### D2.1 — Warm-boot backfill: guides appear on existing instances at upgrade
+
+A deployment whose **first boot predates the UG lane** has the canonical
+`help` page (the ADR 0043 D1 four-surface set) but **not** its guide
+children — first-boot seeding runs once, on a pristine database, and never
+again. Without a warm path, that instance would show `/help` with no
+guides until its next fresh database. **This is the gap the backfill
+closes**, on the same precedent the platform already set for the
+identical drift question:
+
+- **`FirstBootSeeder.BackfillUserGuidesAsync`** runs in the **warm-boot**
+  branch of `SchemaBootstrap` (the same `else` that runs
+  `BackfillPageTranslationsAsync` and `BackfillUiStringBaselinesAsync`),
+  on **every upgrade boot** — not gated on first boot.
+- **Create-if-missing only** (the ADR 0042 D1 invariant, the ADR 0047 D2 /
+  ADR 0052 shape): a guide that already exists under `help` — whether a
+  community-edited guide or a resident-created page that happens to use the
+  same slug — is **skipped, never refreshed** (no code-wins clobber). Only
+  the **absent** guides are created, from the same `GuidePages()` registry
+  the first-boot seeder writes, so a fresh and a backfilled instance carry
+  the same `en` floor.
+- **Idempotent**: a second warm boot (a container restart, a repeated
+  deploy) finds every guide it created and skips. No tombstones, no
+  deletes — create-if-missing is what makes the re-run a no-op.
+- **Scope limit (the deliberate non-decision)**: the backfill adds the
+  *absent* guides. It does **not** resurrect a guide a community has
+  *retired* (soft-deleted, the ADR 0024 shape) — the OPS.md §13 review
+  owns that decision, and a retired guide stays retired across upgrades.
+  The "retire" response in D3.3 is a **registry removal** (the code no
+  longer claims to own that guide), which is what stops the backfill from
+  re-adding it.
 
 ### D3 — The consistency loop (the "keep it honest" lane)
 
