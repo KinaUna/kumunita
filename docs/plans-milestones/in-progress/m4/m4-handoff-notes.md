@@ -453,3 +453,20 @@ further open decisions carried into U01.
     list and the U05 `EventController` remain out of scope.
 
 **U04 exit gate met. STOP — do NOT start U05.**
+
+## U05 — EventController + views
+- (a) 7 actions: Index / Detail / Create / Edit / Publish / Delete / Rsvp
+- (b) 4 views: Index / Detail / Create / Edit + the EventEditorModel (4 types in 1 file)
+- (c) bindRichEditor script block (ADR 0031 WYSIWYG editor reused — no new TS)
+- (d) AudienceEditorModel form fields (the M2 audience editor reused)
+- (e) kw-dt TagHelper usage (ADR 0019 / 0020 timezone / format resolvers reused)
+- (f) **Drift — GlobalAdmin edit/delete write denied at Core.** Design matrix §3.4 says
+  Edit/Delete = Author ∪ GlobalAdmin, but the frozen Core write lanes (UpdateAsync /
+  DeleteAsync) call `EventService.CheckEditStanding` with `StaticEmptyRoles`, so a
+  non-author GlobalAdmin's **write** is denied at Core (UACE → 403) even though the Web
+  pre-gate (real roles) passes. The affordance flags + Web pre-gate correctly use the
+  real `KumunitaPrincipal.RoleSet(User)` (GlobalAdmin-aware), and Core remains the final
+  gate. Full GlobalAdmin write override requires the seam to accept `actorRoles` (a Core
+  change, out of U05 scope).
+
+**U05 exit gate met. STOP — do NOT start U06.**

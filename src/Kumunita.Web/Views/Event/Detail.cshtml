@@ -1,0 +1,141 @@
+@model Kumunita.Web.Models.EventDetailViewModel
+@using Kumunita.Core.Events
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Event.Title) ? "Event" : Model.Event.Title;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/events" class="btn btn-link p-0">&larr; Back to events</a>
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @if (Model.ComponentDisplayName is not null)
+            {
+                <span class="badge text-bg-light border">@Model.ComponentDisplayName</span>
+            }
+            @* ADR 0037 — the draft surface: GetAsync returns a draft to the
+               author only, so IsDraft ⇔ IsAuthor here. The badge is visible to
+               the one viewer who may act on it; Publish is the sole lever that
+               clears the flag (the author-only lane). *@
+            @if (Model.Event.IsDraft)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">Draft</span>
+                @if (Model.CanPublish)
+                {
+                    <form class="d-inline" method="post" action="/events/@Model.Event.Id/publish">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-success">Publish</button>
+                    </form>
+                }
+            }
+            @if (Model.CanEdit)
+            {
+                <a class="btn btn-sm btn-outline-primary ms-auto" href="/events/@Model.Event.Id/edit">Edit</a>
+            }
+            @if (Model.CanDelete)
+            {
+                <form class="d-inline" method="post" action="/events/@Model.Event.Id/delete"
+                      onsubmit="return confirm('Delete this event? This cannot be undone.');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+            }
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h1 class="mb-1">
+                    @if (string.IsNullOrWhiteSpace(Model.Event.Title))
+                    {
+                        <span class="text-body-tertiary">Untitled event</span>
+                    }
+                    else
+                    {
+                        @Model.Event.Title
+                    }
+                </h1>
+
+                <div class="text-muted mb-3">
+                    @Model.AuthorDisplayName —
+                    <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
+                    <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
+                    @if (string.IsNullOrWhiteSpace(Model.Event.Location))
+                    {
+                        <!-- no location -->
+                    }
+                    else
+                    {
+                        <span class="ms-2">· @Model.Event.Location</span>
+                    }
+                </div>
+
+                @* The full body — rendered through the one MarkdownRenderer (R·1). *@
+                <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
+            </div>
+        </div>
+
+        @* The RSVP surface (ADR 0054 §3.2): the owner-only list (the author
+           sees their own event's RSVPs; a non-author sees only their own
+           RSVP) + the last-write-wins RSVP form (Going / Maybe / No). *@
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 mb-3">RSVP</h2>
+
+                <form method="post" action="/events/@Model.Event.Id/rsvp" class="d-flex gap-2 align-items-center">
+                    @Html.AntiForgeryToken()
+                    @if (Model.MyRsvp is not null)
+                    {
+                        <span class="text-muted small me-2">You're going to:
+                            <b>@Model.MyRsvp.Status</b></span>
+                    }
+                    @foreach (var status in new[] { RsvpStatus.Going, RsvpStatus.Maybe, RsvpStatus.No })
+                    {
+                        var checkedMark = Model.MyRsvp is not null && Model.MyRsvp.Status == status ? "checked" : null;
+                        <input class="btn-check" type="radio" name="status" id="@($"rsvp-{status}")"
+                               value="@status" @checkedMark autocomplete="off" />
+                        <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@status</label>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                </form>
+
+                @if (Model.Rsvps.Count > 0)
+                {
+                    <hr class="my-3" />
+                    <h3 class="h6 mb-2 text-muted">Responses</h3>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var rsvp in Model.Rsvps)
+                        {
+                            <li class="d-flex justify-content-between py-1">
+                                <span>@rsvp.UserId</span>
+                                <span>
+                                    <span class="badge @(rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
+                                        @rsvp.Status
+                                    </span>
+                                    <span class="text-muted small ms-2"><kw-dt dt="@rsvp.At" format="g"></kw-dt></span>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

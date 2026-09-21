@@ -1,0 +1,84 @@
+@model Kumunita.Web.Models.EventIndexViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Events";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>Events</h1>
+                    <p class="lede">
+                        Upcoming events around the neighborhood — see what's on, and RSVP.
+                    </p>
+                </div>
+                <a class="btn btn-outline-primary" href="/events/new">New event</a>
+            </div>
+        </header>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (Model.Components.Count > 0)
+        {
+            <form method="get" action="/events" class="mb-4">
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;">Community</label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value="">All communities</option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary">Filter</button>
+                </div>
+            </form>
+        }
+
+        <div class="airy-ann-list">
+            @if (Model.Events.Count == 0)
+            {
+                <div class="p-4 text-muted">No upcoming events yet.</div>
+            }
+            @foreach (var row in Model.Events)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+                        </h3>
+                        <div class="text-muted small mb-1">
+                            @row.AuthorDisplayName — <kw-dt dt="@row.Start" format="g"></kw-dt>
+                            @if (row.ComponentDisplayName is not null)
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(row.Location))
+                        {
+                            <div class="mb-1">@row.Location</div>
+                        }
+                        <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
