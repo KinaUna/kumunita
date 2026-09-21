@@ -641,6 +641,236 @@ public static class SampleDataSeeder
             AuthorId = sophie.Id, Created = now
         });
 
+        // ── Danish coverage pass (a GlobalAdmin/Translator standing — the user-added
+        //    translation lanes, ADR 0022 posts/replies, 0026 group, 0029 announcements,
+        //    0039 pages, and the tags lane, mirroring the de/fr rows above). The
+        //    expansion items already carry `da`; the rest of the neighborhood now does
+        //    too, so the demo is translatable into all four enabled languages
+        //    (en/de/fr/da) instead of falling back to English on nearly every `da` view.
+        // ── Communities (ADR 0026 — GlobalAdmin/Translator standing) ─────────────────
+        // Four default components — de/fr/da matrix so the sidebar reads natively.
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "de",
+            Name = "Sicherheit", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "fr",
+            Name = "Sécurité", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "da",
+            Name = "Sikkerhed", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "de",
+            Name = "Wartung", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "fr",
+            Name = "Entretien", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "da",
+            Name = "Vedligeholdelse", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "de",
+            Name = "Soziales", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "fr",
+            Name = "Social", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "da",
+            Name = "Socialt", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "de",
+            Name = "Gemeinschaftsführung", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "fr",
+            Name = "Gouvernance", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "da",
+            Name = "Forvaltning", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        // ── Tags ─────────────────────────────────────────────────────────────────────
+        session.Store(new TagTranslation { Id = Id(), TagId = tagCleanup.Id, LanguageCode = "da", Name = "Rengøring",  AuthorId = sophie.Id, Created = now.AddDays(-27) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagNotice.Id,  LanguageCode = "da", Name = "Meddelelse", AuthorId = sophie.Id, Created = now.AddDays(-27) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRecipe.Id,  LanguageCode = "da", Name = "Opskrift",   AuthorId = sophie.Id, Created = now.AddDays(-17) });
+
+        // ── Announcements ────────────────────────────────────────────────────────────
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = welcome.Id, LanguageCode = "da",
+            Title = "Velkommen til naboskabet",
+            Body = "Dette er en demo-instans af **Kumunita**, en selvhostet platform til ét nabolag.\n\nAlt, hvad du ser her, er eksempeldata — fri til at redigere, skjule eller slette, mens du udforsker.",
+            AuthorId = sophie.Id, Created = now.AddDays(-13)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = volunteers.Id, LanguageCode = "da",
+            Title = "Frivillige søges til oprydning lørdag",
+            Body = "Vi rydder bagvejen på **lørdag**. Tag handsker med — vi stiller med poser.",
+            AuthorId = sophie.Id, Created = now.AddDays(-3)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = alarm.Id, LanguageCode = "da",
+            Title = "Test af brandalarmer denne uge",
+            Body = "Bygningens alarm vil lyde **torsdag 09:00–09:30**. Det er en test — brug venligst ikke evakueringsstigerne, medmindre de faktisk er i brug.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = testPlatform.Id, LanguageCode = "da",
+            Title = "Testplatform",
+            Body = "Dette er en testplatform — ikke beregnet til reel brug.\n\nTjenester kan holde op med at virke når som helst, data kan slettes når som helst, og der kan ske ændringer når som helst.\n\nDenne testplatform er i øjeblikket åben for, at nye brugere kan tilmelde sig, så alle kan prøve den — del derfor ikke nogen reel eller privat information her.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "da",
+            Title = "Fælleslokalet åbent om aftenen",
+            Body = "Fra næste uge er lokalet åbent **ukedage 18:00–22:00** for alle, der vil have et stille sted at arbejde eller læse.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "da",
+            Title = "Fundne genstande — en sort paraply",
+            Body = "Noen har efterladt en sort paraply ved opslagstavlen. Den er i god behold hos mig — hent den på den fælles grønflade.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        // ── Community posts + replies ────────────────────────────────────────────────
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postRecycling.Id, LanguageCode = "da",
+            Title = "Nyt genbrugsprogram fra næste måned",
+            Body = "Byen flytter glas til **tirsdage** og papir til **fredage**, fra den 1.\n\nHar nogen det nye foldeseddel? Jeg kan trykke eksemplarer til entréen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postPotluck.Id, LanguageCode = "da",
+            Title = "Fællesmåltid på grønfladen i weekenden?",
+            Body = "Har nogen lyst til en simpel fællesmad under træet **søndag**? Ingen pres — en ret hver, drikkevarer på huset (mine).",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postMinutes.Id, LanguageCode = "da",
+            Title = "Notater fra månedsmøde (udkast til kommentar)",
+            Body = "Opsummering af bygningsmødet sidste uge:\n\n- Godkendte plan for havebedene\n- Udsatte ommalet af hegn til næste sæson\n- Indsamlet 3 € til fælleværktøjskassen\n\nMeld dig, hvis du er uenig i noget, inden det afsluttes.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postElectrician.Id, LanguageCode = "da",
+            Title = "Kender I en god lokal elektriker?",
+            Body = "Vores køkkensikring slår fra konstant. Hvis nogen har brugt en lokal elektriker i år, vil jeg sætte pris på en anbefaling.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postSeedlings.Id, LanguageCode = "da",
+            Title = "Gratis frøplanter i genbrugshjørnet",
+            Body = "Jeg har en bakke med tomat- og basilikumfrøplanter på hylden ved sønderboksene — de første får, de første tager.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postStreetName.Id, LanguageCode = "da",
+            Title = "Hvor kommer gadenavnet fra?",
+            Body = "Halvdelen af kvarteret kalder det for ét, kortet siger noget andet. Veder nogen historien bagved det?",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply1.Id, LanguageCode = "da",
+            Body = "Jeg har foldesedlen — den er på opslagstavlen, side 2. Både glas *og* flaskeopsamlingen er flyttet.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply2.Id, LanguageCode = "da",
+            Body = "Perfekt, tak Ben — jeg henter den og trykker eksemplarerne i dag.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply3.Id, LanguageCode = "da",
+            Body = "Jeg er med! Jeg tager en stor salat med. Hvad med 14:00?",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+
+        // ── Group posts + group name/description ─────────────────────────────────────
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = groupPost.Id, LanguageCode = "da",
+            Title = "Plan for grønfladen til foråret",
+            Body = "Udkast til de fælles bed:\n\n- Nordbed: urter (basilikum, persille)\n- Syd­bed: tomater\n\nStem i tråden, så afslutter jeg frølisten.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = groupPostCompost.Id, LanguageCode = "da",
+            Title = "Kompostkassen — hvem er på denne uge?",
+            Body = "Kassen er klar til at skiftes. Kan nogen tage en tur ved at vende den denne uge? Den forfalder mandag.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new GroupTranslation
+        {
+            Id = Id(), GroupId = green.Id, LanguageCode = "da",
+            Name = "Gadegrønt", Description = "Naboer, der arbejder på den fælles grønflade ved legepladsen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-30)
+        });
+        session.Store(new GroupTranslation
+        {
+            Id = Id(), GroupId = family.Id, LanguageCode = "da",
+            Name = "Familien Kowalski", Description = "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
+            AuthorId = sophie.Id, Created = now.AddDays(-40)
+        });
+
+        // ── Resident blog ────────────────────────────────────────────────────────────
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogRoot.Id, LanguageCode = "da",
+            Title = "Annas hjørne af gaden",
+            Body = "Et lille sted til noter om kvarteret — den slags, man ellers poster i gruppechat, og som ingen finder igen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-5)
+        });
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogPost.Id, LanguageCode = "da",
+            Title = "Bænken ved porten",
+            Body = "Der er en bænk, som de fleste af os er gået glip af. Den får solen først om morgenen, og duerne har erobret den ved ni.\n\nJeg bliver ved med at skulle pudse den for folk, der bruger den til at læse. Lille ting, men den er vores.",
+            AuthorId = sophie.Id, Created = now.AddDays(-3)
+        });
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogPost2.Id, LanguageCode = "da",
+            Title = "Hjørnebutikkens gamle klokke",
+            Body = "Den lille klokke over hjørnebutikken klinger stadig, når nogen åbner døren. Ingen driver butikken længere, men lyden er geblevet — en lille påmindelse om, at gaden engang var mere travl.",
+            AuthorId = sophie.Id, Created = now
+        });
+
         await session.SaveChangesAsync();
 
         // Deploy posture (ADR 0056): hand the demo credentials to the instance's admin
@@ -768,18 +998,38 @@ public static class SampleDataSeeder
     }
 
     /// <summary>
-    /// A random 128-bit (32-character) high-entropy password for a deploy-posture demo
-    /// account. CSPRNG-backed (<see cref="System.Security.Cryptography.RandomNumberGenerator"/>);
-    /// lowercase hex, so it meets the app's password policy (length ≥ 8; the
-    /// non-alphanumeric requirement is relaxed by <c>Program.cs</c>). Distinct per account,
+    /// A random 32-character high-entropy password for a deploy-posture demo account.
+    /// CSPRNG-backed (<see cref="System.Security.Cryptography.RandomNumberGenerator"/>)
+    /// over the full alphanumeric alphabet, and guaranteed to contain at least one
+    /// uppercase, one lowercase, and one digit — the app's Identity password policy
+    /// requires all three (only the *non-alphanumeric* requirement is relaxed by
+    /// <c>Program.cs</c>; <c>RequireUppercase</c> / <c>RequireLowercase</c> /
+    /// <c>RequireDigit</c> keep their ASP.NET Core defaults). Distinct per account,
     /// and never derived from, or printed alongside, the seed admin's own credential
     /// (ADR 0056).
     /// </summary>
     private static string RandomPassword()
     {
-        var bytes = new byte[16];
-        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
-        return Convert.ToHexString(bytes).ToLowerInvariant();
+        const int length = 32;
+        const string upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string lower = "abcdefghijklmnopqrstuvwxyz";
+        const string digit = "0123456789";
+        const string alphabet = upper + lower + digit;
+
+        var chars = new char[length];
+        // Seed one guaranteed member of each required class, fill the rest from the
+        // full alphabet, then shuffle (CSPRNG Fisher–Yates) so no position is predictable.
+        chars[0] = upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)];
+        chars[1] = lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(lower.Length)];
+        chars[2] = digit[System.Security.Cryptography.RandomNumberGenerator.GetInt32(digit.Length)];
+        for (var i = 3; i < length; i++)
+            chars[i] = alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)];
+        for (var i = length - 1; i > 0; i--)
+        {
+            var j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
     }
 
     /// <summary>

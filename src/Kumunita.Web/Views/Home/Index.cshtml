@@ -86,16 +86,15 @@
 {
     <section class="kmb-section" aria-label="What's new">
         <div class="container">
-            <div class="row justify-content-between align-items-end mb-4">
+            <div class="row mb-4">
                 <div>
-                    <div class="eyebrow"><kw-l key="home.feed_eyebrow">Signed in</kw-l></div>
-                    <h2 class="h3 mt-1"><kw-l key="home.feed_title">What's new around the street</kw-l></h2>
+                    <h2 class="h3"><kw-l key="home.feed_title">What's new around the street</kw-l></h2>
                 </div>
             </div>
 
             @if (feed.IsEmpty)
             {
-                <p class="text-white-50"><kw-l key="home.feed_empty">Nothing posted yet — be the first to start the conversation in the feed.</kw-l></p>
+                <p class="text-secondary"><kw-l key="home.feed_empty">Nothing posted yet — be the first to start the conversation in the feed.</kw-l></p>
             }
             else
             {
@@ -104,7 +103,7 @@
                     {
                         <div class="col-12 col-lg-4">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_posts">Posts</kw-l></h3>
+                                <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_posts">Posts</kw-l></h3>
                                 <a href="/community" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
                             </div>
                             <div class="list-group list-group-flush">
@@ -124,9 +123,9 @@
                                         </a>
                                         @if (!string.IsNullOrWhiteSpace(row.Preview))
                                         {
-                                            <p class="small text-white-50 mb-2">@row.Preview</p>
+                                            <p class="small text-secondary mb-2">@row.Preview</p>
                                         }
-                                        <div class="d-flex align-items-center small text-white-50">
+                                        <div class="d-flex align-items-center small text-secondary">
                                             @if (row.AuthorSubjectId is { } authorId && row.Author is not null)
                                             {
                                                 <span class="d-inline-flex align-items-center me-1">
@@ -152,7 +151,7 @@
                     {
                         <div class="col-12 col-lg-4">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_announcements">Announcements</kw-l></h3>
+                                <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_announcements">Announcements</kw-l></h3>
                                 <a href="/announcements" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
                             </div>
                             <div class="list-group list-group-flush">
@@ -178,11 +177,11 @@
                                         </a>
                                         @if (!string.IsNullOrWhiteSpace(row.Preview))
                                         {
-                                            <p class="small text-white-50 mb-2">@row.Preview</p>
+                                            <p class="small text-secondary mb-2">@row.Preview</p>
                                         }
                                         @if (row.When is { } when)
                                         {
-                                            <div class="small text-white-50"><kw-dt dt="@when" format="g"></kw-dt></div>
+                                            <div class="small text-secondary"><kw-dt dt="@when" format="g"></kw-dt></div>
                                         }
                                     </div>
                                 }
@@ -194,7 +193,7 @@
                     {
                         <div class="col-12 col-lg-4">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_pages">Pages</kw-l></h3>
+                                <h3 class="h6 text-uppercase text-secondary mb-0"><kw-l key="home.feed_pages">Pages</kw-l></h3>
                                 <a href="/pages" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
                             </div>
                             <div class="list-group list-group-flush">
@@ -206,7 +205,7 @@
                                         </a>
                                         @if (row.When is { } when)
                                         {
-                                            <div class="small text-white-50"><kw-dt dt="@when" format="g"></kw-dt></div>
+                                            <div class="small text-secondary"><kw-dt dt="@when" format="g"></kw-dt></div>
                                         }
                                     </div>
                                 }

@@ -314,7 +314,6 @@ public static class KnownTranslationKeys
                 "Water cuts, roadworks, the new speed bumps — notes that stay put instead of scrolling away.",
 
             // ── home "what's new" feed (signed-in visitors) ─────────────────
-            ["home.feed_eyebrow"]        = "Signed in",
             ["home.feed_title"]          = "What's new around the street",
             ["home.feed_posts"]          = "Posts",
             ["home.feed_announcements"]  = "Announcements",
@@ -1286,7 +1285,6 @@ public static class KnownTranslationKeys
                 "Wasserausfälle, Baustellen, neue Tempobremsen — Hinweise, die bleiben und nicht davonscrollen.",
 
             // ── home "Neues"-Feed (angemeldete Nutzer) ─────────────────────
-            ["home.feed_eyebrow"]        = "Angemeldet",
             ["home.feed_title"]          = "Neues um die Ecke",
             ["home.feed_posts"]          = "Beiträge",
             ["home.feed_announcements"]  = "Hinweise",
@@ -2214,7 +2212,6 @@ public static class KnownTranslationKeys
                 "Coupures d'eau, travaux, nouveaux ralentisseurs — des annonces qui restent au lieu de défiler.",
 
             // ── home « nouveautés » (visiteurs connectés) ──────────────────
-            ["home.feed_eyebrow"]        = "Connecté",
             ["home.feed_title"]          = "Les nouveautés du quartier",
             ["home.feed_posts"]          = "Posts",
             ["home.feed_announcements"]  = "Annonces",
@@ -3144,7 +3141,6 @@ public static class KnownTranslationKeys
                 "Vandafbrud, vejarbejde, de nye bakkedæmper — notater der bliver hængende i stedet for at forsvinde.",
 
             // ── home "Nyheder"-fæde (loggede ind brugere) ──────────────────
-            ["home.feed_eyebrow"]        = "Logget ind",
             ["home.feed_title"]          = "Det nyt i nabolaget",
             ["home.feed_posts"]          = "Indlæg",
             ["home.feed_announcements"]  = "Meddelelser",
