@@ -261,4 +261,28 @@ public interface IPageService
     Task RemoveTranslationAsync(
         string pageId, string languageCode,
         string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
+
+    /// <summary>
+    /// **Resets** a page back to its seeded (first-boot) baseline text (ADR
+    /// 0058): overwrites the page's <c>en</c> (source) title/body and its
+    /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
+    /// with the code-owned seeded registries (<see cref="Bootstrap
+    /// .FirstBootSeeder.EnDefaultPages"/> / <see cref="Bootstrap
+    /// .FirstBootSeeder.GuidePages"/> and the matching baseline sets), so a
+    /// page can be re-seeded to the latest shipped text after a code
+    /// release. Standing is the **same as edit** (ADR 0040 §3.7): a
+    /// <see cref="Authorization.AccessVia.Admin"/> (GlobalAdmin) on either
+    /// page kind — a community Moderator or a page-author has no reset
+    /// standing (reset is a platform-level operation). A page slug with no
+    /// seeded baseline (a community-authored page, or a slug the seeded
+    /// registries don't carry) is a <see cref="InvalidOperationException"/>
+    /// (the form maps this to a validation error, not a 400/500). A denied
+    /// actor is a <see cref="UnauthorizedAccessException"/> (403); a missing
+    /// or soft-deleted page is a <see cref="KeyNotFoundException"/> (404).
+    /// One <c>SaveChangesAsync</c>; a hand-written <see
+    /// cref="Authorization.AccessAudit"/> row (action <c>page.reset</c>) is
+    /// stored in the caller's session.
+    /// </summary>
+    Task ResetToSeededAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session);
 }

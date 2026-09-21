@@ -2236,6 +2236,176 @@ public static class FirstBootSeeder
         }
     }
 
+    // ─── ADR 0058 — the reset-to-seeded lane (a destructive override on
+    //     request) ────────────────────────────────────────────────────────────
+    //
+    // The four-surface set (terms / help / privacy / conduct) and the UG
+    // guides ship code-owned baselines here (the <see cref="EnDefaultPages"/>
+    // / <see cref="DeDefaultPages"/> / <see cref="FrDefaultPages"/> /
+    // <see cref="DaDefaultPages"/> + <see cref="GuidePages"/> /
+    // <see cref="DeGuidePages"/> / <see cref="FrGuidePages"/> /
+    // <see cref="DaGuidePages"/> registries). After first boot those are
+    // community-owned (the ADR 0042 D1 "a human editor is the only writer of
+    // a non-<c>en</c> body" invariant) — the warm-boot backfills only
+    // create-if-missing and never clobber an admin edit. These two methods
+    // are the **explicit, operator-requested** override that closes the gap:
+    // they let an admin pull the seeded text back over a page they have
+    // customized (or over a stale version from before a feature changed the
+    // seeded copy). The <see cref="Kumunita.Core.Pages.PageService
+    // .ResetToSeededAsync"/> write lane owns standing + the audit row; the
+    // two methods below own the **content** (resolving the page to its
+    // seeded baseline, and applying the <c>en</c> + non-<c>en</c> bodies) so
+    // the seeder stays the single source of the seeded text and the lane and
+    // the seeder can never drift.
+
+    /// <summary>
+    /// ADR 0058 — the **display probe**: does the <see cref="Page"/> at
+    /// (<paramref name="slug"/>, <paramref name="parentId"/>) have a
+    /// <b>seeded</b> <c>en</c> baseline and at least one non-<c>en</c>
+    /// (de / fr / da) baseline to reset to? The Web edit view calls this to
+    /// decide whether to render the "Reset to seeded" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is the
+    /// <see cref="Kumunita.Core.Pages.PageService.ResetToSeededAsync"/>
+    /// standing re-check). <c>false</c> for a page the seed never wrote (a
+    /// resident-authored system page, a blog page, a page with a custom slug)
+    /// — there is no seeded text to reset to, so there is nothing to offer.
+    /// <para>
+    /// The parent resolution mirrors the seeder / backfill: the four-surface
+    /// set resolves under the <c>system</c> root (ADR 0040), the guides
+    /// resolve under the canonical <c>help</c> page (ADR 0057 D1), with the
+    /// bare-root fallback for a pre-ADR-0040 deployment.
+    /// </para>
+    /// </summary>
+    public static bool HasSeededText(string slug)
+    {
+        // The probe is purely over the code-owned seed registries (no DB): a
+        // slug has seeded text to reset to exactly when it has a seeded `en`
+        // body (the four-surface set or a UG guide). The non-`en` baselines
+        // are a superset check — if the `en` body is seeded, at least the `en`
+        // reset is meaningful, so the `en` presence is the single gate.
+        if (string.IsNullOrEmpty(slug)) return false;
+        return FindSeededPageText(slug) is not null;
+    }
+
+    /// <summary>
+    /// ADR 0058 — the **reset applier**: overwrites the <see cref="Page"/>
+    /// <c>en</c> <see cref="Kumunita.Core.Pages.Page.Title"/> /
+    /// <see cref="Kumunita.Core.Pages.Page.Body"/> and the <c>de</c> /
+    /// <c>fr</c> / <c>da</c> <see cref="Kumunita.Core.Pages
+    /// .PageTranslation"/> rows of <paramref name="page"/> with the seeded
+    /// baseline text (matched on <c>page.Slug</c>), in the **caller's**
+    /// in-flight <see cref="IDocumentSession"/> (the C3 invariant — the
+    /// <see cref="Kumunita.Core.Pages.PageService
+    /// .ResetToSeededAsync"/> lane commits it in its single
+    /// <c>SaveChangesAsync</c> and owns the standing re-check + the
+    /// <c>page.reset</c> <see cref="Kumunita.Core.Authorization.AccessAudit"/>
+    /// row). <para>
+    /// Mirrors the <see cref="SeedDefaultPagesAsync"/> /
+    /// <see cref="SeedPageTranslationsAsync"/> content exactly, but is
+    /// **destructive by design** (a code-wins overwrite of the
+    /// <c>(PageId, LanguageCode)</c> rows rather than the seeder's
+    /// create-if-missing): the reset is the operator's explicit choice to
+    /// accept the seeded text, so a customized body is replaced (the lane's
+    /// confirmation prompt is the guard). A page with no seeded
+    /// <c>en</c> baseline (<see cref="FindSeededPageText"/> returns
+    /// <c>null</c>) is a <see cref="InvalidOperationException"/> — the Web
+    /// layer maps that to a re-rendered form error (there is nothing to
+    /// reset to).
+    /// </para>
+    /// </summary>
+    public static async Task ResetSeededTextAsync(
+        IDocumentSession session, Page page, DateTimeOffset now, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(page);
+        var slug = page.Slug;
+
+        // The `en` body + title (the page itself).
+        var seeded = FindSeededPageText(slug);
+        if (seeded is null)
+            throw new InvalidOperationException(
+                $"The page '{slug}' has no seeded text to reset to " +
+                "(it is not one of the seeded platform pages or guides).");
+
+        page.Title = seeded.Value.Title;
+        page.Body = seeded.Value.Body;
+        page.LanguageCode = SourceLanguage;
+        page.Modified = now;
+        session.Store(page);
+
+        // The non-`en` translations (de / fr / da) — a code-wins overwrite of
+        // each (PageId, LanguageCode) row that has a seeded baseline. A
+        // language the seeded set does not carry (e.g. a community-added
+        // language the baseline does not translate into) is left untouched —
+        // the reset only replaces what the seed knows.
+        foreach (var (code, baselines) in new[]
+        {
+            ("de", DeDefaultPages()),
+            ("fr", FrDefaultPages()),
+            ("da", DaDefaultPages()),
+            ("de", DeGuidePages()),
+            ("fr", FrGuidePages()),
+            ("da", DaGuidePages()),
+        })
+        {
+            var baseline = baselines.FirstOrDefault(b => b.Slug == slug);
+            if (baseline == default)
+                continue;   // this language carries no baseline for this slug.
+
+            var row = await session
+                .Query<PageTranslation>()
+                .Where(t => t.PageId == page.Id && t.LanguageCode == code)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (row is null)
+            {
+                session.Store(new PageTranslation
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    PageId = page.Id,
+                    LanguageCode = code,
+                    Title = baseline.Title,
+                    Body = baseline.Body,
+                    AuthorId = string.Empty,   // platform content — no resident author
+                    Created = now,
+                });
+            }
+            else
+            {
+                // Destructive by design (ADR 0058): the operator asked to
+                // reset, so the customized row is replaced with the seeded
+                // baseline. The original text is preserved by the
+                // page.translation.* / page.reset audit trail + the page's
+                // own Modified stamp (the seeder's create-if-missing never
+                // reaches here — this lane is the explicit override).
+                row.Title = baseline.Title;
+                row.Body = baseline.Body;
+                session.Store(row);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ADR 0058 — the seeded <c>en</c> (title, body) registry for a single
+    /// page slug: from <see cref="EnDefaultPages"/> (the four-surface set) or
+    /// <see cref="GuidePages"/> (the UG guides). <c>null</c> when the slug is
+    /// not one of the seeded pages (the reset lane maps that to a form error
+    /// — there is nothing to reset to).
+    /// </summary>
+    private static (string Title, string Body)? FindSeededPageText(string slug)
+    {
+        var en = EnDefaultPages().FirstOrDefault(p => p.Slug == slug);
+        if (en != default)
+            return (en.Title, en.Body);
+
+        var guide = GuidePages().FirstOrDefault(p => p.Slug == slug);
+        if (guide != default)
+            return (guide.Title, guide.Body);
+
+        return null;
+    }
+
     /// <summary>
     /// Warm-boot backfill of the <c>de</c> / <c>fr</c> / <c>da</c>
     /// <see cref="PageTranslation"/> rows for the four canonical seeded pages

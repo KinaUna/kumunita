@@ -1137,6 +1137,96 @@ public sealed class PageService : IPageService
         await session.SaveChangesAsync().ConfigureAwait(false);
     }
 
+    // ─── ADR 0058 — reset to the seeded baseline text ────────────────────
+
+    /// <summary>
+    /// ADR 0058 — resets <paramref name="pageId"/> back to its **seeded
+    /// (first-boot) baseline text**: the page's <c>en</c> title/body and its
+    /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
+    /// are overwritten with the code-owned seed registries (the same text the
+    /// seeder writes on first boot — <see cref="Bootstrap
+    /// .FirstBootSeeder.EnDefaultPages"/> / <see cref="Bootstrap
+    /// .FirstBootSeeder.GuidePages"/> and the matching baselines), so a
+    /// page's text can be re-seeded to the latest shipped version after a
+    /// code release. <para>
+    /// **Standing (ADR 0040, amending §3.7):** the **same as edit** — a
+    /// <see cref="PageKind.System"/> page is a GlobalAdmin only; a
+    /// <see cref="PageKind.User"/> (blog) page is the author ∪ GlobalAdmin.
+    /// The <see cref="CheckEditStanding"/> gate is the single source of
+    /// truth (the Web <c>[Authorize]</c> is a convenience pre-gate, not the
+    /// source of truth, C3). A denied actor is a <see
+    /// cref="UnauthorizedAccessException"/> (403); a missing page is a
+    /// <see cref="KeyNotFoundException"/> (404).
+    /// </para>
+    /// <para>
+    /// **Destructive by design:** a customized <c>en</c> body and a
+    /// customized translation are **replaced** with the seeded baseline — the
+    /// reset is the operator's explicit, confirmed choice to accept the
+    /// seeded text (the Web lane's <c>confirm()</c> prompt is the guard). A
+    /// slug the seed registries do not carry (a community-authored page, or a
+    /// slug never seeded) is a <see cref="InvalidOperationException"/> — the
+    /// Web layer maps that to a re-rendered form error (there is nothing to
+    /// reset to; the button is hidden in that case by <see
+    /// cref="Bootstrap.FirstBootSeeder.HasSeededText"/>). One
+    /// <c>SaveChangesAsync</c>; a hand-written <see cref="AccessAudit"/> row
+    /// (action <c>page.reset</c>) is stored in the caller's session.
+    /// </para>
+    /// </summary>
+    public async Task ResetToSeededAsync(
+        string pageId, string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(pageId))
+            throw new ArgumentException("A page id is required.", nameof(pageId));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var page = await session.LoadAsync<Page>(pageId).ConfigureAwait(false);
+        if (page is null)
+            throw new KeyNotFoundException($"Page '{pageId}' was not found in the session; nothing to reset.");
+
+        // Standing re-check (server-side, C3 single-source pin) — the **edit**
+        // gate, per ADR 0058: a system page is GlobalAdmin-only; a blog page
+        // is the author ∪ GlobalAdmin. A community Moderator has no reset
+        // standing on either kind (reset is a platform-level operation).
+        CheckEditStanding(actorId, actorRoles, page);
+
+        // The actual overwrite (the en body + the de/fr/da translation rows)
+        // is delegated to the seeder's reset applier — it owns the seeded
+        // registries and the translation-row matching (ADR 0058). It throws
+        // InvalidOperationException when the slug has no seeded baseline;
+        // the Web lane maps that to a form error.
+        var now = DateTimeOffset.UtcNow;
+        await Bootstrap.FirstBootSeeder.ResetSeededTextAsync(session, page, now, CancellationToken.None).ConfigureAwait(false);
+
+        // Audit: the narrowest standing that applied (the edit resolver —
+        // Owner if the actor is the author of a blog page, else Admin for a
+        // GlobalAdmin). ADR 0040: a community Moderator never qualifies, so
+        // AccessVia.Moderator is never reached here.
+        var via = ResolveWriteStandingVia(
+            page.Kind,
+            actorRoles,
+            page.ComponentId,
+            isAuthor: string.Equals(page.AuthorId, actorId, StringComparison.Ordinal));
+
+        var audit = new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "page.reset",
+            TargetKind = "page",
+            TargetId = pageId,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
     // ─── Write-lane standing resolvers (U03 — distinct from U02's helpers) ─
 
     /// <summary>

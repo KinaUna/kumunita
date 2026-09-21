@@ -610,6 +610,7 @@ public static class KnownTranslationKeys
             ["pages.back"]        = "← Back to the pages",
             ["pages.by"]          = "by",
             ["pages.delete"]      = "Delete",
+            ["pages.resetSeeded"] = "Reset to seeded text",
             ["pages.untitled"]    = "Untitled page",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
@@ -1567,6 +1568,7 @@ public static class KnownTranslationKeys
             ["pages.back"]        = "← Zurück zu den Seiten",
             ["pages.by"]          = "von",
             ["pages.delete"]      = "Löschen",
+            ["pages.resetSeeded"] = "Auf Seed-Text zurücksetzen",
             ["pages.untitled"]    = "Unbenannte Seite",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
@@ -2498,6 +2500,7 @@ public static class KnownTranslationKeys
             ["pages.back"]        = "← Retour aux pages",
             ["pages.by"]          = "par",
             ["pages.delete"]      = "Supprimer",
+            ["pages.resetSeeded"] = "R\u00e9initialiser au texte seed\u00e9",
             ["pages.untitled"]    = "Page sans titre",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────
@@ -3430,6 +3433,7 @@ public static class KnownTranslationKeys
             ["pages.back"]        = "← Tilbage til siderne",
             ["pages.by"]          = "af",
             ["pages.delete"]      = "Slet",
+            ["pages.resetSeeded"] = "Nulstil til seedet tekst",
             ["pages.untitled"]    = "Side uden titel",
 
             // ── blog (per-resident page feed, ADR 0040) ─────────────────────

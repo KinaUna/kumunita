@@ -483,6 +483,13 @@ public sealed class PageController(
             MountPoint = page.MountPoint,
             LanguageCode = page.LanguageCode,
             IsAdmin = KumunitaPrincipal.RoleSet(User).Contains(Roles.GlobalAdmin),
+            // ADR 0058 — offer the "Reset to seeded text" button only when
+            // this page's slug is one of the seeded platform pages / guides
+            // (the seed registries carry an `en` baseline for it). A page
+            // with no seeded baseline has nothing to reset to, so the
+            // button is hidden (the service's standing re-check is the
+            // separate 403 gate on the POST).
+            CanReset = Kumunita.Core.Bootstrap.FirstBootSeeder.HasSeededText(page.Slug),
         };
         await SeedComposeOptionsAsync(model, actorId).ConfigureAwait(false);
         return View(model);
@@ -616,6 +623,55 @@ public sealed class PageController(
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+    }
+
+    // ── POST /pages/{id}/reset-seeded — ADR 0058 reset to seeded text ───────
+
+    /// <summary>
+    /// <c>POST /pages/{id}/reset-seeded</c> — ADR 0058: reset a page back to
+    /// its **seeded (first-boot) baseline text** — overwrites the page's
+    /// <c>en</c> title/body and its <c>de</c> / <c>fr</c> / <c>da</c>
+    /// translations with the code-owned seed registries (the same text the
+    /// seeder writes on first boot), so the page can be re-seeded to the
+    /// latest shipped version after a code release. The standing is the
+    /// **edit standing** (ADR 0040 §3.7, re-checked by the service, C3): a
+    /// system page is GlobalAdmin-only; a blog page is author ∪ GlobalAdmin.
+    /// A <see cref="UnauthorizedAccessException"/> from the service is a
+    /// <b>403</b>; a <see cref="KeyNotFoundException"/> is a <b>404</b>; a
+    /// <see cref="InvalidOperationException"/> (the page's slug has no seeded
+    /// baseline — the button was hidden, but a hand-crafted POST may still
+    /// arrive) is a re-rendered <b>400</b> form error.
+    /// </summary>
+    [HttpPost]
+    [Route("{id:guid}/reset-seeded")]
+    [ValidateAntiForgeryToken]
+    [Authorize]
+    public async Task<IActionResult> ResetToSeeded(string id)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User) ?? string.Empty;
+        await using var session = store.LightweightSession();
+        try
+        {
+            await pages.ResetToSeededAsync(id, actorId, KumunitaPrincipal.RoleSet(User), session).ConfigureAwait(false);
+            TempData["info"] = "Page text reset to the seeded version.";
+            return RedirectToAction(nameof(Edit), new { id });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The slug has no seeded baseline (there is nothing to reset to).
+            // The edit view hides the button in this case (CanReset = false);
+            // this catch is the belt-and-suspenders for a hand-crafted POST.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return BadRequest();
         }
     }
 

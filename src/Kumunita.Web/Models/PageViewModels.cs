@@ -216,6 +216,24 @@ public sealed class PageComposeViewModel
     [BindNever]
     public bool IsAdmin { get; set; }
 
+    /// <summary>
+    /// ADR 0058 — whether the edit lane may offer the <b>"Reset to seeded
+    /// text"</b> button. <c>true</c> exactly when the page's <see
+    /// cref="Kumunita.Core.Pages.Page.Slug"/> is one of the seeded platform
+    /// pages / guides (<see cref="Kumunita.Core.Bootstrap.FirstBootSeeder
+    /// .HasSeededText"/> — the code-owned seed registries carry an
+    /// <c>en</c> baseline for it) — a page with no seeded baseline (a
+    /// resident-authored page, or a slug the seed never wrote) has nothing
+    /// to reset to, so the button is hidden. The standing (edit standing —
+    /// the button's POST is 403-denied by the service for a non-qualifier)
+    /// is already enforced on the edit lane itself, so by the time this view
+    /// renders the actor has standing; <see cref="CanReset"/> only reflects
+    /// the <em>seeded-text availability</em>. <b>[BindNever]</b> — the
+    /// server derives it from the stored page (never bound from the form).
+    /// </summary>
+    [BindNever]
+    public bool CanReset { get; set; }
+
     public string? Title { get; set; }
 
     /// <summary>The WYSIWYG body (Markdown) — the single

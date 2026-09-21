@@ -1680,6 +1680,351 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         }
     }
 
+    // ─── PG U06 (ADR 0058) — the reset-to-seeded-text lane ─────────────────
+    //
+    // The ADR 0058 reset lane is a store-composing service lane (the
+    // PageService.ResetToSeededAsync seam) that delegates the actual
+    // overwrite to the seeder's reset applier (FirstBootSeeder
+    // .ResetSeededTextAsync), which owns the seeded text registries. These
+    // tests pin: the destructive overwrite of a customized en body + a
+    // customized translation, the create-if-missing of an absent
+    // translation row, the edit-standing gate (a community Moderator / a
+    // plain Member is denied on a system page), the non-seeded-slug refusal
+    // (there is nothing to reset to → InvalidOperationException), the
+    // page.reset audit-row shape (Action / TargetKind / Via), and idempotency
+    // (a second reset is a no-op — no duplicate translation rows).
+
+    [Fact]
+    public async Task PG6_Reset_FourSurfacePage_OverwritesCustomizedEnBodyAndTranslations()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the canonical four-surface set (terms / help / privacy /
+        // conduct) + their de/fr/da translation rows, the shape a first-boot
+        // deployment has.
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        // Find the `terms` page (under the `system` root).
+        await using (var q = store.QuerySession())
+        {
+            var systemRoot = await q.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await q.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var termsId = terms.Id;
+            var seededEn = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
+
+            // Customize: overwrite the en body + a de translation with
+            // admin-authored text (the "keep my customizations" state the
+            // reset lane exists to undo on request).
+            await using (var w = store.OpenSession(new Marten.Services.SessionOptions()))
+            {
+                terms.Body = "My custom terms text.";
+                terms.Modified = DateTimeOffset.UtcNow;
+                w.Store(terms);
+                var de = await w.Query<PageTranslation>()
+                    .Where(t => t.PageId == termsId && t.LanguageCode == "de")
+                    .FirstAsync(ct);
+                de.Body = "Mein eigener Text.";
+                w.Store(de);
+                await w.SaveChangesAsync(ct);
+            }
+
+            // Reset (a GlobalAdmin — full edit standing on a system page).
+            await using (var s = newSession(store))
+            {
+                await svc.ResetToSeededAsync(termsId, "u-admin", RolesSet(Roles.GlobalAdmin), s);
+            }
+
+            // The en body is back to the seeded baseline (the custom text is
+            // gone — destructive by design, ADR 0058).
+            await using (var q2 = store.QuerySession())
+            {
+                var after = await q2.LoadAsync<Page>(termsId);
+                Assert.Equal(seededEn.Body, after!.Body);
+                Assert.Equal(seededEn.Title, after.Title);
+                Assert.Equal(FirstBootSeeder.SourceLanguage, after.LanguageCode);
+
+                // The de translation is back to the seeded baseline too.
+                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "terms");
+                var deAfter = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == termsId && t.LanguageCode == "de")
+                    .FirstAsync(ct);
+                Assert.Equal(deBaseline.Body, deAfter.Body);
+                Assert.Equal(deBaseline.Title, deAfter.Title);
+
+                // The fr + da rows still carry their seeded baselines (the
+                // reset re-applied them — idempotent content).
+                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "terms");
+                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == "terms");
+                var frAfter = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == termsId && t.LanguageCode == "fr")
+                    .FirstAsync(ct);
+                var daAfter = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == termsId && t.LanguageCode == "da")
+                    .FirstAsync(ct);
+                Assert.Equal(frBaseline.Body, frAfter.Body);
+                Assert.Equal(daBaseline.Body, daAfter.Body);
+            }
+
+            // The page.reset audit row: the edit-standing tag (a GlobalAdmin
+            // on a system page → AccessVia.Admin), action `page.reset`,
+            // target kind `page`.
+            var audits = (await AuditsFor(store, termsId, "page.reset")).ToList();
+            Assert.Single(audits);
+            Assert.Equal(AccessVia.Admin, audits[0].Via);
+            Assert.Equal("page", audits[0].TargetKind);
+            Assert.Equal(AccessOutcome.Allow, audits[0].Outcome);
+        }
+    }
+
+    [Fact]
+    public async Task PG6_Reset_CreatesAbsentTranslationRow_FromSeededBaseline()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seed the four-surface set but deliberately do NOT seed the
+        // translation rows (the "pages seeded, translations not" shape — the
+        // ADR 0043 D7 / ADR 0044 D5 gap the backfill lane serves). The reset
+        // must create the de/fr/da rows from the seeded baselines (the
+        // create-if-missing branch of the applier).
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        await using (var s = newSession(store))
+        {
+            await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+            await s.SaveChangesAsync(ct);
+        }
+
+        await using (var q0 = store.QuerySession())
+        {
+            var systemRoot = await q0.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var help = await q0.Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var helpId = help.Id;
+
+            // No translation rows yet (seeded pages only).
+            var before = await q0.Query<PageTranslation>()
+                .Where(t => t.PageId == helpId)
+                .CountAsync(ct);
+            Assert.Equal(0, before);
+
+            // Reset creates them.
+            await using (var s2 = newSession(store))
+            {
+                await svc.ResetToSeededAsync(helpId, "u-admin", RolesSet(Roles.GlobalAdmin), s2);
+            }
+
+            // de / fr / da rows now exist, each carrying its seeded baseline.
+            await using (var q2 = store.QuerySession())
+            {
+                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "help");
+                var frBaseline = FirstBootSeeder.FrDefaultPages().Single(p => p.Slug == "help");
+                var daBaseline = FirstBootSeeder.DaDefaultPages().Single(p => p.Slug == "help");
+                var de = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == helpId && t.LanguageCode == "de")
+                    .FirstAsync(ct);
+                var fr = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == helpId && t.LanguageCode == "fr")
+                    .FirstAsync(ct);
+                var da = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == helpId && t.LanguageCode == "da")
+                    .FirstAsync(ct);
+                Assert.Equal(deBaseline.Body, de.Body);
+                Assert.Equal(frBaseline.Body, fr.Body);
+                Assert.Equal(daBaseline.Body, da.Body);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PG6_Reset_NonSeededSlug_Throws_InvalidOperationException()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // A community-authored page (a slug the seed registries do not carry)
+        // has nothing to reset to — the lane throws (the Web layer maps this
+        // to a form error; the button is hidden in this case by CanReset).
+        await Plant(store, new Page
+        {
+            Id = "pg6-res-notseeded", Slug = "my-custom-page",
+            Title = "Custom", Body = "custom body", AuthorId = "u-someone",
+        });
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.ResetToSeededAsync("pg6-res-notseeded", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+
+        // No audit row was written (the refusal fires before the write).
+        Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.reset").ToList());
+    }
+
+    [Fact]
+    public async Task PG6_Reset_ModeratorOnSystemPage_Throws_UnauthorizedAccess()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        await using (var q0 = store.QuerySession())
+        {
+            var systemRoot = await q0.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var terms = await q0.Query<Page>()
+                .Where(p => p.Slug == "terms" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var termsId = terms.Id;
+
+            // A community Moderator has no reset standing on a system page
+            // (ADR 0058 — the edit-standing gate: a system page is
+            // GlobalAdmin-only).
+            await using (var s = newSession(store))
+            {
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    svc.ResetToSeededAsync(termsId, "u-mod", RolesSet(Roles.ModeratorComponent("comp-x")), s));
+            }
+
+            // A plain Member is denied too.
+            await using (var s2 = newSession(store))
+            {
+                await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                    svc.ResetToSeededAsync(termsId, "u-member", RolesSet(Roles.Member), s2));
+            }
+
+            // No audit row (the standing check fires before the write).
+            Assert.Empty((await AuditRows(store)).Where(a => a.Action == "page.reset").ToList());
+        }
+    }
+
+    [Fact]
+    public async Task PG6_Reset_AuthorOfBlogPage_HasStanding()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+
+        // A blog (PageKind.User) page whose slug IS a seeded slug is an
+        // odd-but-valid shape (an admin re-used a seeded slug for their own
+        // blog page). ADR 0058 pins the standing as the **edit** standing:
+        // the author has reset standing on their own blog page (a system
+        // page would not). The overwrite still applies the seeded baseline
+        // (the slug is the reset key, not the kind).
+        await Plant(store, new Page
+        {
+            Id = "pg6-res-blog", Slug = "terms",
+            Title = "My blog terms", Body = "my blog terms body",
+            AuthorId = "u-author", Kind = PageKind.User,
+        });
+
+        await using var session = newSession(store);
+        await svc.ResetToSeededAsync("pg6-res-blog", "u-author", RolesSet(Roles.Member), session);
+
+        await using (var q = store.QuerySession())
+        {
+            var after = await q.LoadAsync<Page>("pg6-res-blog");
+            var seeded = FirstBootSeeder.EnDefaultPages().Single(p => p.Slug == "terms");
+            Assert.Equal(seeded.Body, after!.Body);
+
+            // The audit Via is Owner (the author of a blog page — the
+            // edit-standing resolver returns AccessVia.Owner when the actor
+            // is the author).
+            var audits = (await AuditsFor(store, "pg6-res-blog", "page.reset")).ToList();
+            Assert.Single(audits);
+            Assert.Equal(AccessVia.Owner, audits[0].Via);
+        }
+    }
+
+    [Fact]
+    public async Task PG6_Reset_Idempotent_SecondRunIsNoOp_NoDuplicateRows()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+        var ct = TestContext.Current.CancellationToken;
+        await SeedCanonicalPagesAndTranslationsAsync(store, ct);
+
+        await using (var q0 = store.QuerySession())
+        {
+            var systemRoot = await q0.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var privacy = await q0.Query<Page>()
+                .Where(p => p.Slug == "privacy" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var privacyId = privacy.Id;
+
+            // Reset twice — the second must not create duplicate rows.
+            await using (var s1 = newSession(store))
+            {
+                await svc.ResetToSeededAsync(privacyId, "u-admin", RolesSet(Roles.GlobalAdmin), s1);
+            }
+            await using (var s2 = newSession(store))
+            {
+                await svc.ResetToSeededAsync(privacyId, "u-admin", RolesSet(Roles.GlobalAdmin), s2);
+            }
+
+            await using (var q2 = store.QuerySession())
+            {
+                foreach (var code in new[] { "de", "fr", "da" })
+                {
+                    var count = await q2.Query<PageTranslation>()
+                        .Where(t => t.PageId == privacyId && t.LanguageCode == code)
+                        .CountAsync(ct);
+                    Assert.Equal(1, count);   // no duplicates from the second reset
+                }
+
+                // The content is still the seeded baseline (idempotent).
+                var deBaseline = FirstBootSeeder.DeDefaultPages().Single(p => p.Slug == "privacy");
+                var de = await q2.Query<PageTranslation>()
+                    .Where(t => t.PageId == privacyId && t.LanguageCode == "de")
+                    .FirstAsync(ct);
+                Assert.Equal(deBaseline.Body, de.Body);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PG6_Reset_MissingPage_Throws_KeyNotFound()
+    {
+        var store = await BootStoreAsync();
+        var svc = new PageService(store);
+
+        await using var session = newSession(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.ResetToSeededAsync("pg6-res-missing", "u-admin", RolesSet(Roles.GlobalAdmin), session));
+    }
+
+    [Fact]
+    public void PG6_HasSeededText_TrueForSeededSlugs_FalseForOthers()
+    {
+        // The pure registry probe (the button-visibility gate): a seeded slug
+        // is recognized; a non-seeded slug is not.
+        Assert.True(FirstBootSeeder.HasSeededText("terms"));
+        Assert.True(FirstBootSeeder.HasSeededText("help"));
+        Assert.True(FirstBootSeeder.HasSeededText("privacy"));
+        Assert.True(FirstBootSeeder.HasSeededText("conduct"));
+        // A UG guide slug is seeded too (the guide set is part of the
+        // reset-eligible universe).
+        var guideSlug = FirstBootSeeder.GuidePages().First().Slug;
+        Assert.True(FirstBootSeeder.HasSeededText(guideSlug));
+
+        // A slug the seed registries do not carry is not reset-eligible.
+        Assert.False(FirstBootSeeder.HasSeededText("my-custom-page"));
+        Assert.False(FirstBootSeeder.HasSeededText(string.Empty));
+        Assert.False(FirstBootSeeder.HasSeededText("about"));   // not seeded (the U05 pin)
+    }
+
     // ─── Shared helpers ─────────────────────────────────────────────────────
 
     /// <summary>Boot a fresh scratch store (M1 + M3 + Page doc types) and
@@ -1791,6 +2136,25 @@ public class PageServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
     }
 
     private static HashSet<string> RolesSet(params string[] roles) => roles.ToHashSet();
+
+    /// <summary>
+    /// Seed the canonical four-surface set (terms / help / privacy / conduct)
+    /// <em>and</em> their <c>de</c> / <c>fr</c> / <c>da</c>
+    /// <see cref="PageTranslation"/> rows — the first-boot deployment shape
+    /// (the ADR 0042 / ADR 0043 seeded universe), committed. The ADR 0058
+    /// reset tests use this as the "already-seeded" starting state so the
+    /// reset lane's destructive-overwrite + idempotency assertions have a
+    /// realistic baseline to reset against.
+    /// </summary>
+    private static async Task SeedCanonicalPagesAndTranslationsAsync(
+        IDocumentStore store, CancellationToken ct)
+    {
+        var defaultPages = FirstBootSeeder.EnDefaultPages();
+        await using var s = store.OpenSession(new Marten.Services.SessionOptions());
+        var pageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+        await FirstBootSeeder.SeedPageTranslationsAsync(s, pageIds, DateTimeOffset.UtcNow, ct);
+        await s.SaveChangesAsync(ct);
+    }
 
     /// <summary>Open the caller's in-flight write session (the C3 shape the
     /// write lanes commit into — the <c>AnnouncementServiceTests.newSession</c>

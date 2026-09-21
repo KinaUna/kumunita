@@ -254,6 +254,25 @@
                     @(isEdit ? "Save changes" : "Create page")
                 </button>
                 <a class="btn btn-outline-secondary" href="/pages"><kw-l key="common.cancel">Cancel</kw-l></a>
+
+                @* ADR 0058 — the "Reset to seeded text" button: edit lane only,
+                   and only when this page's slug is one of the seeded platform
+                   pages / guides (Model.CanReset, derived server-side from the
+                   seed registries). It overwrites the en body + the de/fr/da
+                   translations with the seeded baseline (destructive — the
+                   confirm() is the guard). A separate form, since the main
+                   form's action is the edit lane. *@
+                @if (isEdit && Model.CanReset)
+                {
+                    <form class="d-inline" method="post"
+                          action="/pages/@Model.PageId/reset-seeded"
+                          onsubmit="return confirm('Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger">
+                            <kw-l key="pages.resetSeeded">Reset to seeded text</kw-l>
+                        </button>
+                    </form>
+                }
             </div>
         </form>
     </div>
