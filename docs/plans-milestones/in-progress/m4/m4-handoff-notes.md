@@ -664,3 +664,74 @@ further open decisions carried into U01.
     U09 list remain out of scope.
 
 **U07 exit gate met. STOP — do NOT start U08.**
+
+## U08 — EventReminderHandler + EventReminderTick (the §6.4 job)
+
+- **(a) Files touched (all in `src/Kumunita.Web` — zero Core, zero TS, zero
+  tests):**
+  - `src/Kumunita.Web/SideEffects/EventReminderHandler.cs` — **new** file.
+    The thin Web-host adapter + tick, the `AuditPurgeHandler` +
+    `AuditPurgeTick` precedent **verbatim**:
+    - `EventReminderTick` — `public sealed record EventReminderTick() :
+      Wolverine.TimeoutMessage(TimeSpan.FromDays(1));` (the 1-day delay baked
+      into the message type; **no** per-callsite `DelayedFor`; the frozen
+      `Wolverine.TimeoutMessage` base, no signature change).
+    - `EventReminderHandler.Handle(EventReminderTick tick, Marten.IDocumentStore
+      store, IOptions<EventReminderOptions> options, Kumunita.Core.Identity
+      .IMailerStage mailer)` → `await
+      EventReminderService.SendRemindersAsync(store, options.Value,
+      DateTimeOffset.UtcNow, mailer);` then `return new[] { new
+      EventReminderTick() };` (the self-rescheduling `TimeoutMessage` idiom —
+      re-yield a fresh tick so the daily cadence carries forward).
+  - `src/Kumunita.Web/Program.cs` — **two** small additive edits:
+    - `builder.Services.AddOptions<Kumunita.Core.Events.EventReminderOptions>();`
+      (bound next to `AddKumunitaCore();` — `EventReminderOptions` is a
+      top-level class in `Kumunita.Core.Events`, as U07 drift (f) records;
+      `IOptions<…>` resolves the POCO's defaults, `WindowHours = 24` floor).
+    - the boot kick-off: `await bus.PublishAsync(new EventReminderTick());`
+      immediately after the existing `AuditPurgeTick` publish (same scope,
+      same post-`StartAsync` placement — the `AuditPurgeTick` precedent;
+      idempotent, same as the purge).
+- **(b) `IMailerStage` resolution:** the handler's **`mailer` parameter**
+  (U07 drift (f) — the design doc §4 C# block is stale, it shows the
+  3-arg form; the real U07 signature is
+  `SendRemindersAsync(store, options, now, mailer, ct)`) — Wolverine
+  convention-resolves the `IMailerStage` (host-registered
+  `OutboxEmailStager`) into the handler method and passes it through. The
+  thin adapter owns the resolution, exactly the `AuditPurgeHandler`
+  precedent (handler resolves the live store + options, hands them to the
+  Wolverine-free service).
+- **(c) Frozen-seam confirmation (no re-shaping):**
+  - **`EventReminderService` (U07) untouched** — the handler *consumes* the
+    frozen `SendRemindersAsync` signature (5-arg incl. `mailer`); no Core
+    file was edited in this unit (zero Core behavioral changes).
+  - **`IMailerStage` untouched** — consumed via the frozen `StageAsync`
+    (already the case inside U07's service); the handler only *resolves*
+    it, never re-shapes it.
+  - **`OutboxEmail` + `OutboxEmailHandler` trio untouched** — the reminder
+    path stages `OutboxEmail` rows (inside U07's service, via the frozen
+    `IMailerStage`); the §6.2 durable handler (existing, `Kumunita.Web/
+    SideEffects/OutboxEmailHandler`) dispatches over SMTP on a successful
+    commit. U08 references neither type.
+  - **`Wolverine.TimeoutMessage` base untouched** — `EventReminderTick`
+    derives from it with the frozen base constructor (`TimeSpan.FromDays(1)`
+    — the `AuditPurgeTick` precedent verbatim); no new idiom, no new
+    Wolverine API surface (the §6.4 drift-pause (e) pin holds).
+- **(d) Exit gate (per `AGENTS.md` — `dotnet test` / VS Test Explorer
+  **not** run, per the runner-discovery quirk):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Error(s)**
+    (the 87 warnings are the same pre-existing house-style set from U07 —
+    xUnit1051 in `EventServiceTests.cs` + CS8601 in `EventController.cs`;
+    none introduced by U08).
+  - Full Core suite: `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+    **Total: 654, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** — U07's
+    `EventReminderService` (now consumed by the handler) still passes; no
+    regressions in the `Post` / `Announcement` / `Page` / Identity /
+    UserInfo / M4 read/write/standing/reminder surfaces.
+  - No TS build (no TS touched in this unit).
+- **(e) Scope boundary:** the 23 seam tests (U09), `EventControllerTests`
+  (U10), the acceptance gate (U11), and the design-doc / README /
+  `Milestones.cs` close (U12) all remain out of scope for this unit.
+
+**U08 exit gate met. STOP — do NOT start U09.**

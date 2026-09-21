@@ -126,6 +126,13 @@ if (builder.Environment.IsDevelopment())
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
 
+// M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
+// (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
+// a config POCO bound per-instance, not improvised). AddOptions<T>() here the
+// way Core's AddKumunitaCore does it for AuditPurgeOptions: the handler
+// (SideEffects/EventReminderHandler) resolves IOptions<EventReminderOptions>.
+builder.Services.AddOptions<Kumunita.Core.Events.EventReminderOptions>();
+
 // ADR 0019 — the per-request effective-time-zone resolver (scoped: one instance
 // per request, the first GetAsync call resolves the actor's Profile.TimeZone
 // override → the instance default → the UTC floor and caches it; the kw-dt
@@ -401,12 +408,14 @@ await app.StartAsync();
 // (WolverineRuntime.AssertHasStarted), so any earlier placement breaks first boot.
 await SchemaBootstrap.ApplyAsync(app.Services);
 
-// Kick off the AuditPurge recurring job (SideEffects/AuditPurgeHandler) on boot.
-// The TimeoutMessage type bakes in a 1-day delay, so publishing one fresh tick
-// schedules the first purge to run tomorrow; AuditPurgeHandler self-reschedules
-// (returns a new AuditPurgeTick) after each run so the cadence continues. Idempotent:
-// the purge is a no-op when no rows are expired, so a double-schedule across two
-// consecutive boots is harmless.
+// Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
+// SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a
+// 1-day delay, so publishing one fresh tick each schedules the first run for
+// tomorrow; each handler self-reschedules (returns a new tick) after each run so
+// the cadence continues. Idempotent: the purge is a no-op when no rows are
+// expired, and the reminder service is a no-op when nothing is in the window
+// (the existing-OutboxEmail-key check is the no-double-send guard), so a
+// double-schedule across two consecutive boots is harmless.
 //
 // This must run AFTER StartAsync: Wolverine's IMessageBus asserts that the
 // underlying IHost has started (WolverineRuntime.AssertHasStarted), so any publish
@@ -416,6 +425,7 @@ await SchemaBootstrap.ApplyAsync(app.Services);
 await using var startupScope = app.Services.CreateAsyncScope();
 var bus = startupScope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
 await bus.PublishAsync(new AuditPurgeTick());
+await bus.PublishAsync(new EventReminderTick());
 
 try
 {
