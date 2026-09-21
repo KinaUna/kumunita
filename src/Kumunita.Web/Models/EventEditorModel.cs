@@ -370,6 +370,15 @@ public sealed record EventIndexViewModel(
 /// non-author sees an empty list). The RSVP form (Going / Maybe / No)
 /// is **owner-only** visible (a non-author sees only their own RSVP).
 /// </para>
+/// <para>
+/// **<see cref="EventRsvpEntry.DisplayName"/>** is the RSVPing
+/// resident's display name — a <c>GetProfileAsync</c> read (null-safe:
+/// falls back to the raw subject id if the profile row is missing — a
+/// display-name lookup, never an access decision, the same shape as
+/// <see cref="AuthorDisplayName"/>). The avatar is served by the same
+/// audited lane as every other avatar (<c>GET /profile/avatar/{subjectId}</c>,
+/// the Directory pattern — the view's <c>data-avatar-fallback</c> monogram).
+/// </para>
 /// </summary>
 public sealed record EventDetailViewModel(
     Kumunita.Core.Events.Event Event,
@@ -379,4 +388,15 @@ public sealed record EventDetailViewModel(
     bool CanDelete,
     bool CanPublish,
     Kumunita.Core.Events.EventRsvp? MyRsvp,
-    IReadOnlyList<Kumunita.Core.Events.EventRsvp> Rsvps);
+    IReadOnlyList<EventRsvpEntry> Rsvps);
+
+/// <summary>
+/// One RSVP row enriched with its resident's <see cref="DisplayName"/>
+/// (the display-name lookup the owner-only RSVP list needs to render an
+/// avatar + name instead of the raw subject id — a read convenience, no
+/// access decision; the avatar's serving lane is the audited
+/// <c>GET /profile/avatar/{subjectId}</c> shared by every other avatar).
+/// </summary>
+public sealed record EventRsvpEntry(
+    Kumunita.Core.Events.EventRsvp Rsvp,
+    string DisplayName);

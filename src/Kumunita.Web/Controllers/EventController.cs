@@ -300,16 +300,28 @@ public sealed class EventController : Controller
         catch (KeyNotFoundException) { myRsvp = null; }
         catch (UnauthorizedAccessException) { myRsvp = null; }
 
-        var rsvps = default(IReadOnlyList<EventRsvp>);
+        var rsvpRows = default(IReadOnlyList<EventRsvp>);
         if (isAuthor)
         {
             try
             {
-                rsvps = await this.events.GetRsvpsAsync(id, HttpContext.RequestAborted);
+                rsvpRows = await this.events.GetRsvpsAsync(id, HttpContext.RequestAborted);
             }
-            catch (KeyNotFoundException) { rsvps = []; }
+            catch (KeyNotFoundException) { rsvpRows = []; }
         }
-        rsvps ??= [];
+        rsvpRows ??= [];
+
+        // The RSVP list's display names — one read lookup per RSVPing resident
+        // (null-safe: falls back to the raw subject id, the same shape as the
+        // author name above — a display lookup, never an access decision).
+        var rsvps = new List<EventRsvpEntry>(rsvpRows.Count);
+        foreach (var rsvp in rsvpRows)
+        {
+            var p = await userInfo.GetProfileAsync(rsvp.UserId);
+            var name = p?.DisplayName is not null && p.DisplayName.Length > 0
+                ? p.DisplayName : rsvp.UserId;
+            rsvps.Add(new EventRsvpEntry(rsvp, name));
+        }
 
         var vm = new EventDetailViewModel(
             Event: ev,

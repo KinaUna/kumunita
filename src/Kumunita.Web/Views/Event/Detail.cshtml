@@ -137,13 +137,25 @@
                     <ul class="list-unstyled mb-0">
                         @foreach (var rsvp in Model.Rsvps)
                         {
-                            <li class="d-flex justify-content-between py-1">
-                                <span>@rsvp.UserId</span>
+                            @* RSVPing resident (the Directory pattern): the <img>
+                               links the audited serving lane (GET
+                               /profile/avatar/{subjectId}) and avatar.ts hides it
+                               on the 404, falling back to the initial monogram. *@
+                            var rsvpInitial = !string.IsNullOrWhiteSpace(rsvp.DisplayName)
+                                ? char.ToUpperInvariant(rsvp.DisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <li class="d-flex justify-content-between py-1 align-items-center">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <span class="ms-2">@rsvp.DisplayName</span>
+                                </span>
                                 <span>
-                                    <span class="badge @(rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
-                                        @rsvp.Status
+                                    <span class="badge @(rsvp.Rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
+                                        @rsvp.Rsvp.Status
                                     </span>
-                                    <span class="text-muted small ms-2"><kw-dt dt="@rsvp.At" format="g"></kw-dt></span>
+                                    <span class="text-muted small ms-2"><kw-dt dt="@rsvp.Rsvp.At" format="g"></kw-dt></span>
                                 </span>
                             </li>
                         }

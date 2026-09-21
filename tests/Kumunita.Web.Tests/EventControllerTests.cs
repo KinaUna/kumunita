@@ -579,6 +579,11 @@ public class EventControllerTests
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Ada" });
+        // RSVP-list display names: the author's row resolves to the profile's
+        // name; the other residents' profiles are absent (NSubstitute null →
+        // the raw subject-id fallback, the null-safe display lookup).
+        userInfo.GetProfileAsync("u-a").Returns((Profile?)null);
+        userInfo.GetProfileAsync("u-b").Returns((Profile?)new Profile { SubjectId = "u-b", DisplayName = "Ben" });
 
         var controller = Build(events, userInfo: userInfo, subjectId: author);
 
@@ -587,6 +592,10 @@ public class EventControllerTests
         Assert.NotNull(result);
         var model = Assert.IsType<EventDetailViewModel>(result!.ViewData.Model);
         Assert.Equal(3, model.Rsvps.Count);
+        Assert.Equal("u-a", model.Rsvps[0].DisplayName);       // no profile → subject-id fallback.
+        Assert.Equal("Ben", model.Rsvps[1].DisplayName);        // profile's display name.
+        Assert.Equal("Ada", model.Rsvps[2].DisplayName);        // the author's own row.
+        Assert.Equal(RsvpStatus.Going, model.Rsvps[0].Rsvp.Status); // the row still carries its RSVP.
         Assert.Equal(RsvpStatus.Going, model.MyRsvp!.Status);
         Assert.True(model.CanEdit);   // the author's standing affordance.
         Assert.True(model.CanDelete); // identical row (author ∪ GlobalAdmin).
@@ -620,6 +629,7 @@ public class EventControllerTests
         Assert.NotNull(result);
         var model = Assert.IsType<EventDetailViewModel>(result!.ViewData.Model);
         Assert.Empty(model.Rsvps);
+        await userInfo.DidNotReceive().GetProfileAsync("u-a"); // list not loaded → no per-rsvp name lookups.
         Assert.Null(model.MyRsvp);
         Assert.False(model.CanEdit);
         Assert.False(model.CanDelete);
