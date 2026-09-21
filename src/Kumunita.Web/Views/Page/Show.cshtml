@@ -10,6 +10,15 @@
     var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
     string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 
+    // ADR 0049 — the default-visible variant: the viewer's current language
+    // (Model.DefaultVariant, resolved by the controller) when a translation
+    // row in that language exists; otherwise the authored-in variant (the
+    // ADR 0027 floor). When DefaultVariant is null (e.g. no provider) the
+    // authored-in variant is always default-visible.
+    var originalCode = Model.OriginalLanguageCode;
+    bool originalHidden = Model.DefaultVariant is not null
+        && Model.Translations.Any(t => String.Equals(t.LanguageCode, Model.DefaultVariant, StringComparison.OrdinalIgnoreCase));
+
     // ADR 0029 — the "add a translation" candidate list (U06): the enabled
     // catalog languages that have no stored PageTranslation row yet AND are
     // not the page's authored-in language (the ADR 0027 "candidate list
@@ -17,7 +26,6 @@
     // HasTranslation flag). Offered only when Model.CanTranslate is set (a
     // standing-holder: GlobalAdmin / Translator / a community Moderator of
     // the page's scope).
-    var originalCode = Model.OriginalLanguageCode;
     var missingLanguages = Model.Languages
         .Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
 }
@@ -79,8 +87,9 @@
         <div class="card">
             <div class="card-body">
                 <div data-td-group="page">
-                    @* Original variant (default-visible). *@
-                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode">
+                    @* Original variant — hidden when the viewer's language has a translation (ADR 0049). *@
+                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                         @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
                         <h1 class="mb-1">
                             @if (string.IsNullOrWhiteSpace(Model.Title))
                             {
@@ -94,10 +103,14 @@
                         <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
                     </div>
 
-                    @* One hidden variant per stored translation. *@
+                    @* One variant per stored translation — the viewer's-language one is
+                       default-visible when it matches Model.DefaultVariant (ADR 0049),
+                       otherwise hidden. *@
                     @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
                     {
-                        <div class="td-variant" data-td-variant="@t.LanguageCode" style="display:none">
+                        bool tDefault = String.Equals(t.LanguageCode, Model.DefaultVariant, StringComparison.OrdinalIgnoreCase);
+                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
                             @if (!string.IsNullOrWhiteSpace(t.Title))
                             {
                                 <h1 class="mb-1">@t.Title</h1>

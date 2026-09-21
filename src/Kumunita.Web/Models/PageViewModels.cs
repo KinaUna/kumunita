@@ -146,7 +146,20 @@ public sealed record PageShowViewModel(
     /// the authored-in language + any already-translated code (the ADR 0027
     /// "candidate list excludes the item's own language" rule).
     /// </summary>
-    bool CanTranslate);
+    bool CanTranslate,
+    /// <summary>
+    /// ADR 0049 — the viewer's resolved current-language BCP-47 code for this
+    /// request (the same chain the <c>&lt;kw-l&gt;</c> TagHelper resolves UI
+    /// text through: <c>kumunita.locale</c> cookie → <c>Accept-Language</c>
+    /// match → instance default → <c>en</c>). The view uses this to pick
+    /// which of the page's <see cref="Kumunita.Core.Pages.PageTranslation"/>
+    /// variants is <b>default-visible</b>: the matching translation (if any)
+    /// is shown first, the authored-in variant is demoted to a one-click
+    /// chip swap (ADR 0027 machinery untouched). <c>null</c> when the
+    /// per-request read seam is absent (e.g. a test harness) — the view
+    /// degrades to the ADR 0027 floor (authored-in variant default-visible).
+    /// </summary>
+    string? DefaultVariant);
 
 /// <summary>
 /// The composer form-bound model — <c>GET/POST /pages/new</c> and

@@ -64,7 +64,13 @@ public sealed class PageController(
     Authorization.IAuthorizationService authz,
     ILocalizationService localization,
     IUserInfoService userInfo,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // ADR 0049 — the per-request translation read seam, used to auto-select
+    // which of a page's pre-rendered language variants (the ADR 0039
+    // PageTranslation rows) is default-visible. Optional so existing
+    // test-construction sites keep compiling; DI always supplies the live
+    // ITranslationProvider in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
     // ── GET /pages — the tree browse (C6 CanSeeAsync(Read)-filtered) ─────────
 
@@ -109,6 +115,29 @@ public sealed class PageController(
         var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var visibleSet = visible.ToDictionary(p => p.Id, StringComparer.Ordinal);
 
+        // ADR 0049 / ADR 0051 — the tree-browse titles show the page's title
+        // in the viewer's current language when a PageTranslation row for
+        // that language exists (else the authored title — the ADR 0022 floor).
+        // One per-request read of the shared chain; a read, not a decision
+        // (the CanSeeAsync already ran). Display-only, no audit row.
+        var titleByPageId = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (translationProvider is not null)
+        {
+            string? effLang = await EffectiveLanguageCode.ResolveAsync(
+                HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
+            if (effLang is not null)
+            {
+                foreach (var p in visible)
+                {
+                    var translations = await pages.GetTranslationsAsync(p.Id).ConfigureAwait(false);
+                    var match = translations.FirstOrDefault(t =>
+                        string.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+                    if (match is not null && !string.IsNullOrWhiteSpace(match.Title))
+                        titleByPageId[p.Id] = match.Title;
+                }
+            }
+        }
+
         // The forest: a visible page's children are the visible pages nested
         // under it; a visible page whose parent is absent (denied) is a root.
         PageNode ToNode(Page p)
@@ -116,8 +145,9 @@ public sealed class PageController(
             var kids = visible
                 .Where(c => string.Equals(c.ParentId, p.Id, StringComparison.Ordinal))
                 .ToList();
+            var title = titleByPageId.TryGetValue(p.Id, out var t) ? t : p.Title;
             return new PageNode(
-                p.Id, p.Title, PagePaths.Href(byId, p), p.IsDraft,
+                p.Id, title, PagePaths.Href(byId, p), p.IsDraft,
                 kids.Select(ToNode).ToList());
         }
 
@@ -210,6 +240,19 @@ public sealed class PageController(
         var canTranslate = PageService.CanTranslatePage(
             actorId ?? string.Empty, KumunitaPrincipal.RoleSet(User), page);
 
+        // ADR 0049 — the default-visible variant is the viewer's current
+        // language when a translation of the page into that language exists;
+        // otherwise the authored-in variant (the ADR 0027 floor). One read of
+        // the shared per-request chain (the same helper the post/announcement
+        // detail views use), so the page's default, the post's default, and
+        // the kw-l UI-text default can never disagree for the same request.
+        string? defaultVariant = null;
+        if (translationProvider is not null)
+        {
+            defaultVariant = await EffectiveLanguageCode.ResolveAsync(
+                HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
+        }
+
         return View(new PageShowViewModel(
             page.Id,
             page.Title,
@@ -223,7 +266,8 @@ public sealed class PageController(
             isAuthor,
             authorProfile?.DisplayName,
             communityName,
-            canTranslate
+            canTranslate,
+            defaultVariant
         ));
     }
 
