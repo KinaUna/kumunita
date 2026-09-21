@@ -89,6 +89,25 @@
             </div>
             }
 
+            @* ADR 0057 — "all platform users" (ADR 0041 AllResidents flag):
+               one checkbox toggles the new 4.5 decision branch, after the
+               community branch, before the public branch. The flag is
+               carried verbatim through BuildAudience to the document.
+               Rendered identically on both editors (Visibility and
+               ContactVisibility) — the partial is invoked once per editor. *@
+            <div class="form-check" style="margin-left:0.5rem; margin-top:0.75rem;">
+                <input class="form-check-input" type="checkbox"
+                       name="@($"{editorName}.AllResidentsVisible")"
+                       id="@($"{editorName}-all-residents")"
+                       value="true" @(activeEditor.AllResidentsVisible ? "checked" : null) />
+                <label class="form-check-label" for="@($"{editorName}-all-residents")">
+                    <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
+                </label>
+            </div>
+            <div class="text-muted small" style="margin-left:1rem; margin-bottom:0.75rem;">
+                <kw-l key="profile.audience_all_residents_hint">New residents can see this automatically — no need to re-edit when someone joins.</kw-l>
+            </div>
+
             @* The grant option lists are read-only view data seeded on
                 <c>ViewData</c> (NOT <c>ViewBag</c> — the bag's indexer
                 throws RuntimeBinderException; see below) and are NOT
@@ -140,9 +159,12 @@
             @if (string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
             {
                 @* The empty-audience warning is meaningful only when the author has
-                   actually opted in AND the grant list is empty — an opt-out with
-                   an empty editor is the §2.4 short-circuit row, not a mis-set gate. *@
-                @if (optIn && activeEditor.IsEmpty)
+                   actually opted in AND the grant list is empty AND the
+                   "all platform users" flag (ADR 0041 / ADR 0057) is not set —
+                   an opt-out with an empty editor is the §2.4 short-circuit row,
+                   not a mis-set gate, and AllResidentsVisible grants everyone
+                   even with an empty grants list. *@
+                @if (optIn && activeEditor.IsEmpty && !activeEditor.AllResidentsVisible)
                 {
                     <div class="alert alert-warning mt-2 mb-0">
                         <b>Heads up:</b> you haven't picked anyone or any group below,

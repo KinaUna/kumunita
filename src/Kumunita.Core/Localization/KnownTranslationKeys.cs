@@ -535,6 +535,10 @@ public static class KnownTranslationKeys
                 "a person is allowed if they meet any of the people/groups you picked",
             ["profile.audience_mode_all"] =
                 "a person is allowed only if they meet all of the people/groups you picked",
+            ["profile.audience_all_residents"] =
+                "Everyone on the platform (all signed-in residents)",
+            ["profile.audience_all_residents_hint"] =
+                "New residents can see this automatically — no need to re-edit when someone joins.",
 
             // ── posts (Detail page) ──────────────────────────────────────────
             ["posts.back_to"] = "back to",
@@ -1494,6 +1498,10 @@ public static class KnownTranslationKeys
                 "eine Person ist erlaubt, wenn sie eine der gewählten Personen/Gruppen erfüllt",
             ["profile.audience_mode_all"] =
                 "eine Person ist nur erlaubt, wenn sie alle gewählten Personen/Gruppen erfüllt",
+            ["profile.audience_all_residents"] =
+                "Alle auf der Plattform (alle angemeldeten Bewohner:innen)",
+            ["profile.audience_all_residents_hint"] =
+                "Neue Bewohner:innen sehen das automatisch — du musst nichts neu eintragen, wenn jemand beitritt.",
 
             // ── posts (Detail page) ──────────────────────────────────────────
             ["posts.back_to"] = "zurück zu",
@@ -2421,6 +2429,10 @@ public static class KnownTranslationKeys
                 "une personne est autorisée si elle correspond à l'une des personnes/groupes que tu as sélectionnés",
             ["profile.audience_mode_all"] =
                 "une personne est autorisée uniquement si elle correspond à toutes les personnes/groupes que tu as sélectionnés",
+            ["profile.audience_all_residents"] =
+                "Tout le monde sur la plateforme (tous les résident·e·s connecté·e·s)",
+            ["profile.audience_all_residents_hint"] =
+                "Les nouveaux résident·e·s peuvent voir cela automatiquement — pas besoin de rééditer quand quelqu'un rejoint.",
 
             // ── posts (Detail page) ──────────────────────────────────────────
             ["posts.back_to"] = "retour à",
@@ -3349,6 +3361,10 @@ public static class KnownTranslationKeys
                 "en person er tilladt, hvis de opfylder én af de personer/grupper, du har valgt",
             ["profile.audience_mode_all"] =
                 "en person er kun tilladt, hvis de opfylder alle de personer/grupper, du har valgt",
+            ["profile.audience_all_residents"] =
+                "Alle på platformen (alle loggede beboere)",
+            ["profile.audience_all_residents_hint"] =
+                "Nye beboere kan se dette automatisk — du behøver ikke at redigere igen, når nogen slutter sig.",
 
             // ── posts (Detail page) ──────────────────────────────────────────
             ["posts.back_to"] = "tilbage til",
