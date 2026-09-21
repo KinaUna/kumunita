@@ -11,12 +11,13 @@ non-decision *"true `contenteditable` / a third-party editor — hard
 non-negotiable out."* The user has **explicitly approved** this reversal
 (**2026-09-15**). Does **not** supersede 0031; it changes the composer
 surface — the rendered pane becomes `contenteditable`, the textarea becomes
-a read-only mirror — and adds **one** new pure serializer + **one** new pure
+an editable Markdown source (two-way sync) — and adds **one** new pure serializer + **one** new pure
 sanitizer.)
 Amends: 0032 (the rendered-by-default view — **kept**; the pane is still
 the default view the resident lands on. What changes is that the pane is
-now **editable** (the resident types *in* it) and the `</>` toggle reveals a
-**read-only** Markdown mirror rather than the editable source. The
+now **editable** (the resident types *in* it) and the `</>` toggle reveals
+an **editable Markdown source** (two-way sync) rather than a read-only
+mirror. The
 `tsc`-only / additive / no-new-route consequences of 0032 keep binding.)
 
 ## Context
@@ -60,17 +61,20 @@ hand-rolled, pure, unit-tested, dependency-free).
 
 ## Decision
 
-**D1 — The pane is the editing surface; the textarea is the read-only sink.**
+**D1 — The pane is the editing surface; the textarea is the sink.**
 The `rc-editor-pane` (the `[data-rich-editor-preview]` element IE made the
 default view) carries `contenteditable="true"` (**set by the binder at
 runtime**, not in the Razor) and becomes the **editable** surface. The
 `<textarea data-rich-editor>` is **not removed, not disabled, not re-shaped**
 — it stays the live form field the server binds (RC R·3 / RE·1 / IE·1
-unchanged); the binder keeps it in sync as a **read-only mirror** (on every
-pane `input`, `textarea.value = toMarkdown(pane.innerHTML)`). The pane is
+unchanged); the binder keeps it in sync (on every pane `input`,
+`textarea.value = toMarkdown(pane.innerHTML)`). The pane is
 **authoritative**; the textarea is the **sink** the server reads on submit.
-**No bidirectional sync** — the textarea is never typed into; it is only
-*written* by the binder.
+**Two-way sync** (WY·7): the textarea is also an **editable** surface —
+typing in the code view re-renders the pane (`input` → `renderPane`), and
+typing in the pane updates the code view (`syncTextarea`). The two remain
+the same Markdown in different views: the pane is the rendered form,
+the code view is the source form.
 
 **D2 — One new pure function: `toMarkdown(html): string`.** A dependency-
 free, pure, unit-tested **DOM→Markdown serializer** in
@@ -94,7 +98,7 @@ sees the constrained subset.
 
 **The `tsc`-only constraint stands unchanged.** What this ADR changes is the
 **composer surface only**: the pane is now `contenteditable`, the textarea is
-now a read-only mirror, and there is a new hand-rolled, pure, unit-tested
+now an editable Markdown source (two-way sync), and there is a new hand-rolled, pure, unit-tested
 serializer + sanitizer. There is still **no editor dependency in
 `package.json`**, still **no `.csproj` change**, **no new route**, **no new
 server surface**, and **no second renderer on the read path**.
@@ -106,8 +110,10 @@ server surface**, and **no second renderer on the read path**.
   (the Selection / Range API), not Markdown markers. The promise *"a resident
   writes what they see"* is now met for *writing* as well as for *seeing*.
 - **The Markdown source is preserved as the sink.** The `<textarea>` remains
-  the single source of truth the server binds (RE·1): read-only now, still
-  bound, still submitted, its value the serialized Markdown of the pane.
+  the single source of truth the server binds (RE·1): now **editable** (the
+  code view, two-way sync — WY·7), still
+  bound, still submitted, its value the serialized Markdown of the pane (or
+  the resident's hand-typed Markdown, which the pane then re-renders from).
   `ImageIds` parse (`ContentImageIds`) and `MarkdownRenderer` render are
   **untouched** (RC R·3 / RC R·1).
 - **Paste is safe by construction.** Every `on*` handler, `style`,
@@ -121,10 +127,11 @@ server surface**, and **no second renderer on the read path**.
   `dom-to-markdown.ts`, and one CSS focus-ring rule. The Web-test suite pins
   the artifact (17 tests — the 9 pure-function contract tests + the 8
   artifact-string / regression pins, §2.7 of the design doc).
-- **The code view is a mirror, not a mode.** The `</>` toggle (IE) still
-  swaps the `<kw-l>` label; its semantics change to reveal a **read-only**
-  Markdown mirror of the pane (the pane stays editable + visible in both
-  states — WY·7).
+- **The code view is an editable source.** The `</>` toggle (IE) still
+  swaps the `<kw-l>` label; its semantics are to reveal the **editable**
+  Markdown source (the textarea) with **two-way sync** — typing in the
+  code view re-renders the pane, and typing in the pane updates the code
+  view (the pane stays editable + visible in both states — WY·7).
 
 ## Not decided here (explicit non-decisions)
 

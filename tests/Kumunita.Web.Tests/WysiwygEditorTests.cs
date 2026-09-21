@@ -445,27 +445,33 @@ public class WysiwygEditorTests
 
     /// <summary>
     /// <b>#10</b> — the compiled <c>wwwroot/js/lib/rich-editor.js</c>
-    /// sets <c>textarea.readOnly</c> (WY·7 — the code view is a
-    /// <b>read-only</b> mirror of the pane; the resident never types into
-    /// the sink — WY·2: the textarea stays the live form field the server
-    /// binds on submit, never disabled / removed / re-shaped, RC R·3 /
-    /// RE·1 / IE·1) <b>and</b> still carries the
-    /// <c>rc-editor-source-hidden</c> class toggle (the IE·1 frozen base
-    /// — the textarea is revealed / hidden by that CSS class, unchanged
-    /// from IE). The two needles together prove the U7 <c>setView</c>
-    /// rework shipped (the pre-U7 block toggled only the class — an
-    /// editable source — and referenced no <c>readOnly</c>).
+    /// does <b>not</b> set <c>textarea.readOnly</c> (WY·7 — the code view
+    /// is an <b>editable</b> Markdown source with two-way sync, not a
+    /// read-only mirror: typing in the code view re-renders the pane
+    /// (<c>input</c> → <c>renderPane</c>), and typing in the pane updates
+    /// the code view (<c>syncTextarea</c>) — WY·2: the textarea stays the
+    /// live form field the server binds on submit, never disabled /
+    /// removed / re-shaped, RC R·3 / RE·1 / IE·1) <b>and</b> still
+    /// carries the <c>rc-editor-source-hidden</c> class toggle (the IE·1
+    /// frozen base — the textarea is revealed / hidden by that CSS
+    /// class, unchanged from IE). The two needles together prove the
+    /// editable-source <c>setView</c> contract shipped (the U7
+    /// read-only-mirror block set <c>readOnly = true</c>; the editable
+    /// source sets neither <c>readOnly</c> nor <c>disabled</c>).
     /// </summary>
     [Fact]
-    public void WY7_CodeViewIsReadOnlyMirror()
+    public void WY7_CodeViewIsEditableSource()
     {
         var content = ReadCompiledRichEditor();
-        // WY·7 / WY·2 — the textarea is the read-only sink (the binder
-        // sets `textarea.readOnly = true` in the U7 setView block).
-        Assert.Contains("readOnly", content, StringComparison.Ordinal);
+        // WY·7 / WY·2 — the code view is an editable Markdown source:
+        // the binder must NOT set `textarea.readOnly` (the U7 read-only
+        // mirror) and must not disable the form field either (the
+        // RichEditorTextarea_IsNotDisabled_OrRemoved pin covers the
+        // latter; this one pins the former).
+        Assert.DoesNotContain("readOnly", content, StringComparison.Ordinal);
         // IE·1 frozen base — the source-hidden class is still the
-        // reveal/hide mechanism (the code view is a mirror, not a mode
-        // switch — WY·1: the pane stays editable + visible in both states).
+        // reveal/hide mechanism (WY·1: the pane stays editable +
+        // visible in both states).
         Assert.Contains("rc-editor-source-hidden", content, StringComparison.Ordinal);
     }
 

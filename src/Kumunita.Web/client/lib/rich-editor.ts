@@ -787,17 +787,16 @@ export function bindRichEditor(root: HTMLElement): void {
   renderPane(); // initial render (so the preview is populated on load)
 
   // IE·1, D1/D2 — the view toggle (additive; the existing wiring is
-  // untouched). WY U7 rework (design doc §2.5f): the `</>` button's
-  // semantics change from "toggle the editable source's visibility" to
-  // "toggle the **read-only** code view's visibility". The two states
-  // (WY·7):
+  // untouched). WY U7 rework (design doc §2.5f): the `</>` button toggles
+  // the **code view**'s visibility. The two states (WY·7):
   //   (1) **pane only** (the default — the textarea is hidden by the
   //       `rc-editor-source-hidden` class, unchanged from IE);
   //   (2) **pane + code view** (the textarea is revealed by removing
-  //       `rc-editor-source-hidden`; the textarea is **read-only** —
-  //       `readOnly = true`, WY·2 / WY·7 — the resident never types into
-  //       the mirror; the pane stays editable + visible in both states —
-  //       WY·1, the code view is a mirror, not a mode switch).
+  //       `rc-editor-source-hidden`; the code view is an **editable
+  //       Markdown source** with two-way sync: typing in the code view
+  //       re-renders the pane (the existing `input` → `renderPane` path),
+  //       and typing in the pane updates the code view (`syncTextarea`).
+  //       The pane stays editable + visible in both states — WY·1).
   // The label swap (the `rc.editor.source` / `rc.editor.showPreview`
   // keys via the `<kw-l>` element) is **kept** — the
   // `_RichEditorToggle` partial resolves them server-side, unchanged
@@ -807,16 +806,17 @@ export function bindRichEditor(root: HTMLElement): void {
   const toggle = root.querySelector<HTMLButtonElement>('button[data-ie-toggle]');
   if (toggle) {
     const srcHidden = 'rc-editor-source-hidden';
-    // WY·7 / WY·2 — the textarea is the read-only sink (the server binds
-    // it on submit, RC R·3 / RE·1); the resident never types into the
-    // mirror. Set once, independent of the two view states — the pane
-    // is the editing surface in both (WY·1).
-    textarea.readOnly = true;
+    // WY·7 — the code view is an **editable Markdown source** (not a
+    // read-only mirror): the textarea's visibility is toggled (hidden by
+    // the `rc-editor-source-hidden` class, unchanged from IE) while the
+    // pane stays editable + visible in both states (WY·1). The textarea
+    // remains the live form field the server binds on submit (RC R·3 /
+    // RE·1) — now also a typing surface, with two-way sync:
+    //   code view → pane : the `input` → `renderPane` listener registered
+    //                      above re-renders the pane from the Markdown;
+    //   pane → code view : `syncTextarea` (the WY·2 sync, defined below in
+    //                      the WY block) keeps the value in step.
     const setView = (showCodeView: boolean): void => {
-      // WY·7 — the code view is a **mirror**, not a mode switch: the
-      // textarea's visibility is toggled (hidden by the
-      // `rc-editor-source-hidden` class, unchanged from IE) while the
-      // pane stays editable + visible in both states (WY·1).
       textarea.classList.toggle(srcHidden, !showCodeView);
       // Label swap (kept unchanged from IE): the button carries both
       // labels as data-* attributes (data-ie-label-source /
@@ -837,10 +837,11 @@ export function bindRichEditor(root: HTMLElement): void {
     setView(false); // WY·7 state (1) — the editable pane is the default view (code view hidden).
     toggle.addEventListener('click', () => {
       // Flip the code view: currently hidden (class present) → reveal the
-      // read-only mirror; currently visible (class absent) → hide it
-      // again. The argument is the current "is hidden?" state, so each
+      // editable Markdown source; currently visible (class absent) → hide
+      // it again. The argument is the current "is hidden?" state, so each
       // click inverts it. The pane stays editable + visible throughout
-      // (WY·1 — the code view is a mirror, not a mode switch).
+      // (WY·1 — the code view is the Markdown mirror, editable in both
+      // states via two-way sync).
       setView(textarea.classList.contains(srcHidden));
     });
   }

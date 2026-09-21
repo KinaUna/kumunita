@@ -1,4 +1,4 @@
-# WYSIWYG inline editing (`WY`) — the rendered pane is the editable surface; the Markdown source becomes a read-only mirror
+# WYSIWYG inline editing (`WY`) — the rendered pane is the editable surface; the Markdown source is an editable source view (two-way sync)
 
 > **Three-tier contract.** This file is the **primary** tier of the WY lane:
 > it pins the invariants (WY·1–WY·9), the FACES (WY1–WY10), the exact DOM /
@@ -58,9 +58,10 @@ This lane completes the arc from the resident's point of view:
 - **The rendered pane becomes the editable surface** — a resident clicks the
   rendered text, puts the caret in it, and types; the formatting buttons
   splice *rendered* structure (WY·1, WY·4).
-- **The Markdown source becomes a read-only mirror** — the `</>` toggle
-  now reveals a **read-only** Markdown mirror of the pane (the "code view"),
-  not the editable source (WY·7).
+- **The Markdown source is an editable source view** — the `</>` toggle
+  reveals the Markdown source (the "code view") as an **editable** surface
+  with **two-way sync**: typing in the code view re-renders the pane, and
+  typing in the pane updates the code view (WY·7).
 - **The textarea stays the single source of truth the server binds** — the
   binder keeps it in sync by serializing the pane on every `input`
   (WY·2, WY·5).
@@ -88,7 +89,8 @@ becomes `contenteditable`) and **one new pure function** (a DOM→Markdown
 serializer, the inverse of `renderPreview`). The Markdown source stays the
 single source of truth the server binds (RC R·3 / RE·1, **unchanged**); the
 pane becomes the editable surface; the serializer keeps the two in sync;
-the code view (the `</>` toggle) becomes a **read-only mirror** of the pane.
+the code view (the `</>` toggle) is an **editable source** with two-way sync
+(typed Markdown re-renders the pane; pane edits update the code view).
 
 ### The ADR 0033 reversal (load-bearing)
 
@@ -101,8 +103,9 @@ reversal and **what still binds**: `Body` stays a Markdown `string`
 (`package.json` still `typescript`-only), **one renderer on the read path**
 (RC R·1 — `MarkdownRenderer` is untouched), and the saved body is
 **byte-identical** Markdown (RC R·3). What changes is the **composer
-surface only**: the pane is now `contenteditable`, the textarea is now a
-read-only mirror, and there is a new hand-rolled, pure, unit-tested
+surface only**: the pane is now `contenteditable`, the textarea is now an
+editable source view (two-way sync), and there is a new hand-rolled, pure,
+unit-tested
 **DOM→Markdown serializer** (the inverse of `renderPreview`) + a
 **sanitizer** for paste.
 
@@ -140,9 +143,9 @@ construction, the same `isSafeImageSrc` / `isSafeUrl` semantics.
 - The **sanitizer** (`sanitizeHtml(html): string`) + the **`paste` handler**
   (paste / raw HTML is sanitized to the WY·3 subset before insertion) —
   WY·6.
-- The **code view rework** (the `data-ie-toggle` `</>` button reveals a
-  **read-only** Markdown mirror of the pane; the label swap is kept) —
-  WY·7.
+- The **code view rework** (the `data-ie-toggle` `</>` button reveals the
+  Markdown source as an **editable** surface with two-way sync; the label
+  swap is kept) — WY·7.
 - **ADR 0033** (the reversal + what still binds).
 - **This design doc** (this file).
 - The **artifact-string pins** (the compiled JS contains
@@ -184,12 +187,12 @@ base and keep binding in their own number spaces.
 | # | Invariant (one-line WY note) |
 |---|------------------------------|
 | **WY·1** | **The pane is the editing surface** — the `rc-editor-pane` carries `contenteditable="true"` (set by the binder at runtime, not in the Razor). The resident clicks the rendered text, puts the caret in it, and types. |
-| **WY·2** | **The textarea is the read-only sink** — RC R·3 / RE·1 unchanged: it is **never** removed, disabled, or re-shaped; it stays the live form field the server binds on submit; the binder only *writes* to it (`.value = toMarkdown(pane.innerHTML)`), the resident never *types* into it. |
+| **WY·2** | **The textarea is the sink the server binds** — RC R·3 / RE·1 unchanged: it is **never** removed, disabled, or re-shaped; it stays the live form field the server binds on submit; the binder keeps it in sync (`.value = toMarkdown(pane.innerHTML)`); the resident may *type* into it (the code view, WY·7 — two-way sync). |
 | **WY·3** | **The serializer emits exactly the RC-pinned subset and nothing more** — the WY·3 subset (P, H1–H6, UL/OL, LI, STRONG, EM, CODE, A, IMG, PRE/CODE) is the **ceiling**; `toMarkdown` is the **inverse of `renderPreview`** (the same subset, the same escape-first construction, the same `isSafeImageSrc` / `isSafeUrl` semantics). |
 | **WY·4** | **The toolbar splices DOM, not Markdown, into the pane** — the Selection / Range API on the `contenteditable` (the per-button mappings in §Part 2); after every splice the binder keeps the textarea in sync. |
 | **WY·5** | **The saved body is byte-identical** to what a resident could have hand-typed in the code view — RC R·3 / RC R·1 unchanged; the server parse (`ContentImageIds`) and the read path (`MarkdownRenderer`) are untouched. |
 | **WY·6** | **Paste / raw HTML is sanitized to the WY·3 subset before insertion** — the `paste` handler intercepts the clipboard, runs it through `sanitizeHtml`, and inserts only the constrained subset (the escape-first / `isSafeImageSrc` / `isSafeUrl` semantics already in `rich-editor.ts` are reused). |
-| **WY·7** | **The code view is a read-only mirror of the pane** — the `data-ie-toggle` `</>` button reveals the textarea (the serialized Markdown); the textarea is **read-only** (`readOnly = true`, set by the binder); the pane stays editable + visible in both states; the label swap is kept. |
+| **WY·7** | **The code view is an editable source with two-way sync** — the `data-ie-toggle` `</>` button reveals the textarea (the serialized Markdown); the textarea is **editable** (no `readOnly`); two-way sync — typing in the code view re-renders the pane (`input` → `renderPane`), and typing in the pane updates the code view (`syncTextarea`); the pane stays editable + visible in both states; the label swap is kept. |
 | **WY·8** | **The `tsc`-only constraint stands unchanged** — no editor dependency in `package.json` (still `typescript`-only); no `.csproj` change; the lane is client-only and additive. |
 | **WY·9** | **a11y** — the pane is keyboard-operable, reachable in tab order, and carries `role="textbox"` + `aria-multiline`; the toolbar buttons stay `<button type="button">` + localized via `<kw-l>`. |
 
@@ -206,7 +209,7 @@ invariants.
 | **WY4** | The resident clicks **Image** → the RC upload lane fires (`POST /content-image` via `apiFetch`, the `insert-image.ts` convention — no new route); on success an `<img src="/content-image/{id}" alt="…">` is spliced into the pane; `ImageIds` is populated **exactly as if hand-typed**. | WY·3, WY·4 |
 | **WY5** | The resident saves → the saved body is **byte-identical** to what they could have hand-typed in the code view; the read path (`MarkdownRenderer`) renders it identically; the server parse (`ContentImageIds`) is untouched. | WY·5, RC R·3, RC R·1 |
 | **WY6** | The resident pastes rich HTML (from Gmail, Word, etc.) into the pane → the `paste` handler sanitizes it to the WY·3 subset before insertion (every `on*` handler, `style`, disallowed `class`, disallowed element, unsafe `href`/`src` is stripped). | WY·6 |
-| **WY7** | The resident clicks the `</>` toggle → the **read-only** Markdown mirror (the textarea) is revealed beneath the pane; the pane stays editable + visible; the label swaps (`</>` / `Preview`); clicking again hides the mirror. | WY·7 |
+| **WY7** | The resident clicks the `</>` toggle → the **editable** Markdown source (the textarea) is revealed beside the pane with **two-way sync** (typing in the code view re-renders the pane; typing in the pane updates the code view); the pane stays editable + visible; the label swaps (`</>` / `Preview`); clicking again hides the source. | WY·7 |
 | **WY8** | On a surface where the image button is gated out (the RE `data-rich-editor-no-image` precedent), the **Image** button is absent — the pane, the toolbar's other buttons, and the code view are unchanged there. | (RE precedent) |
 | **WY9** | A keyboard-only resident can tab to the pane, place the caret, type, and apply formatting; the toolbar buttons are `<button type="button">` localized via `<kw-l>`; the pane carries `role="textbox"` + `aria-multiline`. | WY·9 |
 | **WY10** | **The round-trip property:** for any `md` in the RC-pinned subset, `toMarkdown(renderPreview(md)) === md` — the serializer is the **exact inverse** of `renderPreview` (the same subset, the same escape-first construction, the same `isSafeImageSrc` / `isSafeUrl` semantics). Pinned as a pure-function test. | WY·3, WY·5 |
@@ -242,10 +245,11 @@ invariants.
   button reuses the **RC upload lane** (`POST /content-image` via `apiFetch`,
   the `insert-image.ts` convention — **no** new route, **no** second
   upload).
-- **The code view (the `</>` toggle) becomes a read-only mirror.** The
-  `data-ie-toggle` button (IE, ADR 0032) is kept; its semantics change from
-  "reveal the editable source" to "reveal the **read-only** Markdown
-  mirror." The label swap (`</>` / `Preview`) is kept.
+- **The code view (the `</>` toggle) is an editable source.** The
+  `data-ie-toggle` button (IE, ADR 0032) is kept; it reveals the Markdown
+  source (the textarea) as an **editable** surface with **two-way sync**
+  (code view → pane via `input` → `renderPane`; pane → code view via
+  `syncTextarea`). The label swap (`</>` / `Preview`) is kept.
 - **The composer surfaces are unchanged in shape.** They keep the same
   `.rc-editor` wrapper, the same toolbar, the same textarea, the same pane
   (the **16 editor blocks / 10 view files** U0 verified). The only markup
@@ -328,18 +332,20 @@ files). No new element, no re-shape of the `.rc-body` / `.rc-image` CSS
 | Aspect | Pinned shape (exact) |
 |--------|----------------------|
 | **Pane (editing surface, WY·1)** | `[data-rich-editor-preview]` carries `contenteditable="true"` — **set by the binder at runtime** (`pane.contentEditable = 'true'`), **not** in the Razor. Also carries `role="textbox"` + `aria-multiline` (WY·9, set by the binder). |
-| **Textarea (read-only sink, WY·2)** | `textarea[data-rich-editor]` is **not** re-shaped, **not** disabled, **not** removed, **not** re-hidden. It stays the live form field the server binds on submit (RC R·3 / RE·1 / IE·1 unchanged). The binder sets `textarea.readOnly = true` (WY·7 — the code view is a **read-only mirror**, the resident never types into it). The binder is the **only** writer to `textarea.value`. |
+| **Textarea (sink, WY·2; editable source, WY·7)** | `textarea[data-rich-editor]` is **not** re-shaped, **not** disabled, **not** removed, **not** re-hidden. It stays the live form field the server binds on submit (RC R·3 / RE·1 / IE·1 unchanged). It is **editable** (no `readOnly`) — the code view is an **editable source** (WY·7) with two-way sync: the binder writes `textarea.value = toMarkdown(pane.innerHTML)` on pane `input`, and the `input` → `renderPane` listener re-renders the pane when the resident types in the code view. |
 | **Toolbar** | `.rc-editor-toolbar` is **not** re-shaped; the buttons stay `<button type="button" data-md="…">` (B/I/C/H1/H2/H3/•/1./Link/Image) + the `data-ie-toggle` button. Only the buttons' **click handlers** change (U5, §2.5e). |
-| **`data-ie-toggle` button** | **Not** re-shaped (the `_RichEditorToggle` partial markup is unchanged — the label swap is kept). Its **click handler's semantics** change (U7, §2.5f): it reveals a **read-only mirror**, not the editable source. |
+| **`data-ie-toggle` button** | **Not** re-shaped (the `_RichEditorToggle` partial markup is unchanged — the label swap is kept). Its **click handler** (U7 rework, §2.5f) toggles the **code view**: revealing the textarea as an **editable Markdown source** with two-way sync (WY·7). |
 | **Pane initial state (on load)** | `pane.innerHTML = renderPreview(textarea.value)` — the binder populates the pane from the textarea's current value (reuses the existing `renderPreview` — **not** a new renderer). |
-| **Pane `input` handler (WY·2)** | `textarea.value = toMarkdown(pane.innerHTML)` — on every pane `input`, the binder serializes the pane's constrained HTML to Markdown and writes it into the textarea. **No bidirectional sync** — the textarea is never typed into. |
+| **Pane `input` handler (WY·2)** | `textarea.value = toMarkdown(pane.innerHTML)` — on every pane `input`, the binder serializes the pane's constrained HTML to Markdown and writes it into the textarea. **Two-way sync** (WY·7): the textarea is *also* a typing surface — typing in the code view re-renders the pane (the `input` → `renderPane` listener). |
 | **Toolbar `click` handlers (WY·4)** | Each splices **DOM** (the Selection / Range API on the `contenteditable` pane), then calls `textarea.value = toMarkdown(pane.innerHTML)` (U5, §2.5e). |
 | **`paste` handler (WY·6)** | Intercepted on the pane; the clipboard HTML is run through `sanitizeHtml` **before** insertion (U6, §2.5d). |
 
 **The pane is authoritative; the textarea is the sink.** The resident types
 in the pane; the binder serializes to the textarea; the server reads the
-textarea on submit. The textarea's `.value` is **always** the serialized
-Markdown of the pane — never hand-typed (WY·2, WY·7).
+textarea on submit. The textarea's `.value` is the serialized
+Markdown of the pane — or, when the resident types in the code view, the
+hand-typed Markdown (the pane then re-renders from it, WY·2 / WY·7
+**two-way sync**).
 
 ### 2.3 the serializer contract (exact TS)
 
@@ -476,8 +482,8 @@ works exactly as it did before WY (the IE no-op guard). The WY block:
 
 - **(a)** sets `pane.contentEditable = 'true'` (WY·1 — the pane becomes the
   editing surface). Also sets `pane.setAttribute('role', 'textbox')` +
-  `pane.setAttribute('aria-multiline', '')` (WY·9 a11y) and
-  `textarea.readOnly = true` (WY·7 — the code view is a read-only sink).
+  `pane.setAttribute('aria-multiline', '')` (WY·9 a11y). The code view is an
+  **editable** source (WY·7 — no `readOnly`; two-way sync, §2.5f).
 - **(b)** sets `pane.innerHTML = renderPreview(textarea.value)` (the initial
   population — reuses `renderPreview`, **not** a new renderer).
 - **(c)** installs the **`input` handler** on the pane:
@@ -537,7 +543,7 @@ works exactly as it did before WY (the IE no-op guard). The WY block:
     is no empty placeholder element to lose a caret in (the earlier `<br>`
     placeholder approach was fragile and the source of the italic-specific
     failure). Because the default insert is cancelled, the handler calls
-    `syncTextarea()` itself to keep the WY·2 read-only sink in sync.
+    `syncTextarea()` itself to keep the WY·2 sink in sync.
 
   **The toolbar reflects the caret's state (active buttons).** A
   `selectionchange` listener (filtered to the pane) plus a call after every
@@ -568,15 +574,17 @@ works exactly as it did before WY (the IE no-op guard). The WY block:
   never leaks into the saved body — the pane DOM may carry it as a caret
   anchor, but the textarea sink and the saved Markdown do not.
 - **(f)** reworks the **`data-ie-toggle` button's click handler** (U7) so the
-  code view is a **read-only mirror**: the two states are (1) **pane only**
+  code view is an **editable source**: the two states are (1) **pane only**
   (the default — the textarea is hidden by the `rc-editor-source-hidden`
   class, **unchanged** from IE) and (2) **pane + code view** (the textarea is
   revealed by removing `rc-editor-source-hidden`; the textarea is
-  **read-only** — `textarea.readOnly = true`, WY·2 / WY·7). The **label
+  **editable** — no `readOnly`; two-way sync: typing in the code view
+  re-renders the pane, typing in the pane updates the code view, WY·2 / WY·7). The **label
   swap** (`rc.editor.source` / `rc.editor.showPreview`) is **kept**
   (the `_RichEditorToggle` partial resolves them server-side — **unchanged**
   from IE). The **pane stays editable + visible** in **both** states
-  (WY·1 — the code view is a **mirror**, not a mode switch).
+  (WY·1 — the code view is the **source form** of the same content, not a
+  separate mode).
 
 **The existing RE/IE wiring is untouched** — the WY block is **additive**
 (the `if (previewPane) { … }` guard means a view that hasn't updated the pane
@@ -627,7 +635,7 @@ does not need a DOM):**
 **Artifact-string pins (U4–U7 author — the compiled JS contains the WY
 surface; the RE/IE regression pins are unchanged):**
 
-10. `WY7_CodeViewIsReadOnlyMirror` — the compiled JS sets `textarea.readOnly` and reveals the textarea via the `rc-editor-source-hidden` class toggle (WY·7 — the code view is a read-only mirror; the textarea is never disabled/removed).
+10. `WY7_CodeViewIsEditableSource` — the compiled JS does **not** set `textarea.readOnly` and still reveals the textarea via the `rc-editor-source-hidden` class toggle (WY·7 — the code view is an **editable** Markdown source with two-way sync; the textarea is never disabled/removed).
 11. `WY8_TscOnly_NoEditorDependency` — `package.json` is still `typescript`-only (no editor dependency) (WY·8).
 12. `WY9_PaneIsKeyboardOperable` — the compiled JS sets `role="textbox"` + `aria-multiline` on the pane (WY·9).
 13. `CompiledRichEditorJs_ContainsContentEditable` — the compiled `wwwroot/js/lib/rich-editor.js` contains the string `contentEditable` (the U4 WY block is present).
@@ -677,8 +685,9 @@ by a later unit is a `## U<m> — Drift pause` section in the handoff note
 - the **9-invariant table** (WY·1–WY·9, Part 1) and the **10 FACES**
   (WY1–WY10, Part 1) — pinned by id;
 - the **DOM contract** (§2.2) — the pane's `contenteditable` /
-  `role="textbox"` / `aria-multiline`, the textarea's `readOnly` + the
-  sink-only binding, the toolbar / `data-ie-toggle` shapes, the initial-
+  `role="textbox"` / `aria-multiline`, the textarea's no-`readOnly` + the
+  sink binding (editable source, WY·7), the toolbar / `data-ie-toggle`
+  shapes, the initial-
   population + `input`-sync + toolbar-splice lines;
 - the **serializer contract** (§2.3) — `toMarkdown(html): string`, the WY·3
   subset, the element→Markdown mapping table, the escape rule, the 8 edge
@@ -758,7 +767,7 @@ it does not re-open any Part-1 / Part-2 section.
   11. `CompiledRichEditorJs_ContainsToMarkdown`
   12. `CompiledRichEditorJs_ContainsDomSplice`
   13. `WY8_TscOnly_NoEditorDependency`
-  14. `WY7_CodeViewIsReadOnlyMirror`
+  14. `WY7_CodeViewIsEditableSource`
 - **Regression pins (both in `InlineEditorTests.cs`, both PASS):**
   `RichEditorTextarea_IsNotDisabled_OrRemoved` (the textarea is never
   disabled/removed — WY·2 / IE·1) and `CompiledRichEditorJs_StillExportsRePureFunctions`
