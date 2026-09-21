@@ -3,6 +3,7 @@ using System.Text.Json;
 using Kumunita.Core.Events;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
+using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Marten;
@@ -59,17 +60,20 @@ public sealed class EventController : Controller
     private readonly IUserInfoService userInfo;
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
+    private readonly EffectiveTimezoneResolver timezone;
 
     public EventController(
         IEventService events,
         IUserInfoService userInfo,
         ILocalizationService localization,
-        IDocumentStore store)
+        IDocumentStore store,
+        EffectiveTimezoneResolver timezone)
     {
         this.events = events;
         this.userInfo = userInfo;
         this.localization = localization;
         this.store = store;
+        this.timezone = timezone;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -348,6 +352,20 @@ public sealed class EventController : Controller
     [HttpGet("/events/new")]
     public async Task<IActionResult> CreateGet()
     {
+        // Default the composer's time range to the actor's *current* date and
+        // time in their effective time zone (resident override → platform
+        // default → UTC floor, via EffectiveTimezoneResolver) rather than the
+        // framework's <see cref="DateTimeOffset"/> default (0001-01-01 00:00).
+        // Start is now rounded to the whole minute; End defaults to one hour
+        // after Start (the author adjusts both on the form).
+        var zone = await timezone.GetAsync();
+        // Current (DST-aware) offset for the zone at this instant, so the
+        // seeded wall-clock time is correct across DST transitions.
+        var nowInZone = DateTimeOffset.UtcNow.ToOffset(zone.GetUtcOffset(DateTimeOffset.UtcNow));
+        var start = new DateTimeOffset(
+            nowInZone.Year, nowInZone.Month, nowInZone.Day,
+            nowInZone.Hour, nowInZone.Minute, 0, nowInZone.Offset);
+
         var model = new EventEditorModel
         {
             Audience = new AudienceEditorModel
@@ -356,6 +374,8 @@ public sealed class EventController : Controller
                 Grants = "[]",
                 CommunityVisible = true,
             },
+            Start = start,
+            End = start.AddHours(1),
             ReminderEnabled = true,
             SaveAsDraft = true, // ADR 0037 — a new event is a draft until published.
             Languages = await SeedLanguagePickerAsync(),

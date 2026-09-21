@@ -5,6 +5,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
+using Kumunita.Web.Localization;
 using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
@@ -720,7 +721,13 @@ public class EventControllerTests
         }
 
         var localization = DefaultLocalization();
-        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>());
+        // The composer's time-range default resolves the actor's effective time
+        // zone (resident override → platform default → UTC floor). An anonymous
+        // HttpContextAccessor (no request principal) drives it to the UTC floor —
+        // a shape test only needs a non-throwing, non-null zone.
+        var timezone = new EffectiveTimezoneResolver(
+            userInfoImpl, localization, new HttpContextAccessor());
+        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
         var claims = new List<Claim>();
