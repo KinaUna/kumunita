@@ -62,9 +62,11 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
 
     /// <summary>
     /// Boot the full guide set (the four-surface set + the guides under
-    /// <c>help</c>) into a session, commit. Mirrors the production boot order
-    /// (ADR 0057 D1: the guides are seeded right after the four-surface set,
-    /// same session, same commit — C3).
+    /// <c>help</c> + the de/fr/da guide baselines) into a session, commit.
+    /// Mirrors the production boot order (ADR 0057 D1: the guides are seeded
+    /// right after the four-surface set, same session, same commit — C3;
+    /// amended 2026-09-21: the de/fr/da baselines are seeded immediately after
+    /// the guides, same session).
     /// </summary>
     private static async Task BootGuidesAsync(IDocumentStore store, CancellationToken ct)
     {
@@ -75,7 +77,8 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             await FirstBootSeeder.SeedPageTranslationsAsync(s, seededPageIds, DateTimeOffset.UtcNow, ct);
             if (seededPageIds.TryGetValue("help", out var helpId))
             {
-                await FirstBootSeeder.SeedUserGuidesAsync(s, helpId, DateTimeOffset.UtcNow, ct);
+                var guidePageIds = await FirstBootSeeder.SeedUserGuidesAsync(s, helpId, DateTimeOffset.UtcNow, ct);
+                await FirstBootSeeder.SeedGuideTranslationsAsync(s, guidePageIds, DateTimeOffset.UtcNow, ct);
             }
             await s.SaveChangesAsync(ct);
         }
@@ -179,15 +182,14 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     }
 
     [Fact]
-    public async Task UG_Guides_NoPageTranslationRows_AtFirstBoot()
+    public async Task UG_Guides_DaFrDaBaselines_AtFirstBoot()
     {
-        // ADR 0057 D2 — the guides ship `en`-only (the ADR 0042 D1 "code wins
-        // for `en`" floor; a non-`en` guide body is community-owned, added
-        // later by a human Translator — the ADR 0005 C "never
-        // machine-translated" clause). So a first boot attaches NO
-        // PageTranslation row to a guide, and this keeps the ADR 0044
-        // page-baseline parity green (the PageTranslation count is unchanged
-        // by the guides — they add Page docs, not translation rows).
+        // ADR 0057 D2 (amended 2026-09-21) — the guides ship with curated
+        // de/fr/da baselines on a pristine DB: 8 guides × 3 languages = 24
+        // PageTranslation rows. The ADR 0042 D1 "create-if-missing" invariant
+        // still holds (a human Translator's edit is never clobbered by a
+        // later deploy); the "never machine-translated" ADR 0005 C clause is
+        // preserved — the baselines are hand-curated, not machine output.
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
         var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
@@ -209,13 +211,185 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // Exactly the guide set (sanity: the guides are present).
         Assert.Equal(guideSlugs.Length, guideIds.Count);
 
-        // No PageTranslation row is attached to any guide's own Id (the
-        // en-only floor — a non-`en` guide body, once a human adds it, would
-        // attach here, but a first boot has none).
-        var translationsOnGuides = await q.Query<PageTranslation>()
+        // 8 guides × 3 languages (de/fr/da) = 24 PageTranslation rows.
+        var total = await q.Query<PageTranslation>()
             .Where(t => guideIds.Contains(t.PageId))
             .CountAsync(ct);
-        Assert.Equal(0, translationsOnGuides);
+        Assert.Equal(guideIds.Count * 3, total);
+
+        // Each guide carries exactly one row per language (de, fr, da).
+        foreach (var lang in new[] { "de", "fr", "da" })
+        {
+            var langCount = await q.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId) && t.LanguageCode == lang)
+                .CountAsync(ct);
+            Assert.Equal(guideIds.Count, langCount);
+        }
+
+        // The baselines are platform content (no resident author) — the ADR
+        // 0042 D2 "AuthorId = string.Empty" marker.
+        var authorIds = await q.Query<PageTranslation>()
+            .Where(t => guideIds.Contains(t.PageId))
+            .Select(t => t.AuthorId)
+            .ToListAsync(ct);
+        Assert.All(authorIds, a => Assert.Equal(string.Empty, a));
+    }
+
+    [Fact]
+    public async Task UG_GuideBaselineIdempotency_AcrossTwoBoots()
+    {
+        // ADR 0042 D1 — create-if-missing: a second boot must not create
+        // duplicate PageTranslation rows for the guide baselines. The count
+        // stays at 24 (8 × 3), not 48.
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+
+        await BootGuidesAsync(store, ct);
+        await BootGuidesAsync(store, ct); // second boot
+
+        await using var q = store.QuerySession();
+        var systemRoot = await q.Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstAsync(ct);
+        var help = await q.Query<Page>()
+            .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+            .FirstAsync(ct);
+        var guideIds = await q.Query<Page>()
+            .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
+
+        var total = await q.Query<PageTranslation>()
+            .Where(t => guideIds.Contains(t.PageId))
+            .CountAsync(ct);
+        Assert.Equal(guideIds.Count * 3, total);
+    }
+
+    [Fact]
+    public async Task UG_BackfillGuideTranslations_CreatesAbsent_NeverClobbers_HumanEdit()
+    {
+        // ADR 0057 D2 (amended 2026-09-21) — the warm-boot backfill
+        // (BackfillGuideTranslationsAsync) creates the absent de/fr/da
+        // baselines on a deployment whose guides predate the baseline, and
+        // never clobbers a row a human Translator has already edited
+        // (the ADR 0042 D1 create-if-missing invariant).
+
+        // Boot: four-surface set + guides (no baselines — mirrors a
+        // deployment whose first boot predates the guide-translation lane).
+        var store = await BootStoreAsync();
+        var ct = TestContext.Current.CancellationToken;
+        var guideSlugs = FirstBootSeeder.GuidePages().Select(g => g.Slug).ToArray();
+
+        await using (var s = newSession(store))
+        {
+            var defaultPages = FirstBootSeeder.EnDefaultPages();
+            var seededPageIds = await FirstBootSeeder.SeedDefaultPagesAsync(s, defaultPages, DateTimeOffset.UtcNow, ct);
+            await FirstBootSeeder.SeedPageTranslationsAsync(s, seededPageIds, DateTimeOffset.UtcNow, ct);
+            if (seededPageIds.TryGetValue("help", out var helpId))
+            {
+                await FirstBootSeeder.SeedUserGuidesAsync(s, helpId, DateTimeOffset.UtcNow, ct);
+                // NOTE: deliberately NOT calling SeedGuideTranslationsAsync —
+                // mirroring a pre-baseline boot.
+            }
+            await s.SaveChangesAsync(ct);
+        }
+
+        // Sanity: 0 baseline rows before backfill.
+        await using (var q0 = store.QuerySession())
+        {
+            var systemRoot = await q0.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var help = await q0.Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var guideIds = await q0.Query<Page>()
+                .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct);
+            var count = await q0.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
+            Assert.Equal(0, count);
+        }
+
+        // Run the backfill.
+        await using (var bf = newSession(store))
+        {
+            await FirstBootSeeder.BackfillGuideTranslationsAsync(bf, ct);
+            await bf.SaveChangesAsync(ct);
+        }
+
+        // Verify: 24 rows (8 × 3) created, platform author.
+        await using (var q1 = store.QuerySession())
+        {
+            var systemRoot = await q1.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var help = await q1.Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var guideIds = await q1.Query<Page>()
+                .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct);
+            var count = await q1.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
+            Assert.Equal(guideIds.Count * 3, count);
+        }
+
+        // Now: a human Translator edits ONE baseline row (simulating a
+        // community edit). Re-run backfill. The edited row's Body must be
+        // preserved (never clobbered), and the other 23 rows must stay.
+        await using (var s2 = newSession(store))
+        {
+            var systemRoot = await s2.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var help = await s2.Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var postsGuide = await s2.Query<Page>()
+                .Where(p => p.ParentId == help.Id && p.Slug == "posts")
+                .FirstAsync(ct);
+            var dePosts = await s2.Query<PageTranslation>()
+                .Where(t => t.PageId == postsGuide.Id && t.LanguageCode == "de")
+                .FirstAsync(ct);
+            dePosts.Title = "Human-edited title";
+            dePosts.Body = "Human-edited body";
+            s2.Store(dePosts);
+            await s2.SaveChangesAsync(ct);
+        }
+
+        // Re-run backfill — must be a no-op for the edited row.
+        await using (var bf2 = newSession(store))
+        {
+            await FirstBootSeeder.BackfillGuideTranslationsAsync(bf2, ct);
+            await bf2.SaveChangesAsync(ct);
+        }
+
+        // Verify: the human edit is preserved, count is still 24.
+        await using (var q2 = store.QuerySession())
+        {
+            var systemRoot = await q2.Query<Page>()
+                .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+                .FirstAsync(ct);
+            var help = await q2.Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id)
+                .FirstAsync(ct);
+            var guideIds = await q2.Query<Page>()
+                .Where(p => p.ParentId == help.Id && p.IsDeleted == false)
+                .Select(p => p.Id).ToListAsync(ct);
+            var count = await q2.Query<PageTranslation>()
+                .Where(t => guideIds.Contains(t.PageId)).CountAsync(ct);
+            Assert.Equal(guideIds.Count * 3, count);
+
+            var postsGuide = await q2.Query<Page>()
+                .Where(p => p.ParentId == help.Id && p.Slug == "posts")
+                .FirstAsync(ct);
+            var dePosts = await q2.Query<PageTranslation>()
+                .Where(t => t.PageId == postsGuide.Id && t.LanguageCode == "de")
+                .FirstAsync(ct);
+            Assert.Equal("Human-edited title", dePosts.Title);
+            Assert.Equal("Human-edited body", dePosts.Body);
+        }
     }
 
     // ── UG backfill (ADR 0057 D3 / the ADR 0047 D2 + ADR 0052 warm-boot

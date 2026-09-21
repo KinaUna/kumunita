@@ -93,6 +93,11 @@ public static class SchemaBootstrap
             //     (a deployment whose first boot predates the UG lane has
             //     help but no guides — create-if-missing, never clobbering a
             //     community edit; ADR 0057)
+            //   · the de/fr/da PageTranslation baselines on the user guides
+            //     (a deployment whose first boot predates the guide-translation
+            //     baseline has guides but no translated rows — create-if-missing,
+            //     never clobbering a community Translator's edit; ADR 0057 amended
+            //     2026-09-21)
             await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
             await FirstBootSeeder
                 .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
@@ -100,10 +105,12 @@ public static class SchemaBootstrap
                 .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
             await FirstBootSeeder
                 .BackfillUserGuidesAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillGuideTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
             logger.LogInformation(
                 "Warm boot: backfill complete (de/fr/da rows for the canonical " +
                 "static pages + the UI-string catalog baselines + the user guides " +
-                "under help, create-if-missing).");
+                "under help + the de/fr/da guide baselines, create-if-missing).");
         }
     }
 

@@ -35,12 +35,14 @@ did.
 ## The registry (the single source)
 
 The guide set is a **closed registry**, in the seeder's `GuidePages()` array
-(the ADR 0042 D1 "the registry is the single source both the seeder and
-these tests read" shape, applied to the guides). A new guide is a new row in
-the registry, not a silent addition — the ADR 0040 `PageKind` closed-set
-rule applied to the guide set. The eight seeded guides (the current shipped
-surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/`RE`/`TG`/`PG`/`GU`/`GA`/`TR`/`TZ`/
-`DF` lanes):
+(the `en` floor) **plus the matching `DeGuidePages()` / `FrGuidePages()` /
+`DaGuidePages()` arrays** (the `de`/`fr`/`da` baselines, ADR 0057 D2 amended
+2026-09-21) — the ADR 0042 D1 "the registry is the single source both the
+seeder and these tests read" shape, applied to the guides. A new guide is a
+new row in **all four** arrays (one per language), not a silent addition —
+the ADR 0040 `PageKind` closed-set rule applied to the guide set. The eight
+seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
+`RE`/`TG`/`PG`/`GU`/`GA`/`TR`/`TZ`/`DF` lanes):
 
 | Slug (under `help/`) | Covers | The ADR it documents |
 |---|---|---|
@@ -80,12 +82,21 @@ resident page using the slug) is never clobbered (ADR 0057 D2.1, the ADR
    The `getting-started` index is the *only* guide that links to the others;
    the rest are self-contained.
 4. **The `en` floor is always present; the non-`en` body is community-owned.**
-   A guide ships `en`-only (ADR 0057 D2); a `de`/`fr`/`da` body is added by a
-   **human Translator** (the ADR 0021 lane) or a GlobalAdmin in the in-app
-   editor, and is never clobbered by a later deploy (the ADR 0042 D1
+   A guide ships a curated `de`/`fr`/`da` **baseline** on a pristine DB
+   (ADR 0057 D2, amended 2026-09-21 — the seeder's `DeGuidePages()` /
+   `FrGuidePages()` / `DaGuidePages()` arrays are the single source, the
+   same shape as the four-surface set's baselines), seeded
+   **create-if-missing only**. A **human Translator** (the ADR 0021 lane) or
+   a GlobalAdmin may then refine a `de`/`fr`/`da` body in the in-app editor,
+   and that edit is never clobbered by a later deploy (the ADR 0042 D1
    invariant). A machine translation is **never** the writer of a non-`en`
    guide body (ADR 0005 C — the "never machine-translated" clause, applied to
-   guides as to UGC).
+   guides as to UGC); the baselines are hand-curated, not machine output.
+   **Cross-links inside the `de`/`fr`/`da` baselines use the absolute form**
+   (`[posts](/pages/system/help/posts)`) because a guide's canonical URL
+   carries the `system` root and the relative links the `en` floor uses
+   (e.g. `[posts](posts)`) do not resolve on the tree-browse page; the
+   `en` floor is untouched.
 
 ## The consistency loop (the "keep it honest" lane)
 
@@ -111,9 +122,10 @@ lane**. A lane that ships a feature that changes how a resident does a thing
 - **Update** the affected guide's `en` body (the code-owned floor) in the
   same commit — the ADR 0042 D1 "code wins for `en`" shape applied to the
   guide's `en` body.
-- **Add a row** to the guide registry (the seeder's `GuidePages()` array)
-  if it is a *new* feature — the ADR 0040 `PageKind` closed-set rule applied
-  to the guide set.
+- **Add a row** to the guide registry (the seeder's `GuidePages()` array,
+  **plus the matching `DeGuidePages()` / `FrGuidePages()` / `DaGuidePages()`
+  baselines**) if it is a *new* feature — the ADR 0040 `PageKind` closed-set
+  rule applied to the guide set.
 - **Update** the conventions doc (this file) in the same commit — the
   registry table gains the new row, the ADR it documents is named, and the
   drift pin (below) picks up the new slug.
@@ -199,7 +211,10 @@ A guide is a `PageKind.System` page (the ADR 0040 model, unchanged):
 A new guide ships in **one lane**, in **one commit**, with **all** of:
 
 1. **A row in the registry** — the seeder's `GuidePages()` array gains the
-   new `(Slug, Title, Body)` tuple (the `en` body, the code-owned floor).
+   new `(Slug, Title, Body)` tuple (the `en` body, the code-owned floor),
+   **and the matching `DeGuidePages()` / `FrGuidePages()` / `DaGuidePages()`
+   arrays gain the translated baselines** (the `de`/`fr`/`da` floor, the
+   ADR 0057 D2 amended 2026-09-21 shape).
 2. **A row in the conventions doc** — the registry table (above) gains the
    new row, the ADR it documents is named, and the drift pin picks up the
    new slug.

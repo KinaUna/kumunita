@@ -496,17 +496,23 @@ public static class FirstBootSeeder
         var seededPageIds = await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
         await SeedPageTranslationsAsync(session, seededPageIds, now, ct).ConfigureAwait(false);
 
-        // UG (ADR 0057): the resident-facing guides — `Page` docs nested under
-        // the canonical `help` page (the ADR 0043 D1 `system/help` surface),
-        // `en`-only (the ADR 0042 D1 "code wins for `en`" floor; a non-`en`
-        // guide body is community-owned, added later by a human Translator).
+        // UG (ADR 0057, amended 2026-09-21 to seed de/fr/da baselines): the
+        // resident-facing guides — `Page` docs nested under the canonical
+        // `help` page (the ADR 0043 D1 `system/help` surface). The `en` body
+        // is the code-owned floor (ADR 0042 D1 "code wins for `en`"); the
+        // `de` / `fr` / `da` baselines now ship as `PageTranslation` rows too
+        // (the same shape as the four-surface set's baselines above) so a
+        // fresh instance shows the guides in the viewer's language, and a
+        // non-`en` body, once a human rewords one, is community-owned and
+        // never clobbered by a later deploy (the create-if-missing invariant).
         // Same session / same commit as the four-surface set above (C3).
         // Pass the `help` page's Id straight through from `seededPageIds` —
         // it is the in-flight (not yet committed) `help` page, so re-querying
         // for it here would miss and silently drop every guide on first boot.
         if (seededPageIds.TryGetValue("help", out var helpId))
         {
-            await SeedUserGuidesAsync(session, helpId, now, ct).ConfigureAwait(false);
+            var guidePageIds = await SeedUserGuidesAsync(session, helpId, now, ct).ConfigureAwait(false);
+            await SeedGuideTranslationsAsync(session, guidePageIds, now, ct).ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -712,12 +718,14 @@ public static class FirstBootSeeder
     /// <c>public</c> members are reachable).
     /// </para>
     /// </summary>
-    public static async Task SeedUserGuidesAsync(
+    public static async Task<Dictionary<string, string>> SeedUserGuidesAsync(
         IDocumentSession session,
         string helpPageId,
         DateTimeOffset now,
         CancellationToken ct)
     {
+        var guidePageIds = new Dictionary<string, string>(StringComparer.Ordinal);
+
         // The guides hang from the canonical `help` page (under the `system`
         // root, ADR 0043 D1). The caller hands us the `help` page's Id
         // directly (it is the very page `SeedDefaultPagesAsync` just
@@ -728,7 +736,7 @@ public static class FirstBootSeeder
         // page), guarded as a no-op — never create the guides as orphan roots.
         if (string.IsNullOrEmpty(helpPageId))
         {
-            return;   // no canonical `help` page — nothing to hang the guides from.
+            return guidePageIds;   // no canonical `help` page — nothing to hang the guides from.
         }
 
         foreach (var (slug, title, body) in GuidePages())
@@ -741,7 +749,7 @@ public static class FirstBootSeeder
 
             if (existing is null)
             {
-                session.Store(new Page
+                var newGuide = new Page
                 {
                     Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
                     Slug = slug,
@@ -754,7 +762,9 @@ public static class FirstBootSeeder
                     AuthorId = string.Empty,    // platform content — no resident author
                     Created = now,
                     Modified = now,
-                });
+                };
+                session.Store(newGuide);
+                guidePageIds[slug] = newGuide.Id;   // for SeedGuideTranslationsAsync
             }
             else
             {
@@ -763,6 +773,81 @@ public static class FirstBootSeeder
                 existing.Body = body;   // code wins: refresh the `en` guide body
                 existing.Modified = now;
                 session.Store(existing);
+                guidePageIds[slug] = existing.Id;   // for SeedGuideTranslationsAsync
+            }
+        }
+
+        return guidePageIds;
+    }
+
+    /// <summary>
+    /// UG (ADR 0057, amended 2026-09-21) — seed the <c>de</c> / <c>fr</c> /
+    /// <c>da</c> <see cref="PageTranslation"/> rows for the seeded resident
+    /// guides, attached to the guides' **own** ids (the read path
+    /// <c>IPageService.GetTranslationsAsync(page.Id)</c> queries
+    /// <c>PageTranslation.PageId == page.Id</c> — the <c>system</c> root or
+    /// the <c>help</c> page's id is not a valid parent). Mirrors
+    /// <see cref="SeedPageTranslationsAsync"/> exactly (the four-surface set's
+    /// baseline lane) — same create-if-missing idiom, same session (C3),
+    /// same one <c>SaveChangesAsync</c> in the caller.
+    /// <para>
+    /// <paramref name="guidePageIds"/> is the slug → guide-Id map
+    /// <see cref="SeedUserGuidesAsync"/> returns (the guides' own in-flight
+    /// ids, not yet committed — the same "pass straight through" invariant as
+    /// the four-surface set).
+    /// </para>
+    /// <para>
+    /// Idempotent (query-then-Store, one row per (guide, language) pair,
+    /// <b>create-if-missing</b> — an existing row is skipped, never
+    /// refreshed): a pristine DB has no rows yet (create); a warm re-run (the
+    /// outer <c>IsPristineAsync</c> gate normally blocks this) leaves existing
+    /// rows exactly as written — no duplicates, no overwrite. A non-<c>en</c>
+    /// guide body, once a human rewords one in the in-app editor, is
+    /// community-owned and never clobbered by a later deploy (the ADR 0042 D1
+    /// invariant, unchanged).
+    /// </para>
+    /// <para>
+    /// <see cref="PageTranslation.AuthorId"/> is empty (platform content — no
+    /// resident author, the same convention as the four-surface set's rows).
+    /// </para>
+    /// </summary>
+    public static async Task SeedGuideTranslationsAsync(
+        IDocumentSession session,
+        IReadOnlyDictionary<string, string> guidePageIds,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        foreach (var (code, baselines) in new[]
+        {
+            ("de", DeGuidePages()),
+            ("fr", FrGuidePages()),
+            ("da", DaGuidePages()),
+        })
+        {
+            foreach (var (slug, title, body) in baselines)
+            {
+                if (!guidePageIds.TryGetValue(slug, out var pageId))
+                    continue;   // defensive — the GuidePages() slugs agree with the baseline slugs; skip rather than throw
+                var existing = await session
+                    .Query<PageTranslation>()
+                    .Where(t => t.PageId == pageId && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new PageTranslation
+                    {
+                        Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                        PageId = pageId,
+                        LanguageCode = code,
+                        Title = title,
+                        Body = body,
+                        AuthorId = string.Empty,   // platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
             }
         }
     }
@@ -852,6 +937,117 @@ public static class FirstBootSeeder
                 });
             }
             // else: skip — create-if-missing (never overwrite a community edit; ADR 0042 D1).
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// UG (ADR 0057, amended 2026-09-21) — **warm-boot backfill** of the
+    /// <c>de</c> / <c>fr</c> / <c>da</c> <see cref="PageTranslation"/> rows
+    /// for the resident guides: the gap a deployment whose first boot predates
+    /// this baseline lane has — the guides' <c>en</c> body (the
+    /// <see cref="GuidePages"/>() floor, created by
+    /// <see cref="BackfillUserGuidesAsync"/> or the original first-boot seed)
+    /// but no translation rows, so a German / French / Danish-speaking
+    /// resident reads the <c>en</c> body for every guide.
+    /// <para>
+    /// Mirrors <see cref="BackfillPageTranslationsAsync"/> (the four-surface
+    /// set's baseline backfill) — **create-if-missing only** (the ADR 0042 D1
+    /// invariant): a row for a (guide, language) pair that already exists — a
+    /// human Translator's edit in the in-app editor — is skipped, never
+    /// refreshed. Only the absent rows are created, from the same
+    /// <see cref="DeGuidePages"/> / <see cref="FrGuidePages"/> /
+    /// <see cref="DaGuidePages"/> baselines the first-boot seeder uses, so a
+    /// fresh and a backfilled instance carry the same non-<c>en</c> baseline.
+    /// </para>
+    /// <para>
+    /// Idempotent: a second run finds every row it created on the first run
+    /// and skips (the create-if-missing path). No tombstones, no deletes.
+    /// </para>
+    /// </summary>
+    public static async Task BackfillGuideTranslationsAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        // Resolve the canonical `help` page (the guides hang from it, ADR
+        // 0057 D1) — the same `system/help` primary + bare-`help` fallback as
+        // BackfillUserGuidesAsync, so the two backfills agree on the parent.
+        var systemRoot = await session
+            .Query<Page>()
+            .Where(p => p.Slug == "system" && p.ParentId == null && p.IsDeleted == false)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        Page? help = null;
+        if (systemRoot is not null)
+        {
+            help = await session
+                .Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == systemRoot.Id && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+        }
+        if (help is null)
+        {
+            help = await session
+                .Query<Page>()
+                .Where(p => p.Slug == "help" && p.ParentId == null && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+        }
+
+        if (help is null)
+        {
+            return;   // no canonical `help` page — nothing to backfill translations for.
+        }
+
+        foreach (var (slug, _, _) in GuidePages())
+        {
+            var guide = await session
+                .Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == help.Id && p.IsDeleted == false)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (guide is null)
+                continue;   // the guide itself is absent; BackfillUserGuidesAsync owns that gap.
+
+            // The de/fr/da baselines for this guide, create-if-missing (ADR 0042 D1).
+            foreach (var (code, baselines) in new[]
+            {
+                ("de", DeGuidePages()),
+                ("fr", FrGuidePages()),
+                ("da", DaGuidePages()),
+            })
+            {
+                var baseline = baselines.FirstOrDefault(b => b.Slug == slug);
+                if (baseline == default)
+                    continue;   // defensive — the slug is not in the baseline set; skip rather than throw.
+
+                var existing = await session
+                    .Query<PageTranslation>()
+                    .Where(t => t.PageId == guide.Id && t.LanguageCode == code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new PageTranslation
+                    {
+                        Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                        PageId = guide.Id,
+                        LanguageCode = code,
+                        Title = baseline.Title,
+                        Body = baseline.Body,
+                        AuthorId = string.Empty,   // platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite a community edit; ADR 0042 D1).
+            }
         }
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -1023,6 +1219,576 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
+    /// UG (ADR 0057, amended 2026-09-21) — the curated <c>de</c> baseline for
+    /// the resident guides: the single source of the seeded German guide
+    /// bodies (the same shape as <see cref="GuidePages"/>() — a public static
+    /// array of <c>(Slug, Title, Body)</c> tuples). A full translation of the
+    /// <see cref="GuidePages"/>() bodies — the same Markdown structure
+    /// (heading, the step blocks, the cross-links), idiomatic German UI copy at
+    /// the ADR 0042 D2 bar (the <c>du</c> register held, sentence case, no
+    /// word-for-word calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine DB
+    /// (ADR 0042 D1 — seeded once, then community-owned; the in-app editor
+    /// supersedes them and no later deploy reverts a human edit).
+    /// <para>
+    /// <b>Cross-links are absolute.</b> A guide's canonical URL is
+    /// <c>/pages/system/help/{slug}</c> (the <c>system</c> root is part of the
+    /// derived path — the guides are grandchildren of <c>system</c>), so a
+    /// sibling link like the <c>en</c> floor's <c>[posts](posts)</c> does not
+    /// resolve on the tree-browse page. These translations therefore link with
+    /// the absolute form <c>[posts](/pages/system/help/posts)</c>, which is a
+    /// relative <c>/</c>-rooted path the <see cref="Kumunita.Web.Security.MarkdownRenderer"/>
+    /// <c>IsSafeUrl</c> allowlist accepts. The <c>en</c> floor
+    /// (<see cref="GuidePages"/>) is untouched — only the seeded baselines use
+    /// the absolute form, and both render identically for the resident.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] DeGuidePages()
+    {
+        return
+        [
+            ("getting-started", "Erste Schritte",
+             "## Erste Schritte\n\n" +
+             "Das ist der erste Ort, an den du dich wendest. Kumunita ist ein " +
+             "privater Ort für genau ein Viertel — diese Seite und die Seiten " +
+             "darunter führen dich Schritt für Schritt durch alles.\n\n" +
+             "**Wo was ist.** Der **Feed** ist der Ort der Beiträge. **Gruppen** " +
+             "sammeln Bewohner um ein Gebäude, ein Projekt oder ein gemeinsames " +
+             "Interesse. Das **Verzeichnis** zeigt die Bewohner auf der Plattform " +
+             "und die Angaben, die jeder von ihnen teilen möchte. Der **Seiten**-Baum " +
+             "(der Link **Seiten**) ist der Ort dieser Anleitungen, der Nutzungs-" +
+             "bedingungen, des Datenschutzes und des Verhaltenskodex.\n\n" +
+             "**Deine ersten Schritte.**\n" +
+             "- **Einen Beitrag schreiben.** Wähle **Neuer Beitrag**, schreibe ihn, " +
+             "wähle, wer ihn sehen darf, und klicke auf **Posten**. Siehe " +
+             "[Beiträge](/pages/system/help/posts) für die vollständige Anleitung.\n" +
+             "- **Einer Gruppe beitreten.** Gruppen sind der Ort eines gemeinsamen " +
+             "Interesses. Siehe [Gruppen](/pages/system/help/groups).\n" +
+             "- **Sprache und Zeitzone einstellen.** Sie werden auf deinem Konto " +
+             "gespeichert. Siehe [Sprache](/pages/system/help/language).\n\n" +
+             "Für alles andere gibt es unter dieser Seite eine Anleitung — folge " +
+             "dem Link zu dem, was du tun willst.\n"),
+            ("posts", "Beiträge",
+             "## Beiträge\n\n" +
+             "Ein Beitrag ist eine Notiz, die du mit den Menschen teilst, die du " +
+             "wählst.\n\n" +
+             "**So schreibst du einen.** Wähle oben im Feed **Neuer Beitrag**. Gib " +
+             "ein, was du sagen möchtest. Unter **Wer darf ihn sehen** wählst du die " +
+             "Zielgruppe. Klicke auf **Posten**.\n\n" +
+             "**Wer darf ihn sehen.** Standardmäßig sieht ihn jeder im Viertel. Du " +
+             "kannst das eingrenzen — auf eine bestimmte Person oder auf eine Gruppe " +
+             "— über den Zielgruppen-Auswahlbereich. Siehe [Zielgruppe](/pages/system/help/audience), " +
+             "was jede Wahl bedeutet.\n\n" +
+             "**Antworten.** Jeder, der deinen Beitrag sehen kann, kann darauf " +
+             "antworten. Eine Antwort ist unter der einzelnen Zielgruppenwahl deines " +
+             "Beitrags sichtbar — sie hat keine eigene Zielgruppe. Du kannst deine " +
+             "eigenen Antworten **Bearbeiten** oder **Löschen**; die Plattform merkt " +
+             "sich, wann eine bearbeitet wurde.\n\n" +
+             "**Einen Beitrag bearbeiten oder löschen.** Der Autor kann seinen " +
+             "Beitrag bearbeiten oder weich löschen — er bleibt dort, wo er war, " +
+             "gekennzeichnet als gelöscht, damit der Faden noch Sinn ergibt. Ein " +
+             "Global-Admin (und, wo zugewiesen, ein Moderator) kann einen Beitrag " +
+             "entfernen, der den Verhaltenskodex verletzt.\n\n" +
+             "**Dateien.** Du kannst einem Beitrag Bilder oder andere Dateien " +
+             "anhängen. Sie werden auf der Instanz gespeichert und unter der " +
+             "Zielgruppe des Beitrags geteilt.\n"),
+            ("groups", "Gruppen",
+             "## Gruppen\n\n" +
+             "Eine Gruppe sammelt Bewohner um eine gemeinsame Sache — ein Gebäude, " +
+             "ein Projekt, ein Hobby.\n\n" +
+             "**Öffentlich und privat.** Eine **öffentliche** Gruppe kann jeder " +
+             "beitreten; eine **private** Gruppe nur auf Einladung, und nur ihre " +
+             "Mitglieder können sie sehen, darauf posten oder sie über einen " +
+             "Beitrag in die Zielgruppe nehmen. Beide Arten helfen dir, das " +
+             "Viertel zu organisieren.\n\n" +
+             "**So erstellst du eine.** Wähle **Gruppe erstellen**, gib einen Namen " +
+             "und eine kurze Beschreibung und wähle, ob sie öffentlich oder privat " +
+             "ist. Namen und Beschreibung kannst du jederzeit bearbeiten.\n\n" +
+             "**Gruppenbeiträge.** Eine Gruppe hat einen eigenen Feed. Ein Beitrag, " +
+             "den du in einer Gruppe machst, wird von den Mitgliedern der Gruppe " +
+             "gesehen (und von allen, die du in ihre Zielgruppe nimmst). Du kannst " +
+             "in eine Gruppe posten wie in den Gemeinschafts-Feed — der " +
+             "Zielgruppen-Auswahlbereich enthält dann einfach die Gruppe.\n\n" +
+             "**Verlassen.** Ein Mitglied kann eine Gruppe verlassen; die Gruppe " +
+             "behält ihre Beiträge. Ein Gruppenbesitzer oder ein Global-Admin kann " +
+             "ein Mitglied entfernen oder eine Gruppe schließen.\n"),
+            ("drafts", "Entwürfe",
+             "## Entwürfe\n\n" +
+             "Ein Entwurf ist ein Beitrag, den du geschrieben hast, aber noch " +
+             "nicht geteilt hast.\n\n" +
+             "**So speicherst du einen.** Im Editor hake **Als Entwurf speichern** " +
+             "an und speichere. Der Entwurf ist gespeichert, aber niemand kann ihn " +
+             "sehen — auch nicht die Admins — bis du ihn veröffentlicht hast.\n\n" +
+             "**Deine Entwürfe finden.** Öffne **Meine Entwürfe** im Menü. Jeder " +
+             "Entwurf, den du gespeichert hast, ist dort, mit einem **Entwurf**-" +
+             "Kennzeichen.\n\n" +
+             "**Veröffentlichen.** Öffne den Entwurf und klicke auf " +
+             "**Veröffentlichen**. Er wird unter der Zielgruppe sichtbar, die du " +
+             "gesetzt hast. Bis dahin sieht ihn nur du.\n\n" +
+             "Entwürfe gehören dir — nur der Autor und ein Global-Admin können sie " +
+             "sehen oder ändern, und ein Global-Admin kann einen Entwurf entfernen, " +
+             "der dort nicht hingehört.\n"),
+            ("audience", "Zielgruppe",
+             "## Zielgruppe\n\n" +
+             "Zielgruppe ist die Wahl, die du beim Posten triffst, wer den Beitrag " +
+             "sehen darf. Die Plattform erzwingt sie bei jedem Lesen.\n\n" +
+             "**Die Wahlen.**\n" +
+             "- **Alle in diesem Viertel** — der Standard. Jedes Mitglied der " +
+             "Gemeinschaft kann ihn sehen.\n" +
+             "- **Eine bestimmte Person** — nur dieser Bewohner (und du) kann ihn " +
+             "sehen.\n" +
+             "- **Eine Gruppe** — die Mitglieder der Gruppe (und du) können ihn " +
+             "sehen.\n\n" +
+             "Du kannst die Wahlen kombinieren — zum Beispiel eine Gruppe *und* " +
+             "eine bestimmte Person. Was auch immer du wählst, wird die Zielgruppe " +
+             "des Beitrags — und nichts anderes.\n\n" +
+             "**Eine Antwort hat keine eigene Zielgruppe.** Sie ist unter der " +
+             "einzigen Zielgruppenwahl des Beitrags sichtbar — das ist die " +
+             "„Antwort-erbt\u201C-Regel, und sie hält den Faden für die Leute lesbar, " +
+             "die bereits im Raum sind.\n\n" +
+             "**Die Zielgruppe eines Beitrags lässt sich nach der Veröffentlichung " +
+             "nicht ändern.** Um ihn mit mehr Leuten zu teilen, starte einen neuen " +
+             "Beitrag mit der breiteren Zielgruppe — der ursprüngliche bleibt bei " +
+             "denen, die du zuerst gewählt hast.\n"),
+            ("language", "Sprache",
+             "## Sprache\n\n" +
+             "Kumunita kann sich in mehr als einer Sprache zeigen, und du wählst, " +
+             "in welcher.\n\n" +
+             "**So stellst du deine ein.** Öffne **Einstellungen**, wähle **Wähle " +
+             "deine Sprache** und wähle die Sprache, die du möchtest. Deine Wahl " +
+             "wird auf deinem Konto gespeichert.\n\n" +
+             "**Was sich ändert.** Die Oberfläche — Knöpfe, Überschriften und die " +
+             "integrierten Seiten — erscheint in der Sprache, die du gewählt hast. " +
+             "Ein Beitrag oder eine Gruppensbeschreibung, die jemand geschrieben " +
+             "*und* in deine Sprache übersetzt hat, zeigt diese Übersetzung zuerst, " +
+             "das Original ist einen Klick entfernt.\n\n" +
+             "**Was sich nicht ändert.** Die Worte, die ein Bewohner tippt, sind " +
+             "seine. Ein Beitrag wird immer so gelesen, wie sein Autor ihn " +
+             "geschrieben hat, es sei denn, jemand hat eine Übersetzung " +
+             "hinzugefügt — die Plattform maschinensetzt nie das Schreiben eines " +
+             "Bewohners.\n\n" +
+             "**Zeitzone und Datum.** Du kannst auch die Zeitzone und das " +
+             "Datumsformat, das du siehst, in derselben **Einstellung**-Seite " +
+             "einstellen. Beides wird auf deinem Konto gespeichert.\n"),
+            ("events", "Termine",
+             "## Termine\n\n" +
+             "Ein Termin ist etwas, das das Viertel zu einer Zeit an einem Ort " +
+             "macht — ein Treffen, ein Reparaturtag, ein Beisammensein.\n\n" +
+             "**So siehst du sie.** Termine erscheinen im Feed und auf der " +
+             "Terminliste mit ihrem Datum, ihrer Uhrzeit und ihrem Ort.\n\n" +
+             "**So nimmst du teil.** Öffne den Termin und wähle **Teilnehmen**. " +
+             "Deine Antwort wird dem Termin und deinem Konto zugeordnet, und du " +
+             "kannst sie jederzeit vor dem Termin ändern.\n\n" +
+             "**Die Erinnerung.** Du kannst dich für eine Erinnerung am Vortag " +
+             "anmelden. Sie wird einmalig an dein Konto gesendet, und nur wenn du " +
+             "dich dafür angemeldet hast — es gibt keine Erinnerung, für die du " +
+             "dich nicht angemeldet hast.\n\n" +
+             "**Einen anlegen.** Ein Global-Admin (und, wo zugewiesen, ein " +
+             "Moderator) kann einen Termin für das Viertel anlegen, seine " +
+             "Zielgruppe setzen und wählen, ob er eine Erinnerung trägt. Du " +
+             "kannst über einen Termin im Feed posten wie über alles andere.\n"),
+            ("translator", "Übersetzer",
+             "## Übersetzer\n\n" +
+             "Ein **Übersetzer** ist ein Bewohner, dem das Recht zugewiesen ist, " +
+             "eine Sprachversion eines Dings hinzuzufügen und zu bearbeiten, das " +
+             "die Plattform bereits trägt — eine Seite, eine Gruppensbeschreibung, " +
+             "einen Gemeindenamen oder einen Beitrag oder eine Antwort.\n\n" +
+             "**Was ein Übersetzer darf.**\n" +
+             "- **Eine Übersetzung hinzufügen** einer Seite, einer Gruppe, eines " +
+             "Gemeindenamens, eines Beitrags oder einer Antwort — in einer Sprache, " +
+             "die die Instanz aktiviert hat.\n" +
+             "- **Eine Übersetzung bearbeiten**, die er hinzugefügt hat, jederzeit.\n\n" +
+             "**Was ein Übersetzer nicht darf.**\n" +
+             "- **Das Original ändern.** Die Worte des Autors sind die des " +
+             "Autors; ein Übersetzer fügt eine Sprachversion daneben hinzu, nie " +
+             "darüber.\n" +
+             "- **Für die Maschine übersetzen.** Eine Übersetzung ist eine " +
+             "menschliche Handlung — die Plattform maschinensetzt nie das Schreiben " +
+             "eines Bewohners, und ein Übersetzer fügt kein Maschinen-Output ein, " +
+             "als wäre es sein eigenes.\n" +
+             "- **Einen Global-Admin vertreten.** Ein Übersetzer hat kein Recht auf " +
+             "den eigenen Seiten der Plattform, auf Moderation oder auf die " +
+             "Mitgliedschaft einer Gruppe — das sind die Lanes eines " +
+             "Global-Admins (oder, wo zugewiesen, eines Moderators).\n\n" +
+             "Die Arbeit eines Übersetzers ist sichtbar: die Oberfläche zeigt neben " +
+             "einem übersetzten Ding die Person, die diese Übersetzung " +
+             "hinzugefügt hat, und das Original ist immer einen Klick entfernt.\n"),
+        ];
+    }
+
+    /// <summary>
+    /// UG (ADR 0057, amended 2026-09-21) — the curated <c>fr</c> baseline for
+    /// the resident guides: the single source of the seeded French guide
+    /// bodies (the same shape as <see cref="GuidePages"/>() — a public static
+    /// array of <c>(Slug, Title, Body)</c> tuples). A full translation of the
+    /// <see cref="GuidePages"/>() bodies — the same Markdown structure
+    /// (heading, the step blocks, the cross-links), idiomatic French UI copy at
+    /// the ADR 0042 D2 bar (the familiar <c>tu</c> register held, sentence
+    /// case, no word-for-word calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine DB
+    /// (ADR 0042 D1 — seeded once, then community-owned; the in-app editor
+    /// supersedes them and no later deploy reverts a human edit).
+    /// <para>
+    /// <b>Cross-links are absolute</b> — see <see cref="DeGuidePages"/>() for
+    /// the rationale (a guide's canonical URL is
+    /// <c>/pages/system/help/{slug}</c>; the <c>en</c> floor's relative links
+    /// do not resolve on the tree-browse page, so the baselines link with the
+    /// absolute <c>/pages/system/help/…</c> form, which the
+    /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/> allowlist accepts).
+    /// The <c>en</c> floor is untouched.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] FrGuidePages()
+    {
+        return
+        [
+            ("getting-started", "Premiers pas",
+             "## Premiers pas\n\n" +
+             "C'est le premier endroit à consulter. Kumunita est un foyer privé " +
+             "pour un seul quartier — cette page et les pages en dessous te " +
+             "guident pas à pas.\n\n" +
+             "**Où sont les choses.** Le **fil** est le lieu des messages. Les " +
+             "**groupes** rassemblent les riverains autour d'un bâtiment, d'un " +
+             "projet ou d'un intérêt partagé. L'**annuaire** montre les résidents " +
+             "de la plateforme et les détails que chacun a choisi de partager. " +
+             "L'**arborescence des pages** (le lien **Pages**) est le lieu de ces " +
+             "guides, des conditions d'utilisation, de la confidentialité et du " +
+             "code de conduite.\n\n" +
+             "**Tes premiers pas.**\n" +
+             "- **Écrire un message.** Choisis **Nouveau message**, rédige-le, " +
+             "choisis qui peut le voir, et clique sur **Publier**. Voir " +
+             "[Messages](/pages/system/help/posts) pour le guide complet.\n" +
+             "- **Rejoindre un groupe.** Les groupes sont le lieu d'un intérêt " +
+             "partagé. Voir [Groupes](/pages/system/help/groups).\n" +
+             "- **Réglage la langue et le fuseau horaire.** Ils sont enregistrés " +
+             "sur ton compte. Voir [Langue](/pages/system/help/language).\n\n" +
+             "Tout le reste a un guide sous cette page — suis le lien vers ce " +
+             "que tu veux faire.\n"),
+            ("posts", "Messages",
+             "## Messages\n\n" +
+             "Un message est une note que tu partages avec les personnes que tu " +
+             "choisis.\n\n" +
+             "**Pour en écrire un.** Choisis **Nouveau message** en haut du fil. " +
+             "Écris ce que tu veux dire. Sous **Qui peut le voir**, choisis " +
+             "l'audience. Clique sur **Publier**.\n\n" +
+             "**Qui peut le voir.** Par défaut, il est vu par tout le quartier. Tu " +
+             "peux restreindre — à une personne précise, ou à un groupe — avec le " +
+             "sélecteur d'audience. Voir [Audience](/pages/system/help/audience) " +
+             "pour ce que chaque choix signifie.\n\n" +
+             "**Réponses.** N'importe qui qui peut voir ton message peut y " +
+             "répondre. Une réponse est visible sous l'audience unique de ton " +
+             "message — elle n'a pas sa propre audience. Tu peux **Modifier** ou " +
+             "**Supprimer** tes propres réponses ; la plateforme se souvient " +
+             "quand une réponse a été modifiée.\n\n" +
+             "**Modifier et supprimer ton message.** L'auteur peut modifier son " +
+             "message ou le supprimer en douceur — il reste là où il était, " +
+             "marqué comme supprimé, pour que le fil garde du sens. Un " +
+             "administrateur global (et, si c'est concédé, un modérateur) peut " +
+             "retirer un message qui viole le code de conduite.\n\n" +
+             "**Fichiers.** Tu peux joindre des images ou d'autres fichiers à un " +
+             "message. Ils sont stockés sur l'instance et partagés sous " +
+             "l'audience du message.\n"),
+            ("groups", "Groupes",
+             "## Groupes\n\n" +
+             "Un groupe rassemble les riverains autour d'une chose commune — un " +
+             "bâtiment, un projet, un loisir.\n\n" +
+             "**Public et privé.** Un groupe **public** est ouvert à tous ; un " +
+             "groupe **privé** est sur invitation, et seul ses membres peuvent le " +
+             "voir, y poster ou le prendre dans l'audience d'un message. Les deux " +
+             "types t'aident à organiser le quartier.\n\n" +
+             "**Pour en créer un.** Choisis **Créer un groupe**, donne-lui un nom " +
+             "et une courte description, et choisis s'il est public ou privé. Tu " +
+             "peux modifier le nom et la description à tout moment.\n\n" +
+             "**Messages de groupe.** Un groupe a son propre fil. Un message que " +
+             "tu fais dans un groupe est vu par les membres du groupe (et par " +
+             "tous ceux que tu ajoutes à son audience). Tu peux poster dans un " +
+             "groupe comme dans le fil communautaire — le sélecteur d'audience " +
+             "contient simplement le groupe.\n\n" +
+             "**Quitter.** Un membre peut quitter un groupe ; le groupe garde ses " +
+             "messages. Un propriétaire de groupe ou un administrateur global " +
+             "peut retirer un membre ou fermer un groupe.\n"),
+            ("drafts", "Brouillons",
+             "## Brouillons\n\n" +
+             "Un brouillon est un message que tu as écrit mais pas encore partagé.\n\n" +
+             "**Pour en sauvegarder un.** Dans le composeur, coche **Enregistrer " +
+             "comme brouillon** et enregistre. Le brouillon est enregistré mais " +
+             "visible par personne — pas même les administrateurs — jusqu'à ce " +
+             "que tu le publies.\n\n" +
+             "**Pour trouver tes brouillons.** Ouvre **Mes brouillons** dans le " +
+             "menu. Chaque brouillon que tu as sauvegardé y est, avec une " +
+             "badge **Brouillon**.\n\n" +
+             "**Pour publier.** Ouvre le brouillon et clique sur **Publier**. Il " +
+             "devient visible sous l'audience que tu as définie. En attendant, " +
+             "seul tu peux le voir.\n\n" +
+             "Les brouillons sont à toi — seul l'auteur et un administrateur " +
+             "global peuvent les voir ou les modifier, et un administrateur " +
+             "global peut retirer un brouillon qui n'y a pas sa place.\n"),
+            ("audience", "Audience",
+             "## Audience\n\n" +
+             "L'audience est le choix, fait quand tu publies, de qui peut voir le " +
+             "message. La plateforme l'applique à chaque lecture.\n\n" +
+             "**Les choix.**\n" +
+             "- **Tout le monde dans ce quartier** — par défaut. Chaque membre de " +
+             "la communauté peut le voir.\n" +
+             "- **Une personne précise** — seul ce résident (et toi) peut le voir.\n" +
+             "- **Un groupe** — les membres du groupe (et toi) peuvent le voir.\n\n" +
+             "Tu peux combiner les choix — par exemple, un groupe *et* une " +
+             "personne précise. Ce que tu choisis devient l'audience du message, " +
+             "et rien d'autre.\n\n" +
+             "**Une réponse n'a pas sa propre audience.** Elle est visible sous " +
+             "l'audience unique du message — c'est la règle « la réponse " +
+             "hérite », et elle garde le fil lisible pour les gens déjà dans la " +
+             "pièce.\n\n" +
+             "**Tu ne peux pas changer l'audience d'un message après l'avoir " +
+             "publié.** Pour le partager avec plus de gens, démarre un nouveau " +
+             "message avec l'audience plus large — l'original reste avec ceux " +
+             "que tu as d'abord choisis.\n"),
+            ("language", "Langue",
+             "## Langue\n\n" +
+             "Kumunita peut se montrer dans plus d'une langue, et tu choisis " +
+             "laquelle.\n\n" +
+             "**Pour régler la tienne.** Ouvre **Paramètres**, choisis **Choisis " +
+             "ta langue** et sélectionne la langue que tu veux. Ton choix est " +
+             "enregistré sur ton compte.\n\n" +
+             "**Ce qui change.** L'interface — boutons, titres et les pages " +
+             "intégrées — apparaît dans la langue que tu as choisie. Un message ou " +
+             "une description de groupe que quelqu'un a écrite *et* traduite dans " +
+             "ta langue montre cette traduction d'abord, l'original est à un " +
+             "clic.\n\n" +
+             "**Ce qui ne change pas.** Les mots qu'un résident tape sont les " +
+             "siens. Un message est toujours lu comme son auteur l'a écrit, à " +
+             "moins que quelqu'un n'ait ajouté une traduction — la plateforme ne " +
+             "traduit jamais par machine l'écriture d'un résident.\n\n" +
+             "**Fuseau horaire et dates.** Tu peux aussi régler le fuseau " +
+             "horaire et le format de date que tu vois, dans la même page " +
+             "**Paramètres**. Les deux sont enregistrés sur ton compte.\n"),
+            ("events", "Événements",
+             "## Événements\n\n" +
+             "Un événement est quelque chose que le quartier fait à un moment et " +
+             "à un endroit — une réunion, une journée de réparation, une " +
+             "rencontre.\n\n" +
+             "**Pour les voir.** Les événements apparaissent dans le fil et sur " +
+             "la liste des événements, avec leur date, leur heure et leur lieu.\n\n" +
+             "**Pour y participer.** Ouvre l'événement et choisis **Participer**. " +
+             "Ta réponse est enregistrée sur l'événement et ton compte, et tu " +
+             "peux la changer à tout moment avant l'événement.\n\n" +
+             "**Le rappel.** Tu peux t'inscrire à un rappel la veille de " +
+             "l'événement. Il est envoyé une fois, à ton compte, et seulement si " +
+             "tu t'es inscrit — il n'y a pas de rappel auquel tu ne t'es pas " +
+             "inscrit.\n\n" +
+             "**En créer un.** Un administrateur global (et, si c'est concédé, un " +
+             "modérateur) peut créer un événement pour le quartier, définir son " +
+             "audience, et choisir s'il porte un rappel. Tu peux parler d'un " +
+             "événement dans le fil comme de n'importe quoi d'autre.\n"),
+            ("translator", "Traducteurs",
+             "## Traducteurs\n\n" +
+             "Un **traducteur** est un résident à qui est accordé le droit " +
+             "d'ajouter et de modifier une version d'une langue d'une chose que " +
+             "la plateforme porte déjà — une page, une description de groupe, un " +
+             "nom de communauté, ou un message ou une réponse.\n\n" +
+             "**Ce qu'un traducteur peut faire.**\n" +
+             "- **Ajouter une traduction** d'une page, d'un groupe, d'un nom de " +
+             "communauté, d'un message ou d'une réponse — dans une langue que " +
+             "l'instance a activée.\n" +
+             "- **Modifier une traduction** qu'il a ajoutée, à tout moment.\n\n" +
+             "**Ce qu'un traducteur ne peut pas faire.**\n" +
+             "- **Changer l'original.** Les mots de l'auteur sont ceux de " +
+             "l'auteur ; un traducteur ajoute une version d'une langue à côté, " +
+             "jamais par-dessus.\n" +
+             "- **Traduire pour la machine.** Une traduction est un acte humain — " +
+             "la plateforme ne traduit jamais par machine l'écriture d'un " +
+             "résident, et un traducteur n'insère pas une sortie machine comme si " +
+             "c'était la sienne.\n" +
+             "- **Remplacer un administrateur global.** Un traducteur n'a aucun " +
+             "droit sur les propres pages de la plateforme, sur la modération, ou " +
+             "sur l'adhésion d'un groupe — ce sont les lanes d'un administrateur " +
+             "global (ou, si c'est concédé, d'un modérateur).\n\n" +
+             "Le travail d'un traducteur est visible : l'interface montre, à côté " +
+             "d'une chose traduite, la personne qui a ajouté cette traduction, et " +
+             "l'original est toujours à un clic.\n"),
+        ];
+    }
+
+    /// <summary>
+    /// UG (ADR 0057, amended 2026-09-21) — the curated <c>da</c> baseline for
+    /// the resident guides: the single source of the seeded Danish guide
+    /// bodies (the same shape as <see cref="GuidePages"/>() — a public static
+    /// array of <c>(Slug, Title, Body)</c> tuples). A full translation of the
+    /// <see cref="GuidePages"/>() bodies — the same Markdown structure
+    /// (heading, the step blocks, the cross-links), idiomatic Danish UI copy
+    /// (the familiar <c>dig</c> register held, sentence case, no word-for-word
+    /// calques). These ship as
+    /// <see cref="Kumunita.Core.Pages.PageTranslation"/> rows on a pristine DB
+    /// (ADR 0042 D1 — seeded once, then community-owned; the in-app editor
+    /// supersedes them and no later deploy reverts a human edit).
+    /// <para>
+    /// <b>Cross-links are absolute</b> — see <see cref="DeGuidePages"/>() for
+    /// the rationale. The <c>en</c> floor is untouched.
+    /// </para>
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] DaGuidePages()
+    {
+        return
+        [
+            ("getting-started", "Første skridt",
+             "## Første skridt\n\n" +
+             "Det er det sted, du skal starte på. Kumunita er et privat hjem til " +
+             "præcis ét nabolag — denne side og siderne under den fører dig " +
+             "trin for trin gennem alt.\n\n" +
+             "**Hvad findes hvor.** **Feeden** er stedet for indlæggene. " +
+             "**Grupper** samler beboere om en bygning, et projekt eller en " +
+             "fælles interesse. **Kontaktlisten** viser beboerne på platformen og " +
+             "de oplysninger, hver af dem har valgt at dele. **Sider**-træet " +
+             "(linket **Sider**) er stedet for disse guides, vilkårene, " +
+             "privatlivspolitikken og adfærdskodeksen.\n\n" +
+             "**Dine første skridt.**\n" +
+             "- **Skriv et indlæg.** Vælg **Nyt indlæg**, skriv det, vælg, hvem " +
+             "der kan se det, og klik på **Opret**. Se [indlæg](/pages/system/help/posts) " +
+             "for den fulde vejledning.\n" +
+             "- **Bund dig til en gruppe.** Grupper er stedet for en fælles " +
+             "interesse. Se [grupper](/pages/system/help/groups).\n" +
+             "- **Indstil sprog og tidzone.** De gemmes på din konto. Se " +
+             "[sprog](/pages/system/help/language).\n\n" +
+             "Alt andet har en guide under denne side — følg linket til det, du " +
+             "vil gøre.\n"),
+            ("posts", "Indlæg",
+             "## Indlæg\n\n" +
+             "Et indlæg er en note, du deler med de mennesker, du vælger.\n\n" +
+             "**Sådan skriver du ét.** Vælg **Nyt indlæg** øverst i feeden. Skriv " +
+             "det, du vil sige. Under **Hvem kan se det** vælger du modtagerkredsen. " +
+             "Klik på **Opret**.\n\n" +
+             "**Hvem kan se det.** Som udgangspunkt ses det af alle i nabolaget. " +
+             "Du kan indsnævre det — til en bestemt person eller til en gruppe — " +
+             "med modtagerkreds-vælgeren. Se [modtagerkreds](/pages/system/help/audience), " +
+             "hvad hvert valg betyder.\n\n" +
+             "**Svar.** Enhver, der kan se dit indlæg, kan svare på det. Et svar " +
+             "ses under dit indlægs ene modtagerkredsvalg — det har ikke sin egen " +
+             "modtagerkreds. Du kan **redigere** eller **slette** dine egne svar; " +
+             "platformen husker, hvornår et svar er blevet redigeret.\n\n" +
+             "**Redigering og sletning af dit indlæg.** Forfatteren kan redigere " +
+             "sit eget indlæg eller blødt slette det — det forbliver, hvor det var, " +
+             "mærket som slettet, så tråden stadig giver mening. En global admin " +
+             "(og, hvor tildelt, en moderator) kan fjerne et indlæg, der bryder " +
+             "adfærdskodeksen.\n\n" +
+             "**Filer.** Du kan vedhæfte billeder eller andre filer til et indlæg. " +
+             "De gemmes på instansen og deles under indlægget modtagerkreds.\n"),
+            ("groups", "Grupper",
+             "## Grupper\n\n" +
+             "En gruppe samler beboere om en fælles ting — en bygning, et projekt, " +
+             "en hobby.\n\n" +
+             "**Offentlige og private.** En **offentlig** gruppe kan enhver " +
+             "blive medlem af; en **privat** gruppe er på invitation, og kun dens " +
+             "medlemmer kan se den, poste til den eller tage den med i et " +
+             "indlægs modtagerkreds. Begge typer hjælper dig med at organisere " +
+             "nabolaget.\n\n" +
+             "**Sådan opretter du én.** Vælg **Opret gruppe**, giv den et navn og " +
+             "en kort beskrivelse, og vælg, om den er offentlig eller privat. Du " +
+             "kan redigere navnet og beskrivelsen til enhver tid.\n\n" +
+             "**Gruppeindlæg.** En gruppe har sin egen feed. Et indlæg, du " +
+             "opretter i en gruppe, ses af gruppens medlemmer (og alle, du " +
+             "tilføjer til dens modtagerkreds). Du kan poste til en gruppe, ligesom " +
+             "du poster til fællesfeeden — modtagerkreds-vælgeren inkluderer bare " +
+             "gruppen.\n\n" +
+             "**Forladelse.** Et medlem kan forlade en gruppe; gruppen beholder " +
+             "sit indlæg. En gruppeejere eller en global admin kan fjerne et " +
+             "medlem eller lukke en gruppe.\n"),
+            ("drafts", "Udkast",
+             "## Udkast\n\n" +
+             "Et udkast er et indlæg, du har skrevet, men endnu ikke delt.\n\n" +
+             "**Sådan gemmer du ét.** I redaktøren markerer du **Gem som udkast** " +
+             "og gemmer. Udkastet er gemt, men synligt for ingen — ikke engang " +
+             "admin'erne — før du publicerer det.\n\n" +
+             "**Sådan finder du dine udkast.** Åbn **Mine udkast** i menuen. " +
+             "Hvert udkast, du har gemt, er dér, med et **Udkast**-mærke.\n\n" +
+             "**Sådan publicerer du.** Åbn udkastet og klik på **Publicer**. Det " +
+             "bliver synligt under den modtagerkreds, du har valgt. Indtil da kan " +
+             "kun du se det.\n\n" +
+             "Udkast er dine — kun forfatteren og en global admin kan se eller " +
+             "ændre dem, og en global admin kan fjerne et udkast, der hører dér " +
+             "ikke til.\n"),
+            ("audience", "Modtagerkreds",
+             "## Modtagerkreds\n\n" +
+             "Modtagerkreds er valget, du træffer, når du poster, om hvem der kan " +
+             "se indlægget. Platformen håndhæver det ved hvert læs.\n\n" +
+             "**Valgene.**\n" +
+             "- **Alle i dette nabolag** — udgangspunktet. ethvert medlem af " +
+             "fællesskabet kan se det.\n" +
+             "- **En bestemt person** — kun denne beboer (og du) kan se det.\n" +
+             "- **En gruppe** — gruppens medlemmer (og du) kan se det.\n\n" +
+             "Du kan kombinere valg — for eksempel en gruppe *og* en bestemt " +
+             "person. Hvad end du vælger, bliver det indlægget modtagerkreds, og " +
+             "intet andet.\n\n" +
+             "**Et svar har ikke sin egen modtagerkreds.** Det ses under " +
+             "indlægget ene modtagerkredsvalg — det er „svaret arver\u201C-reglen, og " +
+             "den holder tråden læsbar for de mennesker, der allerede er i " +
+             "lokalet.\n\n" +
+             "**Du kan ikke ændre et indlægs modtagerkreds, efter du har " +
+             "publiceret det.** For at dele det med flere mennesker, start et nyt " +
+             "indlæg med den bredere modtagerkreds — det originale forbliver ved " +
+             "dem, du først valgte.\n"),
+            ("language", "Sprog",
+             "## Sprog\n\n" +
+             "Kumunita kan vise sig på mere end ét sprog, og du vælger, hvilket.\n\n" +
+             "**Sådan indstiller du dit.** Åbn **Indstillinger**, vælg **Vælg dit " +
+             "sprog** og vælg det sprog, du vil. Dit valg gemmes på din konto.\n\n" +
+             "**Hvad der ændres.** Grænsefladen — knapper, overskrifter og de " +
+             "indbyggede sider — vises på det sprog, du har valgt. Et indlæg eller " +
+             "en gruppebeskrivelse, som nogen har skrevet *og* oversat til dit " +
+             "sprog, viser denne oversættelse først, originalen er ét klik væk.\n\n" +
+             "**Hvad der ikke ændres.** De ord, en beboer skriver, er dennes. Et " +
+             "indlæg læses altid som forfatteren har skrevet det, medmindre nogen " +
+             "har tilføjet en oversættelse — platformen maskinoversætter aldrig " +
+             "en beboers skrivning.\n\n" +
+             "**Tidzone og datoer.** Du kan også indstille den tidzone og det " +
+             "datoformat, du ser, på den samme **Indstillinger**-side. Begge " +
+             "gemmes på din konto.\n"),
+            ("events", "Begivenheder",
+             "## Begivenheder\n\n" +
+             "En begivenhed er noget, nabolaget gør på et tidspunkt og et sted — " +
+             "et møde, en reparationsdag, et samvær.\n\n" +
+             "**Sådan ser du dem.** Begivenheder vises i feeden og på " +
+             "begivenhedslisten med deres dato, deres tid og deres sted.\n\n" +
+             "**Sådan deltager du.** Åbn begivenheden og vælg **Deltag**. Dit " +
+             "svar registreres på begivenheden og din konto, og du kan ændre det " +
+             "til enhver tid før begivenheden.\n\n" +
+             "**Påmindelsen.** Du kan tilmelde dig en påmindelse dagen før " +
+             "begivenheden. Den sendes én gang, til din konto, og kun hvis du " +
+             "har bedt om den — der er ingen påmindelse, du ikke har tilmeldt " +
+             "dig.\n\n" +
+             "**Sådan opretter du én.** En global admin (og, hvor tildelt, en " +
+             "moderator) kan oprette en begivenhed for nabolaget, sætte dens " +
+             "modtagerkreds og vælge, om den bærer en påmindelse. Du kan poste " +
+             "om en begivenhed i feeden, ligesom du poster om alt andet.\n"),
+            ("translator", "Oversættere",
+             "## Oversættere\n\n" +
+             "En **oversætter** er en beboer, der er givet ret til at tilføje og " +
+             "redigere en sproglig version af noget, platformen allerede bærer — " +
+             "en side, en gruppebeskrivelse, et fællesskabsnavn eller et indlæg " +
+             "eller et svar.\n\n" +
+             "**Hvad en oversætter må gøre.**\n" +
+             "- **Tilføje en oversættelse** af en side, en gruppe, et " +
+             "fællesskabsnavn, et indlæg eller et svar — på et sprog, instansen " +
+             "har aktiveret.\n" +
+             "- **Redigere en oversættelse**, de har tilføjet, til enhver tid.\n\n" +
+             "**Hvad en oversætter ikke må gøre.**\n" +
+             "- **Ændre originalen.** Forfatterens ord er forfatterens; en " +
+             "oversætter tilføjer en sproglig version ved siden af, aldrig " +
+             "ovenpå.\n" +
+             "- **Oversætte for maskinen.** En oversættelse er et menneskeligt " +
+             "arbejde — platformen maskinoversætter aldrig en beboers skrivning, " +
+             "og en oversætter indsætter ikke et maskineresultat, som var det " +
+             "deres eget.\n" +
+             "- **Stå i stedet for en global admin.** En oversætter har ingen " +
+             "ret på platformens egne sider, på moderation eller på en gruppe " +
+             "medlemskab — det er en global admin (eller, hvor tildelt, en " +
+             "moderator) lane.\n\n" +
+             "En oversætters arbejde er synligt: grænsefladen viser, ved siden " +
+             "af en oversat ting, den person, der har tilføjet denne oversættelse, " +
+             "og originalen er altid ét klik væk.\n"),
+        ];
+    }
+
+    /// <summary>
     /// The canonical <c>en</c> default-page bodies (terms + help + privacy +
     /// conduct — the four <c>Page</c>-backed surfaces of the ADR 0043 D1
     /// five-surface set). The single source of the seed text: the
@@ -1068,9 +1834,17 @@ public static class FirstBootSeeder
              "- **Directory** shows the residents on the platform and the details each " +
              "has chosen to share.\n" +
              "- **Moderation** lets a global admin (and, where granted, a moderator) " +
-             "keep the feed a safe place.\n" +
-             "- **Guides** walk you through the platform, step by step, in plain " +
-             "language — start with *Getting started*, the first page under this one.\n\n" +
+             "keep the feed a safe place.\n\n" +
+             "## Guides\n\n" +
+             "A step-by-step walkthrough of the platform, in plain language:\n\n" +
+             "- [Getting started](/pages/system/help/getting-started) — your first ten minutes\n" +
+             "- [Posts](/pages/system/help/posts) — writing, replying, editing, deleting, attaching files\n" +
+             "- [Groups](/pages/system/help/groups) — public and private groups, group posts\n" +
+             "- [Drafts](/pages/system/help/drafts) — save without publishing\n" +
+             "- [Audience](/pages/system/help/audience) — choosing who can see a post\n" +
+             "- [Language](/pages/system/help/language) — your language, time zone, and date format\n" +
+             "- [Events](/pages/system/help/events) — the feed, RSVP, reminders\n" +
+             "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -1151,10 +1925,18 @@ public static class FirstBootSeeder
              "- **Das Verzeichnis** zeigt die Menschen auf der Plattform und die " +
              "Angaben, die jeder von ihnen teilen möchte.\n" +
              "- **Moderation** lässt einen Global-Admin (und, wo zugewiesen, einen " +
-             "Moderator) den Feed einen sicheren Ort halten.\n" +
-             "- **Anleitungen** führen dich Schritt für Schritt durch die Plattform, " +
-             "in verständlicher Sprache — beginne mit *Erste Schritte*, der ersten " +
-             "Seite unter dieser.\n\n" +
+             "Moderator) den Feed einen sicheren Ort halten.\n\n" +
+             "## Anleitungen\n\n" +
+             "Eine Schritt-für-Schritt-Anleitung der Plattform, in verständlicher " +
+             "Sprache:\n\n" +
+             "- [Erste Schritte](/pages/system/help/getting-started) — deine ersten zehn Minuten\n" +
+             "- [Beiträge](/pages/system/help/posts) — Schreiben, Antworten, Bearbeiten, Löschen, Dateien anhängen\n" +
+             "- [Gruppen](/pages/system/help/groups) — Öffentliche und private Gruppen, Gruppenbeiträge\n" +
+             "- [Entwürfe](/pages/system/help/drafts) — Speichern ohne zu veröffentlichen\n" +
+             "- [Zielgruppe](/pages/system/help/audience) — Wer darf einen Beitrag sehen\n" +
+             "- [Sprache](/pages/system/help/language) — Deine Sprache, Zeitzone und das Datumsformat\n" +
+             "- [Termine](/pages/system/help/events) — Der Feed, RSVP, Erinnerungen\n" +
+             "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -1241,10 +2023,17 @@ public static class FirstBootSeeder
              "- **L'annuaire** montre les résidents de la plateforme et les détails " +
              "que chacun a choisi de partager.\n" +
              "- **La modération** laisse un administrateur global (et, si c'est " +
-             "concédé, un modérateur) garder le fil un lieu sûr.\n" +
-             "- **Les guides** t'accompagnent pas à pas dans la plateforme, en " +
-             "langage simple — commence par *Premiers pas*, la première page sous " +
-             "celle-ci.\n\n" +
+             "concédé, un modérateur) garder le fil un lieu sûr.\n\n" +
+             "## Guides\n\n" +
+             "Un guide pas à pas de la plateforme, en langage simple :\n\n" +
+             "- [Premiers pas](/pages/system/help/getting-started) — tes dix premières minutes\n" +
+             "- [Messages](/pages/system/help/posts) — Écrire, répondre, modifier, supprimer, joindre des fichiers\n" +
+             "- [Groupes](/pages/system/help/groups) — Groupes publics et privés, messages de groupe\n" +
+             "- [Brouillons](/pages/system/help/drafts) — Sauvegarder sans publier\n" +
+             "- [Audience](/pages/system/help/audience) — Qui peut voir un message\n" +
+             "- [Langue](/pages/system/help/language) — Ta langue, ton fuseau horaire et ton format de date\n" +
+             "- [Événements](/pages/system/help/events) — Le fil, la participation, les rappels\n" +
+             "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -1328,10 +2117,17 @@ public static class FirstBootSeeder
              "- **Kontaktlisten** viser de beboere på platformen og de oplysninger, " +
              "hver af dem har valgt at dele.\n" +
              "- **Moderation** lader en global admin (og, hvor tildelt, en " +
-             "moderator) holde feeden et sikkert sted.\n" +
-             "- **Guides** fører dig trin for trin gennem platformen, i sprog " +
-             "alle forstår — start med *Første skridt*, den første side under " +
-             "denne.\n\n" +
+             "moderator) holde feeden et sikkert sted.\n\n" +
+             "## Guides\n\n" +
+             "En trin-for-trin vejledning til platformen, i sprog alle forstår:\n\n" +
+             "- [Første skridt](/pages/system/help/getting-started) — dine første ti minutter\n" +
+             "- [Indlæg](/pages/system/help/posts) — Skrive, svare, redigere, slette, vedhæfte filer\n" +
+             "- [Grupper](/pages/system/help/groups) — Offentlige og private grupper, gruppeindlæg\n" +
+             "- [Udkast](/pages/system/help/drafts) — Gemme uden at publicere\n" +
+             "- [Modtagerkreds](/pages/system/help/audience) — Hvem der kan se et indlæg\n" +
+             "- [Sprog](/pages/system/help/language) — Dit sprog, din tidzone og dit datoformat\n" +
+             "- [Begivenheder](/pages/system/help/events) — Feeden, deltagelse, påmindelser\n" +
+             "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",

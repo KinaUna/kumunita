@@ -1,4 +1,4 @@
-# ADR 0057 — User guides: resident-facing guides live in the `help/` subtree of the existing page tree; en-only floor; a three-layer consistency loop keeps them honest as code changes (the `UG` named lane)
+# ADR 0057 — User guides: resident-facing guides live in the `help/` subtree of the existing page tree; `en` floor + curated `de`/`fr`/`da` baselines (community-owned); a three-layer consistency loop keeps them honest as code changes (the `UG` named lane)
 
 Status: Accepted
 Date: 2026-09-21
@@ -143,19 +143,27 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   see **D2.1**). This is the **floor** of the guide's `en` text: on a
   fresh instance a resident reading a guide in `en` reads the code's
   current view of the feature.
-- **A non-`en` guide body is not seeded by this lane.** The guides ship
-  `en`-only, and a `de`/`fr`/`da` guide body is added by a **human
-  Translator** (the ADR 0021 lane) or a GlobalAdmin in the in-app editor —
-  the ADR 0042 D1 / 0047 / 0049 / 0051 shape, *unchanged*. A machine
-  translation is **never** the writer of a non-`en` guide body (ADR 0005 C —
-  the "never machine-translated" clause, applied to guides as to UGC).
-  This is a **deliberate** asymmetry with the four-surface set (which
-  ships `de`/`fr`/`da` baselines): the four-surface set is *policy* (the
-  platform's own statement, the operator completes it); the guides are
-  *how-to* (the resident's own steps, the community completes them in its
-  own language, at its own pace). The `en` floor is always present; the
-  non-`en` body, once a human adds it, is community-owned and never
-  clobbered by a later deploy (the ADR 0042 D1 invariant, unchanged).
+- **A non-`en` guide body ships as a curated `de`/`fr`/`da` baseline**
+  (**amended 2026-09-21** — superseding the original "ship `en`-only"
+  decision). On a pristine DB the guides now carry a `de`/`fr`/`da`
+  `PageTranslation` row each (8 guides × 3 languages = 24 rows), seeded
+  by `FirstBootSeeder.SeedGuideTranslationsAsync` from the hand-curated
+  registries `DeGuidePages()` / `FrGuidePages()` / `DaGuidePages()` — the
+  **same shape** as the four-surface set's baselines
+  (`DeDefaultPages()` / `FrDefaultPages()` / `DaDefaultPages()`), so the
+  "deliberate asymmetry" the original text described is now gone: guides
+  and the four-surface set both ship a `de`/`fr`/`da` floor.
+  The ownership split is **unchanged** and is the load-bearing part:
+  these baselines are seeded **create-if-missing only** (the ADR 0042 D1
+  invariant), so once a **human Translator** (the ADR 0021 lane) or a
+  GlobalAdmin edits a guide body in the in-app editor, no later deploy
+  clobbers that edit. A **machine translation is still never** the writer
+  of a non-`en` guide body (ADR 0005 C — the "never
+  machine-translated" clause, applied to guides as to UGC); the baselines
+  are hand-curated, not machine output. The `en` floor is always present
+  (the `Page` doc body); the non-`en` body, whether the seeded baseline or
+  a human's edit, is community-owned and never clobbered by a later
+  deploy (the ADR 0042 D1 invariant, unchanged).
 - The **standing** on a guide is the ADR 0040 system-page matrix: **edit /
   move / delete = GlobalAdmin only**; **add a translation = GlobalAdmin ∪
   Translator** (the ADR 0021 / 0022 / 0047 / 0048 lanes, unchanged). A
@@ -197,6 +205,18 @@ identical drift question:
   The "retire" response in D3.3 is a **registry removal** (the code no
   longer claims to own that guide), which is what stops the backfill from
   re-adding it.
+
+- **The `de`/`fr`/`da` baselines have their own backfill** (**amended
+  2026-09-21**, following D2): **`FirstBootSeeder.BackfillGuideTranslationsAsync`**
+  runs in the same warm-boot `else`, immediately after
+  `BackfillUserGuidesAsync`, and creates the absent
+  `de`/`fr`/`da` `PageTranslation` rows for the guides, create-if-missing.
+  A deployment whose first boot predates the guide-translation baseline
+  has the guide `Page` docs but no `de`/`fr`/`da` rows; this closes that
+  gap. The same two invariants hold: **create-if-missing** (a row a
+  community Translator or GlobalAdmin has already edited is skipped, never
+  refreshed — the ADR 0042 D1 invariant) and **idempotent** (a second warm
+  boot finds every baseline it created and skips).
 
 ### D3 — The consistency loop (the "keep it honest" lane)
 
@@ -266,11 +286,18 @@ it's ceremony" rule):
     direct children are still `{terms, help, privacy, conduct}`, and
     `system` is still the **only** root (the guides are *grandchildren* of
     `system`, not new roots — the ADR 0039 §3.3 forest shape, unchanged).
-  - **No `PageTranslation` row is attached to a guide** — the guides ship
-    `en`-only (D2); a non-`en` guide body, once added, is a
-    `PageTranslation` row on the guide's *own* `Id` (the ADR 0042 D6
-    parentage distinction, unchanged), and the *first-boot* state has
-    none.
+  - **The `de`/`fr`/`da` baselines are attached, one per guide per
+    language** (**amended 2026-09-21**, following D2) — the guides ship a
+    `de`/`fr`/`da` `PageTranslation` row each (8 guides × 3 languages =
+    24 rows), on the guide's *own* `Id` (the ADR 0042 D6 parentage
+    distinction, unchanged), authored by the platform (`AuthorId` empty),
+    and the *first-boot* state has exactly that set. The test that
+    previously pinned "no `PageTranslation` row is attached to a guide"
+    (`UG_Guides_NoPageTranslationRows_AtFirstBoot`) is now flipped to
+    `UG_Guides_DaFrDaBaselines_AtFirstBoot` (asserts 8 × 3 rows, one per
+    language, platform-authored) plus an idempotency pin
+    (`UG_GuideBaselineIdempotency_AcrossTwoBoots`) and a backfill pin
+    (`UG_BackfillGuideTranslations_CreatesAbsent_NeverClobbers_HumanEdit`).
   - **The `en` body parity** — the guide's seeded `Page.Body` equals
     `GuidePages()[slug].Body` exactly (the ADR 0042 D1 "code wins for
     `en`" shape, pinned by the test).
@@ -312,13 +339,17 @@ it's ceremony" rule):
 - **The `help` page is promoted from a leaf to a folder-with-index.**
   ADR 0039 §3.3 already names this shape as valid ("a page is either a
   *folder* … or a *leaf*, or both ('folder-with-index')"). The `help`
-  page's body gains a single new bullet (a pointer to the guides); the
-  four existing bullets are unchanged (the ADR 0042 D2 "structure
-  preserved" parity, the `de`/`fr`/`da` baseline arrays gain the matching
-  new bullet). The `/help` hard-coded route (ADR 0043 D2) is **unchanged**
-  — it still resolves to the `help` page's *own* body; the guides are
-  reachable at `/pages/help/{slug}` (the ADR 0039 §3.8 tree browse) and
-  from the `getting-started` index (D1).
+  page's body gains a **`## Guides` section** listing all eight guides as
+  absolute links (`/pages/system/help/{slug}`); the four existing bullets
+  are unchanged (the ADR 0042 D2 "structure preserved" parity — the
+  `de`/`fr`/`da` baseline arrays in `DeDefaultPages()` /
+  `FrDefaultPages()` / `DaDefaultPages()` carry the matching translated
+  `## Guides` section, so the en/de/fr/da `help` bodies stay in parity).
+  The `/help` hard-coded route (ADR 0043 D2) is **unchanged** — it still
+  resolves to the `help` page's *own* body; the guides are reachable at
+  `/pages/system/help/{slug}` (the ADR 0039 §3.8 tree browse — the
+  `system` root is part of the derived path) and cross-linked from the
+  `help` index and the `getting-started` guide (D1).
 - **The `en` floor is code-owned; the non-`en` bodies are community-owned.**
   The ADR 0042 D1 / 0047 / 0049 / 0051 shape, unchanged: the `en` body is
   the code's view of the feature, the non-`en` body is the community's
