@@ -1080,6 +1080,545 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // U09 — the 8 §3.7 pinned names not yet named in this file
+    // (T02 / T06 / T07 / T08 / T09 / T14 / T15 / T17 / T18).
+    // Each mirrors the §3.7 master-list shape exactly; the existing U03/U04
+    // tests above already cover most of the underlying behaviour — these
+    // add the §3.7-named pins so the U11 gate (23 names) is complete.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── T02 — M4_NullAudienceEventIsPublic (§3.3 — Decide() branch 5) ──────
+    // A null-Audience event is public (world-readable): the frozen CanAsync
+    // decision for an anonymous actor (empty actorId) is Allow via branch 5
+    // (Audience is null). A signed-in resident also sees it. The §3.7 name
+    // is "unauthenticated sees it" — branch 5, the public pin.
+
+    [Fact]
+    public async Task M4_NullAudienceEventIsPublic()
+    {
+        var store = await BootStoreAsync();
+        var (_, authz, svc) = Services(store);
+        const string author = "u-u09-t02-author";
+        const string resident = "u-u09-t02-resident";
+
+        await Plant(store, new Event
+        {
+            Id = "t02-ev", AuthorId = author,
+            Title = "Open to all", Body = "body t02",
+            Start = new DateTimeOffset(2026, 4, 20, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 20, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = null,   // null = public (branch 5)
+        });
+
+        // The frozen CanAsync decision for the anonymous actor is Allow
+        // (branch 5 — the §3.7 "unauthenticated sees it" pin).
+        await using var q = store.QuerySession();
+        var ev = await q.LoadAsync<Event>("t02-ev");
+        var decision = await authz.CanAsync(string.Empty, AccessAction.Read,
+            new EventToAuditableResource(ev!));
+        Assert.True(decision.Allowed);
+
+        // A signed-in resident (the "member" in the §3.7 name) also sees it.
+        var residentFeed = await svc.ListUpcomingAsync(null, resident, 1);
+        Assert.Contains("t02-ev", residentFeed.Select(e => e.Id));
+        var ev2 = await svc.GetAsync("t02-ev", resident);
+        Assert.Equal("Open to all", ev2.Title);
+    }
+
+    // ── T06 — M4_PlainMemberCreateAllowed (§3.4 — create standing) ─────────
+    // A plain signed-in resident (no roles) may create an event — the
+    // "create = any signed-in resident" pin (ADR 0054 §3.4). The author
+    // becomes the standing owner; the audit row is stored.
+
+    [Fact]
+    public async Task M4_PlainMemberCreateAllowed()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string resident = "u-u09-t06-resident";
+
+        var ev = await svc.CreateAsync(resident, new CreateEventRequest
+        {
+            Title = "Plain member event", Body = "body t06",
+            Start = new DateTimeOffset(2026, 4, 21, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 21, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        Assert.Equal(resident, ev.AuthorId);    // the resident becomes the standing owner.
+        Assert.Equal("Plain member event", ev.Title);
+
+        // The create lane's audit row is stored (C3, TargetKind "event").
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.create" && r.TargetKind == "event" && r.TargetId == ev.Id);
+    }
+
+    // ── T07 — M4_AuthorCanEditOwnEvent (§3.4 — owner edit) ─────────────────
+    // The author of an event may edit it (ADR 0014/0016/0017): Title/Body
+    // change, AuthorId/Created preserved, Modified stamped, audit row stored.
+
+    [Fact]
+    public async Task M4_AuthorCanEditOwnEvent()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t07-author";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "original", Body = "body t07",
+            Start = new DateTimeOffset(2026, 4, 22, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 22, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+        var createdStamp = ev.Created;
+
+        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        {
+            Title = "edited", Body = "new body",
+            Start = ev.Start, End = ev.End,
+        });
+
+        Assert.Equal("edited", updated.Title);
+        Assert.Equal("new body", updated.Body);
+        Assert.Equal(author, updated.AuthorId);         // preserved untouched.
+        Assert.Equal(createdStamp, updated.Created);    // preserved untouched.
+        Assert.NotNull(updated.Modified);               // stamped on a real change.
+
+        // The edit lane's audit row is stored (C3, TargetKind "event").
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.update" && r.TargetKind == "event" && r.TargetId == ev.Id);
+    }
+
+    // ── T08 — M4_PlainMemberEditDenied (§3.4 — non-author edit ⇒ 403) ─────
+    // A non-author, non-GlobalAdmin resident editing someone else's event is
+    // denied with a 403 (UnauthorizedAccessException) — the C3 standing pin.
+
+    [Fact]
+    public async Task M4_PlainMemberEditDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t08-author";
+        const string stranger = "u-u09-t08-stranger";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned", Body = "body t08",
+            Start = new DateTimeOffset(2026, 4, 23, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 23, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.UpdateAsync(ev.Id, stranger, new UpdateEventRequest
+            {
+                Title = "hijack", Body = "body t08",
+                Start = ev.Start, End = ev.End,
+            }));
+
+        // The event is unchanged (the denied write did not apply).
+        var still = await svc.GetAsync(ev.Id, author);
+        Assert.Equal("owned", still.Title);
+    }
+
+    // ── T09 — M4_GlobalAdminOverrideEdit (§3.4 — ADR 0017 shape) ──────────
+    // A GlobalAdmin who is **not** the author may edit (the ADR 0017
+    // override branch of CheckEditStanding). A plain member without the
+    // GlobalAdmin role is denied — the contrast proves the override is the
+    // role branch, not a default allow.
+
+    [Fact]
+    public void M4_GlobalAdminOverrideEdit()
+    {
+        var ev = new Event
+        {
+            Id = "t09-ev",
+            AuthorId = "u-u09-t09-author",
+            Title = "owned", Body = "body t09",
+            Start = new DateTimeOffset(2026, 4, 24, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 24, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+        };
+
+        // GlobalAdmin (not the author): the override branch passes.
+        var adminRoles = new HashSet<string>(StringComparer.Ordinal) { Roles.GlobalAdmin };
+        EventService.CheckEditStanding("u-u09-t09-admin", adminRoles, ev);
+
+        // A plain member (no roles, not the author): denied.
+        var plainRoles = new HashSet<string>();
+        Assert.Throws<UnauthorizedAccessException>(
+            () => EventService.CheckEditStanding("u-u09-t09-stranger", plainRoles, ev));
+    }
+
+    // ── T14 — M4_RsvpUniqueIndexOneRowPerUser (§3.2 — unique (EventId,UserId))
+    // After a resident RSVPs twice (Going then No), the (EventId, UserId)
+    // unique index holds exactly one row for that resident — last write
+    // wins; a second resident holds their own row (the per-resident key).
+
+    [Fact]
+    public async Task M4_RsvpUniqueIndexOneRowPerUser()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t14-author";
+        const string r1 = "u-u09-t14-r1";
+        const string r2 = "u-u09-t14-r2";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "BBQ", Body = "body t14",
+            Start = new DateTimeOffset(2026, 4, 25, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 25, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        // r1 RSVPs twice (Going then No) — last write wins, one row.
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going);
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.No);
+        // r2 RSVPs once (Going) — their own row.
+        await svc.RsvpAsync(ev.Id, r2, RsvpStatus.Going);
+
+        var all = await svc.GetRsvpsAsync(ev.Id);
+        Assert.Equal(2, all.Count);                                            // exactly 2 rows.
+        Assert.Single(all.Where(r => r.UserId == r1));                         // r1: one row.
+        Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == r1).Status);  // last write won.
+        Assert.Single(all.Where(r => r.UserId == r2));                         // r2: one row.
+        Assert.Equal(RsvpStatus.Going, all.Single(r => r.UserId == r2).Status);
+    }
+
+    // ── T15 — M4_RsvpListOwnerOnly (§3.2 — RSVP list read is owner-only) ──
+    // The owner (author) reads their own event's RSVPs successfully; a
+    // non-author is denied the event detail (403) — the owner-only gate's
+    // Core-layer expression (the Web boundary enforces the actor check;
+    // the Core layer denies a non-author the event detail). The §3.7 pin:
+    // "the RSVP list read is owner-only."
+
+    [Fact]
+    public async Task M4_RsvpListOwnerOnly()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t15-author";
+        const string r1 = "u-u09-t15-r1";
+        const string stranger = "u-u09-t15-stranger";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "BBQ", Body = "body t15",
+            Start = new DateTimeOffset(2026, 4, 26, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 26, 11, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, author),  // grantee = author only
+            IsDraft = false,
+        });
+
+        // A resident RSVPs (the RSVP list will hold their row).
+        await svc.RsvpAsync(ev.Id, r1, RsvpStatus.Going);
+
+        // The author (owner) reads the RSVP list successfully.
+        var rsvps = await svc.GetRsvpsAsync(ev.Id);
+        Assert.Contains(rsvps, r => r.UserId == r1 && r.Status == RsvpStatus.Going);
+
+        // A non-author (not in the audience) is denied the event detail (403)
+        // — the owner-only gate's Core-layer expression.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.GetAsync(ev.Id, stranger));
+    }
+
+    // ── T17 — M4_AuditRowShape_Create (§3.4 — the row shape) ───────────────
+    // The create-lane AccessAudit row is exactly: TargetKind "event",
+    // Action "event.create", Via Owner, Outcome Allow (the §3.7 pin).
+
+    [Fact]
+    public async Task M4_AuditRowShape_Create()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t17-author";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "shape", Body = "body t17",
+            Start = new DateTimeOffset(2026, 4, 27, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 27, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        var rows = await EventAuditRows(store);
+        var row = Assert.Single(rows);              // exactly one row (the create).
+        Assert.Equal("event", row.TargetKind);      // the exact string.
+        Assert.Equal("event.create", row.Action);   // the lane's action.
+        Assert.Equal(AccessVia.Owner, row.Via);     // the author's own standing.
+        Assert.Equal(AccessOutcome.Allow, row.Outcome);
+        Assert.Equal(ev.Id, row.TargetId);          // the row points at the created event.
+    }
+
+    // ── T18 — M4_EventToAuditableResourceShape (§3.3 — 6-member projection)
+    // The EventToAuditableResource adapter (U02) projects the 6 members
+    // (Id / Name / OwnerId / Audience / ComponentId / TargetKind). Name is
+    // the title, or the body truncated to 60 chars (57 + "...") when the
+    // title is empty. TargetKind is the exact string "event".
+
+    [Fact]
+    public void M4_EventToAuditableResourceShape()
+    {
+        // An event with a title: Name = the title.
+        var withTitle = new Event
+        {
+            Id = "t18-ev",
+            Title = "Cleanup day",
+            Body = "Bring gloves and boots",
+            AuthorId = "u-u09-t18-author",
+            ComponentId = "c-u09-t18",
+            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = null,   // public (null)
+        };
+        var a1 = new EventToAuditableResource(withTitle);
+        Assert.Equal("t18-ev", a1.Id);
+        Assert.Equal("Cleanup day", a1.Name);           // title → Name.
+        Assert.Equal("u-u09-t18-author", a1.OwnerId);   // author → OwnerId.
+        Assert.Null(a1.Audience);                        // null → null (public).
+        Assert.Equal("c-u09-t18", a1.ComponentId);       // component → ComponentId.
+        Assert.Equal("event", a1.TargetKind);            // the exact string.
+
+        // An event without a title (Title = null — the adapter's `??` fallback
+        // triggers on null, not empty): Name = body truncated to 60 chars
+        // (57 + "...") — the §3.3 pin.
+        var body = new string('x', 65);   // 65 chars → truncated to 57 + "..." = 60.
+        var noTitle = new Event
+        {
+            Id = "t18-ev2",
+            Title = null!,                // null → the adapter falls back to the body.
+            Body = body,
+            AuthorId = "u-u09-t18-author2",
+            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = null,
+        };
+        var a2 = new EventToAuditableResource(noTitle);
+        Assert.Equal(body[..57] + "...", a2.Name);      // 57 + "..." = 60 chars total.
+        Assert.Equal(60, a2.Name.Length);
+
+        // A non-null Audience is projected as-is (the same reference).
+        var withAud = new Event
+        {
+            Id = "t18-ev3",
+            Title = "t",
+            Body = "b",
+            AuthorId = "u-u09-t18-author3",
+            Start = new DateTimeOffset(2026, 4, 28, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 28, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = new Audience { Community = true },
+        };
+        var a3 = new EventToAuditableResource(withAud);
+        Assert.NotNull(a3.Audience);
+        Assert.True(a3.Audience!.Community);            // projected verbatim.
+        Assert.Same(withAud.Audience, a3.Audience);     // the same reference (not a copy).
+    }
+
+    // ── T01 — M4_MemberSeesUpcomingEventFeed (§3.3 — the feed) ─────────────
+    // A signed-in member (a grantee in the audience) sees the event in the
+    // upcoming feed; the feed is ordered by Start ascending (the §3.7 pin:
+    // "the feed (CanSeeAsync(Read) survivors, Start ordering)").
+
+    [Fact]
+    public async Task M4_MemberSeesUpcomingEventFeed()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t01-author";
+        const string member = "u-u09-t01-member";
+
+        await Plant(store, new Event
+        {
+            Id = "t01-ev", AuthorId = author,
+            Title = "Feed event", Body = "body t01",
+            Start = new DateTimeOffset(2026, 4, 29, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 29, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = Audience(GrantKind.User, member),   // the member is the grantee.
+        });
+
+        // The member (grantee) sees the event in the feed.
+        var feed = await svc.ListUpcomingAsync(null, member, 1);
+        Assert.Contains("t01-ev", feed.Select(e => e.Id));
+
+        // A stranger (not in the audience) does not see it.
+        var strangerFeed = await svc.ListUpcomingAsync(null, "u-u09-t01-stranger", 1);
+        Assert.DoesNotContain("t01-ev", strangerFeed.Select(e => e.Id));
+    }
+
+    // ── T03 — M4_CommunityAudienceSeesFeed (§3.3 — ADR 0036 Community) ─────
+    // A <c>Audience.Community</c> event on a component is visible to a member
+    // of that component (branch 4) but not to a non-member (branch 7 Deny).
+
+    [Fact]
+    public async Task M4_CommunityAudienceSeesFeed()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-u09-t03-author";
+        const string member = "u-u09-t03-member";
+        const string nonMember = "u-u09-t03-nonmember";
+        const string comp = "c-u09-t03";
+
+        await Plant(store, new Component { Id = comp, Name = "Safety", Enabled = true });
+        await userInfo.SetCommunityMembershipAsync(comp, member, actorId: "u-u09-t03-admin");
+
+        await Plant(store, new Event
+        {
+            Id = "t03-ev", AuthorId = author, ComponentId = comp,
+            Title = "Community event", Body = "body t03",
+            Start = new DateTimeOffset(2026, 4, 30, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 30, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = new Audience { Community = true },   // the Community branch.
+        });
+
+        // The community member sees the event (branch 4).
+        var memberFeed = await svc.ListUpcomingAsync(comp, member, 1);
+        Assert.Contains("t03-ev", memberFeed.Select(e => e.Id));
+
+        // A non-member does not (branch 7 Deny).
+        var nonMemberFeed = await svc.ListUpcomingAsync(comp, nonMember, 1);
+        Assert.DoesNotContain("t03-ev", nonMemberFeed.Select(e => e.Id));
+    }
+
+    // ── T04 — M4_GrantsAudienceOnlyGranteeSees (§3.3 — the grant-list branch)
+    // A group-grant event is visible to a group member (branch 6) but not to
+    // an un-granted resident (branch 7 Deny).
+
+    [Fact]
+    public async Task M4_GrantsAudienceOnlyGranteeSees()
+    {
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-u09-t04-author";
+        const string member = "u-u09-t04-member";
+        const string outsider = "u-u09-t04-outsider";
+        const string group = "g-u09-t04";
+
+        await Plant(store, new Group
+        {
+            Id = group, Name = "Book club", OwnerId = author,
+            Created = DateTimeOffset.UtcNow,
+        });
+        await userInfo.AddGroupMemberAsync(group, member, addedBy: author);
+
+        await Plant(store, new Event
+        {
+            Id = "t04-ev", AuthorId = author,
+            Title = "Book club", Body = "body t04",
+            Start = new DateTimeOffset(2026, 5, 1, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 5, 1, 19, 0, 0, TimeSpan.Zero),
+            IsDraft = false,
+            Audience = Audience(GrantKind.Group, group),   // the grant-list branch.
+        });
+
+        // The group member sees the event (branch 6 MatchGroups).
+        var memberFeed = await svc.ListUpcomingAsync(null, member, 1);
+        Assert.Contains("t04-ev", memberFeed.Select(e => e.Id));
+
+        // An un-granted resident does not (branch 7 Deny).
+        var outsiderFeed = await svc.ListUpcomingAsync(null, outsider, 1);
+        Assert.DoesNotContain("t04-ev", outsiderFeed.Select(e => e.Id));
+    }
+
+    // ── T11 — M4_SoftDeleteExcludesFromFeedAndDetail (§3.5 — ADR 0024) ────
+    // After the author soft-deletes (IsDeleted = true), the event is
+    // filtered from the feed AND the detail is a 404 (the non-leaky pin).
+
+    [Fact]
+    public async Task M4_SoftDeleteExcludesFromFeedAndDetail()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t11-author";
+        const string resident = "u-u09-t11-resident";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "live", Body = "body t11",
+            Start = new DateTimeOffset(2026, 5, 2, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 5, 2, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        // Before delete: the event is in the feed and readable.
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident);
+
+        // The author soft-deletes (ADR 0024 — IsDeleted = true).
+        await svc.DeleteAsync(ev.Id, author);
+
+        // After delete: the event is filtered from the feed and the detail
+        // is a 404 (the non-leaky pin — same as a missing id).
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+
+        // The delete lane's audit row is stored (C3, TargetKind "event").
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.delete" && r.TargetKind == "event" && r.TargetId == ev.Id);
+    }
+
+    // ── T12 — M4_AuthorSoftDeleteOwnEvent (§3.5 — the author delete lane) ──
+    // The author (the standing owner) may soft-delete their own event
+    // (ADR 0024 — the ADR 0014/0016/0017 author branch). A non-author is
+    // denied with a 403 (the C3 standing pin).
+
+    [Fact]
+    public async Task M4_AuthorSoftDeleteOwnEvent()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t12-author";
+        const string stranger = "u-u09-t12-stranger";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned", Body = "body t12",
+            Start = new DateTimeOffset(2026, 5, 3, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 5, 3, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        // The author (the standing owner) soft-deletes their own event.
+        await svc.DeleteAsync(ev.Id, author);
+
+        // The event is now filtered from the feed (the read lanes filter it).
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+
+        // The detail is a 404 (the non-leaky pin).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, author));
+
+        // A non-author (stranger) is denied the delete (403 — the C3 pin).
+        var ev2 = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned2", Body = "body t12b",
+            Start = new DateTimeOffset(2026, 5, 3, 12, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 5, 3, 13, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.DeleteAsync(ev2.Id, stranger));
+        // The second event is still live (the denied write did not apply).
+        Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // Test plumbing (mirrors PostServiceTests).
     // ════════════════════════════════════════════════════════════════════════
 

@@ -735,3 +735,105 @@ further open decisions carried into U01.
   `Milestones.cs` close (U12) all remain out of scope for this unit.
 
 **U08 exit gate met. STOP — do NOT start U09.**
+
+---
+
+## U09 — seam tests (23)
+
+**(a) Test files.** The 23 pinned seam tests from the design doc §3.7 (ADR 0054
+master list) live in two files:
+
+- `tests/Kumunita.Core.Tests/EventServiceTests.cs` — **T01–T18** (the
+  event read/write/standing/RSVP/audit/adapter seams).
+- `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` — **T19–T23**
+  (the reminder window/filter/author-inclusion/idempotency/no-audit seams).
+
+**(b) The 23 test names (verbatim).**
+
+| # | Test name (exact) | File |
+|---|---|---|
+| T01 | `M4_MemberSeesUpcomingEventFeed` | EventServiceTests |
+| T02 | `M4_NullAudienceEventIsPublic` | EventServiceTests |
+| T03 | `M4_CommunityAudienceSeesFeed` | EventServiceTests |
+| T04 | `M4_GrantsAudienceOnlyGranteeSees` | EventServiceTests |
+| T05 | `M4_DraftInvisibleToNonAuthor` | EventServiceTests |
+| T06 | `M4_PlainMemberCreateAllowed` | EventServiceTests |
+| T07 | `M4_AuthorCanEditOwnEvent` | EventServiceTests |
+| T08 | `M4_PlainMemberEditDenied` | EventServiceTests |
+| T09 | `M4_GlobalAdminOverrideEdit` | EventServiceTests |
+| T10 | `M4_PublishAuthorOnly` | EventServiceTests |
+| T11 | `M4_SoftDeleteExcludesFromFeedAndDetail` | EventServiceTests |
+| T12 | `M4_AuthorSoftDeleteOwnEvent` | EventServiceTests |
+| T13 | `M4_RsvpLastWriteWins` | EventServiceTests |
+| T14 | `M4_RsvpUniqueIndexOneRowPerUser` | EventServiceTests |
+| T15 | `M4_RsvpListOwnerOnly` | EventServiceTests |
+| T16 | `M4_RsvpWritesNoAccessAuditRow` | EventServiceTests |
+| T17 | `M4_AuditRowShape_Create` | EventServiceTests |
+| T18 | `M4_EventToAuditableResourceShape` | EventServiceTests |
+| T19 | `M4_ReminderWindowFiltersOutsideEvents` | EventReminderServiceTests |
+| T20 | `M4_ReminderGoingRsvpsOnly` | EventReminderServiceTests |
+| T21 | `M4_ReminderAuthorAlwaysIncluded` | EventReminderServiceTests |
+| T22 | `M4_ReminderIdempotencyKeyShape` | EventReminderServiceTests |
+| T23 | `M4_ReminderWritesNoAccessAuditRow` | EventReminderServiceTests |
+
+**(c) Pass/red counts (the U11 gate input).** All **23 PASS / 0 RED**.
+
+| # | Test | Result |
+|---|---|---|
+| T01 | `M4_MemberSeesUpcomingEventFeed` | PASS |
+| T02 | `M4_NullAudienceEventIsPublic` | PASS |
+| T03 | `M4_CommunityAudienceSeesFeed` | PASS |
+| T04 | `M4_GrantsAudienceOnlyGranteeSees` | PASS |
+| T05 | `M4_DraftInvisibleToNonAuthor` | PASS |
+| T06 | `M4_PlainMemberCreateAllowed` | PASS |
+| T07 | `M4_AuthorCanEditOwnEvent` | PASS |
+| T08 | `M4_PlainMemberEditDenied` | PASS |
+| T09 | `M4_GlobalAdminOverrideEdit` | PASS |
+| T10 | `M4_PublishAuthorOnly` | PASS |
+| T11 | `M4_SoftDeleteExcludesFromFeedAndDetail` | PASS |
+| T12 | `M4_AuthorSoftDeleteOwnEvent` | PASS |
+| T13 | `M4_RsvpLastWriteWins` | PASS |
+| T14 | `M4_RsvpUniqueIndexOneRowPerUser` | PASS |
+| T15 | `M4_RsvpListOwnerOnly` | PASS |
+| T16 | `M4_RsvpWritesNoAccessAuditRow` | PASS |
+| T17 | `M4_AuditRowShape_Create` | PASS |
+| T18 | `M4_EventToAuditableResourceShape` | PASS |
+| T19 | `M4_ReminderWindowFiltersOutsideEvents` | PASS |
+| T20 | `M4_ReminderGoingRsvpsOnly` | PASS |
+| T21 | `M4_ReminderAuthorAlwaysIncluded` | PASS |
+| T22 | `M4_ReminderIdempotencyKeyShape` | PASS |
+| T23 | `M4_ReminderWritesNoAccessAuditRow` | PASS |
+
+**Tally: 23 PASS / 0 RED.**
+
+**Notes.**
+- **Pre-existing (authored in U03/U04/U07):** T05, T10, T13, T16 (and the
+  reminder surface T19–T23) already existed by their exact pinned names from
+  the earlier M4 units and were carried through unchanged — no rename drift.
+- **Authored in U09 (this session):** 14 exact-name tests were confirmed or
+  added in `EventServiceTests.cs` to close the §3.7 gap — T01, T02, T03, T04,
+  T06, T07, T08, T09, T11, T12, T14, T15, T17, T18. Where a near-name test
+  existed from U03/U04 (e.g. `M4_GrantAudienceOnlyGranteeSees` for T04,
+  `M4_SoftDeleteAuthorExcludesFromFeedAndDetail` for T11), a new exact-name
+  test was added rather than renaming the existing one, so no downstream
+  reference drift was introduced.
+- **Frozen seams untouched (as scoped):** `EventReminderService` (the 5-arg
+  `SendRemindersAsync(store, options, now, mailer, ct)`), `IMailerStage`,
+  `IEventService`, and the `Event` / `EventRsvp` documents were **not**
+  re-shaped in this unit; the tests assert against their frozen shapes.
+- **Exit gate (verified):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Error(s)**.
+  - `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+    **Total: 668, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** — all 23
+    pinned seam tests discovered + executed + passing (the 668 total is the
+    full Core suite, now including the 14 U09-authored exact-name tests).
+  - Name-presence check: a `IndexOf` scan over both test files for each of the
+    23 verbatim §3.7 names → **ALL 23 PRESENT**.
+  - No TS build (no TS touched in this unit).
+- **(e) Scope boundary:** the acceptance gate (U11), e2e authoring (U12), the
+  design-doc / README / `Milestones.cs` / `ARCHITECTURE.md` close (U12), and
+  the Web-side `EventControllerTests` (U10) all remain out of scope for this
+  unit.
+
+**U09 exit gate met. STOP — do NOT start U10.**
