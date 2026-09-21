@@ -2,15 +2,228 @@
 @model Kumunita.Web.Models.HomeViewModel
 @{
     ViewData["Title"] = "Home";
+    // Landing-style page: opt out of the shared .container so sections
+    // run full-bleed (the About page's pattern, _Layout.cshtml + the .kmb-*
+    // rules in site.css).
+    ViewData["FullBleed"] = true;
 }
 
-<section class="kmb-section">
+<!-- ══════════ 1. Intro: what Kumunita is and does ══════════ -->
+<section class="kmb-hero">
     <div class="container">
         <div class="row justify-content-center text-center">
-            <div class="col-12 kmb-hero">
+            <div class="col-12 col-lg-9">
+                <div class="eyebrow"><kw-l key="home.intro_eyebrow">A private home for one neighbourhood</kw-l></div>
+                <h1 class="display-5 mb-4">@Model.CommunityName</h1>
+                <p class="kmb-hero-lead mx-auto mb-4" style="max-width: 42rem;">
+                    <kw-l key="home.intro_lead">One quiet place for everything your street does — the feed, the groups, and the notes that deserve better than a group chat. Private, plain-language, and yours.</kw-l>
+                </p>
+                <div class="d-flex flex-wrap justify-content-center gap-3 kmb-hero-actions">
+                    <a asp-controller="Posts" asp-action="AllSections" class="btn btn-pill btn-primary">
+                        <kw-l key="home.cta_feed">See the feed</kw-l>
+                    </a>
+                    <a href="/about" class="btn btn-pill btn-hero-ghost">
+                        <kw-l key="home.about_link">What it is &amp; how it works</kw-l>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 2. What Kumunita does (the three surfaces) ══════════ -->
+<section class="kmb-features" aria-label="What Kumunita is">
+    <div class="kmb-features-band">
+        <div class="container">
+            <div class="row g-4 justify-content-center">
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 1 1 16.1-3.8z"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title"><kw-l key="home.feature_feed_title">One feed for the street</kw-l></h3>
+                        <p><kw-l key="home.feature_feed_body">Posts and threads from your blocks and lanes, in one quiet place — no algorithm, no noise.</kw-l></p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon kmb-feat-icon-warm mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title"><kw-l key="home.feature_groups_title">Groups that fit</kw-l></h3>
+                        <p><kw-l key="home.feature_groups_body">Garden swap, book club, street watch — a group for whatever the neighbourhood already does.</kw-l></p>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-8 col-md-4">
+                    <div class="kmb-feat-card">
+                        <div class="kmb-feat-icon mb-3" aria-hidden="true">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 17v5"/>
+                                <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/>
+                            </svg>
+                        </div>
+                        <h3 class="kmb-feat-title"><kw-l key="home.feature_pinned_title">Pinned where it matters</kw-l></h3>
+                        <p><kw-l key="home.feature_pinned_body">Water cuts, roadworks, the new speed bumps — notes that stay put instead of scrolling away.</kw-l></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════ 3. What's new (signed-in visitors only) ══════════ -->
+@if (Model.Feed is { } feed)
+{
+    <section class="kmb-section" aria-label="What's new">
+        <div class="container">
+            <div class="row justify-content-between align-items-end mb-4">
+                <div>
+                    <div class="eyebrow"><kw-l key="home.feed_eyebrow">Signed in</kw-l></div>
+                    <h2 class="h3 mt-1"><kw-l key="home.feed_title">What's new around the street</kw-l></h2>
+                </div>
+            </div>
+
+            @if (feed.IsEmpty)
+            {
+                <p class="text-white-50"><kw-l key="home.feed_empty">Nothing posted yet — be the first to start the conversation in the feed.</kw-l></p>
+            }
+            else
+            {
+                <div class="row g-4">
+                    @if (feed.Posts.Count > 0)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_posts">Posts</kw-l></h3>
+                                <a href="/community" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                @foreach (var row in feed.Posts)
+                                {
+                                    string avatarInitial = !string.IsNullOrWhiteSpace(row.Author)
+                                        ? char.ToUpperInvariant(row.Author.TrimStart()[0]).ToString()
+                                        : string.Empty;
+                                    <div class="list-group-item px-0">
+                                        <a href="@row.Href" class="text-decoration-none">
+                                            <span class="fw-semibold d-block mb-1">@row.Title
+                                                @if (row.Badge is { } badge)
+                                                {
+                                                    <span class="badge text-bg-light ms-2 airy-post-chip" title="@badge">@badge</span>
+                                                }
+                                            </span>
+                                        </a>
+                                        @if (!string.IsNullOrWhiteSpace(row.Preview))
+                                        {
+                                            <p class="small text-white-50 mb-2">@row.Preview</p>
+                                        }
+                                        <div class="d-flex align-items-center small text-white-50">
+                                            @if (row.AuthorSubjectId is { } authorId && row.Author is not null)
+                                            {
+                                                <span class="d-inline-flex align-items-center me-1">
+                                                    <img class="avatar" src="/profile/avatar/@authorId" alt=""
+                                                         data-avatar-fallback>
+                                                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                                                </span>
+                                                <span>@row.Author</span>
+                                                <span class="ms-1">·</span>
+                                            }
+                                            @if (row.When is { } when)
+                                            {
+                                                <span><kw-dt dt="@when" format="g"></kw-dt></span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (feed.Announcements.Count > 0)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_announcements">Announcements</kw-l></h3>
+                                <a href="/announcements" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                @foreach (var row in feed.Announcements)
+                                {
+                                    <div class="list-group-item px-0">
+                                        <a href="@row.Href" class="text-decoration-none">
+                                            <span class="fw-semibold d-block mb-1">@row.Title
+                                                @if (row.Badge is { } badge)
+                                                {
+                                                    <span class="badge text-bg-light ms-2" title="@badge">
+                                                        @if (badge == Kumunita.Web.Controllers.HomeController.BadgePinned)
+                                                        {
+                                                            <kw-l key="home.feed_badge_pinned">Pinned</kw-l>
+                                                        }
+                                                        else
+                                                        {
+                                                            @badge
+                                                        }
+                                                    </span>
+                                                }
+                                            </span>
+                                        </a>
+                                        @if (!string.IsNullOrWhiteSpace(row.Preview))
+                                        {
+                                            <p class="small text-white-50 mb-2">@row.Preview</p>
+                                        }
+                                        @if (row.When is { } when)
+                                        {
+                                            <div class="small text-white-50"><kw-dt dt="@when" format="g"></kw-dt></div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (feed.Pages.Count > 0)
+                    {
+                        <div class="col-12 col-lg-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h3 class="h6 text-uppercase text-white-50 mb-0"><kw-l key="home.feed_pages">Pages</kw-l></h3>
+                                <a href="/pages" class="small text-decoration-none"><kw-l key="home.feed_view_all">View all</kw-l> →</a>
+                            </div>
+                            <div class="list-group list-group-flush">
+                                @foreach (var row in feed.Pages)
+                                {
+                                    <div class="list-group-item px-0">
+                                        <a href="@row.Href" class="text-decoration-none">
+                                            <span class="fw-semibold d-block mb-1">@row.Title</span>
+                                        </a>
+                                        @if (row.When is { } when)
+                                        {
+                                            <div class="small text-white-50"><kw-dt dt="@when" format="g"></kw-dt></div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+}
+
+<!-- ══════════ 4. The plan (where this project stands) ══════════ -->
+<section class="kmb-section kmb-section-tint-a">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-12 col-lg-9">
                 <div class="eyebrow"><kw-l key="home.eyebrow">Where this project stands</kw-l></div>
-                <h1 class="mt-2 mb-3">@Model.CommunityName</h1>
-                <p class="kmb-section-lead mx-auto text-white-50" style="max-width: 42rem;">
+                <h2 class="h3 mt-2"><kw-l key="home.roadmap_heading">Built in the open, one milestone at a time</kw-l></h2>
+                <p class="kmb-section-lead mx-auto mt-3" style="max-width: 42rem;">
                     <kw-l key="home.lead">A private home for one neighbourhood — built in the open, one milestone at a time. This is the same list you'll find in the README, and the code behind every item is on the public repository.</kw-l>
                 </p>
             </div>

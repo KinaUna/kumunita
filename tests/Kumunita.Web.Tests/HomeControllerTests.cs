@@ -15,7 +15,7 @@ namespace Kumunita.Web.Tests;
 /// </summary>
 public class HomeControllerTests
 {
-    private static (HomeController controller, HomeViewModel? vm) RunIndex(string name, string? supportEmail)
+    private static async Task<(HomeController controller, HomeViewModel? vm)> RunIndexAsync(string name, string? supportEmail)
     {
         var options = Options.Create(new CommunityOptions
         {
@@ -23,37 +23,50 @@ public class HomeControllerTests
             SupportEmail = supportEmail,
         });
         var controller = new HomeController(options);
-        var action = controller.Index();
+        var action = await controller.Index();
         var view = Assert.IsType<ViewResult>(action);
         return (controller, Assert.IsType<HomeViewModel>(view.ViewData.Model));
     }
 
     [Fact]
-    public void Index_Renders_CommunityName_From_Config()
+    public async Task Index_Renders_CommunityName_From_Config()
     {
-        var (_, vm) = RunIndex("Maplewood Residents", "maps@example.com");
+        var (_, vm) = await RunIndexAsync("Maplewood Residents", "maps@example.com");
 
         Assert.Equal("Maplewood Residents", vm!.CommunityName);
     }
 
     [Fact]
-    public void Index_Forwards_SupportEmail_From_Config()
+    public async Task Index_Forwards_SupportEmail_From_Config()
     {
-        var (_, vm) = RunIndex("Maplewood", "resident@example.org");
+        var (_, vm) = await RunIndexAsync("Maplewood", "resident@example.org");
 
         Assert.Equal("resident@example.org", vm!.SupportEmail);
     }
 
     [Fact]
-    public void Index_FallsBack_To_DefaultName_When_Unset()
+    public async Task Index_FallsBack_To_DefaultName_When_Unset()
     {
         // Program.cs binds Community__* on startup; if nothing is set, the POCO
         // default "Kumunita" surfaces — pinning this here protects the OPS default.
         var options = Options.Create(new CommunityOptions());
         var controller = new HomeController(options);
-        var view = Assert.IsType<ViewResult>(controller.Index());
+        var view = Assert.IsType<ViewResult>(await controller.Index());
 
         var vm = Assert.IsType<HomeViewModel>(view.ViewData.Model);
         Assert.Equal("Kumunita", vm.CommunityName);
+    }
+
+    [Fact]
+    public async Task Index_NoFeed_ForAnonymous_Viewer()
+    {
+        // The feed is signed-in only; an anonymous visitor (no SubjectId claim)
+        // gets null Feed — the view renders hero + roadmap only.
+        var controller = new HomeController(Options.Create(new CommunityOptions()));
+        // No controller context ⇒ User is null ⇒ SubjectId null.
+        var view = Assert.IsType<ViewResult>(await controller.Index());
+
+        var vm = Assert.IsType<HomeViewModel>(view.ViewData.Model);
+        Assert.Null(vm.Feed);
     }
 }

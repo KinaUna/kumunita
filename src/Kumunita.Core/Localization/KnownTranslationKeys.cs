@@ -297,6 +297,37 @@ public static class KnownTranslationKeys
                 "Everything listed below is part of that plan, and you're welcome to see how it's made.",
             ["home.support"] = "Questions or feedback? Write to",
 
+            // ── home intro (what Kumunita is + the three surfaces) ──────────
+            ["home.intro_eyebrow"]  = "A private home for one neighbourhood",
+            ["home.intro_lead"] =
+                "One quiet place for everything your street does — the feed, the groups, " +
+                "and the notes that deserve better than a group chat. Private, plain-language, and yours.",
+            ["home.cta_feed"]      = "See the feed",
+            ["home.about_link"]    = "What it is & how it works",
+            ["home.feature_feed_title"]  = "One feed for the street",
+            ["home.feature_feed_body"] =
+                "Posts and threads from your blocks and lanes, in one quiet place — no algorithm, no noise.",
+            ["home.feature_groups_title"]  = "Groups that fit",
+            ["home.feature_groups_body"] =
+                "Garden swap, book club, street watch — a group for whatever the neighbourhood already does.",
+            ["home.feature_pinned_title"]  = "Pinned where it matters",
+            ["home.feature_pinned_body"] =
+                "Water cuts, roadworks, the new speed bumps — notes that stay put instead of scrolling away.",
+
+            // ── home "what's new" feed (signed-in visitors) ─────────────────
+            ["home.feed_eyebrow"]        = "Signed in",
+            ["home.feed_title"]          = "What's new around the street",
+            ["home.feed_posts"]          = "Posts",
+            ["home.feed_announcements"]  = "Announcements",
+            ["home.feed_pages"]          = "Pages",
+            ["home.feed_view_all"]       = "View all",
+            ["home.feed_empty"] =
+                "Nothing posted yet — be the first to start the conversation in the feed.",
+            ["home.feed_badge_pinned"]   = "Pinned",
+
+            // ── home roadmap (the plan, after the intro) ────────────────────
+            ["home.roadmap_heading"] = "Built in the open, one milestone at a time",
+
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Sign in",
             ["account.login_submit"]  = "Sign in",
@@ -1219,6 +1250,37 @@ public static class KnownTranslationKeys
                 "Alles, was unten aufgeführt ist, ist Teil dieses Plans — und du darfst gern einen Blick darauf werfen, wie es entsteht.",
             ["home.support"] = "Fragen oder Feedback? Schreibe an",
 
+            // ── home intro (was Kumunita ist + die drei Oberflächen) ─────────
+            ["home.intro_eyebrow"]  = "Ein privater Ort für eine Nachbarschaft",
+            ["home.intro_lead"] =
+                "Ein ruhiger Ort für alles, was eure Straße bewegt — der Feed, die Gruppen und " +
+                "die Hinweise, die mehr verdienen als einen Gruppenchat. Privat, verständlich und euer.",
+            ["home.cta_feed"]      = "Zum Feed",
+            ["home.about_link"]    = "Was es ist & wie es funktioniert",
+            ["home.feature_feed_title"]  = "Ein Feed für die Straße",
+            ["home.feature_feed_body"] =
+                "Beiträge und Threads aus euren Kiezen, an einem ruhigen Ort — kein Algorithmus, kein Lärm.",
+            ["home.feature_groups_title"]  = "Gruppen, die passen",
+            ["home.feature_groups_body"] =
+                "Gartenswap, Bücherclub, Nachbarschaftswache — eine Gruppe für alles, was die Nachbarschaft schon macht.",
+            ["home.feature_pinned_title"]  = "Angepinnt, wo es zählt",
+            ["home.feature_pinned_body"] =
+                "Wasserausfälle, Baustellen, neue Tempobremsen — Hinweise, die bleiben und nicht davonscrollen.",
+
+            // ── home "Neues"-Feed (angemeldete Nutzer) ─────────────────────
+            ["home.feed_eyebrow"]        = "Angemeldet",
+            ["home.feed_title"]          = "Neues um die Ecke",
+            ["home.feed_posts"]          = "Beiträge",
+            ["home.feed_announcements"]  = "Hinweise",
+            ["home.feed_pages"]          = "Seiten",
+            ["home.feed_view_all"]       = "Alle ansehen",
+            ["home.feed_empty"] =
+                "Noch nichts gepostet — sei die erste Person, die die Unterhaltung im Feed anstößt.",
+            ["home.feed_badge_pinned"]   = "Angepinnt",
+
+            // ── home Roadmap (der Plan, nach der Intro) ────────────────────
+            ["home.roadmap_heading"] = "In der offenen Entwicklung, Meilenstein für Meilenstein",
+
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Anmelden",
             ["account.login_submit"]  = "Anmelden",
@@ -2096,6 +2158,37 @@ public static class KnownTranslationKeys
                 "Un chez-soi privé pour un quartier — construit pas à pas, en toute transparence. " +
                 "Tout ce qui figure plus bas fait partie de ce plan, et tu es le bienvenu à voir comment il est réalisé.",
             ["home.support"] = "Des questions ou des retours ? Écris à",
+
+            // ── home intro (ce qu'est Kumunita + les trois surfaces) ────────
+            ["home.intro_eyebrow"]  = "Un chez-soi privé pour un quartier",
+            ["home.intro_lead"] =
+                "Un seul endroit tranquille pour tout ce que fait votre rue — le flux, les groupes " +
+                "et les annonces qui méritent mieux qu'un groupe de chat. Privé, clair et à vous.",
+            ["home.cta_feed"]      = "Voir le flux",
+            ["home.about_link"]    = "Ce que c'est & comment ça marche",
+            ["home.feature_feed_title"]  = "Un seul flux pour la rue",
+            ["home.feature_feed_body"] =
+                "Posts et fils de discussion de vos ruelles, en un seul endroit tranquille — pas d'algorithme, pas de bruit.",
+            ["home.feature_groups_title"]  = "Des groupes qui collent",
+            ["home.feature_groups_body"] =
+                "Échange de plants, club de lecture, veille de rue — un groupe pour tout ce que le quartier fait déjà.",
+            ["home.feature_pinned_title"]  = "Épinglé là où ça compte",
+            ["home.feature_pinned_body"] =
+                "Coupures d'eau, travaux, nouveaux ralentisseurs — des annonces qui restent au lieu de défiler.",
+
+            // ── home « nouveautés » (visiteurs connectés) ──────────────────
+            ["home.feed_eyebrow"]        = "Connecté",
+            ["home.feed_title"]          = "Les nouveautés du quartier",
+            ["home.feed_posts"]          = "Posts",
+            ["home.feed_announcements"]  = "Annonces",
+            ["home.feed_pages"]          = "Pages",
+            ["home.feed_view_all"]       = "Tout voir",
+            ["home.feed_empty"] =
+                "Rien de posté pour l'instant — soyez le premier à lancer la conversation dans le flux.",
+            ["home.feed_badge_pinned"]   = "Épinglé",
+
+            // ── home feuille de route (le plan, après l'intro) ─────────────
+            ["home.roadmap_heading"] = "Construit en toute transparence, étape par étape",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Se connecter",
@@ -2976,6 +3069,37 @@ public static class KnownTranslationKeys
                 "Et privat hjem for ét nabolag — bygget skridt for skridt og i det åbne. " +
                 "Alt, der er angivet nedenfor, er en del af den plan — og du er velkommen til at se, hvordan den bygges.",
             ["home.support"] = "Spørgsmål eller feedback? Skriv til",
+
+            // ── home intro (hvad Kumunita er + de tre overflader) ──────────
+            ["home.intro_eyebrow"]  = "Et privat hjem for ét nabolag",
+            ["home.intro_lead"] =
+                "Ét roligt sted til alt det, jeres gade laver — fæden, grupperne og " +
+                "de meddelelser, der fortjener mere end en gruppechat. Privat, klart og jeres.",
+            ["home.cta_feed"]      = "Se fæden",
+            ["home.about_link"]    = "Hvad det er & hvordan det virker",
+            ["home.feature_feed_title"]  = "Én fæde for gaden",
+            ["home.feature_feed_body"] =
+                "Indlæg og tråde fra jeres stræder, ét roligt sted — ingen algoritme, ingen støj.",
+            ["home.feature_groups_title"]  = "Grupper der passer",
+            ["home.feature_groups_body"] =
+                "Havedeling, bogklub, naboovervågning — en gruppe til alt det nabolaget allerede laver.",
+            ["home.feature_pinned_title"]  = "Fastgjort hvor det betyder noget",
+            ["home.feature_pinned_body"] =
+                "Vandafbrud, vejarbejde, de nye bakkedæmper — notater der bliver hængende i stedet for at forsvinde.",
+
+            // ── home "Nyheder"-fæde (loggede ind brugere) ──────────────────
+            ["home.feed_eyebrow"]        = "Logget ind",
+            ["home.feed_title"]          = "Det nyt i nabolaget",
+            ["home.feed_posts"]          = "Indlæg",
+            ["home.feed_announcements"]  = "Meddelelser",
+            ["home.feed_pages"]          = "Sider",
+            ["home.feed_view_all"]       = "Se alle",
+            ["home.feed_empty"] =
+                "Ingenting er indlagt endnu — vær den første, der starter samtalen i fæden.",
+            ["home.feed_badge_pinned"]   = "Fastgjort",
+
+            // ── home milepæler (planen, efter introen) ─────────────────────
+            ["home.roadmap_heading"] = "Bygget i det åbne, milepæl for milepæl",
 
             // ── account (Login / Signup — titles + primary actions) ─────────
             ["account.login_title"]   = "Log ind",

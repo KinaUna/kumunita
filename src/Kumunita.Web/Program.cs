@@ -406,7 +406,46 @@ await app.StartAsync();
 // OutboxEmail envelope via Wolverine IMessageContext, which — like the
 // AuditPurgeTick publish below — requires the host to be started
 // (WolverineRuntime.AssertHasStarted), so any earlier placement breaks first boot.
+//
+// Capture the first-boot (pristine) signal NOW — before ApplyAsync runs
+// MigrateAsync, which creates the identity schema and would flip the pristine
+// check to false. The Development sample-data seeder below is create-once, so
+// it must run on first boot only; the gate reads this pre-migration value.
+bool firstBoot;
+await using (var probeScope = app.Services.CreateAsyncScope())
+{
+    firstBoot = await DbBootstrap.IsPristineAsync(
+        probeScope.ServiceProvider.GetRequiredService<AppDbContext>());
+}
 await SchemaBootstrap.ApplyAsync(app.Services);
+
+// Development-only sample data (a mock neighborhood): a fresh `docker compose
+// down -v && docker compose up --build` comes up already populated with a
+// password-bearing admin, a scoped moderator, a translator, several verified
+// residents, groups, announcements, posts/replies, events/RSVPs, tags, and a
+// resident blog — so a developer has content to exercise immediately. It runs
+// on the same first-boot gate as FirstBootSeeder (the `firstBoot` flag above —
+// the content stores are create-once, so re-running on a warm DB would
+// duplicate every group/announcement/post) and only in the Development
+// environment, so a real deployment can never see it. See SampleDataSeeder
+// (Kumunita.Core.Bootstrap) for the full rationale and the printed credentials.
+//
+// This must run AFTER StartAsync for the same reason SchemaBootstrap does
+// (scoped EF/identity + mt/document writers, and the component-mandatory write
+// lane opens its own session), so the scoped services are resolved in an async
+// scope exactly like the tick publishes below.
+if (app.Environment.IsDevelopment() && firstBoot)
+{
+    await using var sampleScope = app.Services.CreateAsyncScope();
+    var sampleSp = sampleScope.ServiceProvider;
+    await SampleDataSeeder.SeedAsync(
+        sampleSp.GetRequiredService<AppDbContext>(),
+        sampleSp.GetRequiredService<IDocumentStore>(),
+        sampleSp.GetRequiredService<UserManager<User>>(),
+        sampleSp.GetRequiredService<RoleManager<IdentityRole>>(),
+        sampleSp.GetRequiredService<Kumunita.Core.UserInfo.IUserInfoService>(),
+        sampleSp.GetRequiredService<ILogger>());
+}
 
 // Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
 // SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a

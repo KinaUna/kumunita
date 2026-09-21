@@ -264,6 +264,27 @@ renders the configured `Community__Name`. On a **fresh** database the versioned 
 initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**
 exactly once, and subsequent boots are a no-op.
 
+**Sample data & demo accounts.** On a **fresh** database in `Development`, the first-boot
+lane also seeds a mock neighborhood so a fresh instance is immediately exercisable —
+residents, groups, community + group posts with replies, events with RSVPs, tags, a
+resident blog, and de/fr translations (ADR 0055). It is `Development`-only and first-boot
+only, so a real deployment can never see it. The demo logins (all `examplium.com`, a
+deliberately-fictional domain kept distinct from the real `kumunita.com`):
+
+| Account | E-mail | Password | Standing |
+|---|---|---|---|
+| Admin | `admin@examplium.com` | `Admin123!` | `GlobalAdmin` (the seeded first-boot admin, now with a password) |
+| Maria | `moderator@examplium.com` | `Mod1234!` | `Moderator` scoped to Safety + Social |
+| Sophie | `translator@examplium.com` | `Trans123!` | `Translator` (authors the de/fr translation rows) |
+| Anna | `anna@examplium.com` | `Resident123!` | resident; contact-opted-in; Warsaw timezone |
+| Ben | `ben@examplium.com` | `Resident123!` | resident |
+| Carla | `carla@examplium.com` | `Resident123!` | resident; contact-opted-in; owns the public "Street Green" group |
+| David | `david@examplium.com` | `Resident123!` | resident; Prague timezone |
+
+Wipe everything with `docker compose down -v` and rebuild — the seeder re-seeds on the
+next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps it from
+ever re-running on a warm database).
+
 *Dev (no app container):* `docker compose up -d db`,
 `npm run build` in `src/Kumunita.Web/`, then
 `dotnet run --project src/Kumunita.Web` (settings from

@@ -80,6 +80,13 @@ sent → default components (Safety, Maintenance, Social, Governance) are seeded
 language catalog is seeded (source language `en` enabled and set as default).
 Re-running the seeder is a no-op once the admin exists.
 
+> **Development only (ADR 0055):** in `Development` the first-boot lane *also* seeds a
+> mock neighborhood (residents, groups, posts/replies, events/RSVPs, tags, a blog,
+> de/fr translations) so a fresh `docker compose` instance is immediately exercisable.
+> It is gated on `IsDevelopment()` **and** first-boot, so a `Production` deployment never
+> runs it; the demo logins are `@examplium.com` (kept distinct from the real
+> `kumunita.com`). See the README §Running "Sample data & demo accounts" table.
+
 **Languages are in-app data, not config.** Supported languages, the default language,
 and all translations live in the DB (`mt` schema; admin-managed under
 `/admin/languages`, ADR 0005) — not env, not image config. They ride the existing
