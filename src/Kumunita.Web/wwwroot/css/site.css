@@ -1116,6 +1116,7 @@ body.kmb-page-fullbleed .navbar {
   gap: 0.5rem;
   text-align: center;
 }
+.dir-card { cursor: pointer; }
 .dir-card:hover { border-color: var(--kmb-hover-border); }
 .dir-card .dname { font-weight: 600; font-size: 1rem; }
 .dir-card .dname a { color: var(--kmb-ink); text-decoration: none; }
