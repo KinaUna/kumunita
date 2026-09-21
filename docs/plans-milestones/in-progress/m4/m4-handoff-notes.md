@@ -470,3 +470,79 @@ further open decisions carried into U01.
   change, out of U05 scope).
 
 **U05 exit gate met. STOP — do NOT start U06.**
+
+## U06 — nav entry + /my/drafts + kw-dt
+
+- **(a) Files touched (all in `src/Kumunita.Web` — **zero Core files changed**,
+  per the "no Core changes" scope; the event-draft read is a Web-layer store
+  query, not a new Core seam):**
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — the **nav entry**: one
+    `<li class="nav-item">` linking `href="/events"`, label
+    `<kw-l key="nav.events">Events</kw-l>`, placed in the **signed-in** block
+    between `Groups` and `Pages` (the `Community` nav pattern verbatim — one
+    entry, not three; `EventController` is `[Authorize]` ⇒ resident-only, so
+    it sits with the other resident-only links, not the public Home/
+    Announcements).
+  - `src/Kumunita.Web/Controllers/MyDraftsController.cs` — the **`/my/drafts`
+    lane**: added an `IDocumentStore` ctor parameter + a read-lane query of the
+    actor's own draft events (`.Where(e => e.IsDraft && e.AuthorId == actor &&
+    !e.IsDeleted)` `.OrderByDescending(e => e.Created)`, opened on a dedicated
+    `store.QuerySession()` — the C3 read-lane shape). This **reuses the
+    existing `/my/drafts` lane** (the ADR 0037 author-only pin) rather than
+    inventing a new one; the author-only shape is identical to the
+    `PostService.ListMyDraftsAsync` / `IAnnouncementService.ListMyDraftsAsync`
+    reads (pure `AuthorId == actor` + `IsDraft`, no role, no `AccessAudit`
+    row — the M4 `IEventService` seam has no dedicated draft-list lane, so the
+    Web page reads the actor's own draft `Event` docs directly — a *read*, not
+    a decision). Class + action doc-comments updated to name the event lane.
+  - `src/Kumunita.Web/Models/MyDraftsViewModel.cs` — added `Events`
+    (`IReadOnlyList<Event>`), `using Kumunita.Core.Events;`.
+  - `src/Kumunita.Web/Views/MyDrafts/Index.cshtml` — the **Events** section
+    (after the Announcements section): `@if (Model.Events.Count > 0)` block,
+    each row linking to `/events/{ev.Id}` (the detail lane offers Publish,
+    ADR 0037), title-else-`MarkdownRenderer.PlainTextPreview(ev.Body, 80)`;
+    the `any` empty-state check now includes `Model.Events.Count > 0`.
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml` — the **`kw-dt`** extension:
+    Start / End / `EventRsvp.At` already used `<kw-dt>` (U05); added the two
+    remaining `Event` timestamps — `Created` + `Modified` (the
+    `DateTimeOffset?`) — as a `text-muted small mt-3` footer after the body
+    card, the one `<kw-dt>` TagHelper (ADR 0019 / 0020 per-request timezone +
+    format resolver), mirroring the Announcement Detail footer (a value →
+    text; an unset `Modified` renders nothing). No new mechanism.
+- **(b) The nav line (verbatim):** `<a class="nav-link text-dark"
+  href="/events"><kw-l key="nav.events">Events</kw-l></a>` — a single entry
+  in the signed-in nav block.
+- **(c) The `/my/drafts` wiring (the ADR 0037 pin, author-only):** the
+  `MyDraftsController.Index` now resolves the actor's own draft events via
+  `store.QuerySession()` → `.Query<Event>()
+  .Where(e => e.IsDraft && e.AuthorId == actor && !e.IsDeleted)
+  .OrderByDescending(e => e.Created)` and passes them on
+  `MyDraftsViewModel.Events`; the view renders them under an **Events**
+  heading, each row linking to `/events/{id}` (the detail lane, where the
+  author-only Publish button lives). A draft event is therefore discoverable
+  at `/my/drafts`, author-only (a non-author's query returns no one else's
+  drafts — the author-only pin holds end-to-end).
+- **(d) The `kw-dt` locations (every `Event` timestamp renders via the one
+  TagHelper):** `Start` / `End` — `Views/Event/Index.cshtml` (feed row) +
+  `Views/Event/Detail.cshtml` (detail header, U05); `EventRsvp.At` —
+  `Views/Event/Detail.cshtml` (the owner-only RSVP list, U05);
+  `Created` / `Modified` — **this unit** (`Views/Event/Detail.cshtml` footer).
+  The composer/edit `Start` / `End` inputs keep `value="…ToLocalTime()"`
+  (browser datetime-local pre-fill — an input control value, not a rendered
+  reader timestamp; not a `kw-dt` target). No new timezone / format mechanism.
+- **(e) Exit gate (per `AGENTS.md` — both green; `dotnet test` / VS Test
+  Explorer **not** run, per the runner-discovery quirk — that is U10's job):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Warning(s),
+    0 Error(s)**.
+  - `npm --prefix src/Kumunita.Web run build` → **clean** (`tsc` completed,
+    no output).
+- **(f) Untouched (per scope):** the `Post` / `Announcement` / `Page`
+  surfaces; the U05 **(f) drift** note (GlobalAdmin edit/delete write denied
+  at the frozen Core seam — author-only enforced at Core, the Web pre-gate
+  uses the real role set; **not** "fixed" here — a Core seam change is
+  out of U06 scope and belongs to a later lane / ADR); no new tests (U10
+  authors the `EventControllerTests`); no reminder service (U07); no
+  acceptance gate (U11); no design-doc / README / `Milestones.cs` edits (U12);
+  **no Core changes** (the 5 touched files are all in `src/Kumunita.Web`).
+
+**U06 exit gate met. STOP — do NOT start U07.**

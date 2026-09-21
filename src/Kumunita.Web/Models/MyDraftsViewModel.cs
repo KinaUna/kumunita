@@ -1,4 +1,5 @@
 using Kumunita.Core.Announcements;
+using Kumunita.Core.Events;
 
 namespace Kumunita.Web.Models;
 
@@ -36,4 +37,10 @@ public sealed class MyDraftsViewModel
     /// <summary>The actor's draft announcements, sorted by <c>Created</c>
     /// descending.</summary>
     public IReadOnlyList<Announcement> Announcements { get; set; } = [];
+
+    /// <summary>The actor's draft events (M4, ADR 0054 / ADR 0037), sorted by
+    /// <c>Created</c> descending — the same author-only <c>IsDraft &amp;
+    /// AuthorId == actor</c> read as the post / announcement draft lanes, so a
+    /// draft event is discoverable here (feeds deliberately exclude drafts).</summary>
+    public IReadOnlyList<Event> Events { get; set; } = [];
 }

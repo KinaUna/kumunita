@@ -89,6 +89,20 @@
 
                 @* The full body — rendered through the one MarkdownRenderer (R·1). *@
                 <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
+
+                @* Created / edited — the remaining Event timestamps (ADR 0019 /
+                   0020), rendered by the one <kw-dt> TagHelper (the per-request
+                   timezone + format resolver). Mirrors the Announcement Detail
+                   footer (a value → text, an unset Modified renders nothing). *@
+                <div class="text-muted small mt-3">
+                    <kw-l key="events.created">Created</kw-l>
+                    <kw-dt dt="@Model.Event.Created" format="g"></kw-dt>
+                    @if (Model.Event.Modified is not null)
+                    {
+                        <span> · <kw-l key="events.edited">edited</kw-l>
+                            <kw-dt dt="@Model.Event.Modified.Value" format="g"></kw-dt></span>
+                    }
+                </div>
             </div>
         </div>
 

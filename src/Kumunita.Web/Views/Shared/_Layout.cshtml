@@ -58,6 +58,14 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
                             </li>
+                            @* M4 (ADR 0054) — the events feed (the "content-with-time"
+                               lane): upcoming events the resident may read + RSVP.
+                               [Authorize] on the EventController ⇒ resident-only,
+                               so it lives in this signed-in block (one entry, not
+                               three — the feed / detail / composer are one surface). *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/events"><kw-l key="nav.events">Events</kw-l></a>
+                            </li>
                             @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
                                view). Display, not access — the tree is CanSeeAsync(Read)
                                -filtered and the composer button is standing-gated. The

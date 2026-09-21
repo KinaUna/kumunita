@@ -3,7 +3,7 @@
 @using Kumunita.Web.Security
 @{
     ViewData["Title"] = "My drafts";
-    bool any = Model.Posts.Count > 0 || Model.Announcements.Count > 0;
+    bool any = Model.Posts.Count > 0 || Model.Announcements.Count > 0 || Model.Events.Count > 0;
 }
 
 <div class="row justify-content-center">
@@ -80,6 +80,33 @@
                             </a>
                         </div>
                         <a class="btn btn-sm btn-outline-primary text-nowrap" href="/announcements/@a.Id">
+                            <kw-l key="posts.publish">Open</kw-l>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+
+        @* M4 (ADR 0054) — the actor's own draft events: the same author-only
+           discoverability surface (ADR 0037); the detail lane offers Publish. *@
+        @if (Model.Events.Count > 0)
+        {
+            <h6 class="mt-4 fw-semibold">Events</h6>
+            <ul class="list-group mb-4">
+                @foreach (var ev in Model.Events)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                        <div>
+                            <span class="badge bg-warning text-dark me-2">
+                                <kw-l key="posts.draft_badge">Draft</kw-l>
+                            </span>
+                            <a href="/events/@ev.Id">
+                                @(string.IsNullOrWhiteSpace(ev.Title)
+                                    ? MarkdownRenderer.PlainTextPreview(ev.Body, 80)
+                                    : ev.Title)
+                            </a>
+                        </div>
+                        <a class="btn btn-sm btn-outline-primary text-nowrap" href="/events/@ev.Id">
                             <kw-l key="posts.publish">Open</kw-l>
                         </a>
                     </li>
