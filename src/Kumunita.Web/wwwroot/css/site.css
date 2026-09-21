@@ -222,6 +222,9 @@ body {
 body.kmb-page-fullbleed {
   margin-bottom: 0; /* full-bleed landing pages carry their own rhythm */
 }
+body.kmb-page-fullbleed .navbar {
+  margin-bottom: 0; /* the full-bleed hero starts flush below the navbar */
+}
 
 .lead {
   font-weight: 400;
@@ -499,7 +502,7 @@ body.kmb-page-fullbleed {
 .kmb-features-band {
   background-color: #142e22;
   padding-top: var(--kmb-space-section-sm);
-  padding-bottom: 0;
+  padding-bottom: 0.625rem; /* small breathing room below the cards */
 }
 .kmb-features-row {
   margin-bottom: calc(var(--kmb-overlap) * -1);

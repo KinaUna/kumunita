@@ -302,7 +302,6 @@ public static class KnownTranslationKeys
             ["home.intro_lead"] =
                 "One quiet place for everything your street does — the feed, the groups, " +
                 "and the notes that deserve better than a group chat. Private, plain-language, and yours.",
-            ["home.cta_feed"]      = "See the feed",
             ["home.about_link"]    = "What it is & how it works",
             ["home.feature_feed_title"]  = "One feed for the street",
             ["home.feature_feed_body"] =
@@ -1255,7 +1254,6 @@ public static class KnownTranslationKeys
             ["home.intro_lead"] =
                 "Ein ruhiger Ort für alles, was eure Straße bewegt — der Feed, die Gruppen und " +
                 "die Hinweise, die mehr verdienen als einen Gruppenchat. Privat, verständlich und euer.",
-            ["home.cta_feed"]      = "Zum Feed",
             ["home.about_link"]    = "Was es ist & wie es funktioniert",
             ["home.feature_feed_title"]  = "Ein Feed für die Straße",
             ["home.feature_feed_body"] =
@@ -2164,7 +2162,6 @@ public static class KnownTranslationKeys
             ["home.intro_lead"] =
                 "Un seul endroit tranquille pour tout ce que fait votre rue — le flux, les groupes " +
                 "et les annonces qui méritent mieux qu'un groupe de chat. Privé, clair et à vous.",
-            ["home.cta_feed"]      = "Voir le flux",
             ["home.about_link"]    = "Ce que c'est & comment ça marche",
             ["home.feature_feed_title"]  = "Un seul flux pour la rue",
             ["home.feature_feed_body"] =
@@ -3075,7 +3072,6 @@ public static class KnownTranslationKeys
             ["home.intro_lead"] =
                 "Ét roligt sted til alt det, jeres gade laver — fæden, grupperne og " +
                 "de meddelelser, der fortjener mere end en gruppechat. Privat, klart og jeres.",
-            ["home.cta_feed"]      = "Se fæden",
             ["home.about_link"]    = "Hvad det er & hvordan det virker",
             ["home.feature_feed_title"]  = "Én fæde for gaden",
             ["home.feature_feed_body"] =
