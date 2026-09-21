@@ -40,6 +40,7 @@ All per-instance identity and integration is env. The *image* is identical every
 | `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
 | `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The image lane's raster-only gate; the extension point this row was sized to leave open for follow-on lanes |
 | `Media__AttachmentAllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive, for the **attachment (download) lane** (ADR 0034, lane `ATT`) — **distinct** from the image lane's `Media__AllowedContentTypes`. Default: `application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv, application/zip, image/jpeg, image/png, image/webp, image/gif` (SVG excluded; the four raster types included so a photo can be attached *as a download*). Same `Media__MaxBytes` cap. Guards-before-write: empty → 400, oversize → 413, disallowed → 415 (SECURITY.md §3(e)) |
+| `SampleData__Enabled` | Optional | No | First-boot mock-neighborhood seeder (ADR 0055 / 0056). Default **absent/`false`** — a real deployment omits it, so the seeder is unreachable by construction. Set `true` only for a **deployed demo site** (`Production` + fresh DB): the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo accounts get random high-entropy passwords, and a single credentials summary is emailed to the seed admin's address through the durable outbox. In `Development` it instead uses the documented weak demo credentials (README §Running table). First-boot only (pristine-DB gate) |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -80,12 +81,18 @@ sent → default components (Safety, Maintenance, Social, Governance) are seeded
 language catalog is seeded (source language `en` enabled and set as default).
 Re-running the seeder is a no-op once the admin exists.
 
-> **Development only (ADR 0055):** in `Development` the first-boot lane *also* seeds a
-> mock neighborhood (residents, groups, posts/replies, events/RSVPs, tags, a blog,
-> de/fr translations) so a fresh `docker compose` instance is immediately exercisable.
-> It is gated on `IsDevelopment()` **and** first-boot, so a `Production` deployment never
-> runs it; the demo logins are `@examplium.com` (kept distinct from the real
-> `kumunita.com`). See the README §Running "Sample data & demo accounts" table.
+> **Sample data — opt-in (ADR 0055 / 0056):** when `SampleData__Enabled=true` the
+> first-boot lane seeds a mock neighborhood (residents, groups, posts/replies,
+> events/RSVPs, tags, a blog, de/fr translations) so a fresh instance is immediately
+> exercisable. It is gated on `SampleData__Enabled` **and** first-boot, so a real
+> deployment that never sets the flag never runs it. Two postures: in `Development`
+> it uses the documented weak demo credentials (README §Running table); on a deployed
+> demo site (`Production` + the flag) the seed admin keeps its `SeedAdmin__`
+> setup-token lane, the other demo accounts get random high-entropy passwords, and a
+> single credentials summary is emailed to the seed admin's address through the
+> durable outbox. The demo logins are `@examplium.com` (kept distinct from the real
+> `kumunita.com`). See the README §Running "Sample data & demo accounts" table, and
+> **Procedure 12** (deploying a demo site) for the step-by-step.
 
 **Languages are in-app data, not config.** Supported languages, the default language,
 and all translations live in the DB (`mt` schema; admin-managed under
@@ -358,6 +365,55 @@ slice of that map.
 | Date | What happened | Impact | Action taken | Follow-up | Who |
 |------|---------------|--------|--------------|-----------|-----|
 |      |               |        |              |           |     |
+
+### 12. Deploy a demo site (sample data)
+
+A **deployed demo site** is a throwaway `Production` instance a prospective
+neighborhood can click through, pre-populated with the mock neighborhood (ADR
+0055 / 0056). It is a **separate app + dedicated Postgres** (the one-instance-per
+neighborhood topology, ADR 0002) — never a real neighborhood's database. It is
+**disposable by design**: treat its data as scratch, and never let it become a real
+deployment (wipe + re-seed, or provision fresh, when it outlives its purpose).
+
+What makes it a *demo* instance (vs. a real one) is the env set, not the image:
+`SampleData__Enabled=true` (first-boot only) plus the `examplium.com` naming. In the
+**deploy posture** the seed admin keeps its `SeedAdmin__` setup-token lane, the other
+demo accounts get random high-entropy passwords, and a single credentials summary is
+emailed to the seed admin's address through the durable outbox — no weak credential is
+stored on the public instance (the README §Running table is the **Development**
+credential set, not this one).
+
+1. Provision a fresh app + dedicated Postgres exactly as **Procedure 1**, but with the
+   demo identity: `Community__Name` (e.g. "Kumunita Demo Residents"),
+   `Community__SupportEmail` (e.g. `demo@examplium.com`), a strong DB password, a real
+   SMTP relay, `Verification__BaseUrl` = the demo domain, `Media__RootPath` +
+   `DataProtection__KeysDirectory` on a volume, and `SampleData__Enabled=true`.
+2. Set `SeedAdmin__Email` to the **operator's real admin address** (the credentials
+   e-mail and the setup e-mail both land there) and `SeedAdmin__Token` to a freshly
+   generated one-time token (Procedure 2). Store the token in the secrets manager.
+3. Deploy against a **fresh** Postgres (the pristine-DB gate is what makes the seeder
+   run). Confirm `/health` is OK.
+4. Open the site's first-boot setup link, **complete the admin setup** (set the admin
+   password; the token is invalidated on first use), then **remove `SeedAdmin__*` from
+   env** (Procedure 2, step 4).
+5. **Capture the credentials e-mail** in the admin inbox — it lists each demo account's
+   e-mail → random password. Store the ones you need (secrets manager) and **delete the
+   e-mail** (it is sensitive; the body says so).
+6. Exercise the demo (feed, groups, posts, events, RSVPs, the language switcher, the
+   resident blog). Verify the pinned "Test Platform" announcement is visible to a
+   signed-out visitor (it is the most visible thing on a demo instance and tells them
+   this is not real and to keep private data off it).
+7. Record it in the **Instance inventory** with a `Notes` marker such as
+   `DEMO — disposable, sample data (ADR 0056)` so it is never mistaken for a real
+   neighborhood.
+
+Teardown / reset: `docker compose down -v` (dev) or delete the Coolify app + its Postgres
+addon and re-run steps 1–5 for a fresh seed — the seeder is first-boot only and
+idempotent, so a warm DB will not re-seed or duplicate (the pristine gate keeps it from
+re-running). Do **not** point a real neighborhood's `Community__Name` / Postgres at this
+instance; if a demo site is ever going to carry real residents, provision a **real**
+instance (Procedure 1, without `SampleData__Enabled`) and migrate the residents in —
+a demo DB is not a real DB.
 
 ---
 

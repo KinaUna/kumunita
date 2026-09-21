@@ -264,12 +264,25 @@ renders the configured `Community__Name`. On a **fresh** database the versioned 
 initializes the `mt` schema with no operator step (ADR 0004) — the log shows **First boot**
 exactly once, and subsequent boots are a no-op.
 
-**Sample data & demo accounts.** On a **fresh** database in `Development`, the first-boot
-lane also seeds a mock neighborhood so a fresh instance is immediately exercisable —
-residents, groups, community + group posts with replies, events with RSVPs, tags, a
-resident blog, and de/fr translations (ADR 0055). It is `Development`-only and first-boot
-only, so a real deployment can never see it. The demo logins (all `examplium.com`, a
-deliberately-fictional domain kept distinct from the real `kumunita.com`):
+**Sample data & demo accounts.** On a **fresh** database, the first-boot lane can seed a
+mock neighborhood so an instance is immediately exercisable — residents, groups, community
++ group posts with replies, events with RSVPs, tags, a resident blog, and de/fr translations
+(ADR 0055, extended by ADR 0056). It is **opt-in via `SampleData__Enabled=true`** and
+first-boot only, so a real deployment that never sets the flag can never see it. Two
+postures, one seeder (ADR 0056):
+
+- **Development** (local dev loop, `appsettings.Development.json` / `docker-compose.yml`
+  already set the flag) — the documented weak demo credentials below, printed to the log;
+  the seed admin keeps its `SeedAdmin__` setup-token lane *plus* a weak demo password.
+- **Deployed demo site** (a Coolify `Production` instance with `SampleData__Enabled=true`)
+  — the seed admin **keeps only its `SeedAdmin__` setup-token lane** (no weak password),
+  the other demo accounts get **random high-entropy passwords**, and a single credentials
+  summary is **emailed to the seed admin's address** through the durable outbox. No weak
+  credential is stored on the public instance; the operator's admin inbox is the only place
+  the random passwords appear.
+
+The Development-posture demo logins (all `examplium.com`, a deliberately-fictional domain
+kept distinct from the real `kumunita.com`):
 
 | Account | E-mail | Password | Standing |
 |---|---|---|---|
@@ -280,6 +293,14 @@ deliberately-fictional domain kept distinct from the real `kumunita.com`):
 | Ben | `ben@examplium.com` | `Resident123!` | resident |
 | Carla | `carla@examplium.com` | `Resident123!` | resident; contact-opted-in; owns the public "Street Green" group |
 | David | `david@examplium.com` | `Resident123!` | resident; Prague timezone |
+
+**Deployed demo site recipe (ADR 0056).** A Coolify `Production` app + dedicated Postgres,
+with `SampleData__Enabled=true`, the `examplium.com` `Community__*` / `SeedAdmin__*` names,
+and a **fresh** DB → first boot seeds the full neighborhood. The seed admin signs in with
+its one-time `SeedAdmin__` setup token (as on any real deployment), and the demo
+credentials (random per account) arrive as a single e-mail to that admin's address —
+the table above is the **Development** credential set, not the deployed one. The full
+step-by-step (including the disposable-DB caveat) is [OPS.md Procedure 12](docs/OPS.md).
 
 Wipe everything with `docker compose down -v` and rebuild — the seeder re-seeds on the
 next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps it from

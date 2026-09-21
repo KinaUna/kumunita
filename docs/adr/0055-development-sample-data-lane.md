@@ -1,6 +1,9 @@
 # ADR 0055 — Development sample data: a first-boot, Development-only mock neighborhood
 
-Status: Accepted
+Status: Accepted (the **gate** is amended by [ADR 0056](0056-sample-data-opt-in-and-deploy-posture.md):
+the seeder now runs on an explicit `SampleData__Enabled` opt-in rather than the `Development`
+wall, and gains a deploy posture for a public demo site. The data model, content, and
+idempotency decided here are unchanged.)
 Date: 2026-09-21
 Amends: **0012** (the `Component.Mandatory` flag + the sanctioned
 `SetCommunityMandatoryAsync` write lane — *reused* as the visibility

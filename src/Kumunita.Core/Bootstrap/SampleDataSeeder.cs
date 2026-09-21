@@ -18,12 +18,17 @@ namespace Kumunita.Core.Bootstrap;
 /// <b>Development-only sample data</b> (a mock neighborhood). Runs on a <b>pristine</b>
 /// database — the same outer <see cref="DbBootstrap.IsPristineAsync"/> gate that
 /// <see cref="FirstBootSeeder"/> runs under — so a fresh
-/// <c>docker compose down -v && docker compose up --build</c> comes up immediately
-/// populated with accounts (a password-bearing admin, a scoped moderator, a translator,
-/// several verified residents), groups, announcements, community + group posts with
-/// replies, published events with RSVPs, tags, and a resident blog. It is gated to the
-/// <c>Development</c> environment at the call site (see <c>Program.cs</c>) so it can
-/// never run on a real deployment.
+/// <c>docker compose down -v && docker compose up --build</c> (dev) or a fresh
+/// deployed demo instance (ADR 0056) comes up immediately populated with accounts
+/// (a scoped moderator, a translator, several verified residents), groups,
+/// announcements, community + group posts with replies, published events with RSVPs,
+/// tags, and a resident blog. It is gated on <c>SampleData__Enabled</c> <b>and</b> the
+/// pristine-DB check (see <c>Program.cs</c>, ADR 0056): a real deployment never carries
+/// the flag, so the seeder is unreachable by construction. In the deploy posture (a
+/// <c>Production</c> instance with the flag set) the demo accounts get random
+/// high-entropy passwords handed to the seed admin by e-mail through the durable
+/// outbox, and the admin keeps its <c>SeedAdmin__</c> token lane (no weak credential
+/// is stored on a public instance).
 /// <para>
 /// <b>Idempotent + pristine-gated.</b> Like <see cref="FirstBootSeeder"/>, every step is
 /// a create-if-missing no-op (accounts keyed by e-mail, content keyed by its own ids) and
@@ -65,8 +70,11 @@ public static class SampleDataSeeder
     private static string Id() => Guid.NewGuid().ToString("N");
 
     /// <summary>
-    /// Runs the sample-data steps. Called once by <see cref="SchemaBootstrap"/> on a
-    /// pristine DB, only when the host is in the Development environment.
+    /// Runs the sample-data steps. Called once by <c>Program.cs</c> on a pristine DB,
+    /// only when <c>SampleData__Enabled</c> is set (ADR 0056). In the Development
+    /// environment it takes the weak-credential posture; otherwise (a deployed demo
+    /// site) it takes the deploy posture — random passwords + a credentials e-mail to
+    /// the seed admin.
     /// </summary>
     public static async Task SeedAsync(
         AppDbContext identity,
@@ -74,41 +82,66 @@ public static class SampleDataSeeder
         UserManager<User> userManager,
         RoleManager<IdentityRole> roleManager,
         IUserInfoService userInfo,
-        ILogger logger,
+        IMailerStage? mailer = null,
+        string? adminEmail = null,
+        ILogger logger = default!,
         CancellationToken ct = default)
     {
+        // Two postures, one seeder (ADR 0056):
+        //  · Development (mailer == null) — the documented weak demo credentials
+        //    (README table), printed to the log; the seed admin also gets a weak demo
+        //    password on top of its setup-token lane.
+        //  · Deploy (mailer != null) — the seed admin stays on its <c>SeedAdmin__</c>
+        //    setup-token lane (no weak password), the other demo accounts get random
+        //    high-entropy passwords, and a single credentials summary is staged to the
+        //    seed admin's e-mail through the durable outbox (below) — no weak
+        //    credential is stored on a public instance.
+        bool deployPosture = mailer is not null;
+        string adminAccountEmail = (deployPosture && adminEmail is not null) ? adminEmail : AdminEmail;
+        string? adminPw      = deployPosture ? null : AdminPassword;
+        string? moderatorPw  = deployPosture ? RandomPassword() : ModeratorPassword;
+        string? translatorPw = deployPosture ? RandomPassword() : TranslatorPassword;
+        string? annaPw       = deployPosture ? RandomPassword() : ResidentPassword;
+        string? benPw        = deployPosture ? RandomPassword() : ResidentPassword;
+        string? carlaPw      = deployPosture ? RandomPassword() : ResidentPassword;
+        string? davidPw      = deployPosture ? RandomPassword() : ResidentPassword;
+
         logger.LogInformation(
-            "Development sample data: seeding the mock neighborhood (Development-only, pristine DB).");
+            deployPosture
+                ? "Sample data: seeding the mock neighborhood (deploy posture, pristine DB)."
+                : "Development sample data: seeding the mock neighborhood (Development-only, pristine DB).");
 
         // ── 1. Accounts ────────────────────────────────────────────────────────────────
         // The seeded admin (FirstBootSeeder) already exists with a setup token but no
-        // password — EnsureUserAsync finds it and adds the demo password. The rest are
-        // created fresh. All are verified residents (Member standing is implicit).
+        // password — in Development EnsureUserAsync adds the demo password; in the deploy
+        // posture a null password is a no-op, so the account keeps its token lane (no weak
+        // credential). The other demo accounts are created fresh. All are verified
+        // residents (Member standing is implicit).
         var admin   = await EnsureUserAsync(userManager, roleManager, mt,
-            AdminEmail, AdminPassword, "Alex Admin",
+            adminAccountEmail, adminPw, "Alex Admin",
             elevatedRole: Roles.GlobalAdmin, logger: logger, ct: ct);
 
         var maria   = await EnsureUserAsync(userManager, roleManager, mt,
-            ModeratorEmail, ModeratorPassword, "Maria Moderator",
+            ModeratorEmail, moderatorPw, "Maria Moderator",
             elevatedRole: Roles.Moderator, logger: logger, ct: ct);
 
         var sophie    = await EnsureUserAsync(userManager, roleManager, mt,
-            TranslatorEmail, TranslatorPassword, "Sophie Translate",
+            TranslatorEmail, translatorPw, "Sophie Translate",
             elevatedRole: Roles.Translator, logger: logger, ct: ct);
 
         var anna    = await EnsureUserAsync(userManager, roleManager, mt,
-            "anna@examplium.com", ResidentPassword, "Anna Kowalska",
+            "anna@examplium.com", annaPw, "Anna Kowalska",
             contactVisibility: true, timeZone: "Europe/Warsaw", logger: logger, ct: ct);
 
         var ben     = await EnsureUserAsync(userManager, roleManager, mt,
-            "ben@examplium.com", ResidentPassword, "Ben Nowak", logger: logger, ct: ct);
+            "ben@examplium.com", benPw, "Ben Nowak", logger: logger, ct: ct);
 
         var carla   = await EnsureUserAsync(userManager, roleManager, mt,
-            "carla@examplium.com", ResidentPassword, "Carla Kubiak",
+            "carla@examplium.com", carlaPw, "Carla Kubiak",
             contactVisibility: true, logger: logger, ct: ct);
 
         var david   = await EnsureUserAsync(userManager, roleManager, mt,
-            "david@examplium.com", ResidentPassword, "David Lis",
+            "david@examplium.com", davidPw, "David Lis",
             timeZone: "Europe/Prague", logger: logger, ct: ct);
 
         // ── 2. Components are mandatory (ADR 0012) — every verified resident is a member
@@ -610,10 +643,38 @@ public static class SampleDataSeeder
 
         await session.SaveChangesAsync();
 
-        logger.LogInformation(
-            "Development sample data: complete. Accounts — {Admin} ({AdminPassword}), {Mod} ({ModPassword}), {Trans} ({TransPassword}), " +
-            "anna/ben/carla/david@examplium.com (all {ResPassword}).",
-            AdminEmail, AdminPassword, ModeratorEmail, ModeratorPassword, TranslatorEmail, TranslatorPassword, ResidentPassword);
+        // Deploy posture (ADR 0056): hand the demo credentials to the instance's admin
+        // through the durable outbox (one OutboxEmail, idempotency-keyed) — the only place
+        // they exist beyond the hashed EF store. No-op in Development (mailer is null).
+        if (deployPosture && mailer is not null)
+        {
+            await using var emailSession = mt.OpenSession(new SessionOptions());
+            await mailer.StageAsync(emailSession,
+                idempotencyKey: $"sampledata:{admin.Id}",
+                recipient: adminAccountEmail,
+                subject: "Kumunita: demo-instance credentials",
+                body: SampleDataCredentialsBody(moderatorPw, translatorPw, annaPw, benPw, carlaPw, davidPw),
+                ct: ct);
+            await emailSession.SaveChangesAsync();
+            logger.LogInformation(
+                "Sample data (deploy): credentials staged to the seed admin's outbox ({Admin}).",
+                adminAccountEmail);
+        }
+
+        if (deployPosture)
+        {
+            logger.LogInformation(
+                "Sample data (deploy posture): complete. Demo credentials were emailed to the " +
+                "seed admin ({Admin}); the admin account keeps its SeedAdmin__ setup-token lane " +
+                "(no weak credential stored).", adminAccountEmail);
+        }
+        else
+        {
+            logger.LogInformation(
+                "Development sample data: complete. Accounts — {Admin} ({AdminPassword}), {Mod} ({ModPassword}), {Trans} ({TransPassword}), " +
+                "anna/ben/carla/david@examplium.com (all {ResPassword}).",
+                AdminEmail, AdminPassword, ModeratorEmail, ModeratorPassword, TranslatorEmail, TranslatorPassword, ResidentPassword);
+        }
     }
 
     /// <summary>
@@ -635,7 +696,7 @@ public static class SampleDataSeeder
         RoleManager<IdentityRole> roleManager,
         IDocumentStore mt,
         string email,
-        string password,
+        string? password,
         string displayName,
         bool contactVisibility = false,
         string? timeZone = null,
@@ -654,21 +715,24 @@ public static class SampleDataSeeder
 
             existing = new User { Id = Id(), Email = email, UserName = email };
             await userManager.CreateAsync(existing);
-            var pwResult = await userManager.AddPasswordAsync(existing, password);
-            if (!pwResult.Succeeded)
-                throw new InvalidOperationException(
-                    $"Failed to set the demo password for '{email}': {string.Join(", ", pwResult.Errors.Select(e => e.Description))}");
+            if (!string.IsNullOrEmpty(password))
+            {
+                var pwResult = await userManager.AddPasswordAsync(existing, password);
+                if (!pwResult.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Failed to set the demo password for '{email}': {string.Join(", ", pwResult.Errors.Select(e => e.Description))}");
+            }
             if (elevatedRole is not null)
                 await userManager.AddToRoleAsync(existing, elevatedRole);
         }
         else
         {
             // Idempotent: add the password only if the account has none (the seeded
-            // admin is created without a password — the setup-token lane).
-            if (string.IsNullOrEmpty(existing.PasswordHash))
+            // admin is created without a password — the setup-token lane). A null
+            // password (the deploy-posture admin, ADR 0056) is a no-op: the account
+            // keeps its token lane and gets no weak credential.
+            if (string.IsNullOrEmpty(existing.PasswordHash) && !string.IsNullOrEmpty(password))
             {
-                if (string.IsNullOrEmpty(password))
-                    throw new InvalidOperationException($"No password supplied for existing account '{email}'.");
                 var pwResult = await userManager.AddPasswordAsync(existing, password);
                 if (!pwResult.Succeeded)
                     throw new InvalidOperationException(
@@ -701,5 +765,51 @@ public static class SampleDataSeeder
         if (logger is not null)
             logger.LogDebug("Sample data: ensured account {Email} ({Name}).", email, displayName);
         return existing;
+    }
+
+    /// <summary>
+    /// A random 128-bit (32-character) high-entropy password for a deploy-posture demo
+    /// account. CSPRNG-backed (<see cref="System.Security.Cryptography.RandomNumberGenerator"/>);
+    /// lowercase hex, so it meets the app's password policy (length ≥ 8; the
+    /// non-alphanumeric requirement is relaxed by <c>Program.cs</c>). Distinct per account,
+    /// and never derived from, or printed alongside, the seed admin's own credential
+    /// (ADR 0056).
+    /// </summary>
+    private static string RandomPassword()
+    {
+        var bytes = new byte[16];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// The deploy-posture credentials e-mail body (ADR 0056): the demo accounts' e-mail +
+    /// generated password, one per line, plus the note that the seed-admin account keeps
+    /// its <c>SeedAdmin__</c> setup-token lane (its own credential is the one-time token
+    /// from the first-boot setup e-mail). Staged once through the durable outbox to the
+    /// seed admin; the operator is told to delete it once captured.
+    /// </summary>
+    private static string SampleDataCredentialsBody(
+        string? moderatorPw, string? translatorPw,
+        string? annaPw, string? benPw, string? carlaPw, string? davidPw)
+    {
+        var lines = new List<string>
+        {
+            "A Kumunita instance has seeded a demo neighborhood (sample data).",
+            "Demo account credentials (e-mail → password):",
+            "",
+            $"{ModeratorEmail}  →  {moderatorPw}",
+            $"{TranslatorEmail}  →  {translatorPw}",
+            $"anna@examplium.com  →  {annaPw}",
+            $"ben@examplium.com  →  {benPw}",
+            $"carla@examplium.com  →  {carlaPw}",
+            $"david@examplium.com  →  {davidPw}",
+            "",
+            "Your own admin account keeps its one-time setup-token lane; use the setup link " +
+            "from the first-boot setup e-mail to set your admin password.",
+            "",
+            "Treat this e-mail as sensitive and delete it once you have the credentials."
+        };
+        return string.Join("\n", lines);
     }
 }

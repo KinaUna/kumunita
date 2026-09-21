@@ -13,6 +13,7 @@ using Marten;
 using Marten.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Net.Mail;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -265,6 +266,13 @@ builder.Services.AddHttpContextAccessor();
 // token TtlDays bound from Verification__TtlDays (default 14 in the class doc).
 builder.Services.Configure<SeedAdminOptions>(
     builder.Configuration.GetSection(SeedAdminOptions.SectionName));
+
+// Sample-data opt-in (ADR 0056): the mock-neighborhood seeder runs only when this
+// flag is true AND the database is pristine — an explicit per-instance decision,
+// not a side effect of the environment. Absence is the default: real deployments
+// never carry it, so the seeder is unreachable by construction.
+builder.Services.Configure<SampleDataOptions>(
+    builder.Configuration.GetSection(SampleDataOptions.SectionName));
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP
@@ -409,8 +417,8 @@ await app.StartAsync();
 //
 // Capture the first-boot (pristine) signal NOW — before ApplyAsync runs
 // MigrateAsync, which creates the identity schema and would flip the pristine
-// check to false. The Development sample-data seeder below is create-once, so
-// it must run on first boot only; the gate reads this pre-migration value.
+// check to false. The sample-data seeder below is create-once, so it must run
+// on first boot only; the gate reads this pre-migration value.
 bool firstBoot;
 await using (var probeScope = app.Services.CreateAsyncScope())
 {
@@ -419,23 +427,35 @@ await using (var probeScope = app.Services.CreateAsyncScope())
 }
 await SchemaBootstrap.ApplyAsync(app.Services);
 
-// Development-only sample data (a mock neighborhood): a fresh `docker compose
-// down -v && docker compose up --build` comes up already populated with a
-// password-bearing admin, a scoped moderator, a translator, several verified
-// residents, groups, announcements, posts/replies, events/RSVPs, tags, and a
-// resident blog — so a developer has content to exercise immediately. It runs
-// on the same first-boot gate as FirstBootSeeder (the `firstBoot` flag above —
-// the content stores are create-once, so re-running on a warm DB would
-// duplicate every group/announcement/post) and only in the Development
-// environment, so a real deployment can never see it. See SampleDataSeeder
-// (Kumunita.Core.Bootstrap) for the full rationale and the printed credentials.
+// Sample data (a mock neighborhood): a fresh `docker compose down -v &&
+// docker compose up --build` (dev) or a fresh deployed demo instance (ADR 0056)
+// comes up already populated with a scoped moderator, a translator, several
+// verified residents, groups, announcements, posts/replies, events/RSVPs, tags,
+// and a resident blog — so it is immediately exercisable. It runs on the same
+// first-boot gate as FirstBootSeeder (the `firstBoot` flag above — the content
+// stores are create-once, so re-running on a warm DB would duplicate every
+// group/announcement/post) and only when SampleData__Enabled=true — an explicit
+// per-instance opt-in, never a side effect of the environment. A real deployment
+// never carries the flag, so the seeder is unreachable by construction (ADR 0055/0056).
+//
+// Two postures, one seeder (ADR 0056):
+//  · Development  — the documented weak demo credentials (README table); the
+//    seed admin keeps the SeedAdmin__ token lane plus a weak demo password.
+//  · Production   — the seed admin stays on its SeedAdmin__ token lane (no weak
+//    password), the other demo accounts get random high-entropy passwords, and
+//    a single credentials summary is staged to the seed admin's e-mail through
+//    the durable outbox. No weak credential is ever stored on a public instance.
 //
 // This must run AFTER StartAsync for the same reason SchemaBootstrap does
 // (scoped EF/identity + mt/document writers, and the component-mandatory write
 // lane opens its own session), so the scoped services are resolved in an async
 // scope exactly like the tick publishes below.
-if (app.Environment.IsDevelopment() && firstBoot)
+var sampleDataOpts = app.Services.GetRequiredService<IOptions<SampleDataOptions>>().Value;
+var seedAdminOpts  = app.Services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
+if (sampleDataOpts.Enabled && firstBoot)
 {
+    bool deployPosture = !app.Environment.IsDevelopment()
+                         && !string.IsNullOrWhiteSpace(seedAdminOpts.Email);
     await using var sampleScope = app.Services.CreateAsyncScope();
     var sampleSp = sampleScope.ServiceProvider;
     await SampleDataSeeder.SeedAsync(
@@ -444,6 +464,10 @@ if (app.Environment.IsDevelopment() && firstBoot)
         sampleSp.GetRequiredService<UserManager<User>>(),
         sampleSp.GetRequiredService<RoleManager<IdentityRole>>(),
         sampleSp.GetRequiredService<Kumunita.Core.UserInfo.IUserInfoService>(),
+        deployPosture
+            ? sampleSp.GetRequiredService<IMailerStage>()
+            : null,
+        deployPosture ? seedAdminOpts.Email : null,
         sampleSp.GetRequiredService<ILogger>());
 }
 
