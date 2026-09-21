@@ -546,3 +546,121 @@ further open decisions carried into U01.
   **no Core changes** (the 5 touched files are all in `src/Kumunita.Web`).
 
 **U06 exit gate met. STOP — do NOT start U07.**
+
+## U07 — EventReminderService (the §6.4 job's business logic)
+
+- **(a) Files touched (all in `Kumunita.Core` + `Kumunita.Core.Tests` — zero Web,
+  zero TS):**
+  - `src/Kumunita.Core/Events/EventReminderService.cs` — **new** file. The
+    **Wolverine-free** §6.4 job business logic (the `AuditPurgeService` precedent
+    verbatim — a static class + a sibling options POCO, both top-level in
+    `Kumunita.Core.Events`). Two public types: `EventReminderOptions` (the
+    `AuditPurgeOptions` shape — `WindowHours = 24` floor; the "remind the day
+    before" window) and `EventReminderService` (the single
+    `SendRemindersAsync(IDocumentStore store, EventReminderOptions options,
+    DateTimeOffset now, IMailerStage mailer, CancellationToken ct = default)`
+    static method). The `now` injection point makes the window boundary
+    deterministic under the harness (the `AuditPurgeService.PurgeAsync` precedent).
+  - `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` — **new** file. The
+    **5 `EventReminderServiceTests`** (T19–T23 from the §3.7 master list), the
+    `AuditPurgeServiceTests` / `SideEffectHarnessTests` shape to mirror — the
+    `PostgresFixture` + `BootStoreAsync` (`M1DocTypes` + `M3DocTypes` +
+    `M4DocTypes` Configure, `ApplyAllConfiguredChangesToDatabaseAsync`) + `Plant`
+    helpers, plus a `RecordingMailer` test double (NSubstitute `IMailerStage` that
+    records the staged `IdempotencyKey` + `Recipient` pairs).
+- **(b) The §3.6 contract (the 4 pins):**
+  - **(a) Window:** candidate = `ReminderEnabled && !IsDraft && !IsDeleted &&
+    now < Start ≤ now + WindowHours` (default 24 h). A `Start` in the past is not
+    reminded; one beyond the window is not yet. (The user's `now+1h → now+24h`
+    "remind the day before" band is the *in-band* case; the outer bound is the
+    pinned `now < Start ≤ now+24h`.)
+  - **(b) Going RSVPs:** the recipient set is the event's `EventRsvp` rows with
+    `Status = Going` **plus the author, always** (the "author, always" rule is
+    independent of the Going filter — T21 proves the author is reminded even when
+    their own RSVP is `No`). A `Maybe` / `No` RSVP is not reminded.
+  - **(c) Staging:** each recipient is staged via the **frozen**
+    `IMailerStage.StageAsync` with the §6.2 per-email idempotency key
+    `remind:{eventId}:{userId}`. Recipient resolution: the `Profile.Email`
+    (UserInfo module's own document) — a recipient with no known email is
+    skipped (no address to deliver to; the M1 unverified posture).
+  - **(d) No audit row:** **zero** `AccessAudit` rows after
+    `SendRemindersAsync` (a side effect, not an access decision — the
+    verification-email posture, ADR 0054 §3.6). Nothing here touches the
+    authorization path or the frozen `IAuthorizationService`.
+  - **No double-send across ticks:** before staging, the existing
+    `OutboxEmail` key set for this run is read; a key already present (from an
+    earlier tick) is not re-staged — the §3.6 "existing-row check" guard. This
+    is the re-runnable (idempotent) guarantee the §6.2 best-effort table
+    relies on.
+- **(c) The 5 test names + pass status (T19–T23, the §3.7 master list verbatim):**
+  - T19 `M4_ReminderWindowFiltersOutsideEvents` — **PASS** (25 h out = no; 23 h out = yes).
+  - T20 `M4_ReminderGoingRsvpsOnly` — **PASS** (`Maybe` / `No` excluded; `Going` + author included).
+  - T21 `M4_ReminderAuthorAlwaysIncluded` — **PASS** (author reminded even with their own `No` RSVP).
+  - T22 `M4_ReminderIdempotencyKeyShape` — **PASS** (exactly 2 staged rows, keys `remind:{eventId}:{userId}`).
+  - T23 `M4_ReminderWritesNoAccessAuditRow` — **PASS** (2 staged rows + zero `AccessAudit` rows).
+- **(d) Frozen-seam confirmation (no re-shaping):**
+  - **`IMailerStage` is untouched** — no new method, no signature change. The
+    U07 service *consumes* it via the frozen `StageAsync` (the `IdentityService`
+    / `FirstBootSeeder` precedent). The `RecordingMailer` test double
+    (NSubstitute) records the staged (key, recipient) pairs — a test double for
+    the frozen seam, not a re-shape.
+  - **`OutboxEmail` + `OutboxEmailHandler` trio is untouched** — the service
+    *stages* rows (the `OutboxEmail` document) and commits on a successful
+    `SaveChangesAsync`; the §6.2 durable handler (a Web-host concern, U08)
+    dispatches over SMTP on a successful commit. The U07 service does not
+    reference `OutboxEmailHandler` or `SmtpSender` (those stay in
+    `Kumunita.Web/SideEffects/`).
+  - **`Event` / `EventRsvp` / `M4DocTypes` / `IEventService` / `EventService`
+    / `EventToAuditableResource` are untouched** — the reminder service reads
+    the `Event` + `EventRsvp` documents directly (a read, not a write seam
+    change) and does not touch the U01–U05 surface.
+  - **`Post` / `Announcement` / `Page` surfaces untouched** (the M4 lane is
+    additive on top of the existing lanes).
+- **(e) Exit gate (per `AGENTS.md` — both green; `dotnet test` / VS Test
+  Explorer **not** run, per the runner-discovery quirk):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Error(s)**
+    (the 87 warnings are pre-existing house-style — xUnit1051 in
+    `EventServiceTests.cs` + CS8601 in `EventController.cs`, unchanged from
+    U06; none introduced by U07).
+  - Scoped: `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll -class
+    "Kumunita.Core.Tests.EventReminderServiceTests"` → **Total: 5, Errors: 0,
+    Failed: 0, Skipped: 0, Not Run: 0** (all 5 `M4_Reminder*` tests pass).
+  - Full Core suite: `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll` →
+    **Total: 654, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (649
+    pre-U07 + 5 new U07 tests; no regressions in the `Post` / `Announcement` /
+    `Page` / Identity / UserInfo / M4 read/write/standing surfaces).
+- **(f) Drift pauses (frozen-seam scope boundary + one seam refinement):**
+  - **The design doc §4 C# seam block** shows
+    `SendRemindersAsync(IDocumentStore store, EventReminderOptions options,
+    DateTimeOffset now, CancellationToken ct = default)` — **omitting the
+    `IMailerStage mailer` param**. The §3.6 prose (and the user's explicit
+    U07 instruction) mandate staging **via the frozen `IMailerStage.StageAsync`**
+    — only reachable if the stager is passed into the static service. So the
+    U07 signature **adds a `mailer` param** (a §4 signature refinement, **not**
+    a re-shape of `IMailerStage` itself — the interface is untouched, no new
+    method). **U08's `EventReminderHandler` will resolve the real
+    `IMailerStage` (the production `OutboxEmailStager`) and pass it** — the
+    thin adapter owns that resolution (the `AuditPurgeHandler` precedent, where
+    the handler resolves the live store + options and hands them to the
+    Wolverine-free service). This is a **drift event** under the §3.9
+    drift-guard's "the §6.4 job shape" pin — recorded here, not silently
+    worked around. The `OutboxEmail` / `OutboxEmailHandler` trio is **not**
+    re-shaped; the `IMailerStage` interface is **not** re-shaped; only the
+    `SendRemindersAsync` call signature gains the `mailer` param (the
+    Wolverine-free service does not own the stager's lifecycle — the Web host
+    does, and passes it in, the same as it passes `store` + `options`).
+  - **The `Profile.Email` lookup** (recipient resolution) is the one
+    cross-context read in the service (`Kumunita.Core.UserInfo.Profile` —
+    the UserInfo module's own document). This is a *read* (not a decision),
+    the same shape as the `EventService`'s read-lane store queries (U03) —
+    the service reads the `Profile.Email` directly (a read, not a new seam
+    on `IUserInfoService`). No new `IUserInfoService` method, no new
+    `AccessAction` / `AccessVia` / authorization branch, no audit row.
+  - **`Milestones.cs` / README / `MilestonesTests` untouched** (U12's
+    close-time job); the `EventReminderHandler` + `EventReminderTick` (U08);
+    `EventControllerTests` (U10); the acceptance gate (U11); and the 23-test
+    U09 list remain out of scope.
+
+**U07 exit gate met. STOP — do NOT start U08.**
