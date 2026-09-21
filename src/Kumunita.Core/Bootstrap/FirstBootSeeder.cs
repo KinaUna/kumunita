@@ -496,6 +496,19 @@ public static class FirstBootSeeder
         var seededPageIds = await SeedDefaultPagesAsync(session, enPages, now, ct).ConfigureAwait(false);
         await SeedPageTranslationsAsync(session, seededPageIds, now, ct).ConfigureAwait(false);
 
+        // UG (ADR 0057): the resident-facing guides — `Page` docs nested under
+        // the canonical `help` page (the ADR 0043 D1 `system/help` surface),
+        // `en`-only (the ADR 0042 D1 "code wins for `en`" floor; a non-`en`
+        // guide body is community-owned, added later by a human Translator).
+        // Same session / same commit as the four-surface set above (C3).
+        // Pass the `help` page's Id straight through from `seededPageIds` —
+        // it is the in-flight (not yet committed) `help` page, so re-querying
+        // for it here would miss and silently drop every guide on first boot.
+        if (seededPageIds.TryGetValue("help", out var helpId))
+        {
+            await SeedUserGuidesAsync(session, helpId, now, ct).ConfigureAwait(false);
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
 
         logger.LogInformation(
@@ -651,6 +664,275 @@ public static class FirstBootSeeder
     }
 
     /// <summary>
+    /// UG (ADR 0057) — seed the **resident-facing guides** as <see cref="Page"/>
+    /// docs nested under the canonical <c>help</c> page (the ADR 0043 D1
+    /// <c>system/help</c> surface), into the **caller's** in-flight
+    /// <see cref="IDocumentSession"/> (the C3 invariant — same session, one
+    /// commit, so it commits in the caller's single <c>SaveChangesAsync</c>).
+    /// <para>
+    /// Each guide is <see cref="PageKind.System"/> (the ADR 0040 standing
+    /// matrix: edit / move / delete = GlobalAdmin only; add a translation =
+    /// GlobalAdmin ∪ Translator), <see cref="Page.Audience"/> = <c>null</c>
+    /// (public — a resident's first question is "how do I …", and that answer
+    /// is not audience-gated), <see cref="Page.LanguageCode"/> = <c>en</c>
+    /// (authored-in the source language), <see cref="Page.AuthorId"/> empty
+    /// (platform content — no resident author), and neither a draft nor
+    /// deleted. A guide is a <b>direct child of the <c>help</c> page</b> —
+    /// i.e. a <i>grandchild</i> of the <c>system</c> root, <b>not</b> a new
+    /// root and <b>not</b> a direct child of <c>system</c> (the ADR 0043 D1
+    /// exact-set pin — <c>system</c>'s direct children stay
+    /// <c>{terms, help, privacy, conduct}</c> and <c>system</c> stays the
+    /// only root — and the ADR 0040 namespace guard: a <c>System</c> guide
+    /// under the <c>System</c> <c>help</c> page, a resident's <c>User</c>
+    /// page never under <c>help</c>).
+    /// </para>
+    /// <para>
+    /// <b><c>en</c>-only by construction.</b> The guides ship the
+    /// <see cref="GuidePages"/>() <c>en</c> floor; a non-<c>en</c> guide body
+    /// is <b>not</b> seeded here (no <see cref="PageTranslation"/> row is
+    /// attached to a guide) — it is added later by a human Translator (the
+    /// ADR 0021 lane) or a GlobalAdmin in the in-app editor, and is never
+    /// clobbered by a later deploy (the ADR 0042 D1 "code wins for <c>en</c>"
+    /// floor + the "a human Translator is the only writer of a non-<c>en</c>
+    /// body" invariant, ADR 0005 C — the "never machine-translated" clause).
+    /// This keeps the ADR 0044 page-baseline parity green (the
+    /// <see cref="PageTranslation"/> count is unchanged by the guides).
+    /// </para>
+    /// <para>
+    /// Idempotent (query-then-Store, code-wins): an existing guide for a
+    /// slug is refreshed in place (<c>Title</c>/<c>Body</c>), never
+    /// duplicated — so booting twice yields exactly the same guide set (the
+    /// ADR 0042 D1 "code wins for <c>en</c>" shape, the same idempotent
+    /// upsert as <see cref="SeedDefaultPagesAsync"/>).
+    /// </para>
+    /// <para>
+    /// Public (not internal) so the Core test can pin the exact seeded set +
+    /// idempotency across two live sessions without an
+    /// <c>InternalsVisibleTo</c> (the repo's Core test constraint — only
+    /// <c>public</c> members are reachable).
+    /// </para>
+    /// </summary>
+    public static async Task SeedUserGuidesAsync(
+        IDocumentSession session,
+        string helpPageId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        // The guides hang from the canonical `help` page (under the `system`
+        // root, ADR 0043 D1). The caller hands us the `help` page's Id
+        // directly (it is the very page `SeedDefaultPagesAsync` just
+        // `Store`d in this same session and has not yet committed) — so we do
+        // NOT re-query for it: a pre-commit query for the in-flight `help`
+        // page returns nothing, which would silently skip every guide on a
+        // pristine first boot. A null Id is the impossible state (no `help`
+        // page), guarded as a no-op — never create the guides as orphan roots.
+        if (string.IsNullOrEmpty(helpPageId))
+        {
+            return;   // no canonical `help` page — nothing to hang the guides from.
+        }
+
+        foreach (var (slug, title, body) in GuidePages())
+        {
+            var existing = await session
+                .Query<Page>()
+                .Where(p => p.Slug == slug && p.ParentId == helpPageId)
+                .FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                session.Store(new Page
+                {
+                    Id = Guid.NewGuid().ToString("N"),   // surrogate (the pair idiom)
+                    Slug = slug,
+                    ParentId = helpPageId,   // under the canonical `help` page (ADR 0057 D1)
+                    Kind = PageKind.System,   // a platform guide (ADR 0040 standing matrix)
+                    Title = title,
+                    Body = body,
+                    LanguageCode = SourceLanguage,   // authored-in `en` (the floor)
+                    Audience = null,            // public — world-readable (the how-to is not gated)
+                    AuthorId = string.Empty,    // platform content — no resident author
+                    Created = now,
+                    Modified = now,
+                });
+            }
+            else
+            {
+                existing.Kind = PageKind.System;   // normalize on re-seed
+                existing.Title = title;
+                existing.Body = body;   // code wins: refresh the `en` guide body
+                existing.Modified = now;
+                session.Store(existing);
+            }
+        }
+    }
+
+    /// <summary>
+    /// UG (ADR 0057) — the canonical <c>en</c> guide bodies: the single source
+    /// of the resident-facing guide text (the seeder writes exactly this, and
+    /// the <c>UG</c> drift-pin test reads exactly this — the ADR 0042 D1
+    /// "the registry is the single source both the seeder and these tests
+    /// read, so mirroring is exact" shape, applied to the guides). The closed
+    /// set (the ADR 0040 <c>PageKind</c> closed-set rule applied to the guide
+    /// set) — a new guide is a new lane, not a silent addition. Each entry is
+    /// a <see cref="Page"/> nested under the canonical <c>help</c> page
+    /// (ADR 0057 D1), written at the ADR 0042 D2 bar (plain language, the
+    /// resident's steps, no code jargon, sentence case).
+    /// </summary>
+    public static (string Slug, string Title, string Body)[] GuidePages()
+    {
+        return
+        [
+            ("getting-started", "Getting started",
+             "## Getting started\n\n" +
+             "This is the first place to look. Kumunita is a private home for one " +
+             "neighborhood — this page and the ones under it walk you through it, " +
+             "step by step.\n\n" +
+             "**Where things are.** The **feed** is where posts live. **Groups** " +
+             "gather residents around a building, a project, or a shared interest. " +
+             "The **directory** shows the residents on the platform and the details " +
+             "each has chosen to share. The **pages** tree (the **Pages** link) is " +
+             "where you find these guides, the terms, the privacy note, and the code " +
+             "of conduct.\n\n" +
+             "**Your first steps.**\n" +
+             "- **Write a post.** Pick **New post**, write it, choose who can see it, " +
+             "and click **Post**. See [posts](posts) for the full walk-through.\n" +
+             "- **Join a group.** Groups are where a shared interest lives. See " +
+             "[groups](groups).\n" +
+             "- **Set your language and time zone.** They are saved on your account. " +
+             "See [language](language).\n\n" +
+             "Everything else has a guide under this page — follow the link for " +
+             "that thing.\n"),
+            ("posts", "Posts",
+             "## Posts\n\n" +
+             "A post is a note you share with the people you choose.\n\n" +
+             "**To write one.** Pick **New post** at the top of the feed. Type what " +
+             "you want to say. Under **Who can see it**, choose the audience. Click " +
+             "**Post**.\n\n" +
+             "**Who can see it.** By default a post is seen by everyone in the " +
+             "neighborhood. You can narrow that — to a specific person, or to a " +
+             "group — with the audience picker. See [audience](audience) for what " +
+             "each choice means.\n\n" +
+             "**Replies.** Anyone who can see your post can reply to it. A reply is " +
+             "visible under your post's single audience choice — it doesn't get its " +
+             "own audience. You can **Edit** or **Delete** your own replies; the " +
+             "platform remembers when one was edited.\n\n" +
+             "**Editing and deleting your post.** The author can edit their own " +
+             "post, or soft-delete it — it stays where it was, marked as deleted, " +
+             "so the thread still makes sense. A global admin (and, where granted, a " +
+             "moderator) can remove a post that breaks the code of conduct.\n\n" +
+             "**Files.** You can attach images or other files to a post. They are " +
+             "stored on the instance and shared under the post's audience.\n"),
+            ("groups", "Groups",
+             "## Groups\n\n" +
+             "A group gathers residents around a shared thing — a building, a " +
+             "project, a hobby.\n\n" +
+             "**Public and private.** A **public** group is anyone's to join; a " +
+             "**private** group is by invitation, and only its members can see it, " +
+             "post to it, or be added to a post's audience through it. Both kinds " +
+             "let you organize the neighborhood.\n\n" +
+             "**To create one.** Pick **Create a group**, give it a name and a " +
+             "short description, and choose whether it's public or private. You can " +
+             "edit the name and description any time.\n\n" +
+             "**Group posts.** A group has its own feed. A post you make in a group " +
+             "is seen by the group's members (and anyone you add to its audience). " +
+             "You can post to a group the same way you post to the community feed " +
+             "— the audience picker just includes the group.\n\n" +
+             "**Leaving.** A member can leave a group; the group keeps its posts. A " +
+             "group owner or a global admin can remove a member or close a group.\n"),
+            ("drafts", "Drafts",
+             "## Drafts\n\n" +
+             "A draft is a post you've written but not yet shared.\n\n" +
+             "**To save one.** In the composer, tick **Save as draft** and save. " +
+             "The draft is saved but visible to no one — not even the admins — " +
+             "until you publish it.\n\n" +
+             "**To find your drafts.** Open **My drafts** in the menu. Every draft " +
+             "you've saved is there, with a **Draft** badge.\n\n" +
+             "**To publish.** Open the draft and click **Publish**. It becomes " +
+             "visible under the audience you set. Until then, only you can see it.\n\n" +
+             "Drafts are yours — only the author and a global admin can see or " +
+             "change them, and a global admin can remove a draft that shouldn't " +
+             "be there.\n"),
+            ("audience", "Audience",
+             "## Audience\n\n" +
+             "Audience is the choice, made when you post, of who can see the post. " +
+             "The platform enforces it on every read.\n\n" +
+             "**The choices.**\n" +
+             "- **Everyone in this neighborhood** — the default. Every member of the " +
+             "community can see it.\n" +
+             "- **A specific person** — only that resident (and you) can see it.\n" +
+             "- **A group** — the group's members (and you) can see it.\n\n" +
+             "You can combine the picks — for example, a group *and* a specific " +
+             "person. Whatever you pick becomes the post's audience, and nothing " +
+             "else.\n\n" +
+             "**A reply doesn't have its own audience.** It is visible under the " +
+             "post's single audience choice — that's the \"reply-inherits\" rule, " +
+             "and it keeps a thread readable for the people already in the room.\n\n" +
+             "**You can't change the audience of a post after you've published it.** " +
+             "To share it with more people, start a new post with the wider " +
+             "audience — the original stays with the people you first chose.\n"),
+            ("language", "Language",
+             "## Language\n\n" +
+             "Kumunita can show itself in more than one language, and you choose " +
+             "which one.\n\n" +
+             "**To set yours.** Open **Settings**, pick **Choose your language**, " +
+             "and select the language you want. Your choice is saved on your " +
+             "account.\n\n" +
+             "**What it changes.** The interface — buttons, headings, and the " +
+             "built-in pages — appears in the language you picked. A post or group " +
+             "description that someone has written *and* translated into your " +
+             "language shows that translation first, with the original one click " +
+             "away.\n\n" +
+             "**What it doesn't change.** The words a resident types are their " +
+             "words. A post is always read as its author wrote it unless someone " +
+             "has added a translation — the platform never machine-translates a " +
+             "resident's writing.\n\n" +
+             "**Time zone and dates.** You can also set the time zone and the date " +
+             "format you see, in the same **Settings** page. Both are saved on " +
+             "your account.\n"),
+            ("events", "Events",
+             "## Events\n\n" +
+             "An event is something the neighborhood is doing at a time and a " +
+             "place — a meeting, a repair day, a social.\n\n" +
+             "**To see them.** Events appear in the feed and on the events list, " +
+             "with their date, time, and place.\n\n" +
+             "**To join.** Open the event and pick **RSVP**. Your response is " +
+             "recorded against the event and your account, and you can change it " +
+             "any time before the event.\n\n" +
+             "**The reminder.** You can opt in to a reminder the day before the " +
+             "event. It's sent once, to your account, and only if you asked for " +
+             "it — there is no reminder you didn't sign up for.\n\n" +
+             "**Creating one.** A global admin (or, where granted, a moderator) " +
+             "can create an event for the neighborhood, set its audience, and " +
+             "choose whether it carries a reminder. You can post about an event in " +
+             "the feed the same way you post about anything else.\n"),
+            ("translator", "Translators",
+             "## Translators\n\n" +
+             "A **Translator** is a resident granted the standing to add and edit " +
+             "a language version of a thing the platform already carries — a page, " +
+             "a group description, a community name, or a post or reply.\n\n" +
+             "**What a Translator may do.**\n" +
+             "- **Add a translation** of a page, a group, a community name, a post, " +
+             "or a reply — in a language the instance has enabled.\n" +
+             "- **Edit a translation** they added, any time.\n\n" +
+             "**What a Translator may not do.**\n" +
+             "- **Change the original.** The author's words are the author's; a " +
+             "Translator adds a language version beside them, never over them.\n" +
+             "- **Translate for the machine.** A translation is a human act — the " +
+             "platform never machine-translates a resident's writing, and a " +
+             "Translator doesn't paste a machine output in as if it were their " +
+             "own.\n" +
+             "- **Stand in for a GlobalAdmin.** A Translator has no standing on the " +
+             "platform's own pages, on moderation, or on a group's membership — " +
+             "those are a GlobalAdmin's (or, where granted, a moderator's) " +
+             "lanes.\n\n" +
+             "A Translator's work is visible: the interface shows, next to a " +
+             "translated thing, the one who added that translation, and the " +
+             "original is always one click away.\n"),
+        ];
+    }
+
+    /// <summary>
     /// The canonical <c>en</c> default-page bodies (terms + help + privacy +
     /// conduct — the four <c>Page</c>-backed surfaces of the ADR 0043 D1
     /// five-surface set). The single source of the seed text: the
@@ -696,7 +978,9 @@ public static class FirstBootSeeder
              "- **Directory** shows the residents on the platform and the details each " +
              "has chosen to share.\n" +
              "- **Moderation** lets a global admin (and, where granted, a moderator) " +
-             "keep the feed a safe place.\n\n" +
+             "keep the feed a safe place.\n" +
+             "- **Guides** walk you through the platform, step by step, in plain " +
+             "language — start with *Getting started*, the first page under this one.\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -777,7 +1061,10 @@ public static class FirstBootSeeder
              "- **Das Verzeichnis** zeigt die Menschen auf der Plattform und die " +
              "Angaben, die jeder von ihnen teilen möchte.\n" +
              "- **Moderation** lässt einen Global-Admin (und, wo zugewiesen, einen " +
-             "Moderator) den Feed einen sicheren Ort halten.\n\n" +
+             "Moderator) den Feed einen sicheren Ort halten.\n" +
+             "- **Anleitungen** führen dich Schritt für Schritt durch die Plattform, " +
+             "in verständlicher Sprache — beginne mit *Erste Schritte*, der ersten " +
+             "Seite unter dieser.\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -864,7 +1151,10 @@ public static class FirstBootSeeder
              "- **L'annuaire** montre les résidents de la plateforme et les détails " +
              "que chacun a choisi de partager.\n" +
              "- **La modération** laisse un administrateur global (et, si c'est " +
-             "concédé, un modérateur) garder le fil un lieu sûr.\n\n" +
+             "concédé, un modérateur) garder le fil un lieu sûr.\n" +
+             "- **Les guides** t'accompagnent pas à pas dans la plateforme, en " +
+             "langage simple — commence par *Premiers pas*, la première page sous " +
+             "celle-ci.\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -948,7 +1238,10 @@ public static class FirstBootSeeder
              "- **Kontaktlisten** viser de beboere på platformen og de oplysninger, " +
              "hver af dem har valgt at dele.\n" +
              "- **Moderation** lader en global admin (og, hvor tildelt, en " +
-             "moderator) holde feeden et sikkert sted.\n\n" +
+             "moderator) holde feeden et sikkert sted.\n" +
+             "- **Guides** fører dig trin for trin gennem platformen, i sprog " +
+             "alle forstår — start med *Første skridt*, den første side under " +
+             "denne.\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",
