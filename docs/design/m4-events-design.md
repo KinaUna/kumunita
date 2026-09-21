@@ -5,8 +5,8 @@
 > (the next number after 0053) is this milestone's decision record. This file
 > is the **primary reference tier** (the exact seams every unit codes
 > against); the sealed-unit register is
-> `docs/plans-milestones/in-progress/m4/plan-m4.md`; the scratch log is
-> `docs/plans-milestones/in-progress/m4/m4-handoff-notes.md`.
+> `docs/plans-milestones/done/m4/plan-m4.md`; the scratch log is
+> `docs/plans-milestones/done/m4/m4-handoff-notes.md`.
 >
 > **Status.** Accepted (ADR 0054, 2026-09-20). All decisions marked
 > **[DECIDED]** are locked in ADR 0054; the ADR is the authoritative record,

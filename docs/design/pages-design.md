@@ -5,7 +5,7 @@
 > Portability; **no roadmap letter moves**. **ADR 0039** (the next number after
 > 0038) is this lane's decision record. This file is the **primary reference
 > tier** (the exact seams every unit codes against); the sealed-unit register
-> is `docs/plans-milestones/pages/plan-pages.md`.
+> is `docs/plans-milestones/done/pages/plan-pages.md`.
 >
 > **Status.** Accepted (ADR 0039, 2026-09-17). All decisions marked
 > **[DECIDED]** are locked in ADR 0039. The former **[PROPOSED]** markers have

@@ -8,7 +8,7 @@
 >    field sets, the hierarchy + audience + translation + mount-point
 >    decisions, the standing matrix, the absorb-migration ordering. Every
 >    decision marked **[DECIDED — ADR 0039]** is locked.
-> 2. **Secondary — the register** `docs/plans-milestones/pages/plan-pages.md`.
+> 2. **Secondary — the register** `docs/plans-milestones/done/pages/plan-pages.md`.
 >    Source of truth for *which* unit, in *which* order, touches *which*
 >    files, the exit criteria, and the drift-pause policy.
 > 3. **Scratch — this file.** A running log. Each unit **appends** a `## U#`
@@ -21,7 +21,7 @@
 
 ## Protocol (every agent, every unit)
 
-- This file + your **unit plan** (`docs/plans-milestones/pages/pages-uNN-plan.md`)
+- This file + your **unit plan** (`docs/plans-milestones/done/pages/pages-uNN-plan.md`)
   is the whole context you need. **Do not** scan the whole repo.
 - Read the unit plan's "entry reads" (a small fixed set), do the work, hit the
   unit's build gate, **then** append a `## U#` section here *before* doing

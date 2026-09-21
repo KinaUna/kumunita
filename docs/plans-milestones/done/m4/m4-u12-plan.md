@@ -45,7 +45,7 @@ tests.**
    `Event` + `EventRsvp` docs; the `EventToAuditableResource` adapter;
    the `EventService` read + write surface; the `EventReminders` §6.4
    job; the `EventController` + views; the nav entry).
-4. **`docs/plans-milestones/in-progress/m4/m4-handoff-notes.md`** — the
+4. **`docs/plans-milestones/done/m4/m4-handoff-notes.md`** — the
    `## U12 — close` section (the M3 / M2 close section shape to mirror).
 
 ## Exit

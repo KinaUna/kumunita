@@ -31,7 +31,7 @@ the day before. It is the platform's first **content-with-time** surface.
 **Roadmap order (recorded here, per the sign-off gate):** the **`PG`
 (pages) lane is SHIPPED** — its register (U00–U07) is green, `LocalizedPage`
 is fully retired (zero references in `src/`), and
-`docs/plans-milestones/pages/pages-handoff-notes.md` records "the PG lane
+`docs/plans-milestones/done/pages/pages-handoff-notes.md` records "the PG lane
 is complete … No next unit in this lane." M4 is therefore opened **not** as
 a pull-forward over in-flight work but as the **next** lane: this same
 commit closes `PG` (`StatusNext` → `StatusDone`) and opens `M4`

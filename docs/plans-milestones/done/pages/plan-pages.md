@@ -5,7 +5,7 @@
 > tree** that absorbs the existing `LocalizedPage` static-page lane. The
 > **primary** reference tier (the exact C# seams + the design decisions) is the
 > design doc `docs/design/pages-design.md`; the **scratch** tier is
-> `docs/plans-milestones/pages/pages-handoff-notes.md` (one appended `## U#`
+> `docs/plans-milestones/done/pages/pages-handoff-notes.md` (one appended `## U#`
 > section per unit, never rewritten).
 >
 > **What this is:** a follow-on lane over the existing static-page / audience /

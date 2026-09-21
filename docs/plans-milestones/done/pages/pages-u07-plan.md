@@ -24,7 +24,7 @@ migration is a no-op in effect** — the seeded pages (U05) already carry the
    (create the `Page`/`PageTranslation` tables, seed the three pages, keep
    `LocalizedPage` read-only + non-destructive for one release, then **delete
    the `LocalizedPage` surface** in U07 once the new route is green).
-2. `docs/plans-milestones/pages/pages-handoff-notes.md` — **read the whole
+2. `docs/plans-milestones/done/pages/pages-handoff-notes.md` — **read the whole
    log** (the `## U1`…`## U6` sections) to confirm all six prior units are
    green + to catch any drift pause that defers work to U07. **Do not run
    U07 if any of U01–U06 is not green** (drift-pause (e), the sequencing

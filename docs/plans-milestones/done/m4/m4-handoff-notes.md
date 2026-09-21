@@ -26,7 +26,7 @@ it). ADR 0054 is the decision record (U00 locks it). The §6.4 scheduled job
    rewrites the ARCHITECTURE.md §5 block.
 2. **Milestones pin handoff.** PG **already shipped** (its lane
    `U00–U07` is green and `LocalizedPage` is retired — see
-   `docs/plans-milestones/pages/pages-handoff-notes.md`). The roadmap trio
+   `docs/plans-milestones/done/pages/pages-handoff-notes.md`). The roadmap trio
    is stale: `Milestones.cs` still shows PG as `StatusNext` and M4 as
    `StatusPlanned`. U00's roadmap step **closes PG (`StatusDone`) and
    opens M4 (`StatusNext`)** in the same commit, and renames the

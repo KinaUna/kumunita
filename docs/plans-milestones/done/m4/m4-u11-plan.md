@@ -36,7 +36,7 @@ handoff notes.
 
 ## Deliverables (≤ 1 file)
 
-1. **`docs/plans-milestones/in-progress/m4/m4-handoff-notes.md`** — the
+1. **`docs/plans-milestones/done/m4/m4-handoff-notes.md`** — the
    `## U11 — acceptance gate` section (the M3 / M2 gate section shape to
    mirror):
    - **Closed-loop** — the `Event` → `EventRsvp` →

@@ -5,7 +5,7 @@
 > scheduled, reminded action). The **primary reference tier** (the exact C#
 > seams + the design decisions) is the design doc
 > `docs/design/m4-events-design.md`; the **scratch tier** is
-> `docs/plans-milestones/in-progress/m4/m4-handoff-notes.md` (one appended
+> `docs/plans-milestones/done/m4/m4-handoff-notes.md` (one appended
 > `## U#` section per unit, never rewritten).
 >
 > **What this is:** the first **content-with-time** milestone: a new bounded
@@ -509,10 +509,10 @@ below), one unit per fresh agent with a ~32K context window.
 - **Primary — the design doc** (`docs/design/m4-events-design.md`) — the
   exact C# signatures of every seam U01–U12 must match; the 23 pinned seam
   test names; the three-test acceptance gate; the drift-guard.
-- **Secondary — this file** (`docs/plans-milestones/in-progress/m4/plan-m4.md`)
+- **Secondary — this file** (`docs/plans-milestones/done/m4/plan-m4.md`)
   — the unit registry with each unit's deliverables and exit criteria.
 - **Scratch — the rolling handoff note**
-  (`docs/plans-milestones/in-progress/m4/m4-handoff-notes.md`). One section
+  (`docs/plans-milestones/done/m4/m4-handoff-notes.md`). One section
   per unit, appended (never rewritten). Each unit writes exactly one short
   section before it exits; the next unit reads only that section + its own
   entry-read list.

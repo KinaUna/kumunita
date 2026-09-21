@@ -163,7 +163,7 @@ const extended = baseTest.extend<{ kumunita: Kumunita }>({
       'grantEventToUser` per the fixture contract above. Reuse the M2 U13 ' +
       'fixture contract (e2e-m2.spec.ts) for the signup/login shape; the ' +
       'two new helpers (lastCreatedEventId, grantEventToUser) are M4 ADDs. ' +
-      'See docs/plans-milestones/in-progress/m4/m4-handoff-notes.md § U11.',
+      'See docs/plans-milestones/done/m4/m4-handoff-notes.md § U11.',
     );
     // `use` is required by the Playwright fixture API. The throw above
     // fires first (before `use` is ever called), so there is nothing
