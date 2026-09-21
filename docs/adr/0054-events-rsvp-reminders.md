@@ -185,13 +185,15 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
     `IMailerStage` + `OutboxEmail` + `OutboxEmailHandler` trio is
     **untouched** (no new method, no new email channel, no new SMTP
     config) — the job only *stages* rows.
-- **The 23 pinned seam test names** (the design doc §3.7 is the master
-  list, locked here) — 18 in `EventServiceTests` (T01–T18: the feed
+- **The 25 pinned seam test names** (the design doc §3.7 is the master
+  list, locked here) — 20 in `EventServiceTests` (T01–T18: the feed
   family, the `null`-audience-public branch, the `Community` + grants
   branches, the draft pin, the standing matrix, the publish author-only
   pin, the soft-delete filter, the RSVP last-write-wins + unique-index +
   owner-only-list + no-audit-row pins, the audit-row shape, the adapter
-  shape) + 5 in `EventReminderServiceTests` (T19–T23: the window filter,
+  shape; T24–T25: the GlobalAdmin-override end-to-end edit + delete
+  part-vs-whole seam, the audit row tagged `Via = Admin`) + 5 in
+  `EventReminderServiceTests` (T19–T23: the window filter,
   the `Going`-RSVP filter, the author-inclusion rule, the
   idempotency-key shape, the no-audit-row pin).
 - **The three-test acceptance gate** (the design doc §3.8, recorded by the
@@ -200,13 +202,17 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   author RSVPs → their RSVP is visible in the owner-only list), **handoff**
   (a user added to the audience's grants after creation sees the event on
   the next request — strong consistency; the `Delegation` branch is the
-  handoff-onto-a-delegate case), **part-vs-whole** (the 23 names are the
+  handoff-onto-a-delegate case), **part-vs-whole** (the 25 names are the
   whole; all pass together in the same run as the inherited M1–M3 / PG
   anchors).
 - **The drift-guard** (the design doc §3.9): the `Event` field set
   (including the `Body` / `ReminderEnabled` naming decision), the
   `EventRsvp` shape, the `EventToAuditableResource` adapter, the
-  `IEventService` public method set, the 23 test names, the three-test
+  `IEventService` public method set (the edit/delete write lanes carry the
+  principal's `actorRoles` per §3.4, the `AnnouncementService` /
+  `PageService` precedent — the GlobalAdmin override is enforced
+  server-side, not deferred to the Web boundary), the 25 test names, the
+  three-test
   gate, and the §6.4 job shape are **frozen** — a re-shape of any of them
   is a new ADR, a rename of a test name is a drift event, and a new
   Wolverine idiom is a new unit, not a silently-omitted one.

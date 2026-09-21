@@ -574,7 +574,7 @@ public sealed class EventController : Controller
 
         try
         {
-            await this.events.UpdateAsync(id, actorId, request, HttpContext.RequestAborted);
+            await this.events.UpdateAsync(id, actorId, roles, request, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {
@@ -661,7 +661,7 @@ public sealed class EventController : Controller
 
         try
         {
-            await this.events.DeleteAsync(id, actorId, HttpContext.RequestAborted);
+            await this.events.DeleteAsync(id, actorId, roles, HttpContext.RequestAborted);
         }
         catch (KeyNotFoundException)
         {

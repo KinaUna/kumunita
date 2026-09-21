@@ -64,12 +64,18 @@ public interface IEventService
     Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default);
 
     /// <summary>
-    /// Edit an event — **author-only edit, GlobalAdmin override** (the ADR 0014 / 0016 /
-    /// 0017 precedent). <c>AuthorId</c> / <c>Created</c> preserved untouched;
-    /// <c>Modified</c> stamped on a real change. The <c>AccessAudit</c> row
-    /// (<c>event.update</c>) is stored in the caller's session (C3).
+    /// Edit an event — **author ∪ GlobalAdmin** (the ADR 0014 / 0016 / 0017
+    /// precedent, enforced server-side per ADR 0054 §3.4). <c>AuthorId</c> /
+    /// <c>Created</c> preserved untouched; <c>Modified</c> stamped on a real change.
+    /// The <c>actorRoles</c> parameter carries the principal's real role set (the Web
+    /// layer passes <c>RoleSet(User)</c>) so the GlobalAdmin override branch of
+    /// <see cref="EventService.CheckEditStanding"/> is exercised in this service —
+    /// the <c>AnnouncementService.UpdateAsync</c> / <c>PageService.CheckEditStanding</c>
+    /// precedent (the Web hands in real roles; Core enforces the matrix).
+    /// The <c>AccessAudit</c> row (<c>event.update</c>) is stored in the caller's
+    /// session (C3).
     /// </summary>
-    Task<Event> UpdateAsync(string eventId, string actorId, UpdateEventRequest request, CancellationToken ct = default);
+    Task<Event> UpdateAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, UpdateEventRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Publish a draft — **author-only** (the ADR 0037 pin — a non-author, even a
@@ -80,11 +86,15 @@ public interface IEventService
 
     /// <summary>
     /// **Soft-delete** an event — sets <c>IsDeleted = true</c> (the ADR 0024
-    /// author-lane shape); the record is kept and the read lanes filter it out. The
+    /// author-lane shape); the record is kept and the read lanes filter it out.
+    /// Standing: **author ∪ GlobalAdmin** (ADR 0054 §3.4, the ADR 0017 override
+    /// branch) — the <c>actorRoles</c> parameter carries the principal's real role set
+    /// so the GlobalAdmin override is enforced server-side (the
+    /// <c>AnnouncementService</c> / <c>PageService</c> precedent). The
     /// <c>AccessAudit</c> row (<c>event.delete</c>) is stored in the caller's session
     /// (C3).
     /// </summary>
-    Task DeleteAsync(string eventId, string actorId, CancellationToken ct = default);
+    Task DeleteAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
     /// <summary>
     /// RSVP — the **last-write-wins** concurrency exception (§3.2): upserts the

@@ -279,37 +279,52 @@ public sealed class EventService : IEventService
             "Only the author or a GlobalAdmin may edit an event.");
     }
 
+    /// <summary>
+    /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
+    /// audit tag (ADR 0054 §3.4): the event's <see cref="Event.AuthorId"/>
+    /// → <see cref="AccessVia.Owner"/>; a non-author actor (only reachable when
+    /// a <see cref="Roles.GlobalAdmin"/> took the ADR 0017 override branch)
+    /// → <see cref="AccessVia.Admin"/>.
+    /// </summary>
+    private static AccessVia AuditViaFor(string actorId, string authorId)
+        => string.Equals(authorId, actorId, StringComparison.Ordinal)
+            ? AccessVia.Owner
+            : AccessVia.Admin;
+
     // ─── Write lanes (U04) — standing re-checked server-side (§3.4, C3) ───
     //
-    // **Seam constraint (frozen, U01):** the <see cref="IEventService"/> write
-    // lanes carry only <c>actorId</c> — **no** <c>actorRoles</c> and **no**
-    // caller <c>IDocumentSession</c> (unlike the <see cref="Posts.PostService"/> /
-    // <see cref="Announcements.AnnouncementService"/> / <see cref="Pages.PageService"/>
-    // precedent, which take a role set + in-flight session). Two consequences:
-    //   1. Each lane opens its **own** write session (the
-    //      <see cref="AuthorizationService.CanAsync"/> standalone C3 shape) and
-    //      stores the domain write + the <see cref="AccessAudit"/> row in that
-    //      one session, committing atomically (invariant C3 — the write and the
-    //      audit row commit or roll back together, never un-audited).
-    //   2. Standing is enforced with the actor-id-expressible branch, via the
-    //      **same** pure helper the U03 read/standing tests pin
-    //      (<see cref="CheckCreateStanding"/> / <see cref="CheckEditStanding"/>)
-    //      — the C3 single-source pin (no second copy of the matrix). The
-    //      **GlobalAdmin-override** branch of the edit/delete standing (ADR 0017)
-    //      is *not* expressible in this frozen seam (it needs the actor's role
-    //      set, which the lanes do not receive): it is applied at the Web
-    //      boundary (U05) by calling the same <see cref="CheckEditStanding"/>
-    //      with the principal's roles. This unit therefore pins the **author**
-    //      (Owner) branch server-side and defers the **Admin** override to the
-    //      Web layer — recorded as a frozen-seam scope boundary, not a silent
-    //      gap.
+    // **Seam shape (ADR 0054 §4, the <see cref="AnnouncementService"/> /
+    // <see cref="PageService"/> precedent):** the <see cref="IEventService"/>
+    // write lanes carry <c>actorId</c> + the principal's real role set
+    // (<c>actorRoles</c>, the Web layer's <c>RoleSet(User)</c>) but open their
+    // **own** write session (no caller <c>IDocumentSession</c> — the M4 service
+    // composes its own C3 session, the standalone
+    // <see cref="AuthorizationService.CanAsync"/> shape). Two consequences:
+    //   1. Each lane opens its **own** write session and stores the domain write
+    //      + the <see cref="AccessAudit"/> row in that one session, committing
+    //      atomically (invariant C3 — the write and the audit row commit or roll
+    //      back together, never un-audited).
+    //   2. Standing is enforced server-side via the **same** pure helper the
+    //      U03 read/standing tests pin (<see cref="CheckCreateStanding"/> /
+    //      <see cref="CheckEditStanding"/>) — the C3 single-source pin (no second
+    //      copy of the matrix). The **edit/delete** lanes pass the actor's real
+    //      role set, so **both** the author (Owner) and the ADR 0017
+    //      GlobalAdmin-override (Admin) branches are exercised **in this
+    //      service** — the <see cref="AnnouncementService"/> /
+    //      <see cref="PageService"/> precedent (the Web hands in real roles; Core
+    //      enforces the matrix), as ADR 0054 §3.4 commits.
+    //      The **create** lane (any resident) and the **publish** lane
+    //      (author-only, ADR 0037) consult no roles — they pass
+    //      <see cref="StaticEmptyRoles"/> (a non-null sentinel).
     //
     // **Audit-row shape** (C3, §3.4): <c>TargetKind = "event"</c> (the exact
     // string — the <see cref="EventToAuditableResource"/> discriminator),
     // <c>Action</c> = <c>event.create</c> / <c>event.update</c> /
     // <c>event.publish</c> / <c>event.delete</c>, <c>Via</c> =
-    // <see cref="AccessVia.Owner"/> (every lane's standing here is the author's
-    // own), <c>Outcome</c> = <see cref="AccessOutcome.Allow"/>. **No**
+    // <see cref="AccessVia.Owner"/> (create, publish) or
+    // <see cref="AccessVia.Admin"/> (edit / delete by a non-author GlobalAdmin —
+    // the <see cref="AuditViaFor"/> derivation), <c>Outcome</c> =
+    // <see cref="AccessOutcome.Allow"/>. **No**
     // <c>event.rsvp</c> action: <see cref="RsvpAsync"/> stores **no** audit row
     // (a routine resident action, not an access decision — the
     // <see cref="M4_RsvpWritesNoAccessAuditRow"/> pin).
@@ -395,21 +410,23 @@ public sealed class EventService : IEventService
     /// untouched, and <see cref="Event.Modified"/> is stamped **only on a real
     /// change** (a no-op re-save does not bump the stamp — the
     /// <see cref="Announcements.AnnouncementService.UpdateAsync"/> shape).
-    /// Standing (server-side, C3): the **author** (the <see
-    /// cref="CheckEditStanding"/> helper's Owner branch) — the **GlobalAdmin
-    /// override** (ADR 0017) is applied at the Web boundary (U05), not in this
-    /// frozen seam (it needs the actor's role set, which the lane does not
-    /// receive — the frozen-seam scope boundary, see the U04 handoff note). A
-    /// missing id is <see cref="KeyNotFoundException"/> (404); a non-author is
-    /// <see cref="UnauthorizedAccessException"/> (403). One <see
+    /// Standing (server-side, C3): **author ∪ GlobalAdmin** — the <see
+    /// cref="CheckEditStanding"/> helper's Owner branch and the ADR 0017
+    /// GlobalAdmin-override branch are both exercised here (the <paramref name="actorRoles"/>
+    /// carries the principal's real role set from the Web layer, matching the
+    /// <see cref="Announcements.AnnouncementService"/> / <see
+    /// cref="Pages.PageService"/> precedent). A missing id is <see
+    /// cref="KeyNotFoundException"/> (404); a non-authorized actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
     /// cref="AccessAudit"/> row (<c>event.update</c>, <c>TargetKind =
     /// "event"</c>, <c>Via Owner</c>) commits atomically with the write (C3).
     /// </summary>
-    public async Task<Event> UpdateAsync(string eventId, string actorId, UpdateEventRequest request, CancellationToken ct = default)
+    public async Task<Event> UpdateAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, UpdateEventRequest request, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         ArgumentNullException.ThrowIfNull(request);
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit an event.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
 
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
         var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
@@ -418,9 +435,11 @@ public sealed class EventService : IEventService
 
         // Standing re-check (server-side, C3 single-source) against the
         // **stored** event (loaded first, so its AuthorId is available — the
-        // AnnouncementService edit-gate shape): the author (Owner branch). The
-        // GlobalAdmin override is the Web layer's (U05) — see the unit note.
-        CheckEditStanding(actorId, StaticEmptyRoles, existing);
+        // AnnouncementService edit-gate shape): author (Owner branch) OR
+        // GlobalAdmin (ADR 0017 override). The actorRoles carries the principal's
+        // real role set (the Web layer's RoleSet(User), the
+        // AnnouncementService / PageService precedent).
+        CheckEditStanding(actorId, actorRoles, existing);
 
         // ADR 0018 — resolve the authored-in tag on **both** sides before
         // comparing (the AnnouncementService.UpdateAsync shape): a no-op
@@ -469,7 +488,9 @@ public sealed class EventService : IEventService
             existing.Modified = DateTimeOffset.UtcNow;
 
         session.Store(existing);
-        StoreAuditRow(session, actorId, "event.update", existing.Id, AccessVia.Owner);
+        // ADR 0054 §3.4 — the audit row tags the branch the actor qualified
+        // under: the author → Owner, a non-author GlobalAdmin override → Admin.
+        StoreAuditRow(session, actorId, "event.update", existing.Id, AuditViaFor(actorId, existing.AuthorId));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return existing;
     }
@@ -525,30 +546,36 @@ public sealed class EventService : IEventService
     /// <see cref="Event.IsDeleted"/> to <c>true</c>; the record is kept (never
     /// hard-deleted) and the read lanes (<see cref="ListUpcomingAsync"/> /
     /// <see cref="GetAsync"/>) filter it out (U03's non-leaky pin — a deleted
-    /// event is a 404, not a 403). Standing (server-side, C3): the **author**
-    /// (the <see cref="CheckEditStanding"/> helper's Owner branch) — the
-    /// **GlobalAdmin override** (ADR 0017) is applied at the Web boundary
-    /// (U05), not in this frozen seam (the frozen-seam scope boundary, see the
-    /// unit note). A missing id is <see cref="KeyNotFoundException"/> (404); a
-    /// non-author is <see cref="UnauthorizedAccessException"/> (403). One
-    /// <see cref="AccessAudit"/> row (<c>event.delete</c>, <c>TargetKind =
+    /// event is a 404, not a 403). Standing (server-side, C3): **author ∪
+    /// GlobalAdmin** (ADR 0054 §3.4, the ADR 0017 override branch) — the
+    /// <paramref name="actorRoles"/> carries the principal's real role set from the Web
+    /// layer, so both the Owner and Admin branches of <see
+    /// cref="CheckEditStanding"/> are exercised here (the
+    /// <see cref="Announcements.AnnouncementService"/> / <see
+    /// cref="Pages.PageService"/> precedent). A missing id is <see
+    /// cref="KeyNotFoundException"/> (404); a non-authorized actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>event.delete</c>, <c>TargetKind =
     /// "event"</c>, <c>Via Owner</c>) commits atomically (C3). **Idempotent**:
     /// deleting an already-deleted event is a no-op (it does not re-stamp
     /// <see cref="Event.Modified"/>).
     /// </summary>
-    public async Task DeleteAsync(string eventId, string actorId, CancellationToken ct = default)
+    public async Task DeleteAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
         if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete an event.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
 
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
         var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
         if (existing is null)
             throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to delete.");
 
-        // Standing re-check (server-side, C3 single-source): the author (Owner
-        // branch). The GlobalAdmin override is the Web layer's (U05).
-        CheckEditStanding(actorId, StaticEmptyRoles, existing);
+        // Standing re-check (server-side, C3 single-source): author (Owner
+        // branch) OR GlobalAdmin (ADR 0017 override). The actorRoles carries the
+        // principal's real role set (the Web layer's RoleSet(User), the
+        // AnnouncementService / PageService precedent).
+        CheckEditStanding(actorId, actorRoles, existing);
 
         if (!existing.IsDeleted)
         {
@@ -557,7 +584,9 @@ public sealed class EventService : IEventService
         }
 
         session.Store(existing);
-        StoreAuditRow(session, actorId, "event.delete", existing.Id, AccessVia.Owner);
+        // ADR 0054 §3.4 — tag the branch the actor qualified under:
+        // author → Owner, non-author GlobalAdmin override → Admin.
+        StoreAuditRow(session, actorId, "event.delete", existing.Id, AuditViaFor(actorId, existing.AuthorId));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
@@ -631,13 +660,13 @@ public sealed class EventService : IEventService
 
     /// <summary>
     /// A non-null, empty role set for the standing helpers'
-    /// <c>actorRoles</c> parameter on the lanes that do not exercise the
-    /// GlobalAdmin override (create / author-branch edit / author-branch
-    /// delete). The frozen <see cref="IEventService"/> write lanes carry no role
-    /// set (the frozen-seam scope boundary, see the unit note), so the
-    /// author-only branch is what the server enforces; the Web layer (U05)
-    /// calls the same <see cref="CheckEditStanding"/> with the principal's
-    /// roles to admit the GlobalAdmin override.
+    /// <c>actorRoles</c> parameter on the lanes that consult no roles
+    /// (create — any resident — and publish — author-only, ADR 0037). The
+    /// edit / delete lanes receive the principal's real role set from the Web
+    /// layer (the <see cref="AnnouncementService"/> / <see cref="PageService"/>
+    /// precedent) so the GlobalAdmin override (ADR 0017) is exercised
+    /// server-side; this sentinel is a non-null stand-in for the lanes that
+    /// never look at roles.
     /// </summary>
     private static readonly IReadOnlySet<string> StaticEmptyRoles = new HashSet<string>(StringComparer.Ordinal);
 

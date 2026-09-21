@@ -1105,3 +1105,88 @@ de/fr/da key-parity pins) passes with the 3 new keys.
   ARCHITECTURE.md deferral note.
 
 **U12 exit gate met. M4 is DONE — STOP. The next lane is M5 (Projects).**
+
+## U13 — GlobalAdmin edit/delete write override (resolves U05(f))
+
+> **Provenance:** the U05 exit note (f) — *"Drift — GlobalAdmin edit/delete
+> write denied at Core"* — is the seam this unit closes. It was flagged in
+> U05 as *"a Core change, out of U05 scope"* and carried forward through U12
+> (which closed M4's *planned* surface without touching it). U13 makes **the
+> code honor the ADR** (ADR 0054 is unchanged — it was the authority the code
+> now matches, per the "code to honor the ADR" fix (a) chosen over amending
+> the ADR).
+
+**(a) The seam (the one structural change).** `IEventService.UpdateAsync` /
+`DeleteAsync` now take `IReadOnlySet<string> actorRoles` — the
+`AnnouncementService.UpdateAsync(... actorId, actorRoles, session)` /
+`PageService.CheckEditStanding(actorId, actorRoles, page)` precedent the U05
+note already cited. The `EventController` passes the principal's real
+`RoleSet(User)` (the pre-gate already computed it; no new dependency).
+`CreateAsync` / `PublishAsync` are **unchanged** (the create lane is any
+resident; the publish lane is author-only per ADR 0037 — a non-author
+GlobalAdmin is still denied publish), as are the `StaticEmptyRoles` sentinel
+(now used only by create/publish) and `RsvpAsync` (no audit row).
+
+**(b) The audit-tag correctness fix (a second, real gap found while threading
+roles).** The `event.update` / `event.delete` audit row was hard-coded to
+`AccessVia.Owner`. A non-author GlobalAdmin override (the branch U05(f)
+left unreachable) would therefore be recorded as `Owner` — a lie, since the
+actor was **not** the author. ADR 0054 §3.4 says these lanes tag `Owner` /
+`Admin`. New `AuditViaFor(actorId, authorId)`: the author → `AccessVia.Owner`,
+a non-author actor (only reachable via the GlobalAdmin override) →
+`AccessVia.Admin`. `event.create` / `event.publish` remain `Owner`.
+
+**(c) The two missing part-vs-whole seam tests (the FIG test the U05 note
+could not write).** `M4_GlobalAdminOverrideEditEndToEnd` (**T24**) and
+`M4_GlobalAdminOverrideDeleteEndToEnd` (**T25**) — a non-author GlobalAdmin
+edits / soft-deletes someone else's event **through the `UpdateAsync` /
+`DeleteAsync` write lane**, and the audit row is asserted `Via = Admin`.
+These close the §3.8 row-3 *part-vs-whole* gate, which was red for the
+GlobalAdmin branch (the U09 `M4_GlobalAdminOverrideEdit` (T09) pin only
+drove the **pure** `CheckEditStanding` helper, not the **lane** — green CI,
+red seam). The §3.7 master list is now **25** names (T01–T25).
+
+**(d) Re-verified (this machine's `dotnet exec` runner path, AGENTS.md):**
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Error(s)**
+  (warnings unchanged: `xUnit1051` in the M4 test files, `CS8601` in
+  `EventController.cs`).
+- `dotnet exec …Kumunita.Core.Tests.dll` → **Total: 670, Errors: 0, Failed:
+  0** (668 + T24/T25; the **25 M4 seam tests (T01–T25) pass *together*** with
+  the inherited M1/M2/M3/M3b/PG anchors — the §3.8 part-vs-whole pin now
+  holds for the GlobalAdmin-override branch).
+- `dotnet exec …Kumunita.Web.Tests.dll` → **Total: 351, Errors: 0, Failed:
+  0** — the `EventControllerTests` family is fully green (the U12 run already
+  showed 0 failed; the 4 NSubstitute call sites in `EventControllerTests`
+  now stub the `actorRoles` argument the seam carries).
+
+**(e) Doc sync landed (U13's close, mirroring the U12 (c) shape).**
+- `docs/design/m4-events-design.md` — §3.7 master list 23→25 (+T24/T25), the
+  §4 seam block now shows the `actorRoles`-bearing `UpdateAsync`/
+  `DeleteAsync` (the `AnnouncementService`/`PageService` precedent), the
+  part-vs-whole rows 23→25, and a **U13 addendum** in §6 recording the fix +
+  the re-verified runs (670/670 Core, 351/351 Web).
+- `docs/adr/0054-events-rsvp-reminders.md` — the locked master-list count
+  23→25 (T24/T25 named), the part-vs-whole row 23→25, and the drift-guard's
+  `IEventService` public method set note (the edit/delete lanes carry
+  `actorRoles` per §3.4, enforced server-side — **not** deferred to the Web
+  boundary).
+- `docs/adr/README.md` — row 0054 "23 pinned seam tests" → "25 pinned seam
+  tests".
+- `docs/ARCHITECTURE.md` — the `Events/` tree-line gate note: the standing
+  matrix is now stated as enforced **server-side** (the lanes carry
+  `actorRoles`, the audit row tags `Owner`/`Admin`), with the re-verified
+  Core 670/670 + Web 351/351 and the 25-seam-test count.
+- **ADR 0054 is the authority and is substantively unchanged** in its matrix —
+  only the count it locks (23→25) and the seam-shape note (which now matches
+  §3.4) were touched.
+
+**(f) What did NOT change.** `CreateAsync` / `PublishAsync` (publish remains
+author-only, ADR 0037 — a non-author GlobalAdmin is still denied publish),
+`RsvpAsync` (no audit row), the `StaticEmptyRoles` sentinel (create/publish
+only), the `Event` / `EventRsvp` doc shapes, the `M4DocTypes` surface, the
+§6.4 reminder job, and the `EventToAuditableResource` adapter.
+
+**U13 exit gate met: the code honors ADR 0054 §3.4 (GlobalAdmin edit/delete
+override honored server-side, audit row tagged `Admin`), the U05(f) drift is
+resolved, and the M4 seam is green end-to-end (Core 670/670, Web 351/351,
+0 errors).**

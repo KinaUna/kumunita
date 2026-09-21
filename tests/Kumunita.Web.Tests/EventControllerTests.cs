@@ -221,7 +221,7 @@ public class EventControllerTests
         var result = await controller.Delete(id);
 
         Assert.IsType<ForbidResult>(result);
-        await events.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await events.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>
@@ -493,8 +493,8 @@ public class EventControllerTests
         UpdateEventRequest? capturedUpdate = null;
         var events = Substitute.For<IEventService>();
         events.GetAsync(id, "subj-admin-001", Arg.Any<CancellationToken>()).Returns(existing);
-        events.UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>())
-            .Returns(call => { capturedUpdate = call.ArgAt<UpdateEventRequest>(2); return existing; });
+        events.UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => { capturedUpdate = call.ArgAt<UpdateEventRequest>(3); return existing; });
 
         var model = new EventEditorModel
         {
@@ -511,7 +511,7 @@ public class EventControllerTests
 
         Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
-        await events.Received(1).UpdateAsync(id, "subj-admin-001", Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>());
+        await events.Received(1).UpdateAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>());
         Assert.NotNull(capturedUpdate);
         var sent = capturedUpdate!;
         Assert.Equal("New title", sent.Title);
@@ -544,7 +544,7 @@ public class EventControllerTests
         });
 
         Assert.IsType<NotFoundResult>(result);
-        await events.DidNotReceive().UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>());
+        await events.DidNotReceive().UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateEventRequest>(), Arg.Any<CancellationToken>());
     }
 
     // ── RSVP surface (GET /events/{id} + POST /events/{id}/rsvp) ───────────────

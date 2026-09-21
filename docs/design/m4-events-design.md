@@ -274,9 +274,9 @@ lane, own ADR.
   `AuditPurgeTick` (the `IntegrateWithWolverine()` + `ApplyAllConfigured-
   ChangesToDatabaseAsync` trio precedent).
 
-### 3.7 The 23 pinned seam test names  **[DECIDED — ADR 0054 — the master list]**
+### 3.7 The 25 pinned seam test names  **[DECIDED — ADR 0054 — the master list]**
 
-U09 implements **exactly** these 23 names in
+U09 implements **exactly** these 25 names in
 `tests/Kumunita.Core.Tests/EventServiceTests.cs` (T01–T18) and
 `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` (T19–T23). A rename
 or re-scope of a name after this freeze is a **drift event** (§3.9):
@@ -306,6 +306,8 @@ or re-scope of a name after this freeze is a **drift event** (§3.9):
 | T21 | `M4_ReminderAuthorAlwaysIncluded` | §3.6; the author is reminded even without an RSVP |
 | T22 | `M4_ReminderIdempotencyKeyShape` | §3.6; exactly one staged email per recipient, key `remind:{eventId}:{userId}` |
 | T23 | `M4_ReminderWritesNoAccessAuditRow` | §3.6; zero `AccessAudit` rows after `SendRemindersAsync` |
+| T24 | `M4_GlobalAdminOverrideEditEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin edits (the `UpdateAsync` write lane, the ADR 0017 override), audit row tagged `Via = Admin` |
+| T25 | `M4_GlobalAdminOverrideDeleteEndToEnd` | §3.4; the part-vs-whole seam — a non-author GlobalAdmin soft-deletes (the `DeleteAsync` write lane, the ADR 0017 override), audit row tagged `Via = Admin` |
 
 ### 3.8 The three-test acceptance gate  **[DECIDED — ADR 0054 — U11 records the run]**
 
@@ -313,7 +315,7 @@ or re-scope of a name after this freeze is a **drift event** (§3.9):
 |---|------|------------------------|
 | 1 | **closed loop** | an author creates a published event → it appears in the feed (`TargetKind = "event"` aggregate row, `VisibleCount ≥ 1`, `Outcome = Allow`); the author RSVPs `Going` → their RSVP is visible in the owner-only list |
 | 2 | **handoff** | a user added to the event's `Audience.Grants` **after** creation sees the event on the **next** request — strong consistency, no cache; the `Delegation` branch is the handoff-onto-a-delegate case (the delegate sees the owner's grant-scoped event) |
-| 3 | **part-vs-whole** | the 23 names in §3.7 are the **whole**; tests 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited M1/M2/M3/M3b/PG anchors (no per-name isolation) |
+| 3 | **part-vs-whole** | the 25 names in §3.7 are the **whole**; tests 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited M1/M2/M3/M3b/PG anchors (no per-name isolation) |
 
 **Runner note (AGENTS.md test-runner quirk, this machine):** the reliable
 path is build then in-process execution — **not** `dotnet test` / VS Test
@@ -341,7 +343,7 @@ dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
   `Decide()` branch.
 - **The `EventService` public methods** (§4) — the exact signatures. An
   ADD beyond this list is a **new ADR**; a re-scope of one is a drift event.
-- **The 23 test names** (§3.7) — the master list; a rename/renumber is a
+- **The 25 test names** (§3.7) — the master list; a rename/renumber is a
   break.
 - **The three-test gate** (§3.8) — closed loop / handoff / part-vs-whole.
 - **The §6.4 job shape** (§3.6) — the `AuditPurgeHandler` precedent verbatim;
@@ -360,11 +362,15 @@ public interface IEventService
     Task<IReadOnlyList<EventRsvp>> GetRsvpsAsync(string eventId, CancellationToken ct = default);      // owner-only
     Task<EventRsvp?> GetMyRsvpAsync(string eventId, string actorId, CancellationToken ct = default);
 
-    // Write lanes (U04) — standing re-checked server-side (§3.4, C3)
+    // Write lanes (U04) — standing re-checked server-side (§3.4, C3).
+    // The edit/delete lanes carry the principal's real role set (the
+    // AnnouncementService / PageService precedent — the Web hands in real
+    // roles, Core enforces the matrix), so the GlobalAdmin override (ADR
+    // 0017) is exercised server-side; create/publish consult no roles.
     Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default);
-    Task<Event> UpdateAsync(string eventId, string actorId, UpdateEventRequest request, CancellationToken ct = default);
+    Task<Event> UpdateAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, UpdateEventRequest request, CancellationToken ct = default);
     Task<Event> PublishAsync(string eventId, string actorId, CancellationToken ct = default);          // author-only (ADR 0037)
-    Task DeleteAsync(string eventId, string actorId, CancellationToken ct = default);                  // soft (ADR 0024)
+    Task DeleteAsync(string eventId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default); // soft (ADR 0024)
     Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default); // last-write-wins, no audit row
 }
 
@@ -469,6 +475,47 @@ grant-scoped audience re-scope, the §3.8 row 2 pin):
 `Kumunita.Core.Tests` 668/668 + the `EventControllerTests` family 19/19, with
 the one Web red attributed to pre-existing kw-l drift, not the M4 family).
 
+**U13 addendum (verified, not assumed) — the GlobalAdmin-override seam fix.**
+The U09/U10 record above captured the freeze as then-built, where the
+`IEventService` edit/delete write lanes carried **no** `actorRoles` and the
+GlobalAdmin override (ADR 0017) was applied only at the Web boundary — leaving
+the §3.8 row-3 *part-vs-whole* gate red: a non-author GlobalAdmin could not
+edit/delete **end-to-end** through the service seam, and the `AccessVia` audit
+tag for an override edit/delete was mislabeled `Owner` (the actor was not the
+author). U13 closed that seam, **honoring the ADR** (ADR 0054 is unchanged —
+it was the authority the code now matches):
+
+- `IEventService.UpdateAsync` / `DeleteAsync` now take
+  `IReadOnlySet<string> actorRoles` (the `AnnouncementService` / `PageService`
+  precedent — the Web hands in the principal's real `RoleSet(User)`, Core
+  enforces the matrix server-side); `EventService` re-checks standing with the
+  real role set, so **both** the author (Owner) and the GlobalAdmin (Admin)
+  branches are exercised *in the service*.
+- The `event.update` / `event.delete` audit row tags the branch the actor
+  qualified under (the new `AuditViaFor`): author → `AccessVia.Owner`,
+  non-author GlobalAdmin override → `AccessVia.Admin` (ADR 0054 §3.4, the
+  `Owner`/`Admin` matrix above). `event.create` / `event.publish` remain `Owner`.
+- Two new **integration** (part-vs-whole) seam tests added — **T24**
+  `M4_GlobalAdminOverrideEditEndToEnd` and **T25**
+  `M4_GlobalAdminOverrideDeleteEndToEnd` (a non-author GlobalAdmin edits /
+  soft-deletes someone else's event through the write lane, audit row tagged
+  `Via = Admin`) — bringing the §3.7 master list to **25** names.
+
+Re-verified after U13 (this machine's `dotnet exec` runner path, AGENTS.md):
+
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Error(s)**
+  (warnings unchanged from U09/U10: `xUnit1051` in the M4 test files, `CS8601`
+  in `EventController.cs`).
+- `dotnet exec …Kumunita.Core.Tests.dll` → **Total: 670, Errors: 0, Failed:
+  0** (668 + T24/T25 — the **25 M4 seam tests (T01–T25) pass *together*** with
+  the inherited M1/M2/M3/M3b/PG anchors in the same run; the §3.8 part-vs-whole
+  pin now holds for the GlobalAdmin-override branch too).
+- `dotnet exec …Kumunita.Web.Tests.dll` → **Total: 351, Errors: 0, Failed:
+  0** — the `EventControllerTests` family is fully green (the U11 run's single
+  kw-l red — a registry drift outside the M4 family — no longer reproduces in
+  this re-verification; the M4 controller seam tests are unaffected by U13
+  beyond the `actorRoles` argument the NSubstitute stubs now carry).
+
 **FACES (the two the U11 plan text pins).**
 
 - **Strengthens — Adaptive:** a resident's RSVP / reminder reaches a real
@@ -501,7 +548,7 @@ valid TypeScript; the same M2 U13 "author without the runtime" state).
 lastCreatedEventId / grantEventToUser` implementation (the M2 D2 token-channel
 + M4's two helpers), (2) a Postgres boot wired to the same DB the `dotnet run`
 server reads, (3) **no** new production-code changes — the M4 Core + Web seams
-are frozen and already exercised by the 23 Core seam tests + 19 controller
+are frozen and already exercised by the 25 Core seam tests + 19 controller
 tests. **The unit that lands the runtime** records the M4 e2e pass count in a
 subsequent `### Run result (M4 e2e — <date>)` section of this doc.
 

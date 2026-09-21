@@ -711,7 +711,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         var createdBefore = ev.Created;
 
-        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "new title", Body = "new body",
             Start = created, End = created,
@@ -747,7 +747,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Null(ev.Modified);   // a fresh create does not stamp Modified.
 
         // Re-save the exact same values — a no-op.
-        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "unchanged", Body = "body",
             Start = created, End = created,
@@ -784,7 +784,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal(new[] { "bb22" }, ev.AttachmentIds);
 
         // Edit to new media refs (replace-style — the re-parse is authoritative).
-        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "t", Body = "![b](/content-image/cc33) and [g](/attachment/dd44)",
             Start = created, End = created,
@@ -815,7 +815,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.UpdateAsync(ev.Id, stranger, new UpdateEventRequest { Title = "hijack", Start = created, End = created }));
+            () => svc.UpdateAsync(ev.Id, stranger, EmptyRoles, new UpdateEventRequest { Title = "hijack", Start = created, End = created }));
     }
 
     // ── U04·8 — M4_UpdateMissingEvent_404 ───────────────────────────────────
@@ -828,7 +828,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var store = await BootStoreAsync();
         var (_, _, svc) = Services(store);
         await Assert.ThrowsAsync<KeyNotFoundException>(
-            () => svc.UpdateAsync("no-such-event", "u-u04-u5", new UpdateEventRequest { Title = "t" }));
+            () => svc.UpdateAsync("no-such-event", "u-u04-u5", EmptyRoles, new UpdateEventRequest { Title = "t" }));
     }
 
     // ── U04·9 — M4_PublishAuthorOnly (ADR 0037) ─────────────────────────────
@@ -939,7 +939,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
         await svc.GetAsync(ev.Id, resident);
 
-        await svc.DeleteAsync(ev.Id, author);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
 
         // Gone from the feed; the detail is a 404 (non-leaky pin).
         Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
@@ -968,7 +968,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.DeleteAsync(ev.Id, stranger));
+            () => svc.DeleteAsync(ev.Id, stranger, EmptyRoles));
         // The event is still live (not deleted).
         Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
     }
@@ -1176,7 +1176,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         var createdStamp = ev.Created;
 
-        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        var updated = await svc.UpdateAsync(ev.Id, author, EmptyRoles, new UpdateEventRequest
         {
             Title = "edited", Body = "new body",
             Start = ev.Start, End = ev.End,
@@ -1215,7 +1215,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.UpdateAsync(ev.Id, stranger, new UpdateEventRequest
+            () => svc.UpdateAsync(ev.Id, stranger, EmptyRoles, new UpdateEventRequest
             {
                 Title = "hijack", Body = "body t08",
                 Start = ev.Start, End = ev.End,
@@ -1253,6 +1253,92 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var plainRoles = new HashSet<string>();
         Assert.Throws<UnauthorizedAccessException>(
             () => EventService.CheckEditStanding("u-u09-t09-stranger", plainRoles, ev));
+    }
+
+    // ── T24 — M4_GlobalAdminOverrideEditEndToEnd (ADR 0017, the part-vs-whole seam) ─
+    // The **integration** (part-vs-whole) counterpart of the T09 pure-standing
+    // pin: a non-author GlobalAdmin who edits someone else's event through the
+    // **write lane** (UpdateAsync) succeeds — the ADR 0054 §3.4 matrix
+    // (Edit = AuthorId ∪ GlobalAdmin, enforced server-side in the
+    // EventService), and the audit row is tagged Via = Admin (not Owner).
+    // This is the FIG three-test seam the U05 handoff notes flagged as the
+    // missing link (a non-author GlobalAdmin could not edit end-to-end because
+    // the lanes carried no role set); it is now closed here.
+
+    [Fact]
+    public async Task M4_GlobalAdminOverrideEditEndToEnd()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t24-author";
+        const string admin = "u-u09-t24-admin";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned", Body = "body t15",
+            Start = new DateTimeOffset(2026, 4, 25, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 25, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+
+        // The non-author GlobalAdmin edits it (the ADR 0017 override branch).
+        var updated = await svc.UpdateAsync(ev.Id, admin, GlobalAdminRoles, new UpdateEventRequest
+        {
+            Title = "admin-edited", Body = "body t15",
+            Start = ev.Start, End = ev.End,
+        });
+
+        Assert.Equal("admin-edited", updated.Title);
+        Assert.Equal(author, updated.AuthorId);        // author of record preserved.
+        Assert.NotNull(updated.Modified);              // a real change ⇒ stamped.
+
+        // The audit row is stored and tagged Admin (the override branch,
+        // ADR 0054 §3.4) — not Owner (which would be a lie: the actor was not
+        // the author).
+        var rows = await EventAuditRows(store);
+        var row = Assert.Single(rows, r => r.Action == "event.update" && r.TargetId == ev.Id);
+        Assert.Equal(AccessVia.Admin, row.Via);
+    }
+
+    // ── T25 — M4_GlobalAdminOverrideDeleteEndToEnd (ADR 0017, the part-vs-whole seam) ─
+    // The **integration** (part-vs-whole) counterpart for the delete lane: a
+    // non-author GlobalAdmin soft-deletes someone else's event through
+    // **DeleteAsync** (ADR 0054 §3.4: Soft-delete = AuthorId ∪ GlobalAdmin,
+    // enforced server-side), the event leaves the feed / detail is a 404
+    // (the non-leaky pin), and the audit row is tagged Via = Admin.
+
+    [Fact]
+    public async Task M4_GlobalAdminOverrideDeleteEndToEnd()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u09-t25-author";
+        const string admin = "u-u09-t25-admin";
+        const string resident = "u-u09-t25-resident";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "live", Body = "body t16",
+            Start = new DateTimeOffset(2026, 4, 26, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 26, 11, 0, 0, TimeSpan.Zero),
+            Audience = null,
+            IsDraft = false,
+        });
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+
+        // The non-author GlobalAdmin soft-deletes it (the ADR 0017 override).
+        await svc.DeleteAsync(ev.Id, admin, GlobalAdminRoles);
+
+        // Gone from the feed; the detail is a 404 (the non-leaky pin).
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+
+        // The audit row is stored and tagged Admin (the override branch,
+        // ADR 0054 §3.4).
+        var rows = await EventAuditRows(store);
+        var row = Assert.Single(rows, r => r.Action == "event.delete" && r.TargetId == ev.Id);
+        Assert.Equal(AccessVia.Admin, row.Via);
     }
 
     // ── T14 — M4_RsvpUniqueIndexOneRowPerUser (§3.2 — unique (EventId,UserId))
@@ -1560,7 +1646,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         await svc.GetAsync(ev.Id, resident);
 
         // The author soft-deletes (ADR 0024 — IsDeleted = true).
-        await svc.DeleteAsync(ev.Id, author);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
 
         // After delete: the event is filtered from the feed and the detail
         // is a 404 (the non-leaky pin — same as a missing id).
@@ -1595,7 +1681,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
 
         // The author (the standing owner) soft-deletes their own event.
-        await svc.DeleteAsync(ev.Id, author);
+        await svc.DeleteAsync(ev.Id, author, EmptyRoles);
 
         // The event is now filtered from the feed (the read lanes filter it).
         Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
@@ -1613,7 +1699,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
             IsDraft = false,
         });
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.DeleteAsync(ev2.Id, stranger));
+            () => svc.DeleteAsync(ev2.Id, stranger, EmptyRoles));
         // The second event is still live (the denied write did not apply).
         Assert.Contains(ev2.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
     }
@@ -1624,6 +1710,18 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
     private static void await_ThrowsUnauthorized(Action action)
         => Assert.Throws<UnauthorizedAccessException>(action);
+
+    /// <summary>A non-null empty role set for the author-branch write-lane call
+    /// sites (the actor qualifies as the author, not via the GlobalAdmin
+    /// override) — a non-null stand-in mirroring the <see cref="EventService"/>
+    /// create/publish sentinel shape.</summary>
+    private static readonly IReadOnlySet<string> EmptyRoles = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>The role set carrying the <see cref="Roles.GlobalAdmin"/>
+    /// override claim (ADR 0017) for the non-author GlobalAdmin write-lane
+    /// tests.</summary>
+    private static readonly IReadOnlySet<string> GlobalAdminRoles =
+        new HashSet<string>(StringComparer.Ordinal) { Roles.GlobalAdmin };
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
     /// database (the fresh-postgres-per-test isolation means "all event rows"
