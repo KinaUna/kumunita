@@ -300,3 +300,156 @@ further open decisions carried into U01.
     U09 23-test list remain out of scope.
 
 **U03 exit gate met. STOP — do NOT start U04.**
+
+## U04 — write lanes
+
+- **(a) Files touched:**
+  - `src/Kumunita.Core/Events/EventService.cs` — implemented the **five
+    write lanes** on the frozen `IEventService` (U01), replacing the five
+    `NotImplementedException` placeholders U03 left in place:
+    `CreateAsync` / `UpdateAsync` / `PublishAsync` / `DeleteAsync` /
+    `RsvpAsync`. Added four private helpers: `StoreAuditRow` (the single
+    `AccessAudit` row per write lane — C3 invariant), `ResolveLanguageCodeAsync`
+    (ADR 0018 authored-in tag, `LocaleSettings` singleton, `en` floor),
+    `AudiencesEqual` / `ListsEqual` (no-op-change detection for the
+    `UpdateAsync` `Modified` stamp), and the `StaticEmptyRoles` constant
+    (see (d) drift). The `IEventService` seam, `Event` / `EventRsvp` /
+    `M4DocTypes` / `EventToAuditableResource` (U02) / the four **read**
+    lanes + two standing helpers (U03) are all **untouched**.
+  - `src/Kumunita.Core/Events/EventRequests.cs` — added
+    `IReadOnlyList<string>? ImageIds` and `IReadOnlyList<string>?
+    AttachmentIds` to **both** `CreateEventRequest` and `UpdateEventRequest`
+    (the `PostDraft` / `Announcement` precedent: nullable default, null-
+    coalesced to `[]` inside the service — ADR 0025 RC / ADR 0034 ATT).
+    `CreateEventRequest.IsDraft` / `UpdateEventRequest`'s field set are
+    otherwise untouched; **`UpdateEventRequest` does not carry `IsDraft`**
+    (publish, ADR 0037, owns that flip — the draft state is not an editable
+    field, see (d)).
+  - `tests/Kumunita.Core.Tests/EventServiceTests.cs` — appended **17 new
+    `M4_*` write-lane tests** (the U04 family, the plan's "specific test
+    families": create/edit standing matrix, publish author-only pin,
+    soft-delete filter, RSVP last-write-wins + unique-index behavior, and the
+    audit-row `Action` / `TargetKind` shape assertions) + the
+    `EventAuditRows` helper (the `PostDraftModeTests.PostAudits` shape,
+    scoped to `TargetKind == "event"`). The 17 U03 read/standing tests are
+    untouched.
+- **(b) The five write lanes (signatures confirmed against the frozen
+  `IEventService`):**
+  - `CreateAsync(string actorId, CreateEventRequest request, ct)` —
+    `CheckCreateStanding` (any signed-in resident; empty actor →
+    `UnauthorizedAccessException`, the Web 403); resolves the authored-in
+    `LanguageCode` (ADR 0018); stores the `Event` with `IsDraft` carried
+    verbatim from the request (ADR 0037), `AuthorId = actorId`, `Created =
+    UtcNow`, `Modified = null`, `IsDeleted = false`, and the
+    `TagIds` / `ImageIds` / `AttachmentIds` null-coalesced to `[]`; stores
+    one `AccessAudit` row (`Action = "event.create"`, `TargetKind = "event"`,
+    `Via = Owner`, `Outcome = Allow`, single-target) on the **same**
+    `IDocumentSession` (C3 atomic commit). Returns the created event.
+  - `UpdateAsync(string eventId, string actorId, UpdateEventRequest
+    request, ct)` — load → 404-if-missing → `CheckEditStanding(actor,
+    StaticEmptyRoles, existing)` (**author branch only** — see (d) frozen
+    seam) → re-resolve the `LanguageCode` on **both** sides before comparing
+    (the `AnnouncementService.UpdateAsync` no-op-stamp shape) → compute
+    `changed` across all editable fields (title / body / component / start /
+    end / location / capacity / audience / reminder / language / tags /
+    images / attachments) → apply the author's choices verbatim (ADR 0001-B)
+    → stamp `Modified` **only** on a real change (a no-op re-save leaves the
+    stamp untouched) → `session.Store(existing)` (the PostService re-store
+    quirk) → one `AccessAudit` row (`"event.update"`, `Via Owner`).
+    `AuthorId` / `Created` / `IsDraft` / `IsDeleted` are **deliberately
+    not** reassigned (publish / delete own those; see (d)).
+  - `PublishAsync(string eventId, string actorId, ct)` — load → 404-if-
+    missing → **author-only** (`existing.AuthorId == actorId` ordinal; a
+    non-author is denied **even at GlobalAdmin** — ADR 0037's pin, contrast
+    ADR 0017's edit lane) → flip `IsDraft = false` → stamp `Modified`
+    **only** if it was still a draft (idempotent: a second publish on an
+    already-live event is a no-op, no double-stamp) → `Store` → one
+    `AccessAudit` row (`"event.publish"`, `Via Owner`).
+  - `DeleteAsync(string eventId, string actorId, ct)` — load → 404-if-
+    missing → `CheckEditStanding` (author branch, same frozen-seam scope as
+    `UpdateAsync`) → set `IsDeleted = true` (ADR 0024 soft-delete — the row
+    is not removed, the read lanes filter it) → stamp `Modified` → `Store`
+    → one `AccessAudit` row (`"event.delete"`, `Via Owner`).
+  - `RsvpAsync(string eventId, string actorId, RsvpStatus status, ct)` —
+    load the `Event` → 404-if-missing-or-deleted → enforce signed-in
+    (empty `actorId` → `UnauthorizedAccessException`) **directly, not via
+    `CanAsync`** (the pin below — using `CanAsync` would write a read-audit
+    row, which the ADR 0054 §3.2 "no audit row on an RSVP" pin forbids) →
+    last-write-wins upsert keyed on the `(EventId, UserId)` unique index:
+    load the actor's existing row (if any), mutate `Status` / `At`, else
+    create → **`session.Store(rsvp)` on both branches** (the PostService
+    "a loaded-then-mutated row is not reliably carried to the DB by
+    SaveChangesAsync alone" quirk — the bug this fix caught, see (d)) →
+    `SaveChangesAsync`. **No `AccessAudit` row** (the ADR 0054 §3.2 pin).
+- **(c) Build + test result (U04 exit gate, both green):**
+  - `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 Error(s)**
+    (the house-style xUnit1051 warnings are unchanged from U03 — present
+    across the whole suite, not introduced by U04).
+  - Full Core suite (the exit gate per `AGENTS.md` — `dotnet test` / VS Test
+    Explorer are not used, per the runner-discovery quirk): `dotnet exec
+    tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+    → **Total: 649, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0** (632
+    pre-U04 + 17 new U04 tests; no regressions in the `Post` / `Announcement`
+    / `Page` / Identity / UserInfo surfaces).
+  - **The 17 `M4_*` U04 tests** (all PASS): `M4_CreateWritesEventAndAuditRow`,
+    `M4_CreateAudienceWrittenVerbatim`, `M4_CreateNoActor_Denies`,
+    `M4_UpdateAuthorEditsAndPreservesAuthor`, `M4_UpdateNoOpDoesNotStampModified`,
+    `M4_UpdateReparsesMediaIds`, `M4_UpdateStrangerDenied`,
+    `M4_UpdateMissingEvent_404`, `M4_PublishAuthorOnly`,
+    `M4_PublishStrangerDenied`, `M4_PublishIdempotentNoDoubleStamp`,
+    `M4_SoftDeleteAuthorExcludesFromFeedAndDetail`,
+    `M4_SoftDeleteStrangerDenied`, `M4_RsvpLastWriteWins`,
+    `M4_RsvpDistinctResidentsCoexist`, `M4_RsvpMissingEvent_404`,
+    `M4_RsvpWritesNoAccessAuditRow`.
+- **(d) Drift pauses (frozen-seam scope boundary + one real bug caught):**
+  - **The GlobalAdmin edit override (ADR 0017) is not applied in this
+    frozen seam.** The frozen `IEventService` write lanes (U01) take
+    **only** `actorId` — no `actorRoles`, no `IDocumentSession` — so
+    `UpdateAsync` / `DeleteAsync` enforce standing via
+    `CheckEditStanding(actorId, StaticEmptyRoles, existing)` with an
+    **empty** role set: only the author branch passes; a GlobalAdmin who is
+    not the author is **denied at the Core layer** in this unit. The Web
+    boundary (U05, `EventController`) is where the same
+    `CheckEditStanding` is called again with the principal's real role set
+    to admit the GlobalAdmin override — matching the `AnnouncementService`
+    / `PageService` split where the Core service is the source of truth for
+    the **author** branch and the Web layer is where the elevated-role
+    override is evaluated for lanes whose frozen seam carries no roles.
+    This is a scope boundary in **this unit** (U04, Core only), not a
+    redefinition of ADR 0017 — the override still exists, it is just not
+    reachable through the Core seam's signature. The create lane is
+    unaffected (create = any signed-in resident, no roles consulted) and
+    the publish lane is unaffected (author-only by ADR 0037, no roles
+    consulted by design).
+  - **`UpdateEventRequest` does not carry `IsDraft`.** The draft state is
+    owned by the publish lane (ADR 0037), not by the edit lane — an editor
+    cannot flip an event draft↔live via `UpdateAsync`; only `PublishAsync`
+    (author-only) does. `UpdateAsync` deliberately does not reassign
+    `IsDraft` (nor `AuthorId` / `Created` / `IsDeleted` — the latter owned
+    by the delete lane, ADR 0024).
+  - **The `RsvpAsync` "last-write-wins" upsert required an explicit
+    `session.Store(rsvp)` on the **mutated**-row branch** — a row loaded via
+    `session.Query<EventRsvp>()` and then mutated in place is **not**
+    reliably written to the DB by `SaveChangesAsync` alone (the same
+    PostService "re-store + save" quirk, see `PostService.cs` U8b tag-attach
+    comment). The first test run of `M4_RsvpLastWriteWins` confirmed this:
+    the second `RsvpAsync` call correctly found and mutated the same in-
+    memory row (the `no.Id == going.Id` assert passed), but the `Status`
+    change did not reach Postgres (the read-back still showed the first
+    write's `Going`). Adding `session.Store(rsvp)` unconditionally on both
+    the create and mutate branches — mirroring `UpdateAsync` / `PublishAsync`
+    / `DeleteAsync`, which already `Store` their loaded-then-mutated `Event`
+    — fixed it, and the full Core suite (649 tests) is green. This is a
+    real, reproducible Marten change-tracking quirk in this codebase, not a
+    test harness artifact.
+  - **`M4_RsvpWritesNoAccessAuditRow` (the no-audit-row pin)** is satisfied
+    by enforcing the signed-in + event-presence check **directly** in
+    `RsvpAsync` (empty `actorId` → 403; missing/deleted event → 404) rather
+    than calling `IAuthorizationService.CanAsync` — the latter would write a
+    read-audit row, which ADR 0054 §3.2 forbids for an RSVP (a routine
+    resident action, not an access decision).
+  - `Milestones.cs` / README / `MilestonesTests` are **untouched** (U12's
+    close-time job, per the AGENTS.md doc↔code parity rule); the U09 23-test
+    list and the U05 `EventController` remain out of scope.
+
+**U04 exit gate met. STOP — do NOT start U05.**

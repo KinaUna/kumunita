@@ -22,6 +22,20 @@ public sealed record CreateEventRequest
     public bool IsDraft { get; init; } = true;
     public string LanguageCode { get; init; } = string.Empty;
     public IReadOnlyList<string> TagIds { get; init; } = [];
+    // RC R·3/R·7 (ADR 0025) — the content-image ids, **server-side** (the Web
+    // layer parses the body's /content-image/{id} links via
+    // ContentImageIds.ExtractContentImageIds before calling the service — Core
+    // stays body-parse-free, R·5). Written onto the Event doc with a
+    // null-coalesce to the POCO's non-null empty list (`= []`). Nullable
+    // default: a positional/initialiser that omits it ⇒ null ⇒ [].
+    public IReadOnlyList<string>? ImageIds { get; init; }
+    // ATT (ADR 0034) — the file-attachment ids, **server-side** (the Web layer
+    // parses the body's /attachment/{id} links via AttachmentIds.ExtractAttachmentIds
+    // before calling the service). Written onto the Event doc with a
+    // null-coalesce to the POCO's non-null empty list. **Separate from**
+    // ImageIds (C-ATT·5 — an event's images stay in ImageIds, its files in
+    // AttachmentIds). Nullable default: omitted ⇒ null ⇒ [].
+    public IReadOnlyList<string>? AttachmentIds { get; init; }
 }
 
 /// <summary>
@@ -45,4 +59,13 @@ public sealed record UpdateEventRequest
     public bool ReminderEnabled { get; init; } = true;
     public string LanguageCode { get; init; } = string.Empty;
     public IReadOnlyList<string> TagIds { get; init; } = [];
+    // RC R·3/R·7 (ADR 0025) — the re-parsed content-image ids from the
+    // (re-submitted) body; the re-parse is authoritative (replace-style, the
+    // Announcement edit lane's shape). Server-side; the client never sends them
+    // (a form field would be spoofable). Nullable default: omitted ⇒ null ⇒ [].
+    public IReadOnlyList<string>? ImageIds { get; init; }
+    // ATT (ADR 0034) — the re-parsed attachment ids from the (re-submitted)
+    // body (replace-style). Server-side; separate from ImageIds (C-ATT·5).
+    // Nullable default: omitted ⇒ null ⇒ [].
+    public IReadOnlyList<string>? AttachmentIds { get; init; }
 }

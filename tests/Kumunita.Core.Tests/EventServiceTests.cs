@@ -593,11 +593,510 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // U04 — the five write lanes (create / update / publish / delete / rsvp).
+    // ADR 0054 §3.4 / §3.5: standing re-checked server-side (C3 single-source),
+    // the AccessAudit row (TargetKind "event", the event.* action, Via Owner,
+    // Outcome Allow) committed atomically with the write (C3), and the RSVP
+    // lane's last-write-wins + no-audit-row pin (§3.2).
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── U04·1 — M4_CreateWritesEventAndAuditRow ─────────────────────────────
+    // CreateAsync (a plain resident) writes the event verbatim (ADR 0001-B),
+    // sets AuthorId = actor, mints a draft, and stores one AccessAudit row
+    // (event.create, TargetKind "event", Via Owner, Outcome Allow).
+
+    [Fact]
+    public async Task M4_CreateWritesEventAndAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-c1-author";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "Cleanup day",
+            Body = "Bring gloves",
+            Start = new DateTimeOffset(2026, 4, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 1, 12, 0, 0, TimeSpan.Zero),
+            Audience = null,            // public (branch 5)
+            IsDraft = true,             // ADR 0037 — a new event is a draft
+        });
+
+        Assert.False(string.IsNullOrEmpty(ev.Id));
+        Assert.Equal(author, ev.AuthorId);            // the author becomes the standing owner.
+        Assert.Equal("Cleanup day", ev.Title);
+        Assert.Equal("Bring gloves", ev.Body);
+        Assert.True(ev.IsDraft);
+        Assert.Equal("en", ev.LanguageCode);          // ADR 0018 — the instance-default floor ("" → en).
+        Assert.NotNull(ev.Created);
+
+        var rows = await EventAuditRows(store);
+        var create = Assert.Single(rows);
+        Assert.Equal("event.create", create.Action);
+        Assert.Equal("event", create.TargetKind);     // the exact string (C3 — the adapter's discriminator).
+        Assert.Equal(ev.Id, create.TargetId);
+        Assert.Equal(author, create.ActorId);
+        Assert.Equal(author, create.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Owner, create.Via);
+        Assert.Equal(AccessOutcome.Allow, create.Outcome);
+    }
+
+    // ── U04·2 — M4_CreateAudienceWrittenVerbatim (ADR 0001-B) ───────────────
+    // The composer's audience choice is written verbatim (never mutated): a
+    // user-grant event is visible to the grantee and denied to a stranger.
+
+    [Fact]
+    public async Task M4_CreateAudienceWrittenVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-c2-author";
+        const string grantee = "u-u04-c2-grantee";
+        const string stranger = "u-u04-c2-stranger";
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "Members only", Body = "b",
+            Start = new DateTimeOffset(2026, 4, 2, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 4, 2, 11, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+            IsDraft = false,                            // published so the feed/decision path runs.
+        });
+
+        // The stored row carries the audience verbatim (bit-identical to the input).
+        Assert.NotNull(ev.Audience);
+        Assert.Equal(1, ev.Audience!.Grants.Count);
+        Assert.Equal(GrantKind.User, ev.Audience.Grants[0].Kind);
+        Assert.Equal(grantee, ev.Audience.Grants[0].Id);
+
+        // The grantee sees it; the stranger is denied the detail (403).
+        await svc.GetAsync(ev.Id, grantee);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.GetAsync(ev.Id, stranger));
+    }
+
+    // ── U04·3 — M4_CreateNoActor_Denies ─────────────────────────────────────
+    // An empty actor (an anonymous caller) is denied with a 403 — the Web
+    // [Authorize] would have stopped them; this re-checks at the Core layer.
+
+    [Fact]
+    public async Task M4_CreateNoActor_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        // An empty actor is a 403 — thrown before any store access (the
+        // CheckCreateStanding denial). No event row and no audit row land.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.CreateAsync("", new CreateEventRequest { Title = "t" }));
+        var rows = await EventAuditRows(store);
+        Assert.Empty(rows);
+    }
+
+    // ── U04·4 — M4_UpdateAuthorEditsAndPreservesAuthor (ADR 0014/0016/0017) ─
+    // The author edits the event: Title/Body change, AuthorId + Created are
+    // preserved untouched, Modified is stamped (a real change), and one
+    // event.update audit row is stored.
+
+    [Fact]
+    public async Task M4_UpdateAuthorEditsAndPreservesAuthor()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-u1-author";
+        var created = new DateTimeOffset(2026, 4, 3, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "old title", Body = "old body",
+            Start = created, End = created, IsDraft = false,
+        });
+        var createdBefore = ev.Created;
+
+        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        {
+            Title = "new title", Body = "new body",
+            Start = created, End = created,
+        });
+
+        Assert.Equal("new title", updated.Title);
+        Assert.Equal("new body", updated.Body);
+        Assert.Equal(author, updated.AuthorId);            // preserved untouched.
+        Assert.Equal(createdBefore, updated.Created);      // preserved untouched.
+        Assert.NotNull(updated.Modified);                  // a real change ⇒ stamped.
+
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.update" && r.TargetId == ev.Id);
+    }
+
+    // ── U04·5 — M4_UpdateNoOpDoesNotStampModified (no-op re-save pin) ───────
+    // A no-op re-save of an unchanged event does **not** stamp Modified (the
+    // AnnouncementService.UpdateAsync shape) — the change-detection pin.
+
+    [Fact]
+    public async Task M4_UpdateNoOpDoesNotStampModified()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-u2-author";
+        var created = new DateTimeOffset(2026, 4, 4, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "unchanged", Body = "body",
+            Start = created, End = created, IsDraft = false,
+        });
+        Assert.Null(ev.Modified);   // a fresh create does not stamp Modified.
+
+        // Re-save the exact same values — a no-op.
+        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        {
+            Title = "unchanged", Body = "body",
+            Start = created, End = created,
+        });
+        Assert.Null(updated.Modified);   // no real change ⇒ the stamp stays untouched.
+    }
+
+    // ── U04·6 — M4_UpdateReparsesMediaIds (RC ADR 0025 / ATT ADR 0034) ──────
+    // The edit lane persists the server-side-parsed content-image + attachment
+    // ids (the client never sends a form field): a body referencing
+    // /content-image/{id} and /attachment/{id} yields the matching ImageIds /
+    // AttachmentIds lists on the stored row.
+
+    [Fact]
+    public async Task M4_UpdateReparsesMediaIds()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-u3-author";
+        var created = new DateTimeOffset(2026, 4, 5, 9, 0, 0, TimeSpan.Zero);
+
+        // The Web layer would parse these from the body (ContentImageIds /
+        // AttachmentIds.Extract*); here we pass the parsed ids verbatim to the
+        // request (the client never sends a *form field* — the parsed ids are
+        // the server-side truth).
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "t", Body = "see ![a](/content-image/aa11) and [f](/attachment/bb22)",
+            Start = created, End = created,
+            ImageIds = new[] { "aa11" },
+            AttachmentIds = new[] { "bb22" },
+        });
+        Assert.Equal(new[] { "aa11" }, ev.ImageIds);
+        Assert.Equal(new[] { "bb22" }, ev.AttachmentIds);
+
+        // Edit to new media refs (replace-style — the re-parse is authoritative).
+        var updated = await svc.UpdateAsync(ev.Id, author, new UpdateEventRequest
+        {
+            Title = "t", Body = "![b](/content-image/cc33) and [g](/attachment/dd44)",
+            Start = created, End = created,
+            ImageIds = new[] { "cc33" },
+            AttachmentIds = new[] { "dd44" },
+        });
+        Assert.Equal(new[] { "cc33" }, updated.ImageIds);
+        Assert.Equal(new[] { "dd44" }, updated.AttachmentIds);
+    }
+
+    // ── U04·7 — M4_UpdateStrangerDenied (C3 standing, server-side) ──────────
+    // A non-author, non-GlobalAdmin resident editing an event is denied with a
+    // 403 (the author branch of the standing matrix — the C3 single-source pin;
+    // the Web [Authorize] is not the source of truth).
+
+    [Fact]
+    public async Task M4_UpdateStrangerDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-u4-author";
+        const string stranger = "u-u04-u4-stranger";
+        var created = new DateTimeOffset(2026, 4, 6, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned", Body = "b", Start = created, End = created, IsDraft = false,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.UpdateAsync(ev.Id, stranger, new UpdateEventRequest { Title = "hijack", Start = created, End = created }));
+    }
+
+    // ── U04·8 — M4_UpdateMissingEvent_404 ───────────────────────────────────
+    // A missing event id is a 404 (KeyNotFoundException), not a 403 — the
+    // non-leaky pin, the AnnouncementService edit-lane shape.
+
+    [Fact]
+    public async Task M4_UpdateMissingEvent_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.UpdateAsync("no-such-event", "u-u04-u5", new UpdateEventRequest { Title = "t" }));
+    }
+
+    // ── U04·9 — M4_PublishAuthorOnly (ADR 0037) ─────────────────────────────
+    // Publishing flips IsDraft → false so the event enters the feed, is
+    // readable via the normal decision path, and stores one event.publish
+    // audit row. The author-only pin is enforced (the ADR 0037 shape).
+
+    [Fact]
+    public async Task M4_PublishAuthorOnly()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-p1-author";
+        const string resident = "u-u04-p1-resident";
+        var created = new DateTimeOffset(2026, 4, 7, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "draft", Body = "b", Start = created, End = created,
+            IsDraft = true, Audience = null,
+        });
+
+        // A draft is excluded from the feed and invisible to a non-author.
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+
+        var published = await svc.PublishAsync(ev.Id, author);
+        Assert.False(published.IsDraft);
+
+        // Now the feed shows it and a public reader can open it.
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident);
+
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.publish" && r.TargetId == ev.Id);
+    }
+
+    // ── U04·10 — M4_PublishStrangerDenied (ADR 0037 author-only) ────────────
+    // A non-author publishing is denied with a 403 — even at GlobalAdmin
+    // (ADR 0037's author-only pin: publishing is the author's choice, not an
+    // admin's lever). Here the stranger is a plain resident.
+
+    [Fact]
+    public async Task M4_PublishStrangerDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-p2-author";
+        const string stranger = "u-u04-p2-stranger";
+        var created = new DateTimeOffset(2026, 4, 8, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "draft", Body = "b", Start = created, End = created, IsDraft = true,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.PublishAsync(ev.Id, stranger));
+        // The event is still a draft.
+        var still = await svc.GetAsync(ev.Id, author);
+        Assert.True(still.IsDraft);
+    }
+
+    // ── U04·11 — M4_PublishIdempotentNoDoubleStamp (no-op-re-save pin) ──────
+    // A second publish on an already-live event is a no-op — it does not
+    // re-stamp Modified.
+
+    [Fact]
+    public async Task M4_PublishIdempotentNoDoubleStamp()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-p3-author";
+        var created = new DateTimeOffset(2026, 4, 9, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "d", Body = "b", Start = created, End = created, IsDraft = true,
+        });
+        var first = await svc.PublishAsync(ev.Id, author);
+        var modifiedAfterFirst = first.Modified;
+        Assert.NotNull(modifiedAfterFirst);
+
+        var second = await svc.PublishAsync(ev.Id, author);
+        Assert.False(second.IsDraft);
+        Assert.Equal(modifiedAfterFirst, second.Modified);   // no re-stamp on the no-op.
+    }
+
+    // ── U04·12 — M4_SoftDeleteAuthorExcludesFromFeedAndDetail (ADR 0024) ────
+    // Soft-delete (the author lane) sets IsDeleted; the event leaves the feed
+    // and the detail is a 404 (the non-leaky pin — same as a missing id). One
+    // event.delete audit row is stored.
+
+    [Fact]
+    public async Task M4_SoftDeleteAuthorExcludesFromFeedAndDetail()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-d1-author";
+        const string resident = "u-u04-d1-resident";
+        var created = new DateTimeOffset(2026, 4, 10, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "live", Body = "b", Start = created, End = created,
+            IsDraft = false, Audience = null,
+        });
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await svc.GetAsync(ev.Id, resident);
+
+        await svc.DeleteAsync(ev.Id, author);
+
+        // Gone from the feed; the detail is a 404 (non-leaky pin).
+        Assert.DoesNotContain(ev.Id, (await svc.ListUpcomingAsync(null, resident, 1)).Select(e => e.Id));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => svc.GetAsync(ev.Id, resident));
+
+        var rows = await EventAuditRows(store);
+        Assert.Contains(rows, r => r.Action == "event.delete" && r.TargetId == ev.Id);
+    }
+
+    // ── U04·13 — M4_SoftDeleteStrangerDenied ────────────────────────────────
+    // A non-author, non-GlobalAdmin resident deleting an event is denied with
+    // a 403 (the author branch of the standing matrix, the C3 pin).
+
+    [Fact]
+    public async Task M4_SoftDeleteStrangerDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-d2-author";
+        const string stranger = "u-u04-d2-stranger";
+        var created = new DateTimeOffset(2026, 4, 11, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "owned", Body = "b", Start = created, End = created, IsDraft = false,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.DeleteAsync(ev.Id, stranger));
+        // The event is still live (not deleted).
+        Assert.Contains(ev.Id, (await svc.ListUpcomingAsync(null, author, 1)).Select(e => e.Id));
+    }
+
+    // ── U04·14 — M4_RsvpLastWriteWins (ADR 0054 §3.2) ───────────────────────
+    // RSVP is last-write-wins, keyed per (EventId, UserId): the same resident
+    // RSVPing twice collapses to a single row carrying their latest status,
+    // with the At stamp updated.
+
+    [Fact]
+    public async Task M4_RsvpLastWriteWins()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-r1-author";
+        const string rsvp1 = "u-u04-r1-user";
+        var created = new DateTimeOffset(2026, 4, 12, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
+        });
+
+        var going = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
+        Assert.Equal(RsvpStatus.Going, going.Status);
+
+        var no = await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.No);
+        Assert.Equal(RsvpStatus.No, no.Status);          // last write wins.
+        Assert.True(no.At >= going.At);                  // the At stamp advanced (or held).
+        Assert.Equal(going.Id, no.Id);                   // the same row (the unique business key).
+
+        // Exactly one RSVP row for this resident on this event.
+        var all = await svc.GetRsvpsAsync(ev.Id);
+        Assert.Single(all.Where(r => r.UserId == rsvp1));
+        Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == rsvp1).Status);
+    }
+
+    // ── U04·15 — M4_RsvpDistinctResidentsCoexist ────────────────────────────
+    // Two different residents each hold one row (the (EventId, UserId) unique
+    // key is per-resident, not per-event) — the last-write-wins lane is keyed
+    // per user.
+
+    [Fact]
+    public async Task M4_RsvpDistinctResidentsCoexist()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-r2-author";
+        const string u1 = "u-u04-r2-u1";
+        const string u2 = "u-u04-r2-u2";
+        var created = new DateTimeOffset(2026, 4, 13, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
+        });
+
+        await svc.RsvpAsync(ev.Id, u1, RsvpStatus.Going);
+        await svc.RsvpAsync(ev.Id, u2, RsvpStatus.Maybe);
+
+        var all = await svc.GetRsvpsAsync(ev.Id);
+        Assert.Equal(2, all.Count);
+        Assert.Contains(all, r => r.UserId == u1 && r.Status == RsvpStatus.Going);
+        Assert.Contains(all, r => r.UserId == u2 && r.Status == RsvpStatus.Maybe);
+    }
+
+    // ── U04·16 — M4_RsvpMissingEvent_404 ────────────────────────────────────
+    // RSVP to a missing event is a 404 (KeyNotFoundException) — the non-leaky
+    // pin, the GetRsvpsAsync shape.
+
+    [Fact]
+    public async Task M4_RsvpMissingEvent_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.RsvpAsync("no-such-event", "u-u04-r3", RsvpStatus.Going));
+    }
+
+    // ── U04·17 — M4_RsvpWritesNoAccessAuditRow (ADR 0054 §3.2) ──────────────
+    // An RSVP stores **no** AccessAudit row (a routine resident action, not an
+    // access decision — the same posture as a profile edit). Zero event.*
+    // audit rows are created by the RSVP lane.
+
+    [Fact]
+    public async Task M4_RsvpWritesNoAccessAuditRow()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u04-r4-author";
+        const string rsvp1 = "u-u04-r4-user";
+        var created = new DateTimeOffset(2026, 4, 14, 9, 0, 0, TimeSpan.Zero);
+
+        var ev = await svc.CreateAsync(author, new CreateEventRequest
+        {
+            Title = "BBQ", Body = "b", Start = created, End = created, IsDraft = false, Audience = null,
+        });
+        // The create lane wrote exactly one row (event.create).
+        var before = await EventAuditRows(store);
+        Assert.Equal(1, before.Count);
+        Assert.Equal("event.create", before.Single().Action);
+
+        // The RSVP lane must add **no** audit row.
+        await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
+
+        var after = await EventAuditRows(store);
+        Assert.Equal(1, after.Count);                          // still exactly one (the create).
+        Assert.DoesNotContain(after, r => r.Action == "event.rsvp");   // no such action exists.
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // Test plumbing (mirrors PostServiceTests).
     // ════════════════════════════════════════════════════════════════════════
 
     private static void await_ThrowsUnauthorized(Action action)
         => Assert.Throws<UnauthorizedAccessException>(action);
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database (the fresh-postgres-per-test isolation means "all event rows"
+    /// is unambiguous — <c>TargetKind == "event"</c>).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> EventAuditRows(IDocumentStore store)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "event")
+            .ToListAsync(ct);
+    }
 
     private async Task<IDocumentStore> BootStoreAsync()
     {

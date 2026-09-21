@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -278,25 +279,438 @@ public sealed class EventService : IEventService
             "Only the author or a GlobalAdmin may edit an event.");
     }
 
-    // --- Write lanes (U04) — standing re-checked server-side (§3.4, C3) --------
+    // ─── Write lanes (U04) — standing re-checked server-side (§3.4, C3) ───
+    //
+    // **Seam constraint (frozen, U01):** the <see cref="IEventService"/> write
+    // lanes carry only <c>actorId</c> — **no** <c>actorRoles</c> and **no**
+    // caller <c>IDocumentSession</c> (unlike the <see cref="Posts.PostService"/> /
+    // <see cref="Announcements.AnnouncementService"/> / <see cref="Pages.PageService"/>
+    // precedent, which take a role set + in-flight session). Two consequences:
+    //   1. Each lane opens its **own** write session (the
+    //      <see cref="AuthorizationService.CanAsync"/> standalone C3 shape) and
+    //      stores the domain write + the <see cref="AccessAudit"/> row in that
+    //      one session, committing atomically (invariant C3 — the write and the
+    //      audit row commit or roll back together, never un-audited).
+    //   2. Standing is enforced with the actor-id-expressible branch, via the
+    //      **same** pure helper the U03 read/standing tests pin
+    //      (<see cref="CheckCreateStanding"/> / <see cref="CheckEditStanding"/>)
+    //      — the C3 single-source pin (no second copy of the matrix). The
+    //      **GlobalAdmin-override** branch of the edit/delete standing (ADR 0017)
+    //      is *not* expressible in this frozen seam (it needs the actor's role
+    //      set, which the lanes do not receive): it is applied at the Web
+    //      boundary (U05) by calling the same <see cref="CheckEditStanding"/>
+    //      with the principal's roles. This unit therefore pins the **author**
+    //      (Owner) branch server-side and defers the **Admin** override to the
+    //      Web layer — recorded as a frozen-seam scope boundary, not a silent
+    //      gap.
+    //
+    // **Audit-row shape** (C3, §3.4): <c>TargetKind = "event"</c> (the exact
+    // string — the <see cref="EventToAuditableResource"/> discriminator),
+    // <c>Action</c> = <c>event.create</c> / <c>event.update</c> /
+    // <c>event.publish</c> / <c>event.delete</c>, <c>Via</c> =
+    // <see cref="AccessVia.Owner"/> (every lane's standing here is the author's
+    // own), <c>Outcome</c> = <see cref="AccessOutcome.Allow"/>. **No**
+    // <c>event.rsvp</c> action: <see cref="RsvpAsync"/> stores **no** audit row
+    // (a routine resident action, not an access decision — the
+    // <see cref="M4_RsvpWritesNoAccessAuditRow"/> pin).
+    //
+    // **Media ids** (RC R·3/R·7 ADR 0025 + ATT ADR 0034): <see cref="Event.ImageIds"/>
+    // / <see cref="Event.AttachmentIds"/> are written server-side — the Web
+    // layer parses the body's <c>/content-image/{id}</c> / <c>/attachment/{id}</c>
+    // links (the <c>ContentImageIds.ExtractContentImageIds</c> /
+    // <c>AttachmentIds.ExtractAttachmentIds</c> idiom) and passes the ids in the
+    // request (the client never sends a *form field* — a form field would be
+    // spoofable); Core null-coalesces <c>null</c> → the POCO's non-null empty
+    // list (<c>?? []</c>, the <see cref="Announcements.AnnouncementService"/>
+    // edit-lane shape). The <c>ImageIds</c> / <c>AttachmentIds</c> fields were
+    // added to <see cref="CreateEventRequest"/> / <see cref="UpdateEventRequest"/>
+    // in this unit (the <see cref="Posts.PostDraft"/> / <see cref="Announcement"/>
+    // precedent) — see the U04 handoff note.
 
-    /// <inheritdoc cref="IEventService.CreateAsync"/> — **U04** implements.
-    public Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default)
-        => throw new NotImplementedException("M4 U01 skeleton — the create lane (U04) has not landed yet.");
+    /// <inheritdoc cref="IEventService.CreateAsync"/>
+    /// <summary>
+    /// Create an event (ADR 0054 §3.4 / §3.5): the author's choices are written
+    /// **verbatim** (ADR 0001-B — <see cref="Event.Audience"/> is copied as-is,
+    /// never mutated), the <c>IsDraft</c> flag is the ADR 0037 pin (a new event
+    /// is a draft), and the author becomes the standing owner
+    /// (<see cref="Event.AuthorId"/> = <paramref name="actorId"/>). Standing
+    /// (server-side, C3): **any signed-in resident** — the
+    /// <see cref="CheckCreateStanding"/> helper (the actorId-expressible branch;
+    /// a null/empty actor is a 403). One <see cref="AccessAudit"/> row
+    /// (<c>event.create</c>, <c>TargetKind = "event"</c>, <c>Via Owner</c>) is
+    /// stored in the same session (C3) and commits atomically with the write.
+    /// </summary>
+    public async Task<Event> CreateAsync(string actorId, CreateEventRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to create an event.");
 
-    /// <inheritdoc cref="IEventService.UpdateAsync"/> — **U04** implements.
-    public Task<Event> UpdateAsync(string eventId, string actorId, UpdateEventRequest request, CancellationToken ct = default)
-        => throw new NotImplementedException("M4 U01 skeleton — the edit lane (U04) has not landed yet.");
+        var now = DateTimeOffset.UtcNow;
+        var @event = new Event
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = request.Title,
+            Body = request.Body,
+            ComponentId = request.ComponentId,
+            AuthorId = actorId,                       // ADR 0054 §3.4 — the author becomes the standing owner.
+            Start = request.Start,
+            End = request.End,
+            Location = request.Location,
+            Capacity = request.Capacity,
+            Audience = request.Audience,              // ADR 0001-B — written verbatim; never mutated here.
+            ReminderEnabled = request.ReminderEnabled,
+            IsDraft = request.IsDraft,                // ADR 0037 — a newly created event is a draft by default.
+            LanguageCode = request.LanguageCode,      // ADR 0018 — materialized below (instance default floor).
+            TagIds = request.TagIds ?? [],            // ADR 0044 — null-coalesce to the POCO's non-null empty list.
+            ImageIds = request.ImageIds ?? [],        // RC ADR 0025 — server-side; the client never sends a form field.
+            AttachmentIds = request.AttachmentIds ?? [], // ATT ADR 0034 — server-side; separate from ImageIds.
+            Created = now
+        };
 
-    /// <inheritdoc cref="IEventService.PublishAsync"/> — **U04** implements.
-    public Task<Event> PublishAsync(string eventId, string actorId, CancellationToken ct = default)
-        => throw new NotImplementedException("M4 U01 skeleton — the publish lane (U04) has not landed yet.");
+        // ADR 0018 — a null/empty authored code is materialized from the
+        // instance default (the <see cref="LocaleSettings.DefaultLanguageCode"/>
+        // singleton, loaded in the write session) with <c>en</c> the floor, so
+        // no stored row is left empty (the <see cref="Announcements.AnnouncementService"/>
+        // ResolveLanguageCodeAsync shape).
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        @event.LanguageCode = await ResolveLanguageCodeAsync(@event.LanguageCode, session, ct).ConfigureAwait(false);
 
-    /// <inheritdoc cref="IEventService.DeleteAsync"/> — **U04** implements.
-    public Task DeleteAsync(string eventId, string actorId, CancellationToken ct = default)
-        => throw new NotImplementedException("M4 U01 skeleton — the soft-delete lane (U04) has not landed yet.");
+        // Standing re-check (server-side, C3 single-source — the Web [Authorize]
+        // is a convenience pre-gate only): any signed-in resident may create.
+        // The helper throws before anything is stored.
+        CheckCreateStanding(actorId, StaticEmptyRoles, @event);
 
-    /// <inheritdoc cref="IEventService.RsvpAsync"/> — **U04** implements.
-    public Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default)
-        => throw new NotImplementedException("M4 U01 skeleton — the RSVP lane (U04) has not landed yet.");
+        session.Store(@event);
+        StoreAuditRow(session, actorId, "event.create", @event.Id, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return @event;
+    }
+
+    /// <inheritdoc cref="IEventService.UpdateAsync"/>
+    /// <summary>
+    /// Edit an event (ADR 0054 §3.4, the ADR 0014 / 0016 / 0017 precedent): the
+    /// author's choices are written verbatim (ADR 0001-B), <see
+    /// cref="Event.AuthorId"/> / <see cref="Event.Created"/> are preserved
+    /// untouched, and <see cref="Event.Modified"/> is stamped **only on a real
+    /// change** (a no-op re-save does not bump the stamp — the
+    /// <see cref="Announcements.AnnouncementService.UpdateAsync"/> shape).
+    /// Standing (server-side, C3): the **author** (the <see
+    /// cref="CheckEditStanding"/> helper's Owner branch) — the **GlobalAdmin
+    /// override** (ADR 0017) is applied at the Web boundary (U05), not in this
+    /// frozen seam (it needs the actor's role set, which the lane does not
+    /// receive — the frozen-seam scope boundary, see the U04 handoff note). A
+    /// missing id is <see cref="KeyNotFoundException"/> (404); a non-author is
+    /// <see cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>event.update</c>, <c>TargetKind =
+    /// "event"</c>, <c>Via Owner</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task<Event> UpdateAsync(string eventId, string actorId, UpdateEventRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to edit an event.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to edit.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** event (loaded first, so its AuthorId is available — the
+        // AnnouncementService edit-gate shape): the author (Owner branch). The
+        // GlobalAdmin override is the Web layer's (U05) — see the unit note.
+        CheckEditStanding(actorId, StaticEmptyRoles, existing);
+
+        // ADR 0018 — resolve the authored-in tag on **both** sides before
+        // comparing (the AnnouncementService.UpdateAsync shape): a no-op
+        // re-save that leaves the picker at the instance default must compare
+        // as "unchanged" (resolving "" → the default on the stored side and the
+        // default → the default on the updated side makes them equal), so it
+        // does not falsely stamp Modified.
+        var existingLanguageCode = await ResolveLanguageCodeAsync(existing.LanguageCode, session, ct).ConfigureAwait(false);
+        var updatedLanguageCode = await ResolveLanguageCodeAsync(request.LanguageCode, session, ct).ConfigureAwait(false);
+
+        // A "real change" is any of the editable fields differing from the
+        // stored row (the AnnouncementService.UpdateAsync `changed` shape — a
+        // no-op re-save leaves the stamp untouched).
+        var changed = existing.Title != request.Title
+            || existing.Body != request.Body
+            || !string.Equals(existing.ComponentId, request.ComponentId, StringComparison.Ordinal)
+            || existing.Start != request.Start
+            || existing.End != request.End
+            || !string.Equals(existing.Location, request.Location, StringComparison.Ordinal)
+            || existing.Capacity != request.Capacity
+            || !AudiencesEqual(existing.Audience, request.Audience)
+            || existing.ReminderEnabled != request.ReminderEnabled
+            || existingLanguageCode != updatedLanguageCode
+            || !ListsEqual(existing.TagIds, request.TagIds ?? [])
+            || !ListsEqual(existing.ImageIds, request.ImageIds ?? [])
+            || !ListsEqual(existing.AttachmentIds, request.AttachmentIds ?? []);
+
+        // Apply the author's choices verbatim (ADR 0001-B). AuthorId / Created /
+        // IsDraft / IsDeleted are **deliberately not** reassigned here — the
+        // author of record is whoever created it, the draft/delete state is
+        // owned by the publish (ADR 0037) / delete (ADR 0024) lanes.
+        existing.Title = request.Title;
+        existing.Body = request.Body;
+        existing.ComponentId = request.ComponentId;
+        existing.Start = request.Start;
+        existing.End = request.End;
+        existing.Location = request.Location;
+        existing.Capacity = request.Capacity;
+        existing.Audience = request.Audience;           // ADR 0001-B — written verbatim; never mutated.
+        existing.ReminderEnabled = request.ReminderEnabled;
+        existing.LanguageCode = updatedLanguageCode;    // ADR 0018
+        existing.TagIds = request.TagIds ?? [];         // ADR 0044 — null-coalesce to the POCO's non-null empty list.
+        existing.ImageIds = request.ImageIds ?? [];     // RC ADR 0025 — server-side; the re-parse (replace-style) is authoritative.
+        existing.AttachmentIds = request.AttachmentIds ?? []; // ATT ADR 0034 — server-side; separate from ImageIds.
+        if (changed)
+            existing.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(existing);
+        StoreAuditRow(session, actorId, "event.update", existing.Id, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <inheritdoc cref="IEventService.PublishAsync"/>
+    /// <summary>
+    /// Publish a draft event (ADR 0037 pin): flips <see cref="Event.IsDraft"/>
+    /// to <c>false</c> so the event becomes visible under its
+    /// <see cref="Event.Audience"/> split. **Author-only** — the sole decision
+    /// is <c>existing.AuthorId == actorId</c> (ordinal); a non-author is denied
+    /// (<see cref="UnauthorizedAccessException"/>, the Web 403) **even at
+    /// GlobalAdmin** (ADR 0037's author-only pin: publishing is the author's
+    /// choice, not an admin's lever — contrast ADR 0017's edit lane). A missing
+    /// id is <see cref="KeyNotFoundException"/> (404). **Idempotent**: a second
+    /// publish on an already-live event is a no-op — it does not stamp
+    /// <see cref="Event.Modified"/> when <c>IsDraft</c> was already <c>false</c>.
+    /// One <see cref="AccessAudit"/> row (<c>event.publish</c>,
+    /// <c>TargetKind = "event"</c>, <c>Via Owner</c>) commits atomically
+    /// (C3).
+    /// </summary>
+    public async Task<Event> PublishAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to publish an event.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to publish.");
+
+        // ADR 0037 — author-only (GlobalAdmin explicitly denied). A pure
+        // ordinal check; the Web layer maps the exception to a 403.
+        if (!string.Equals(existing.AuthorId, actorId, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Only the author may publish this event.");
+
+        // Idempotent (the no-op-re-save pin): a second publish does not stamp
+        // Modified when the event is already live.
+        if (existing.IsDraft)
+        {
+            existing.IsDraft = false;
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        StoreAuditRow(session, actorId, "event.publish", existing.Id, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return existing;
+    }
+
+    /// <inheritdoc cref="IEventService.DeleteAsync"/>
+    /// <summary>
+    /// **Soft-delete** an event (ADR 0024, the author-lane shape): sets
+    /// <see cref="Event.IsDeleted"/> to <c>true</c>; the record is kept (never
+    /// hard-deleted) and the read lanes (<see cref="ListUpcomingAsync"/> /
+    /// <see cref="GetAsync"/>) filter it out (U03's non-leaky pin — a deleted
+    /// event is a 404, not a 403). Standing (server-side, C3): the **author**
+    /// (the <see cref="CheckEditStanding"/> helper's Owner branch) — the
+    /// **GlobalAdmin override** (ADR 0017) is applied at the Web boundary
+    /// (U05), not in this frozen seam (the frozen-seam scope boundary, see the
+    /// unit note). A missing id is <see cref="KeyNotFoundException"/> (404); a
+    /// non-author is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <see cref="AccessAudit"/> row (<c>event.delete</c>, <c>TargetKind =
+    /// "event"</c>, <c>Via Owner</c>) commits atomically (C3). **Idempotent**:
+    /// deleting an already-deleted event is a no-op (it does not re-stamp
+    /// <see cref="Event.Modified"/>).
+    /// </summary>
+    public async Task DeleteAsync(string eventId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete an event.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (existing is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source): the author (Owner
+        // branch). The GlobalAdmin override is the Web layer's (U05).
+        CheckEditStanding(actorId, StaticEmptyRoles, existing);
+
+        if (!existing.IsDeleted)
+        {
+            existing.IsDeleted = true;                 // ADR 0024 — the soft-delete flag (read lanes filter it).
+            existing.Modified = DateTimeOffset.UtcNow;
+        }
+
+        session.Store(existing);
+        StoreAuditRow(session, actorId, "event.delete", existing.Id, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IEventService.RsvpAsync"/>
+    /// <summary>
+    /// RSVP to an event (ADR 0054 §3.2) — the **last-write-wins** concurrency
+    /// exception, keyed per <c>(EventId, UserId)</c>: upserts the actor's single
+    /// RSVP row with the latest <see cref="RsvpStatus"/>. A resident's latest
+    /// status is simply the truth; a conflicting write is a no-op or
+    /// self-converging (the <see cref="M4DocTypes"/> unique
+    /// <c>(EventId, UserId)</c> index is the DB-enforced business key).
+    /// <para>
+    /// Standing (server-side, C3): **any signed-in resident** who may RSVP —
+    /// a null/empty actor is a <see cref="UnauthorizedAccessException"/> (403).
+    /// The event must be present and **not deleted** (a missing/deleted id is a
+    /// <see cref="KeyNotFoundException"/> — the non-leaky pin, the
+    /// <see cref="GetRsvpsAsync"/> shape). **No <see cref="AccessAudit"/> row**
+    /// is stored (the RSVP is a routine resident action, not an access decision
+    /// — the same posture as a profile edit; the <see
+    /// cref="M4_RsvpWritesNoAccessAuditRow"/> pin). This lane therefore does
+    /// **not** route the standing through <see cref="IAuthorizationService"/>
+    /// (a <c>CanAsync</c> read-decision would append a read-audit row, violating
+    /// the pin) — it enforces signed-in + presence directly.
+    /// </para>
+    /// </summary>
+    public async Task<EventRsvp> RsvpAsync(string eventId, string actorId, RsvpStatus status, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId)) throw new KeyNotFoundException("An event id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to RSVP.");
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null || @event.IsDeleted)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to RSVP to.");
+
+        // Last-write-wins upsert (the (EventId, UserId) unique-index business
+        // key): load the actor's existing row; mutate Status/At, else create.
+        // One SaveChangesAsync (C3). No audit row (the pin above).
+        var rsvp = await session.Query<EventRsvp>()
+            .Where(r => r.EventId == eventId && r.UserId == actorId)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        var now = DateTimeOffset.UtcNow;
+        if (rsvp is null)
+        {
+            rsvp = new EventRsvp
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = eventId,
+                UserId = actorId,
+                Status = status,
+                At = now
+            };
+        }
+        else
+        {
+            rsvp.Status = status;
+            rsvp.At = now;
+        }
+        // Re-Store on both branches: a row loaded (or created) and then mutated
+        // is not reliably carried to the DB by SaveChangesAsync alone — the
+        // PostService "re-store + save" quirk. Storing the freshly-created row
+        // here too keeps the idiom uniform.
+        session.Store(rsvp);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return rsvp;
+    }
+
+    // ─── U04 private helpers ───────────────────────────────────────────────
+
+    /// <summary>
+    /// A non-null, empty role set for the standing helpers'
+    /// <c>actorRoles</c> parameter on the lanes that do not exercise the
+    /// GlobalAdmin override (create / author-branch edit / author-branch
+    /// delete). The frozen <see cref="IEventService"/> write lanes carry no role
+    /// set (the frozen-seam scope boundary, see the unit note), so the
+    /// author-only branch is what the server enforces; the Web layer (U05)
+    /// calls the same <see cref="CheckEditStanding"/> with the principal's
+    /// roles to admit the GlobalAdmin override.
+    /// </summary>
+    private static readonly IReadOnlySet<string> StaticEmptyRoles = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Appends the single <see cref="AccessAudit"/> row for a write lane
+    /// (invariant C3): <c>TargetKind = "event"</c> (the exact string — the
+    /// <see cref="EventToAuditableResource"/> discriminator), the given
+    /// <c>Action</c>, <c>Via</c>, <c>Outcome = Allow</c>, single-target
+    /// (<c>TargetId</c> set; counts null). Stored in the caller's write
+    /// session (it commits atomically with the domain write — C3).
+    /// </summary>
+    private static void StoreAuditRow(IDocumentSession session, string actorId, string action, string targetId, AccessVia via)
+    {
+        session.Store(new AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,   // the author acts as themself (no delegation in these lanes).
+            Action = action,
+            TargetKind = "event",             // the exact string (C3 — the adapter's discriminator).
+            TargetId = targetId,
+            Via = via,
+            Outcome = AccessOutcome.Allow
+        });
+    }
+
+    /// <summary>
+    /// ADR 0018 — resolves the authored-in <see cref="Event.LanguageCode"/>:
+    /// a non-empty authored code is used verbatim (BCP-47 tag); a null/empty
+    /// code is materialized from the instance default (<see
+    /// cref="LocaleSettings.DefaultLanguageCode"/>, loaded in the write
+    /// session) with <c>en</c> the floor. The result is always a concrete BCP-47
+    /// code — no stored row is left empty (the
+    /// <see cref="Announcements.AnnouncementService"/> ResolveLanguageCodeAsync
+    /// shape).
+    /// </summary>
+    private async Task<string> ResolveLanguageCodeAsync(string? languageCode, IDocumentSession session, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(languageCode))
+            return languageCode;
+
+        var settings = await session.LoadAsync<LocaleSettings>(LocaleSettings.SingletonId, ct).ConfigureAwait(false);
+        if (settings is not null && !string.IsNullOrWhiteSpace(settings.DefaultLanguageCode))
+            return settings.DefaultLanguageCode;
+
+        return "en";
+    }
+
+    /// <summary>
+    /// Structural equality for the <see cref="Event.Audience"/> on the change
+    /// detection (the <see cref="Audience"/> is a mutable class, not a value
+    /// type): two audiences are equal iff both are <c>null</c>, or both are
+    /// non-null and their <c>Mode</c> / <c>Community</c> / <c>AllResidents</c>
+    /// and their <c>Grants</c> (order-insensitive, by <see
+    /// cref="AudienceGrant"/>'s value equality) are equal.
+    /// </summary>
+    private static bool AudiencesEqual(Audience? a, Audience? b)
+    {
+        if (a is null || b is null)
+            return a is null && b is null;
+
+        if (a.Mode != b.Mode || a.Community != b.Community || a.AllResidents != b.AllResidents)
+            return false;
+
+        var aGrants = new HashSet<AudienceGrant>(a.Grants);
+        var bGrants = new HashSet<AudienceGrant>(b.Grants);
+        return aGrants.SetEquals(bGrants);
+    }
+
+    /// <summary>Order-insensitive equality for two <see cref="IReadOnlyList{T}"/>
+    /// of value-equality elements (the change-detection comparison for the
+    /// <c>TagIds</c> / <c>ImageIds</c> / <c>AttachmentIds</c> lists).</summary>
+    private static bool ListsEqual(IReadOnlyList<string> a, IReadOnlyList<string> b)
+        => new HashSet<string>(a, StringComparer.Ordinal).SetEquals(b);
 }
