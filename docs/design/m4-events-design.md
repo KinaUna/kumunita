@@ -420,3 +420,105 @@ surfaces — the two docs are new, the surface is additive (ADR 0004 §B.1).
 - **Not a second mechanism, anywhere.** One audience, one decision path, one
   renderer, one editor, one email trio, one timezone/format resolver — the
   milestone *reuses* instead of *duplicating*.
+
+---
+
+## 6. Run result (M4 acceptance gate — 2026-09-21)  **[U11 — the record close; the full close is U12]**
+
+This is the **record** close (U11's unit — run the gate, record the result,
+author the e2e spec, record the gap). The **close** (the `ARCHITECTURE.md`
+`Events/` flip, the README Roadmap, `Milestones.cs`, `MilestonesTests.cs`)
+is **U12** — out of scope for this record.
+
+**Runner (AGENTS.md test-runner quirk, this machine):** the reliable path is
+build then in-process execution — **not** `dotnet test` / VS Test Explorer
+(xunit.v3 discovery goes wrong: "No tests found / exit code 5" is a **runner**
+bug, not a failure):
+
+```
+dotnet build Kumunita.slnx -c Debug
+dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+```
+
+**The runs (verified, not assumed).**
+
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Error(s)**
+  (127 pre-existing warnings: `xUnit1051` in the M4 test files, `CS8601` in
+  `EventController.cs` — unchanged from U09/U10).
+- `dotnet exec …Kumunita.Core.Tests.dll` → **Total: 668, Errors: 0, Failed:
+  0, Skipped: 0, Not Run: 0, Time: 59.181s**. The **23 M4 seam tests
+  (T01–T23, §3.7) pass *together*** with the inherited M1/M2/M3/M3b/PG anchors
+  in the **same** run — the §3.8 part-vs-whole pin holds.
+- `dotnet exec …Kumunita.Web.Tests.dll` → **Total: 351, Errors: 0, Failed:
+  1, Skipped: 0, Not Run: 0, Time: 9.699s**. The **`EventControllerTests`
+  family (19 tests, U10) is fully green**; the single red is the *pre-existing*
+  kw-l registry drift (see *Drift status* below), **not** the M4 controller
+  family.
+
+Record (shape mirrored from M3 § `Run result`; M4's *handoff* lane is the
+grant-scoped audience re-scope, the §3.8 row 2 pin):
+
+| # | Gate test (§3.8) | Evidence (actual test names — all passed) |
+|---|------|-------------------------------------------|
+| 1 | **closed loop** — an author creates a published event → it appears in the feed (`TargetKind = "event"` aggregate row, `VisibleCount ≥ 1`, `Outcome = Allow`); the author RSVPs `Going` → their RSVP is visible in the owner-only list | `EventServiceTests.M4_PlainMemberCreateAllowed` (T06, C3 — the create lane writes the `event.create` audit row), `EventServiceTests.M4_MemberSeesUpcomingEventFeed` (T01, C6 — the feed's `CanSeeAsync(Read)` lets the audience member see the event; the closed-loop `VisibleCount ≥ 1` is the observable), `EventServiceTests.M4_RsvpLastWriteWins` (T13, §3.2 — the `RsvpAsync` last-write-wins exception), `EventServiceTests.M4_RsvpListOwnerOnly` (T15, §3.2 — the owner-only RSVP-list read; the author sees their own event's RSVPs). |
+| 2 | **handoff** — a user added to the event's `Audience.Grants` **after** creation sees the event on the **next** request (strong consistency, no cache); the `Delegation` branch is the handoff-onto-a-delegate case | `EventServiceTests.M4_GrantsAudienceOnlyGranteeSees` (T04, C6 — the grant-scoped audience: only the grantee sees the event; the *next* `ListUpcomingAsync` call sees the live grant row — the strong-consistency lane), `EventServiceTests.M4_CommunityAudienceSeesFeed` (T03, ADR 0036 — the community-visible branch the handoff lane re-scopes over). |
+| 3 | **part-vs-whole** — the 23 names in §3.7 are the **whole**; tests 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited M1/M2/M3/M3b/PG anchors (no per-name isolation) | U09's 23 pinned `[Fact]`s in `tests/Kumunita.Core.Tests/EventServiceTests.cs` (T01 `M4_MemberSeesUpcomingEventFeed` · T02 `M4_NullAudienceEventIsPublic` · T03 `M4_CommunityAudienceSeesFeed` · T04 `M4_GrantsAudienceOnlyGranteeSees` · T05 `M4_DraftInvisibleToNonAuthor` · T06 `M4_PlainMemberCreateAllowed` · T07 `M4_AuthorCanEditOwnEvent` · T08 `M4_PlainMemberEditDenied` · T09 `M4_GlobalAdminOverrideEdit` · T10 `M4_PublishAuthorOnly` · T11 `M4_SoftDeleteExcludesFromFeedAndDetail` · T12 `M4_AuthorSoftDeleteOwnEvent` · T13 `M4_RsvpLastWriteWins` · T14 `M4_RsvpUniqueIndexOneRowPerUser` · T15 `M4_RsvpListOwnerOnly` · T16 `M4_RsvpWritesNoAccessAuditRow` · T17 `M4_AuditRowShape_Create` · T18 `M4_EventToAuditableResourceShape`) + `tests/Kumunita.Core.Tests/EventReminderServiceTests.cs` (T19 `M4_ReminderWindowFiltersOutsideEvents` · T20 `M4_ReminderGoingRsvpsOnly` · T21 `M4_ReminderAuthorAlwaysIncluded` · T22 `M4_ReminderIdempotencyKeyShape` · T23 `M4_ReminderWritesNoAccessAuditRow`) — **all 23 green** — **plus** the M1/M2/M3/M3b/PG-inherited anchors re-run unchanged in the same execution (`Kumunita.Core.Tests` 668/668, 0 failed). |
+
+**Gate status: all three tests PASS** (closed-loop · handoff · part-vs-whole;
+`Kumunita.Core.Tests` 668/668 + the `EventControllerTests` family 19/19, with
+the one Web red attributed to pre-existing kw-l drift, not the M4 family).
+
+**FACES (the two the U11 plan text pins).**
+
+- **Strengthens — Adaptive:** a resident's RSVP / reminder reaches a real
+  outcome and the loop closes with an owner (create → feed → RSVP → owner-only
+  list; the reminder email is the side effect that lands on a *working* event,
+  per the U07/U08 sequencing invariant).
+- **Consumes — Stable:** the daily `EventReminderTick` (U08) is a new moving
+  part in prod, and the reminder window's coverage edge (the 24-hour
+  `now < Start ≤ now+24h` boundary, T19) is a boundary we must keep provably
+  closing — a new §6.4 recurring job in the durable-handler surface.
+
+**E2E status (authored, NOT run — the M2 U13 / M3 U10 / M3b U10 precedent).**
+
+The e2e runtime (Postgres-boot + token-channel) is **not yet present**: the
+`kumunita` Playwright fixture is still a **documented throw** in
+`e2e-m2.spec.ts`, `e2e-m3.spec.ts`, and (newly) **`e2e-m4.spec.ts`** — no M4
+unit (U0–U11) implements the runtime. Per plan U11 ("*if it does not yet
+exist, author the spec (mirror M2's U13), do not run it, and record the gap
+in the design doc*"), U11 **authored** `tests/Kumunita.Web.Tests/e2e-m4.spec.ts`
+(three specs mirroring the §3.8 gate: (a) closed-loop create→feed→RSVP→
+owner-only-list, (b) handoff grant-added-after-creation seen on the next
+request, (c) part-vs-whole feed/detail/RSVP surface coherence). Selectors +
+route pins are grounded against the **shipped** M4 views
+(`Views/Event/{Index,Detail,Create,Edit}.cshtml` + `Controllers/EventController.cs`).
+`npx tsc --noEmit` on `tests/Kumunita.Web.Tests` → **exit 0** (the spec is
+valid TypeScript; the same M2 U13 "author without the runtime" state).
+
+**Pass count: 0 (spec authored; not runnable)** — by design of the pause. The
+**bounded runtime gap** is: (1) the `kumunita` fixture's `signup / login /
+lastCreatedEventId / grantEventToUser` implementation (the M2 D2 token-channel
++ M4's two helpers), (2) a Postgres boot wired to the same DB the `dotnet run`
+server reads, (3) **no** new production-code changes — the M4 Core + Web seams
+are frozen and already exercised by the 23 Core seam tests + 19 controller
+tests. **The unit that lands the runtime** records the M4 e2e pass count in a
+subsequent `### Run result (M4 e2e — <date>)` section of this doc.
+
+**Drift status (still open — U12's concern, not a U11 regression).**
+
+- **`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` is RED**
+  (the single Web.Tests red). Root cause, confirmed: three `kw-l` keys used in
+  the M4 views are **not** in
+  `src/Kumunita.Core/Localization/KnownTranslationKeys.cs`:
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml:98` — `events.created`
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml:102` — `events.edited`
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml:67` — `nav.events`
+
+  This is **pre-existing M4 drift** (the key registry was not extended when
+  the M4 views were authored in U05/U06), **not** a U09/U10 regression — the
+  `EventControllerTests` family is fully green. **Flagged for U12** so the
+  close is honest (the fix is a one-line-per-key addition to
+  `KnownTranslationKeys.cs`, or a follow-on localization lane). No `## U<m> —
+  Drift pause` sections exist in the handoff note for this unit; the U11 record
+  does not touch any frozen pin.

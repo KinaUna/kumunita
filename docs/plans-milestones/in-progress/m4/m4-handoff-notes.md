@@ -946,3 +946,94 @@ edits (those are U11/U12).
   unit.
 
 **U09 exit gate met. STOP — do NOT start U10.**
+
+## U11 — gate recorded
+
+**Date: 2026-09-21.** The three-test acceptance gate (design doc §3.8 —
+closed loop / handoff / part-vs-whole) is **executed and recorded** below,
+using U09's 23 Core seam tests as the part-vs-whole evidence. The M4 family
+is fully green; the one Web-side red is the **pre-existing M4 kw-l registry
+drift** (still open — see *Still-open drift*), **not** a U09/U10 regression.
+
+**(a) The three gate tests + pass counts (the §3.8 pin).**
+
+| # | Gate test (shape, §3.8) | M4 Core evidence (U09 §3.7 names) | Result |
+|---|---|---|---|
+| 1 | **closed loop** — an author creates a published event → it appears in the feed (`TargetKind = "event"` aggregate row, `VisibleCount ≥ 1`, `Outcome = Allow`); the author RSVPs `Going` → their RSVP is visible in the owner-only list | T06 `M4_PlainMemberCreateAllowed`, T01 `M4_MemberSeesUpcomingEventFeed`, T13 `M4_RsvpLastWriteWins`, T15 `M4_RsvpListOwnerOnly` | **PASS (4/4)** |
+| 2 | **handoff** — a user added to the event's `Audience.Grants` **after** creation sees the event on the **next** request (strong consistency, no cache); the `Delegation` branch is the handoff-onto-a-delegate case | T04 `M4_GrantsAudienceOnlyGranteeSees`, T03 `M4_CommunityAudienceSeesFeed` | **PASS (2/2)** |
+| 3 | **part-vs-whole** — the 23 names in §3.7 are the **whole**; tests 1–2 are the **parts**; all must pass **together** in the same `Kumunita.Core.Tests` run as the inherited M1/M2/M3/M3b/PG anchors (no per-name isolation) | all 23 of T01–T23 (U09's pinned list) executed in one run | **PASS (23/23)** |
+
+**(b) The runs (verified, not assumed — the AGENTS.md `dotnet exec` path).**
+
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Error(s)**
+  (127 pre-existing warnings: `xUnit1051` in the M4 test files, `CS8601` in
+  `EventController.cs` — unchanged from U09/U10).
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  → **Total: 668, Errors: 0, Failed: 0, Skipped: 0, Not Run: 0, Time: 59.181s**.
+  The **23 M4 seam tests (T01–T23) pass *together*** with the inherited
+  M1/M2/M3/M3b/PG anchors in the **same** run — the §3.8 part-vs-whole pin
+  holds (no per-name isolation). Gate tests 1+2 are the *parts*; the 23 are
+  the *whole*.
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Total: 351, Errors: 0, Failed: 1, Skipped: 0, Not Run: 0, Time: 9.699s**.
+  The **`EventControllerTests` family (19 tests, U10) is fully green**; the
+  single red is the *pre-existing* kw-l registry drift (see (e) below), **not**
+  the M4 controller family.
+
+**(c) FACES (the two the U11 plan text pins).**
+
+- **Strengthens — Adaptive:** a resident's RSVP / reminder reaches a real
+  outcome and the loop closes with an owner (create → feed → RSVP → owner-only
+  list, the gate's closed-loop test; the reminder email is the side effect that
+  lands on a *working* event, per the U07/U08 sequencing invariant).
+- **Consumes — Stable:** the daily `EventReminderTick` (U08) is a new moving
+  part in prod, and the reminder window's coverage edge (the 24-hour
+  `now < Start ≤ now+24h` boundary, T19) is a boundary we must keep provably
+  closing — a new `§6.4` recurring job in the durable-handler surface.
+
+**(d) E2E status (authored, NOT run — the M2 D2 / M3 U10 / M3b U10 precedent).**
+
+The e2e runtime (Postgres-boot + token-channel) is **not yet present**: the
+`kumunita` Playwright fixture is still a **documented throw** in `e2e-m2.spec.ts`,
+`e2e-m3.spec.ts`, and (newly) `e2e-m4.spec.ts` — no M4 unit (U0–U11) implements
+the runtime. Per plan U11 ("*if it does not yet exist, author the spec (mirror
+M2's U13), do not run it, and record the gap in the design doc*"), U11:
+
+- **authored** `tests/Kumunita.Web.Tests/e2e-m4.spec.ts` (three specs mirroring
+  the §3.8 gate: (a) closed-loop create→feed→RSVP→owner-only-list, (b) handoff
+  grant-added-after-creation seen on next request, (c) part-vs-whole
+  feed/detail/RSVP surface coherence). Selectors + route pins are grounded
+  against the **shipped** M4 views (`Views/Event/{Index,Detail,Create,Edit}.cshtml`
+  + `Controllers/EventController.cs`). `npx tsc --noEmit` on
+  `tests/Kumunita.Web.Tests` → **exit 0** (the spec is valid TypeScript; no new
+  `@playwright/test` errors — the same M2 U13 "author without the runtime"
+  state).
+- **did NOT run** the e2e (the fixture throws; `playwright test` is not
+  runnable). Pass count: **0 (spec authored; not runnable)** — by design of the
+  pause.
+- **the bounded runtime gap is** (i) the `kumunita` fixture's
+  `signup / login / lastCreatedEventId / grantEventToUser` implementation (the
+  M2 D2 token-channel + M4's two helpers), (ii) a Postgres boot wired to the same
+  DB the `dotnet run` server reads, (iii) **no** new production-code changes —
+  the M4 Core + Web seams are frozen and already exercised by the 23 Core seam
+  tests + 19 controller tests. **The next unit who lands the runtime records
+  the pass count in a later `### Run result (M4 e2e — <date>)` section.**
+
+**(e) Still-open drift (recorded, not fixed in U11 — out of U11's scope).**
+
+- **`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` is RED
+  (the single Web.Tests red).** Root cause, confirmed: three `kw-l` keys used in
+  the M4 views are **not** in `src/Kumunita.Core/Localization/KnownTranslationKeys.cs`:
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml:98` — `events.created`
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml:102` — `events.edited`
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml:67` — `nav.events`
+
+  This is **pre-existing M4 drift** (the key registry was not extended when the
+  M4 views were authored in U05/U06), **not** a U09/U10 regression — the
+  `EventControllerTests` family is fully green. U11 **does not** fix it (the
+  Core localization seam is frozen for this unit; the fix is a U12-close or a
+  follow-on lane — *add the three keys to `KnownTranslationKeys.cs`*). **Flagged
+  for U12** so the close is honest.
+
+**U11 exit gate met (build 0 errors; gate section present + consistent with
+U09/U10 results). STOP — do NOT start U12.**
