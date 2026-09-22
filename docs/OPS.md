@@ -302,7 +302,10 @@ Most of this is an **in-app GlobalAdmin** action; a few need the operator at the
 
 Security and privacy are the product's top priority — the threat model, data classes,
 and the full control map live in `docs/SECURITY.md`. This checklist is the operational
-slice of that map.
+slice of that map. The *verification* of these controls — cadence, owners, and the
+run-anywhere checklists (including deployment checks D-1…D-8) — lives in
+`docs/SECURITY-AUDIT.md`; this section says *what* must be true, that document says
+*when and by whom we check it, and where we record that we did*.
 
 - **Network:** expose only 80/443 (and SSH, key-only). **Postgres must not be public** —
   bind to the internal/localhost or Coolify network.

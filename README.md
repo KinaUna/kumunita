@@ -332,6 +332,7 @@ Coolify/Let's Encrypt, `/health` monitored, scheduled Postgres backups.
   neighborhood's fragmented life into a whole) and how we build accordingly. Start at
   [`docs/philosophy/START-HERE.md`](docs/philosophy/START-HERE.md)
 - `docs/SECURITY.md` — **security & privacy: the top priority** — threat model, data classes, control map
+- `docs/SECURITY-AUDIT.md` — **security audit program** — the cadence, owners, and run-anywhere checklists (code / deployment / platform-admin / recurring) that verify the SECURITY.md controls actually hold
 - `docs/ARCHITECTURE.md` — detailed stack, data model, module boundaries
 - `docs/OPS.md` — operations runbook: provisioning, upgrades, backups, restore, security
 - `docs/COOLIFY.md` — Coolify setup: one-time VPS install, per-neighborhood Postgres + app, verify

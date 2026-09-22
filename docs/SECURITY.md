@@ -2,9 +2,11 @@
 
 Security and privacy are the **highest-priority requirements** of this product, not
 features to add. This document is the single source for *what we protect, from whom,
-and why*. It complements `ARCHITECTURE.md` (how the mechanisms work) and `OPS.md`
-§10 (the operational checklist). Rationale for identity/authorization decisions lives
-in `adr/0001` and `adr/0003`.
+and why*. It complements `ARCHITECTURE.md` (how the mechanisms work), `OPS.md`
+§10 (the operational hardening checklist), and `SECURITY-AUDIT.md` (the audit
+program — the cadence, owners, and run-anywhere checklists that verify the controls
+here actually hold, and where each run is recorded). Rationale for
+identity/authorization decisions lives in `adr/0001` and `adr/0003`.
 
 Status: pre-M0, design-level. Update this document when a control changes, a threat is
 accepted, or an open item below is decided — and record non-obvious decisions as ADRs.
