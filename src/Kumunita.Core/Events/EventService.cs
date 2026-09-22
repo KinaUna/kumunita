@@ -291,6 +291,49 @@ public sealed class EventService : IEventService
             ? AccessVia.Owner
             : AccessVia.Admin;
 
+    /// <summary>
+    /// The **translation** display pin (ADR 0059, the
+    /// <see cref="Posts.PostService.CanAddTranslation"/> shape): <c>true</c> when
+    /// <paramref name="actorId"/> may add / edit / remove a translation of the
+    /// event authored by <paramref name="eventAuthorId"/>. A <b>display</b> pin,
+    /// not a gate — the real deny is the
+    /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
+    /// / <see cref="RemoveEventTranslationAsync"/> standing check, which re-runs the
+    /// same rule server-side. Delegates to the same
+    /// <see cref="ResolveTranslationStanding"/> the write lanes use, so the display
+    /// and the three gates can never drift apart.
+    /// </summary>
+    public static bool CanAddTranslation(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveTranslationStanding(eventAuthorId, actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0059 translation standing resolver (shared by
+    /// <see cref="AddEventTranslationAsync"/> / <see cref="UpdateEventTranslationAsync"/>
+    /// / <see cref="RemoveEventTranslationAsync"/> /
+    /// <see cref="CanAddTranslation"/>). Returns the <see cref="AccessVia"/> the
+    /// actor qualifies under, or <c>null</c> to deny. Precedence (most specific
+    /// standing first, so the audit row records the narrowest right that applied):
+    /// the event's **author** (<see cref="AccessVia.Owner"/>); a
+    /// <see cref="Roles.Translator"/> (ADR 0021, <see cref="AccessVia.Admin"/>);
+    /// or a <see cref="Roles.GlobalAdmin"/> (<see cref="AccessVia.Admin"/>).
+    /// Events have **no** component-moderator standing (ADR 0054 §5 — the M4
+    /// community lane has no component-moderator branch, ADR 0007's group-lane
+    /// precedent).
+    /// </summary>
+    private static AccessVia? ResolveTranslationStanding(string eventAuthorId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(eventAuthorId, actorId, StringComparison.Ordinal))
+            return AccessVia.Owner;
+
+        if (actorRoles.Contains(Roles.Translator))
+            return AccessVia.Admin;
+
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return AccessVia.Admin;
+
+        return null;
+    }
+
     // ─── Write lanes (U04) — standing re-checked server-side (§3.4, C3) ───
     //
     // **Seam shape (ADR 0054 §4, the <see cref="AnnouncementService"/> /
@@ -320,10 +363,14 @@ public sealed class EventService : IEventService
     // **Audit-row shape** (C3, §3.4): <c>TargetKind = "event"</c> (the exact
     // string — the <see cref="EventToAuditableResource"/> discriminator),
     // <c>Action</c> = <c>event.create</c> / <c>event.update</c> /
-    // <c>event.publish</c> / <c>event.delete</c>, <c>Via</c> =
+    // <c>event.publish</c> / <c>event.delete</c> / <c>eventtranslation.add</c> /
+    // <c>eventtranslation.update</c> / <c>eventtranslation.remove</c> (ADR 0059),
+    // <c>Via</c> =
     // <see cref="AccessVia.Owner"/> (create, publish) or
     // <see cref="AccessVia.Admin"/> (edit / delete by a non-author GlobalAdmin —
-    // the <see cref="AuditViaFor"/> derivation), <c>Outcome</c> =
+    // the <see cref="AuditViaFor"/> derivation; and the ADR 0059 translation
+    // lanes — author → Owner, Translator / GlobalAdmin → Admin, the
+    // <see cref="ResolveTranslationStanding"/> derivation), <c>Outcome</c> =
     // <see cref="AccessOutcome.Allow"/>. **No**
     // <c>event.rsvp</c> action: <see cref="RsvpAsync"/> stores **no** audit row
     // (a routine resident action, not an access decision — the
@@ -654,6 +701,212 @@ public sealed class EventService : IEventService
         session.Store(rsvp);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return rsvp;
+    }
+
+    // ─── Translation lanes (ADR 0059 — the "follow-on lane" ADR 0054 deferred) ───
+    //
+    // Mirrors the PostService / AnnouncementService translation lanes (ADR 0022 /
+    // 0029 / 0048) on the **M4 self-composed-session convention**: the write lanes
+    // open their **own** write session (no caller IDocumentSession — the M4 service
+    // composes its own C3 session), store the domain write + the AccessAudit row in
+    // that one session, and commit atomically (invariant C3). Standing is enforced
+    // server-side via the same pure helper the U03 read/standing tests pin
+    // (ResolveTranslationStanding) — the C3 single-source pin (no second copy of the
+    // matrix). Audit-row shape: TargetKind = "event" (the exact string — the
+    // EventToAuditableResource discriminator), Action = eventtranslation.add /
+    // eventtranslation.update / eventtranslation.remove, Via = Owner (author) or
+    // Admin (Translator / GlobalAdmin), Outcome = Allow.
+
+    /// <inheritdoc cref="IEventService.GetEventTranslationsAsync"/>
+    /// <summary>
+    /// The **read** seam for an event's user-added translations (ADR 0059). Owns its
+    /// own <c>QuerySession</c> (C3 read lane); **not** an authorization surface and
+    /// writes **no** audit row (C-M3·1 — the translation has no own audience; its
+    /// visibility inherits the parent event's single <c>Read</c> decision, which the
+    /// caller has already made). The Web reads this only after
+    /// <see cref="GetAsync"/> returned the event.
+    /// </summary>
+    public async Task<IReadOnlyList<EventTranslation>> GetEventTranslationsAsync(string eventId)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new ArgumentException("An event id is required.", nameof(eventId));
+
+        await using var session = _store.QuerySession();
+        return await session
+            .Query<EventTranslation>()
+            .Where(t => t.EventId == eventId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc cref="IEventService.AddEventTranslationAsync"/>
+    /// <summary>
+    /// Add a **user-added translation** of an event in this service's own write
+    /// session (invariant C3 — the same-transaction lane; the write + the
+    /// <see cref="AccessAudit"/> row commit or roll back atomically).
+    /// <para>
+    /// <b>Standing (ADR 0059, the approved default):</b> the event's
+    /// <b>author</b> (<see cref="AccessVia.Owner"/>); a
+    /// <see cref="Identity.Roles.Translator"/> (ADR 0021,
+    /// <see cref="AccessVia.Admin"/>); or a <see cref="Identity.Roles.GlobalAdmin"/>
+    /// (<see cref="AccessVia.Admin"/>). Events have no component-moderator standing
+    /// (ADR 0054 §5 — the M4 community lane has no component-moderator branch). A
+    /// denied actor throws <see cref="UnauthorizedAccessException"/> before anything
+    /// is stored.
+    /// </para>
+    /// <paramref name="languageCode"/> is the **target** language (written
+    /// verbatim — a blank target is a caller error). One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<EventTranslation> AddEventTranslationAsync(
+        string eventId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new ArgumentException("An event id is required.", nameof(eventId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to add a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to translate.");
+
+        // Standing re-check (server-side, C3 single-source): author (Owner) OR
+        // Translator / GlobalAdmin (Admin). Events have no component-moderator
+        // standing (ADR 0054 §5).
+        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the event's author (or a Translator, or a GlobalAdmin) " +
+                "may add a translation of it.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new EventTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            EventId = eventId,
+            LanguageCode = languageCode,
+            Title = string.IsNullOrWhiteSpace(title) ? null : title,
+            Body = body,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        session.Store(translation);
+        StoreAuditRow(session, actorId, "eventtranslation.add", eventId, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc cref="IEventService.UpdateEventTranslationAsync"/>
+    /// <summary>
+    /// Edit an existing event translation (ADR 0059, the ADR 0048 edit-lane shape):
+    /// updates the <see cref="EventTranslation.Title"/> /
+    /// <see cref="EventTranslation.Body"/> for the <c>(eventId, languageCode)</c>
+    /// pair, re-stamps <see cref="EventTranslation.Created"/> and re-records
+    /// <see cref="EventTranslation.AuthorId"/> (the last actor to edit).
+    /// <para>
+    /// <b>Standing (ADR 0059):</b> the same matrix as
+    /// <see cref="AddEventTranslationAsync"/> (author / Translator / GlobalAdmin).
+    /// A missing row is a <see cref="KeyNotFoundException"/> (404). One
+    /// <c>AccessAudit</c> row (<c>eventtranslation.update</c>,
+    /// <c>TargetKind = "event"</c>) commits atomically with the write (C3).
+    /// </para>
+    /// </summary>
+    public async Task<EventTranslation> UpdateEventTranslationAsync(
+        string eventId, string languageCode, string? title, string body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new ArgumentException("An event id is required.", nameof(eventId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(body))
+            throw new ArgumentException("A translation requires a non-empty body.", nameof(body));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to edit a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to edit.");
+
+        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the event's author (or a Translator, or a GlobalAdmin) " +
+                "may edit a translation of it.");
+
+        var row = await session.Query<EventTranslation>()
+            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to edit.");
+
+        row.Title = string.IsNullOrWhiteSpace(title) ? null : title;
+        row.Body = body;
+        row.AuthorId = actorId;
+        row.Created = DateTimeOffset.UtcNow;
+
+        session.Store(row);
+        StoreAuditRow(session, actorId, "eventtranslation.update", eventId, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return row;
+    }
+
+    /// <inheritdoc cref="IEventService.RemoveEventTranslationAsync"/>
+    /// <summary>
+    /// Remove an event translation (ADR 0059, the ADR 0048 remove-lane shape):
+    /// deletes the <c>(eventId, languageCode)</c> row.
+    /// <para>
+    /// <b>Standing (ADR 0059):</b> the same matrix as
+    /// <see cref="AddEventTranslationAsync"/> (author / Translator / GlobalAdmin).
+    /// A missing row is a <see cref="KeyNotFoundException"/> (404). One
+    /// <c>AccessAudit</c> row (<c>eventtranslation.remove</c>,
+    /// <c>TargetKind = "event"</c>) commits atomically with the write (C3).
+    /// </para>
+    /// </summary>
+    public async Task RemoveEventTranslationAsync(
+        string eventId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(eventId))
+            throw new ArgumentException("An event id is required.", nameof(eventId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to remove a translation.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var @event = await session.LoadAsync<Event>(eventId, ct).ConfigureAwait(false);
+        if (@event is null)
+            throw new KeyNotFoundException($"Event '{eventId}' was not found in the session; nothing to remove.");
+
+        var via = ResolveTranslationStanding(@event.AuthorId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the event's author (or a Translator, or a GlobalAdmin) " +
+                "may remove a translation of it.");
+
+        var row = await session.Query<EventTranslation>()
+            .Where(t => t.EventId == eventId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Event '{eventId}' has no translation for '{languageCode}'; nothing to remove.");
+
+        session.Delete(row);
+        StoreAuditRow(session, actorId, "eventtranslation.remove", eventId, via.Value);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     // ─── U04 private helpers ───────────────────────────────────────────────

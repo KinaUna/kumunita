@@ -1705,6 +1705,474 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // ADR 0059 — the event-translation lane (author ∪ Translator ∪ GlobalAdmin).
+    // Mirrors the PostService translation-lane pins (ADR 0022): a pure standing
+    // matrix (the display helper + the three write lanes' server-side re-check),
+    // the audit-row shape (eventtranslation.add/update/remove, TargetKind
+    // "event", Via Owner for the author / Admin for Translator+GlobalAdmin,
+    // Outcome Allow), and the 404-vs-403 split (missing event / missing row →
+    // KeyNotFoundException; a denied actor → UnauthorizedAccessException before
+    // anything is stored). Events have **no** component-moderator standing
+    // (ADR 0054 §5) — the matrix is author ∪ Translator ∪ GlobalAdmin only.
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── ADR 0059·1 — M4_TranslationStandingMatrix (the pure display helper) ─
+    // CanAddTranslation is the **pure** standing matrix the Web consults to
+    // decide whether to render the add/edit/remove controls: author → true
+    // (Owner), Translator → true (Admin), GlobalAdmin → true (Admin), a plain
+    // Member → false, and a stranger with no roles → false. This is the C3
+    // single-source pin — the same matrix the write lanes re-check.
+
+    [Fact]
+    public void M4_TranslationStandingMatrix()
+    {
+        const string author = "u-a059-s1-author";
+        const string translator = "u-a059-s1-translator";
+        const string admin = "u-a059-s1-admin";
+        const string member = "u-a059-s1-member";
+
+        // The author of the event always has standing.
+        Assert.True(EventService.CanAddTranslation(author, author, EmptyRoles));
+
+        // A Translator (ADR 0021) has standing on **anyone's** event.
+        Assert.True(EventService.CanAddTranslation(author, translator, TranslatorRoles));
+
+        // A GlobalAdmin (ADR 0017) has standing on **anyone's** event.
+        Assert.True(EventService.CanAddTranslation(author, admin, GlobalAdminRoles));
+
+        // A plain Member (not the author, no elevated role) has no standing.
+        Assert.False(EventService.CanAddTranslation(author, member, MemberRoles));
+
+        // A stranger with no roles has no standing.
+        Assert.False(EventService.CanAddTranslation(author, "u-a059-s1-stranger", EmptyRoles));
+    }
+
+    // ── ADR 0059·2 — M4_TranslationAuthorAdds_WritesRowAndAudit (via Owner) ─
+    // The **author** adds a translation: the EventTranslation row is stored
+    // verbatim (title null-normalized when blank), and one AccessAudit row
+    // (eventtranslation.add, TargetKind "event", Via Owner, Outcome Allow,
+    // TargetId = the event) commits atomically with the write (C3).
+
+    [Fact]
+    public async Task M4_TranslationAuthorAdds_WritesRowAndAudit()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-a1-author";
+        const string evId = "a059-a1-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Cleanup day", Body = "body a059-a1",
+            Start = new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        var row = await svc.AddEventTranslationAsync(evId, "de",
+            "Aufräumtag", "Kommunikationstest", author, EmptyRoles);
+
+        Assert.Equal(evId, row.EventId);
+        Assert.Equal("de", row.LanguageCode);
+        Assert.Equal("Aufräumtag", row.Title);
+        Assert.Equal("Kommunikationstest", row.Body);
+        Assert.Equal(author, row.AuthorId);
+        Assert.NotNull(row.Created);
+
+        // The row is readable back through the read seam.
+        var read = await svc.GetEventTranslationsAsync(evId);
+        Assert.Single(read);
+        Assert.Equal("de", read[0].LanguageCode);
+
+        // Exactly one audit row — the add, via the author's own standing.
+        var rows = await EventAuditRows(store);
+        var add = Assert.Single(rows);
+        Assert.Equal("eventtranslation.add", add.Action);
+        Assert.Equal("event", add.TargetKind);
+        Assert.Equal(evId, add.TargetId);
+        Assert.Equal(author, add.ActorId);
+        Assert.Equal(author, add.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Owner, add.Via);
+        Assert.Equal(AccessOutcome.Allow, add.Outcome);
+    }
+
+    // ── ADR 0059·3 — M4_TranslationTranslatorAdds_ViaAdmin (ADR 0021) ──────
+    // A **Translator** (not the author) adds a translation of the author's
+    // event: the row is stored, and the audit row records the elevated standing
+    // as <c>Via = AccessVia.Admin</c> (the ADR 0021 / ADR 0030 delegated
+    // editor), EffectivePrincipalId = the acting translator.
+
+    [Fact]
+    public async Task M4_TranslationTranslatorAdds_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-a2-author";
+        const string translator = "u-a059-a2-translator";
+        const string evId = "a059-a2-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Potluck", Body = "body a059-a2",
+            Start = new DateTimeOffset(2026, 6, 2, 14, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 2, 18, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        await svc.AddEventTranslationAsync(evId, "fr",
+            "Potluck", "Un pot commun", translator, TranslatorRoles);
+
+        var rows = await EventAuditRows(store);
+        var add = Assert.Single(rows);
+        Assert.Equal("eventtranslation.add", add.Action);
+        Assert.Equal(translator, add.ActorId);
+        Assert.Equal(translator, add.EffectivePrincipalId);
+        Assert.Equal(AccessVia.Admin, add.Via);     // the elevated (delegated) standing.
+        Assert.Equal(AccessOutcome.Allow, add.Outcome);
+    }
+
+    // ── ADR 0059·4 — M4_TranslationGlobalAdminAdds_ViaAdmin (ADR 0017) ─────
+    // A **GlobalAdmin** (not the author) adds a translation: the row is stored,
+    // the audit row records <c>Via = AccessVia.Admin</c> (the ADR 0017
+    // override), EffectivePrincipalId = the acting admin.
+
+    [Fact]
+    public async Task M4_TranslationGlobalAdminAdds_ViaAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-a3-author";
+        const string admin = "u-a059-a3-admin";
+        const string evId = "a059-a3-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Meetup", Body = "body a059-a3",
+            Start = new DateTimeOffset(2026, 6, 3, 10, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 3, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        await svc.AddEventTranslationAsync(evId, "da",
+            "Møde", "Et møde", admin, GlobalAdminRoles);
+
+        var rows = await EventAuditRows(store);
+        var add = Assert.Single(rows);
+        Assert.Equal("eventtranslation.add", add.Action);
+        Assert.Equal(admin, add.ActorId);
+        Assert.Equal(AccessVia.Admin, add.Via);
+        Assert.Equal(AccessOutcome.Allow, add.Outcome);
+    }
+
+    // ── ADR 0059·5 — M4_TranslationStrangerDenied_NoWrite ──────────────────
+    // A plain **Member** who is neither the author nor a Translator/GlobalAdmin
+    // is denied with <c>UnauthorizedAccessException</c> (the Web 403) **before
+    // anything is stored**: no EventTranslation row, no audit row.
+
+    [Fact]
+    public async Task M4_TranslationStrangerDenied_NoWrite()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-a4-author";
+        const string stranger = "u-a059-a4-stranger";
+        const string evId = "a059-a4-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Garden", Body = "body a059-a4",
+            Start = new DateTimeOffset(2026, 6, 4, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 4, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.AddEventTranslationAsync(evId, "de", "t", "b", stranger, MemberRoles));
+
+        // The denial wrote nothing — no translation row, no audit row.
+        Assert.Empty(await svc.GetEventTranslationsAsync(evId));
+        Assert.Empty(await EventAuditRows(store));
+    }
+
+    // ── ADR 0059·6 — M4_TranslationMissingEvent_404 ─────────────────────────
+    // Adding a translation to a **missing** event is a 404
+    // (<c>KeyNotFoundException</c>) — the non-leaky pin, and the same for a
+    // denied-actor who targets a missing event (the 404-vs-403 split: a missing
+    // resource is reported as missing, not as a standing denial).
+
+    [Fact]
+    public async Task M4_TranslationMissingEvent_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.AddEventTranslationAsync("no-such-event", "de", "t", "b",
+                "u-a059-a5", EmptyRoles));
+    }
+
+    // ── ADR 0059·7 — M4_TranslationAddBlankTitle_NullNormalized ────────────
+    // A blank (empty / whitespace) <c>title</c> is stored as <c>null</c> (the
+    // display falls back to the event's own title), while a real title is kept
+    // verbatim — the same normalization the PostService add lane does.
+
+    [Fact]
+    public async Task M4_TranslationAddBlankTitle_NullNormalized()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-a6-author";
+        const string evId = "a059-a6-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Original", Body = "body a059-a6",
+            Start = new DateTimeOffset(2026, 6, 5, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 5, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        var blank = await svc.AddEventTranslationAsync(evId, "de", "   ", "Körper", author, EmptyRoles);
+        Assert.Null(blank.Title);                    // blank → null.
+        Assert.Equal("Körper", blank.Body);
+    }
+
+    // ── ADR 0059·8 — M4_TranslationAuthorUpdates_AuditUpdate ───────────────
+    // The **author** edits an existing translation: the stored row is updated
+    // (Title/Body replaced, AuthorId re-recorded as the acting author), and one
+    // <c>eventtranslation.update</c> audit row (TargetKind "event", Via Owner)
+    // commits atomically with the write.
+
+    [Fact]
+    public async Task M4_TranslationAuthorUpdates_AuditUpdate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-u1-author";
+        const string evId = "a059-u1-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "Cleanup", Body = "body a059-u1",
+            Start = new DateTimeOffset(2026, 6, 6, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 6, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+        await svc.AddEventTranslationAsync(evId, "de", "alt titel", "alt body", author, EmptyRoles);
+
+        var updated = await svc.UpdateEventTranslationAsync(evId, "de",
+            "neuer titel", "neuer body", author, EmptyRoles);
+
+        Assert.Equal("neuer titel", updated.Title);
+        Assert.Equal("neuer body", updated.Body);
+        Assert.Equal(author, updated.AuthorId);
+
+        // The add + the update — exactly two rows, the update one being Owner.
+        var rows = await EventAuditRows(store);
+        var update = Assert.Single(rows, r => r.Action == "eventtranslation.update");
+        Assert.Equal("event", update.TargetKind);
+        Assert.Equal(evId, update.TargetId);
+        Assert.Equal(author, update.ActorId);
+        Assert.Equal(AccessVia.Owner, update.Via);
+        Assert.Equal(AccessOutcome.Allow, update.Outcome);
+    }
+
+    // ── ADR 0059·9 — M4_TranslationStrangerUpdateDenied ─────────────────────
+    // A denied actor (a plain Member, not the author) editing a translation is
+    // a 403 — and the row is left untouched.
+
+    [Fact]
+    public async Task M4_TranslationStrangerUpdateDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-u2-author";
+        const string stranger = "u-a059-u2-stranger";
+        const string evId = "a059-u2-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "t", Body = "body a059-u2",
+            Start = new DateTimeOffset(2026, 6, 7, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 7, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.UpdateEventTranslationAsync(evId, "de", "x", "y", stranger, MemberRoles));
+
+        // The row is unchanged (the denied write did not apply).
+        var read = await svc.GetEventTranslationsAsync(evId);
+        Assert.Equal("titel", read.Single().Title);
+        Assert.Equal("body", read.Single().Body);
+    }
+
+    // ── ADR 0059·10 — M4_TranslationUpdateMissingRow_404 ───────────────────
+    // Editing a translation language the event has **no** row for is a 404
+    // (KeyNotFoundException) — distinct from the standing denial (403).
+
+    [Fact]
+    public async Task M4_TranslationUpdateMissingRow_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-u3-author";
+        const string evId = "a059-u3-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "t", Body = "body a059-u3",
+            Start = new DateTimeOffset(2026, 6, 8, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 8, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        // No "fr" row exists on this event.
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.UpdateEventTranslationAsync(evId, "fr", "t", "b", author, EmptyRoles));
+    }
+
+    // ── ADR 0059·11 — M4_TranslationAuthorRemoves_AuditRemove ──────────────
+    // The **author** removes a translation: the row is gone (the read seam
+    // returns empty) and one <c>eventtranslation.remove</c> audit row
+    // (TargetKind "event", Via Owner, Outcome Allow) is stored.
+
+    [Fact]
+    public async Task M4_TranslationAuthorRemoves_AuditRemove()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-r1-author";
+        const string evId = "a059-r1-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "t", Body = "body a059-r1",
+            Start = new DateTimeOffset(2026, 6, 9, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 9, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+
+        await svc.RemoveEventTranslationAsync(evId, "de", author, EmptyRoles);
+
+        Assert.Empty(await svc.GetEventTranslationsAsync(evId));
+        var rows = await EventAuditRows(store);
+        var remove = Assert.Single(rows, r => r.Action == "eventtranslation.remove");
+        Assert.Equal("event", remove.TargetKind);
+        Assert.Equal(evId, remove.TargetId);
+        Assert.Equal(author, remove.ActorId);
+        Assert.Equal(AccessVia.Owner, remove.Via);
+        Assert.Equal(AccessOutcome.Allow, remove.Outcome);
+    }
+
+    // ── ADR 0059·12 — M4_TranslationStrangerRemoveDenied ───────────────────
+    // A denied actor (a plain Member) removing a translation is a 403 and the
+    // row survives.
+
+    [Fact]
+    public async Task M4_TranslationStrangerRemoveDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-r2-author";
+        const string stranger = "u-a059-r2-stranger";
+        const string evId = "a059-r2-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "t", Body = "body a059-r2",
+            Start = new DateTimeOffset(2026, 6, 10, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 10, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+        await svc.AddEventTranslationAsync(evId, "de", "titel", "body", author, EmptyRoles);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.RemoveEventTranslationAsync(evId, "de", stranger, MemberRoles));
+
+        Assert.Single(await svc.GetEventTranslationsAsync(evId));   // the row survived.
+    }
+
+    // ── ADR 0059·13 — M4_TranslationRemoveMissingRow_404 ───────────────────
+    // Removing a translation language the event has **no** row for is a 404.
+
+    [Fact]
+    public async Task M4_TranslationRemoveMissingRow_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-r3-author";
+        const string evId = "a059-r3-ev";
+
+        await Plant(store, new Event
+        {
+            Id = evId, AuthorId = author,
+            Title = "t", Body = "body a059-r3",
+            Start = new DateTimeOffset(2026, 6, 11, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 11, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => svc.RemoveEventTranslationAsync(evId, "fr", author, EmptyRoles));
+    }
+
+    // ── ADR 0059·14 — M4_TranslationGetOrderedByLanguageCode ───────────────
+    // The read seam returns the event's translations ordered by
+    // <c>LanguageCode</c> ascending (the display + the missing-languages
+    // computation rely on a stable order), and only the rows for that event.
+
+    [Fact]
+    public async Task M4_TranslationGetOrderedByLanguageCode()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-a059-g1-author";
+        const string evA = "a059-g1-evA";
+        const string evB = "a059-g1-evB";
+
+        await Plant(store, new Event
+        {
+            Id = evA, AuthorId = author, Title = "A", Body = "b",
+            Start = new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 12, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = evB, AuthorId = author, Title = "B", Body = "b",
+            Start = new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 6, 12, 11, 0, 0, TimeSpan.Zero),
+            IsDraft = false, Audience = null,
+        });
+
+        // Seed evA with two rows (inserted out of order) and evB with one.
+        await svc.AddEventTranslationAsync(evA, "fr", "t", "b", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evA, "da", "t", "b", author, EmptyRoles);
+        await svc.AddEventTranslationAsync(evB, "de", "t", "b", author, EmptyRoles);
+
+        // evA's rows come back in LanguageCode order (da < fr); evB's single row
+        // is isolated to its own event.
+        var a = await svc.GetEventTranslationsAsync(evA);
+        Assert.Equal(new[] { "da", "fr" }, a.Select(t => t.LanguageCode).ToArray());
+
+        var b = await svc.GetEventTranslationsAsync(evB);
+        Assert.Single(b);
+        Assert.Equal("de", b[0].LanguageCode);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // Test plumbing (mirrors PostServiceTests).
     // ════════════════════════════════════════════════════════════════════════
 
@@ -1722,6 +2190,16 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
     /// tests.</summary>
     private static readonly IReadOnlySet<string> GlobalAdminRoles =
         new HashSet<string>(StringComparer.Ordinal) { Roles.GlobalAdmin };
+
+    /// <summary>The role set carrying the <see cref="Roles.Translator"/> claim
+    /// (ADR 0021) for the ADR 0059 translation-lane tests.</summary>
+    private static readonly IReadOnlySet<string> TranslatorRoles =
+        new HashSet<string>(StringComparer.Ordinal) { Roles.Translator };
+
+    /// <summary>A plain <see cref="Roles.Member"/> role set (ADR 0030) — a
+    /// resident with no elevated standing, for the ADR 0059 denial pin.</summary>
+    private static readonly IReadOnlySet<string> MemberRoles =
+        new HashSet<string>(StringComparer.Ordinal) { Roles.Member };
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
     /// database (the fresh-postgres-per-test isolation means "all event rows"

@@ -238,8 +238,8 @@ mechanism** for any of them: the `IsDraft` flag + `/my/drafts` lane (ADR
 0034, server-side body parse); the `LanguageCode` (ADR 0018); the `IsDeleted`
 flag + read-lane filter (ADR 0024). **The translation lane is NOT extended to
 events in M4** — an `Event` is authored-in-language only in this milestone;
-the event-translation row (the ADR 0022/0026/0029 shape) is a follow-on
-lane, own ADR.
+the event-translation row (the ADR 0022/0026/0029 shape) is a follow-on lane
+that shipped separately under **ADR 0059**.
 
 ### 3.6 The `EventReminders` §6.4 job  **[DECIDED — ADR 0054]**
 

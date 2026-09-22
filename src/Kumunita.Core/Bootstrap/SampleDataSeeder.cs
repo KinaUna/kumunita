@@ -378,6 +378,18 @@ public static class SampleDataSeeder
         session.Store(cleanup);
         session.Store(potluck);
 
+        // A user-added event translation (ADR 0059 — author ∪ GlobalAdmin ∪
+        // Translator standing, not machine-translated): a German row for the
+        // Community Cleanup Day, so the ADR 0027 chip-swap + ADR 0051 feed
+        // display have something to exercise on the Detail page.
+        session.Store(new EventTranslation
+        {
+            Id = Id(), EventId = cleanup.Id, LanguageCode = "de",
+            Title = "Gemeinschaftlicher Aufräumtag",
+            Body = "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum.",
+            AuthorId = sophie.Id, Created = now.AddDays(-3)
+        });
+
         // RSVPs — one row per (event, resident); a mix of Going / Maybe / No.
         session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddDays(-1) });
         session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = ben.Id, Status = RsvpStatus.Going, At = now.AddDays(-1).AddHours(2) });

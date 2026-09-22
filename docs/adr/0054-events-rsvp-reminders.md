@@ -129,9 +129,11 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   `TagIds` (ADR 0044); the `ImageIds` + `AttachmentIds` (ADR 0025 / 0034 —
   the server-side body parse populates them; the client never sends them);
   the `LanguageCode` (ADR 0018); the `IsDeleted` flag + read-lane filter
-  (ADR 0024). **The translation lane (ADR 0022/0026/0029) is NOT extended
-  to events in M4** — an `Event` is authored-in-language only; the
-  event-translation row is a follow-on lane with its own ADR.
+  (ADR 0024). **The translation lane (ADR 0022/0026/0029) is NOT extended to
+  events in M4's own scope** — an `Event` is authored-in-language in M4; the
+  user-added event-translation lane ships as a separate named lane under ADR
+  0059 (the ADR 0022/0029/0048 lane carried to the events surface), so it is
+  additive to this ADR, not part of it.
 - **The Web surface** — `EventController` (`Kumunita.Web.Controllers`):
   `GET /events` (the feed — upcoming events, `componentId` filter optional,
   `CanSeeAsync(Read)`-filtered so a private event's *existence* does not
@@ -241,9 +243,9 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   AGENTS.md doc↔code parity rule.
 - **Out of scope (deliberate non-decisions):** iCal export (M6),
   notifications-as-a-lane (M6), group events (a follow-on lane, own ADR),
-  event translations (a follow-on lane, own ADR), per-resident reminder
-  settings (a follow-on lane), and the `VerifyDigest` §6.4 job (stays
-  deferred).
+  per-resident reminder settings (a follow-on lane), and the `VerifyDigest`
+  §6.4 job (stays deferred). (The event-translation lane left out of M4's
+  own scope shipped under **ADR 0059**.)
 
 ## Tests
 

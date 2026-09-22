@@ -90,6 +90,11 @@ public class EventControllerTests
         Assert.Equal("/events/{id}/publish", Route("Publish"));
         Assert.Equal("/events/{id}/delete", Route("Delete"));
         Assert.Equal("/events/{id}/rsvp", Route("Rsvp"));
+        // ADR 0059 — the user-added event-translation lane (author ∪ Translator
+        // ∪ GlobalAdmin): the add / update / remove POSTs.
+        Assert.Equal("/events/{id}/translations", Route("AddTranslation"));
+        Assert.Equal("/events/{id}/translations/update", Route("UpdateTranslation"));
+        Assert.Equal("/events/{id}/translations/remove", Route("RemoveTranslation"));
     }
 
     // ── 404-vs-403 split (detail + edit + write POSTs) ─────────────────────────
@@ -659,6 +664,336 @@ public class EventControllerTests
         Assert.IsType<RedirectResult>(result);
         Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
         await events.Received(1).RsvpAsync(id, "subj-resident-001", RsvpStatus.Maybe, Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059 — the event-translation lane (author ∪ Translator ∪ GlobalAdmin) ─
+    //
+    // Thin Web lanes: the controller pins the route, the shape gate (blank
+    // languageCode / body → redirect-back, no service call), the 404-vs-403
+    // split (the service's <see cref="KeyNotFoundException"/> →
+    // <see cref="NotFoundResult"/>, <see cref="UnauthorizedAccessException"/> →
+    // <see cref="ForbidResult"/>), and delegates the standing + write to
+    // <see cref="IEventService"/> (the service is the authority — the controller
+    // never re-derives the standing split itself, ADR 0006-D). Mirrors the
+    // AnnouncementControllerTests ADR 0029/0048 translation-lane pins; the
+    // EventService seam has **no** <c>IDocumentSession</c> parameter (the M4
+    // controller never opens a session — the service owns its own, C3).
+
+    // ── ADR 0059·A — AddTranslation happy path (author, the Owner branch) ─────
+    // The event's **author** adds a translation: the controller pre-checks the
+    // viewer can see the event (<see cref="IEventService.GetAsync"/>), delegates
+    // the write to <see cref="IEventService.AddEventTranslationAsync"/> (passing
+    // the author's real role set), and on success redirects back to the detail
+    // page with a <c>TempData["info"]</c> confirmation.
+
+    [Fact]
+    public async Task AddTranslation_Author_HappyPath_Redirects()
+    {
+        const string id = "ev-t-001";
+        const string author = "subj-author-001";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, author, Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, author));
+        events.AddEventTranslationAsync(
+                id, "de", "Titel", "Körper", author,
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new EventTranslation
+            {
+                Id = "tr-001", EventId = id, LanguageCode = "de",
+                Title = "Titel", Body = "Körper", AuthorId = author,
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(events, subjectId: author);
+
+        var result = await controller.AddTranslation(id, "de", "Titel", "Körper");
+
+        Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
+
+        // The author's (possibly empty) role set is passed through — the service
+        // re-checks standing from the author match, not the roles.
+        await events.Received(1).AddEventTranslationAsync(
+            id, "de", "Titel", "Körper", author,
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·B — AddTranslation via Translator (the Admin branch) ────────
+    // A **Translator** (not the author) adds a translation of the author's event
+    // — the ADR 0021 delegated-editor lane exercised through the Web surface.
+
+    [Fact]
+    public async Task AddTranslation_Translator_HappyPath_Redirects()
+    {
+        const string id = "ev-t-002";
+        const string author = "subj-author-002";
+        const string translator = "subj-translator-002";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, translator, Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, author));
+        events.AddEventTranslationAsync(
+                id, "fr", "Titre", "Corps", translator,
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new EventTranslation
+            {
+                Id = "tr-002", EventId = id, LanguageCode = "fr",
+                Title = "Titre", Body = "Corps", AuthorId = translator,
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(events, roles: [Roles.Translator], subjectId: translator);
+
+        var result = await controller.AddTranslation(id, "fr", "Titre", "Corps");
+
+        Assert.IsType<RedirectResult>(result);
+        await events.Received(1).AddEventTranslationAsync(
+            id, "fr", "Titre", "Corps", translator,
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.Translator)), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·C — AddTranslation denied → Forbid ───────────────────────────
+    // A standing-denied actor (the service's <see
+    // cref="UnauthorizedAccessException"/>) maps to a clean <see
+    // cref="ForbidResult"/> — never a 500.
+
+    [Fact]
+    public async Task AddTranslation_Denied_Forbid()
+    {
+        const string id = "ev-t-003";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-member", Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, "subj-author-003"));
+        events.AddEventTranslationAsync(
+                id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<EventTranslation>(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(events, roles: [Roles.Member], subjectId: "subj-member");
+
+        var result = await controller.AddTranslation(id, "de", "t", "b");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    // ── ADR 0059·D — AddTranslation missing event → NotFound ─────────────────
+    // A missing (or not-visible) event: the service's <see
+    // cref="IEventService.GetAsync"/> reports <see cref="KeyNotFoundException"/>
+    // and the controller maps that to a clean <see cref="NotFoundResult"/> — the
+    // write lane never touches a dangling reference.
+
+    [Fact]
+    public async Task AddTranslation_MissingEvent_NotFound()
+    {
+        const string id = "ev-t-missing";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-author-004", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Event>(new KeyNotFoundException($"Event '{id}' was not found.")));
+
+        var controller = Build(events, subjectId: "subj-author-004");
+
+        var result = await controller.AddTranslation(id, "de", "t", "b");
+
+        Assert.IsType<NotFoundResult>(result);
+        await events.DidNotReceive().AddEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·E — AddTranslation blank languageCode → redirect back ───────
+    // A blank <c>languageCode</c> is a shape error — the controller
+    // short-circuits with a redirect back to the detail page and never calls the
+    // service's write seam.
+
+    [Fact]
+    public async Task AddTranslation_BlankLanguageCode_RedirectsBack_NoWrite()
+    {
+        var events = Substitute.For<IEventService>();
+        var controller = Build(events, subjectId: "subj-author-005");
+
+        var result = await controller.AddTranslation("ev-t-005", "   ", "Titel", "Körper");
+
+        Assert.IsType<RedirectResult>(result);
+        await events.DidNotReceive().AddEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·F — AddTranslation blank body → redirect back ───────────────
+    // A blank <c>body</c> is a shape error (the same short-circuit): a
+    // translation needs some text, and the write seam is never called.
+
+    [Fact]
+    public async Task AddTranslation_BlankBody_RedirectsBack_NoWrite()
+    {
+        var events = Substitute.For<IEventService>();
+        var controller = Build(events, subjectId: "subj-author-006");
+
+        var result = await controller.AddTranslation("ev-t-006", "de", "Titel", "");
+
+        Assert.IsType<RedirectResult>(result);
+        await events.DidNotReceive().AddEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·G — UpdateTranslation happy path (author) ───────────────────
+    // The **author** edits an existing translation: delegates to
+    // <see cref="IEventService.UpdateEventTranslationAsync"/> and redirects back.
+
+    [Fact]
+    public async Task UpdateTranslation_Author_HappyPath_Redirects()
+    {
+        const string id = "ev-u-001";
+        const string author = "subj-author-001";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, author, Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, author));
+        events.UpdateEventTranslationAsync(
+                id, "de", "Neu", "Körper", author,
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new EventTranslation
+            {
+                Id = "tr-u-001", EventId = id, LanguageCode = "de",
+                Title = "Neu", Body = "Körper", AuthorId = author,
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(events, subjectId: author);
+
+        var result = await controller.UpdateTranslation(id, "de", "Neu", "Körper");
+
+        Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
+        await events.Received(1).UpdateEventTranslationAsync(
+            id, "de", "Neu", "Körper", author,
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·H — UpdateTranslation denied → Forbid ───────────────────────
+    // A standing-denied actor editing a translation is a clean 403.
+
+    [Fact]
+    public async Task UpdateTranslation_Denied_Forbid()
+    {
+        const string id = "ev-u-002";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-member", Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, "subj-author-002"));
+        events.UpdateEventTranslationAsync(
+                id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<EventTranslation>(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(events, roles: [Roles.Member], subjectId: "subj-member");
+
+        var result = await controller.UpdateTranslation(id, "de", "x", "b");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    // ── ADR 0059·I — UpdateTranslation missing event → NotFound ──────────────
+    // A missing event is a clean 404 (the non-leaky pin).
+
+    [Fact]
+    public async Task UpdateTranslation_MissingEvent_NotFound()
+    {
+        const string id = "ev-u-missing";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-author-003", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Event>(new KeyNotFoundException($"Event '{id}' was not found.")));
+
+        var controller = Build(events, subjectId: "subj-author-003");
+
+        var result = await controller.UpdateTranslation(id, "de", "t", "b");
+
+        Assert.IsType<NotFoundResult>(result);
+        await events.DidNotReceive().UpdateEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·J — RemoveTranslation happy path (author) ───────────────────
+    // The **author** removes a translation: delegates to
+    // <see cref="IEventService.RemoveEventTranslationAsync"/> and redirects back.
+
+    [Fact]
+    public async Task RemoveTranslation_Author_HappyPath_Redirects()
+    {
+        const string id = "ev-r-001";
+        const string author = "subj-author-001";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, author, Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, author));
+
+        var controller = Build(events, subjectId: author);
+
+        var result = await controller.RemoveTranslation(id, "de");
+
+        Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/events/{id}", ((RedirectResult)result).Url);
+        await events.Received(1).RemoveEventTranslationAsync(
+            id, "de", author, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·K — RemoveTranslation denied → Forbid ───────────────────────
+    // A standing-denied actor removing a translation is a clean 403.
+
+    [Fact]
+    public async Task RemoveTranslation_Denied_Forbid()
+    {
+        const string id = "ev-r-002";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-member", Arg.Any<CancellationToken>())
+            .Returns(SampleEvent(id, "subj-author-002"));
+        events.RemoveEventTranslationAsync(
+                id, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(events, roles: [Roles.Member], subjectId: "subj-member");
+
+        var result = await controller.RemoveTranslation(id, "de");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    // ── ADR 0059·L — RemoveTranslation missing event → NotFound ──────────────
+    // A missing event is a clean 404 (the non-leaky pin).
+
+    [Fact]
+    public async Task RemoveTranslation_MissingEvent_NotFound()
+    {
+        const string id = "ev-r-missing";
+        var events = Substitute.For<IEventService>();
+        events.GetAsync(id, "subj-author-003", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Event>(new KeyNotFoundException($"Event '{id}' was not found.")));
+
+        var controller = Build(events, subjectId: "subj-author-003");
+
+        var result = await controller.RemoveTranslation(id, "de");
+
+        Assert.IsType<NotFoundResult>(result);
+        await events.DidNotReceive().RemoveEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    // ── ADR 0059·M — RemoveTranslation blank languageCode → redirect back ────
+    // A blank <c>languageCode</c> is a shape error — the controller
+    // short-circuits with a redirect back and never calls the service.
+
+    [Fact]
+    public async Task RemoveTranslation_BlankLanguageCode_RedirectsBack_NoWrite()
+    {
+        var events = Substitute.For<IEventService>();
+        var controller = Build(events, subjectId: "subj-author-005");
+
+        var result = await controller.RemoveTranslation("ev-r-005", "   ");
+
+        Assert.IsType<RedirectResult>(result);
+        await events.DidNotReceive().RemoveEventTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(),
+            Arg.Any<CancellationToken>());
     }
 
     // ── Harness ────────────────────────────────────────────────────────────────

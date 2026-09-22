@@ -39,9 +39,11 @@ namespace Kumunita.Core.Events;
 /// <see cref="ImageIds"/> / <see cref="AttachmentIds"/> (the client never sends them).</item>
 /// </list>
 /// <para>
-/// **Not extended in M4:** the translation lane (ADR 0022/0026/0029) — an
-/// <c>Event</c> is authored-in-language only in this milestone (the design doc §5
-/// non-decision); the event-translation row is a follow-on lane, own ADR.
+/// <b>Translation lane:</b> an <c>Event</c> may also carry **user-added
+/// translations** (the <see cref="EventTranslation"/> row) — added / edited /
+/// removed by the event's author or a Translator / GlobalAdmin (ADR 0059, the
+/// ADR 0022/0029 lane carried to the M4 surface). <c>LanguageCode</c> below is
+/// the authored-in language, *not* the translation mechanism.
 /// </para>
 /// </summary>
 public sealed class Event
@@ -124,7 +126,9 @@ public sealed class Event
     /// <c>Post.LanguageCode</c> shape). Written at create time and editable on the edit
     /// lane. Materialized from the instance default (<c>en</c> floor) when the author
     /// leaves it unchosen, so no stored row is empty. **Not a translation mechanism** —
-    /// the M4 translation lane is *not* extended to events (the design doc §5).
+    /// user-added translations of this event live on the separate
+    /// <see cref="EventTranslation"/> row (ADR 0059), keyed by their own
+    /// <c>LanguageCode</c>.
     /// </summary>
     public string LanguageCode { get; set; } = string.Empty;
 

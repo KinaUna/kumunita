@@ -41,6 +41,10 @@ namespace Kumunita.Web.Controllers;
 /// lane.</item>
 /// <item><c>POST /events/{id}/rsvp</c> — the last-write-wins RSVP (no audit
 /// row — a routine resident action, not an access decision).</item>
+/// <item><c>POST /events/{id}/translations[...]</c> — the ADR 0059
+/// user-added translation lanes (add / update / remove; standing — author /
+/// Translator / GlobalAdmin — re-pinned server-side; each write commits an
+/// <c>eventtranslation.*</c> audit row atomically, C3).</item>
 /// </list>
 /// <para>
 /// **ADR 0006-D:** a thin HTTP layer — the visibility split is the service's,
@@ -61,19 +65,22 @@ public sealed class EventController : Controller
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
     private readonly EffectiveTimezoneResolver timezone;
+    private readonly ITranslationProvider? translationProvider;
 
     public EventController(
         IEventService events,
         IUserInfoService userInfo,
         ILocalizationService localization,
         IDocumentStore store,
-        EffectiveTimezoneResolver timezone)
+        EffectiveTimezoneResolver timezone,
+        ITranslationProvider? translationProvider = null)
     {
         this.events = events;
         this.userInfo = userInfo;
         this.localization = localization;
         this.store = store;
         this.timezone = timezone;
+        this.translationProvider = translationProvider;
     }
     private static string? SubjectId(ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
@@ -160,6 +167,45 @@ public sealed class EventController : Controller
             .ToList();
     }
 
+    /// <summary>
+    /// ADR 0051 — in place, swap <paramref name="event"/>'s Title/Body to the
+    /// translation row in the viewer's current language when one exists: the
+    /// translation's body (required on the row), and its title when non-blank
+    /// (otherwise the authored title is kept — the ADR 0022 floor). A read, not
+    /// a decision: the event's <c>CanSeeAsync</c> already ran in the feed read.
+    /// No content is generated, rewritten, or fetched — only the exact
+    /// human-authored row (ADR 0018/0022) is selected. A null
+    /// <see cref="translationProvider"/> (test construction site) is a no-op —
+    /// the authored-in text stays, exactly the <see cref="PostsController
+    /// .ApplyTranslationToPostAsync"/> shape.
+    /// </summary>
+    private async Task ApplyEventTranslationAsync(Event @event, string effLang)
+    {
+        if (translationProvider is null)
+            return;
+        var translations = await this.events.GetEventTranslationsAsync(@event.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(match.Title))
+            @event.Title = match.Title; // blank translation title → the authored-in title
+        @event.Body = match.Body; // Body is required on a translation row
+    }
+
+    /// <summary>
+    /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
+    /// <c>TempData</c> confirmation message (a display convenience — a
+    /// <see cref="Kumunita.Core.Localization.ILocalizationService
+    /// .ListLanguagesAsync"/> read, not a decision). Falls back to the raw
+    /// code when the language is not in the catalog (a never-blank shape — the
+    /// <see cref="PostsController.SeedLanguageName"/> idiom).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync();
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
+    }
+
     // ── Read lanes ─────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -184,6 +230,19 @@ public sealed class EventController : Controller
         catch (UnauthorizedAccessException)
         {
             return new ForbidResult();
+        }
+
+        // ADR 0051 — extend ADR 0049's default-visible-variant rule to the feed
+        // surface: each row shows the event's title/body in the viewer's current
+        // language when a translation exists (else the authored-in text — the
+        // ADR 0022 floor). One read of the shared per-request chain; a "a read,
+        // not a decision" surface (the feed's CanSeeAsync already ran). No Core /
+        // schema change (the posts feed's ADR 0051 idiom).
+        if (translationProvider is not null)
+        {
+            var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var e in events)
+                await ApplyEventTranslationAsync(e, effLang);
         }
 
         // Author display names (a *read* lookup, never an access decision — the
@@ -327,6 +386,21 @@ public sealed class EventController : Controller
             rsvps.Add(new EventRsvpEntry(rsvp, name));
         }
 
+        // ADR 0059 — the event's user-added translations (a "a read, not a
+        // decision" surface; the parent event's single Read decision already ran
+        // in GetAsync above — C-M3·1) and the enabled-catalog language set the
+        // chips / "add a translation" candidate list render from (the ADR 0027
+        // chip-swap + ADR 0022 add-form shape). CanTranslate is the ADR 0059
+        // display pin (author / Translator / GlobalAdmin) — the real gate is the
+        // server-side re-check in the Add/Update/Remove lanes at POST.
+        var eventTranslations = await this.events.GetEventTranslationsAsync(id);
+        var enabledLanguages = await SeedLanguagePickerAsync();
+        var translationCodes = eventTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var languages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
+            .ToList();
+        var canTranslate = EventService.CanAddTranslation(ev.AuthorId, actorId, roles);
+
         var vm = new EventDetailViewModel(
             Event: ev,
             AuthorDisplayName: authorName,
@@ -335,7 +409,11 @@ public sealed class EventController : Controller
             CanDelete: canDelete,
             CanPublish: canPublish,
             MyRsvp: myRsvp,
-            Rsvps: rsvps);
+            Rsvps: rsvps,
+            EventTranslations: eventTranslations,
+            Languages: languages,
+            CanTranslate: canTranslate,
+            OriginalLanguageCode: ev.LanguageCode);
 
         return View(vm);
     }
@@ -732,6 +810,227 @@ public sealed class EventController : Controller
         {
             return new ForbidResult();
         }
+        return Redirect($"/events/{id}");
+    }
+
+    // ── Translations (ADR 0059) — user-added event translations ──────────────
+    //
+    // Thin Web lanes (ADR 0006-D: routes + shape) that delegate the write +
+    // standing decision to the frozen <see cref="IEventService"/> translation
+    // seams (the standing — author / Translator / GlobalAdmin — is re-pinned
+    // server-side; the detail page's <see cref="EventDetailViewModel
+    // .CanTranslate"/> is only the display affordance). A denied standing actor
+    // is a 403 (<see cref="UnauthorizedAccessException"/> → <c>ForbidResult</c>);
+    // a missing event/row is a 404 (<see cref="KeyNotFoundException"/> →
+    // <c>NotFound</c>). The M4 convention: the service opens its **own** write
+    // session (C3) — the controller does **not** wrap the call in
+    // <see cref="IDocumentStore.LightweightSession"/> (contrast the M3
+    // <see cref="PostsController"/> translation lanes).
+
+    /// <summary>
+    /// Adds a **user-added translation** of the event into
+    /// <paramref name="languageCode"/> (ADR 0059):
+    /// <c>POST /events/{id}/translations</c>. A thin Web lane (ADR 0006-D)
+    /// delegating to <see cref="IEventService.AddEventTranslationAsync"/>.
+    /// <para>
+    /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the event
+    /// (re-run the parent's single <c>Read</c> decision via
+    /// <see cref="IEventService.GetAsync"/> — the exact
+    /// <see cref="Rsvp"/> / <see cref="Delete"/> precedent; a
+    /// <c>KeyNotFoundException</c> is a 404, a
+    /// <c>UnauthorizedAccessException</c> a 403 — the C3 non-leaky posture).
+    /// </para>
+    /// </summary>
+    [HttpPost("/events/{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/events/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/events/{id}");
+        }
+
+        // C-M3·1 precondition: the viewer must be able to see the event.
+        try
+        {
+            await this.events.GetAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await this.events.AddEventTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                RoleSet(User),
+                HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/events/{id}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the event in
+    /// <paramref name="languageCode"/> (ADR 0059, the ADR 0048 edit-lane
+    /// shape): <c>POST /events/{id}/translations/update</c>. Thin Web lane;
+    /// delegates to <see cref="IEventService.UpdateEventTranslationAsync"/>.
+    /// Precondition + failure shapes mirror <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("/events/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/events/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/events/{id}");
+        }
+
+        try
+        {
+            await this.events.GetAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await this.events.UpdateEventTranslationAsync(
+                id,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actorId,
+                RoleSet(User),
+                HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/events/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the event in
+    /// <paramref name="languageCode"/> (ADR 0059, the ADR 0048 remove-lane
+    /// shape): <c>POST /events/{id}/translations/remove</c>. Thin Web lane;
+    /// delegates to <see cref="IEventService.RemoveEventTranslationAsync"/>.
+    /// Failure shapes mirror <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("/events/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/events/{id}");
+        }
+
+        try
+        {
+            await this.events.GetAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await this.events.RemoveEventTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
         return Redirect($"/events/{id}");
     }
 }

@@ -645,13 +645,16 @@ footer now carries an unconditional "Platform" column linking all five (ADR
 ### M4 → M5 deferrals (carried forward — design/m4-events-design.md §5)
 
 M4 shipped the events surface **additively and reusing** (ADR 0054). The
-following were **deliberately not** in M4 and are follow-on lanes (own design
-doc + ADR each) or M6 work — the M5 close should carry this list so the
-out-of-scope boundary stays honest:
+following were **deliberately not** in M4's own scope and are follow-on lanes
+(own design doc + ADR each) or M6 work — the M5 close should carry this list
+so the out-of-scope boundary stays honest. (One item below — event
+translations — has since shipped as its own lane, ADR 0059; it is listed here
+to keep the M4 boundary honest, not as a live deferral.)
 
-- **Event translations** — the `Event` is authored-in-language only (ADR
-  0018); the ADR 0022/0026/0029 translation lane is *not* extended to events
-  yet.
+- **Event translations** — the `Event` is authored-in-language (ADR 0018);
+  the ADR 0022/0026/0029 user-added translation lane **now** extends to events
+  as a separate named lane (ADR 0059 — `EventTranslation` + the add / update /
+  remove seams + the ADR 0027/0049/0051 display).
 - **Group events** — a `Group`-scoped event channel (the ADR 0013
   membership-lane precedent would be the shape).
 - **Per-resident reminder settings** — "remind me N hours before" is a

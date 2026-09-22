@@ -7,12 +7,12 @@ namespace Kumunita.Core;
 /// The <c>M4</c> (Events) bounded context's Marten-native document registration
 /// surface (ADR 0004 §B.1 / ADR 0054) — the parallel surface to
 /// <see cref="M1DocTypes"/> / <see cref="M3DocTypes"/> / <see cref="MediaDocTypes"/> /
-/// <see cref="PageDocTypes"/> for the new <c>Kumunita.Core.Events</c> context. Both
+/// <see cref="PageDocTypes"/> for the new <c>Kumunita.Core.Events</c> context. All
 /// documents are POCOs with the conventional <c>string</c> <c>Id</c> identity (the
-/// M3 "string Id" convention), so only the two business/feed indexes need pinning;
+/// M3 "string Id" convention), so only the business/feed indexes need pinning;
 /// everything else is Marten's default.
 /// <para>
-/// **The two docs are new, not additive** (ADR 0054 §3.1 / §3.2 — a new bounded
+/// **The docs are new, not additive** (ADR 0054 §3.1 / §3.2 — a new bounded
 /// context, its own POCOs, its own surface). The **surface** is additive:
 /// <c>ApplyAllConfiguredChangesToDatabaseAsync()</c> delta-detects and applies the
 /// new tables idempotently at boot; the existing <c>Post</c> / <c>Announcement</c> /
@@ -60,5 +60,18 @@ public static class M4DocTypes
         // required (unlike M3DocTypes' AnnouncementTranslation edge case).
         opts.Schema.For<EventRsvp>()
                .UniqueIndex(r => r.EventId, r => r.UserId);
+
+        // EventTranslation (ADR 0059 — the "follow-on lane" ADR 0054 explicitly
+        // deferred): one row per (event, language) pair. The (EventId, LanguageCode)
+        // **unique** index enforces exactly one translation per language per event at
+        // the DB layer — the same business-key convention as PostTranslation /
+        // AnnouncementTranslation (the surrogate Id is the document identity, the
+        // (EventId, LanguageCode) pair is the DB-enforced business key).
+        //
+        // The auto-derived name (mt_doc_eventtranslation_uidx_event_idlanguage_code,
+        // ~50 chars) is under Postgres's 64-char NAMEDATALEN limit, so no explicit
+        // name is required (unlike M3DocTypes' AnnouncementTranslation edge case).
+        opts.Schema.For<EventTranslation>()
+               .UniqueIndex(t => t.EventId, t => t.LanguageCode);
     }
 }

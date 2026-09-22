@@ -379,6 +379,29 @@ public sealed record EventIndexViewModel(
 /// audited lane as every other avatar (<c>GET /profile/avatar/{subjectId}</c>,
 /// the Directory pattern — the view's <c>data-avatar-fallback</c> monogram).
 /// </para>
+/// <para>
+/// **<see cref="EventTranslations"/>** is the event's user-added translations
+/// (ADR 0059 — the "follow-on lane" ADR 0054 deferred; the
+/// <see cref="Kumunita.Core.Events.IEventService
+/// .GetEventTranslationsAsync"/> read; **not** an authorization surface — C-M3·1
+/// — the Web reads it only after <see cref="Kumunita.Core.Events
+/// .IEventService.GetAsync"/> returned the event). **<see cref="Languages"/>**
+/// is the enabled language catalog (the
+/// <see cref="LanguageOption"/> set — each with its
+/// <see cref="LanguageOption.HasTranslation"/> flag set from
+/// <see cref="EventTranslations"/>), the chip-swap + "add a translation"
+/// candidate list (the ADR 0027 chip-swap + ADR 0022 add-form shape).
+/// **<see cref="CanTranslate"/>** is the ADR 0059 display pin
+/// (<see cref="Kumunita.Core.Events.EventService.CanAddTranslation"/> — the
+/// author / Translator / GlobalAdmin matrix) — true renders the add / edit /
+/// remove affordances (the real gate is the server-side re-check in
+/// <see cref="Kumunita.Core.Events.IEventService
+/// .AddEventTranslationAsync"/> / <see cref="Kumunita.Core.Events.IEventService
+/// .UpdateEventTranslationAsync"/> / <see cref="Kumunita.Core.Events.IEventService
+/// .RemoveEventTranslationAsync"/>). **<see cref="OriginalLanguageCode"/>**
+/// is the event's authored-in tag (ADR 0018) — the "original" variant's
+/// language name in the chip-swap + the base row's identity.
+/// </para>
 /// </summary>
 public sealed record EventDetailViewModel(
     Kumunita.Core.Events.Event Event,
@@ -388,7 +411,22 @@ public sealed record EventDetailViewModel(
     bool CanDelete,
     bool CanPublish,
     Kumunita.Core.Events.EventRsvp? MyRsvp,
-    IReadOnlyList<EventRsvpEntry> Rsvps);
+    IReadOnlyList<EventRsvpEntry> Rsvps,
+    IReadOnlyList<Kumunita.Core.Events.EventTranslation>? EventTranslations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "")
+{
+    /// <summary>The event's translations, coalesced to a non-null empty list (a
+    /// never-blank shape for the view).</summary>
+    public IReadOnlyList<Kumunita.Core.Events.EventTranslation> Translations
+        => EventTranslations ?? [];
+
+    /// <summary>The enabled language options, coalesced to a non-null empty list
+    /// (a never-blank shape for the view).</summary>
+    public IReadOnlyList<LanguageOption> LanguageOptions
+        => Languages ?? [];
+}
 
 /// <summary>
 /// One RSVP row enriched with its resident's <see cref="DisplayName"/>
