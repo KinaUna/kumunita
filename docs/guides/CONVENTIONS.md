@@ -40,7 +40,7 @@ The guide set is a **closed registry**, in the seeder's `GuidePages()` array
 2026-09-21) — the ADR 0042 D1 "the registry is the single source both the
 seeder and these tests read" shape, applied to the guides. A new guide is a
 new row in **all four** arrays (one per language), not a silent addition —
-the ADR 0040 `PageKind` closed-set rule applied to the guide set. The eight
+the ADR 0040 `PageKind` closed-set rule applied to the guide set. The nine
 seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
 `RE`/`TG`/`PG`/`GU`/`GA`/`TR`/`TZ`/`DF` lanes):
 
@@ -54,6 +54,7 @@ seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
 | `language` | the language picker, the `Accept-Language` fallback, the per-resident override | ADR 0005 / 0015 / 0046 / 0019 / 0020 |
 | `events` | how an event works: the feed, the detail view, RSVP, the day-before reminder | ADR 0054 |
 | `translator` | what the `Translator` role may and may not do, in plain language | ADR 0021 |
+| `child-accounts` | the guardian's child accounts: what a guardian may and may not do (suspend, memberships, invitation approval, assign a second guardian, hand-over), and the privacy boundary (no reading the child's content) | ADR 0028 / 0038 |
 
 A guide that documents a feature **not yet shipped** (M5 Projects, M6
 Portability / iCal / notifications / search, the deferred items in SECURITY.md

@@ -1215,6 +1215,38 @@ public static class FirstBootSeeder
              "A Translator's work is visible: the interface shows, next to a " +
              "translated thing, the one who added that translation, and the " +
              "original is always one click away.\n"),
+            ("child-accounts", "Child accounts",
+             "## Child accounts\n\n" +
+             "A child account is an account you set up for a child, and you keep " +
+             "the controls over it. You set it up because you created the account " +
+             "— that standing is what gives you the controls, and it does not let " +
+             "you read what the child writes.\n\n" +
+             "**What you can do.** You can suspend and un-suspend the account, " +
+             "decide which groups and communities the child belongs to, approve a " +
+             "group invitation the child received, and assign another guardian to " +
+             "share the controls. You can also hand the account over when the child " +
+             "is ready to run it on their own.\n\n" +
+             "**What you can't do.** You can't read the child's posts, replies, or " +
+             "profile. Those are the child's, and they stay the child's.\n\n" +
+             "**To add one.** Open **Account → Children**, fill in the child's " +
+             "display name, email, and a password, and click **Add a child " +
+             "account**. The child verifies their own email to sign in — the usual " +
+             "sign-up flow.\n\n" +
+             "**To suspend or un-suspend.** On the **Children** page, find the " +
+             "child and click **Suspend** or **Un-suspend**. A suspended child " +
+             "can't sign in until you un-suspend them.\n\n" +
+             "**To manage memberships.** On the child's page, add or remove group " +
+             "and community memberships under **Group memberships** and " +
+             "**Community memberships**.\n\n" +
+             "**To approve a group invitation.** On the child's page, find the " +
+             "invitation under **Pending group invitations** and click " +
+             "**Approve**.\n\n" +
+             "**To assign another guardian.** On the child's page, open " +
+             "**Assign a guardian**, enter their email, and click **Assign**. " +
+             "They then hold the same controls you do.\n\n" +
+             "**To hand over the account.** When the child is ready, open their " +
+             "page and click **Dissolve guardianship**. Their memberships are " +
+             "kept, and their own controls come back on the next read.\n"),
         ];
     }
 
@@ -1413,6 +1445,43 @@ public static class FirstBootSeeder
              "Die Arbeit eines Übersetzers ist sichtbar: die Oberfläche zeigt neben " +
              "einem übersetzten Ding die Person, die diese Übersetzung " +
              "hinzugefügt hat, und das Original ist immer einen Klick entfernt.\n"),
+            ("child-accounts", "Kinderkonten",
+             "## Kinderkonten\n\n" +
+             "Ein Kinderkonto ist ein Konto, das du für ein Kind einrichtest, und " +
+             "die Kontrollen darüber behältst du. Du hast das Konto eingerichtet — " +
+             "genau das gibt dir die Kontrollen, aber es lässt dich nicht lesen, " +
+             "was das Kind schreibt.\n\n" +
+             "**Was du kannst.** Du kannst das Konto sperren und wieder aktivieren, " +
+             "entscheiden, in welchen Gruppen und Gemeinschaften das Kind ist, " +
+             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, und " +
+             "einen weiteren Vormund zuweisen, mit dem du die Kontrollen teilst. " +
+             "Und du kannst das Konto übergeben, wenn das Kind bereit ist, es " +
+             "selbst zu führen.\n\n" +
+             "**Was du nicht kannst.** Du kannst die Beiträge, Antworten und das " +
+             "Profil des Kindes nicht lesen. Das sind des Kindes, und es bleibt " +
+             "des Kindes.\n\n" +
+             "**Zum Hinzufügen.** Öffne **Konto → Kinder**, gib den Anzeigenamen, " +
+             "die E-Mail-Adresse und ein Passwort des Kindes ein und klicke auf " +
+             "**Kinderkonto hinzufügen**. Das Kind bestätigt seine eigene E-Mail " +
+             "zur Anmeldung — der gewöhnliche Anmeldevorgang.\n\n" +
+             "**Zum Sperren oder Wieder aktivieren.** Auf der Seite **Kinder** " +
+             "findest du das Kind und klickst auf **Sperren** oder " +
+             "**Wieder aktivieren**. Ein gesperrtes Kind kann sich nicht " +
+             "anmelden, bis du es wieder aktivierst.\n\n" +
+             "**Mitgliedschaften verwalten.** Auf der Seite des Kindes fügst du " +
+             "Gruppen- und Gemeinschaftsmitgliedschaften unter " +
+             "**Gruppenmitgliedschaften** und **Gemeinschaftsmitgliedschaften** " +
+             "hinzu oder entfernst sie.\n\n" +
+             "**Eine Gruppeneinladung genehmigen.** Auf der Seite des Kindes " +
+             "findest du die Einladung unter **Ausstehende Gruppeneinladungen** " +
+             "und klickst auf **Genehmigen**.\n\n" +
+             "**Einen weiteren Vormund zuweisen.** Auf der Seite des Kindes " +
+             "öffnest du **Vormund zuweisen**, gibst dessen E-Mail ein und klickst " +
+             "auf **Zuweisen**. Dann hat er dieselben Kontrollen wie du.\n\n" +
+             "**Das Konto übergeben.** Wenn das Kind bereit ist, öffne seine Seite " +
+             "und klicke auf **Vormundschaft auflösen**. Die Mitgliedschaften " +
+             "bleiben erhalten, und die eigenen Kontrollen kommen beim nächsten " +
+             "Lesen zurück.\n"),
         ];
     }
 
@@ -1606,6 +1675,41 @@ public static class FirstBootSeeder
              "Le travail d'un traducteur est visible : l'interface montre, à côté " +
              "d'une chose traduite, la personne qui a ajouté cette traduction, et " +
              "l'original est toujours à un clic.\n"),
+            ("child-accounts", "Comptes enfants",
+             "## Comptes enfants\n\n" +
+             "Un compte enfant est un compte que tu crées pour un enfant, et tu en " +
+             "gardes les contrôles. Tu l'as créé — c'est cela qui te donne les " +
+             "contrôles, mais cela ne te laisse pas lire ce que l'enfant " +
+             "écrit.\n\n" +
+             "**Ce que tu peux faire.** Tu peux suspendre et réactiver le compte, " +
+             "décider de quels groupes et communautés l'enfant fait partie, " +
+             "approuver une invitation de groupe que l'enfant a reçue, et assigner " +
+             "un autre tuteur pour partager les contrôles. Et tu peux transférer " +
+             "le compte quand l'enfant est prêt à le conduire seul.\n\n" +
+             "**Ce que tu ne peux pas faire.** Tu ne peux pas lire les " +
+             "publications, les réponses ou le profil de l'enfant. Ce sont ceux de " +
+             "l'enfant, et ils restent ceux de l'enfant.\n\n" +
+             "**Pour en ajouter un.** Ouvre **Compte → Enfants**, entre le nom " +
+             "affiché, l'adresse e-mail et un mot de passe de l'enfant, et clique " +
+             "sur **Ajouter un compte enfant**. L'enfant vérifie son propre e-mail " +
+             "pour se connecter — le flux d'inscription habituel.\n\n" +
+             "**Pour suspendre ou réactiver.** Sur la page **Enfants**, trouve " +
+             "l'enfant et clique sur **Suspendre** ou **Réactiver**. Un enfant " +
+             "suspendu ne peut pas se connecter jusqu'à ce que tu le " +
+             "réactives.\n\n" +
+             "**Gérer les adhésions.** Sur la page de l'enfant, ajoute ou retire " +
+             "des adhésions aux groupes et aux communautés sous **Adhésions aux " +
+             "groupes** et **Adhésions aux communautés**.\n\n" +
+             "**Approuver une invitation de groupe.** Sur la page de l'enfant, " +
+             "trouve l'invitation sous **Invitations de groupe en attente** et " +
+             "clique sur **Approuver**.\n\n" +
+             "**Assigner un autre tuteur.** Sur la page de l'enfant, ouvre " +
+             "**Assigner un tuteur**, entre son e-mail et clique sur **Assigner**. " +
+             "Il a alors les mêmes contrôles que toi.\n\n" +
+             "**Transférer le compte.** Quand l'enfant est prêt, ouvre sa page et " +
+             "clique sur **Dissoudre la tutelle**. Ses adhésions sont " +
+             "conservées, et ses propres contrôles reviennent à la prochaine " +
+             "lecture.\n"),
         ];
     }
 
@@ -1785,6 +1889,38 @@ public static class FirstBootSeeder
              "En oversætters arbejde er synligt: grænsefladen viser, ved siden " +
              "af en oversat ting, den person, der har tilføjet denne oversættelse, " +
              "og originalen er altid ét klik væk.\n"),
+            ("child-accounts", "Barnkonti",
+             "## Barnkonti\n\n" +
+             "En barnkonto er en konto, du opretter til et barn, og kontrollerne " +
+             "over den holder du. Du har oprettet kontoen — det er det, der giver " +
+             "dig kontrollerne, men det lader dig ikke læse, hvad barnet " +
+             "skriver.\n\n" +
+             "**Hvad du kan.** Du kan suspendere og genoprette kontoen, bestemme, " +
+             "hvilke grupper og fællesskaber barnet tilhører, godkende en " +
+             "gruppeinvitation, barnet har modtaget, og tildele en anden " +
+             "værgemand, så I deler kontrollerne. Og du kan give kontoen videre, " +
+             "når barnet er klar til at drive den selv.\n\n" +
+             "**Hvad du ikke kan.** Du kan ikke læse barnets indlæg, svar eller " +
+             "profil. De er barnets, og de forbliver barnets.\n\n" +
+             "**For at tilføje en.** Åbn **Konto → Børn**, udfyld barnets " +
+             "vistnavn, e-mailadresse og en adgangskode, og klik på **Tilføj en " +
+             "barnkonto**. Barnet bekræfter sin egen e-mail for at logge ind — " +
+             "den sædvanlige tilmeldingsproces.\n\n" +
+             "**For at suspendere eller genoprette.** På siden **Børn** finder du " +
+             "barnet og klikker på **Suspendér** eller **Genopret**. Et suspendet " +
+             "barn kan ikke logge ind, indtil du genopretter det.\n\n" +
+             "**Styr på medlemskaber.** På barnets side tilføjer eller fjerner du " +
+             "gruppemedlemskaber og fællesskabsmedlemskaber under " +
+             "**Gruppemedlemskaber** og **Fællesskabsmedlemskaber**.\n\n" +
+             "**Godkend en gruppeinvitation.** På barnets side finder du " +
+             "invitationen under **Afventende gruppeinvitationer** og klikker " +
+             "på **Godkend**.\n\n" +
+             "**Tildel en anden værgemand.** På barnets side åbner du **Tildel " +
+             "en værgemand**, indtaster e-mailen og klikker på **Tildel**. Så har " +
+             "personen de samme kontroller som dig.\n\n" +
+             "**Giv kontoen videre.** Når barnet er klar, åbner du dets side og " +
+             "klikker på **Afløs værgemodet**. Medlemskaberne bevares, og " +
+             "barnets egne kontroller kommer tilbage ved næste læsning.\n"),
         ];
     }
 
@@ -1844,7 +1980,8 @@ public static class FirstBootSeeder
              "- [Audience](/pages/system/help/audience) — choosing who can see a post\n" +
              "- [Language](/pages/system/help/language) — your language, time zone, and date format\n" +
              "- [Events](/pages/system/help/events) — the feed, RSVP, reminders\n" +
-             "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n\n" +
+             "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
+             "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -1936,7 +2073,8 @@ public static class FirstBootSeeder
              "- [Zielgruppe](/pages/system/help/audience) — Wer darf einen Beitrag sehen\n" +
              "- [Sprache](/pages/system/help/language) — Deine Sprache, Zeitzone und das Datumsformat\n" +
              "- [Termine](/pages/system/help/events) — Der Feed, RSVP, Erinnerungen\n" +
-             "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n\n" +
+             "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
+             "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -2033,7 +2171,8 @@ public static class FirstBootSeeder
              "- [Audience](/pages/system/help/audience) — Qui peut voir un message\n" +
              "- [Langue](/pages/system/help/language) — Ta langue, ton fuseau horaire et ton format de date\n" +
              "- [Événements](/pages/system/help/events) — Le fil, la participation, les rappels\n" +
-             "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n\n" +
+             "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
+             "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -2127,7 +2266,8 @@ public static class FirstBootSeeder
              "- [Modtagerkreds](/pages/system/help/audience) — Hvem der kan se et indlæg\n" +
              "- [Sprog](/pages/system/help/language) — Dit sprog, din tidzone og dit datoformat\n" +
              "- [Begivenheder](/pages/system/help/events) — Feeden, deltagelse, påmindelser\n" +
-             "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n\n" +
+             "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
+             "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",
