@@ -715,6 +715,16 @@ body.kmb-page-fullbleed .navbar {
   height: 72px;
   font-size: 1.5rem;
 }
+/* The compact size used by the navbar account toggle (the toggle is ~32px tall). */
+.avatar.avatar-sm {
+  width: 28px;
+  height: 28px;
+}
+.avatar-mono.avatar-sm {
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+}
 
 /* --- Rich-content bodies (RC U06) ------------------------------------------
    Every UGC body (post / group-post / announcement + replies + translations)

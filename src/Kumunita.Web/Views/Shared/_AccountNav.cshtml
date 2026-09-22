@@ -1,10 +1,12 @@
 @using Kumunita.Core.Localization
 @using Kumunita.Core.Identity
+@using Kumunita.Core.UserInfo
 @using Kumunita.Web.Security
 @inject ILocalizationService Localization
 @inject ITranslationProvider Translation
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @inject IIdentityService Identity
+@inject IUserInfoService UserInfo
 @*
     Right-hand nav actions (the public section links live in the layout's
     left nav). Signed in: a single account dropdown (toggle labelled with the
@@ -23,6 +25,21 @@
     // to the languages surface (the translation editors are open to them). GlobalAdmins
     // already reach it through the Admin shell, so this link is Translator-only.
     bool isTranslator = KumunitaPrincipal.IsTranslator(User);
+
+    // The signed-in resident's avatar on the account toggle (the Directory
+    // pattern — the same fail-closed contract as every avatar <img>: src is the
+    // audited serving lane GET /profile/avatar/{subjectId}, and on a 404 (no
+    // avatar set) avatar.js hides the <img> and shows the monogram sibling).
+    // A read of the signed-in resident's own row — never another resident's.
+    string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
+    string navAvatarInitial = string.Empty;
+    if (!string.IsNullOrEmpty(navAvatarSubject))
+    {
+        var navProfile = await UserInfo.GetProfileAsync(navAvatarSubject);
+        navAvatarInitial = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
+            ? char.ToUpperInvariant(navProfile.DisplayName.TrimStart()[0]).ToString()
+            : string.Empty;
+    }
 
     // The nav-bar language switcher: the enabled catalog (in SortOrder), and the
     // resident's current preference (the kumunita.locale cookie) to mark the
@@ -57,8 +74,16 @@
            language switcher sits inside it as a sub-section, so the navbar
            carries a single toggle instead of six flat links. *@
         <li class="nav-item dropdown">
-            <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
+            <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center gap-2" href="#"
                id="accountMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                @if (!string.IsNullOrEmpty(navAvatarSubject))
+                {
+                    <span class="d-inline-flex align-items-center">
+                        <img class="avatar avatar-sm" src="/profile/avatar/@navAvatarSubject" alt=""
+                             data-avatar-fallback>
+                        <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
+                    </span>
+                }
                 <kw-l key="nav.account">Account</kw-l>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
