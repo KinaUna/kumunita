@@ -9,6 +9,8 @@ using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Marten;
 using Marten.Services;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +41,12 @@ builder.Services.AddSingleton<ILogger>(sp => sp.GetRequiredService<ILoggerFactor
 // Per-instance identity: same image everywhere, different config (ADR 0002).
 builder.Services.Configure<CommunityOptions>(
     builder.Configuration.GetSection(CommunityOptions.SectionName));
+
+// /health full-payload gate (M3): when Health__Token is set, the detailed
+// diagnostic payload requires the X-Health-Token header (or a GlobalAdmin
+// session). The minimal liveness probe stays anonymous (Coolify / edge proxy).
+builder.Services.Configure<HealthOptions>(
+    builder.Configuration.GetSection(HealthOptions.SectionName));
 
 // Media (plan U2): per-instance media-store config (ADR 0011). Same bind shape
 // as CommunityOptions — `Media__*` (OPS.md); the RootPath default + the raster
@@ -180,6 +188,48 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
+
+// Rate limiting (SECURITY.md §5 control "Rate limiting (register / login /
+// report), per-IP" — A2). Per-endpoint fixed-window policies on the
+// anonymous write surfaces (signup, resend, login) and the resident-facing
+// report-intake lane. Partitioned by client IP (resolved via UseForwardedHeaders
+// behind the Caddy edge, so the real client IP — not the proxy's — is used).
+// A 429 response is returned when the policy's limit is exceeded.
+builder.Services.AddRateLimiter(opts =>
+{
+    // A reusable fixed-window policy: allow `limit` requests per `window`
+    // per partition key (the resolved client IP — real IP behind the edge).
+    // AddPolicy takes a Func<HttpContext, RateLimitPartition<TPartitionKey>>.
+    static void AddWindow(RateLimiterOptions o, string policyName, int limit, TimeSpan window)
+    {
+        o.AddPolicy(policyName, (context) =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = limit,
+                    Window = window,
+                    AutoReplenishment = true
+                }));
+    }
+
+    // Login: 5 attempts per 15 minutes per IP (per-account lockout already
+    // covers the same-account brute-force; this covers cross-account stuffing).
+    AddWindow(opts, "login", limit: 5, window: TimeSpan.FromMinutes(15));
+
+    // Signup: 5 per hour per IP (account-creation flood).
+    AddWindow(opts, "signup", limit: 5, window: TimeSpan.FromHours(1));
+
+    // Resend verification: 5 per hour per IP (email-bombing surface).
+    AddWindow(opts, "resend", limit: 5, window: TimeSpan.FromHours(1));
+
+    // Report filing: 10 per hour per IP (authorization-escalation surface per
+    // SECURITY.md — a resident can file reports against content they can see).
+    AddWindow(opts, "report", limit: 10, window: TimeSpan.FromHours(1));
+
+    // Setup (admin first-boot token): 5 per 15 minutes per IP (token brute-force).
+    AddWindow(opts, "setup", limit: 5, window: TimeSpan.FromMinutes(15));
+});
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
 // .AspNetCore.Identity.Application cookie, with a default ValidationInterval of
@@ -390,9 +440,23 @@ if (!app.Environment.IsDevelopment())
 // dev launch profile binds an https port directly when you want one locally.
 app.UseRouting();
 
+// Rate limiting (H1) — must run AFTER UseRouting so per-endpoint policies
+// (declared via [EnableRateLimiting] on the controller action) are resolved
+// from the matched endpoint. The partition key is the resolved client IP
+// (UseForwardedHeaders restored it earlier in the non-dev pipeline; in dev
+// the key is the loopback — still functional for local flood-throttling).
+app.UseRateLimiter();
+
 app.UseAuthentication();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
+
+// M4 — privilege-revocation enforcement: re-reads the DB role set on every
+// request for principals carrying elevated roles, and signs them out if the
+// role set changed while the session was live. Registered after block
+// enforcement (a blocked user is signed out unconditionally) and before
+// authorization (so the gate sees a current claim set).
+app.UseMiddleware<PrivilegedStampMiddleware>();
 
 app.UseAuthorization();
 

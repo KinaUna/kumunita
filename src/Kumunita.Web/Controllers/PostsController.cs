@@ -9,6 +9,7 @@ using Kumunita.Web.Security;
 using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -1903,6 +1904,7 @@ public sealed class PostsController(
     /// </summary>
     [HttpPost("/posts/{id}/report")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("report")]
     public async Task<IActionResult> Report([FromRoute] string id, [FromForm] string? reason)
     {
         if (string.IsNullOrEmpty(id))

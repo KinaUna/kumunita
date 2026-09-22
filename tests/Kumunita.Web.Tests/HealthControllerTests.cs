@@ -2,6 +2,7 @@ using Kumunita.Core.Identity;
 using Kumunita.Web.Controllers;
 using Marten;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Kumunita.Web.Tests;
@@ -44,7 +45,10 @@ public class HealthControllerTests
                 ? SmtpHealthResult.Ok
                 : SmtpHealthResult.Fail("connect: refused (test)"));
 
-        return new HealthController(store, deadLetters, smtpHealth);
+        // Token = null (back-compat): the full payload is always visible —
+        // these tests exercise the pre-M3 shape (no auth gate).
+        var healthOptions = Options.Create(new HealthOptions { Token = null });
+        return new HealthController(store, deadLetters, smtpHealth, healthOptions);
     }
 
     [Fact]

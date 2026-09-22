@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Marten;
 
@@ -100,22 +101,25 @@ public sealed class AccountController(
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("resend")]
     public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
     {
         if (!ModelState.IsValid)
             return View(model);
 
-        var result = await identity.ResendVerificationEmailAsync(model.Email);
-        if (result.Success)
-        {
-            TempData["info"] =
-                $"If there is an unverified account with email '{model.Email}', a new " +
-                "verification link is on its way. Check your inbox (and your spam folder).";
-            return RedirectToAction(nameof(Login));
-        }
-
-        ModelState.AddModelError(string.Empty, result.Reason ?? "Could not resend the verification email.");
-        return View(model);
+        await identity.ResendVerificationEmailAsync(model.Email);
+        // M1 — uniform response: whether or not an account exists for this email
+        // (and whether the per-account attempt bound is exhausted), the response is
+        // identical. The Core service returns different Reason strings for the two
+        // failure modes; both must produce the SAME response so an attacker probing
+        // which emails are registered cannot distinguish them. The uniform message
+        // is "if an unverified account exists, a link is on its way" — true for the
+        // fresh-account path, false for the no-account / exhausted paths, but the
+        // resident cannot tell which is which.
+        TempData["info"] =
+            $"If there is an unverified account with email '{model.Email}', a new " +
+            "verification link is on its way. Check your inbox (and your spam folder).";
+        return RedirectToAction(nameof(Login));
     }
 
     // ── Verify (the one designed handoff) ───────────────────────────────────────────────
@@ -226,6 +230,7 @@ public sealed class AccountController(
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)

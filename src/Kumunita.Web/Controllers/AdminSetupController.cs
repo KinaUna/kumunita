@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Kumunita.Web.Controllers;
 
@@ -40,19 +41,44 @@ public sealed class AdminSetupController(
     // ── GET /admin/setup — the form ──────────────────────────────────────────────────────
 
     [HttpGet]
-    public IActionResult Setup() =>
-        User.Identity?.IsAuthenticated == true
-            ? Redirect("/profile/edit")
-            : View(new SetupViewModel());
+    public async Task<IActionResult> Setup()
+    {
+        // Already signed in — bounce to the profile editor.
+        if (User.Identity?.IsAuthenticated == true)
+            return Redirect("/profile/edit");
+
+        // M2 — the first-boot setup lane is closed once the seed-admin account
+        // has a working password (CompleteSeedAdminSetupAsync consumed the token
+        // and set Profile.Verified). After that there is no live setup surface,
+        // and the endpoint should 404 (not 200-with-a-form) so an anonymous
+        // caller cannot probe the account's existence or keep a stale form in
+        // the wild. The login page (AccountController.Login) already surfaces a
+        // secondary link to /admin/setup only while the lane is open (the
+        // ShowSetupLink flag), so this is the one authoritative gate.
+        if (await identity.IsFirstBootSetupCompleteAsync())
+            return NotFound();
+
+        return View(new SetupViewModel());
+    }
 
     // ── POST /admin/setup — the swap + sign-in ───────────────────────────────────────────
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("setup")]
     public async Task<IActionResult> Setup(SetupViewModel model)
     {
         if (!ModelState.IsValid)
             return View(model);
+
+        // M2 — setup lane already complete: the token is consumed (or never
+        // existed for this email). Return 404 (the lane is closed) rather than
+        // surfacing the Core's InvalidOperationException (which would reveal
+        // "account not found" vs "token invalid" vs "already used" — three
+        // distinguishable signals to an attacker). A 404 is uniform for all
+        // three cases and matches the GET's closed-lane response.
+        if (await identity.IsFirstBootSetupCompleteAsync())
+            return NotFound();
 
         // The token is the credential; the password the user just chose becomes
         // the long-term credential. If anything fails (bad token, already used,
@@ -67,11 +93,13 @@ public sealed class AdminSetupController(
                 setupTokenValue: model.SetupToken,
                 newPassword: model.NewPassword);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            model.Error = ex.Message;
-            ModelState.AddModelError(string.Empty, ex.Message);
-            return View(model);
+            // M2 — the lane is open (the GET check above would have 404'd if it
+            // were closed) but the token is invalid / expired / not for this
+            // email. Return 404 (uniform, no account-existence signal) rather
+            // than surfacing the exception message.
+            return NotFound();
         }
 
         // Sign the user in through the SAME factory the rest of the app uses.
