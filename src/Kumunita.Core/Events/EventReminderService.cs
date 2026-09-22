@@ -1,4 +1,5 @@
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -34,6 +35,20 @@ public sealed class EventReminderOptions
 /// not RSVP. A <see cref="RsvpStatus.Maybe"/> / <see cref="RsvpStatus.No"/> RSVP is not
 /// reminded. A recipient with no <see cref="Profile"/> email (unseeded / suspended) is
 /// skipped — there is no address to deliver to.
+/// </para>
+/// <para>
+/// <b>Time zone &amp; date-time format (ADR 0019 / 0020):</b> the reminder's
+/// "when" is rendered in <b>each recipient's</b> effective time zone and
+/// effective date-time format — the exact resolution order the <c>kw-dt</c>
+/// TagHelper uses: the recipient's <see cref="Profile.TimeZone"/> /
+/// <see cref="Profile.DateFormat"/> override → the platform default
+/// (<see cref="ILocalizationService.GetDefaultTimezoneAsync()"/> /
+/// <see cref="ILocalizationService.GetDefaultDateFormatAsync()"/>) → the
+/// <c>UTC</c> / <see cref="DateFormat.FloorFormat"/> floor. The instant is
+/// converted to the zone's wall-clock <i>first</i>, then the format is applied
+/// (invariant culture). A background job has no request principal, so the
+/// recipient's <see cref="Profile"/> is the "actor" here; the two platform
+/// defaults are resolved once per tick and shared across recipients.
 /// </para>
 /// <para>
 /// <b>Email (the frozen trio, untouched):</b> each recipient is staged via the
@@ -73,11 +88,20 @@ public static class EventReminderService
         EventReminderOptions options,
         DateTimeOffset now,
         IMailerStage mailer,
+        ILocalizationService localization,
         CancellationToken ct = default)
     {
         if (store is null) throw new ArgumentNullException(nameof(store));
         if (options is null) throw new ArgumentNullException(nameof(options));
         if (mailer is null) throw new ArgumentNullException(nameof(mailer));
+        if (localization is null) throw new ArgumentNullException(nameof(localization));
+
+        // The platform-default time zone + date-time format (ADR 0019 / 0020) —
+        // resolved ONCE per tick (the two platform reads are shared across
+        // recipients; a recipient's own Profile override wins over these, per
+        // the kw-dt resolution order).
+        var defaultZoneId = await localization.GetDefaultTimezoneAsync();
+        var defaultFormat = await localization.GetDefaultDateFormatAsync();
 
         var windowEnd = now.AddHours(Math.Max(24, options.WindowHours));
         var windowStart = now;
@@ -131,19 +155,22 @@ public static class EventReminderService
                         .Select(m => m.IdempotencyKey)
                         .ToListAsync(ct)).ToHashSet(StringComparer.Ordinal);
 
-            // Resolve each recipient's delivery address (the UserInfo module's own document).
+            // Resolve each recipient's Profile — the delivery address AND the
+            // recipient's effective time zone + date-time format override
+            // (Profile.TimeZone / Profile.DateFormat; ADR 0019 / 0020).
             var allUsers = recipientsByEvent.Values.SelectMany(v => v).Distinct().ToList();
             await using var q4 = store.QuerySession();
-            var emails = allUsers.Count == 0
-                ? new Dictionary<string, string>(StringComparer.Ordinal)
+            var profiles = allUsers.Count == 0
+                ? new Dictionary<string, Profile>(StringComparer.Ordinal)
                 : (await q4.Query<Profile>()
                         .Where(p => allUsers.Contains(p.SubjectId))
                         .ToListAsync(ct))
-                    .Where(p => !string.IsNullOrWhiteSpace(p.Email))
-                    .ToDictionary(p => p.SubjectId, p => p.Email!, StringComparer.Ordinal);
+                    .ToDictionary(p => p.SubjectId, StringComparer.Ordinal);
 
             // (d) Stage one OutboxEmail per (event, recipient) — the frozen trio (untouched).
             //     A recipient without a known email is skipped (no address to deliver to).
+            //     The body's "when" is rendered in the recipient's own time zone +
+            //     date-time format (ADR 0019 / 0020, the kw-dt resolution order).
             //     NO AccessAudit row is written — a reminder is a side effect, not an access
             //     decision (the M1 verification-email posture; ADR 0054 §3.6).
             await using var session = store.OpenSession(new Marten.Services.SessionOptions());
@@ -155,14 +182,14 @@ public static class EventReminderService
                     var key = $"remind:{ev.Id}:{userId}";
                     if (existingKeys.Contains(key))
                         continue;                                  // already sent this tick
-                    if (!emails.TryGetValue(userId, out var recipient) || string.IsNullOrWhiteSpace(recipient))
+                    if (!profiles.TryGetValue(userId, out var profile) || string.IsNullOrWhiteSpace(profile?.Email))
                         continue;                                  // no delivery address
                     await mailer.StageAsync(
                         session,
                         idempotencyKey: key,
-                        recipient: recipient,
+                        recipient: profile!.Email!,
                         subject: $"Reminder: {ev.Title}",
-                        body: BuildReminderBody(ev),
+                        body: BuildReminderBody(ev, profile, defaultZoneId, defaultFormat),
                         ct: ct);
                     staged++;
                 }
@@ -173,13 +200,69 @@ public static class EventReminderService
         }
     }
 
-    /// <summary>The reminder email body (rendered Markdown — the §6.1 "rendered body the
-    /// handler needs when SMTP is down" shape).</summary>
-    private static string BuildReminderBody(Event ev)
+    /// <summary>The reminder email body. The "when" is rendered in
+    /// <paramref name="recipient"/>'s effective time zone + date-time format
+    /// (ADR 0019 / 0020); the rest is the event's title + location + body
+    /// (the §6.1 "rendered body" shape).</summary>
+    private static string BuildReminderBody(Event ev, Profile? recipient, string defaultZoneId, string defaultFormat)
     {
-        var when = ev.Start.ToString("yyyy-MM-dd HH:mm 'UTC'");
+        var when = FormatEventInstant(
+            ev.Start,
+            recipient?.TimeZone, defaultZoneId,
+            recipient?.DateFormat, defaultFormat);
         var where = string.IsNullOrWhiteSpace(ev.Location) ? string.Empty : $", {ev.Location}";
         return $"**{ev.Title}** is coming up: {when}{where}. " +
                (string.IsNullOrWhiteSpace(ev.Body) ? string.Empty : ev.Body);
     }
+
+    /// <summary>
+    /// Renders <paramref name="instant"/> in the recipient's effective time
+    /// zone + date-time format — the exact resolution order the <c>kw-dt</c>
+    /// TagHelper uses (ADR 0019 / 0020): the recipient's <c>Profile.TimeZone</c>
+    /// / <c>Profile.DateFormat</c> override → the platform default → the
+    /// <c>UTC</c> / <see cref="DateFormat.FloorFormat"/> floor. The instant is
+    /// converted to the zone's wall-clock <i>first</i>, then the format is
+    /// applied with the invariant culture (the zone/format, not the host
+    /// locale, are what the resident sees). Never throws — an unknown zone id
+    /// or an unusable format degrades to the next tier.
+    /// </summary>
+    private static string FormatEventInstant(
+        DateTimeOffset instant,
+        string? profileZoneId, string defaultZoneId,
+        string? profileFormat, string defaultFormat)
+    {
+        var zone = TryResolveZone(profileZoneId)
+                  ?? TryResolveZone(defaultZoneId)
+                  ?? FallbackUtc();
+
+        string fmt;
+        if (DateFormat.IsValid(profileFormat)) fmt = profileFormat!;
+        else if (DateFormat.IsValid(defaultFormat)) fmt = defaultFormat;
+        else fmt = DateFormat.FloorFormat;
+
+        var utc = instant.UtcDateTime;
+        var wallTime = utc + zone.GetUtcOffset(utc);
+        return wallTime.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Convert an IANA id to a <see cref="TimeZoneInfo"/>, or
+    /// <c>null</c> when the id is blank / not present on the OS (the
+    /// <c>EffectiveTimezoneResolver.TryConvert</c> "fall through" rule —
+    /// never a throw).</summary>
+    private static TimeZoneInfo? TryResolveZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+        try
+        {
+            return System.TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static TimeZoneInfo FallbackUtc() =>
+        System.TimeZoneInfo.FindSystemTimeZoneById("UTC");
 }

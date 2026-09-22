@@ -246,7 +246,8 @@ that shipped separately under **ADR 0059**.
 - **`EventReminderService`** (Wolverine-free static class in
   `Kumunita.Core.Events`, the `AuditPurgeService` precedent):
   `SendRemindersAsync(IDocumentStore store, EventReminderOptions options,
-  DateTimeOffset now, CancellationToken ct)` — (a) load events with
+  DateTimeOffset now, IMailerStage mailer, ILocalizationService localization,
+  CancellationToken ct)` — (a) load events with
   `ReminderEnabled = true` whose `Start` is within the **24-hour window**
   (`now < Start ≤ now + 24h` — the "remind the day before" semantics; a
   `Start` in the past is not reminded); (b) recipients = the event's
@@ -256,7 +257,12 @@ that shipped separately under **ADR 0059**.
   (idempotency key **`remind:{eventId}:{userId}`** — the §6.2 per-email key
   scheme; the key's existing-row check is the no-double-send guard across
   ticks); (d) **no `AccessAudit` row** (a side effect, not an access decision
-  — the verification-email posture).
+  — the verification-email posture). The reminder's "when" renders in each
+  **recipient's** own time zone + date-time format (ADR 0019 / 0020 — the
+  `kw-dt` resolution order: the recipient's `Profile.TimeZone` / `Profile.DateFormat`
+  override → the platform default → the `UTC` / `DateFormat.FloorFormat` floor),
+  **not** a hard-coded UTC stamp (the recipient's `Profile` is the "actor" the
+  background job has no request principal for).
 - **`EventReminderHandler`** (`Kumunita.Web/SideEffects`, the
   `AuditPurgeHandler` precedent verbatim): a thin adapter — call the
   Wolverine-free service with a live `IDocumentStore` +
@@ -386,6 +392,8 @@ public static class EventReminderService
         Marten.IDocumentStore store,
         EventReminderOptions options,
         DateTimeOffset now,
+        Kumunita.Core.Identity.IMailerStage mailer,
+        Kumunita.Core.Localization.ILocalizationService localization,
         CancellationToken ct = default);
 }
 
@@ -395,9 +403,11 @@ public static class EventReminderHandler
     public static async Task<IEnumerable<object>> Handle(
         EventReminderTick tick,
         Marten.IDocumentStore store,
-        Microsoft.Extensions.Options.IOptions<EventReminderOptions> options)
+        Microsoft.Extensions.Options.IOptions<EventReminderOptions> options,
+        Kumunita.Core.Identity.IMailerStage mailer,
+        Kumunita.Core.Localization.ILocalizationService localization)
     {
-        await EventReminderService.SendRemindersAsync(store, options.Value, DateTimeOffset.UtcNow);
+        await EventReminderService.SendRemindersAsync(store, options.Value, DateTimeOffset.UtcNow, mailer, localization);
         return new[] { new EventReminderTick() };   // self-reschedule (1-day delay baked into the type)
     }
 }
@@ -552,20 +562,21 @@ are frozen and already exercised by the 25 Core seam tests + 19 controller
 tests. **The unit that lands the runtime** records the M4 e2e pass count in a
 subsequent `### Run result (M4 e2e — <date>)` section of this doc.
 
-**Drift status (still open — U12's concern, not a U11 regression).**
+**Drift status (RESOLVED).**
 
-- **`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` is RED**
-  (the single Web.Tests red). Root cause, confirmed: three `kw-l` keys used in
-  the M4 views are **not** in
-  `src/Kumunita.Core/Localization/KnownTranslationKeys.cs`:
-  - `src/Kumunita.Web/Views/Event/Detail.cshtml:98` — `events.created`
-  - `src/Kumunita.Web/Views/Event/Detail.cshtml:102` — `events.edited`
-  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml:67` — `nav.events`
+- ~~`KwLRegistryConsistencyTests.Every_KwL_Key_In_A_View_Is_Registered` was
+  RED (the single Web.Tests red).~~ **Now resolved** — the three `kw-l` keys
+  flagged below are registered in
+  `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` in **en / de / fr /
+  da**, and the test is green (verified 2026-09-22: `Kumunita.Web.Tests`
+  **Total: 364, Errors: 0, Failed: 0**). The keys, at their use sites:
+  - `src/Kumunita.Web/Views/Event/Detail.cshtml` — `events.created`, `events.edited`
+  - `src/Kumunita.Web/Views/Shared/_Layout.cshtml` — `nav.events`
 
-  This is **pre-existing M4 drift** (the key registry was not extended when
-  the M4 views were authored in U05/U06), **not** a U09/U10 regression — the
-  `EventControllerTests` family is fully green. **Flagged for U12** so the
-  close is honest (the fix is a one-line-per-key addition to
-  `KnownTranslationKeys.cs`, or a follow-on localization lane). No `## U<m> —
-  Drift pause` sections exist in the handoff note for this unit; the U11 record
-  does not touch any frozen pin.
+  This was **pre-existing M4 drift** (the key registry was not extended when
+  the M4 views were authored in U05/U06), **not** a U09/U10/U12 regression —
+  the `EventControllerTests` family was fully green throughout. The close is
+  honest: the fix was a one-line-per-key addition to `KnownTranslationKeys.cs`
+  (en / de / fr / da), and the registry-consistency test now passes. No `## U<m>
+  — Drift pause` sections exist in the handoff note for this unit; the U11
+  record does not touch any frozen pin.

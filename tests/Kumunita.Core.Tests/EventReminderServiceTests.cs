@@ -2,6 +2,7 @@ using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
 using NSubstitute;
@@ -59,7 +60,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "w-in", authorInside, now.AddHours(23));
         await PlantEvent(store, "w-out", authorOutside, now.AddHours(25));
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer);
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
 
         // 23 h out (inside the window) → the author is reminded.
         Assert.Contains(staged, s => s.Key == $"remind:w-in:{authorInside}");
@@ -94,7 +95,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantRsvp(store, "g-ev", maybe, RsvpStatus.Maybe);
         await PlantRsvp(store, "g-ev", no, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer);
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
 
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{goer}");          // Going → reminded
         Assert.Contains(staged, s => s.Key == $"remind:g-ev:{author}");        // author always (T21)
@@ -122,7 +123,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         // The author RSVPed "No" — but the author is still a reminder recipient.
         await PlantRsvp(store, "a-ev", author, RsvpStatus.No);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer);
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
 
         Assert.Contains(staged, s => s.Key == $"remind:a-ev:{author}");
         // Exactly one row for the author (no double-send via the Going path).
@@ -150,7 +151,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "k-ev", author, now.AddHours(5));
         await PlantRsvp(store, "k-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer);
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
 
         // Exactly one staged email per (event, recipient); the key is the
         // §6.2 per-email shape remind:{eventId}:{userId}.
@@ -182,7 +183,7 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         await PlantEvent(store, "n-ev", author, now.AddHours(8));
         await PlantRsvp(store, "n-ev", goer, RsvpStatus.Going);
 
-        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer);
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
 
         // The reminder actually staged emails (the test is not vacuous).
         Assert.Equal(2, staged.Count);
@@ -191,7 +192,54 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
         var audit = await AuditRows(store);
         Assert.Empty(audit);
     }
+    // ── ADR 0019 / 0020 follow-on pin (not a renumber of the frozen M4 master\r\n    //    list — T24 is `M4_GlobalAdminOverrideEditEndToEnd` in EventServiceTests) ──\r\n    //     M4_ReminderWhenUsesRecipientTimezoneAndFormat ───────────────────
+    //
+    // The reminder's "when" renders in the *recipient's* own time zone +
+    // date-time format (ADR 0019 / 0020, the kw-dt resolution order). A
+    // recipient with a Europe/Paris override sees the event instant shifted
+    // to Paris wall-clock; a recipient with no override resolves the platform
+    // default (the UTC zone + the FloorFormat floor, here). In both cases the
+    // literal "'UTC'" label the pre-ADR-0019 code emitted is gone.
 
+    [Fact]
+    public async Task M4_ReminderWhenUsesRecipientTimezoneAndFormat()
+    {
+        var store = await BootStoreAsync();
+        var now = DateTimeOffset.UtcNow;
+        var (mailer, staged) = RecordingMailer();
+
+        const string paris = "u-u07-pz-paris";
+        const string plain = "u-u07-pz-plain";
+        await PlantProfile(store, paris, "pz-paris@kumunita",
+            timeZone: "Europe/Paris", dateFormat: "yyyy-MM-dd HH:mm");
+        await PlantProfile(store, plain, "pz-plain@kumunita");
+
+        var start = now.AddMinutes(30);   // in-window; the "when" instant
+        await PlantEvent(store, "pz-ev", paris, start);
+        await PlantRsvp(store, "pz-ev", plain, RsvpStatus.Going);
+
+        await EventReminderService.SendRemindersAsync(store, new EventReminderOptions(), now, mailer, Localization());
+
+        // The UTC wall time of the event instant = the plain recipient's view
+        // (the platform default here is the UTC zone); the Paris recipient's
+        // view is that instant in Europe/Paris wall-clock.
+        var utc = start.UtcDateTime;
+        var utcTime = utc.ToString("HH:mm");
+        var parisTime = (utc + TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris").GetUtcOffset(utc)).ToString("HH:mm");
+
+        // Paris recipient (Europe/Paris override): sees Paris wall-clock,
+        // never the UTC wall time, never a "'UTC'" label.
+        var parisBody = staged.Single(s => s.Key == $"remind:pz-ev:{paris}").Body;
+        Assert.Contains(parisTime, parisBody);
+        Assert.DoesNotContain(utcTime, parisBody);
+        Assert.DoesNotContain("UTC", parisBody);
+
+        // Plain recipient (no override): the platform default (UTC zone) → the
+        // UTC wall time; still no "'UTC'" label.
+        var plainBody = staged.Single(s => s.Key == $"remind:pz-ev:{plain}").Body;
+        Assert.Contains(utcTime, plainBody);
+        Assert.DoesNotContain("UTC", plainBody);
+    }
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /// <summary>Boot the scratch store with the M1/M3/M4 surfaces (the
@@ -219,9 +267,9 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
     /// <summary>A <b>frozen</b> <see cref="IMailerStage"/> stand-in that records the
     /// staged (idempotency key, recipient) pairs. <c>IMailerStage</c> itself is
     /// untouched — this is a test double for its one method.</summary>
-    private static (IMailerStage mailer, List<(string Key, string Recipient)> staged) RecordingMailer()
+    private static (IMailerStage mailer, List<(string Key, string Recipient, string Body)> staged) RecordingMailer()
     {
-        var staged = new List<(string Key, string Recipient)>();
+        var staged = new List<(string Key, string Recipient, string Body)>();
         var mailer = Substitute.For<IMailerStage>();
         mailer.StageAsync(
                 Arg.Any<IDocumentSession>(),
@@ -232,18 +280,39 @@ public class EventReminderServiceTests(PostgresFixture fixture) : IClassFixture<
                 Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
-                staged.Add(((string)callInfo[1], (string)callInfo[2]));
+                staged.Add(((string)callInfo[1], (string)callInfo[2], (string)callInfo[4]));
                 return Task.CompletedTask;
             });
         return (mailer, staged);
     }
 
-    private static async Task PlantProfile(IDocumentStore store, string subjectId, string email)
+    private static async Task PlantProfile(IDocumentStore store, string subjectId, string email,
+        string? timeZone = null, string? dateFormat = null)
     {
         var ct = TestContext.Current.CancellationToken;
         await using var w = store.OpenSession(new Marten.Services.SessionOptions());
-        w.Store(new Profile { SubjectId = subjectId, DisplayName = subjectId, Verified = true, Email = email });
+        w.Store(new Profile
+        {
+            SubjectId = subjectId,
+            DisplayName = subjectId,
+            Verified = true,
+            Email = email,
+            TimeZone = timeZone,
+            DateFormat = dateFormat,
+        });
         await w.SaveChangesAsync(ct);
+    }
+
+    /// <summary>A <see cref="ILocalizationService"/> stand-in returning the
+    /// ADR 0019 / 0020 floors (the UTC zone id + the <see cref="DateFormat
+    /// .FloorFormat"/> floor) — the platform defaults the reminder's "when"
+    /// falls back to when the recipient has no personal override.</summary>
+    private static ILocalizationService Localization()
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.GetDefaultTimezoneAsync().Returns("UTC");
+        localization.GetDefaultDateFormatAsync().Returns(DateFormat.FloorFormat);
+        return localization;
     }
 
     private static async Task PlantEvent(IDocumentStore store, string id, string authorId, DateTimeOffset start)

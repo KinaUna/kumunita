@@ -1,5 +1,6 @@
 using Kumunita.Core.Events;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Marten;
 using Microsoft.Extensions.Options;
 
@@ -27,7 +28,9 @@ namespace Kumunita.Web.SideEffects;
 /// (U07) — the harness tests prove the window/recipient/staging shape without a
 /// message host; this handler is just a thin adapter that injects the live
 /// <see cref="IDocumentStore"/> + the <b>frozen</b> <see cref="IMailerStage"/>
-/// stager into that service, then re-schedules the next tick.
+/// stager + the <see cref="ILocalizationService"/> platform-default read seam
+/// (ADR 0019 / 0020: the reminder's "when" renders in each recipient's own time
+/// zone + date-time format) into that service, then re-schedules the next tick.
 /// </para>
 /// </summary>
 public static class EventReminderHandler
@@ -49,20 +52,23 @@ public static class EventReminderHandler
         EventReminderTick tick,
         IDocumentStore store,
         IOptions<EventReminderOptions> options,
-        IMailerStage mailer)
+        IMailerStage mailer,
+        ILocalizationService localization)
     {
         // `now` is passed explicitly to the service so the window boundary is
         // deterministic under Wolverine's test-time control; using UtcNow here
         // keeps production correct while the harness pins its own (the
         // AuditPurgeHandler shape verbatim). The mailer is the frozen IMailerStage
-        // seam (the host resolves the real OutboxEmailStager in production) — the
-        // U07 signature requires it (drift (f) in m4-handoff-notes.md; the design
-        // doc §4 C# block omits it and is stale).
+        // seam (the host resolves the real OutboxEmailStager in production); the
+        // localization seam is the ADR 0019 / 0020 platform-default read (the
+        // reminder's "when" renders in each recipient's own time zone +
+        // date-time format, falling back to these defaults).
         await EventReminderService.SendRemindersAsync(
             store,
             options.Value,
             DateTimeOffset.UtcNow,
-            mailer);
+            mailer,
+            localization);
 
         // Self-reschedule: return a fresh EventReminderTick so the recurring
         // schedule carries forward (the TimeoutMessage's 1-day delay is baked into

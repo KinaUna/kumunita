@@ -157,7 +157,8 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   deferred) follows the `AuditPurgeHandler` precedent **verbatim**:
   - **`EventReminderService`** (a Wolverine-free static class in
     `Kumunita.Core.Events`, the `AuditPurgeService` precedent):
-    `SendRemindersAsync(store, options, now, ct)` — (a) load events with
+    `SendRemindersAsync(store, options, now, mailer, localization, ct)` —
+    (a) load events with
     `ReminderEnabled = true` and not deleted whose `Start` is within the
     **24-hour window** (`now < Start ≤ now + 24h` — the "remind the day
     before" semantics; a past `Start` is not reminded); (b) recipients =
@@ -168,10 +169,16 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
     **`remind:{eventId}:{userId}`** (the §6.2 per-email key scheme — the
     existing-row check is the no-double-send guard across ticks); (d) **no
     `AccessAudit` row** (a side effect, not an access decision — the
-    verification-email posture).
+    verification-email posture). The reminder's "when" renders in each
+    **recipient's** own time zone + date-time format (ADR 0019 / 0020, the
+    `kw-dt` resolution order: the recipient's `Profile.TimeZone` /
+    `Profile.DateFormat` override → the platform default → the `UTC` /
+    `DateFormat.FloorFormat` floor) — **not** a hard-coded UTC stamp; the
+    `localization` seam supplies the two platform defaults.
   - **`EventReminderHandler`** (`Kumunita.Web/SideEffects`): a thin
     adapter — call the Wolverine-free service with a live `IDocumentStore`
-    + `IOptions<EventReminderOptions>`, then **re-yield a fresh
+    + `IOptions<EventReminderOptions>` + the frozen `IMailerStage` + the
+    `ILocalizationService` platform-default read, then **re-yield a fresh
     `EventReminderTick`** (the self-rescheduling idiom).
   - **`EventReminderTick`** — `record EventReminderTick() :
     Wolverine.TimeoutMessage(TimeSpan.FromDays(1))` (the `AuditPurgeTick`
@@ -226,7 +233,12 @@ idiom, the `kw-dt` TagHelper, the `IMailerStage` + `OutboxEmail` +
   instead of *duplicating*: the `Event` gets private/community/public
   visibility, the correct `AccessVia` audit tag, and delegation for free
   (the `Decide()` algorithm is unchanged; only the
-  `EventToAuditableResource` adapter is new).
+  `EventToAuditableResource` adapter is new). The reminder's "when"
+  renders through the **same** ADR 0019 / 0020 resolution order the `kw-dt`
+  TagHelper uses — the recipient's `Profile.TimeZone` / `Profile.DateFormat`
+  override → the platform default → the `UTC` / `FloorFormat` floor — so the
+  resident's reminder reads in their own time and format, exactly as the
+  page does.
 - **The reminder email is a side effect on a working event, not the other
   way round** — the §6.4 job lands after the read + write lanes are green
   (the register's sequencing invariant), and it touches no seam: the
