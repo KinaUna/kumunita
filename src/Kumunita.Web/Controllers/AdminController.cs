@@ -12,11 +12,28 @@ using Marten;
 namespace Kumunita.Web.Controllers;
 
 /// <summary>
-/// The /admin shell surface (M1 step 8): roles + component-scope assignment, the
-/// unverified-account safety valve (the admin manual-verify lane), — all
-/// <see cref="Roles.GlobalAdmin"/>-gated. <c>/admin/audit</c> and
-/// <c>/admin/break-glass</c> live under the same controller but on distinct routes:
-/// <c>Index</c> (shell), <c>Audit</c>, <c>BreakGlass</c>.
+/// The /admin surface (M1 step 8; the section split is ADR 0062) — all
+/// <see cref="Roles.GlobalAdmin"/>-gated. The one long scroll is split into five
+/// linkable routes, all on this controller (the constructor is pinned by the
+/// Web-layer test harnesses, so the section actions live here rather than on
+/// separate controllers):
+/// <list type="bullet">
+/// <item><c>/admin</c> — the <see cref="Index"/> overview dashboard (counts + the
+///       unverified-queue shortcut).</item>
+/// <item><c>/admin/accounts</c> — the <see cref="Accounts"/> account list + verify
+///       queue + Block / Unblock.</item>
+/// <item><c>/admin/communities</c> — the <see cref="Communities"/> community list +
+///       add / edit / mandatory / enable-disable.</item>
+/// <item><c>/admin/platform</c> — the <see cref="Platform"/> platform links + the
+///       platform pages table.</item>
+/// <item><c>/admin/security</c> — the <see cref="Security"/> landing hub for the
+///       <c>/admin/audit</c> (<see cref="Audit"/>) and <c>/admin/break-glass</c>
+///       (<see cref="BreakGlass"/>) surfaces, which keep their own routes and pages.</item>
+/// </list>
+/// The per-account detail is <see cref="Manage"/> at <c>/admin/accounts/{subjectId}</c>.
+/// The write lanes (Block / Unblock / SetRole / SetCommunityMembership / the community
+/// mutations / the manual-verify) are unchanged; only the surfaces that render them,
+/// and the redirect targets after a save, changed.
 /// </summary>
 [Authorize(Roles = Kumunita.Core.Identity.Roles.GlobalAdmin)]
 public sealed class AdminController(
@@ -90,27 +107,156 @@ public sealed class AdminController(
     private static string? AdminSubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
-    // ── /admin — the shell: account list + role/scope assignment + safety valve ─────────
+    // ── /admin — the overview dashboard (ADR 0062) ───────────────────────
+    // The one-page status at a glance: account / unverified / blocked counts,
+    // the community count, and the unverified-queue shortcut (the safety
+    // valve, still reachable in one click from the dashboard). The per-section
+    // detail moved off the single /admin scroll onto its own page —
+    // /admin/accounts, /admin/communities, /admin/platform, /admin/security
+    // (see ADR 0062). The read assembly (BuildAccountDataAsync) and the write
+    // lanes are untouched; only the surfaces that render them changed.
 
     [HttpGet]
     public async Task<IActionResult> Index()
     {
-        // The identity schema is the only source of account + role facts — the `mt`
-        // documents (Profile, ModeratorAssignment) are joined via IUserInfoService
-        // reads, per ADR 0004 A/C (no domain model touches the EF context, and vice versa).
-        // Both EF Core and Marten define ToListAsync/FirstOrDefaultAsync extensions, so
-        // qualify the EF one explicitly wherever this controller mixes the two.
+        var (accounts, componentOptions, communityRows) = await BuildAccountDataAsync();
+
+        return View(new AdminDashboardViewModel
+        {
+            AccountsCount          = accounts.Count,
+            UnverifiedCount        = accounts.Count(a => !a.Verified),
+            BlockedCount           = accounts.Count(a => a.Blocked),
+            CommunitiesCount       = communityRows.Count,
+            DisabledCommunityCount = communityRows.Count(c => !c.Enabled),
+            Unverified             = accounts
+                .Where(a => !a.Verified)
+                .Select(a => new AdminDashboardViewModel.UnverifiedAccountRow
+                {
+                    SubjectId   = a.SubjectId,
+                    Email       = a.Email,
+                    DisplayName = a.DisplayName
+                })
+                .ToList()
+        });
+    }
+
+    // ── /admin/accounts — the account list + verify queue + block/unblock ─
+    // The accounts table (the read-only overview + the quick Block / Unblock
+    // actions) plus the unverified-account verify queue (the safety valve).
+    // The per-account writes live on /admin/accounts/{id} (the Manage detail
+    // page). ADR 0062 — the section split off the old single /admin scroll.
+    [Route("admin/accounts")]
+    [HttpGet]
+    public async Task<IActionResult> Accounts()
+    {
+        var (accounts, componentOptions, communityRows) = await BuildAccountDataAsync();
+        return View(new AdminIndexViewModel
+        {
+            Accounts    = accounts,
+            Components  = componentOptions,
+            Communities = communityRows
+        });
+    }
+
+    // ── /admin/communities — the community list + add / edit / toggle ─────
+    // The community (per-instance Component) list with the add / edit /
+    // mandatory / enable-disable actions. ADR 0062 — the section split off
+    // the old single /admin scroll.
+    [Route("admin/communities")]
+    [HttpGet]
+    public async Task<IActionResult> Communities()
+    {
+        var (_, _, communityRows) = await BuildAccountDataAsync();
+        return View(new AdminCommunitiesViewModel
+        {
+            Communities = communityRows
+        });
+    }
+
+    // ── /admin/platform — the platform links + the platform pages table ───
+    // The platform surfaces (languages, timezone, date format, sign-up,
+    // audit, break-glass) and the five shipped platform pages (preview /
+    // edit). ADR 0062 — the section split off the old single /admin scroll.
+    [Route("admin/platform")]
+    [HttpGet]
+    public async Task<IActionResult> Platform()
+    {
+        var platformPages = await BuildPlatformPagesAsync(pages);
+        return View(new AdminPlatformViewModel
+        {
+            PlatformPages = platformPages
+        });
+    }
+
+    // ── /admin/security — the audit + break-glass hub ─────────────────────
+    // A landing page linking to the two live security surfaces (/admin/audit
+    // and /admin/break-glass — their own pages, unchanged). ADR 0062 — the
+    // section split off the old single /admin scroll.
+    [Route("admin/security")]
+    [HttpGet]
+    public IActionResult Security()
+    {
+        return View();
+    }
+
+    // ── /admin/accounts/{subjectId} — the per-account management detail page ──
+    // Extracted out of the shell's accounts table (which inlined the role /
+    // scope / posting-membership checkbox forms per row — the clutter the
+    // admin page needed). The shell keeps the read-only overview + a Manage
+    // link; this page owns the writes and renders the three fieldset forms.
+    // SetRole and SetCommunityMembership redirect here after a save so the
+    // admin lands on the same page with the TempData message. The Block /
+    // Unblock buttons stay on the shell (they're the row-level quick actions)
+    // and on this page (the full standing surface).
+
+    // The app uses conventional routing (Program.cs: `MapControllerRoute
+    // "{controller=Home}/{action=Index}/{id?}"`); the `accounts` segment in
+    // `/admin/accounts/{subjectId}` is a URL segment, not an action name, so
+    // an explicit route is required (the AdminTimezoneController /
+    // AdminSignupController precedent: `[Route("admin/{surface}")]` on
+    // sub-controllers; here a single action-level attribute keeps the
+    // action in the AdminController where its write lanes already live).
+    [Route("admin/accounts/{subjectId}")]
+    [HttpGet]
+    public async Task<IActionResult> Manage(string subjectId)
+    {
+        var (accounts, componentOptions, communityRows) = await BuildAccountDataAsync();
+        var account = accounts.FirstOrDefault(a => a.SubjectId == subjectId);
+        if (account is null)
+            return NotFound();
+
+        var mySubject = AdminSubjectId(User);
+        return View(new AdminAccountManageViewModel
+        {
+            Account     = account,
+            Components  = componentOptions,
+            Communities = communityRows,
+            IsSelf      = mySubject is not null
+                          && string.Equals(mySubject, subjectId, StringComparison.Ordinal),
+            DisabledCommunityIds = communityRows.Where(c => !c.Enabled).Select(c => c.Id).ToList()
+        });
+    }
+
+    // ── Shared assembly for Index and Manage ──────────────────────────────
+    // The shell (Index) and the account detail (Manage) both need the account
+    // list + component options + community rows. The read paths are the same
+    // (identity EF Core + IUserInfoService + IPageService); the write lanes
+    // are untouched by this split (thin-token / audited lanes are unchanged —
+    // only the surfaces that render them change).
+
+    private async Task<(IReadOnlyList<AdminIndexViewModel.AccountRow> accounts,
+                        IReadOnlyList<AdminIndexViewModel.ComponentOption> componentOptions,
+                        IReadOnlyList<AdminIndexViewModel.CommunityRow> communityRows)> BuildAccountDataAsync()
+    {
         var users = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
             identities.Users
                 .OrderBy(u => u.Email ?? u.UserName ?? string.Empty)
                 .AsNoTracking());
 
         var accountsWithRoles = new List<AdminIndexViewModel.AccountRow>();
-
         foreach (var user in users)
         {
             var subject = user.Id ?? string.Empty;
-            // A single join covers every account's role rows (no N UserManager round trips).
             var roles = identities.UserRoles
                 .Where(ur => ur.UserId == subject)
                 .Select(ur => ur.RoleId)
@@ -119,44 +265,24 @@ public sealed class AdminController(
                 .Where(r => roles.Contains(r.Id))
                 .Select(r => r.Name!)
                 .ToList();
-
-            // Only a Moderator's scope matters per ADR 0003 — a non-Moderator's
-            // ModeratorAssignment rows (if any — shouldn't exist post-demotion but
-            // defensively) are never read by the authorization path.
             var componentIds = roleNames.Contains(Kumunita.Core.Identity.Roles.Moderator)
                 ? (await userInfo.GetAssignmentsAsync(subject)).Select(a => a.ComponentId).ToList()
                 : new List<string>();
-
-            // Community membership (the **posting right** — a distinct data row
-            // from the moderator scope above; see ComponentMembership doc-comment
-            // in Kumunita.Core.UserInfo for the "posting right vs moderator scope"
-            // distinction).
             var communityIds = (await userInfo.GetCommunityIdsAsync(subject)).ToList();
-
             var profile = await userInfo.GetProfileAsync(subject);
-            var verified = profile?.Verified ?? false;
-            var blocked  = profile?.Blocked ?? false;
-
             accountsWithRoles.Add(new AdminIndexViewModel.AccountRow
             {
                 SubjectId    = subject,
                 Email        = profile?.Email ?? user.Email ?? user.UserName,
                 DisplayName  = profile?.DisplayName ?? user.UserName,
-                Verified     = verified,
-                Blocked      = blocked,
+                Verified     = profile?.Verified ?? false,
+                Blocked      = profile?.Blocked ?? false,
                 Roles        = roleNames,
                 ComponentIds = componentIds,
                 CommunityIds = communityIds
             });
         }
 
-        // Components come in two projections:
-        //   - `Components` — the enabled-only set for the role-assignment "scope"
-        //     checkbox list (the M1 shape; a disabled component is not a valid
-        //     moderator scope).
-        //   - `Communities` — the full set (enabled + disabled) for the new
-        //     "Communities" section (add / edit / enable-disable). The admin
-        //     needs to *see* the disabled rows to re-enable them.
         var allComponents = await userInfo.GetComponentsAsync(enabledOnly: false);
         var componentOptions = allComponents
             .Where(c => c.Enabled)
@@ -181,19 +307,7 @@ public sealed class AdminController(
             })
             .ToList();
 
-        // SP U03 (ADR 0043 D4) — the "Platform pages" affordance (the five rows,
-        // in footer order, each with its resolved page id or null — see
-        // <see cref="BuildPlatformPagesAsync"/>). `about` is a view, not a page
-        // (ADR 0043 D1), so it lands as a preview-only row.
-        var platformPages = await BuildPlatformPagesAsync(pages);
-
-        return View(new AdminIndexViewModel
-        {
-            Accounts    = accountsWithRoles,
-            Components  = componentOptions,
-            Communities = communityRows,
-            PlatformPages = platformPages
-        });
+        return (accountsWithRoles, componentOptions, communityRows);
     }
 
     // ── /admin — community management (add / edit / enable-disable) ──────
@@ -213,7 +327,7 @@ public sealed class AdminController(
     public async Task<IActionResult> AddCommunity(AddCommunityViewModel model)
     {
         if (!ModelState.IsValid)
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
@@ -238,18 +352,18 @@ public sealed class AdminController(
             // so RoleSet(User) carries GlobalAdmin), but the mandatory lane
             // re-checks standing in Core (thin token) — fail closed.
             TempData["error"] = "You are not permitted to set a community as mandatory.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (InvalidOperationException ex)
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Communities));
     }
 
     [HttpPost]
@@ -257,7 +371,7 @@ public sealed class AdminController(
     public async Task<IActionResult> UpdateCommunity(UpdateCommunityViewModel model)
     {
         if (!ModelState.IsValid)
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
@@ -280,13 +394,13 @@ public sealed class AdminController(
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (InvalidOperationException ex)
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Communities));
     }
 
     [HttpPost]
@@ -294,7 +408,7 @@ public sealed class AdminController(
     public async Task<IActionResult> ToggleCommunityEnabled([FromForm] string componentId, [FromForm] bool enabled)
     {
         if (string.IsNullOrEmpty(componentId))
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
@@ -307,13 +421,13 @@ public sealed class AdminController(
         catch (ArgumentException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (InvalidOperationException ex)
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Communities));
     }
 
     // ── Mandatory toggle (the ADR 0012 GlobalAdmin decision, now reachable
@@ -324,7 +438,7 @@ public sealed class AdminController(
     public async Task<IActionResult> ToggleCommunityMandatory([FromForm] string componentId, [FromForm] bool mandatory)
     {
         if (string.IsNullOrEmpty(componentId))
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
@@ -341,17 +455,17 @@ public sealed class AdminController(
             // Unreachable (page is GlobalAdmin-gated) but the Core lane
             // re-checks standing (thin token) — fail closed.
             TempData["error"] = "You are not permitted to set a community's mandatory standing.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (ArgumentException)
         {
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Communities));
         }
         catch (InvalidOperationException ex)
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Communities));
     }
 
     [HttpPost]
@@ -360,6 +474,15 @@ public sealed class AdminController(
     {
         if (string.IsNullOrEmpty(model.TargetSubjectId))
             return RedirectToAction(nameof(Index));
+
+        // Land back on the detail page (not the shell) after a save — the
+        // admin stays on the surface they were working on (the shell's own
+        // inline form was replaced by the Manage link; this redirect targets
+        // the detail page the form lives on). An explicit URL (not
+        // RedirectToAction) — the app uses conventional routing, and the
+        // `accounts` segment in the path is a URL segment, not an action
+        // name, so action-name-based route generation would not resolve.
+        var back = $"/admin/accounts/{model.TargetSubjectId}";
 
         var admin = AdminSubjectId(User) ?? string.Empty;
 
@@ -392,16 +515,16 @@ public sealed class AdminController(
             // Shouldn't be reachable (this page is already [Authorize(Roles=GlobalAdmin)]),
             // but Core's lane enforces it too as a second gate — map to a clean 403.
             TempData["error"] = "You are not permitted to perform this action.";
-            return RedirectToAction(nameof(Index));
+            return Redirect(back);
         }
         catch (InvalidOperationException ex)
         {
             TempData["error"] = ex.Message;
-            return RedirectToAction(nameof(Index));
+            return Redirect(back);
         }
 
         TempData["info"] = "Roles updated.";
-        return RedirectToAction(nameof(Index));
+        return Redirect(back);
     }
 
     // ── /admin — Community membership (the **posting right**; the distinct data
@@ -418,6 +541,10 @@ public sealed class AdminController(
     {
         if (string.IsNullOrEmpty(model.TargetSubjectId))
             return RedirectToAction(nameof(Index));
+
+        // Same redirect-target note as SetRole: land back on the detail page
+        // (the surface the form lives on). Explicit URL — see SetRole.
+        var back = $"/admin/accounts/{model.TargetSubjectId}";
 
         var admin = AdminSubjectId(User) ?? string.Empty;
 
@@ -488,7 +615,7 @@ public sealed class AdminController(
         if (errors.Count > 0)
         {
             TempData["error"] = string.Join(" ", errors);
-            return RedirectToAction(nameof(Index));
+            return Redirect(back);
         }
 
         var addedCount    = toAdd.Count;
@@ -502,7 +629,7 @@ public sealed class AdminController(
         };
 
         TempData["info"] = summary;
-        return RedirectToAction(nameof(Index));
+        return Redirect(back);
     }
 
     [HttpPost]
@@ -523,7 +650,7 @@ public sealed class AdminController(
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Accounts));
     }
 
     // ── Block / Unblock — the admin account suspension lane (GlobalAdmin) ─────────────
@@ -550,7 +677,7 @@ public sealed class AdminController(
         if (!string.IsNullOrEmpty(subjectId) && string.Equals(subjectId, admin, StringComparison.Ordinal))
         {
             TempData["error"] = "You cannot block your own account. Have another GlobalAdmin perform this, or use a different admin account.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Accounts));
         }
 
         try
@@ -568,7 +695,7 @@ public sealed class AdminController(
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Accounts));
     }
 
     [HttpPost]
@@ -589,7 +716,7 @@ public sealed class AdminController(
         {
             TempData["error"] = ex.Message;
         }
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Accounts));
     }
 
     // ── /admin/audit — the always-on access-decision log (GlobalAdmin) ────────────────

@@ -1,10 +1,15 @@
-@model Kumunita.Web.Models.AdminIndexViewModel
-@using Kumunita.Core.Identity
+@model Kumunita.Web.Models.AdminDashboardViewModel
 @{
     ViewData["Title"] = "Admin";
 }
 
 <h1><kw-l key="admin.title">Admin</kw-l></h1>
+<p class="text-muted">
+    One neighborhood, instance-wide: accounts, communities, platform settings, and
+    the security surfaces. Pick a section below.
+</p>
+
+@await Html.PartialAsync("_AdminNav.cshtml")
 
 @if (TempData["info"] is string info)
 {
@@ -15,426 +20,101 @@
     <div class="alert alert-danger">@err</div>
 }
 
-<h2>Platform</h2>
-<p class="text-muted">
-    Instance-wide management — the languages the platform supports (add / enable /
-    set the default, and edit the translated UI strings and static pages), the
-    access audit log, and the break-glass elevation path.
-</p>
-<div class="d-flex gap-2 flex-wrap mb-4">
-    <a href="/admin/languages" class="btn btn-outline-primary">Manage languages</a>
-    <a href="/admin/timezone" class="btn btn-outline-primary"><kw-l key="admin.timezone_label">Default time zone</kw-l></a>
-    <a href="/admin/dateformat" class="btn btn-outline-primary"><kw-l key="admin.dateformat_label">Default date &amp; time format</kw-l></a>
-    <a href="/admin/signup" class="btn btn-outline-primary"><kw-l key="admin.signup_title">Sign-up</kw-l></a>
-    <a asp-action="Audit" class="btn btn-outline-secondary">Access audit log</a>
-    <a asp-action="BreakGlass" class="btn btn-outline-secondary">Break-glass</a>
-</div>
-
-@* SP U03 (ADR 0043 D4) — the "Platform pages" affordance: the five shipped
-   platform surfaces, each with a preview link (the route — always present)
-   and, for the four Page-backed surfaces, an edit link (id-based,
-   /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
-   view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
-<h3>Platform pages</h3>
-<p class="text-muted">
-    The five pages a fresh instance ships with. "Preview" opens the page as
-    residents see it; "Edit" opens the page editor (admins only). "About" is
-    the product story — preview only.
-</p>
-<table class="table table-sm align-middle mb-4">
-    <thead>
-        <tr>
-            <th>Surface</th>
-            <th>Route</th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @* Row labels are plain text (the admin view's local convention — mostly
-           non-kw-l English; an interpolated kw-l key would break the
-           KwLRegistryConsistencyTests static key scan). The labels match the
-           footer.platform.* registry values by design. *@
-        @{
-            var platformLabels = new Dictionary<string, string>
-            {
-                ["about"]   = "About",
-                ["terms"]   = "Terms of use",
-                ["help"]    = "Help",
-                ["privacy"] = "Privacy",
-                ["conduct"] = "Code of conduct",
-            };
-        }
-        @foreach (var row in Model.PlatformPages)
-        {
-            <tr>
-                <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
-                <td><code>@row.Route</code></td>
-                <td class="text-end">
-                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
-                    @if (row.PageId is not null)
-                    {
-                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-primary">Edit</a>
-                    }
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<h2>Accounts</h2>
-<p class="text-muted">
-    @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.
-</p>
-
-<form method="post" asp-action="ManuallyVerify" id="verify-queue" class="mb-4">
-    @Html.AntiForgeryToken()
-    <label for="verifySubject" class="form-label">Verify an unverified account (safety valve)</label>
-    <div class="input-group">
-        <select class="form-select" name="subjectId" autocomplete="off">
-            @foreach (var a in Model.Accounts.Where(a => !a.Verified))
-            {
-                <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
-            }
-        </select>
-        <button class="btn btn-outline-primary" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
-    </div>
-    @if (Model.UnverifiedCount == 0)
-    {
-        <div class="text-muted small mt-1">No unverified accounts to verify.</div>
-    }
-</form>
-
-<div class="table-responsive">
-    <table class="table table-sm align-middle">
-        <thead>
-            <tr>
-                <th>Account</th>
-                <th>Roles</th>
-                <th>Scope</th>
-                <th>Posting</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var a in Model.Accounts)
-            {
-                <tr>
-                    <td>
-                        <div class="fw-semibold">@(a.DisplayName ?? a.Email ?? a.SubjectId)</div>
-                        @if (a.Email is not null && a.DisplayName != a.Email)
-                        {
-                            <div class="text-muted small">@a.Email</div>
-                        }
-                        @if (!a.Verified)
-                        {
-                            <span class="badge text-bg-warning">unverified</span>
-                        }
-                        @if (a.Blocked)
-                        {
-                            <span class="badge text-bg-danger">blocked</span>
-                        }
-                    </td>
-                    <td>
-                        @foreach (var r in a.Roles)
-                        {
-                            <span class="badge text-bg-secondary">
-                                @r
-                                @if (r == Roles.Moderator)
-                                {
-                                    <span class="small">(@a.ComponentIds.Count component(s))</span>
-                                }
-                            </span>
-                        }
-                    </td>
-                    <td>
-                        @if (a.Roles.Contains(Roles.Moderator))
-                        {
-                            var names = Model.Components
-                                .Where(c => a.ComponentIds.Contains(c.Id))
-                                .Select(c => c.Name)
-                                .ToList();
-                            @string.Join(", ", names)
-                        }
-                    </td>
-                    <td>
-                        @{
-                            var posting = Model.Components
-                                .Where(c => a.CommunityIds.Contains(c.Id))
-                                .Select(c => c.Name)
-                                .ToList();
-                            // Also surface disabled communities the account is still a member
-                            // of (their memberships stay valid; the community feed just 404s).
-                            var extra = a.CommunityIds
-                                .Where(id => !Model.Components.Any(c => c.Id == id))
-                                .Select(id => Model.Communities.FirstOrDefault(c => c.Id == id)?.Name ?? id)
-                                .ToList();
-                            posting.AddRange(extra);
-                        }
-                        @if (posting.Count == 0)
-                        {
-                            <span class="text-muted small">(none)</span>
-                        }
-                        else
-                        {
-                            @string.Join(", ", posting)
-                        }
-                    </td>
-                    <td class="text-end">
-                        <form method="post" asp-action="SetRole" class="d-inline-flex">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
-
-                            <label class="visually-hidden">Roles</label>
-                            @* ADR 0030 — roles are independent/composable: three checkboxes
-                               (any combination), not a single-select. Nothing checked = a
-                               plain Member (the implicit verified-resident standing). *@
-                            <span class="text-muted small me-1" title="Nothing checked = plain Member">roles:</span>
-                            <label title="GlobalAdmin" aria-label="GlobalAdmin" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
-                                <input type="checkbox" name="roleNames" value="@Roles.GlobalAdmin"
-                                       checked="@(a.Roles.Contains(Roles.GlobalAdmin) ? "checked" : null)" />
-                                <span class="badge text-bg-light border">GlobalAdmin</span>
-                            </label>
-                            <label title="Moderator" aria-label="Moderator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
-                                <input type="checkbox" name="roleNames" value="@Roles.Moderator"
-                                       checked="@(a.Roles.Contains(Roles.Moderator) ? "checked" : null)" />
-                                <span class="badge text-bg-light border">Moderator</span>
-                            </label>
-                            <label title="Translator" aria-label="Translator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
-                                <input type="checkbox" name="roleNames" value="@Roles.Translator"
-                                       checked="@(a.Roles.Contains(Roles.Translator) ? "checked" : null)" />
-                                <span class="badge text-bg-light border">Translator</span>
-                            </label>
-
-                            @if (Model.Components.Any())
-                            {
-                                <span class="text-muted small ms-1 me-1">scope:</span>
-                            }
-                            @foreach (var c in Model.Components)
-                            {
-                                <label title="@c.Name" aria-label="@c.Name"
-                                       style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
-                                    @* checked="" is the null-conditional attribute idiom: renders the
-                                       checked keyword when true, emits nothing when false *@
-                                    <input type="checkbox" name="componentIds" value="@c.Id"
-                                           checked="@(a.ComponentIds.Contains(c.Id) ? "checked" : null)" />
-                                    <span class="badge text-bg-light border">@c.Name</span>
-                                </label>
-                            }
-
-                            <button class="btn btn-sm btn-primary" type="submit">Set</button>
-                        </form>
-
-                        @* Posting membership (the distinct data row from the moderator
-                           scope above): a GlobalAdmin grants/removes which communities
-                           a given account may POST to. GlobalAdmins bypass this at
-                           post time, but admins still see the UI for consistency. *@
-                        @if (Model.Components.Any())
-                        {
-                            <form method="post" asp-action="SetCommunityMembership" class="d-inline-flex ms-2">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
-                                <span class="text-muted small me-1">post:</span>
-                                @foreach (var c in Model.Components)
-                                {
-                                    // ADR 0012 — a mandatory community is a member of
-                                    // everyone: shown checked (the union read already
-                                    // includes it) and locked, since unchecking is a
-                                    // server-side no-op and re-checking a redundant row.
-                                    var cMandatory = Model.Communities.FirstOrDefault(x => x.Id == c.Id)?.Mandatory == true;
-                                    <label title="@(cMandatory ? c.Name + " (mandatory — everyone is a member)" : c.Name)" aria-label="@c.Name"
-                                           style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
-                                        <input type="checkbox" name="communityIds" value="@c.Id"
-                                               @(cMandatory ? "disabled" : null)
-                                               checked="@(cMandatory || a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
-                                        <span class="badge text-bg-light border">@c.Name</span>
-                                    </label>
-                                }
-                                <button class="btn btn-sm btn-outline-primary" type="submit">Set</button>
-                            </form>
-                        }
-
-                        @* Block / Unblock — suspend/restore the account's standing (audited
-                           in the Core admin lane). A plain client confirm() guard mirrors the
-                           "dangerous action" intent without a framework dependency.
-                           The Block button is hidden on the admin's *own* row (self-block is
-                           refused by the controller too — the button just isn't offered in
-                           the first place). An Unblock button is still shown on their own row
-                           if they're blocked by another admin, so they can self-restore. *@
-                        @{
-                            var _mySubject = User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
-                            var _isSelf = string.Equals(a.SubjectId, _mySubject, StringComparison.Ordinal);
-                            if (!(_isSelf && !a.Blocked))
-                            {
-                                var _action = a.Blocked ? "Unblock" : "Block";
-                                var _confirm = a.Blocked
-                                    ? "Unblock this account? Their standing will be restored."
-                                    : "Block this account? It loses all standing until unblocked.";
-                                <form method="post"
-                                      asp-action="@_action"
-                                      class="d-inline-flex ms-2"
-                                      data-confirm="@_confirm">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="subjectId" value="@a.SubjectId" />
-                                    <button class="btn btn-sm @(a.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
-                                        @(_action)
-                                    </button>
-                                </form>
-                            }
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
-@* ADR 0030 — roles are independent checkboxes (any combination). The "scope" checkbox
-   set is meaningful only when the Moderator checkbox is checked; the Core SetRoleAsync
-   clears component scope for a non-Moderator target (deletes the assignment rows). *@
-
-<h2 class="mt-5">Communities</h2>
-<p class="text-muted">
-    @Model.Communities.Count community(ies), @Model.DisabledCommunityCount disabled.
-    Adding a community creates a new <code>/community/{id}</code> feed. Disabling one
-    hides it from the feed but keeps its posts and assignments (re-enable to restore).
-</p>
-
-@* ── Add community ── *@
-<form method="post" asp-action="AddCommunity" class="mb-4">
-    @Html.AntiForgeryToken()
-    <div class="row g-3 align-items-end">
-        <div class="col-md-3">
-            <label for="addName" class="form-label">Name</label>
-            <input name="Name" id="addName" type="text" class="form-control" maxlength="100" required autocomplete="off" />
-        </div>
-        <div class="col-md-4">
-            <label for="addDesc" class="form-label">Description (optional)</label>
-            <input name="Description" id="addDesc" type="text" class="form-control" maxlength="500" autocomplete="off" />
-        </div>
-        <div class="col-md-2 d-flex align-items-center ps-2">
-            <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
-            <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
-                   title="Everyone in the neighborhood is a member — no one can be removed or leave it.">Mandatory</label>
-        </div>
-        <div class="col-md-3 text-end">
-            <button class="btn btn-primary" type="submit">Add community</button>
+@* Overview cards — the counts at a glance. The numbers are the dashboard's job:
+   a quick status read before drilling into a section. *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-semibold">@Model.AccountsCount</div>
+                <div class="text-muted small">accounts</div>
+            </div>
         </div>
     </div>
-</form>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-semibold @(Model.UnverifiedCount > 0 ? "text-warning" : "")">@Model.UnverifiedCount</div>
+                <div class="text-muted small">unverified</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-semibold @(Model.BlockedCount > 0 ? "text-danger" : "")">@Model.BlockedCount</div>
+                <div class="text-muted small">blocked</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-bg-light">
+            <div class="card-body py-3">
+                <div class="fs-3 fw-semibold">@Model.CommunitiesCount</div>
+                <div class="text-muted small">communities (@Model.DisabledCommunityCount disabled)</div>
+            </div>
+        </div>
+    </div>
+</div>
 
-@if (Model.Communities.Count == 0)
+@* The verify-queue shortcut — the safety valve for accounts that never
+   completed email verification, still reachable in one click from the dashboard.
+   Rendered only when there is something to verify (a dead form with no options
+   is noise). The write lane (ManuallyVerify) is unchanged. *@
+@if (Model.UnverifiedCount > 0)
 {
-    <div class="text-muted small">No communities yet. Use the form above to add the first one.</div>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Sort</th>
-                    <th>Standing vis.</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var c in Model.Communities)
+    <form method="post" asp-controller="Admin" asp-action="ManuallyVerify"
+          class="alert alert-info alert-dismissible fade show mb-4 d-flex align-items-center gap-3 flex-wrap">
+        @Html.AntiForgeryToken()
+        <span class="fw-semibold">Verify an unverified account</span>
+        <span class="text-muted small">(@Model.UnverifiedCount waiting)</span>
+        <div class="input-group input-group-sm ms-auto">
+            <select class="form-select" name="subjectId" id="verifySubject" autocomplete="off">
+                @foreach (var a in Model.Unverified)
                 {
-                    <tr>
-                        <td>
-                            <div class="fw-semibold">@c.Name</div>
-                            @if (!string.IsNullOrWhiteSpace(c.Description))
-                            {
-                                <div class="text-muted small">@c.Description</div>
-                            }
-                        </td>
-                        <td class="text-muted small">@c.SortOrder</td>
-                        <td>
-                            @if (c.ModeratorAccess)
-                            {
-                                <span class="badge text-bg-secondary">on</span>
-                            }
-                            else
-                            {
-                                <span class="text-muted small">off</span>
-                            }
-                        </td>
-                        <td>
-                            @if (c.Enabled)
-                            {
-                                <span class="badge text-bg-success">enabled</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-warning">disabled</span>
-                            }
-                            @* ADR 0012 — the mandatory badge: everyone is a member;
-                               toggled here (the Make optional / Make mandatory
-                               button) or on the community's manage page — both
-                               are the GlobalAdmin-only lane, never the
-                               moderator's. *@
-                            @if (c.Mandatory)
-                            {
-                                <span class="badge text-bg-dark" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
-                            }
-                        </td>
-                        <td class="text-end">
-                            <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
-                            <form method="post" asp-action="ToggleCommunityMandatory" class="d-inline-flex me-1">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="componentId" value="@c.Id" />
-                                <input type="hidden" name="mandatory" value="@(c.Mandatory ? "false" : "true")" />
-                                <button class="btn btn-sm @(c.Mandatory ? "btn-dark" : "btn-outline-dark")"
-                                        type="submit"
-                                        title="@(c.Mandatory ? "Make optional — membership is explicit rows again." : "Make mandatory — everyone in the neighborhood becomes a member.")">
-                                    @(c.Mandatory ? "Make optional" : "Make mandatory")
-                                </button>
-                            </form>
-                            <form method="post" asp-action="ToggleCommunityEnabled" class="d-inline-flex">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="componentId" value="@c.Id" />
-                                <input type="hidden" name="enabled" value="@(c.Enabled ? "false" : "true")" />
-                                <button class="btn btn-sm @(c.Enabled ? "btn-outline-warning" : "btn-outline-success")"
-                                        type="submit"
-                                        title="@(c.Enabled ? "Hide from the feed — posts and assignments are kept." : "Restore this community to the feed.")">
-                                    @(c.Enabled ? "Disable" : "Re-enable")
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    @* Collapsed edit row *@
-                    <tr class="edit-row" style="display:none" id="edit-@c.Id">
-                        <td colspan="5" class="p-0">
-                            <form method="post" asp-action="UpdateCommunity" class="p-3 border-top bg-light">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="ComponentId" value="@c.Id" />
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <label class="form-label small">Name</label>
-                                        <input type="text" name="Name" value="@c.Name" class="form-control form-control-sm" maxlength="100" required />
-                                    </div>
-                                    <div class="col-md-5">
-                                        <label class="form-label small">Description</label>
-                                        <input type="text" name="Description" value="@c.Description" class="form-control form-control-sm" maxlength="500" />
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label small">Sort order</label>
-                                        <input type="number" name="SortOrder" value="@c.SortOrder" class="form-control form-control-sm" min="0" step="1" />
-                                    </div>
-                                </div>
-                                <div class="mt-2 text-end">
-                                    <button class="btn btn-sm btn-primary" type="submit">Save</button>
-                                </div>
-                            </form>
-                        </td>
-                    </tr>
+                    <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
                 }
-            </tbody>
-        </table>
-    </div>
-
-    @* Edit-row toggle is handled by client/lib/admin-edit-toggle.js (loaded in
-       _Layout.cshtml — SECURITY.md §6 no-inline-script rule). *@
+            </select>
+            <button class="btn btn-primary btn-sm" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </form>
 }
+
+@* Section cards — the four detail sections, each linking to its page. The
+   copy is plain English (this admin view's local convention, as before the
+   split — mostly non-kw-l English). *@
+<div class="row g-3">
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/accounts">
+            <div class="card-body">
+                <div class="fw-semibold">Accounts</div>
+                <small class="text-muted">The account list, the verify queue, and per-account roles, scope, and standing.</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/communities">
+            <div class="card-body">
+                <div class="fw-semibold">Communities</div>
+                <small class="text-muted">Add, edit, enable/disable, and set the mandatory standing of the neighborhood's feeds.</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/platform">
+            <div class="card-body">
+                <div class="fw-semibold">Platform</div>
+                <small class="text-muted">Languages, time zone, date &amp; time format, sign-up, and the five shipped platform pages.</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+        <a class="card text-decoration-none" href="/admin/security">
+            <div class="card-body">
+                <div class="fw-semibold">Security</div>
+                <small class="text-muted">The access audit log and the break-glass elevation path.</small>
+            </div>
+        </a>
+    </div>
+</div>

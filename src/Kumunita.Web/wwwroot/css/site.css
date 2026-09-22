@@ -384,6 +384,25 @@ body.kmb-page-fullbleed .navbar {
   box-shadow: var(--bs-box-shadow-sm);
 }
 
+/* Card titles (the .card-title role): a slightly larger, 600-weight label
+   used consistently as the heading inside .card bodies / .card-headers —
+   replaces the ad-hoc inline `style="font-weight:600"` that views carried. */
+.kmb-card-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 0;
+  font-family: var(--bs-heading-font-family);
+}
+
+/* A nested subsection inside a card (e.g. the "who can see your contact
+   details" editor inside the "contact details" card): a light surface with a
+   border reads as a clearly-contained sub-block rather than a bare card. */
+.kmb-nested-card {
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  background: var(--bs-light-bg-subtle, #faf9f5);
+}
+
 /* --- Navbar ------------------------------------------------------------------ */
 .navbar {
   box-shadow: none;
