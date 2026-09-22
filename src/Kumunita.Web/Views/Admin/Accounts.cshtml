@@ -1,0 +1,163 @@
+@model Kumunita.Web.Models.AdminIndexViewModel
+@using Kumunita.Core.Identity
+@{
+    ViewData["Title"] = "Admin — Accounts";
+}
+
+<h1>Accounts</h1>
+<p class="text-muted">
+    @Model.Accounts.Count account(s), @Model.UnverifiedCount unverified, @Model.BlockedCount blocked.
+    Per-account roles, scope, and membership live on each account's manage page;
+    Block / Unblock are the quick row-level actions here.
+</p>
+
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (Model.UnverifiedCount > 0)
+{
+    @* Verify queue — the safety valve for accounts that never completed email
+       verification. Rendered only when there is something to verify (the
+       clutter pass: a dead form with no options is noise). *@
+    <form method="post" asp-action="ManuallyVerify" id="verify-queue"
+          class="alert alert-info alert-dismissible fade show mb-4 d-flex align-items-center gap-3 flex-wrap">
+        @Html.AntiForgeryToken()
+        <span class="fw-semibold">Verify an unverified account</span>
+        <span class="text-muted small">(@Model.UnverifiedCount waiting)</span>
+        <div class="input-group input-group-sm ms-auto">
+            <select class="form-select" name="subjectId" id="verifySubject" autocomplete="off">
+                @foreach (var a in Model.Accounts.Where(a => !a.Verified))
+                {
+                    <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
+                }
+            </select>
+            <button class="btn btn-primary btn-sm" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </form>
+}
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Account</th>
+                <th>Roles</th>
+                <th>Scope</th>
+                <th>Posting</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var a in Model.Accounts)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@(a.DisplayName ?? a.Email ?? a.SubjectId)</div>
+                        @if (a.Email is not null && a.DisplayName != a.Email)
+                        {
+                            <div class="text-muted small">@a.Email</div>
+                        }
+                        @if (!a.Verified)
+                        {
+                            <span class="badge text-bg-warning">unverified</span>
+                        }
+                        @if (a.Blocked)
+                        {
+                            <span class="badge text-bg-danger">blocked</span>
+                        }
+                    </td>
+                    <td>
+                        @foreach (var r in a.Roles)
+                        {
+                            <span class="badge text-bg-secondary">
+                                @r
+                                @if (r == Roles.Moderator)
+                                {
+                                    <span class="small">(@a.ComponentIds.Count component(s))</span>
+                                }
+                            </span>
+                        }
+                    </td>
+                    <td>
+                        @if (a.Roles.Contains(Roles.Moderator))
+                        {
+                            var names = Model.Components
+                                .Where(c => a.ComponentIds.Contains(c.Id))
+                                .Select(c => c.Name)
+                                .ToList();
+                            @string.Join(", ", names)
+                        }
+                    </td>
+                    <td>
+                        @{
+                            var posting = Model.Components
+                                .Where(c => a.CommunityIds.Contains(c.Id))
+                                .Select(c => c.Name)
+                                .ToList();
+                            // Also surface disabled communities the account is still a member
+                            // of (their memberships stay valid; the community feed just 404s).
+                            var extra = a.CommunityIds
+                                .Where(id => !Model.Components.Any(c => c.Id == id))
+                                .Select(id => Model.Communities.FirstOrDefault(c => c.Id == id)?.Name ?? id)
+                                .ToList();
+                            posting.AddRange(extra);
+                        }
+                        @if (posting.Count == 0)
+                        {
+                            <span class="text-muted small">(none)</span>
+                        }
+                        else
+                        {
+                            @string.Join(", ", posting)
+                        }
+                    </td>
+                    <td class="text-end">
+                        @* The per-account writes live on /admin/accounts/{id} (the Manage
+                           detail page). The list keeps the read-only overview + the
+                           quick Block / Unblock actions (the two row-level operations an
+                           admin wants to reach in one click). *@
+                        <a href="/admin/accounts/@a.SubjectId" class="btn btn-sm btn-outline-secondary me-1">Manage</a>
+
+                        @* Block / Unblock — suspend/restore the account's standing (audited
+                           in the Core admin lane). A plain client confirm() guard mirrors the
+                           "dangerous action" intent without a framework dependency.
+                           The Block button is hidden on the admin's *own* row (self-block is
+                           refused by the controller too — the button just isn't offered in
+                           the first place). An Unblock button is still shown on their own row
+                           if they're blocked by another admin, so they can self-restore. *@
+                        @{
+                            var _mySubject = User.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
+                            var _isSelf = string.Equals(a.SubjectId, _mySubject, StringComparison.Ordinal);
+                            if (!(_isSelf && !a.Blocked))
+                            {
+                                var _action = a.Blocked ? "Unblock" : "Block";
+                                var _confirm = a.Blocked
+                                    ? "Unblock this account? Their standing will be restored."
+                                    : "Block this account? It loses all standing until unblocked.";
+                                <form method="post"
+                                      asp-action="@_action"
+                                      class="d-inline-flex ms-1"
+                                      data-confirm="@_confirm">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="subjectId" value="@a.SubjectId" />
+                                    <button class="btn btn-sm @(a.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
+                                        @(_action)
+                                    </button>
+                                </form>
+                            }
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

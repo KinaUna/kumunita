@@ -1,0 +1,31 @@
+@{
+    ViewData["Title"] = "Admin — Security";
+}
+
+<h1>Security</h1>
+<p class="text-muted">
+    The security surfaces — the always-on access-decision log and the one-time
+    break-glass elevation path. Both are their own pages; this is the section hub.
+</p>
+
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<div class="list-group">
+    <a asp-action="Audit" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Access audit log</div>
+        <small class="text-muted">A record of who was allowed or denied access to restricted content, plus admin actions. Filter by actor, via, or outcome.</small>
+    </a>
+    <a asp-action="BreakGlass" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Break-glass</div>
+        <small class="text-muted">The one-time elevation path for emergencies — consume an operator-written token to act with elevated standing for a bounded window.</small>
+    </a>
+</div>
