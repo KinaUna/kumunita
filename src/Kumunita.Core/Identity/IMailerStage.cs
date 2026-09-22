@@ -10,7 +10,7 @@ namespace Kumunita.Core.Identity;
 /// rolls back the domain write that already committed (the design doc's "Handoff" test).
 /// <para>
 /// <b>Contract (M1 step 7 — the C3-envelope fix, see
-/// <c>docs/plans-milestones/plan-m1-step-7-outbox-email-c3.md</c>, unit U1/U2):</b>
+/// <c>docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md</c>, unit U1/U2):</b>
 /// <see cref="StageAsync"/> now <em>both</em> stores the <c>OutboxEmail</c> row on
 /// <paramref name="session"/> <em>and</em> enqueues the matching durable-message
 /// envelope into Wolverine's message store in the <em>same</em> transaction as
@@ -46,7 +46,7 @@ public interface IMailerStage
     /// the matching durable-message envelope into Wolverine's Postgres-backed message
     /// store, in the same transaction as <paramref name="session"/> (the envelope is held
     /// until the caller's own <c>SaveChangesAsync</c> commits — the C3 guarantee this
-    /// fix restores, see <c>docs/plans-milestones/plan-m1-step-7-outbox-email-c3.md</c>).
+    /// fix restores, see <c>docs/plans-milestones/done/plan-m1-step-7-outbox-email-c3.md</c>).
     /// Idempotency: the caller supplies the <see cref="OutboxEmail.IdempotencyKey"/>
     /// (the §6.2 per-email key — <c>verify:{userId}:{attempt}</c>, <c>setup:{userId}</c>,
     /// ...).
@@ -67,7 +67,7 @@ public interface IMailerStage
 /// <see cref="Wolverine.IMessageContext"/> (the U1-pinned call —
 /// <c>IMessageContext.PublishAsync&lt;T&gt;(T)</c>, <c>ValueTask</c>, see
 /// <see cref="U1PinnedApiProbe"/> for the verified 6.33.0 surface and
-/// <c>docs/plans-milestones/m1-step-7-handoff-notes.md</c>, section "U1 — pinned
+/// <c>docs/plans-milestones/done/m1-step-7-handoff-notes.md</c>, section "U1 — pinned
 /// API"). Both land in the ambient Marten transaction — one <c>SaveChangesAsync</c>
 /// = the domain write + the outbox row + the envelope commit atomically (invariant
 /// C3, no silent missing email). This stays in production alongside the step-7

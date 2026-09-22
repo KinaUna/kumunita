@@ -38,7 +38,8 @@ public sealed class IdentityService(
     IClaimsSource claimsSource,
     IMailerStage mailer,
     IOptions<VerificationOptions> verificationOptions,
-    Microsoft.Extensions.Logging.ILogger<IdentityService> logger) : IIdentityService
+    Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
+    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -119,11 +120,14 @@ public sealed class IdentityService(
             Visibility = new Authorization.Audience()   // self-only (owner branch author; C1 denies the rest)
         });
         session.Store(token);
+        var verifyLink = VerificationLink(token.Id);
+        var (verifySubject, verifyBody) = await BuildVerificationEmailAsync(
+            displayName, verifyLink, preferredLanguage: null);
         await mailer.StageAsync(session,
                     idempotencyKey: $"verify:{user.Id}:1",
                     recipient: email,
-                    subject: "Verify your Kumunita account",
-                    body: VerificationBody(displayName, VerificationLink(token.Id)),
+                    subject: verifySubject,
+                    body: verifyBody,
                     ct: default);
         await session.SaveChangesAsync();
 
@@ -161,13 +165,15 @@ public sealed class IdentityService(
             var now = DateTimeOffset.UtcNow;
             var token = NewVerifyToken(user.Id ?? string.Empty, now, attempt: nextAttempt);
             session.Store(token);
+            var resendName = profile?.DisplayName ?? user.Email ?? "there";
+            var resendLink = VerificationLink(token.Id);
+            var (resendSubject, resendBody) = await BuildVerificationEmailAsync(
+                resendName, resendLink, preferredLanguage: profile?.EmailLanguage);
             await mailer.StageAsync(session,
                 idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
                 recipient: email,
-                subject: "Verify your Kumunita account",
-                body: VerificationBody(
-                    profile?.DisplayName ?? user.Email ?? "there",
-                    VerificationLink(token.Id)),
+                subject: resendSubject,
+                body: resendBody,
                 ct: default);
             await session.SaveChangesAsync();
 
@@ -177,6 +183,15 @@ public sealed class IdentityService(
         }
 
         return new ResendVerificationResult(Success: true);
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> FindSubjectByEmailAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return null;
+        var user = await userManager.FindByEmailAsync(email);
+        return user?.Id;
     }
 
     /// <inheritdoc />
@@ -291,6 +306,73 @@ public sealed class IdentityService(
         await userManager.UpdateSecurityStampAsync(target);
 
         return target;
+    }
+
+    // ── Signup policy (ADR 0050 — the admin-managed open / invitation-only gate) ──
+
+    /// <inheritdoc />
+    public async Task<bool> IsSignupOpenAsync()
+    {
+        // ADR 0050 read seam: the instance gate (LocaleSettings.IsSignupOpen) with
+        // the `true` floor — a missing singleton or an unset value both yield
+        // `true`, so a fresh instance ships with sign-up open (the development
+        // circle keeps working until an admin tightens it). A read (no audit row),
+        // the same shape as the LocaleSettings reads the Localization lane does.
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        // `true` floor: a null settings row (never seen — but defensively) keeps the
+        // gate open; only an explicit `false` closes sign-up.
+        return settings is null || settings.IsSignupOpen;
+    }
+
+    /// <inheritdoc />
+    public async Task SetSignupOpenAsync(bool open, string adminSubjectId)
+    {
+        // ADR 0050 write seam: the admin-settled instance gate (LocaleSettings singleton,
+        // the same doc the timezone / date-format / editor lanes read and write) + exactly
+        // one audit row (via: Admin, action "signup.set-open", target "signup") in the
+        // same session (C3 — no silent, unaudited access). The gate is the whole point
+        // here — it is *not* an access change, so there is no VisibilityCount to attach
+        // (VisibleCount / HiddenCount stay null, the single-target shape ADR 0006 §B
+        // prescribes for a singleton toggle). `open` is the authoritative new value.
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        // Load-or-create the singleton (the SetDefaultTimezoneAsync shape) and set
+        // the gate; the other singleton fields are untouched — this is the signup
+        // gate only.
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { IsSignupOpen = open };
+        }
+        else
+        {
+            settings.IsSignupOpen = open;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "signup.set-open",
+            TargetKind = "signup",
+            TargetId = "signup",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -420,32 +502,41 @@ public sealed class IdentityService(
     // ── Role promote/demote + component scope (ADR 0003) ──────────────────
 
     /// <inheritdoc />
-    public async Task SetRoleAsync(string targetSubjectId, string adminSubjectId, string role,
-        IReadOnlyList<string>? componentIds)
+    public async Task SetRoleAsync(string targetSubjectId, string adminSubjectId,
+        IReadOnlyCollection<string> roles, IReadOnlyList<string>? componentIds)
     {
         var admin = await RequireGlobalAdminAsync(adminSubjectId);
         _ = admin;
         var target = await userManager.FindByIdAsync(targetSubjectId)
             ?? throw new InvalidOperationException($"No account '{targetSubjectId}'.");
 
-        var targetRoles = (await userManager.GetRolesAsync(target)).ToList();
-        var wantsGlobalAdmin = role == Roles.GlobalAdmin;
-        var wantsModerator = role == Roles.Moderator;
+        // ADR 0030 — roles are independent: `roles` is the *set* of elevated roles the
+        // target should hold (any subset of the three). `Member` is the implicit
+        // verified-resident standing and never appears here, so it is filtered out
+        // defensively (a stray "Member" in the set is a no-op either way).
+        var wants = (roles ?? [])
+            .Where(r => r is Roles.Moderator or Roles.Translator or Roles.GlobalAdmin)
+            .ToHashSet();
+        var wantsGlobalAdmin = wants.Contains(Roles.GlobalAdmin);
+        var wantsModerator = wants.Contains(Roles.Moderator);
+        var wantsTranslator = wants.Contains(Roles.Translator);
 
+        var targetRoles = (await userManager.GetRolesAsync(target)).ToHashSet();
         bool rolesChanged =
-            (wantsGlobalAdmin && !targetRoles.Contains(Roles.GlobalAdmin)) ||
-            (!wantsGlobalAdmin && targetRoles.Contains(Roles.GlobalAdmin)) ||
-            (wantsModerator && !targetRoles.Contains(Roles.Moderator)) ||
-            (!wantsModerator && targetRoles.Contains(Roles.Moderator));
+            wantsGlobalAdmin != targetRoles.Contains(Roles.GlobalAdmin) ||
+            wantsModerator   != targetRoles.Contains(Roles.Moderator) ||
+            wantsTranslator  != targetRoles.Contains(Roles.Translator);
 
-        // Apply the GlobalAdmin/Moderator identity roles (Member is the implicit verified
-        // standing — no EF role for it). AddTo/RemoveFromRole manage the role membership;
-        // the role row itself is created by the host's seed (FirstBootSeeder) when the
-        // account is granted the role for the first time.
+        // Apply the GlobalAdmin/Moderator/Translator identity roles (Member is the implicit
+        // verified standing — no EF role for it). AddTo/RemoveFromRole manage the role
+        // membership; the role row itself is created by the host's seed (FirstBootSeeder)
+        // when the account is granted the role for the first time.
         if (wantsGlobalAdmin)  await userManager.AddToRoleAsync(target, Roles.GlobalAdmin);
         else                   await userManager.RemoveFromRoleAsync(target, Roles.GlobalAdmin);
         if (wantsModerator)    await userManager.AddToRoleAsync(target, Roles.Moderator);
         else                   await userManager.RemoveFromRoleAsync(target, Roles.Moderator);
+        if (wantsTranslator)   await userManager.AddToRoleAsync(target, Roles.Translator);
+        else                   await userManager.RemoveFromRoleAsync(target, Roles.Translator);
 
         // Security stamp: demoted accounts lose elevated access on the NEXT request, not at
         // cookie expiry (OPS §10). Rotate regardless to be safe (a re-signin is required to
@@ -486,8 +577,8 @@ public sealed class IdentityService(
             "role", "role", targetSubjectId, Authorization.AccessVia.Admin, Authorization.AccessOutcome.Allow));
         await session.SaveChangesAsync();
 
-        logger.LogInformation("Admin {Admin} set {Target}'s role to {Role}/{Components}.",
-            adminSubjectId, targetSubjectId, role, string.Join(",", componentIds ?? []));
+        logger.LogInformation("Admin {Admin} set {Target}'s roles to {Roles}/{Components}.",
+            adminSubjectId, targetSubjectId, string.Join(",", wants), string.Join(",", componentIds ?? []));
     }
 
     // ── Password (self-serve or admin reset) ───────────────────────────────
@@ -590,6 +681,28 @@ public sealed class IdentityService(
         $"Hi {displayName},\n\nYour Kumunita account is set to verify on its first sign-in. " +
         $"Open this one-time link to confirm the account (it also signs you in):\n\n{verifyLink}\n\n" +
         "If you didn't create this account, you can ignore this message.";
+
+    /// <summary>
+    /// ADR 0061 — the verification email's subject + body, resolved through the
+    /// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> when one is
+    /// available (per-recipient preferred language → instance default →
+    /// <c>en</c> floor), with the English literals as the fallback for the two
+    /// test sites that construct <see cref="IdentityService"/> directly without a
+    /// provider. The body template's <c>{0}</c>/<c>{1}</c> placeholders are the
+    /// resident's display name and the one-time verify link (ADR 0061 / the
+    /// <c>email.verify_body</c> registry entry).
+    /// </summary>
+    private async Task<(string Subject, string Body)> BuildVerificationEmailAsync(
+        string displayName, string verifyLink, string? preferredLanguage)
+    {
+        if (translationProvider is null)
+            return ("Verify your Kumunita account", VerificationBody(displayName, verifyLink));
+
+        string subject = await translationProvider.GetAsync("email.verify_subject", preferredLanguage);
+        string bodyTemplate = await translationProvider.GetAsync("email.verify_body", preferredLanguage);
+        string body = string.Format(bodyTemplate, displayName, verifyLink);
+        return (subject, body);
+    }
 }
 
 

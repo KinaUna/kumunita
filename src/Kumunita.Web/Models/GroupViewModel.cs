@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace Kumunita.Web.Models;
 
@@ -225,7 +227,41 @@ public sealed record GroupDetailViewModel(
     IReadOnlyList<GroupMemberViewModel> Members,
     IReadOnlyList<PendingInvitationViewModel> PendingInvitations,
     IReadOnlyList<ResidentOption> ResidentCandidates,
-    bool IsPrivate = false);
+    bool IsPrivate = false)
+{
+    // ── Group posts (ADR 0013) — the membership-scoped feed lives on the
+    //    detail page (GroupPosts / GroupPostsTotal); the composer is its
+    //    own page (GET /groups/{id}/posts/new + the paired POST). The
+    //    Detail action loads the feed from the same
+    //    ListGroupFeedAsync / GetGroupIdsAsync lanes the old
+    //    /groups/{id}/posts page used, so the access decision + aggregate
+    //    audit row are unchanged (G·1/G·3/G·5).
+    //    These are object-initializer properties (not positional params) so
+    //    their defaults may be non-constant (a C# positional default must be a
+    //    compile-time constant — [] is not), and the existing shape-pinning Web
+    //    test keeps compiling unchanged. ──
+    public IReadOnlyList<PostListItem> GroupPosts { get; init; } = [];
+
+    public int GroupPostsTotal { get; init; }
+
+    public bool CanPost { get; init; }
+
+    // ── ADR 0026 — group name/description translations ─────────────────────
+    // The same three properties the ADR 0022 post-detail surface carries
+    // (PostDetailViewModel): the row set (a "a read, not a decision" surface —
+    // visibility already inherited the group's owner∪member reach), the enabled
+    // catalog language set (with its HasTranslation flag) the chips / "add a
+    // translation" candidate list render from, and the standing pin (a display
+    // convenience, not a gate — the real deny is UserInfoService's
+    // AddGroupTranslationAsync standing check, which re-runs the same rule
+    // server-side). Reusing the ADR 0022 LanguageOption record (PostDetailViewModel
+    // file) — the same (code, native name, has translation) shape.
+    public IReadOnlyList<Kumunita.Core.UserInfo.GroupTranslation> GroupTranslations { get; init; } = [];
+
+    public IReadOnlyList<LanguageOption> Languages { get; init; } = [];
+
+    public bool CanTranslate { get; init; }
+}
 
 // U10's add/remove routes carry a single [FromForm] subjectId each (the route
 // distinguishes add vs remove) — no dedicated form model needed, matching
@@ -250,3 +286,171 @@ public sealed record GroupDetailViewModel(
 /// the raw <see cref="SubjectId"/> when the name is blank — fail-safe, not a
 /// silent blank option).</param>
 public sealed record ResidentOption(string SubjectId, string DisplayName);
+// ── Group posts (ADR 0013, group-posts milestone U7) — the channel's three
+//    view-model types. Mirrors of the M3 post surface's view types (U7 pin:
+//    "mirror, minus the audience slot") — the group lane's access decision
+//    is membership (G·1), so there is no audience editor and no component
+//    picker; the group's membership is the audience proxy. The rows reuse
+//    the M3 <see cref="PostListItem"/> / <see cref="ReplyItem"/> records
+//    verbatim (same namespace; "reuse, don't re-invent"). The controller
+//    (GroupsController's group-post actions) is the only writer of these. ──
+
+/// <summary>
+/// The <b>group post detail</b> surface (ADR 0013, U7) —
+/// <c>GET /groups/{id}/posts/{postId}</c> + its one-level reply list. A
+/// *projection* of
+/// <see cref="Kumunita.Core.Posts.PostService.GetGroupPostAsync"/>'s
+/// <see cref="Kumunita.Core.Posts.PostDetailResult"/> — the single detail
+/// decision row (G·5, TargetId = the post id) is already written at the
+/// Core layer, and the <see cref="Replies"/> list is the
+/// <b>already-authorized</b> one-level set returned *as-is* under the
+/// parent's single group-lane decision (G·7 — no second evaluation, no
+/// per-reply row; the C-M3·1 analog). A <b>denied</b> or <b>missing</b>
+/// post is mapped by the controller to a 404 (the group lane's fail-closed
+/// shape — G·3/G·4, the GroupsController "a non-visible group 404s"
+/// precedent; the audience lane is never evaluated, G·8) before this model
+/// is built, so the view never receives one for a post the viewer may not
+/// read. <see cref="GroupId"/> is the reply form's <b>target slot</b>
+/// (the M3 <see cref="PostDetailViewModel"/>'s reply-form target analog —
+/// the form posts to <c>/groups/{GroupId}/posts/{Post.Id}/replies</c>).
+/// <para>
+/// **No dedicated reply view-model** (the U7 pin, exactly as M3 renders
+/// its reply form inline on the detail page): a one-field <c>body</c>
+/// plain form, no per-reply audience (G·7 — a reply inherits the parent's
+/// single group-lane decision).
+/// </para>
+/// </summary>
+public sealed class GroupPostDetailViewModel
+{
+    public string GroupId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The post's **group's name** (the <see cref="GroupId"/>'s stored
+    /// <c>Group.Name</c>), shown in the **viewer's language** when a
+    /// user-added name translation exists for it (the ADR 0026 floor,
+    /// exactly the community-name idiom the feed's
+    /// <c>ResolveCommunityNameAsync</c> uses), and feeding the "back to the
+    /// group" link's label on the detail page. A display pin, not a gate:
+    /// the post's single group-lane decision already ran in
+    /// <c>GetGroupPostAsync</c>. A display gap, not an error: when the group
+    /// cannot be resolved the view falls back to the raw id (the page still
+    /// renders). The link's <b>target</b> is unaffected.
+    /// </summary>
+    public string GroupDisplayName { get; set; } = string.Empty;
+
+    public Kumunita.Core.Posts.Post Post { get; set; } = null!;
+
+    public string AuthorDisplayName { get; set; } = string.Empty;
+
+    /// <summary>The author's subject id (the <see cref="Kumunita.Core.Posts.Post"/>'s
+    /// <c>AuthorId</c>) — a display convenience: the avatar links the audited
+    /// serving lane <c>GET /profile/avatar/{subjectId}</c> (the same "a read,
+    /// not a decision" pin as <see cref="AuthorDisplayName"/>).</summary>
+    public string AuthorSubjectId { get; set; } = string.Empty;
+
+    /// <summary>The already-authorized one-level replies (G·7 — as-is under
+    /// the parent's single group-lane decision; the M3
+    /// <see cref="ReplyItem"/> shape reused verbatim).</summary>
+    public IReadOnlyList<ReplyItem> Replies { get; set; } = [];
+
+    /// <summary>Whether the signed-in actor authored the post (a display
+    /// pin, not a gate — the M3 <see cref="PostDetailViewModel.IsAuthor"/>
+    /// analog).</summary>
+    public bool IsAuthor { get; set; }
+
+    // ── ADR 0022 — user-added post translations (group lane) ──
+
+    /// <summary>The post's user-added translations, keyed by their target
+    /// language code (a "a read, not a decision" surface; visibility already
+    /// inherited the post's single group-lane decision).</summary>
+    public IReadOnlyList<Kumunita.Core.Posts.PostTranslation> PostTranslations { get; set; } = [];
+
+    /// <summary>Every enabled <see cref="Kumunita.Core.Localization.LanguageCatalog"/>
+    /// language (in <c>SortOrder</c>) with its
+    /// <see cref="LanguageOption.HasTranslation"/> flag — the set the
+    /// "available translations" chips and the "add a translation" candidate
+    /// list render from.</summary>
+    public IReadOnlyList<LanguageOption> Languages { get; set; } = [];
+
+    /// <summary>Whether the signed-in actor holds standing to
+    /// <b>add</b> a translation of this group post (ADR 0022 — on the group
+    /// lane that is the author or a GlobalAdmin only; the component-moderator
+    /// standing does not reach a group lane, ADR 0007). A display pin, not a
+    /// gate.</summary>
+    public bool CanTranslate { get; set; }
+
+    // ── TD lane (ADR 0027) — the authored-in language as a first-class variant ──
+
+    /// <summary>The language the group post was **authored in** (ADR 0018,
+    /// <see cref="Post"/>'s <c>LanguageCode</c>) — carried **additively** on
+    /// this model (TD·6: the shared <see cref="LanguageOption"/> record is
+    /// untouched). TD·1: the detail surface renders this code as the
+    /// **first, default-visible** variant chip, and TD·4: the "Add a …"
+    /// candidate list excludes it. Populated by the detail controller from
+    /// <c>Post.LanguageCode</c> — a read, never a write (TD·7: no Core or
+    /// schema change).</summary>
+    public string OriginalLanguageCode { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// The <b>group-post composer</b> form-bound model (ADR 0013, U7) —
+/// <c>POST /groups/{id}/posts</c>. Mirrors the M3
+/// <see cref="PostComposeViewModel"/> **minus** the
+/// <see cref="PostComposeViewModel.Audience"/> / audience-picker slot (the
+/// U7 pin): the group's membership is the audience proxy — there is no
+/// audience to choose, and the service writes the post's <c>Audience</c>
+/// non-null and <b>empty</b> (G·8) regardless of anything on this form.
+/// Title is optional (a group post's <c>Title ?</c> is the M3
+/// <see cref="Kumunita.Core.Posts.Post"/> shape); the body is required.
+/// The group's identity is the route's <c>{id}</c> — never form-bound
+/// (a form-bound <c>GroupId</c> would be a lane-bypass hole; the
+/// controller mints <see cref="Kumunita.Core.Posts.GroupPostDraft.GroupId"/>
+/// from the route, and the create gate's membership decision is the
+/// authoritative deny — G·3).
+/// </summary>
+public sealed class GroupPostComposeViewModel
+{
+    public string? Title { get; set; }
+
+    public string Body { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The composer's <b>authored-in language</b> picker (ADR 0018, ADR 0005 B)
+    /// — the BCP-47 code the author is writing this group post in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time
+    /// (<see cref="Kumunita.Core.Posts.PostService.CreateGroupPostAsync"/>).
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The composer's language *picker* options — the instance's **enabled**
+    /// language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>.
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="LanguageCode"/>, not a
+    /// catalog-list shape (the <see cref="PostComposeViewModel.Components"/>
+    /// single-source pin at the language layer).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
+
+    /// <summary>
+    /// The composer's <b>save-as-draft</b> toggle (ADR 0037) — a form-bound
+    /// checkbox. When checked, the group post is written with
+    /// <see cref="Kumunita.Core.Posts.Post.IsDraft"/> true: it is saved but
+    /// visible to <b>no one except its author</b> (not even a group member, a
+    /// moderator, or a <see cref="Kumunita.Core.Identity.Roles.GlobalAdmin"/>)
+    /// until the author publishes it
+    /// (<see cref="Kumunita.Core.Posts.PostService.PublishPostAsync"/>). The
+    /// draft gate runs before the group-lane membership decision
+    /// (<see cref="Kumunita.Core.Posts.PostService.GetGroupPostAsync"/>), so
+    /// the membership proxy is moot until publish.
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = false;
+
+    /// <summary>The composer's shape is well-formed for a <c>POST</c>:
+    /// <see cref="Body"/> must be non-empty (a bodyless post is a dead row;
+    /// the M3 <see cref="PostComposeViewModel.IsValid"/> body pin, minus the
+    /// component/audience slots that do not exist on this lane).</summary>
+    public bool IsValid => !string.IsNullOrWhiteSpace(Body);
+}

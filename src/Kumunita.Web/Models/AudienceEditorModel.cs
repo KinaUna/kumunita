@@ -71,6 +71,44 @@ public sealed class AudienceEditorModel
     /// shape is handled at the parent's <see cref="ProfileEditViewModel"/>, not here).</summary>
     public string? Grants { get; set; }
 
+    /// <summary>
+    /// The ADR 0036 "community-visible" flag as a form-bound checkbox. When
+    /// checked (and this editor is bound to a component-scoped resource), the
+    /// resource is visible to all members of the target component — *in
+    /// addition to* the explicit <see cref="Grants"/> list — via the
+    /// <see cref="Kumunita.Core.Authorization.AuthorizationService"/> community
+    /// branch (the 4th decision branch, before the public / grant-match
+    /// branches).
+    /// <para>
+    /// The post composer seeds this <c>true</c> (the new ADR 0036 default);
+    /// the profile editor and other component-agnostic surfaces leave it
+    /// <c>false</c> — there the flag is inert (a null target
+    /// <c>ComponentId</c> short-circuits the community branch) and simply
+    /// round-trips as the stored <see cref="Kumunita.Core.Authorization.Audience
+    /// .Community"/> value. A simple bool model-binds from a checkbox's
+    /// absence (<c>false</c>) and presence (the posted value), no extra
+    /// validation needed — an unchecked box is a well-formed shape, never a
+    /// malformed post.
+    /// </para>
+    /// </summary>
+    public bool CommunityVisible { get; set; }
+
+    /// <summary>
+    /// The ADR 0041 "all residents" flag as a form-bound checkbox. When
+    /// checked, the resource is visible to every signed-in resident (any
+    /// authenticated reader, no community required) — via the new 4.5 decision
+    /// branch (after the community branch, before the public branch). A
+    /// simple bool model-binds from a checkbox's absence (<c>false</c>) and
+    /// presence (the posted value), no extra validation needed.
+    /// <para>
+    /// The page composer's "All residents" scope (ADR 0041) sets this flag on
+    /// the document via the controller's write-side mapping; the editor's own
+    /// checkbox round-trips the stored value. A <c>null</c> audience (a public
+    /// page) has no flag (the public branch wins unconditionally).
+    /// </para>
+    /// </summary>
+    public bool AllResidentsVisible { get; set; }
+
     /// <summary>true when the editor's grant list is empty (an empty audience — the
     /// C1 deny shape). Used by the partial's inline hint (an "empty audience denies
     /// everyone, including you — see the M1 bootstrap default" note). A *parse
@@ -161,13 +199,55 @@ public sealed class AudienceEditorModel
     {
         var mode = Mode is "All" ? AudienceMode.All : AudienceMode.Any;
 
+        Audience audience;
         if (string.IsNullOrWhiteSpace(Grants))
-            return new Audience(mode, Array.Empty<AudienceGrant>());
+            audience = new Audience(mode, Array.Empty<AudienceGrant>());
+        else
+        {
+            var grants = JsonSerializer.Deserialize<AudienceGrant[]>(Grants, JsonOptions)
+                ?? throw new InvalidOperationException(
+                    $"{nameof(AudienceEditorModel)}.{nameof(Grants)} failed to parse as an audience grant list.");
+            audience = new Audience(mode, grants);
+        }
 
-        var grants = JsonSerializer.Deserialize<AudienceGrant[]>(Grants, JsonOptions)
-            ?? throw new InvalidOperationException(
-                $"{nameof(AudienceEditorModel)}.{nameof(Grants)} failed to parse as an audience grant list.");
+        // ADR 0036 — the community branch is a distinct grant (not a mode of
+        // the grants list), so it is set after the audience is built; the
+        // editor's checkbox state is carried verbatim onto the document.
+        audience.Community = CommunityVisible;
+        // ADR 0041 — the "all residents" flag is likewise a distinct grant
+        // (the new 4.5 branch), carried verbatim from the editor's checkbox.
+        audience.AllResidents = AllResidentsVisible;
+        return audience;
+    }
 
-        return new Audience(mode, grants);
+    /// <summary>
+    /// The inverse of <see cref="BuildAudience"/>: seeds this editor's form shape
+    /// from an existing <see cref="Audience"/> document value (the read-direction
+    /// round-trip the post-edit lane needs — the edit form is pre-filled with the
+    /// post's current audience, exactly as the create form is seeded with the
+    /// bootstrap self-only shape). The <see cref="Mode"/> is the value name of the
+    /// audience's <see cref="AudienceMode"/> ("Any" / "All"), and
+    /// <see cref="Grants"/> is the audience's grant list serialized to the same
+    /// JSON-array-of-<see cref="AudienceGrant"/> shape the form posts and
+    /// <see cref="BuildAudience"/> reads back (the single-source pin: one
+    /// serialized grant field, no parallel shape). A null audience falls back to
+    /// the empty self-only shape (Mode "Any", Grants "[]") — the same
+    /// deny-by-default bootstrap default the composer seeds (ADR 0001-B,
+    /// invariant C1).
+    /// </summary>
+    public static AudienceEditorModel FromAudience(Audience? audience)
+    {
+        if (audience is null)
+            return new AudienceEditorModel { Mode = "Any", Grants = "[]" };
+
+        var mode = audience.Mode == AudienceMode.All ? "All" : "Any";
+        var grantsJson = JsonSerializer.Serialize(audience.Grants?.ToArray() ?? Array.Empty<AudienceGrant>(), JsonOptions);
+        return new AudienceEditorModel
+        {
+            AllResidentsVisible = audience.AllResidents,
+            Mode = mode,
+            Grants = grantsJson,
+            CommunityVisible = audience.Community,
+        };
     }
 }

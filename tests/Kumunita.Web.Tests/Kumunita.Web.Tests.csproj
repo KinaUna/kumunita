@@ -14,8 +14,22 @@
       <PackageReference Include="Microsoft.Testing.Extensions.VSTestBridge" Version="2.4.0" />
       <PackageReference Include="NSubstitute" Version="5.3.0" />
       <PackageReference Include="xunit.v3" Version="4.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />
-    </ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.11" />      <!-- GA U06 (ADR 0038): the 5 Assign Web tests are <b>integration</b> tests —
+           the Assign action's standing gate (ActiveLinkAsync) + the happy-path
+           CreateGuardianLinkAsync seam both run real Marten SQL (Marten 9's
+           FirstOrDefaultAsync/ToListAsync cannot be NSubstituted — they cast to
+           the internal MartenLinqQueryable and execute a live query), and the
+           pinned tests assert REAL GuardianLink + guardian.create audit rows.
+           That needs a live Postgres, so this project carries its own
+           PostgresFixture (a byte-for-byte copy of the one in
+           Kumunita.Core.Tests — the repo's documented "Web.Tests is
+           NSubstitute-only, Testcontainers lives in Core.Tests" convention is
+           the seam gap U06 records as a drift pause; the 5 pinned names cannot
+           be driven against the NSubstitute-only shape). Same versions as
+           Core.Tests to keep the two containers in lockstep. -->
+      <PackageReference Include="Npgsql" Version="10.0.3" />
+      <PackageReference Include="Testcontainers" Version="4.14.0" />
+      <PackageReference Include="Testcontainers.PostgreSql" Version="4.14.0" />    </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
@@ -41,6 +55,7 @@
        specs against `dotnet run` (see playwright.config.ts). -->
   <ItemGroup>
     <None Include="e2e-m2.spec.ts" />
+    <None Include="e2e-tags.spec.ts" />
     <None Include="playwright.config.ts" />
     <None Include="package.json" />
     <None Include="package-lock.json" Condition="Exists('package-lock.json')" />

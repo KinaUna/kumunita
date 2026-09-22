@@ -6,8 +6,10 @@ no multi-tenant data model.
 
 ## Start here
 
-- `README.md` — what the platform is, its current status (M3 shipped, M4 next),
-  principles, tech stack, and the **Running** instructions.
+- `README.md` — what the platform is, its current status (M3 + group posts
+  shipped; **multilingual is next** — pulled forward from M6 so the platform can
+  be exercised in more than one language before the circle widens; then M4
+  events/RSVPs, M5 projects), principles, tech stack, and the **Running** instructions.
 - `docs/ARCHITECTURE.md` — the detailed map: stack, data model, the three
   bounded contexts (Identity / UserInfo / Authorization), the module-boundary
   contracts, and the CQRS-lite & side-effects (Wolverine) convention.
@@ -81,7 +83,16 @@ when you change behavior:
 - The **README Roadmap** and `src/Kumunita.Web/Milestones.cs` — the home page
   renders `Milestones.cs`, and its doc-comment names the README as the source
   of truth. Bump a milestone to "done" in one when it ships and the other
-  follows.
+  follows. **Tests pin the exact order + the single-in-progress milestone
+  (`tests/Kumunita.Web.Tests/MilestonesTests.cs`)** — keep that file in step
+  with any roadmap reorder.
+- When a **new capability lands out of the M-letter order**, it gets a *named
+  lane* with a short ID — **not** a renumber. Precedent: the media/avatars
+  lane (ADR 0011, "M4-adjacent") and **group posts** (`GP`, ADR 0013, "no
+  milestone letter; roadmap M4/M5/M6 stay Events/Projects/Portability"). The
+  same rule now applies to **multilingual** (`ML`, ADR 0005, pulled forward to
+  *next* in 2026-09-12 so the platform can be exercised in more than one
+  language before the circle widens) — M4/M5/M6 are untouched.
 - The **bounded-context / persistence layout** described in `docs/ARCHITECTURE.md`
   and ADR 0004/0006 — if you add a new context, doc-type surface, or change how
   contexts are registered in `DependencyInjection.cs`, reflect it in the relevant
@@ -111,6 +122,43 @@ dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
 `Kumunita.Web.Tests` runs in well under a second; `Kumunita.Core.Tests` takes ~20 s
 because it starts `postgres:18` via Testcontainers (and leaves Docker containers
 behind if the process is killed — clean up with `docker container prune`).
+
+## Using the browser (trusted-folder quirk)
+
+The integrated browser (Playwright) can only open files in **trusted**
+folders. The Windows system temp folder (e.g. `%LOCALAPPDATA%\Temp\...`) is
+not trusted: any `file://` URL pointing there returns a **403 "Forbidden.
+File does not reside within a trusted folder."** error — and overwriting an
+already-trusted file in that folder *invalidates* its trust (a previously
+shared page stops loading). This wastes a lot of time: the harness looks
+broken (JS leaks, page errors, typing "does nothing") when the real cause is
+the untrusted path.
+
+The reliable setup (already in the repo):
+
+- **`d:\repos\kumunita\.tmp\`** — a gitignored scratch folder (see
+  `.gitignore`). Files under the repo root **are** trusted, so a browser
+  harness placed here loads and runs fine.
+- **`.tmp\build-harness.js`** — regenerates `.tmp\harness.html` by inlining
+  the **real** compiled JS (`wwwroot/js/lib/rich-editor.js` +
+  `dom-to-markdown.js`, with `import`/`export` stripped and any `</script>`
+  in JS doc-comments escaped to `<\/script>` so it doesn't close the inline
+  `<script>` early). Run it with `node .tmp\build-harness.js` after every
+  `npm --prefix src/Kumunita.Web run build`.
+- The harness mirrors the real toolbar/pane/textarea markup (from
+  `Views/Announcement/Edit.cshtml`) so `bindRichEditor` self-wires exactly as
+  in the app.
+
+Rules:
+
+1. **Never put browser harness files in the system temp folder.** Use
+   `.tmp/` (in-repo, gitignored).
+2. **Re-run `node .tmp\build-harness.js` after each TS recompile** so the
+   harness picks up the latest `wwwroot/js` output — a stale harness will
+   test the wrong code.
+3. **Drive with real `page.keyboard.type`** once the page is trusted — the
+   in-repo harness gives a working, faithful proxy for contenteditable
+   behavior (the old untrusted setup could not).
 
 ## Running PowerShell commands safely (Windows agents)
 

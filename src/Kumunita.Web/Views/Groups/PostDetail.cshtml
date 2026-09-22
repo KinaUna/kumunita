@@ -1,0 +1,619 @@
+@model Kumunita.Web.Models.GroupPostDetailViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = Model.Post.Title ?? "Post";
+    string postId = Model.Post.Id;
+    string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+        ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+        : string.Empty;
+
+    // ADR 0022 (group lane) — translation helpers (in scope for both the post
+    // block and the per-reply block): the enabled-catalog language set with its
+    // HasTranslation flag, the set the "add a translation" form offers, and a
+    // code→native-name resolver (never blank — falls back to the code).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    // TD (ADR 0027) — the authored-in language (TD·1) is a first-class variant,
+    // so the post's "Add a …" candidate list excludes it (TD·4 / TD2).
+    var originalCode = Model.OriginalLanguageCode;
+    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // ADR 0049 — the post's **default-visible** variant is the viewer's current
+    // language when a translation exists in it, else the authored-in language
+    // (the ADR 0027 floor). One computation, shared by the post block and every
+    // reply block below (in scope for both). The ADR 0027 click-to-swap +
+    // return path are untouched — only *which* variant shows first changes.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool originalHidden = Model.PostTranslations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <a href="@Url.Action("Detail", "Groups", new { id = Model.GroupId })" class="text-muted small">
+            &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.GroupDisplayName
+        </a>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success mt-2" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger mt-2" role="alert">@err</div>
+        }
+
+        <div class="card mt-2 mb-4">
+            <div class="card-body">
+                @* Author-only edit entry point (ADR 0016 — the edit lane is
+                   author-only at the Web layer, so a non-author never sees
+                   the button and there is no 404/403 surface to reach from
+                   the detail page; the paired POST's gate is the
+                   authoritative deny). *@
+                @if (Model.IsAuthor)
+                {
+                    @* ADR 0037 — the draft banner: the group-lane draft gate
+                       returns the post to the author only, so this block is
+                       author-only by construction. Publish is the sole lever
+                       that clears the draft flag (the author-only lane). *@
+                    @if (Model.Post.IsDraft)
+                    {
+                        <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2" role="alert">
+                            <span>
+                                <span class="badge bg-warning text-dark me-2"><kw-l key="posts.draft_badge">Draft</kw-l></span>
+                                <kw-l key="posts.draft_note">This post is a draft — only you can see it. Publish it to make it visible to this group's members.</kw-l>
+                            </span>
+                            <form class="d-inline" method="post"
+                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/publish")">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <kw-l key="posts.publish">Publish</kw-l>
+                                </button>
+                            </form>
+                        </div>
+                    }
+
+                    <div class="d-flex justify-content-end mb-2">
+                        @if (Model.Post.DeletedAt is null)
+                        {
+                            <a class="btn btn-sm btn-outline-secondary"
+                               href="@($"/groups/{Model.GroupId}/posts/{postId}/edit")">
+                                Edit
+                            </a>
+                            <form class="d-inline ms-1" method="post"
+                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/delete")"
+                                  data-confirm="Delete this post? Your replies will remain visible.">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        }
+                    </div>
+                }
+                @if (Model.Post.DeletedAt is null)
+                {
+                    <div class="d-flex align-items-center gap-2 text-muted small mb-3">
+                        <span class="d-inline-flex align-items-center">
+                            <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                        </span>
+                        <span>
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                            @if (Model.Post.Modified is not null)
+                            {
+                                <span> — <kw-l key="posts.edited">edited</kw-l> <kw-dt dt="@Model.Post.Modified.Value" format="g"></kw-dt></span>
+                            }
+                        </span>
+                    </div>
+
+                    @* TD (ADR 0027) — the authored-in language is the first,
+                       default-visible variant; each added translation is a
+                       hidden variant; the chip row is a selector that swaps
+                       them. This group wrapper is the post's toggle scope. *@
+                    <div data-td-group="post">
+                        @* Original variant — default-visible unless ADR 0049
+                           auto-selects a translation of it into the viewer's
+                           language (originalHidden); the swap + return path
+                           (ADR 0027) are unchanged either way. *@
+                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                             @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                            <h4>
+                                @(!string.IsNullOrWhiteSpace(Model.Post.Title)
+                                    ? Model.Post.Title
+                                    : MarkdownRenderer.PlainTextPreview(Model.Post.Body, 80))
+                            </h4>
+                            <div class="mb-3 rc-body">
+                                @Html.Raw(MarkdownRenderer.RenderHtml(Model.Post.Body))
+                            </div>
+                        </div>
+
+                        @* One variant per user-added translation — hidden by
+                           default, EXCEPT the one matching the viewer's current
+                           language, which ADR 0049 shows first (in place of the
+                           original); the rest stay hidden behind their chip. *@
+                        @foreach (var t in Model.PostTranslations)
+                        {
+                            bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                            <div class="td-variant" data-td-variant="@t.LanguageCode"
+                                 @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                @if (!string.IsNullOrWhiteSpace(t.Title))
+                                {
+                                    <h4>@t.Title</h4>
+                                }
+                                <div class="mb-3 rc-body">
+                                    @Html.Raw(MarkdownRenderer.RenderHtml(t.Body))
+                                </div>
+                            </div>
+                        }
+
+                        @* The chip row — a selector. The original chip is always
+                           present (TD·1); one chip per added translation (TD·2).
+                           No "None yet" (TD1). *@
+                        <div class="mb-3 border-top pt-3">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="text-muted small fw-semibold">
+                                    <kw-l key="posts.translations_label">Translations</kw-l>
+                                </span>
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="post"
+                                        data-td-variant="@Model.OriginalLanguageCode">
+                                    @LangName(Model.OriginalLanguageCode)
+                                </button>
+                                @foreach (var t in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <button type="button" class="badge text-bg-light border"
+                                            data-translation-chip data-td-group="post"
+                                            data-td-variant="@t.LanguageCode">
+                                        @LangName(t.LanguageCode)
+                                    </button>
+                                }
+                            </div>
+
+                            @* ADR 0048 — edit + remove lane for existing
+                               translations. For each language that already has a
+                               row, offer an "Edit" (pre-filled) + "Remove"
+                               (confirm) control. The add lane below is
+                               unchanged. *@
+                            @if (Model.CanTranslate)
+                            {
+                                @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                {
+                                    <details class="mb-1">
+                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                        </summary>
+                                        <div class="ms-2">
+                                            <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/translations/update")">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <label class="form-label small">
+                                                    @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                                </label>
+                                                <input class="form-control form-control-sm mb-2" name="title"
+                                                       value="@existing.Title" />
+                                                <label class="form-label small">
+                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                </label>
+                                                <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                                <button type="submit" class="btn btn-sm btn-primary">
+                                                    <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                </button>
+                                            </form>
+                                            <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/translations/remove")"
+                                                  class="mt-2" data-confirm="Remove this translation?">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </details>
+                                }
+
+                                @* The "add a translation" lane — one form per supported
+                                   language that has no translation yet. The authored-in
+                                   language is excluded (missingLanguages). *@
+                                @foreach (var lang in missingLanguages)
+                                {
+                                    <details class="mb-1">
+                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                            <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                                        </summary>
+                                        <form class="ms-2" method="post"
+                                              action="@($"/groups/{Model.GroupId}/posts/{postId}/translations")">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@lang.Code" />
+                                            <label class="form-label small" for="post-t-title">
+                                                @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" id="post-t-title"
+                                                   name="title" value="@Model.Post.Title" />
+                                            <label class="form-label small" for="post-t-body">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            @* RE U06 — toolbar + live preview on the reply body (image
+                                               OFF: RC's reply-image lane is unshipped — the reply
+                                               ImageIds write seam is unpopulated [RC drift pause (a)]
+                                               and ContentImageController.Serve has no reply branch [RC
+                                               U03 inert-404]; RE·3 forbids inventing that seam). *@
+                                            <div class="rc-editor">
+                                                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                    <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                    <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                                    <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                                    <partial name="_RichEditorToggle" />
+                                                </div>
+                                                <textarea class="form-control form-control-sm mb-2" id="post-t-body"
+                                                          name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                            </div>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                                            </button>
+                                        </form>
+                                    </details>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    @* ADR 0024 — the post is soft-deleted: the record is kept
+                       (replies below remain visible), but the body is
+                       replaced by a placeholder (author sees the same thing).
+                       No chip row / swap on a deleted post (TD7). *@
+                    <div class="mb-3">
+                        <div class="alert alert-secondary mb-2" role="alert">
+                            <kw-l key="posts.deleted_placeholder">This post has been deleted by its author.</kw-l>
+                        </div>
+                        <span class="text-muted small">
+                            @Model.AuthorDisplayName &middot; <kw-dt dt="@Model.Post.Created" format="g"></kw-dt>
+                        </span>
+                    </div>
+                }
+
+                @*
+                    ADR 0013 — the group lane's "why you can see this" line.
+                    No moderation actions here (Scope Out: the M3b component-
+                    scoped moderator standing does not reach a group lane, and
+                    break-glass is explicitly *unavailable*, G·4 — not a
+                    deferral).
+                *@
+                <div class="text-muted small mb-0">
+                    You can see this post because you are a current member of
+                    the group.
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            Replies <span class="text-muted">(@Model.Replies.Count)</span>
+        </h5>
+
+        @if (Model.Replies.Count == 0)
+        {
+            <p class="text-muted">No replies yet. If you can see this post, you can reply to it.</p>
+        }
+        else
+        {
+            <ul class="list-group mb-4">
+                @foreach (var r in Model.Replies)
+                {
+                    string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
+                        ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="list-group-item">
+                        @* TD (ADR 0027) — the reply's authored-in language is the
+                           first, default-visible variant; each added translation
+                           is a hidden variant; the chip row is a selector that
+                           swaps them. Scope: this reply (data-td-group). *@
+                        <div class="d-flex justify-content-between align-items-start">
+                            @if (r.DeletedAt is null)
+                            {
+                                @* ADR 0049 — the reply's default-visible variant
+                                   is its translation into the viewer's current
+                                   language (when one exists), else the authored-in
+                                   original (the ADR 0027 floor). Declared at the
+                                   top of this block (before any markup) so it is in
+                                   scope for the variant below. *@
+                                bool replyOriginalHidden = r.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+                                <div data-td-group="reply-@r.Id" class="pe-3">
+                                    @* Original variant (default-visible unless ADR 0049
+                                       auto-selects a translation of it). *@
+                                    <div class="td-variant" data-td-variant="@r.OriginalLanguageCode"
+                                         @(replyOriginalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(r.Body))</div>
+                                    </div>
+
+                                    @* One variant per user-added translation — hidden by
+                                       default, EXCEPT the one matching the viewer's
+                                       current language, which ADR 0049 shows first. *@
+                                    @foreach (var t in r.Translations)
+                                    {
+                                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                                        </div>
+                                    }
+
+                                    @* Chip row — a selector. Original chip always
+                                       present (TD·1); one chip per added
+                                       translation (TD·2); no "none yet" (TD4). *@
+                                    <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                                        <span class="text-muted small">
+                                            <kw-l key="posts.translations_label">Translations</kw-l>:
+                                        </span>
+                                        <button type="button" class="badge text-bg-light border"
+                                                data-translation-chip data-td-group="reply-@r.Id"
+                                                data-td-variant="@r.OriginalLanguageCode">
+                                            @LangName(r.OriginalLanguageCode)
+                                        </button>
+                                        @foreach (var t in r.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <button type="button" class="badge text-bg-light border"
+                                                    data-translation-chip data-td-group="reply-@r.Id"
+                                                    data-td-variant="@t.LanguageCode">
+                                                @LangName(t.LanguageCode)
+                                            </button>
+                                        }
+                                    </div>
+
+                                    @* ADR 0048 — edit + remove lane for the
+                                       reply's existing translations. The add
+                                       lane below is unchanged. *@
+                                    @if (r.CanTranslate)
+                                    {
+                                        @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <details class="mb-1">
+                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                                    <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                </summary>
+                                                <div class="ms-2">
+                                                    <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations/update")">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                        <label class="form-label small">
+                                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                        </label>
+                                                        <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                                        <button type="submit" class="btn btn-sm btn-primary">
+                                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                        </button>
+                                                    </form>
+                                                    <form method="post" action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations/remove")"
+                                                          class="mt-2" data-confirm="Remove this translation?">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                            <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </details>
+                                        }
+
+                                        @* Drive "has a translation yet" from the reply's own
+                                           r.Translations rows (not the post's l.HasTranslation),
+                                           so a post's translation never suppresses a reply's
+                                           add-lane. The authored-in language stays excluded. *@
+                                        @foreach (var lang in Model.Languages.Where(l => l.Code != r.OriginalLanguageCode && !r.Translations.Any(t => t.LanguageCode == l.Code)))
+                                        {
+                                            <details class="mb-1">
+                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                                    <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                                                </summary>
+                                                <form class="ms-2" method="post"
+                                                      action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/translations")">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                                                    <label class="form-label small" for="reply-t-body">
+                                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                    </label>
+                                                    @* RE U06 — image OFF (same RC reply-image gap). *@
+                                                    <div class="rc-editor">
+                                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                                            <partial name="_RichEditorToggle" />
+                                                        </div>
+                                                        <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
+                                                                  name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                    </div>
+                                                    <button type="submit" class="btn btn-sm btn-primary">
+                                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                    </button>
+                                                </form>
+                                            </details>
+                                        }
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                @* ADR 0024 — the reply is soft-deleted: the
+                                   record is kept (it still counts toward the
+                                   parent's reply count), but the body is
+                                   replaced by a placeholder (no swap, TD7). *@
+                                <div class="pe-3">
+                                    <span class="text-muted fst-italic">
+                                        <kw-l key="posts.reply_deleted_placeholder">This reply has been deleted by its author.</kw-l>
+                                    </span>
+                                </div>
+                            }
+                            <div class="text-end text-muted small">
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <span class="d-inline-flex align-items-center">
+                                        <img class="avatar" src="/profile/avatar/@r.AuthorSubjectId" alt=""
+                                             data-avatar-fallback>
+                                        <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
+                                    </span>
+                                    <span>@r.AuthorDisplayName</span>
+                                    @* Author-only reply edit (ADR 0016) + delete
+                                       (ADR 0024) — offered only while the reply is
+                                       live; a non-author never sees either
+                                       (r.IsAuthor). *@
+                                    @if (r.IsAuthor && r.DeletedAt is null)
+                                    {
+                                        <details class="d-inline-block">
+                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">Edit</summary>
+                                            <form class="mt-2 text-start" method="post"
+                                                  action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/edit")">
+                                                @Html.AntiForgeryToken()
+                                                @* RE U06 — image OFF (same RC reply-image gap). *@
+                                                <div class="rc-editor">
+                                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                        <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                        <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                                        <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                                        <partial name="_RichEditorToggle" />
+                                                    </div>
+                                                    <textarea class="form-control mb-2" name="body" rows="3"
+                                                              required placeholder="…" data-rich-editor>@r.Body</textarea>
+                                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                </div>
+                                                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                                            </form>
+                                        </details>
+                                        <form class="d-inline" method="post"
+                                              action="@($"/groups/{Model.GroupId}/posts/{postId}/replies/{r.Id}/delete")"
+                                              data-confirm="Delete this reply? It will be replaced by a note. The record is kept.">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">Delete</button>
+                                        </form>
+                                    }
+                                </div>
+                                <div>
+                                    <kw-dt dt="@r.Created" format="g"></kw-dt>
+                                    @if (r.Modified is not null)
+                                    {
+                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> <kw-dt dt="@r.Modified.Value" format="g"></kw-dt></span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            The reply form (exactly M3's Posts/Detail inline shape — a one-
+            field body POST). G·7: the reply inherits the parent's single
+            group-lane decision; there is no per-reply audience. The route
+            re-runs the parent's group-lane decision before the write (C4).
+        *@
+        <h5 class="mt-4 mb-2" style="font-weight:600;">
+            @if (Model.IsAuthor)
+            {
+                <text>Reply (you are the author of this post)</text>
+            }
+            else
+            {
+                <text>Reply</text>
+            }
+        </h5>
+
+        <div class="card">
+            <div class="card-body">
+                <form class="mb-0" method="post"
+                      action="@($"/groups/{Model.GroupId}/posts/{postId}/replies")">
+                    @Html.AntiForgeryToken()
+                    <label class="form-label" for="reply-body" style="font-weight:600;">
+                        Reply
+                    </label>
+                    @* RE U06 — image OFF (same RC reply-image gap). *@
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control mb-3" id="reply-body" name="body" rows="3"
+                                  required placeholder="…" data-rich-editor></textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
+                    @{
+                        var replyLanguages =
+                            (ViewData["Reply_Languages"] as IReadOnlyList<(string Code, string NativeName)>)
+                            ?? new List<(string Code, string NativeName)>();
+                    }
+                    <div class="mb-3">
+                        <label class="form-label" for="reply-language" style="font-weight:600;">
+                            Language
+                        </label>
+                        <select class="form-control" id="reply-language" name="languageCode">
+                            @foreach (var (languageCode, nativeName) in replyLanguages)
+                            {
+                                <option value="@languageCode">@nativeName</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-1">
+                            The language you're replying in — a tag, not a
+                            translation.
+                        </div>
+                    </div>
+                    <div class="text-muted small mb-3">
+                        Replies have no own audience — they are visible under
+                        this post's single group-membership decision (the
+                        "reply-inherits" rule, G·7). You are replying only
+                        where the post itself is visible.
+                    </div>
+                    <button type="submit" class="btn btn-primary">Reply</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* RE U06 — the rich editor (client/lib/rich-editor.ts, tsc-built).
+       Self-wires every .rc-editor block on this page (the four
+       name="body" reply textareas); the image button is omitted on all
+       of them (data-rich-editor-no-image — RC's reply-image lane is
+       unshipped; RE·3). RE·3: no editor dependency. One include covers
+       every .rc-editor root the module finds on the page. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

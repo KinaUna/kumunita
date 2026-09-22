@@ -1,0 +1,15 @@
+@model Kumunita.Web.Models.PageComposeViewModel
+@{
+    ViewData["Title"] = "Edit page";
+}
+<partial name="_PageForm" model="Model" />
+
+@* ADR 0041 — the composer's client-side scripts (rich editor + grant-picker
+   sync + the visibility-block toggling). Declared here in the VIEW file, not
+   inside the _PageForm partial: a `@section` declared in a partial is a known
+   Razor gotcha and can be silently dropped by the layout's RenderSectionAsync,
+   which left the #page-individual-block toggle listener unattached (the
+   "select Individual, block stays hidden" bug). *@
+@section Scripts {
+    <partial name="_PageFormScripts" />
+}

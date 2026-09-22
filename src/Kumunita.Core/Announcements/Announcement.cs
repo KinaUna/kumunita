@@ -68,6 +68,73 @@ public sealed class Announcement
     /// (see <see cref="IAnnouncementService.PinnedAsync"/>).</summary>
     public bool Pinned { get; set; } = false;
 
+    // ADR 0018 authored-in-language ADD (ADR 0004 §B.1 additive — the first
+    // additive Announcement field on this POCO):
+    /// <summary>
+    /// The BCP-47 code of the language this announcement was **authored in**
+    /// (ADR 0018, ADR 0005 B). Written at create time by
+    /// <see cref="AnnouncementService.CreateAsync"/> and editable on the edit
+    /// lane (<see cref="AnnouncementService.UpdateAsync"/> extends its
+    /// changed-detection to this field) — the announcement edit surface is not
+    /// ADR-frozen the way the post/reply edit lanes are. Materialized from the
+    /// instance default (<see cref="Kumunita.Core.Localization.LocaleSettings.DefaultLanguageCode"/>,
+    /// <c>en</c> floor) when the author leaves it unchosen, so no stored row is
+    /// empty. **Not a translation mechanism** (ADR 0005 C unchanged — the body
+    /// is never machine-translated by the platform); it is the tag a future
+    /// search surface and any user-added translations key off.
+    /// </summary>
+    public string LanguageCode { get; set; } = string.Empty;
+
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? Modified { get; set; }
+
+    // RC U03 content-image ADD (ADR 0004 §B.1 additive — the 2nd additive
+    // Announcement field after ADR 0018's LanguageCode; the design doc's
+    // "1st additive" ordinal is corrected to 2nd per the actual field order —
+    // ADR 0018's LanguageCode is the 1st additive on this POCO, so this is the
+    // 2nd; the ordinal is documentation, not behavior):
+    /// <summary>
+    /// The content images referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/content-image/{id}</c> links in
+    /// the rendered body (RC R·3). Populated server-side by the owning write
+    /// lane (RC U04/U05); the serving route's reverse lookup
+    /// (<see cref="IAnnouncementService.FindByImageIdAsync"/>) reads this
+    /// (RC R·4). The 2nd additive field after <see cref="LanguageCode"/>
+    /// (ADR 0018) (ADR 0004 §B.1 — additive, delta-detected, idempotent, no
+    /// seed reset; RC R·7).
+    /// </summary>
+    public IReadOnlyList<string> ImageIds { get; set; } = [];
+    // ATT U3 file-attachment ADD (ADR 0034, ADR 0004 §B.1 additive — the 3rd
+    // additive Announcement field after ADR 0018's LanguageCode, RC's ImageIds):
+    /// <summary>
+    /// The attachment file ids referenced by <see cref="Body"/> — the
+    /// <c>MediaObject</c> ids appearing as <c>/attachment/{id}</c> links in the
+    /// rendered body (C-ATT·1/2). Populated server-side by the owning write
+    /// lane (ATT U5); the serving route's reverse lookup
+    /// (<see cref="IAnnouncementService.FindByAttachmentIdAsync"/>) reads this
+    /// (C-ATT·4). The 3rd additive field after <see cref="LanguageCode"/>
+    /// (ADR 0018), <see cref="ImageIds"/> (RC) — **separate from**
+    /// <see cref="ImageIds"/> (C-ATT·5; an announcement's images stay in
+    /// <see cref="ImageIds"/>, its files in <see cref="AttachmentIds"/>)
+    /// (ADR 0004 §B.1 — additive, delta-detected, idempotent, no seed reset;
+    /// ADR 0034, C-ATT·5).
+    /// </summary>
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];
+
+    // ADR 0037 draft ADD (ADR 0004 §B.1 additive — the 4th additive Announcement
+    // field after ADR 0018's LanguageCode, RC's ImageIds, ATT's AttachmentIds):
+    /// <summary>
+    /// True while this announcement is an unsaved draft (ADR 0037). A draft is
+    /// **invisible to everyone except its author** — the flat
+    /// <see cref="AnnouncementScope"/> visibility split (Public always /
+    /// Community when signed in) is bypassed entirely: a draft does not appear
+    /// in <see cref="IAnnouncementService.ListVisibleAsync"/>,
+    /// <see cref="IAnnouncementService.GetAsync"/>, or
+    /// <see cref="IAnnouncementService.PinnedAsync"/> for any caller other
+    /// than the author (even a <c>GlobalAdmin</c> is denied — ADR 0037's
+    /// author-only pin). Set to <c>false</c> by
+    /// <see cref="IAnnouncementService.PublishAsync"/> when the author is ready
+    /// to share. Default <c>false</c> — existing announcements are never drafts.
+    /// </summary>
+    public bool IsDraft { get; set; } = false;
 }

@@ -50,6 +50,28 @@ public sealed class PostComposeViewModel
     public string Body { get; set; } = string.Empty;
 
     /// <summary>
+    /// The composer's <b>authored-in language</b> picker (ADR 0018, ADR 0005 B)
+    /// — the BCP-47 code the author is writing this post in. A form-bound
+    /// <c>&lt;select&gt;</c> posting <see cref="LanguageCode"/>; empty/unset is
+    /// materialized from the instance default server-side at write time
+    /// (<see cref="Kumunita.Core.Posts.PostService.CreatePostAsync"/>) — the
+    /// composer therefore does not need to pre-seed a concrete default.
+    /// </summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>
+    /// The composer's language *picker* options — the instance's **enabled**
+    /// language catalog (<see cref="Kumunita.Core.Localization.LanguageCatalog"/>),
+    /// ordered by <see cref="Kumunita.Core.Localization.LanguageCatalog.SortOrder"/>,
+    /// read at <c>GET</c> and re-read at <c>POST</c> re-render. <b>[BindNever]</b>
+    /// — the form POSTs a <see cref="LanguageCode"/> (the single selected
+    /// code), not a catalog-list shape (the <see cref="Components"/>
+    /// single-source pin at the language layer).
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
+
+    /// <summary>
     /// The composer's component *picker* options — the
     /// <see cref="Kumunita.Core.UserInfo.Component"/> candidate set, read
     /// from <see cref="IUserInfoService.GetComponentsAsync(bool)"/> at
@@ -63,6 +85,22 @@ public sealed class PostComposeViewModel
     /// </summary>
     [BindNever]
     public IReadOnlyList<(string Id, string Name)> Components { get; set; } = [];
+
+    /// <summary>
+    /// The composer's <b>save-as-draft</b> toggle (ADR 0037) — a form-bound
+    /// checkbox. When checked, the post is written with
+    /// <see cref="Kumunita.Core.Posts.Post.IsDraft"/> true: it is saved but
+    /// visible to <b>no one except its author</b> (not even a
+    /// <see cref="Kumunita.Core.Identity.Roles.GlobalAdmin"/>) until the
+    /// author publishes it (<see
+    /// cref="Kumunita.Core.Posts.PostService.PublishPostAsync"/>). The
+    /// audience/validity rules are unchanged — a draft still needs a
+    /// component + body (it is a real post the author is composing, not a
+    /// scratch fragment) — but the audience is effectively moot until publish,
+    /// since the draft gate runs before the audience decision
+    /// (<see cref="Kumunita.Core.Posts.PostService.GetPostAsync"/>).
+    /// </summary>
+    public bool SaveAsDraft { get; set; } = false;
 
     /// <summary>
     /// The composer's <b>audience</b> editor — the M2 reusable
@@ -79,6 +117,45 @@ public sealed class PostComposeViewModel
     /// verbatim</b> (ADR 0001-B) — never auto-augmented by M3's own logic.
     /// </summary>
     public AudienceEditorModel Audience { get; set; } = new();
+
+    /// <summary>
+    /// The composer's <b>tag</b> input (the <c>TG</c> lane, ADR 0044 — U8b
+    /// register patch). A <b>plain form-bound field</b> (no
+    /// <see cref="BindNever"/> attribute): the client
+    /// (<c>client/lib/tag-suggest.ts</c> L106–L110) posts a hidden
+    /// <c>name="TagIds"</c> field whose value is a <b>JSON array of label
+    /// strings</b> (the author's typed tags — the <c>Slug</c> is derived
+    /// server-side, C-TG·4). The value arrives as a JSON string like
+    /// <c>["sanitation", "budget"]</c> (or <c>[]</c> for the empty state);
+    /// the controller re-parses + normalizes (trim / dedup / drop-blank) on
+    /// the <c>POST</c> so the <see cref="Kumunita.Core.Posts.PostService"/>
+    /// write lane receives a clean <c>IReadOnlyList&lt;string&gt;</c> of
+    /// slugs. A <b>bad slug</b> is a <c>ArgumentException</c> from
+    /// <c>TagService.DeriveSlug</c> (the U5 note (c), C-TG·4 pin) — the
+    /// controller maps it to a form error on the <c>TagIds</c> field (the M3
+    /// "a form is a shape" precedent). <b>Empty / null</b> is the "no
+    /// tags" state (the U4 additive default-empty pin) — the write lane
+    /// skips the <c>AttachToPostAsync</c> call.
+    /// </summary>
+    public string? TagIds { get; set; }
+
+    /// <summary>
+    /// The post's **existing** tags (the <c>TG</c> lane, ADR 0044 — the
+    /// edit-lane pre-seed). A <b>[BindNever]</b> read-only list of the post's
+    /// current tag **slugs** (each charset-valid, C-TG·4 — so a chip seeded
+    /// from it round-trips cleanly through <c>TagService.DeriveSlug</c> on
+    /// re-save, unlike a translated display name which may carry spaces or
+    /// non-ASCII). Seeded on the edit lane's <c>GET</c> from
+    /// <c>Post.TagIds</c> (the tag ids → slug map, loaded from the
+    /// <c>Tag</c> docs) and passed to <c>client/lib/tag-suggest.ts</c> as the
+    /// <c>data-tag-suggest-initial</c> JSON array, which pre-populates the
+    /// chips + the hidden <c>TagIds</c> field so the author **sees** the
+    /// current tags and can remove any (the detach lane — a chip's
+    /// remove-button drops it from the set, and an empty set now detaches all
+    /// on save). A <c>GET /posts/new</c> (no existing tags) leaves this empty.
+    /// </summary>
+    [BindNever]
+    public IReadOnlyList<string> ExistingTagSlugs { get; set; } = [];
 
     /// <summary>
     /// The composer's shape is well-formed for a <c>POST</c>. <see

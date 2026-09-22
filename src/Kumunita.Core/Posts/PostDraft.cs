@@ -16,4 +16,59 @@ public sealed record PostDraft(
     string ComponentId,
     string? Title,
     string Body,
-    Authorization.Audience Audience);
+    Authorization.Audience Audience,
+    // ADR 0018 authored-in-language tag (ADR 0005 B). Optional trailing
+    // parameter: a null/empty code is materialized from the instance default
+    // at write time (see PostService.CreatePostAsync), so the existing
+    // positional call sites (7 in PostServiceTests) keep compiling unchanged
+    // and post the instance default.
+    string? LanguageCode = null,
+    // RC R·3/R·7 (ADR 0025) — the content-image references, **server-side**
+    // (the Web layer parses the body's /content-image/{id} links via
+    // ContentImageIds.ExtractContentImageIds before calling the service — Core
+    // stays body-parse-free, R·5). Written onto the Post doc (ADR 0004 §B.1
+    // additive field) with a null-coalesce to an empty list (the POCO field is
+    // non-null, `= []`).
+    //
+    // §Pinned contract amendment (U04) — the design doc pins this as
+    // `IReadOnlyList<string> ImageIds = []`, but a collection expression is
+    // **not** a legal C# default parameter value (CS1736: default values must be
+    // compile-time constants). The closest source-compatible shape is a
+    // **nullable** default: the existing positional call sites (7 in
+    // PostServiceTests) keep compiling unchanged (they omit it ⇒ null), and
+    // PostService.CreatePostAsync coalesces null → []. See the U04 handoff note.
+    IReadOnlyList<string>? ImageIds = null,
+    // ATT U4 (C-ATT·4; design doc §2.3) — the file-attachment references,
+    // **server-side** (the Web layer parses the body's /attachment/{id} links
+    // via AttachmentIds.ExtractAttachmentIds before calling the service — Core
+    // stays body-parse-free, C-ATT·4). Written onto the Post doc (ADR 0004 §B.1
+    // additive field, **separate from** ImageIds — C-ATT·5) with a
+    // null-coalesce to an empty list (the POCO field is non-null, `= []`).
+    //
+    // §Pinned contract amendment (ATT U4) — the design doc pins this as
+    // `IReadOnlyList<string> AttachmentIds = []`, but a collection expression
+    // is **not** a legal C# default parameter value (CS1736: default values
+    // must be compile-time constants). The closest source-compatible shape is
+    // a **nullable** default: the existing positional call sites keep
+    // compiling unchanged (they omit it ⇒ null), and
+    // PostService.CreatePostAsync coalesces null → [].
+    IReadOnlyList<string>? AttachmentIds = null,
+    // ADR 0037 — draft mode: true ⇒ the post is saved but invisible to everyone
+    // except its author (feeds exclude it, the detail lane author-only-gates it).
+    // Optional trailing parameter (nullable, CS1736 shape) — existing positional
+    // call sites keep compiling unchanged (they omit it ⇒ null ⇒ false).
+    bool? IsDraft = null,
+    // TG (ADR 0044, U8b register patch) — the tag <c>slugs</c> (the
+    // author's typed labels, C-TG·4). Populated **server-side** by the
+    // Web layer (the composer form's <c>TagIds</c> field, re-parsed by the
+    // controller before calling <see cref="PostService.CreatePostAsync"/>
+    // / <see cref="PostService.UpdatePostAsync"/>); null/empty means "no
+    // tags" (the U4 additive default-empty pin — the POCO field is
+    // non-null, `= []`). <b>Distinct from</b> <c>ImageIds</c> / <c>
+    // AttachmentIds</c>: this is the tag-lane write seam's input (the
+    // <c>Slug</c> the <c>TagService.AttachToPostAsync</c> lane
+    // create-or-reuses per C-TG·4, then stores the resolved <c>Tag</c>
+    // ids onto <see cref="Post.TagIds"/>). Optional trailing parameter
+    // (nullable, CS1736 shape) — existing positional call sites keep
+    // compiling unchanged (they omit it ⇒ null ⇒ no tags).
+    IReadOnlyList<string>? TagSlugs = null);

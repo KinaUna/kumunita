@@ -1,12 +1,14 @@
 using System.Security.Claims;
 using Kumunita.Core.Announcements;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using NSubstitute;
 
 namespace Kumunita.Web.Tests;
@@ -134,6 +136,7 @@ public class AnnouncementControllerTests
         Assert.NotNull(model);
         Assert.Single(model!.Announcements);
         Assert.Equal(author, model.Announcements[0].AuthorDisplayName);
+        Assert.Equal(author, model.Announcements[0].AuthorSubjectId); // the avatar lane's subject
     }
 
     /// <summary>
@@ -176,6 +179,7 @@ public class AnnouncementControllerTests
         var model = view!.ViewData.Model as AnnouncementIndexViewModel;
         Assert.NotNull(model);
         Assert.Equal(display, model!.Announcements[0].AuthorDisplayName);
+        Assert.Equal(author, model.Announcements[0].AuthorSubjectId); // the avatar lane's subject
     }
 
     // ── Scope-picker seeding (GET /announcements/new) ──────────────────────
@@ -261,6 +265,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             announcements,
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -299,6 +304,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
 
@@ -332,6 +338,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -364,14 +371,12 @@ public class AnnouncementControllerTests
     /// GET /announcements/{id}/edit, Moderator on a public-scope
     /// announcement: the shape gate refuses up front (403) — a form a user
     /// cannot submit is not rendered in the first place (the service's
-    /// re-check is still the sole real gate at POST). The assertion lives
-    /// on the <em>view model shape</em> — that the form is NOT seeded —
-    /// since the controller's <c>TempData["error"]</c> write on this
-    /// <c>ForbidResult</c> branch NREs in this harness (no <c>ISessionStore</c>),
-    /// exactly per the <see cref="AdminControllerBlockTests"/> "NRE lands
-    /// *after* the Core lane" convention: the pin is that the <c>View</c>
-    /// return path is NOT hit, which is observable via the <c>ViewResult</c>
-    /// assertion below.
+    /// re-check is still the sole real gate at POST). The denied branch
+    /// returns <see cref="ForbidResult"/> directly (no <c>TempData</c>
+    /// write in this harness), so the pin is the result type — not a
+    /// <c>ViewResult</c>. The ADR 0017 edit gate: the Public lane is
+    /// GlobalAdmin-only, so a Moderator (no admin, not the author's lane)
+    /// is refused.
     /// </summary>
     [Fact]
     public async Task Edit_When_Moderator_PublicScope_Returns_Forbid_NotView()
@@ -392,6 +397,7 @@ public class AnnouncementControllerTests
         var controller = new AnnouncementController(
             Substitute.For<IAnnouncementService>(),
             Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
             store);
         controller.ControllerContext = new ControllerContext
         {
@@ -402,12 +408,110 @@ public class AnnouncementControllerTests
             }),
         };
 
-        // The NRE on the TempData["error"] write is expected here (established
-        // harness convention — see AdminControllerBlockTests). The pin is
-        // that the controller did NOT fall into the View(...) branch (which
-        // would have returned a view before the write) — observable via the
-        // NRE being thrown at all. The shape-gate pin.
-        await Assert.ThrowsAsync<NullReferenceException>(() => controller.Edit(id));
+        // The shape gate refuses up front: a Moderator is NOT in the
+        // Public-scope edit standing (GlobalAdmin-only), so the controller
+        // returns ForbidResult without seeding a form. (The service's
+        // re-check at POST is still the sole real gate. The ADR 0017 edit
+        // gate is the same rule re-expressed: Public lane = admin only.)
+        var result = await controller.Edit(id);
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, ADR 0017 flat "all residents" lane:
+    /// a community moderator who did NOT author the flat Community-scope
+    /// announcement is refused the edit form up front (403) — the base
+    /// Moderator role that still lets them CREATE a flat all-residents
+    /// announcement does NOT let them EDIT one they didn't author. The
+    /// non-author branch of the edit standing is denied before any form is
+    /// seeded, so the pin is the ForbidResult (not a ViewResult).
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_NonAuthorModerator_FlatCommunityScope_Returns_Forbid()
+    {
+        const string id = "ann-edit-flat-mod";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Community, CommunityId = null,
+            Title = "t", Body = "b", AuthorId = "subj-author-001",
+            Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = HttpContextWithSession(new[]
+            {
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, "subj-mod-001"),
+                new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Moderator),
+            }),
+        };
+
+        var result = await controller.Edit(id);
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// GET /announcements/{id}/edit, ADR 0017 flat "all residents" lane
+    /// positive pin: the AUTHOR-of-record opens their own flat
+    /// Community-scope announcement's edit form — the AuthorId==actorId
+    /// branch of the edit standing is honored even though the actor holds
+    /// only the Member role (not a role bypass, the author rule). The
+    /// GlobalAdmin Public happy-path test is the same assertion shape;
+    /// here the standing comes from authorship, not the admin role.
+    /// </summary>
+    [Fact]
+    public async Task Edit_When_Author_FlatCommunityScope_Returns_View()
+    {
+        const string id = "ann-edit-flat-author";
+        const string author = "subj-author-flat";
+        var existing = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Community, CommunityId = null,
+            Title = "Old title", Body = "Old body", AuthorId = author,
+            Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var store = Substitute.For<IDocumentStore>();
+        var readSession = Substitute.For<IQuerySession>();
+        readSession.LoadAsync<Announcement>(id, Arg.Any<CancellationToken>()).Returns(Task.FromResult<Announcement?>(existing));
+        store.QuerySession().Returns(readSession);
+
+        var controller = new AnnouncementController(
+            Substitute.For<IAnnouncementService>(),
+            Substitute.For<IUserInfoService>(),
+            DefaultLocalization(),
+            store);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(
+                new ClaimsIdentity(
+                    new[]
+                    {
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, author),
+                        new Claim(Kumunita.Core.Identity.ClaimTypes.Role, Roles.Member),
+                    },
+                    authenticationType: "test")) },
+        };
+
+        var result = (await controller.Edit(id)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = result!.ViewData.Model as AnnouncementComposeViewModel;
+        Assert.NotNull(model);
+        Assert.Equal(id, model!.Id);
+        Assert.Equal("Old title", model.Title);
+        Assert.Equal("Old body", model.Body);
+        Assert.Equal(AnnouncementScope.Community.ToString(), model.Scope);
     }
 
     /// <summary>
@@ -443,7 +547,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -491,7 +595,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -530,7 +634,7 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), store);
+        var controller = new AnnouncementController(announcements, Substitute.For<IUserInfoService>(), DefaultLocalization(), store);
         controller.ControllerContext = new ControllerContext
         {
             HttpContext = HttpContextWithSession(new[]
@@ -663,6 +767,161 @@ public class AnnouncementControllerTests
             }
 
             /// <summary>
+            /// ADR 0051 (extending ADR 0049's default-visible-variant rule from the
+            /// detail views + pinned banner to the <c>/announcements</c> list): a row
+            /// shows the announcement in the viewer's current language when a
+            /// translation into that language exists, else the authored-in text.
+            /// Here the viewer's preference is the <c>kumunita.locale</c> cookie set
+            /// to <c>da</c> (the reported scenario), and the announcement has a
+            /// Danish translation: its body replaces the list's preview, and its
+            /// <em>blank</em> title falls back to the authored title (the ADR 0029
+            /// floor). The as-authored fallback is the sibling test above (no
+            /// provider supplied → the row renders as authored).
+            /// </summary>
+            [Fact]
+            public async Task Index_When_TranslationMatchesViewerLanguage_RowShowsTranslation()
+            {
+                const string author = "subj-admin-001";
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.ListVisibleAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new List<Announcement>
+                    {
+                        new()
+                        {
+                            Id = "ann-da", Scope = AnnouncementScope.Public,
+                            Title = "Community potluck", Body = "Bring a side dish to the potluck this Saturday",
+                            AuthorId = author, Created = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero),
+                        },
+                    });
+                // The Danish translation: a blank title (→ the authored-in title is
+                // kept) and a translated body (→ the list preview shows the Danish).
+                announcements.GetAnnouncementTranslationsAsync("ann-da").Returns(
+                    new List<AnnouncementTranslation>
+                    {
+                        new()
+                        {
+                            Id = "tr-da", AnnouncementId = "ann-da", LanguageCode = "da",
+                            Title = "   ", // blank → the authored-in title is the floor
+                            Body = "Medbring en sideret til potluck denne lørdag",
+                        },
+                    });
+
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Admin" });
+                userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+                var store = Substitute.For<IDocumentStore>();
+                var provider = Substitute.For<ITranslationProvider>();
+                provider.ResolveEffectiveLanguageAsync("da").Returns("da"); // the cookie branch resolves "da" → "da"
+                var controller = new AnnouncementController(announcements, userInfo, DefaultLocalization(), store, provider);
+
+                var httpContext = new DefaultHttpContext();
+                httpContext.Request.Headers.Cookie = "kumunita.locale=da"; // the viewer's explicit preference (M·5)
+                controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+                var result = (await controller.Index()) as ViewResult;
+                var rows = Assert.IsType<List<AnnouncementRow>>((result?.Model as AnnouncementIndexViewModel)?.Announcements!);
+                var row = rows.Single();
+
+                // The list's body/preview is the Danish translation…
+                Assert.Equal("Medbring en sideret til potluck denne lørdag", row.Body);
+                // …and the blank translation title falls back to the authored title (the ADR 0029 floor).
+                Assert.Equal("Community potluck", row.Title);
+            }
+
+            // ──── Detail (GET /announcements/{id}) — full-body read ────────────────
+
+            /// <summary>
+            /// The happy path: the service's <see cref="IAnnouncementService.GetAsync"/>
+            /// returns the announcement (the gate already ran in the service) and the
+            /// controller hands the view the <em>full</em> body — this is the surface
+            /// the list's 250-character preview / the banner's 150-character preview
+            /// link into. The author's display name resolves from the profile seam,
+            /// the community-targeted row resolves its display name, and the pinned
+            /// flag passes through untouched.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Visible_ReturnsFullBodyModel()
+            {
+                const string author = "subj-admin-001";
+                string longBody = string.Concat(Enumerable.Repeat("Maintenance window text. ", 20));
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-detail", "subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new Announcement
+                    {
+                        Id = "ann-detail", Scope = AnnouncementScope.Public,
+                        Title = "Scheduled maintenance", Body = longBody,
+                        AuthorId = author, Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+                        Modified = new DateTimeOffset(2026, 1, 20, 12, 0, 0, TimeSpan.Zero), Pinned = true,
+                    });
+
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Site Admin" });
+
+                var controller = Build(announcements, userInfo, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+                var view = (await controller.Detail("ann-detail")) as ViewResult;
+                Assert.NotNull(view);
+
+                var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+                Assert.Equal("ann-detail", model.Id);
+                Assert.Equal(longBody, model.Body);        // the full text, not a truncated preview
+                Assert.True(model.Pinned);
+                Assert.Equal("Site Admin", model.AuthorDisplayName);
+                Assert.Equal("subj-admin-001", model.AuthorSubjectId); // the avatar lane's subject
+            }
+
+            /// <summary>
+            /// A missing <em>or</em> not-visible id both arrive as the service's
+            /// <c>null</c> return (the gate — missing and denied are indistinguishable
+            /// by design, no 403/audit lane on this bounded context) and the
+            /// controller maps that to a clean <see cref="NotFound"/> — never a
+            /// blank page, never a 500.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Missing_OrNotVisible_ReturnsNotFound()
+            {
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-missing", "subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+                var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
+
+                var result = await controller.Detail("ann-missing");
+
+                Assert.IsType<NotFoundResult>(result);
+                await announcements.DidNotReceive().ListVisibleAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>());
+            }
+
+            /// <summary>
+            /// The anonymous visitor detail lane (public-scope announcements are
+            /// visible signed out, e.g. a maintenance notice): the controller passes
+            /// a <b>null</b> <c>actorId</c> and an <b>empty</b> role set to the
+            /// service — the same shape pin as the list's read gate.
+            /// </summary>
+            [Fact]
+            public async Task Detail_When_Anonymous_PassesNullActorId_ToService()
+            {
+                var announcements = Substitute.For<IAnnouncementService>();
+                announcements.GetAsync("ann-public", null, Arg.Any<IReadOnlySet<string>>()).Returns(
+                    new Announcement
+                    {
+                        Id = "ann-public", Scope = AnnouncementScope.Public,
+                        Title = "Maintenance", Body = "Saturday 02:00-04:00 UTC",
+                        AuthorId = "subj-admin-001", Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
+                    });
+                var userInfo = Substitute.For<IUserInfoService>();
+                userInfo.GetProfileAsync("subj-admin-001").Returns((Profile?)null); // missing profile → subject-id fallback
+                var controller = Build(announcements, userInfo, IsAuthenticated: false);
+
+                var view = (await controller.Detail("ann-public")) as ViewResult;
+                Assert.NotNull(view);
+
+                await announcements.Received(1).GetAsync("ann-public", null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0));
+                var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+                Assert.Equal("subj-admin-001", model.AuthorDisplayName);
+                Assert.Equal("subj-admin-001", model.AuthorSubjectId); // the avatar lane's subject
+            }
+
+            /// <summary>
             /// Builds an <see cref="AnnouncementController"/> with a substituted
     /// <see cref="IAnnouncementService"/> + <see cref="IUserInfoService"/>
     /// (the two store-adjacent seams) and a minted signed-in / signed-out
@@ -671,6 +930,851 @@ public class AnnouncementControllerTests
     /// controller's <c>User.Identity.IsAuthenticated</c> is the right value
     /// for the read-gate pin.
     /// </summary>
+    /// <summary>
+    // ── ADR 0029 — AddTranslation (POST /announcements/{id}/translations) ──
+
+    /// <summary>
+    /// The happy path: a standing-holder (GlobalAdmin) adds a translation.
+    /// The controller validates the form shape (language code + non-empty
+    /// body), confirms the viewer can see the announcement (the flat scope
+    /// gate re-run via <see cref="IAnnouncementService.GetAsync"/>), and then
+    /// delegates the write + standing decision to
+    /// <see cref="IAnnouncementService.AddAnnouncementTranslationAsync"/>
+    /// (the service is the authority — the controller never re-derives the
+    /// standing split itself, ADR 0006-D). On success, a <c>TempData["info"]</c>
+    /// confirmation and a redirect back to the detail page.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-t-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, "fr", "Titre", "Corps", "subj-admin-001",
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(new AnnouncementTranslation
+            {
+                Id = "tr-001", AnnouncementId = id, LanguageCode = "fr",
+                Title = "Titre", Body = "Corps", AuthorId = "subj-admin-001",
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation(id, "fr", "Titre", "Corps");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        Assert.Equal("Announcement", redirect.ControllerName);
+
+        await announcements.Received(1).AddAnnouncementTranslationAsync(
+            id, "fr", "Titre", "Corps", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A community Moderator of the targeted community adds a translation —
+    /// the ADR 0029 community-moderator lane, exercised through the Web
+    /// surface (the service's standing re-check is the real gate; the
+    /// controller only pins the route + shape + the flat-scope precondition).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_TargetedByCommunityModerator_HappyPath_Redirects()
+    {
+        const string id = "ann-t-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-mod-A", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Community, CommunityId = "community-A",
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, "es", "Título", "Cuerpo", "subj-mod-A",
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(new AnnouncementTranslation
+            {
+                Id = "tr-002", AnnouncementId = id, LanguageCode = "es",
+                Title = "Título", Body = "Cuerpo", AuthorId = "subj-mod-A",
+                Created = DateTimeOffset.UtcNow,
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Moderator, Roles.ModeratorComponent("community-A") },
+            IsAuthenticated: true, subjectId: "subj-mod-A");
+
+        var result = await controller.AddTranslation(id, "es", "Título", "Cuerpo");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).AddAnnouncementTranslationAsync(
+            id, "es", "Título", "Cuerpo", "subj-mod-A",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.ModeratorComponent("community-A"))), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A standing-denied actor (the service's <see
+    /// cref="UnauthorizedAccessException"/>) maps to a clean <see
+    /// cref="ForbidResult"/> — the controller does not swallow the exception
+    /// into a 500, and the write lane never persists on a deny (the service
+    /// throws before its <c>SaveChangesAsync</c>).
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_Denied_Forbid_NoWrite()
+    {
+        const string id = "ann-t-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.AddAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<AnnouncementTranslation>(
+                new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.AddTranslation(id, "fr", "Titre", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// A missing (or not-visible) announcement: the service's
+    /// <see cref="IAnnouncementService.GetAsync"/> returns <c>null</c> (the
+    /// gate already ran) and the controller maps that to a clean
+    /// <see cref="NotFoundResult"/> — the write lane never touches a dangling
+    /// reference.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-t-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-missing", "fr", "Titre", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A blank <c>languageCode</c> is a shape error — the controller
+    /// short-circuits with a redirect back to the detail page (the form
+    /// re-renders with the error) and never calls the service's write seam.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_BlankLanguageCode_RedirectsBack_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-001", "   ", "Titre", "Corps");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// A blank <c>body</c> is a shape error (the same short-circuit as
+    /// <see cref="AddTranslation_BlankLanguageCode_RedirectsBack_NoWrite"/>):
+    /// a translation needs some text, and the write seam is never called.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_BlankBody_RedirectsBack_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.AddTranslation("ann-t-001", "fr", "Titre", "");
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", redirect.ActionName);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    // ── ADR 0048 — UpdateTranslation / RemoveTranslation ────────────────────
+
+    [Fact]
+    public async Task UpdateTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-u-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation(id, "fr", "Nouveau", "Corps");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).UpdateAnnouncementTranslationAsync(
+            id, "fr", "Nouveau", "Corps", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_Denied_Forbid()
+    {
+        const string id = "ann-u-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.UpdateAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Kumunita.Core.Announcements.AnnouncementTranslation>(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.UpdateTranslation(id, "fr", "X", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-u-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation("ann-u-missing", "fr", "T", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().UpdateAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task UpdateTranslation_MissingRow_NotFound()
+    {
+        const string id = "ann-u-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.UpdateAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException<Kumunita.Core.Announcements.AnnouncementTranslation>(new KeyNotFoundException("No row.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.UpdateTranslation(id, "fr", "T", "Corps");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_GlobalAdmin_HappyPath_Redirects()
+    {
+        const string id = "ann-r-001";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<RedirectToActionResult>(result);
+        await announcements.Received(1).RemoveAnnouncementTranslationAsync(
+            id, "fr", "subj-admin-001",
+            Arg.Is<IReadOnlySet<string>>(s => s.Contains(Roles.GlobalAdmin)), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_Denied_Forbid()
+    {
+        const string id = "ann-r-002";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-member", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.RemoveAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("Denied.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-member");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_MissingAnnouncement_NotFound()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync("ann-r-missing", "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns((Announcement?)null);
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation("ann-r-missing", "fr");
+
+        Assert.IsType<NotFoundResult>(result);
+        await announcements.DidNotReceive().RemoveAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_MissingRow_NotFound()
+    {
+        const string id = "ann-r-003";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, "subj-admin-001", Arg.Any<IReadOnlySet<string>>())
+            .Returns(new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "Original", Body = "Body",
+                AuthorId = "subj-admin-001", Created = DateTimeOffset.UtcNow,
+                LanguageCode = "en",
+            });
+        announcements.RemoveAnnouncementTranslationAsync(
+            id, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(Task.FromException(new KeyNotFoundException("No row.")));
+
+        var controller = Build(announcements,
+            roles: new[] { Roles.GlobalAdmin }, IsAuthenticated: true, subjectId: "subj-admin-001");
+
+        var result = await controller.RemoveTranslation(id, "fr");
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RemoveTranslation_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.RemoveTranslation("ann-r-001", "fr");
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().RemoveAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// An anonymous caller (no authenticated principal): the controller's
+    /// <c>SubjectId(User)</c> is <c>null</c> and the lane short-circuits to a
+    /// <see cref="ForbidResult"/> before touching the service — the write seam
+    /// is never called and no write is persisted.
+    /// </summary>
+    [Fact]
+    public async Task AddTranslation_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.AddTranslation("ann-t-001", "fr", "Titre", "Corps");
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().AddAnnouncementTranslationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+    }
+
+    // ── ADR 0037 — draft mode (author-only) at the Web layer ─────────────
+    //
+    // The draft *behavior* (a draft is invisible to everyone but its author,
+    // publish is author-only + idempotent, the my-drafts list is author-scoped)
+    // is exhaustively pinned in the Core lane (Kumunita.Core.Tests.
+    // PostDraftModeTests). These Web tests pin the thin HTTP layer's
+    // <em>mapping</em> of that lane's outcomes to status codes + view flags —
+    // the part the Core tests cannot see.
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> happy path (ADR 0037): the
+    /// service's <c>GetAsync</c> returns the draft to the author (the
+    /// author-only draft gate) and <c>PublishAsync</c> clears the flag → the
+    /// controller redirects back to the detail page (now live) and sets the
+    /// "published" TempData. The service is called with the actor's subject
+    /// id (shape pin — the controller passes the right actor).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_DraftAndAuthor_PublishesAndRedirects()
+    {
+        const string id = "ann-df-pub";
+        const string author = "subj-df-author";
+        var draft = new Announcement
+        {
+            Id = id, Scope = AnnouncementScope.Public,
+            Title = "draft", Body = "a draft",
+            AuthorId = author, IsDraft = true,
+            Created = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
+        };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.PublishAsync(id, author, Arg.Any<IDocumentSession>()).Returns(draft);
+
+        var controller = Build(announcements, roles: new[] { Roles.Member },
+            IsAuthenticated: true, subjectId: author);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal("Detail", ((RedirectToActionResult)result).ActionName);
+        await announcements.Received(1).PublishAsync(id, author, Arg.Any<IDocumentSession>());
+        Assert.Equal("Announcement published.", controller.TempData["info"]);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — the ADR 0037 author-only pin
+    /// at the Web layer: the service's <c>GetAsync</c> returns <c>null</c> for
+    /// a draft the actor is not the author of (missing and denied are
+    /// indistinguishable by design), so the controller maps that to a
+    /// <see cref="ForbidResult"/> (403) and <b>never</b> calls
+    /// <c>PublishAsync</c> — no write, no leaked content.
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_DraftAndNonAuthor_Forbid_NoWrite()
+    {
+        const string id = "ann-df-nona";
+        const string nonAuthor = "subj-df-nonauthor"; // a GlobalAdmin is *still* a non-author here
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        // GetAsync returns null for the non-author (author-only draft gate).
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin, Roles.Member },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<ForbidResult>(result);
+        await announcements.DidNotReceive().PublishAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — the service's re-check throws
+    /// <see cref="UnauthorizedAccessException"/> (the defense-in-depth author
+    /// gate, the ADR 0037 pin): the controller maps that to a
+    /// <see cref="ForbidResult"/> — never a 500, never a re-render that would
+    /// leak the draft's content.
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_ServiceThrowsUnauthorized_Forbid()
+    {
+        const string id = "ann-df-unauth";
+        const string nonAuthor = "subj-df-unauth";
+        var draft = new Announcement { Id = id, AuthorId = "subj-df-someone-else", IsDraft = true };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.When(x => x.PublishAsync(id, nonAuthor, Arg.Any<IDocumentSession>()))
+            .Throws(new UnauthorizedAccessException("Only the author of an announcement may publish it."));
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — a missing id surfaces as the
+    /// service's <see cref="KeyNotFoundException"/>; the controller maps that
+    /// to a clean <see cref="NotFoundResult"/> (404, not 500).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_ServiceThrowsKeyNotFound_404()
+    {
+        const string id = "ann-df-missing";
+        const string author = "subj-df-missing-author";
+        var draft = new Announcement { Id = id, AuthorId = author, IsDraft = true };
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(draft);
+        announcements.When(x => x.PublishAsync(id, author, Arg.Any<IDocumentSession>()))
+            .Throws(new KeyNotFoundException($"Announcement '{id}' was not found in the session; nothing to publish."));
+
+        var controller = Build(announcements, IsAuthenticated: true, subjectId: author);
+
+        var result = await controller.Publish(id);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/{id}/publish</c> — an anonymous caller
+    /// (no authenticated principal): the controller's <c>SubjectId(User)</c>
+    /// is empty and the lane short-circuits to an <see cref="UnauthorizedResult"/>
+    /// before touching the service (the ADR 0037 author-only pin — there is no
+    /// "author" to act for an anonymous visitor).
+    /// </summary>
+    [Fact]
+    public async Task Publish_When_Anonymous_Forbid_NoWrite()
+    {
+        var announcements = Substitute.For<IAnnouncementService>();
+        var controller = Build(announcements, IsAuthenticated: false);
+
+        var result = await controller.Publish("ann-df-anon");
+
+        Assert.IsType<UnauthorizedResult>(result);
+        await announcements.DidNotReceive().PublishAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IDocumentSession>());
+    }
+
+    /// <summary>
+    /// <c>GET /announcements/{id}</c> — a draft the actor authored: the
+    /// controller hands the view <c>IsAuthor = true</c> and
+    /// <c>IsDraft = true</c> (the two flags that drive the detail page's
+    /// draft badge + the author-only Publish button — ADR 0037). The service's
+    /// <c>GetAsync</c> returned the draft to the author (the author-only gate),
+    /// so both flags are true for exactly the one viewer who may act.
+    /// </summary>
+    [Fact]
+    public async Task Detail_When_DraftAuthor_FlagsAuthorAndDraft()
+    {
+        const string id = "ann-df-detail";
+        const string author = "subj-df-detail-author";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, author, Arg.Any<IReadOnlySet<string>>()).Returns(
+            new Announcement
+            {
+                Id = id, Scope = AnnouncementScope.Public,
+                Title = "draft", Body = "a draft",
+                AuthorId = author, IsDraft = true,
+                Created = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
+            });
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Author" });
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.Member },
+            IsAuthenticated: true, subjectId: author);
+
+        var view = (await controller.Detail(id)) as ViewResult;
+        var model = Assert.IsType<AnnouncementDetailViewModel>(view!.ViewData.Model);
+        Assert.True(model.IsAuthor);
+        Assert.True(model.IsDraft);
+        Assert.Equal(author, model.AuthorSubjectId);
+    }
+
+    /// <summary>
+    /// <c>GET /announcements/{id}</c> — a draft the actor is <b>not</b> the
+    /// author of (a GlobalAdmin included, the ADR 0037 author-only pin):
+    /// the service's <c>GetAsync</c> returns <c>null</c> (missing and denied
+    /// are indistinguishable by design) and the controller maps that to a
+    /// clean <see cref="NotFoundResult"/> — the non-leaky 404, never a re-render
+    /// that would leak the draft's content to a non-author.
+    /// </summary>
+    [Fact]
+    public async Task Detail_When_DraftNonAuthor_ReturnsNotFound()
+    {
+        const string id = "ann-df-detailex";
+        const string nonAuthor = "subj-df-detail-nonauthor";
+
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.GetAsync(id, nonAuthor, Arg.Any<IReadOnlySet<string>>()).Returns((Announcement?)null);
+
+        var controller = Build(announcements, roles: new[] { Roles.GlobalAdmin, Roles.Member },
+            IsAuthenticated: true, subjectId: nonAuthor);
+
+        var result = await controller.Detail(id);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/new</c> (compose) — the ADR 0037 draft toggle
+    /// binds through to the service's write: the controller maps the form's
+    /// <c>SaveAsDraft</c> flag onto the <see cref="Announcement.IsDraft"/>
+    /// field before calling <c>CreateAsync</c>. A <c>true</c> checkbox must
+    /// produce a draft announcement at the service seam (the Core lane pins
+    /// that a draft is then invisible to all but the author).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_True_CreatesDraft()
+    {
+        const string author = "subj-df-compose-author";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        // A capturing closure: when the controller calls CreateAsync, record the
+        // Announcement it passed so we can assert on the IsDraft mapping below.
+        Announcement? captured = null;
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                captured = call.ArgAt<Announcement>(0);
+                return new Announcement { Id = "ann-df-created" };
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body",
+            SaveAsDraft = true,
+        };
+
+        await controller.New(model);
+
+        Assert.NotNull(captured);
+        Assert.True(captured!.IsDraft);
+    }
+
+    /// <summary>
+    /// <c>POST /announcements/new</c> (compose) — the ADR 0037 draft toggle's
+    /// negative: an unchecked <c>SaveAsDraft</c> (default <c>false</c>)
+    /// produces a <b>live</b> announcement at the service seam (the toggle is
+    /// opt-in — the default behavior of creating a visible announcement is
+    /// unchanged).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_Unchecked_CreatesLive()
+    {
+        const string author = "subj-df-compose-live";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        Announcement? captured = null;
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                captured = call.ArgAt<Announcement>(0);
+                return new Announcement { Id = "ann-df-live" };
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a live post",
+            Body = "live body",
+            SaveAsDraft = false,
+        };
+
+        await controller.New(model);
+
+        Assert.NotNull(captured);
+        Assert.False(captured!.IsDraft);
+    }
+
+    // ── ADR 0037 — draft save stays on the composer (no navigation) ─────────
+
+    /// <summary>
+    /// ADR 0037 — the draft-save <b>navigation</b> pin: a <c>POST /announcements/new</c>
+    /// with <c>SaveAsDraft = true</c> and <b>no</b> remembered <see
+    /// cref="AnnouncementComposeViewModel.DraftId"/> (a first save) must (a)
+    /// <b>create</b> the draft via <see cref="IAnnouncementService.CreateAsync"/>
+    /// (not the edit seam), (b) return a <b>view</b> (re-render the composer)
+    /// rather than a redirect to the feed (a redirect would leave the author's
+    /// content looking lost, since the draft is invisible to the feed), and
+    /// (c) set <c>model.DraftId</c> to the created announcement's id so a
+    /// subsequent save continues this same draft. The author stays where they
+    /// left off — "persist it and let the user continue working on it."
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_FirstSave_CreatesAndStaysOnComposer()
+    {
+        const string author = "subj-df-compose-stay";
+        var announcements = Substitute.For<IAnnouncementService>();
+        announcements.CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                var a = call.ArgAt<Announcement>(0);
+                a.Id = "ann-df-stay-created";
+                return a;
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body",
+            SaveAsDraft = true,
+            DraftId = null,
+        };
+
+        var result = await controller.New(model);
+
+        // (a) created via the create seam — and NOT via the edit seam.
+        await announcements.Received(1).CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+        await announcements.DidNotReceive().UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+
+        // (b) stayed on the composer (a view), not a redirect away.
+        var view = Assert.IsType<ViewResult>(result);
+        var reRendered = Assert.IsType<AnnouncementComposeViewModel>(view.ViewData.Model);
+        // The author's content is still in the form (continued where they left off).
+        Assert.Equal("draft body", reRendered.Body);
+
+        // (c) the draft's id is remembered for the next save.
+        Assert.Equal("ann-df-stay-created", model.DraftId);
+    }
+
+    /// <summary>
+    /// ADR 0037 — the draft-save <b>no-duplicate</b> pin: a <c>POST
+    /// /announcements/new</c> with <c>SaveAsDraft = true</c> and a remembered
+    /// <see cref="AnnouncementComposeViewModel.DraftId"/> (a continuation save)
+    /// must <b>update</b> the existing draft via <see
+    /// cref="IAnnouncementService.UpdateAsync"/> — passing the remembered id as
+    /// the announcement's <c>Id</c> — and must <b>not</b> mint a duplicate via
+    /// <see cref="IAnnouncementService.CreateAsync"/>. Re-saving while staying
+    /// on the composer keeps pointing at one draft (the id round-trips via the
+    /// form's hidden field).
+    /// </summary>
+    [Fact]
+    public async Task New_Post_SaveAsDraft_SecondSave_UpdatesSameDraft_NoDuplicate()
+    {
+        const string author = "subj-df-compose-again";
+        const string existingDraftId = "ann-df-existing";
+        var announcements = Substitute.For<IAnnouncementService>();
+
+        Announcement? capturedUpdate = null;
+        announcements.UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>())
+            .Returns(call =>
+            {
+                capturedUpdate = call.ArgAt<Announcement>(0);
+                return capturedUpdate;
+            });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(announcements, userInfo, roles: new[] { Roles.GlobalAdmin },
+            IsAuthenticated: true, subjectId: author);
+
+        var model = new AnnouncementComposeViewModel
+        {
+            Scope = "Public",
+            Title = "a draft",
+            Body = "draft body, revised",
+            SaveAsDraft = true,
+            DraftId = existingDraftId,
+        };
+
+        var result = await controller.New(model);
+
+        // Updated the existing draft — carrying its id — and did NOT create a new one.
+        await announcements.Received(1).UpdateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+        await announcements.DidNotReceive().CreateAsync(
+            Arg.Any<Announcement>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<IDocumentSession>());
+
+        Assert.NotNull(capturedUpdate);
+        Assert.Equal(existingDraftId, capturedUpdate!.Id);
+
+        // Stayed on the composer.
+        Assert.IsType<ViewResult>(result);
+        Assert.Equal(existingDraftId, model.DraftId);
+    }
+
+    /// <summary>
+    /// ADR 0018 — a default <see cref="ILocalizationService"/> substitute for
+    /// the compose form's language picker: an empty enabled catalog + the
+    /// <c>en</c> instance-default floor (a valid shape — the view renders an
+    /// empty language picker). Used by the direct-construction test sites (and
+    /// the <see cref="Build"/> helper) so the new constructor dependency has a
+    /// plain substitute to read from.
+    /// </summary>
+    private static ILocalizationService DefaultLocalization()
+    {
+        var localization = Substitute.For<ILocalizationService>();
+        localization.ListLanguagesAsync().Returns(new List<LanguageCatalog>());
+        localization.GetDefaultLanguageCodeAsync().Returns("en");
+        return localization;
+    }
+
     private static AnnouncementController Build(
         IAnnouncementService announcements,
         IUserInfoService? userInfo = null,
@@ -689,10 +1793,15 @@ public class AnnouncementControllerTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new AnnouncementController(announcements, userInfoImpl, store);
+        // ADR 0018 — the compose form's language picker reads the catalog +
+        // instance default through the HTTP-free ILocalizationService seam.
+        var localization = DefaultLocalization();
+
+        var controller = new AnnouncementController(announcements, userInfoImpl, localization, store);
+        var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext(),
+            HttpContext = httpContext,
         };
 
         if (IsAuthenticated || (roles is { Length: > 0 }))
@@ -707,6 +1816,23 @@ public class AnnouncementControllerTests
                 new ClaimsIdentity(claims, authenticationType: "test"));
         }
 
+        // The write lanes (AddTranslation / Edit / Delete) all touch TempData on
+        // the way out — the harness has no ITempDataProvider by default, so the
+        // controller's TempData property NREs on first access. A no-op fake
+        // (the AdminDateFormatControllerTests / MLUI_FacesTests pattern) closes
+        // it without requiring a real ISession.
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+
         return controller;
+    }
+
+    private sealed class NoOpTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object?> LoadTempData(HttpContext context) =>
+            new Dictionary<string, object?>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
+        {
+            // no-op — the assertion target is the redirect / the call log, not the bag
+        }
     }
 }

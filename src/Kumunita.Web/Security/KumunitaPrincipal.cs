@@ -28,6 +28,8 @@ public static class KumunitaPrincipal
 
     public static bool IsModerator(ClaimsPrincipal user) => HasRole(user, "Moderator");
 
+    public static bool IsTranslator(ClaimsPrincipal user) => HasRole(user, "Translator");
+
     public static bool IsVerifiedResolved(ClaimsPrincipal user) =>
         user?.Claims.Any(c => c.Type == "Kumunita.Verified" && c.Value == "true") == true;
 

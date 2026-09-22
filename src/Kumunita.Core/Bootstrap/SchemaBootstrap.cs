@@ -76,6 +76,42 @@ public static class SchemaBootstrap
                 seededLogger,
                 ct);
         }
+        else
+        {
+            // Warm boot: backfill the de/fr/da translation rows that a
+            // deployment seeded before those baselines shipped is missing —
+            // both lanes create-if-missing only (ADR 0042 D1): an admin's
+            // in-app edit is never clobbered, and the en rows are left
+            // untouched (a warm-boot refresh would clobber an admin edit, so
+            // the lanes are read-mostly: they add the missing non-en rows and
+            // nothing else).
+            //   · the canonical static pages (terms/help/privacy/conduct)
+            //     PageTranslation rows (ADR 0043 D7 / ADR 0044 D5 / ADR 0047 D2)
+            //   · the UI-string catalog's de/fr/da TranslationResource baselines
+            //     (the ADR 0042 D1 "new-key asymmetry" gap, closed by ADR 0052)
+            //   · the user-guide Page docs under the canonical help page
+            //     (a deployment whose first boot predates the UG lane has
+            //     help but no guides — create-if-missing, never clobbering a
+            //     community edit; ADR 0057)
+            //   · the de/fr/da PageTranslation baselines on the user guides
+            //     (a deployment whose first boot predates the guide-translation
+            //     baseline has guides but no translated rows — create-if-missing,
+            //     never clobbering a community Translator's edit; ADR 0057 amended
+            //     2026-09-21)
+            await using var backfillSession = store.OpenSession(new Marten.Services.SessionOptions());
+            await FirstBootSeeder
+                .BackfillPageTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillUiStringBaselinesAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillUserGuidesAsync(backfillSession, ct).ConfigureAwait(false);
+            await FirstBootSeeder
+                .BackfillGuideTranslationsAsync(backfillSession, ct).ConfigureAwait(false);
+            logger.LogInformation(
+                "Warm boot: backfill complete (de/fr/da rows for the canonical " +
+                "static pages + the UI-string catalog baselines + the user guides " +
+                "under help + the de/fr/da guide baselines, create-if-missing).");
+        }
     }
 
     /// <summary>

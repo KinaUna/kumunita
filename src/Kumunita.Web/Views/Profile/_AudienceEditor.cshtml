@@ -49,24 +49,23 @@
         <h6 class="card-title" style="font-weight:600;">
             @if (string.Equals(editorName, "Visibility", StringComparison.OrdinalIgnoreCase))
             {
-                <text>Who can see your profile</text>
+                <text><kw-l key="profile.audience_visibility">Who can see your profile</kw-l></text>
             }
             else
             {
-                <text>Who can see your contact details</text>
+                <text><kw-l key="profile.audience_contact">Who can see your contact details</kw-l></text>
             }
         </h6>
 
         @if (visuallyOff && string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
         {
             <p class="text-muted" style="margin-bottom:0;">
-                Your contact details are currently hidden from everyone.
-                To change this, switch on “Share my contact info” above.
+                <kw-l key="profile.audience_off_note">Your contact details are currently hidden from everyone. To change this, switch on “Share my contact info” above.</kw-l>
             </p>
         }
 
         <div class="@(visuallyOff ? "opacity-75" : null)">
-            <div class="form-label mt-2" style="font-weight:600;">Match mode</div>
+            <div class="form-label mt-2" style="font-weight:600;"><kw-l key="profile.audience_match_mode">Match mode</kw-l></div>
             @foreach (var m in modes)
             {
                 var checkedMark = string.Equals(activeEditor.Mode, m, StringComparison.OrdinalIgnoreCase)
@@ -77,18 +76,43 @@
                        name="@modePrefix" id="@($"{modePrefix}-{m}")"
                        value="@m" @checkedMark />
                 <label class="form-check-label" for="@($"{modePrefix}-{m}")">
-                    @m @(" — " + (m == "Any"
-                        ? "a person is allowed if they meet <i>any</i> of the people/groups you picked"
-                        : "a person is allowed only if they meet <i>all</i> of the people/groups you picked"))
+                    @m 
+                    @if (m == "Any")
+                    {
+                        <text> — <kw-l key="profile.audience_mode_any">a person is allowed if they meet any of the people/groups you picked</kw-l></text>
+                    }
+                    else
+                    {
+                        <text> — <kw-l key="profile.audience_mode_all">a person is allowed only if they meet all of the people/groups you picked</kw-l></text>
+                    }
                 </label>
             </div>
             }
+
+            @* ADR 0057 — "all platform users" (ADR 0041 AllResidents flag):
+               one checkbox toggles the new 4.5 decision branch, after the
+               community branch, before the public branch. The flag is
+               carried verbatim through BuildAudience to the document.
+               Rendered identically on both editors (Visibility and
+               ContactVisibility) — the partial is invoked once per editor. *@
+            <div class="form-check" style="margin-left:0.5rem; margin-top:0.75rem;">
+                <input class="form-check-input" type="checkbox"
+                       name="@($"{editorName}.AllResidentsVisible")"
+                       id="@($"{editorName}-all-residents")"
+                       value="true" @(activeEditor.AllResidentsVisible ? "checked" : null) />
+                <label class="form-check-label" for="@($"{editorName}-all-residents")">
+                    <kw-l key="profile.audience_all_residents">Everyone on the platform (all signed-in residents)</kw-l>
+                </label>
+            </div>
+            <div class="text-muted small" style="margin-left:1rem; margin-bottom:0.75rem;">
+                <kw-l key="profile.audience_all_residents_hint">New residents can see this automatically — no need to re-edit when someone joins.</kw-l>
+            </div>
 
             @* The grant option lists are read-only view data seeded on
                 <c>ViewData</c> (NOT <c>ViewBag</c> — the bag's indexer
                 throws RuntimeBinderException; see below) and are NOT
                 model properties on <c>ProfileEditViewModel</c> (the U11
-                "exactly six form fields" shape pin); the hidden
+                "exactly seven form fields" shape pin); the hidden
                 <c>Grants</c> textarea rendered by the partial is the
                 only form-bound grant field. *@
             @{
@@ -135,14 +159,18 @@
             @if (string.Equals(editorName, "ContactVisibility", StringComparison.OrdinalIgnoreCase))
             {
                 @* The empty-audience warning is meaningful only when the author has
-                   actually opted in AND the grant list is empty — an opt-out with
-                   an empty editor is the §2.4 short-circuit row, not a mis-set gate. *@
-                @if (optIn && activeEditor.IsEmpty)
+                   actually opted in AND the grant list is empty AND the
+                   "all platform users" flag (ADR 0041 / ADR 0057) is not set —
+                   an opt-out with an empty editor is the §2.4 short-circuit row,
+                   not a mis-set gate, and AllResidentsVisible grants everyone
+                   even with an empty grants list. *@
+                @if (optIn && activeEditor.IsEmpty && !activeEditor.AllResidentsVisible)
                 {
                     <div class="alert alert-warning mt-2 mb-0">
-                        <b>Heads up:</b> you haven't picked anyone or any group below,
-                        so your contact details are currently hidden from <b>everyone</b>.
-                        Add a person or group if you'd like to share them.
+                        <b><kw-l key="profile.audience_empty_warning_lead">Heads up:</kw-l></b>
+                        <kw-l key="profile.audience_empty_warning_body">you haven't picked anyone or any group below, so your contact details are currently hidden from</kw-l>
+                        <b><kw-l key="profile.audience_empty_warning_everyone">everyone</kw-l></b>
+                        <kw-l key="profile.audience_empty_warning_tail">. Add a person or group if you'd like to share them.</kw-l>
                     </div>
                 }
             }

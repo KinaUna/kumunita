@@ -4,7 +4,7 @@
     ViewData["Title"] = $"Moderation: report {Model.ReportId[..Math.Min(8, Model.ReportId.Length)]}…";
 }
 
-<h1>Moderation — Review report</h1>
+<h1><kw-l key="moderation.resolve_title">Moderation — Review report</kw-l></h1>
 
 @if (TempData["info"] is string info)
 {
@@ -17,36 +17,65 @@
 
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">Report details</span>
+        <span class="fw-semibold"><kw-l key="moderation.details">Report details</kw-l></span>
         <span class="badge text-bg-secondary">@Model.Status</span>
     </div>
     <div class="card-body">
         <dl class="row mb-0">
-            <dt class="col-sm-3">Post</dt>
+            <dt class="col-sm-3"><kw-l key="moderation.th_post_label">Post</kw-l></dt>
             <dd class="col-sm-9">@(Model.PostTitle ?? Model.PostId)</dd>
 
-            <dt class="col-sm-3">Component</dt>
+            <dt class="col-sm-3"><kw-l key="moderation.th_component_label">Component</kw-l></dt>
             <dd class="col-sm-9">@(Model.ComponentName ?? "—")</dd>
 
-            <dt class="col-sm-3">Reporter</dt>
+            <dt class="col-sm-3"><kw-l key="moderation.th_reporter_label">Reporter</kw-l></dt>
             <dd class="col-sm-9">@(Model.ReporterName ?? "—")</dd>
 
-            <dt class="col-sm-3">Post author</dt>
+            <dt class="col-sm-3"><kw-l key="moderation.th_author_label">Post author</kw-l></dt>
             <dd class="col-sm-9">@(Model.PostAuthorName ?? "—")</dd>
 
-            <dt class="col-sm-3">Filed</dt>
-            <dd class="col-sm-9">@Model.At.ToLocalTime().ToString("g")</dd>
+            <dt class="col-sm-3"><kw-l key="moderation.th_filed_label">Filed</kw-l></dt>
+            <dd class="col-sm-9"><kw-dt dt="@Model.At" format="g"></kw-dt></dd>
 
-            <dt class="col-sm-3">Reason</dt>
-            <dd class="col-sm-9">@(Model.Reason ?? "(no reason given)")</dd>
+            <dt class="col-sm-3"><kw-l key="moderation.th_reason_label">Reason</kw-l></dt>
+            <dd class="col-sm-9">
+                @if (string.IsNullOrEmpty(Model.Reason))
+                {
+                    <kw-l key="moderation.no_reason">(no reason given)</kw-l>
+                }
+                else
+                {
+                    @Model.Reason
+                }
+            </dd>
 
             @if (!string.IsNullOrEmpty(Model.PostBody))
             {
-                <dt class="col-sm-3">Post body</dt>
+                <dt class="col-sm-3"><kw-l key="moderation.th_body_label">Post body</kw-l></dt>
                 <dd class="col-sm-9">
                     <blockquote class="blockquote mb-0">
                         <div>@Model.PostBody</div>
-                        <footer class="blockquote-footer">post preview</footer>
+                        <footer class="blockquote-footer"><kw-l key="moderation.body_preview">post preview</kw-l></footer>
+                    </blockquote>
+                </dd>
+            }
+
+            @* ADR 0023 — the reply-report-target lane: when this report's
+               target is a specific reply (Model.ReplyId non-null), show the
+               reply's body as a blockquote preview under the post body. The
+               UGC body / author name render as-is (M·3); only the platform
+               labels around them are translated. A null ReplyId (the
+               original M3b post-target shape) omits this block entirely. *@
+            @if (Model.ReplyId is not null && !string.IsNullOrEmpty(Model.ReplyBody))
+            {
+                <dt class="col-sm-3"><kw-l key="moderation.resolve_reply_label">Reply (target of this report)</kw-l></dt>
+                <dd class="col-sm-9">
+                    <blockquote class="blockquote mb-0">
+                        <div>@Model.ReplyBody</div>
+                        <footer class="blockquote-footer">
+                            <kw-l key="moderation.resolve_reply_by">Reply by</kw-l>
+                            @(Model.ReplyAuthorName ?? "—")
+                        </footer>
                     </blockquote>
                 </dd>
             }
@@ -81,16 +110,16 @@
 @if (Model.IsAssignable)
 {
     <div class="card mb-4">
-        <div class="card-header">Assign to a standing moderator</div>
+        <div class="card-header"><kw-l key="moderation.assign_header">Assign to a standing moderator</kw-l></div>
         <div class="card-body">
             <form method="post" action="/moderation/@Model.ReportId/assign">
                 @Html.AntiForgeryToken()
                 <div class="mb-2">
                     <label class="form-label" for="assignedToModeratorId">
-                        Standing moderator on this report's component
+                        <kw-l key="moderation.assign_label">Standing moderator on this report's component</kw-l>
                     </label>
                     <select class="form-select" name="assignedToModeratorId" id="assignedToModeratorId" required>
-                        <option value="" disabled selected hidden>Choose a standing moderator …</option>
+                        <option value="" disabled selected hidden><kw-l key="moderation.assign_pick">Choose a standing moderator …</kw-l></option>
                         @foreach (var m in Model.Moderators)
                         {
                             <option value="@m.SubjectId">@(m.DisplayName ?? m.SubjectId)</option>
@@ -103,8 +132,8 @@
                        ModeratorAssignment row with GrantedBy =
                        the acting GlobalAdmin (U5's shape).*@
                 </div>
-                <button class="btn btn-primary" type="submit">Assign</button>
-                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+                <button class="btn btn-primary" type="submit"><kw-l key="moderation.assign_submit">Assign</kw-l></button>
+                <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
             </form>
         </div>
     </div>
@@ -114,25 +143,19 @@
 {
     <div class="card mb-4">
         <div class="card-header">
-            Unlock (activate <code>Component.ModeratorAccess</code> for this report's component)
+            Unlock (turn on moderation access for this community)
         </div>
         <div class="card-body">
             <p class="text-muted">
-                This is the <b>C5 activation event</b> — it flips the
-                <code>Component.ModeratorAccess</code> flag to <code>true</code>
-                (the ADR 0003 / C5 carve-out going live) and marks the
-                report <code>unlocked</code>. The M1
-                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
-                flag-flip seam opens its own session (a separate commit
-                per the M1 seam's contract — U5's doc-comment); the
-                report's <code>Status</code> write and the
-                <code>AccessAudit</code> row commit atomically in this
-                transaction.
+                This turns on <b>moderation access</b> for the community
+                this report is about and marks the report
+                <code>unlocked</code>. A moderator can then act on its
+                content. Everything you do here is written to the audit log.
             </p>
             <form method="post" action="/moderation/@Model.ReportId/unlock">
                 @Html.AntiForgeryToken()
-                <button class="btn btn-warning" type="submit">Unlock</button>
-                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+                <button class="btn btn-warning" type="submit"><kw-l key="moderation.unlock_submit">Unlock</kw-l></button>
+                <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
             </form>
         </div>
     </div>
@@ -141,26 +164,22 @@
 @if (Model.IsResolvable)
 {
     <div class="card mb-4">
-        <div class="card-header">Resolve (close this report)</div>
+        <div class="card-header"><kw-l key="moderation.resolve_header">Resolve (close this report)</kw-l></div>
         <div class="card-body">
             <p class="text-muted">
-                Marks the report <code>resolved</code> (the final
-                state in the §2.3 item-2 four Status literals) and
-                — per U5's behavior note — also calls the M1
-                <code>IUserInfoService.SetComponentModeratorAccessAsync</code>
-                flag-flip seam with <code>on = true</code> (the
-                resolve lane's "final close" event; the unlock
-                lane's "activation event" is separate).
+                This closes the report — it is marked as
+                <code>resolved</code>, which is its final state.
+                Everything you do here is written to the audit log.
             </p>
             <form method="post" action="/moderation/@Model.ReportId/resolve">
                 @Html.AntiForgeryToken()
-                <button class="btn btn-success" type="submit">Resolve</button>
-                <a href="/moderation" class="btn btn-link ms-2">Cancel</a>
+                <button class="btn btn-success" type="submit"><kw-l key="moderation.resolve_submit">Resolve</kw-l></button>
+                <a href="/moderation" class="btn btn-link ms-2"><kw-l key="moderation.cancel">Cancel</kw-l></a>
             </form>
         </div>
     </div>
 }
 
 <div>
-    <a href="/moderation" class="btn btn-link">← Back to queue</a>
+    <a href="/moderation" class="btn btn-link"><kw-l key="moderation.back_to_queue">← Back to queue</kw-l></a>
 </div>

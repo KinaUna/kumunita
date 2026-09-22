@@ -1,0 +1,40 @@
+@model Kumunita.Web.Controllers.AdminTimezoneController.TimezoneAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Platform default time zone";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.timezone_title">Platform default time zone</kw-l></h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+<p class="text-muted">
+    <kw-l key="admin.timezone_lede">The time zone residents' timestamps fall back to when they have set no personal preference of their own.</kw-l>
+</p>
+
+<form method="post" action="/admin/timezone">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="timezoneId" class="form-label"><kw-l key="admin.timezone_label">Default time zone</kw-l></label>
+            <select class="form-select" name="timezone" id="timezoneId">
+                @foreach (var (id, name) in Model.Zones)
+                {
+                    var selected = id == Model.CurrentId;
+                    <option value="@id" selected="@(selected ? "selected" : null)">@name (@id)</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.timezone_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

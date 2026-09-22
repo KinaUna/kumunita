@@ -1,5 +1,9 @@
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
 @inject Kumunita.Core.Announcements.IAnnouncementService Announcements
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     // Render the single pinned announcement as a banner at the top of every
     // page (see the layout, Views/Shared/_Layout.cshtml). The visibility gate
@@ -12,6 +16,16 @@
 
     if (pinned is not null)
     {
+        // ADR 0049 — the banner prefers a translation of the pinned
+        // announcement into the viewer's current language (same chain as the
+        // detail views: cookie → Accept-Language → instance default → en),
+        // falling back to the authored-in title/body when none exists.
+        var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+        var translations = await Announcements.GetAnnouncementTranslationsAsync(pinned.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        string? shownTitle = match is not null && !string.IsNullOrWhiteSpace(match.Title) ? match.Title : pinned.Title;
+        string shownBody = match is not null ? match.Body : pinned.Body;
+
         string dismissKey = "kumunita-pinned-announcement-dismissed-" + pinned.Id;
         string badgeClass = pinned.Scope == AnnouncementScope.Public
             ? "text-bg-secondary"
@@ -22,17 +36,30 @@
             <div class="container-fluid py-2">
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge @badgeClass">
-                        @(pinned.Scope == AnnouncementScope.Public ? "everyone" : "residents")
-                    </span>
-                    <span class="me-auto me-2">
-                        @if (!string.IsNullOrWhiteSpace(pinned.Title))
+                        @if (pinned.Scope == AnnouncementScope.Public)
                         {
-                            <strong class="me-1">@pinned.Title</strong>
+                            <kw-l key="announcements.scope_everyone">everyone</kw-l>
                         }
-                        @pinned.Body
+                        else
+                        {
+                            <kw-l key="announcements.scope_residents">residents</kw-l>
+                        }
                     </span>
+                    @* The banner shows only the first 150 characters of the
+                       body (a pinned announcement can run to pages) — the
+                       full text is one click away at the detail view. *@
+                    <span class="me-auto me-2">
+                        @if (!string.IsNullOrWhiteSpace(shownTitle))
+                        {
+                            <strong class="me-1">@shownTitle</strong>
+                        }
+                        @MarkdownRenderer.PlainTextPreview(shownBody, 150)
+                    </span>
+                    <a class="btn btn-sm btn-link text-nowrap p-0"
+                       href="/announcements/@pinned.Id"
+                       aria-label="Read this announcement in full"><kw-l key="announcements.banner_read_more">Read more</kw-l></a>
                     <a class="btn btn-sm btn-link text-nowrap p-0" href="/announcements"
-                       aria-label="See all announcements">All announcements</a>
+                       aria-label="See all announcements"><kw-l key="announcements.banner_all">All announcements</kw-l></a>
                     <button type="button" class="btn-close"
                             data-bs-dismiss="alert"
                             data-dismiss-key="@dismissKey"
@@ -41,30 +68,6 @@
             </div>
         </div>
 
-        <script>
-            // Persist the per-announcement dismissal in sessionStorage so the
-            // banner stays hidden for the rest of the browser session (across
-            // every page, but not across browser restarts). The key is per
-            // announcement id, so a future admin pinning a different one will
-            // surface for the user again.
-            (function () {
-                var banner = document.querySelector('.kumunita-pinned-announcement');
-                if (!banner) return;
-                var key = banner.querySelector('[data-dismiss-key]')
-                    .getAttribute('data-dismiss-key');
-                var btn = banner.querySelector('.btn-close');
-
-                if (sessionStorage.getItem(key)) {
-                    banner.style.display = 'none';
-                    return;
-                }
-
-                if (btn) {
-                    btn.addEventListener('click', function () {
-                        sessionStorage.setItem(key, '1');
-                    });
-                }
-            })();
-        </script>
+        <script type="module" src="~/js/lib/pinned-announcement.js"></script>
     }
 }

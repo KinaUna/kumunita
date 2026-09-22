@@ -28,11 +28,20 @@
     // Leave button (ADR 0008), the owner's self-row carries none
     // (the owner cannot leave their own group).
     var subject = KumunitaPrincipal.SubjectId(User);
+
+    // ADR 0026 — translation helpers (mirrors the ADR 0022 post-detail
+    // helpers): the enabled-catalog language set with its HasTranslation
+    // flag, the set the "add a translation" form offers, and a code→
+    // native-name resolver for the chips (never blank — falls back to the
+    // code itself).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-        <p><a class="text-muted" href="@Url.Action("Index", "Groups")">← All groups</a></p>
+        <p><a class="text-muted" href="@Url.Action("Index", "Groups")"><kw-l key="groups.back_all">← All groups</kw-l></a></p>
 
         <h1>@Model.Name</h1>
 
@@ -74,14 +83,14 @@
 
         @if (canManage)
         {
-            <h2>About this group</h2>
+            <h2><kw-l key="groups.about_heading">About this group</kw-l></h2>
             <form method="post" action="@Url.Action("UpdateDescription", "Groups", new { id = Model.GroupId })">
                 @Html.AntiForgeryToken()
-                <label class="form-label" for="description">Description (optional)</label>
+                <label class="form-label" for="description"><kw-l key="groups.about_desc_label">Description (optional)</kw-l></label>
                 <textarea class="form-control" id="description" name="description" rows="3" maxlength="500"
                           placeholder="What is this group about? (visible to everyone who can reach this page)">@Model.Description</textarea>
-                <div class="form-text mt-1">Leave blank to clear the description.</div>
-                <button type="submit" class="btn btn-primary mt-2">Save description</button>
+                <div class="form-text mt-1"><kw-l key="groups.about_desc_clear_hint">Leave blank to clear the description.</kw-l></div>
+                <button type="submit" class="btn btn-primary mt-2"><kw-l key="groups.about_desc_save">Save description</kw-l></button>
             </form>
 
             @*
@@ -97,27 +106,218 @@
                 directions (the U10 add-member pattern, the actor's subject is
                 minted in the controller, never a field).
             *@
-            <h2 class="mt-4">Privacy</h2>
+            <h2 class="mt-4"><kw-l key="groups.privacy_heading">Privacy</kw-l></h2>
             <form method="post" action="@Url.Action("UpdatePrivacy", "Groups", new { id = Model.GroupId })">
                 @Html.AntiForgeryToken()
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="isPrivate"
                            name="isPrivate" value="true" @(Model.IsPrivate ? "checked" : "") />
-                    <label class="form-check-label" for="isPrivate">Private group</label>
+                    <label class="form-check-label" for="isPrivate"><kw-l key="groups.private_label">Private group</kw-l></label>
                 </div>
                 <div class="form-text mt-1">
-                    Private groups (e.g. a family) are hidden from everyone else's
-                    grant/access lists; only the people you add as members can use
-                    them. Clear the box to make the group public again.
+                    <kw-l key="groups.private_hint">A private group (e.g. a family) is hidden from everyone else; only the people you add as members can see and use it. Clear the box to make the group public again.</kw-l>
                 </div>
-                <button type="submit" class="btn btn-primary mt-2">Save</button>
+                <button type="submit" class="btn btn-primary mt-2"><kw-l key="common.save">Save</kw-l></button>
             </form>
         }
 
-        <h2>Members</h2>
+        @*
+            ADR 0026 — group name/description translations. Mirrors the
+            ADR 0022 post-detail render exactly: the available translations
+            as expandable chips (native <details>, no JS), and for each
+            supported language lacking a row an "Add a <lang> translation"
+            form — the latter offered only when Model.CanTranslate (a plain
+            group member never sees it; the route's standing gate is the
+            real wall, the form is just not offered here).
+        *@
+        @if (Model.GroupTranslations.Count > 0 || Model.CanTranslate)
+        {
+            <div class="mb-3 border-top pt-3 mt-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="text-muted small fw-semibold">
+                        <kw-l key="groups.translations_label">Translations</kw-l>
+                    </span>
+                    @if (Model.GroupTranslations.Count == 0)
+                    {
+                        <span class="text-muted small"><kw-l key="groups.translations_none">None yet</kw-l></span>
+                    }
+                    else
+                    {
+                        @foreach (var t in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
+                        {
+                            <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
+                        }
+                    }
+                </div>
+
+                @foreach (var t in Model.GroupTranslations)
+                {
+                    <details class="mb-1">
+                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
+                        <div class="ms-2">
+                            @if (!string.IsNullOrWhiteSpace(t.Name))
+                            {
+                                <h5 class="mt-1">@t.Name</h5>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <p class="mb-0">@t.Description</p>
+                            }
+
+                            @* ADR 0048 — edit + remove lane. Offered only to
+                               standing-holders (the same gate as the add lane
+                               below). *@
+                            @if (Model.CanTranslate)
+                            {
+                                <hr class="my-2" />
+                                <form method="post"
+                                      action="@($"/groups/{Model.GroupId}/translations/update")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <label class="form-label small">
+                                        <kw-l key="groups.translation_name_label">Name</kw-l>
+                                        <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <input class="form-control form-control-sm mb-2" name="name"
+                                           value="@t.Name" />
+                                    <label class="form-label small">
+                                        <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                        <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <textarea class="form-control form-control-sm mb-2"
+                                              name="description" rows="3" placeholder="…">@t.Description</textarea>
+                                    <div class="form-text mb-2">
+                                        <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <kw-l key="groups.translation_save">Save translation</kw-l>
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      action="@($"/groups/{Model.GroupId}/translations/remove")"
+                                      class="mt-2" data-confirm="Remove this translation?">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <kw-l key="posts.translation_remove">Remove</kw-l>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </details>
+                }
+
+                @if (Model.CanTranslate)
+                {
+                    @foreach (var lang in missingLanguages)
+                    {
+                        <details class="mb-1">
+                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                <kw-l key="groups.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                            </summary>
+                            <form class="ms-2" method="post"
+                                  action="@($"/groups/{Model.GroupId}/translations")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                <label class="form-label small" for="group-t-name">
+                                    <kw-l key="groups.translation_name_label">Name</kw-l>
+                                    <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <input class="form-control form-control-sm mb-2" id="group-t-name"
+                                       name="name" value="@Model.Name" />
+                                <label class="form-label small" for="group-t-desc">
+                                    <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                    <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <textarea class="form-control form-control-sm mb-2" id="group-t-desc"
+                                          name="description" rows="3" placeholder="…">@Model.Description</textarea>
+                                <div class="form-text mb-2"><kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l></div>
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <kw-l key="groups.translation_save">Save translation</kw-l>
+                                </button>
+                            </form>
+                        </details>
+                    }
+                }
+            </div>
+        }
+
+        @*
+            Group posts (ADR 0013) — the membership-scoped feed lives on
+            this page (Model.GroupPosts, loaded by the Detail action from
+            ListGroupFeedAsync — the access decision + aggregate audit row
+            are unchanged, G·1/G·5). The composer is its own page (GET
+            /groups/{id}/posts/new; the paired POST's gate is the
+            authoritative deny, G·3). No audience selector — the group's
+            membership IS the lane (G·8). Every viewer who reaches this
+            page is already a member (owner ∪ member gate), so the "New
+            post" button is offered to exactly them.
+        *@
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="mb-0"><kw-l key="groups.posts_heading">Posts</kw-l></h2>
+            @if (Model.CanPost)
+            {
+                <a class="btn btn-primary" href="@($"/groups/{Model.GroupId}/posts/new")"><kw-l key="groups.new_post">New post</kw-l></a>
+            }
+        </div>
+
+        @if (Model.GroupPosts.Count == 0)
+        {
+            <p class="text-muted">
+                @if (Model.CanPost)
+                {
+                    <text><kw-l key="groups.posts_empty_can">No posts yet. Write the first one — it will be visible to the current members.</kw-l></text>
+                }
+                else
+                {
+                    <text><kw-l key="groups.posts_empty">No posts here yet.</kw-l></text>
+                }
+            </p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var p in Model.GroupPosts)
+                {
+                    string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
+                        ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div class="pe-3">
+                            <a href="@($"/groups/{Model.GroupId}/posts/{p.Id}")"
+                               class="text-decoration-none fw-semibold">
+                                @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
+                            </a>
+                            <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
+                        </div>
+                        <div class="text-end text-muted small">
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                                </span>
+                                <span>@p.AuthorDisplayName</span>
+                            </div>
+                            <div><kw-dt dt="@p.Created" format="g"></kw-dt></div>
+                        </div>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.GroupPostsTotal > Model.GroupPosts.Count)
+            {
+                <p class="text-muted small mt-3">
+                    @Model.GroupPostsTotal post@(Model.GroupPostsTotal == 1 ? "" : "s") in this group;
+                    @Model.GroupPosts.Count shown to you.
+                </p>
+            }
+        }
+
+        <h2><kw-l key="groups.members_heading">Members</kw-l></h2>
         @if (Model.Members.Count == 0)
         {
-            <p class="text-muted">No members yet.</p>
+            <p class="text-muted"><kw-l key="groups.members_empty">No members yet.</kw-l></p>
         }
         else
         {
@@ -159,7 +359,7 @@
                             <form method="post" action="@Url.Action("LeaveGroup", "Groups", new { id = Model.GroupId })">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                    Leave
+                                    <kw-l key="groups.member_leave">Leave</kw-l>
                                 </button>
                             </form>
                         }
@@ -197,7 +397,7 @@
 
         @if (Model.IsOwner)
         {
-            <h2 class="mt-4">Invite a resident</h2>
+            <h2 class="mt-4"><kw-l key="groups.invite_heading">Invite a resident</kw-l></h2>
             @if (Model.ResidentCandidates.Count > 0)
             {
                 <form method="post"
@@ -207,6 +407,7 @@
                     <div class="col-sm-8">
                         <label class="visually-hidden" for="invite-filter">Filter residents</label>
                         <input type="text" class="form-control" id="invite-filter"
+                               data-name-filter="invite-subjectId"
                                placeholder="Filter by name…" autocomplete="off" />
                         <label class="visually-hidden" for="invite-subjectId">Resident</label>
                         <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
@@ -225,21 +426,8 @@
                         <button type="submit" class="btn btn-primary">Invite</button>
                     </div>
                 </form>
-                <script>
-                    // Client-side name filter (contains, case-insensitive) — same
-                    // pattern as the add-member form below.
-                    (function () {
-                        var filter = document.getElementById("invite-filter");
-                        var list = document.getElementById("invite-subjectId");
-                        filter.addEventListener("input", function () {
-                            var q = filter.value.trim().toLowerCase();
-                            for (var i = 0; i < list.options.length; i++) {
-                                list.options[i].hidden =
-                                    q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
-                            }
-                        });
-                    })();
-                </script>
+                @* Name filter handled by client/lib/name-filter.js
+                   (loaded in _Layout.cshtml — SECURITY.md §6). *@
             }
             else
             {
@@ -271,6 +459,7 @@
                 <div class="col-sm-8">
                     <label class="visually-hidden" for="add-member-filter">Filter residents</label>
                     <input type="text" class="form-control" id="add-member-filter"
+                           data-name-filter="add-subjectId"
                            placeholder="Filter by name…" autocomplete="off" />
                     <label class="visually-hidden" for="add-subjectId">Resident</label>
                     <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
@@ -287,21 +476,8 @@
                     <button type="submit" class="btn btn-primary">Add</button>
                 </div>
             </form>
-            <script>
-                // Client-side name filter (contains, case-insensitive): hide the
-                // options that don't match what's typed in the filter box above.
-                (function () {
-                    var filter = document.getElementById("add-member-filter");
-                    var list = document.getElementById("add-subjectId");
-                    filter.addEventListener("input", function () {
-                        var q = filter.value.trim().toLowerCase();
-                        for (var i = 0; i < list.options.length; i++) {
-                            list.options[i].hidden =
-                                q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
-                        }
-                    });
-                })();
-            </script>
+            @* Name filter handled by client/lib/name-filter.js
+               (loaded in _Layout.cshtml — SECURITY.md §6). *@
         }
         else
         {

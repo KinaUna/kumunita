@@ -11,28 +11,25 @@ using NSubstitute;
 namespace Kumunita.Web.Tests;
 
 /// <summary>
-/// FACES M1–M6 seam tests for <see cref="ProfileController.Avatar"/> (the profile-avatar
-/// serving lane — design doc §2.3), the Web-side "the gate is the product" contract every
-/// follow-on serving lane copies. Test names are the design doc §2.5 L547–553 pin,
-/// verbatim (§2.7 rule 3 — no drift). The pins this harness owns:
+/// FACES M1, M2, M4, M5, M6 seam tests for <see cref="ProfileController.Avatar"/> (the profile-avatar
+/// serving lane — design doc §2.3). ADR 0057: avatars are visible to every signed-in resident
+/// by construction, so no <see cref="IAuthorizationService.CanAsync"/> decision is taken and no
+/// <see cref="AccessAudit"/> row is written — the pins this harness owns are the structural ones
+/// (unsigned → Challenge; unknown → 404; blocked → 404; any signed-in viewer → 200, no decision).
 /// <list type="number">
 /// <item><b>M1 — owner self-serve:</b> the owner loads their own avatar → a
 ///       <see cref="FileStreamResult"/> (the 200) carrying the <em>stored</em>
 ///       <see cref="MediaObject.ContentType"/> (C-MED·5), the whole payload, and
-///       <c>X-Content-Type-Options: nosniff</c>. Authorization is <em>one</em>
-///       <c>CanAsync</c> <c>Read</c> call the owner branch auto-allows (C-MED·1 — no
-///       special-case self check in the action); the Allow audit row is committed by
-///       the seam (C-MED·2), so the action-level pin is the <em>call</em>.</item>
-/// <item><b>M2 — authorized other:</b> same serving surface, <c>Allowed</c> via the
-///       audience branch. Same 200/nosniff/Content-Type pins; one <c>CanAsync</c>.</item>
-/// <item><b>M3 — denied audience:</b> <c>404</c> (never 403 — the repo's fail-closed
-///       idiom) <em>after</em> the seam; the audit row the seam commits is the
-///       test-name's "And_Audits" half (the call pin); the payload is never reached
-///       (<c>IMediaStore</c> untouched).</item>
-/// <item><b>M4 — blocked profile:</b> <c>404</c> <em>before</em> the decision — a
-///       blocked profile with an avatar set still 404s with <em>no</em> <c>CanAsync</c>
-///       call (no audit row — blocked supersedes, the <see cref="DirectoryService"/>
-///       early-return idiom), and no <c>IMediaStore</c> call.</item>
+///       <c>X-Content-Type-Options: nosniff</c>. No <c>CanAsync</c> call (ADR 0057
+///       removes the per-viewer decision entirely).</item>
+/// <item><b>M2 — any signed-in other:</b> same serving surface, 200 via the
+///       "all signed-in residents" branch (ADR 0041 AllResidents flag; ADR 0057
+///       makes the avatar unconditionally visible to any resident). Same 200/
+///       nosniff/Content-Type pins; no <c>CanAsync</c> call.</item>
+/// <item><b>M4 — blocked profile:</b> <c>404</c> <em>before</em> the avatar read — a
+///       blocked profile with an avatar set still 404s with <em>no</em>
+///       <c>IMediaStore</c> call (blocked supersedes, the <see cref="DirectoryService"/>
+///       early-return idiom).</item>
 /// <item><b>M5 — unknown profile:</b> <c>404</c>; nothing downstream of
 ///       <c>GetProfileAsync</c> runs at all.</item>
 /// <item><b>M6 — unsigned:</b> no principal → <see cref="ChallengeResult"/> (never a
@@ -40,7 +37,7 @@ namespace Kumunita.Web.Tests;
 /// </list>
 /// <para>
 /// Harness pattern mirrors <see cref="AnnouncementControllerTests"/> (NSubstitute +
-/// <c>DefaultHttpContext</c>): the three interface seams are substituted;
+/// <c>DefaultHttpContext</c>): the interface seams are substituted;
 /// <see cref="DirectoryService"/> (ctor param #2) is <em>real</em> — it is <c>sealed</c>
 /// (unproxyable) and neither action under test references it. The principal carries the
 /// single <c>Kumunita.Sub</c> claim <see cref="KumunitaPrincipal"/> mints. Class-level
@@ -65,7 +62,7 @@ public class ProfileAvatarServingTests
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02, 0x03,
     };
 
-    /// <summary>M1 — owner self-serve: 200 + stored Content-Type + nosniff, one owner-branch CanAsync.</summary>
+    /// <summary>M1 — owner self-serve: 200 + stored Content-Type + nosniff, no CanAsync (ADR 0057).</summary>
     [Fact]
     public async Task Serving_SignedAuthorizedOwner_Returns200_CorrectContentType()
     {
@@ -75,10 +72,7 @@ public class ProfileAvatarServingTests
         var controller = Build(userInfo, authz, media, principalSubjectId: Owner);
 
         userInfo.GetProfileAsync(Owner).Returns(OwnerProfile());
-        var mediaObject = ServedMediaObject();
-        authz.CanAsync(Owner, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Owner))
-            .Returns(new Decision(Allowed: true, Via: AccessVia.Owner, EffectivePrincipalId: Owner));
-        media.GetAsync(MediaId, Arg.Any<CancellationToken>()).Returns(mediaObject);
+        media.GetAsync(MediaId, Arg.Any<CancellationToken>()).Returns(ServedMediaObject());
         media.OpenReadAsync(MediaId, Arg.Any<CancellationToken>()).Returns(new MemoryStream(Png));
 
         var result = await controller.Avatar(Owner);
@@ -89,12 +83,13 @@ public class ProfileAvatarServingTests
         await file.FileStream.CopyToAsync(drained, CancellationToken.None); // payload integrity
         Assert.Equal(Png, drained.ToArray());
         Assert.Equal("nosniff", controller.HttpContext.Response.Headers["X-Content-Type-Options"]);
-        await authz.Received(1).CanAsync(Owner, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Owner));
+        // ADR 0057 — the avatar lane no longer takes an authorization decision.
+        await authz.DidNotReceiveWithAnyArgs().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
         await media.Received(1).GetAsync(MediaId, Arg.Any<CancellationToken>());
         await media.Received(1).OpenReadAsync(MediaId, Arg.Any<CancellationToken>());
     }
 
-    /// <summary>M2 — authorized other: 200 + stored Content-Type + nosniff, one audience-branch CanAsync.</summary>
+    /// <summary>M2 — any signed-in other: 200 + stored Content-Type + nosniff, no CanAsync (ADR 0057).</summary>
     [Fact]
     public async Task Serving_SignedAuthorizedOther_Returns200()
     {
@@ -104,8 +99,6 @@ public class ProfileAvatarServingTests
         var controller = Build(userInfo, authz, media, principalSubjectId: Viewer);
 
         userInfo.GetProfileAsync(Other).Returns(OtherProfile());
-        authz.CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other))
-            .Returns(new Decision(Allowed: true, Via: AccessVia.Audience, EffectivePrincipalId: Other));
         media.GetAsync(MediaId, Arg.Any<CancellationToken>()).Returns(ServedMediaObject());
         media.OpenReadAsync(MediaId, Arg.Any<CancellationToken>()).Returns(new MemoryStream(Png));
 
@@ -117,39 +110,15 @@ public class ProfileAvatarServingTests
         await file.FileStream.CopyToAsync(drained, CancellationToken.None);
         Assert.Equal(Png, drained.ToArray());
         Assert.Equal("nosniff", controller.HttpContext.Response.Headers["X-Content-Type-Options"]);
-        await authz.Received(1).CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other));
+        // ADR 0057 — avatars are visible to every signed-in resident (no per-viewer decision).
+        await authz.DidNotReceiveWithAnyArgs().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
         await media.Received(1).OpenReadAsync(MediaId, Arg.Any<CancellationToken>());
     }
 
     /// <summary>
-    /// M3 — denied audience: 404 (never 403), <em>after</em> one <c>CanAsync</c> whose
-    /// Allow-or-Deny audit row the seam commits (the name's "And_Audits" pin — the call
-    /// is what this layer can assert); the payload is never reached.
-    /// </summary>
-    [Fact]
-    public async Task Serving_SignedDeniedAudience_Returns404_And_Audits()
-    {
-        var userInfo = Substitute.For<IUserInfoService>();
-        var authz = Substitute.For<Kumunita.Core.Authorization.IAuthorizationService>();
-        var media = Substitute.For<IMediaStore>();
-        var controller = Build(userInfo, authz, media, principalSubjectId: Viewer);
-
-        userInfo.GetProfileAsync(Other).Returns(OtherProfile());
-        authz.CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other))
-            .Returns(new Decision(Allowed: false, Via: AccessVia.Audience, EffectivePrincipalId: Other));
-
-        var result = await controller.Avatar(Other);
-
-        Assert.IsType<NotFoundResult>(result);                                    // 404, fail-closed
-        await authz.Received(1).CanAsync(Viewer, AccessAction.Read, Arg.Is<ProfileToAuditableResource>(r => r.Id == Other));
-        await media.DidNotReceiveWithAnyArgs().GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await media.DidNotReceiveWithAnyArgs().OpenReadAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-    }
-
-    /// <summary>
-    /// M4 — blocked profile: 404 <em>before</em> the decision. The profile carries an
+    /// M4 — blocked profile: 404 <em>before</em> the avatar read. The profile carries an
     /// <c>AvatarId</c> on purpose — blocked supersedes the avatar (the §2.3 ordering
-    /// pin), and the "no audit row" half is the <c>CanAsync</c> call never happening.
+    /// pin), and no <c>IMediaStore</c> call.
     /// </summary>
     [Fact]
     public async Task Serving_BlockedProfile_Returns404()
@@ -172,7 +141,6 @@ public class ProfileAvatarServingTests
 
         Assert.IsType<NotFoundResult>(result);
         await userInfo.Received(1).GetProfileAsync(Other);
-        await authz.DidNotReceiveWithAnyArgs().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
         await media.DidNotReceiveWithAnyArgs().GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -191,7 +159,6 @@ public class ProfileAvatarServingTests
 
         Assert.IsType<NotFoundResult>(result);
         await userInfo.Received(1).GetProfileAsync(Unknown);
-        await authz.DidNotReceiveWithAnyArgs().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
         await media.DidNotReceiveWithAnyArgs().GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -212,7 +179,6 @@ public class ProfileAvatarServingTests
         Assert.IsType<ChallengeResult>(result);
         Assert.IsNotAssignableFrom<FileStreamResult>(result); // never a 200
         await userInfo.DidNotReceiveWithAnyArgs().GetProfileAsync(Arg.Any<string>());
-        await authz.DidNotReceiveWithAnyArgs().CanAsync(Arg.Any<string>(), Arg.Any<AccessAction>(), Arg.Any<IAuditableResource>());
         await media.DidNotReceiveWithAnyArgs().GetAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -261,7 +227,6 @@ public class ProfileAvatarServingTests
         var controller = new ProfileController(
             userInfo,
             new DirectoryService(userInfo, authz),
-            authz,
             media,
             Options.Create(new MediaOptions()));
 

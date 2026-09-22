@@ -55,6 +55,17 @@ public sealed class ModerationResolveViewModel
     public string? ComponentName { get; set; }   // IUserInfoService.GetComponentAsync read (a read, not a decision)
     public string? PostAuthorName { get; set; }  // IUserInfoService.GetProfileAsync read (a read, not a decision)
 
+    // ── The referenced reply (ADR 0023 — the reply-report-target lane) ─
+    // Populated only when the report's target discriminator
+    // (Report.ReplyId) is non-null. A null ReplyId means the report is
+    // against the post itself (the original M3b shape) and the view omits
+    // the reply block. The body / author name are UGC — rendered as-is,
+    // never translated (M·3); the platform labels around them ARE
+    // translated (the moderation.resolve_reply_* keys).
+    public string? ReplyId { get; set; }          // the target discriminator (null = post-target)
+    public string? ReplyBody { get; set; }        // the reply's body (a read, not a decision)
+    public string? ReplyAuthorName { get; set; }  // IUserInfoService.GetProfileAsync read (a read, not a decision)
+
     // ── The standing-moderator list for the assign form ─────────────
     public IReadOnlyList<StandingModerator> Moderators { get; set; } = [];
 

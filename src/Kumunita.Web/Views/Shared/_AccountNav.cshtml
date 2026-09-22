@@ -1,45 +1,225 @@
+@using Kumunita.Core.Localization
+@using Kumunita.Core.Identity
+@using Kumunita.Core.UserInfo
 @using Kumunita.Web.Security
+@inject ILocalizationService Localization
+@inject ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IIdentityService Identity
+@inject IUserInfoService UserInfo
 @*
     Right-hand nav actions (the public section links live in the layout's
-    left nav). Signed in: Profile · Admin (global admins only) · Sign out.
-    Signed out: Sign in · Sign up.
+    left nav). Signed in: a single account dropdown (toggle labelled with the
+    resident's display name, falling back to the translated "Account" key)
+    holding Profile · Children · My drafts · Settings · Translations
+    (Translator-only) · Admin (global admins only) · Sign out — collapsed so
+    the navbar stays narrow. Signed out: the globe language switcher (standalone
+    dropdown) plus Sign in · Sign up (flat links).
 *@
 @{
     bool isAuthenticated = User.Identity?.IsAuthenticated == true;
     // KumunitaPrincipal.IsGlobalAdmin reads the Kumunita.Role claim type (not the BCL
     // default) — see the helper's doc; ClaimsPrincipal.IsInRole would not match this shape.
     bool isGlobalAdmin = KumunitaPrincipal.IsGlobalAdmin(User);
+    // ADR 0021 — the Translator lane: a delegated translation editor gets a direct link
+    // to the languages surface (the translation editors are open to them). GlobalAdmins
+    // already reach it through the Admin shell, so this link is Translator-only.
+    bool isTranslator = KumunitaPrincipal.IsTranslator(User);
+
+    // The signed-in resident's avatar on the account toggle (the Directory
+    // pattern — the same fail-closed contract as every avatar <img>: src is the
+    // audited serving lane GET /profile/avatar/{subjectId}, and on a 404 (no
+    // avatar set) avatar.js hides the <img> and shows the monogram sibling).
+    // A read of the signed-in resident's own row — never another resident's.
+    string? navAvatarSubject = isAuthenticated ? KumunitaPrincipal.SubjectId(User) : null;
+    string navAvatarInitial = string.Empty;
+    if (!string.IsNullOrEmpty(navAvatarSubject))
+    {
+        var navProfile = await UserInfo.GetProfileAsync(navAvatarSubject);
+        navAvatarInitial = !string.IsNullOrWhiteSpace(navProfile?.DisplayName)
+            ? char.ToUpperInvariant(navProfile.DisplayName.TrimStart()[0]).ToString()
+            : string.Empty;
+    }
+
+    // The nav-bar language switcher: the enabled catalog (in SortOrder), and the
+    // resident's current preference (the kumunita.locale cookie) to mark the
+    // active choice. A read — never a write, never a claim (the thin-token rule).
+    // ADR 0046 — the effective choice is the cookie when set, else the browser's
+    // Accept-Language match (suggested, not persisted); a browser match is
+    // rendered with a "(matched)" suffix so it is never mistaken for a saved
+    // preference.
+    var httpReq = HttpContextAccessor.HttpContext?.Request;
+    var navLanguages = (await Localization.ListLanguagesAsync())
+        .Where(l => l.Enabled)
+        .OrderBy(l => l.SortOrder)
+        .ToList();
+    var cookieLang = httpReq is null ? null : LocaleCookie.Read(httpReq);
+    var browserLang = httpReq is null ? null : RequestLanguage.Browser(httpReq, navLanguages);
+    var currentLang = cookieLang ?? browserLang;
+    var browserMatched = string.IsNullOrEmpty(cookieLang) && browserLang is not null;
+    var returnUrl = httpReq is null ? null : httpReq.Path + httpReq.QueryString;
+    // The "(matched)" marker: a browser-matched active language is a
+    // suggestion, not a saved preference — the label says so (ADR 0046).
+    string LangMatchedLabel = "matched";
+    var matchedMap = await Translation.GetManyAsync(
+        new[] { "locale.browser_matched" }, currentLang);
+    if (matchedMap.TryGetValue("locale.browser_matched", out var m))
+        LangMatchedLabel = m;
 }
 
 <ul class="navbar-nav">
     @if (isAuthenticated)
     {
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Profile" asp-action="Edit">Profile</a>
-        </li>
-        @if (isGlobalAdmin)
-        {
-            <li class="nav-item">
-                <a class="nav-link text-dark" asp-controller="Admin" asp-action="Index">Admin</a>
-            </li>
-        }
-        <li class="nav-item">
-            <form class="form-inline" asp-controller="Account" asp-action="Logout" method="post"
-                  style="display:inline;">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn-link nav-link text-dark" style="border:none; background:none;">
-                    Sign out
-                </button>
-            </form>
+        @* One account dropdown (visible to signed-in residents only): the globe
+           language switcher sits inside it as a sub-section, so the navbar
+           carries a single toggle instead of six flat links. *@
+        <li class="nav-item dropdown">
+            <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center gap-2" href="#"
+               id="accountMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                @if (!string.IsNullOrEmpty(navAvatarSubject))
+                {
+                    <span class="d-inline-flex align-items-center">
+                        <img class="avatar avatar-sm" src="/profile/avatar/@navAvatarSubject" alt=""
+                             data-avatar-fallback>
+                        <span class="avatar-mono avatar-sm" style="display:none;">@navAvatarInitial</span>
+                    </span>
+                }
+                <kw-l key="nav.account">Account</kw-l>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="accountMenu">
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
+                </li>
+                @* GU (ADR 0028) — the guardian's child-accounts surface. Every signed-in
+                   resident can reach their own /me/children; the list is empty for a
+                   non-guardian (the Index view handles that empty state), so no is… flag. *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
+                </li>
+                @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
+                   group posts, and announcements live here, hidden from every feed. *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/my/drafts"><kw-l key="nav.my_drafts">My drafts</kw-l></a>
+                </li>
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
+                </li>
+                @if (isGlobalAdmin)
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" asp-controller="Admin" asp-action="Index"><kw-l key="nav.admin">Admin</kw-l></a>
+                    </li>
+                }
+                @* ADR 0021 — the Translator's home: the language catalog + translation editors.
+                   Shown to Translators only (a GlobalAdmin reaches it via the Admin shell link). *@
+                @if (isTranslator && !isGlobalAdmin)
+                {
+                    <li class="nav-item">
+                        <a class="dropdown-item text-dark" href="/admin/languages"><kw-l key="nav.translations">Translations</kw-l></a>
+                    </li>
+                }
+                <li><hr class="dropdown-divider" /></li>
+                <li class="nav-item">
+                    <form class="form-inline m-0" asp-controller="Account" asp-action="Logout" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="dropdown-item text-dark"><kw-l key="nav.sign_out">Sign out</kw-l></button>
+                    </form>
+                </li>
+                @* Language switcher — a globe icon + enabled-language list inside the
+                   account menu (ML-UI U7). Picking a language posts to the same public
+                   /language save the quick picker used; the ReturnUrl keeps the resident
+                   on the page they were on. The full settings experience
+                   (/settings/language) remains the [Authorize]d page. *@
+                <li><hr class="dropdown-divider" /></li>
+                @* Language picker — a non-interactive header row (globe + the
+                   current choice as a hint) above the indented language list.
+                   A real nested dropdown would close the parent account menu
+                   when opened, so the list renders inline instead. *@
+                <li class="px-3 pt-2 pb-1 small text-secondary d-flex align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" class="me-2 flex-shrink-0"
+                         fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="8" cy="8" r="6.2"/>
+                        <path d="M1.9 8h12.2"/>
+                        <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
+                        <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
+                    </svg>
+                    <span title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
+                        <kw-l key="settings.choose_language">Choose your language</kw-l>
+                    </span>
+                </li>
+                <li>
+                    <ul class="list-unstyled m-0">
+                        @foreach (var lang in navLanguages)
+                        {
+                            var isActive = currentLang == lang.Id;
+                            <li class="px-3">
+                                <form method="post" action="/language" class="m-0">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                    <input type="hidden" name="code" value="@lang.Id" />
+                                    <button type="submit" class="btn btn-link text-dark text-decoration-none dropdown-item px-3 py-1 text-start @(isActive ? "fw-semibold" : "")">
+                                        @lang.NativeName
+                                        @(isActive ? " ✓" : "")
+                                        @(isActive && browserMatched ? " (" + LangMatchedLabel + ")" : "")
+                                    </button>
+                                </form>
+                            </li>
+                        }
+                    </ul>
+                </li>
+            </ul>
         </li>
     }
     else
     {
-        <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Sign in</a>
+        @* Language switcher — the globe is also visible signed out (it lives in
+           the Account dropdown only when signed in). Picking a language posts to
+           the same public /language save; the ReturnUrl keeps the visitor on the
+           page they were on (ML-UI U7). *@
+        <li class="nav-item dropdown">
+            <a class="nav-link text-dark dropdown-toggle d-inline-flex align-items-center" href="#"
+               id="languageMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+               title="@("Language — " + (currentLang is null ? "instance default" : (browserMatched ? currentLang + " (matched)" : currentLang)))">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
+                     fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="8" cy="8" r="6.2"/>
+                    <path d="M1.9 8h12.2"/>
+                    <path d="M8 1.9c2.55 2.1 2.55 10.1 0 12.2"/>
+                    <path d="M8 1.9c-2.55 2.1-2.55 10.1 0 12.2"/>
+                </svg>
+                <span class="visually-hidden"><kw-l key="settings.choose_language">Choose your language</kw-l></span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageMenu">
+                @foreach (var lang in navLanguages)
+                {
+                    var isActive = currentLang == lang.Id;
+                    <li>
+                        <form method="post" action="/language" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <input type="hidden" name="code" value="@lang.Id" />
+                            <button type="submit" class="dropdown-item text-start @(isActive ? "fw-semibold" : "")">
+                                @lang.NativeName
+                                @(isActive ? " ✓" : "")
+                                @(isActive && browserMatched ? " (" + LangMatchedLabel + ")" : "")
+                            </button>
+                        </form>
+                    </li>
+                }
+            </ul>
         </li>
         <li class="nav-item">
-            <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup">Sign up</a>
+            <a class="nav-link text-dark" asp-controller="Account" asp-action="Login"><kw-l key="nav.sign_in">Sign in</kw-l></a>
         </li>
+        @* ADR 0050 — the sign-up gate (the admin-settled instance value, the `true`
+           floor): when closed (invitation-only), the self-service sign-up surface is
+           gone, so the nav link is suppressed — an invited resident is added by an
+           administrator, not through this link. *@
+        @if (await Identity.IsSignupOpenAsync())
+        {
+            <li class="nav-item">
+                <a class="nav-link text-dark" asp-controller="Account" asp-action="Signup"><kw-l key="nav.sign_up">Sign up</kw-l></a>
+            </li>
+        }
     }
 </ul>

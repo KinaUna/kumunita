@@ -304,7 +304,11 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         session.Store(existing);
 
-        var via = addedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        // GU (ADR 0028): the guardian base is the narrowest — an active link
+        // over <paramref name="userId"/> (the child) wins and records
+        // <c>Via: Guardian</c>; otherwise the existing Owner / Admin base applies.
+        var via = await GateGuardianStandingAsync(addedBy, userId)
+            ?? (addedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin);
         var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : addedBy;
 
         var audit = new Authorization.AccessAudit
@@ -349,7 +353,11 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             session.Delete<GroupMembership>(membership.Id);
         }
 
-        var via = removedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        // GU (ADR 0028): the guardian base is the narrowest — an active link
+        // over <paramref name="userId"/> (the child) wins and records
+        // <c>Via: Guardian</c>; otherwise the existing Owner / Admin base applies.
+        var via = await GateGuardianStandingAsync(removedBy, userId)
+            ?? (removedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin);
         var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : removedBy;
 
         var audit = new Authorization.AccessAudit
@@ -449,6 +457,244 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         return;
     }
 
+    // ── ADR 0026 — group name/description translations ─────────────────────
+    // Mirrors the ADR 0022 post-translation lane (PostService), in this context:
+    // a GroupTranslation row (at most one per language, the M1DocTypes unique
+    // index) added by the group's owner (Via: Owner) or a GlobalAdmin /
+    // Translator (Via: Admin), a hand-written AccessAudit row in the same
+    // session (C3), and a plain read seam (no decision, no audit — inherits the
+    // group's owner∪member reach). Add-only (no edit/delete seam).
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<GroupTranslation>> GetGroupTranslationsAsync(string groupId)
+    {
+        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group id is required.", nameof(groupId));
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<GroupTranslation> AddGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId)) throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group's owner (or a translator, or an admin) " +
+                "may add a translation of its name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new GroupTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GroupId = groupId,
+            LanguageCode = languageCode,
+            Name = string.IsNullOrWhiteSpace(name) ? null : name,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.add",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <inheritdoc />
+    public bool CanTranslateGroup(string ownerId, string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveGroupTranslationStanding(ownerId, actorId, actorRoles) is not null;
+
+    // ─── ADR 0048 — edit + delete lane for group / community translations ─
+    // ADR 0026 was add-only (one row per (parent, language) pair). ADR 0048
+    // lifts the "add-only" pin: the same standing matrix (group owner /
+    // GlobalAdmin / Translator for a group; GlobalAdmin / Translator for the
+    // community — no owner on the component) may now **update** the existing
+    // (parent, languageCode) row in place, or **remove** it. Standing is
+    // re-derived from the parent's current owner/scope, not from the row's
+    // AuthorId (which is the adder). Both write a hand-written
+    // <c>AccessAudit</c> row and commit atomically (one <c>SaveChangesAsync</c>).
+
+    /// <summary>
+    /// **Updates** the existing <see cref="GroupTranslation"/> row for
+    /// (<paramref name="groupId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane (group owner → Owner; GlobalAdmin / Translator → Admin).
+    /// A missing group or a missing row is a <see cref="KeyNotFoundException"/>;
+    /// a denied actor throws <see cref="UnauthorizedAccessException"/>. The new
+    /// name / description must have at least one non-blank field. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<GroupTranslation> UpdateGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId))
+            throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("A group translation requires a name or a description (at least one non-blank).", nameof(name));
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group owner, an admin, or a translator may edit a group's translation.");
+
+        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.update",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="GroupTranslation"/> row for
+    /// (<paramref name="groupId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane. A hard <c>session.Delete</c>; the trail is preserved by
+    /// the <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.remove</c>). A missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveGroupTranslationAsync(
+        string groupId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(groupId))
+            throw new ArgumentException("A group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new KeyNotFoundException($"Group '{groupId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<GroupTranslation>()
+            .Where(t => t.GroupId == groupId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException($"Group '{groupId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveGroupTranslationStanding(group.OwnerId, actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only the group owner, an admin, or a translator may remove a group's translation.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "grouptranslation.remove",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The ADR 0026 group-translation standing resolver (shared by
+    /// <see cref="AddGroupTranslationAsync"/> and <see
+    /// cref="CanTranslateGroup"/>). Returns the <see cref="Authorization
+    /// .AccessVia"/> the actor qualifies under, or <c>null</c> to deny.
+    /// Precedence (most specific standing first, so the audit row records the
+    /// narrowest right that applied): the group's <b>owner</b>
+    /// (<see cref="Authorization.AccessVia.Owner"/>); a <b>GlobalAdmin</b> or a
+    /// <b>Translator</b> (both <see cref="Authorization.AccessVia.Admin"/>).
+    /// A group **member** is not a standing (membership is not the right to
+    /// rename the group for others); a component-moderator claim does not
+    /// qualify (the group lane has no component-moderator standing, ADR 0007).
+    /// </summary>
+    private static Authorization.AccessVia? ResolveGroupTranslationStanding(
+        string ownerId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.Equals(ownerId, actorId, StringComparison.Ordinal))
+            return Authorization.AccessVia.Owner;
+        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            return Authorization.AccessVia.Admin;
+        if (actorRoles.Contains(Identity.Roles.Translator))
+            return Authorization.AccessVia.Admin;
+        return null;
+    }
+
     // ── M2b: group invitations (docs/design/m2b-group-invitations.md;
     // one session + one SaveChangesAsync per call, mirroring the M1 group
     // lifecycle shape above — invariants C-M2b·1..3) ──────────────────
@@ -544,6 +790,17 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await using var session = store.OpenSession(new SessionOptions());
 
+        // GU gate (ADR 0028 §C / G·2): a supervised child — one with an active
+        // GuardianLink — may NOT self-accept. Read-only (no mutation); the
+        // approval must come from their guardian via ApproveGroupInvitationAsync.
+        var supervised = await session.Query<GuardianLink>()
+            .Where(l => l.ChildId == actorId && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (supervised is not null)
+            throw new InvalidOperationException(
+                $"Account {actorId} is supervised; a group invitation must be approved by their guardian (see ApproveGroupInvitationAsync).");
+
         var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
         if (group is null)
             throw new InvalidOperationException($"Group not found: {groupId}");
@@ -613,6 +870,95 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await session.SaveChangesAsync().ConfigureAwait(false);
         return;
+    }
+
+    /// <inheritdoc />
+    public async Task<GroupInvitation> ApproveGroupInvitationAsync(string groupId, string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId))
+            throw new ArgumentException("Group id is required.", nameof(groupId));
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate (G·2 live / G·3 deny-by-default): an ACTIVE link for
+        // this exact (guardian, child) pair — the G3_NonChildTargetIsRefused
+        // precondition. No link ⇒ refused (the Web's 404).
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // Precondition: a PENDING invitation on the CHILD (keyed on childId —
+        // distinct from the no-standing gate above).
+        var row = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId && i.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (row is null)
+            throw new InvalidOperationException(
+                $"No group invitation for {childId} in group {groupId}");
+
+        if (row.Status != InvitationStatus.Pending)
+            throw new InvalidOperationException(
+                $"Invitation {row.Id} is already {row.Status}; only a Pending invitation can be approved.");
+
+        // The accept write path, reused verbatim — the membership lands exactly
+        // as AcceptGroupInvitationAsync writes it; the only differences are the
+        // child-keyed row, ResolvedBy = the guardian, and the audit verb/Via.
+        row.Status = InvitationStatus.Accepted;
+        row.ResolvedAt = now;
+        row.ResolvedBy = guardianId;
+        session.Store(row);
+
+        var membership = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId && m.UserId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is null)
+        {
+            membership = new GroupMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                GroupId = groupId,
+                UserId = childId,
+                AddedBy = guardianId,
+                At = now
+            };
+        }
+        else
+        {
+            membership.AddedBy = guardianId;
+            membership.At = now;
+        }
+
+        session.Store(membership);
+
+        // Guardian approval audit: the guardian's standing (all three
+        // identities the guardian; the target is the group).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "group.invite.approve",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
     }
 
     /// <inheritdoc />
@@ -891,6 +1237,75 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task SetProfileTimezoneAsync(string subjectId, string? timezone, string actorBy)
+    {
+        // ADR 0019 — the user's timezone override write lane. Mirrors
+        // SetProfileAvatarAsync exactly (the C-MED·8 single write-lane shape):
+        // the self-scope check happens at the Web boundary (the owner is the
+        // actor); this lane writes Profile.TimeZone only. One session, one
+        // SaveChangesAsync (C3); no audit row (a Profile field write — the
+        // UpsertProfileAsync shape, "not an access decision"). Fail closed on a
+        // missing profile (never load-or-create, the SetProfileAvatarAsync pin).
+        // Strong consistency (C4): the new value is live on the very next
+        // GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.TimeZone = timezone;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy)
+    {
+        // ADR 0020 — the user's date-format override write lane. Mirrors
+        // SetProfileTimezoneAsync exactly (the C-MED·8 single write-lane shape):
+        // the self-scope check happens at the Web boundary (the owner is the
+        // actor); this lane writes Profile.DateFormat only. One session, one
+        // SaveChangesAsync (C3); no audit row (a Profile field write — the
+        // UpsertProfileAsync shape, "not an access decision"). Fail closed on a
+        // missing profile (never load-or-create, the SetProfileTimezoneAsync
+        // pin). Strong consistency (C4): the new value is live on the very next
+        // GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.DateFormat = formatString;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy)
+    {
+        // ADR 0061 — the user's outbound-channel language write lane. Mirrors
+        // SetProfileDateFormatAsync exactly (the C-MED·8 single write-lane
+        // shape): the self-scope check happens at the Web boundary (the owner
+        // is the actor); this lane writes Profile.EmailLanguage only. One
+        // session, one SaveChangesAsync (C3); no audit row (a Profile field
+        // write — the UpsertProfileAsync shape, "not an access decision").
+        // Fail closed on a missing profile (never load-or-create, the
+        // SetProfileDateFormatAsync pin). Strong consistency (C4): the new
+        // value is live on the very next GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.EmailLanguage = emailLanguage;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,
@@ -1137,12 +1552,29 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             return System.Array.Empty<string>();
 
         await using var session = store.QuerySession();
-        return (await session
+        var explicitMembership = await session
             .Query<ComponentMembership>()
             .Where(m => m.UserId == userId)
             .Select(m => m.ComponentId)
             .ToListAsync()
-            .ConfigureAwait(false)) as IReadOnlyCollection<string>;
+            .ConfigureAwait(false);
+
+        // ADR 0012: mandatory communities — every verified resident is a
+        // member, so the union below is the single "who is a member"
+        // definition (posting gate, composer picker, feed directory all read
+        // through it — a flag toggle is live on the very next read, C4).
+        // Enabled ∩ mandatory: a disabled component is the user-chosen
+        // "removed" shape and grants no membership at all.
+        var mandatory = await session
+            .Query<Component>()
+            .Where(c => c.Enabled && c.Mandatory)
+            .Select(c => c.Id)
+            .ToListAsync()
+            .ConfigureAwait(false);
+
+        var union = new HashSet<string>(explicitMembership);
+        union.UnionWith(mandatory);
+        return union;
     }
 
     /// <inheritdoc />
@@ -1222,6 +1654,18 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         await using var session = store.OpenSession(new SessionOptions());
 
+        // ADR 0012: a mandatory community's membership is implicit — the
+        // GetCommunityIdsAsync union would return the pair no matter which
+        // row we clear, so "clearing" it changes nothing. No-op skip (not an
+        // error — the /admin diff form and the self-leave route may
+        // legitimately reach this lane with a mandatory pair, and nothing is
+        // removed there), and no audit row (a no-op writes nothing). The
+        // *refused* shape lives in RemoveCommunityMemberAsync (the
+        // moderator lane that wants the surfaced product message).
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is not null && component.Mandatory)
+            return;
+
         // Delete (if any) — strong consistency (invariant C4): the next
         // GetCommunityIdsAsync is live; an absent row is a no-op (not an error).
         var membership = await session.Query<ComponentMembership>()
@@ -1249,6 +1693,512 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         });
 
         await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ── ADR 0012 — mandatory communities + moderator member lanes ─────────
+    // Thin token, fat authorization: these lanes gate on the caller's current
+    // role set (the <c>actorRoles</c> seam — the same <c>IReadOnlySet&lt;string&gt;</c>
+    // shape PostService.CreatePostAsync / AnnouncementService.CreateAsync take,
+    // minted at the Web boundary from KumunitaPrincipal.RoleSet), and the
+    // decision is made here in Core: the **set-mandatory lane is GlobalAdmin-only**
+    // (a standing-wide decision the product puts in the admin's hands), while
+    // the member add/remove lanes carry Roles.GlobalAdmin ∪ the community's
+    // Roles.ModeratorComponent scope. Writes audit in the same session (C3)
+    // with the narrower standing recorded — a claim-holder acting through
+    // their community scope records <c>Via: Moderator</c>; a GlobalAdmin
+    // records <c>Via: Admin</c>.
+
+    /// <inheritdoc />
+    public async Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+
+        GateCommunityGlobalAdmin(componentId, actorId, actorRoles);
+        var via = Authorization.AccessVia.Admin;
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        component.Mandatory = mandatory;
+        session.Store(component);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = mandatory ? "community.set-mandatory" : "community.set-optional",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    // ── ADR 0026 — community name/description translations ─────────────────
+    // Mirrors the group lane above, in the community shape: a
+    // CommunityTranslation row (at most one per language, the M1DocTypes unique
+    // index) added by a GlobalAdmin or a Translator (both Via: Admin — a
+    // community has no owner, so no AccessVia.Owner branch; a component
+    // moderator governs its members, ADR 0012, not its name), a hand-written
+    // AccessAudit row in the same session (C3), a plain read seam (no decision,
+    // no audit — inherits the community's enabled visibility). Add-only.
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CommunityTranslation>> GetCommunityTranslationsAsync(string componentId)
+    {
+        if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component id is required.", nameof(componentId));
+
+        await using var session = store.QuerySession();
+        return await session
+            .Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId)
+            .OrderBy(t => t.LanguageCode)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId)) throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to translate.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may add a translation of " +
+                "the community's name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var translation = new CommunityTranslation
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            ComponentId = componentId,
+            LanguageCode = languageCode,
+            Name = string.IsNullOrWhiteSpace(name) ? null : name,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description,
+            AuthorId = actorId,
+            Created = now
+        };
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.add",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(translation);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return translation;
+    }
+
+    /// <summary>
+    /// **Updates** the existing <see cref="CommunityTranslation"/> row for
+    /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane (GlobalAdmin / Translator → Admin; the community has no
+    /// owner). A missing component or row is a <see cref="KeyNotFoundException"/>;
+    /// a denied actor throws <see cref="UnauthorizedAccessException"/>. The new
+    /// name / description must have at least one non-blank field. One
+    /// <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "A name/description translation needs at least a name or a description.", nameof(name));
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to update.");
+
+        var row = await session.Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to update.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may edit a translation of " +
+                "the community's name or description.");
+
+        row.Name = string.IsNullOrWhiteSpace(name) ? null : name;
+        row.Description = string.IsNullOrWhiteSpace(description) ? null : description;
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.update",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return row;
+    }
+
+    /// <summary>
+    /// **Removes** the existing <see cref="CommunityTranslation"/> row for
+    /// (<paramref name="componentId"/>, <paramref name="languageCode"/>) in the
+    /// <b>caller's</b> in-flight session (C3). Standing is the same as the ADR
+    /// 0026 add lane. A hard <c>session.Delete</c>; the trail is preserved by
+    /// the <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>communitytranslation.remove</c>). A missing component or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    public async Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            throw new ArgumentException("A component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(languageCode))
+            throw new ArgumentException("A translation requires a concrete target language code.", nameof(languageCode));
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new KeyNotFoundException($"Community '{componentId}' was not found in the session; nothing to remove.");
+
+        var row = await session.Query<CommunityTranslation>()
+            .Where(t => t.ComponentId == componentId && t.LanguageCode == languageCode)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (row is null)
+            throw new KeyNotFoundException(
+                $"Community '{componentId}' has no translation in '{languageCode}'; nothing to remove.");
+
+        var via = ResolveCommunityTranslationStanding(actorId, actorRoles);
+        if (via is null)
+            throw new UnauthorizedAccessException(
+                "Only a translator (or an admin) may remove a translation of " +
+                "the community's name or description.");
+
+        var now = DateTimeOffset.UtcNow;
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "communitytranslation.remove",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via.Value,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Delete(row);
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public bool CanTranslateCommunity(string actorId, IReadOnlySet<string> actorRoles)
+        => ResolveCommunityTranslationStanding(actorId, actorRoles) is not null;
+
+    /// <summary>
+    /// The ADR 0026 community-translation standing resolver (shared by
+    /// <see cref="AddCommunityTranslationAsync"/> and <see
+    /// cref="CanTranslateCommunity"/>). Returns the <see cref="Authorization
+    /// .AccessVia"/> the actor qualifies under, or <c>null</c> to deny. A
+    /// community has **no owner** (no <see cref="Authorization.AccessVia
+    /// .Owner"/> branch) — its name is a GlobalAdmin artifact (the
+    /// <c>/admin</c> create/update lane, <c>Via: Admin</c>) — so the admitted
+    /// standings are a <b>GlobalAdmin</b> or a <b>Translator</b> (both
+    /// <see cref="Authorization.AccessVia.Admin"/>). A component-moderator is
+    /// not (a moderator governs a community's *members*, ADR 0012, not its
+    /// name).
+    /// </summary>
+    private static Authorization.AccessVia? ResolveCommunityTranslationStanding(
+        string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            return Authorization.AccessVia.Admin;
+        if (actorRoles.Contains(Identity.Roles.Translator))
+            return Authorization.AccessVia.Admin;
+        return null;
+    }
+
+    /// <inheritdoc />
+    public async Task AddCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+
+        // GU (ADR 0028): the guardian base is the narrowest and **bypasses** the
+        // community standing gate — a guardian holds neither GlobalAdmin nor a
+        // moderator scope by definition, so it must resolve before the gate is
+        // called. An active link over <paramref name="userId"/> (the child)
+        // records <c>Via: Guardian</c>; otherwise the existing gate applies.
+        var via = await GateGuardianStandingAsync(actorId, userId)
+            ?? GateCommunityStanding(componentId, actorId, actorRoles);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // The component must exist (a membership on a missing component is a data
+        // bug, not a no-op — the frozen admin lane's shape, kept).
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // Same idempotent business-key upsert as SetCommunityMembershipAsync
+        // (the M1DocTypes unique index enforces one row per pair). A row on a
+        // mandatory community is a harmless no-op — the union read already
+        // includes the resident (kept so the forms round-trip with one lane).
+        var existing = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            existing = new ComponentMembership
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ComponentId = componentId,
+                UserId = userId,
+                AddedBy = actorId,
+                At = now
+            };
+        }
+        else
+        {
+            // Refresh the idempotency metadata on a re-add (no new row).
+            existing.AddedBy = actorId;
+            existing.At = now;
+        }
+
+        session.Store(existing);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.add-member",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ArgumentException("User id is required.", nameof(userId));
+
+        // GU (ADR 0028): the guardian base is the narrowest and **bypasses** the
+        // community standing gate — a guardian holds neither GlobalAdmin nor a
+        // moderator scope by definition, so it must resolve before the gate is
+        // called. An active link over <paramref name="userId"/> (the child)
+        // records <c>Via: Guardian</c>; otherwise the existing gate applies.
+        // The mandatory-community refusal below still fires after the <c>via</c>
+        // resolution (unchanged order — the branch adds a path, never removes one).
+        var via = await GateGuardianStandingAsync(actorId, userId)
+            ?? GateCommunityStanding(componentId, actorId, actorRoles);
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var component = await session.LoadAsync<Component>(componentId).ConfigureAwait(false);
+        if (component is null)
+            throw new InvalidOperationException($"Community not found: {componentId}");
+
+        // ADR 0012's invariant: no one is a non-member of a mandatory
+        // community. The union read (GetCommunityIdsAsync) would include
+        // <paramref name="userId"/> no matter which row we deleted, so a
+        // removal here is a refusal — not a no-op (the Clear lane skips
+        // because the /admin diff form may legitimately reach that pair;
+        // this lane is where the product message surfaces).
+        if (component.Mandatory)
+            throw new InvalidOperationException(
+                $"Community \"{component.Name}\" is mandatory — residency in it is implicit and cannot be removed. Mark it optional first.");
+
+        // Delete (if any) — strong consistency (invariant C4): the union read
+        // drops the pair on the very next call; an absent row is a no-op
+        // (the admin-set-form shape, consistent with the frozen lane).
+        var membership = await session.Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId && m.UserId == userId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (membership is not null)
+            session.Delete(membership);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "community.remove-member",
+            TargetKind = "component",
+            TargetId = componentId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ComponentMembership>> GetCommunityMembersAsync(string componentId)
+    {
+        if (string.IsNullOrWhiteSpace(componentId))
+            throw new ArgumentException("Component id is required.", nameof(componentId));
+
+        // Live-row read (invariant C4), the GetGroupMembersAsync analog on
+        // the component axis: the explicit membership rows of one Component,
+        // as an access decision. No audit row (a read, not a decision).
+        await using var session = store.QuerySession();
+        return await session
+            .Query<ComponentMembership>()
+            .Where(m => m.ComponentId == componentId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The ADR 0012 standing gate for the community-management lanes: the
+    /// caller's current role set (their <c>actorRoles</c> argument — never a
+    /// re-derivation from the database; Core decides from the standing the
+    /// principal mints) must carry <see cref="Identity.Roles.GlobalAdmin"/>
+    /// ∪ the community's <see cref="Identity.Roles
+    /// .ModeratorComponent(string)"/> scope claim —
+    /// <see cref="UnauthorizedAccessException"/> otherwise (fail-closed: a
+    /// null/empty set holds neither). Also resolves the <b>recorded</b>
+    /// standing: the narrower scope wins — a claim-holder acting
+    /// through their community scope records via <c>Moderator</c> (M3B's
+    /// "Via: Moderator when scoped" shape), a pure GlobalAdmin via <c>Admin</c>.
+    /// </summary>
+    private static Authorization.AccessVia GateCommunityStanding(
+        string componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var isGlobalAdmin = actorRoles is not null
+            && actorRoles.Contains(Identity.Roles.GlobalAdmin);
+        var isComponentModerator = actorRoles is not null
+            && actorRoles.Contains(Identity.Roles.ModeratorComponent(componentId));
+
+        if (!isGlobalAdmin && !isComponentModerator)
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} does not hold GlobalAdmin or the moderator scope for community {componentId}.");
+
+        return isComponentModerator
+            ? Authorization.AccessVia.Moderator
+            : Authorization.AccessVia.Admin;
+    }
+
+    /// <summary>
+    /// The GU (ADR 0028) standing basis for the membership-curation lanes:
+    /// the actor holds an <b>active</b> <see cref="GuardianLink"/> with
+    /// <c>GuardianId == actor</c> and <c>ChildId == child</c> — i.e. the
+    /// actor is curating their own child's membership. Returns
+    /// <see cref="Authorization.AccessVia.Guardian"/> when that holds, else
+    /// <c>null</c> (the lane's existing base — Owner / Moderator / Admin —
+    /// then applies). Narrower-standing record (G·3): a guardian acting for
+    /// their child records <c>Guardian</c>, not a broader role they also hold.
+    /// Read-only — no session mutation.
+    /// </summary>
+    private async Task<Authorization.AccessVia?> GateGuardianStandingAsync(
+        string actorId, string childId)
+    {
+        if (string.IsNullOrEmpty(actorId) || string.IsNullOrEmpty(childId))
+            return null;
+
+        await using var session = store.QuerySession();
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == actorId && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        return link is not null ? Authorization.AccessVia.Guardian : null;
+    }
+
+    /// <summary>
+    /// The stricter ADR 0012 gate on <b>set-mandatory only</b> (the flag is
+    /// a standing-wide decision the product puts in the admin's hands): the
+    /// caller's role set must carry <see cref="Identity.Roles.GlobalAdmin"/> —
+    /// <see cref="UnauthorizedAccessException"/> otherwise, including for a
+    /// community moderator's scope claim alone.
+    /// </summary>
+    private static void GateCommunityGlobalAdmin(string componentId, string actorId, IReadOnlySet<string> actorRoles)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        if (actorRoles is null || !actorRoles.Contains(Identity.Roles.GlobalAdmin))
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} does not hold GlobalAdmin (required to change the mandatory state of community {componentId}).");
     }
 
     /// <summary>
@@ -1283,5 +2233,306 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
 
         var suffix = Guid.NewGuid().ToString("N")[..4];
         return $"{sb.ToString()}-{suffix}";
+    }
+
+    // ── GU guardian lanes (ADR 0028) — additive, beside the membership lanes ──
+    // Account-scope supervision of a child's account. Standing is the 9th
+    // <c>AccessVia.Guardian</c> value, resolved **live** off the active
+    // <see cref="GuardianLink"/> row (G·2) and **deny-by-default** (G·3). These
+    // are management lanes — **never** on a CanAsync / CanSeeAsync content
+    // decision path (G·1, the load-bearing honesty). Exception vocabulary:
+    // <c>UnauthorizedAccessException</c> = the actor has no standing (no active
+    // link, or not the GuardianId); <c>InvalidOperationException</c> = a row is
+    // missing or in a bad state.
+
+    /// <inheritdoc />
+    public async Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // G·4 idempotent formation: a duplicate (GuardianId, ChildId) Active row
+        // is a no-op — the row is left as-is and returned (not a throw).
+        var existing = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            // No mutation, no audit (a no-op is a no-op — the contract, not an
+            // error). Return the existing row as-is.
+            return existing;
+        }
+
+        var link = new GuardianLink
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GuardianId = guardianId,
+            ChildId = childId,
+            Status = GuardianLinkStatus.Active,
+            CreatedAt = now
+        };
+        session.Store(link);
+
+        // Formation audit: the guardian's own standing (all three identities the
+        // guardian; the target is the guardian-link row itself, keyed to the
+        // child). One SaveChangesAsync (invariant C3).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.create",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
+    public async Task<GuardianLink> AssignGuardianLinkAsync(
+        string childId, string guardianId, string assignedById)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+        if (string.IsNullOrWhiteSpace(assignedById))
+            throw new ArgumentException("Assigning guardian id is required.", nameof(assignedById));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // S·6 — idempotent formation: a duplicate (GuardianId, ChildId) Active row
+        // is a no-op — the row is left as-is and returned (not a throw), no
+        // second pair of audit rows (the G-A·4 precedent, inherited).
+        var existing = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            // No mutation, no audit (a no-op is a no-op — the contract, not an
+            // error). Return the existing row as-is.
+            return existing;
+        }
+
+        var link = new GuardianLink
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            GuardianId = guardianId,
+            ChildId = childId,
+            Status = GuardianLinkStatus.Active,
+            CreatedAt = now
+        };
+        session.Store(link);
+
+        // S·5 — the two complementary audit rows, written in the SAME session
+        // (S·1 — one SaveChangesAsync, no partial write):
+        //
+        // (1) guardian.create — the GU seam's shape, byte-identical to what
+        //     CreateGuardianLinkAsync writes (S·2): ActorId = the ASSIGNED
+        //     guardian (the standing-holder).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.create",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        // (2) guardian.assign — the GA-AR conferral verb: ActorId = the
+        //     ASSIGNING guardian (the conferrer, S·5).
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = assignedById,
+            EffectivePrincipalId = assignedById,
+            Action = "guardian.assign",
+            TargetKind = "guardian-link",
+            TargetId = link.Id,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return link;
+    }
+
+    /// <inheritdoc />
+    public async Task SuspendChildAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        // Load the child's profile (missing → bad state, not a no-op).
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Set the SAME flag BlockedAccountMiddleware + the directory already read
+        // (enforcement parity — the U01 pin).
+        profile.Blocked = true;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.suspend",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task UnsuspendChildAsync(string childId, string guardianId)
+    {
+        if (string.IsNullOrWhiteSpace(childId))
+            throw new ArgumentException("Child id is required.", nameof(childId));
+        if (string.IsNullOrWhiteSpace(guardianId))
+            throw new ArgumentException("Guardian id is required.", nameof(guardianId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        // Standing gate first (G·2/G·3): an ACTIVE link for this exact pair.
+        await GuardActiveLinkAsync(session, guardianId, childId).ConfigureAwait(false);
+
+        var profile = await session.Query<Profile>()
+            .Where(p => p.SubjectId == childId)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+        if (profile is null)
+            throw new InvalidOperationException($"No profile for child {childId}.");
+
+        // Restore standing — live on the next read (G·2).
+        profile.Blocked = false;
+        session.Store(profile);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = guardianId,
+            EffectivePrincipalId = guardianId,
+            Action = "guardian.unsuspend",
+            TargetKind = "profile",
+            TargetId = childId,
+            Via = Authorization.AccessVia.Guardian,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin)
+    {
+        if (string.IsNullOrWhiteSpace(linkId))
+            throw new ArgumentException("Link id is required.", nameof(linkId));
+        if (string.IsNullOrWhiteSpace(actorId))
+            throw new ArgumentException("Actor id is required.", nameof(actorId));
+
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var link = await session.LoadAsync<GuardianLink>(linkId).ConfigureAwait(false);
+        if (link is null)
+            throw new InvalidOperationException($"No guardian link: {linkId}");
+
+        // G·4: on the guardian's own lane the actor must BE the GuardianId
+        // (deny-by-default). The G·5 safety valve (viaAdmin) skips the check.
+        if (!viaAdmin && link.GuardianId != actorId)
+            throw new UnauthorizedAccessException(
+                $"Account {actorId} is not the guardian on link {linkId}.");
+
+        link.Status = GuardianLinkStatus.Dissolved;
+        link.DissolvedAt = now;
+        link.DissolvedBy = actorId;
+        session.Store(link);
+
+        // A dissolve writes NOTHING to membership and does NOT set
+        // Profile.Blocked — the self-lanes restore on the next read (G·2/C4);
+        // un-suspend is a separate act (the G·5 valve or UnsuspendChildAsync).
+        var via = viaAdmin ? Authorization.AccessVia.Admin : Authorization.AccessVia.Guardian;
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = actorId,
+            EffectivePrincipalId = actorId,
+            Action = "guardian.dissolve",
+            TargetKind = "guardian-link",
+            TargetId = linkId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The GU standing gate (G·2 live / G·3 deny-by-default): an <b>active</b>
+    /// <see cref="GuardianLink"/> with <see cref="GuardianLink.GuardianId"/>
+    /// equal to <paramref name="guardianId"/> and <see cref="GuardianLink
+    /// .ChildId"/> equal to <paramref name="childId"/> must exist — else
+    /// <see cref="UnauthorizedAccessException"/> (the Web's 404). The row is
+    /// resolved **live** off <see cref="GuardianLinkStatus"/> (the service is
+    /// the resolver — the POCO carries state, not an <c>IsActive</c> boolean).
+    /// </summary>
+    private static async Task GuardActiveLinkAsync(
+        IDocumentSession session, string guardianId, string childId)
+    {
+        var link = await session.Query<GuardianLink>()
+            .Where(l => l.GuardianId == guardianId && l.ChildId == childId
+                        && l.Status == GuardianLinkStatus.Active)
+            .FirstOrDefaultAsync()
+            .ConfigureAwait(false);
+
+        if (link is null)
+            throw new UnauthorizedAccessException(
+                $"No active guardian link for ({guardianId}, {childId}).");
     }
 }

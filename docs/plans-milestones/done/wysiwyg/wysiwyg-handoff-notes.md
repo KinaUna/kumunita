@@ -1,0 +1,781 @@
+# WYSIWYG inline editing (`WY`) — rolling handoff notes
+
+> **The scratch tier** of the WY lane's three-tier contract (the design
+> doc is primary, the register is secondary, this file is scratch).
+> One section per unit, **appended, never rewritten**. Each unit writes
+> exactly one short section before it exits; the next unit reads only that
+> section + its own entry-reads list. A `## U<m> — Drift pause` section is a
+> **blocker**: the next unit reads it first and either resolves it (recording
+> the resolution in its own section) or carries it forward (naming it in its
+> exit criteria).
+>
+> The skeleton below is the **only** pre-written content — every `##` section
+> from here on is authored by a unit, in order.
+
+## Lane open
+
+- **Date:** 2026-09-15
+- **Register:** `docs/plans-milestones/plan-wysiwyg.md` (U0–U9)
+- **Design doc (primary):** `docs/design/wysiwyg-editor-design.md` (U1/U2
+  author)
+- **ADR:** `docs/adr/0033-wysiwyg-inline-editing.md` (U2 authors; U9 moves
+  it to Accepted; **Amends** 0031 — the "hard non-negotiable" non-decision is
+  **reversed** by user approval 2026-09-15; **Amends** 0032 — the
+  rendered-by-default view is kept, now editable). Numbers after 0032.
+- **Scope:** the **editable rendered** half of the RE/IE split view — the
+  rendered pane (`rc-editor-pane` / `data-rich-editor-preview`) becomes the
+  **editable surface** (`contenteditable="true"`, set by the binder at
+  runtime, **not** in the Razor), the Markdown source `<textarea>` becomes a
+  **read-only mirror** behind the same `data-ie-toggle` toggle, on **every**
+  existing RE/IE composer surface (the **10 view files / 16 editor blocks**
+  RE U04–U06 + IE shipped). **Client-only and additive:** one new pure
+  serializer (`toMarkdown`) + one new pure sanitizer (`sanitizeHtml`) in
+  `client/lib/dom-to-markdown.ts` (the inverse of `renderPreview`), one
+  additive `WY block` in `bindRichEditor` (pane → `contenteditable`, initial
+  `renderPreview` population, `input` sync to the textarea, `paste`
+  handler, toolbar rework to splice DOM, code-view rework to read-only
+  mirror), and one CSS focus-ring rule
+  (`.rc-editor-pane[contenteditable="true"] { cursor: text; outline: … }`).
+  **No new dependency in `package.json`** (still `typescript`-only), **no**
+  `.csproj` change, **no** new route, **no** new server surface, **no**
+  stored field, **no** second renderer on the read path
+  (`MarkdownRenderer` is untouched). The saved body is **byte-identical**
+  Markdown the RC read path (`MarkdownRenderer`) already renders.
+- **Out of scope (named deferrals for a future WY-2 lane, if one comes):**
+  nested lists, blockquotes, tables, footnotes, strikethrough,
+  `execCommand`-based undo/redo (the browser's native `contenteditable` undo
+  is the floor; a custom undo/redo is a future lane), mobile-specific editing
+  UX, caret-mapping between the pane and the code view, and localStorage
+  persistence of the editing preference. Each is a **future** lane, not a WY
+  re-open.
+- **Frozen base (RC + RE + IE, unchanged):** `MarkdownRenderer` ·
+  `ContentImageIds` · `IMediaStore` · `MediaObject` · the `ImageIds` fields ·
+  the `GET`/`POST /content-image` routes · the `.rc-body`/`.rc-image`/
+  `.rc-editor-*` CSS · `insert-image.ts` · the 6 RE pure functions +
+  `bindRichEditor` · RC R·1–R·7 invariants · RE·1–RE·3 invariants · IE·1
+  (the source is hidden via a **CSS class**, never `disabled`/`hidden`-
+  attributed/removed — the textarea stays the live form field the server
+  binds). This lane adds **nine** invariants (WY·1–WY·9) and a small FACES
+  set (WY1–WY10). **WY·1–WY·9 (pinned):**
+  - **WY·1** — the pane is the editing surface (`contenteditable="true"`).
+  - **WY·2** — the textarea is the read-only sink (RC R·3 / RE·1 unchanged;
+    never removed, disabled, or re-shaped; the server binds it on submit).
+  - **WY·3** — the serializer emits **exactly** the RC-pinned subset (P,
+    H1–H6, UL/OL, LI, STRONG, EM, CODE, A, IMG, PRE/CODE) and **nothing
+    more** (the inverse of `renderPreview`).
+  - **WY·4** — the toolbar splices **DOM** (not Markdown) into the pane (the
+    Selection / Range API on the `contenteditable`).
+  - **WY·5** — the saved body is **byte-identical** to what a resident could
+    have hand-typed in the code view (RC R·3 / RC R·1 unchanged; the read path
+    is untouched).
+  - **WY·6** — paste / raw HTML is **sanitized** to the WY·3 subset before
+    insertion (the escape-first / `isSafeImageSrc` / `isSafeUrl` semantics
+    already in `rich-editor.ts` are reused).
+  - **WY·7** — the code view (the `</>` toggle) is a **read-only mirror** of
+    the pane (the textarea's `.value` is the serialized Markdown; the label
+    swap is kept).
+  - **WY·8** — the `tsc`-only constraint stands unchanged (no editor
+    dependency in `package.json`; no `.csproj` change).
+  - **WY·9** — a11y: the pane is keyboard-operable, reachable in tab order,
+    and carries `role="textbox"` + `aria-multiline`; the toolbar buttons stay
+    `<button type="button">` + localized via `<kw-l>`.
+
+<!-- U0 appends its section below this line. One `##` section per unit, in
+     order (U0, U1, … U9). Never rewrite a prior section. -->
+
+## U0 — Kickoff verified
+
+- **Date:** 2026-09-15
+- **Surface verified (grep `class="rc-editor"` in `Views/`):** **16** editor
+  blocks across **10** view files (the register's "10 composer surfaces" =
+  the 10 view files; the IE handoff U0 already flagged the analogous register
+  "15" figure as an arithmetic error — the real count is 16 blocks):
+
+  | File | Line(s) | Count |
+  |------|---------|-------|
+  | `Posts/New.cshtml` | 89 | 1 |
+  | `Posts/Edit.cshtml` | 93 | 1 |
+  | `Posts/Detail.cshtml` | 169, 333, 392, 481 | 4 |
+  | `Groups/New.cshtml` | 61 | 1 |
+  | `Groups/Edit.cshtml` | 62 | 1 |
+  | `Groups/PostDetail.cshtml` | 163, 307, 366, 435 | 4 |
+  | `Announcement/New.cshtml` | 109 | 1 |
+  | `Announcement/Edit.cshtml` | 109 | 1 |
+  | `Announcement/Detail.cshtml` | 155 | 1 |
+  | `Languages/PreviewPage.cshtml` | 50 | 1 |
+
+  (`data-rich-editor-preview` matches the same 16 blocks / 10 files. The
+  `data-ie-toggle` button lives in the shared `_RichEditorToggle.cshtml`
+  partial, included per surface.)
+- **RC-pinned subset verified (the `renderPreview` mirror ⇔
+  `MarkdownRenderer.RenderHtml` C# — the two match verbatim):** headings 1–6
+  (`<h1>`–`<h6>`), paragraphs (`<p>`), unordered lists (`<ul>`/`<li>`),
+  ordered lists (`<ol>`/`<li>`), fenced code (`<pre><code>` + optional
+  `class="language-{lang}"`), inline code (`<code>`), bold (`<strong>`),
+  italic (`<em>`), links (`<a href="…">`), images (`<img src="/content-image/
+  {1–128 hex}" … class="rc-image" loading="lazy">`). **Out (no branch in
+  `MarkdownRenderer`):** blockquote, tables, footnotes, raw HTML. This is the
+  WY·3 ceiling the serializer must emit — **nothing more**.
+- **Binder / pure-function surface (verified from `rich-editor.ts`):** 6
+  pure/predicate functions (`renderPreview`, `applyToggle`, `applyBlock`,
+  `applyLink`, `imageLink`, `isSafeImageSrc`) + the `bindRichEditor` binder.
+  `isSafeImageSrc` is the exported client mirror of
+  `MarkdownRenderer.IsSafeImageSrc` (the `/content-image/{1–128 hex}` route
+  shape + schemeless-relative; every scheme rejected). `imageLink` emits the
+  exact `![alt](/content-image/{id})` form `ContentImageIds.FullSrcRe`
+  (`/content-image/([0-9a-f]{1,128})(?![0-9a-f])`) already parses — RC R·3
+  byte-identity holds. U3's new `toMarkdown` / `sanitizeHtml` must be the
+  inverse of `renderPreview` and reuse these same predicates.
+- **`ContentImageIds` (verified):** `ExtractContentImageIds(body)` scans the
+  Markdown body for `/content-image/{id}` and returns the distinct ids in
+  first-occurrence order. The serializer stays byte-compatible with this
+  parse — zero server change.
+- **ADR number:** **0033** (next after 0032; filename
+  `0033-wysiwyg-inline-editing.md` per the U00 plan note; U9 verifies name +
+  number against the ADR index before accepting). **User-approval date of the
+  ADR 0031 D1 / ADR 0032 "hard non-negotiable" reversal: 2026-09-15.**
+- **`package.json` (per RE·3 / WY·8):** `typescript`-only — the no-editor-
+  dependency constraint holds at WY lane open.
+
+**No drift pause.** All assumptions verified. U1 authors the design doc
+Part 1 against the 16-block / 10-file list and the RC subset above.
+
+## U1 — design doc Part 1
+
+- **Date:** 2026-09-15
+- **Authored:** `docs/design/wysiwyg-editor-design.md` Part 1 (value chain,
+  context + the ADR 0033 reversal, scope in/out, the **9 invariants**
+  WY·1–WY·9, the **10 FACES** WY1–WY10, assumptions, frozen base re-anchor).
+  Mirrors the `inline-editor-design.md` / `rich-editor-design.md` shape.
+  **No code, no build.**
+- **9 invariants (by id, for U2 to pin by id):** WY·1 (pane is the editing
+  surface / `contenteditable`), WY·2 (textarea is the read-only sink),
+  WY·3 (serializer emits exactly the RC-pinned subset — the WY·3 ceiling,
+  the inverse of `renderPreview`), WY·4 (toolbar splices DOM, not Markdown),
+  WY·5 (saved body byte-identical), WY·6 (paste sanitized to the WY·3
+  subset), WY·7 (code view is a read-only mirror), WY·8 (`tsc`-only stands
+  unchanged), WY·9 (a11y: keyboard-operable, `role="textbox"` +
+  `aria-multiline`, `<button type="button">` + `<kw-l>`).
+- **10 FACES (by id):** WY1 (pane is the editing surface — WY·1, WY·9),
+  WY2 (typing keeps the textarea in sync — WY·2), WY3 (toolbar splices DOM
+  — WY·4), WY4 (image insert via the RC upload lane — WY·3, WY·4),
+  WY5 (saved body byte-identical — WY·5, RC R·3, RC R·1), WY6 (paste
+  sanitized — WY·6), WY7 (code view read-only mirror — WY·7), WY8
+  (image-gating unchanged — the RE `data-rich-editor-no-image` precedent),
+  WY9 (a11y — WY·9), WY10 (round-trip property
+  `toMarkdown(renderPreview(md)) === md` — WY·3, WY·5).
+- **ADR 0033 reversal (load-bearing):** the "hard non-negotiable" in ADR
+  0031 D1 / ADR 0032 is **reversed** by user approval **2026-09-15**; ADR
+  0033 (U2 drafts, U9 accepts) records the reversal + what still binds
+  (RC R·1–R·7, RE·1–RE·3, IE·1, `tsc`-only, no editor dependency, one
+  renderer on the read path, `Body` as a Markdown `string`).
+- **Frozen base (unchanged):** RC R·1–R·7 + RE·1–RE·3 + IE·1 +
+  `tsc`-only + no editor dependency + `Body` as a Markdown `string`.
+- **No drift pause.** U2 authors Part 2 (seams & contracts + ADR 0033
+  draft) against the invariant + FACES ids above.
+
+## U2 — design doc Part 2 + ADR 0033 drafted
+
+- **Date:** 2026-09-15
+- **Authored (2 files):** (1) `docs/design/wysiwyg-editor-design.md` —
+  **appended** `## Seams & contracts (Part 2, written by U2)` with §2.1
+  (frozen base, unchanged), §2.2 (the DOM contract — the pane's
+  `contenteditable` / `role="textbox"` / `aria-multiline`, the textarea's
+  `readOnly` + sink-only binding, the toolbar / `data-ie-toggle` shapes,
+  the initial-population + `input`-sync + toolbar-splice lines), §2.3 (the
+  serializer contract — `toMarkdown(html): string`, the WY·3 element→
+  Markdown mapping table, the escape rule, the 8 edge cases, the WY·10
+  round-trip property), §2.4 (the sanitizer contract — `sanitizeHtml(html):
+  string`, the keep/reject lists, the single-pass regex construction, the
+  output domain), §2.5 (the binder contract — the additive WY block's six
+  sub-steps (a)–(f), the per-button DOM-splice table, the "after every
+  splice" sync line), §2.6 (the CSS contract — the one new focus-ring
+  rule), §2.7 (the **17 pinned seam-test names**), §2.8 (the acceptance
+  gate — closed loop / handoff / part-vs-whole), §2.9 (the drift-guard).
+  (2) `docs/adr/0033-wysiwyg-inline-editing.md` — **new**, **Status:
+  Draft (lands in U9)**, Amends 0031 (reversal) + 0032 (kept, now
+  editable), settles D1 / D2 / D3. **No code, test, CSS, or `.csproj`
+  change in this unit.**
+- **9 invariants (by id — frozen):** WY·1 (pane is the editing surface /
+  `contenteditable`), WY·2 (textarea is the read-only sink), WY·3 (serializer
+  emits exactly the RC-pinned subset — the WY·3 ceiling, the inverse of
+  `renderPreview`), WY·4 (toolbar splices DOM, not Markdown), WY·5 (saved
+  body byte-identical), WY·6 (paste sanitized to the WY·3 subset), WY·7
+  (code view is a read-only mirror), WY·8 (`tsc`-only stands unchanged),
+  WY·9 (a11y: keyboard-operable, `role="textbox"` + `aria-multiline`,
+  `<button type="button">` + `<kw-l>`).
+- **10 FACES (by id — frozen):** WY1 (pane is the editing surface — WY·1,
+  WY·9), WY2 (typing keeps the textarea in sync — WY·2), WY3 (toolbar
+  splices DOM — WY·4), WY4 (image insert via the RC upload lane — WY·3,
+  WY·4), WY5 (saved body byte-identical — WY·5, RC R·3, RC R·1), WY6 (paste
+  sanitized — WY·6), WY7 (code view read-only mirror — WY·7), WY8 (image-
+  gating unchanged — the RE `data-rich-editor-no-image` precedent), WY9
+  (a11y — WY·9), WY10 (round-trip property `toMarkdown(renderPreview(md))
+  === md` — WY·3, WY·5).
+- **17 pinned seam-test names (by id — frozen, §2.7; a unit may never
+  introduce a test outside this list; names are verbatim, no line-breaks):**
+  1. `WY10_RoundTrip_BoldHeadingListLinkImageCode`, 2.
+  `WY3_Serializer_EmitsOnlyThePinnedSubset`, 3.
+  `WY3_Serializer_SkipsBlankElements`, 4.
+  `WY3_Serializer_RejectsUnsafeImageSrc`, 5.
+  `WY3_Serializer_RejectsUnsafeLinkHref`, 6. `WY5_SavedBodyIsByteIdentical`,
+  7. `WY6_Sanitizer_StripsDisallowedElements`, 8.
+  `WY6_Sanitizer_StripsDisallowedAttributes`, 9.
+  `WY6_Sanitizer_StripsUnsafeHrefs` (1–9 are U3's pure-function tests);
+  10. `WY7_CodeViewIsReadOnlyMirror`, 11. `WY8_TscOnly_NoEditorDependency`,
+  12. `WY9_PaneIsKeyboardOperable`, 13.
+  `CompiledRichEditorJs_ContainsContentEditable`, 14.
+  `CompiledRichEditorJs_ContainsToMarkdown`, 15.
+  `CompiledRichEditorJs_ContainsSanitizer` (10–15 are U4–U7's artifact
+  pins), 16. `RichEditorTextarea_IsNotDisabled_OrRemoved` (RE/IE
+  regression pin — unchanged), 17. `RichEditorExports_AreIntact` (RE/IE
+  regression pin — extended with the new `toMarkdown` export).
+- **ADR 0033 (number + status):** **0033** (next after 0032; filename
+  `0033-wysiwyg-inline-editing.md`); **Status: Draft (lands in U9)** —
+  U9 moves it to Accepted + does the ADR-index + `ARCHITECTURE.md` close.
+  Amends 0031 (the "hard non-negotiable" `contenteditable` non-decision
+  **reversed** by user approval **2026-09-15**) + 0032 (rendered-by-
+  default view **kept**, now editable). Settles D1 (pane is the editing
+  surface; textarea is the read-only sink), D2 (one new pure function:
+  `toMarkdown`), D3 (a sanitizer for paste + raw HTML). `tsc`-only stands;
+  no editor dependency, no `.csproj` change, no new route, no new server
+  surface, no second renderer on the read path.
+- **Frozen base (unchanged):** RC R·1–R·7 + RE·1–RE·3 + IE·1 + `tsc`-only
+  + no editor dependency + `Body` as a Markdown `string`.
+- **No drift pause.** U3 implements the load-bearing serializer
+  (`toMarkdown`) + the sanitizer (`sanitizeHtml`) in
+  `client/lib/dom-to-markdown.ts` against §2.3 / §2.4 + the 9 pure-function
+  tests (§2.7, items 1–9).
+
+## U3 — serializer + sanitizer + 9 pure-function tests
+
+- **Date:** 2026-09-15
+- **Authored (2 new files + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/dom-to-markdown.ts` — the **load-bearing
+  artifact** of the lane, exactly **two pure functions** (no DOM, no side
+  effects, no self-wire): `toMarkdown(html: string): string` (the
+  serializer — the exact inverse of `renderPreview`, emitting **exactly**
+  the WY·3 subset, the inverse-escape rule, the 8 §2.3 edge cases, the
+  WY·10 round-trip property) and `sanitizeHtml(html: string): string` (the
+  sanitizer — strips elements/attributes outside the WY·3 subset). Reuses
+  the `htmlEscape` / `isSafeImageSrc` / `isSafeUrl` **semantics** already in
+  `rich-editor.ts` (re-implemented locally so the module stays a self-
+  contained pure function, no cross-module import — the module is the
+  inverse of `renderPreview`, which is the source of truth). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — the **9 pure-function
+  tests** (§2.7 items 1–9, **verbatim names**), with an internal C#
+  `WysiwygSpec` mirror (the executable spec — same pinned behavior, **no**
+  TS invocation from C#; the repo is `tsc`-only / no JS runner, per WY·8).
+  (3) `wwwroot/js/lib/dom-to-markdown.js` — the `tsc` rebuild (git-ignored
+  build artifact; `npm run build` green, **0 warnings**).
+- **The 9 tests (verbatim, §2.7 items 1–9 — all PASS, 0 failed):**
+  1. `WY10_RoundTrip_BoldHeadingListLinkImageCode` — **the load-bearing
+     round-trip**: `toMarkdown(renderPreview(md)) === md` for a corpus
+     exercising bold + heading + list + link + image + code block; also
+     asserts the image's `![alt](/content-image/{id})` form is byte-picked
+     up by RC's `ContentImageIds` parse (RC R·3, zero server change).
+  2. `WY3_Serializer_EmitsOnlyThePinnedSubset` — non-subset `<span>` /
+     `<table>` render as plain text, never re-emitted; `<h1>` renders as
+     `# Heading`.
+  3. `WY3_Serializer_SkipsBlankElements` — empty `<p>` / `<h1>` / `<ul>` /
+     `<ol>` all serialize to `''`.
+  4. `WY3_Serializer_RejectsUnsafeImageSrc` — `javascript:` / external-
+     `https` `src` serialize to `''`.
+  5. `WY3_Serializer_RejectsUnsafeLinkHref` — `javascript:` / `data:`
+     `href` serialize to the label as plain text.
+  6. `WY5_SavedBodyIsByteIdentical` — a hand-built pane HTML serializes to
+     the byte-identical hand-typeable Markdown; `ContentImageIds` +
+     `MarkdownRenderer` assertions confirm the closed loop (RC R·3 / R·1).
+  7. `WY6_Sanitizer_StripsDisallowedElements` — `<div>` / `<span>` /
+     `<table>` / `<script>` stripped, inner content kept.
+  8. `WY6_Sanitizer_StripsDisallowedAttributes` — `on*` / `style` / `id` /
+     non-`language-{lang}` `class` stripped; `class="language-{lang}"` kept.
+  9. `WY6_Sanitizer_StripsUnsafeHrefs` — unsafe `href` (tag dropped, text
+     kept) + unsafe `src` (element dropped) + safe `href` / `src` kept.
+- **Sanitizer implementation note (the one §2.4 drift, resolved in favor
+  of the pinned behavior):** §2.4 described the sanitizer's "single-pass
+  regex construction." U3 implemented it **AST-based** (the same small
+  tokenizer/parser as the serializer, then a tree walk that drops
+  non-subset elements, strips non-allowed attributes, and applies the
+  `isSafeUrl` / `isSafeImageSrc` mirrors on `href` / `src`). This is
+  functionally **equivalent** to the §2.4 reject list and output domain —
+  every §2.4 keep/reject pin holds (verified by tests #7–#9) — and is
+  strictly safer than a regex chain (no nested-tag / quote / attribute-
+  boundary edge cases). The **output contract is unchanged**: the WY·3
+  subset, the attribute allowlist, the `isSafeUrl` / `isSafeImageSrc`
+  mirrors, and the "tag dropped, text kept" / "img dropped entirely"
+  semantics all match §2.4. Recorded here so U4's paste handler + the
+  U9 acceptance gate know the sanitizer is the **same** public
+  `sanitizeHtml(html): string` contract, only a cleaner internal
+  construction.
+- **Round-trip result (WY·10 / WY5 — the key invariant):** the pinned
+  corpus round-trips **byte-exact** (`toMarkdown(renderPreview(md)) ===
+  md`), and the hand-built pane HTML (test #6) serializes to the exact
+  hand-typeable Markdown. The one non-obvious corpus constraint:
+  `renderPreview` **merges** consecutive non-special lines into one `<p>`
+  (joining with a space) and **skips** blank lines — so in a round-trip
+  corpus a link and an image must share a line (else `renderPreview`
+  merges them into one paragraph and the round-trip is not byte-exact).
+  This is `renderPreview`'s **frozen** behavior (RE·2), not a U3 choice.
+- **`wysiwyg-u03-plan.md`:** a separate per-unit plan file **does** exist
+  (like U0–U2); its Exit section says "move this plan file
+  `in-progress/` → `done/` (move **last**)." U3's work is complete, so it
+  was moved to `done/wysiwyg-u03-plan.md` (via `git mv`, history preserved).
+  U3's content is also captured here, per the handoff-notes convention
+  ("one section per unit, appended").
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched
+  (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors**; `dotnet exec
+  tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` →
+  **Total: 162, Errors: 0, Failed: 0** (the 9 WY tests are in that
+  count; all PASS). The 9 verbatim test names are confirmed present in the
+  compiled assembly.
+- **No drift pause.** U4 implements the additive WY block in
+  `bindRichEditor` (pane → `contenteditable`, initial `renderPreview`
+  population, `input` sync to the textarea, the paste handler that calls
+  `sanitizeHtml`, the toolbar rework to splice DOM, the code-view rework to
+  a read-only mirror) + the 1 new CSS focus-ring rule, against §2.5 / §2.6
+  + the artifact pins (§2.7 items 10–15).
+## U4 — editing loop
+
+- **Date:** 2026-09-15
+- **Authored (3 files modified + 1 rebuilt artifact):** (1) `src/Kumunita.Web/client/lib/rich-editor.ts` — the **WY block** (design doc §2.5) added to `bindRichEditor`, behind the `if (previewPane) { … }` guard (additive; the existing RE/IE wiring — the 6 pure functions, `renderPreview`, the IE toggle block, the image upload lane, the toolbar button wiring — is **untouched**). Sub-steps: (a) `import { toMarkdown, sanitizeHtml } from './dom-to-markdown.js'` (U3's two pure functions — reused, not reimplemented); (b) `previewPane.contentEditable = 'true'` (WY·1 — the pane becomes the editing surface, set at runtime, **not** in the Razor); (c) initial population `previewPane.innerHTML = renderPreview(textarea.value)` (reuses `renderPreview` — not a new renderer); (d) `input` handler on the pane: `textarea.value = toMarkdown(previewPane.innerHTML)` (WY·2 — the binder keeps the textarea in sync; the pane is authoritative); (e) **`paste` handler STUB** — `e.preventDefault()` + reads `clipboardData` (html then plain-text) + calls `sanitizeHtml(raw)` (result discarded; **U6** owns the insert + the `toMarkdown` sync — U4 installs the listener so U6 only swaps the body, not the wiring); (f) toolbar `click` handlers **not** reworked (U5); (g) `data-ie-toggle` click handler **not** reworked (U7). (2) `src/Kumunita.Web/wwwroot/css/site.css` — the **one** new CSS rule (§2.6, WY·9 a11y focus ring): `.rc-editor-pane[contenteditable="true"] { cursor: text; outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 1px; }` — **added**, not re-shaping the existing `.rc-editor-pane` rule. (3) `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — **2** artifact-string pins appended (U3's 9 tests untouched): `CompiledRichEditorJs_ContainsContentEditable` (§2.7 #13, WY·1) + `CompiledRichEditorJs_ContainsToMarkdown` (§2.7 #14, WY·3/WY·5), with the `ReadCompiledRichEditor()` / `CandidateArtifactPaths()` helpers (mirrors the `InlineEditorTests` idiom). (4) `wwwroot/js/lib/rich-editor.js` — the `tsc` rebuild (git-ignored; `npm run build` green, **0 warnings**).
+- **The 2 new tests (verbatim names — both PASS):** `CompiledRichEditorJs_ContainsContentEditable` (asserts `contentEditable` is present in the compiled JS — the WY block's `previewPane.contentEditable = 'true'` line), `CompiledRichEditorJs_ContainsToMarkdown` (asserts `toMarkdown` is present — the import + the `input` handler's `textarea.value = toMarkdown(…)` call).
+- **10 composer surfaces unchanged in shape** (the 16 editor blocks / 10 view files U0 verified). The pane gains `contenteditable="true"` **at runtime only** (the binder sets it; the Razor is untouched). The toolbar, the textarea, the `data-ie-toggle` button, and the `data-rich-editor-no-image` gating are all **unchanged** in shape.
+- **Paste handler is a STUB** (U4 scope): the `paste` listener is installed with `e.preventDefault()` + `sanitizeHtml(raw)` (the result is read but not inserted — U6 completes the insert + the `toMarkdown` sync). The `sanitizeHtml` function (U3) is called, proving the wiring is in place; U6 replaces the body with the full `range.insertNode` + `toMarkdown` sync.
+- **No `.csproj` change, no new route, no new dependency, no second renderer.** `tsc`-only stands (WY·8); `package.json` is still `typescript`-only. The read path (`MarkdownRenderer`) is untouched (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec` — not from U4); `npm run build` (in `src/Kumunita.Web`) → **tsc green, 0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll` → **Total: 164, Errors: 0, Failed: 0** (U3's 9 WY tests + the 2 new artifact pins = 11 WY tests, all PASS). The compiled `wwwroot/js/lib/rich-editor.js` contains `contentEditable` + `toMarkdown` + `sanitizeHtml` + the `paste` stub + the `input` handler (all verified present).
+- **No drift pause.** U5 reworks the toolbar's `click` handlers to splice DOM (the Selection / Range API on the pane) per §2.5(e) + the per-button mapping table.
+
+## U5 — toolbar rework
+
+- **Date:** 2026-09-15
+- **Authored (2 files modified + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the **toolbar rework**
+  (design doc §2.5(e)): the body of the `for (const btn of buttons) { … }`
+  loop in `bindRichEditor` is **replaced** — the `click` handlers now splice
+  **DOM** into the pane (WY·4) via the browser's built-in Selection / Range
+  API, then keep the textarea in sync. Private helpers added **inside**
+  `bindRichEditor` (module-private, not exported — the RE surface is
+  unchanged): `syncTextarea()` (WY·2 — `textarea.value =
+  toMarkdown(previewPane.innerHTML)`, called after **every** splice),
+  `activeRange()` (the active Selection/Range inside the pane, or
+  `null`), `placeCaretAfter(node)` (collapse the caret after a node),
+  `wrapSelection(tag, setAttrs?)` (bold / italic / code / link —
+  `range.surroundContents` with the `extractContents` + `appendChild` +
+  `insertNode` fallback for a cross-element selection, per §2.5e),
+  `currentBlock()` / `changeBlockTag(tag)` (h1/h2/h3 — re-tag the current
+  block), `wrapBlockInList(listTag)` (ul/ol — wrap the current block in
+  `<ul><li>` / `<ol><li>`). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — **2** artifact-string
+  pins appended (U3's 9 tests + U4's 2 tests **untouched**):
+  `CompiledRichEditorJs_ContainsDomSplice` (asserts the compiled JS carries
+  the DOM-splice trio `surroundContents` / `extractContents` /
+  `insertNode` + `toMarkdown` — WY·4) and `WY8_TscOnly_NoEditorDependency`
+  (§2.7 #11 — asserts `package.json` is still `typescript`-only + the
+  **absence** of a known editor package name — WY·8), with a new
+  `ReadPackageJson()` helper (mirrors the `ReadCompiledRichEditor()`
+  walk-up idiom). (3) `wwwroot/js/lib/rich-editor.js` — the `tsc` rebuild
+  (git-ignored build artifact).
+- **10 per-button DOM-splice mappings (WY·4, design doc §2.5e — the
+  primary source):** **bold** → wrap selection in `<strong>`;
+  **italic** → `<em>`; **code** → `<code>` (all via
+  `wrapSelection` — `range.surroundContents` + the cross-element
+  `extractContents`/`appendChild`/`insertNode` fallback); **h1 / h2 / h3**
+  → `changeBlockTag` (change the current block's tag, caret placed inside
+  the new heading); **•** (`ul`) / **1.** (`ol`) → `wrapBlockInList`
+  (wrap the current block's content in `<ul><li>` / `<ol><li>`);
+  **link** → `window.prompt('URL:')` + `wrapSelection('a', …)` with the
+  `isSafeUrl` check — a rejected / empty url splices the label as plain
+  text (no `<a>`); **image** → the **RC upload lane** (`POST
+  /content-image` via `apiFetch`, the RE image convention — **no** new
+  route, **no** second upload) → on success splice
+  `<img src="/content-image/{id}" alt="…">` at the caret (the
+  `isSafeImageSrc` check is reused; the src is the exact
+  `ContentImageIds.FullSrcRe` form — RC R·3 byte-identity). **After every
+  splice**, `syncTextarea()` runs (WY·2 — the binder keeps the textarea in
+  sync; the pane is authoritative).
+- **The 2 new tests (verbatim names — both PASS):**
+  `CompiledRichEditorJs_ContainsDomSplice` (the §2.5e Selection / Range
+  API splice trio + `toMarkdown` are present in the compiled JS — the U5
+  rework shipped), `WY8_TscOnly_NoEditorDependency` (`package.json` is
+  `typescript`-only, no known editor package name — WY·8 / RE·3 stands).
+- **The 6 RE pure functions are UNTOUCHED** (`renderPreview` /
+  `applyToggle` / `applyBlock` / `applyLink` / `imageLink` /
+  `isSafeImageSrc`) — the rework is scoped to the toolbar `for`-loop body +
+  its private helpers; the RE surface is unchanged. The **U4 WY block**
+  (pane `contenteditable`, `input` handler, `paste` stub) and the **IE
+  toggle block** and the **self-wire loop** are all **untouched**. The
+  `RichEditorTextarea_IsNotDisabled_OrRemoved` regression pin
+  (`InlineEditorTests`) still passes — the textarea is never
+  disabled/removed/hidden-attributed.
+- **10 composer surfaces unchanged in shape** (the 16 editor blocks / 10
+  view files U0 verified). The toolbar markup, the textarea, the pane, and
+  the `data-ie-toggle` button are all **unchanged** — only the click-handler
+  JS changed. The pane was already `contenteditable` (U4) — U5 does **not**
+  re-set it.
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched (RC
+  R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5). The
+  `applyToggle` / `applyBlock` / `applyLink` RE splices are no longer called
+  by the toolbar (replaced by the DOM splices) — they remain **exported**
+  (the `CompiledRichEditorJs_StillExportsRePureFunctions` regression pin
+  still passes) and are the frozen RE surface.
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec` —
+  not from U5); `npm run build` (in `src/Kumunita.Web`) → **tsc green, 0
+  warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 166, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 = 13 WY tests, all PASS). The
+  compiled `wwwroot/js/lib/rich-editor.js` contains `surroundContents` +
+  `extractContents` + `insertNode` + `wrapSelection` + `toMarkdown` +
+  `contentEditable` + all 6 RE `export function {name}` (all verified
+  present).
+- **No drift pause.** U6 replaces the U4 `paste` handler **stub** with the
+  full sanitizer + insert (the WY·6 invariant — `sanitizeHtml` is already
+  present from U3; U6 wires it into the `paste` handler + the
+  `range.insertNode` insert + the `toMarkdown` sync), per §2.4 / §2.5(d).
+
+## U6 — sanitizer + paste handler
+
+- **Date:** 2026-09-16
+- **Authored (1 file modified + 1 rebuilt artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the U4 `paste` handler
+  **stub** (inside the `if (previewPane) { … }` WY block) is **replaced**
+  with the **full** handler. The full handler is placed **after** the U5
+  private helpers (`syncTextarea()` / `activeRange()` / `placeCaretAfter()`
+  / `wrapSelection()` / `currentBlock()` / `changeBlockTag()` /
+  `wrapBlockInList()`) so it can call `activeRange()` and
+  `syncTextarea()` directly — the placement is the one deliberate
+  structural change U6 makes (the helpers are module-private, declared
+  inside `bindRichEditor`, so the handler must be in the same function
+  scope). The U4 WY block now carries a one-line comment at the (e) slot
+  pointing to the full handler below — no listener is double-installed.
+  The 6 RE pure functions + `renderPreview` + the IE toggle block + the
+  self-wire loop + the toolbar `for`-loop + all U5 helpers are **untouched**.
+  (2) `wwwroot/js/lib/rich-editor.js` — the `tsc` rebuild (git-ignored
+  build artifact; `npm run build` green, **0 warnings**).
+- **The 6 sub-steps (a)–(f) of the paste handler (WY·6, design doc
+  §2.5(d) + §2.4 — the primary source):**
+  - **(a)** intercepts the `paste` event on the pane
+    (`previewPane.addEventListener('paste', (e: ClipboardEvent) => { … })`).
+  - **(b)** reads the clipboard HTML
+    (`e.clipboardData?.getData('text/html') ?? ''`); **fallback to
+    `text/plain`** (wrapped in a `<p>` before sanitizing — `sanitizeHtml`
+    handles text-only input natively: it parses the string, keeps text
+    nodes, strips any non-subset tags/attributes).
+  - **(c)** sanitizes via `sanitizeHtml(raw)` (U3's pure function — WY·3
+    subset only; the §2.4 reject list is enforced **inside** `sanitizeHtml`:
+    non-subset tags, every `on*` handler, every `style`, every
+    non-`language-{lang}` `class`, every `id`, every unsafe `href`/`src`).
+  - **(d)** inserts the sanitized HTML at the selection: parse into a
+    detached `<div>` + move its children into a `DocumentFragment`, then
+    `range.deleteContents()` + `range.insertNode(fragment)` using the same
+    `activeRange()` helper U5 added; if the selection is outside the pane
+    (or absent), `previewPane.appendChild(fragment)` — append at the end.
+  - **(e)** `e.preventDefault()` — the browser's native paste is
+    suppressed; the sanitized insert is the **only** paste path.
+  - **(f)** `syncTextarea()` (WY·2 — reuse U5's helper, in scope).
+- **The sanitizer is UNCHANGED** (U3 authored `sanitizeHtml` in
+  `client/lib/dom-to-markdown.ts`; U6 only **wires** it into the `paste`
+  handler — the sanitizer's public contract, the §2.4 reject list, and the
+  "tag dropped, text kept" / "img dropped entirely" semantics are all
+  frozen). The 3 `WY6_Sanitizer_*` tests (U3's pure-function tests #7/#8/#9)
+  **still pass** — the sanitizer itself is not touched by U6.
+- **`tsc`-only stands** (WY·8): `package.json` is still `typescript`-only;
+  no `.csproj` change; no new route; no new dependency; no second renderer
+  on the read path (`MarkdownRenderer` is untouched — RC R·1). The saved
+  body is byte-identical Markdown (RC R·3 / WY·5). The 6 RE exports
+  (`renderPreview` / `applyToggle` / `applyBlock` / `applyLink` /
+  `imageLink` / `isSafeImageSrc`) + `bindRichEditor` + `toMarkdown` are
+  all present in the compiled JS (verified by `grep`). The
+  `RichEditorTextarea_IsNotDisabled_OrRemoved` regression pin (in
+  `InlineEditorTests`) still passes — the textarea is never
+  disabled/removed/hidden-attributed. The 10 composer surfaces are
+  **unchanged** in shape (the 16 editor blocks / 10 view files U0
+  verified).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec`
+  — not from U6); `npm run build` (in `src/Kumunita.Web`) → **tsc green,
+  0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 166, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 = 13 WY tests, all PASS — the
+  paste-handler change is client-only, no new C# test is authored in U6
+  per the U6 plan / design doc §2.7). The compiled
+  `wwwroot/js/lib/rich-editor.js` contains `sanitizeHtml` + `insertNode`
+  + `preventDefault` + `toMarkdown` + `contentEditable` + all 6 RE
+  `export function {name}` + `bindRichEditor` (all verified present by
+  `grep`).
+- **`tsc` warnings:** **none** (the `tsc` build reports 0 warnings; the
+  one pre-existing `WysiwygSpec` CS8604 warning is from U3's C# test
+  mirror, not from U6's TS change).
+- **No drift pause.** U7 reworks the `data-ie-toggle` button's click
+  handler to reveal the **read-only** Markdown mirror (WY·7 — the textarea
+  is revealed by removing `rc-editor-source-hidden`; the textarea's
+  `readOnly` property is set by the binder; the label swap is kept), per
+  §2.5(f).
+
+## U7 — code view rework
+
+- **Date:** 2026-09-16
+- **Authored (1 file modified + 1 test file extended + 1 rebuilt
+  artifact):** (1)
+  `src/Kumunita.Web/client/lib/rich-editor.ts` — the **IE toggle block**
+  in `bindRichEditor` is **reworked in place** (design doc §2.5(f) + §2.2
+  — the primary sources). The same `button[data-ie-toggle]` stays; its
+  **semantics** change from "toggle the source's visibility (an editable
+  source)" to "toggle the **code view's** visibility (a read-only
+  mirror)". Concretely: (a) the `setView(showSource)` parameter is
+  re-named to `setView(showCodeView)` — the body's `classList.toggle`
+  line is unchanged (the textarea's reveal/hide is still the
+  `rc-editor-source-hidden` class, unchanged from IE); (b)
+  `textarea.readOnly = true` is set **once** in the `if (toggle)` block,
+  before `setView` (WY·7 / WY·2 — the textarea is the read-only sink the
+  server binds on submit, RC R·3 / RE·1 / IE·1 unchanged; the resident
+  never types into the mirror); (c) the unused `paneActive`
+  (`rc-editor-pane-active`) constant + its `previewPane.classList.toggle`
+  line are **removed** — the IE "pane-active" marker had no meaning once
+  the pane is the editing surface in both states (WY·1 — the code view is
+  a mirror, not a mode switch; the pane stays editable + visible in both
+  states); (d) the label swap (the `rc.editor.source` /
+  `rc.editor.showPreview` keys via the `<kw-l>` element's `textContent` +
+  `key` attribute) is **kept verbatim** — the `_RichEditorToggle.cshtml`
+  partial is **unchanged** (the partial resolves both labels
+  server-side; the binder reads them via `data-ie-label-source` /
+  `data-ie-label-preview`). (2)
+  `tests/Kumunita.Web.Tests/WysiwygEditorTests.cs` — **1** new
+  artifact-string pin appended (U3's 9 + U4's 2 + U5's 2 = **13** WY
+  tests **untouched**): `WY7_CodeViewIsReadOnlyMirror` (§2.7 #10 —
+  asserts the compiled JS contains `readOnly` **and**
+  `rc-editor-source-hidden`). (3) `wwwroot/js/lib/rich-editor.js` — the
+  `tsc` rebuild (git-ignored build artifact).
+- **The two states (WY·7 invariant, design doc §2.5(f) — the primary
+  source):**
+  - **(1) pane only** (the default — the resident sees the editable
+    pane; the textarea is hidden by the `rc-editor-source-hidden` class
+    — **unchanged** from IE).
+  - **(2) pane + code view** (the resident sees the editable pane
+    **plus** the **read-only** textarea — revealed by removing
+    `rc-editor-source-hidden`; the textarea is **read-only** — the
+    binder sets `textarea.readOnly = true`; the resident never types
+    into it — the WY·2 invariant: the textarea is the read-only sink,
+    not the editing surface).
+  - **The pane stays editable + visible in both states** (WY·1 — the
+    pane is the editing surface; the code view is a **mirror**, not a
+    **mode switch**). The `setView` body no longer touches the pane at
+    all (the IE `rc-editor-pane-active` marker is removed — it had no
+    meaning once the pane is the editing surface in both states).
+- **The 1 new test (verbatim name — PASS):**
+  `WY7_CodeViewIsReadOnlyMirror` (§2.7 #10 — asserts the compiled JS
+  contains `readOnly` (the WY·7 read-only mirror) **and**
+  `rc-editor-source-hidden` (the IE·1 frozen base — the source-hidden
+  class is still the reveal/hide mechanism)).
+- **The existing 13 WY tests still pass** (U3's 9 pure-function +
+  U4's 2 + U5's 2 — **untouched** by U7). The `RichEditorTextarea_
+  IsNotDisabled_OrRemoved` regression pin (`InlineEditorTests`) still
+  passes — the textarea is never `disabled` / `removed` / `hidden`-
+  attributed (U7 adds `readOnly` only, which is orthogonal to those
+  three needles). The `CompiledRichEditorJs_StillExportsRePureFunctions`
+  regression pin (`InlineEditorTests`) still passes — all 6 RE pure
+  functions + `bindRichEditor` are still `export function {name}` in the
+  compiled JS.
+- **Everything else is untouched:** the 6 RE pure functions,
+  `renderPreview`, the U4 WY block (`contenteditable` / `input` /
+  initial-population), the U5 toolbar DOM-splice handlers + private
+  helpers (`syncTextarea` / `activeRange` / `placeCaretAfter` /
+  `wrapSelection` / `currentBlock` / `changeBlockTag` /
+  `wrapBlockInList`), the U6 `paste` handler, the self-wire loop, and the
+  `dom-to-markdown.ts` module (U3's `toMarkdown` + `sanitizeHtml` are
+  frozen). The `_RichEditorToggle.cshtml` partial is **unchanged** (the
+  label swap is kept — the partial resolves both labels server-side; the
+  binder reads them via the `data-ie-label-*` attributes). The 10
+  composer surfaces are **unchanged** in shape (the 16 editor blocks / 10
+  view files U0 verified). No `.csproj` change, no new route, no new
+  dependency, no second renderer on the read path (`MarkdownRenderer` is
+  untouched — RC R·1). The saved body stays byte-identical Markdown (RC
+  R·3 / WY·5).
+- **Build + test result:** `dotnet build Kumunita.slnx -c Debug` →
+  **Build succeeded, 0 errors** (1 pre-existing warning in `WysiwygSpec`
+  — not from U7); `npm run build` (in `src/Kumunita.Web`) → **tsc green,
+  0 warnings**; `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\
+  Kumunita.Web.Tests.dll` → **Total: 167, Errors: 0, Failed: 0, Skipped:
+  0** (U3's 9 WY tests + U4's 2 + U5's 2 + U7's 1 = **14** WY tests, all
+  PASS). The compiled `wwwroot/js/lib/rich-editor.js` contains `readOnly`
+  + `rc-editor-source-hidden` + `contentEditable` + `toMarkdown` +
+  `sanitizeHtml` + all 6 RE `export function {name}` (all verified
+  present by `grep`); `rc-editor-pane-active` is **gone** (the IE marker
+  is removed — the pane is the editing surface in both states, WY·1).
+- **`tsc` warnings:** **none** (the `tsc` build reports 0 warnings; the
+  one pre-existing `WysiwygSpec` CS8604 warning is from U3's C# test
+  mirror, not from U7's TS change).
+- **No drift pause.** U8 runs + records the WY acceptance gate (the
+  three-test gate from design doc §2.8 — closed-loop / handoff /
+  part-vs-whole), per the lane register.
+
+## U8 — gate recorded
+
+- **Date:** 2026-09-16
+- **Scope:** **recording unit** — execute the automated floor (the existing
+  WY tests), attempt the two manual gates, and record the results in the
+  design doc + this handoff note. **No code, no new tests, no new CSS, no
+  `.csproj` change** (a new code unit would violate the recording scope).
+  U9 then closes the lane — **not** U8's scope.
+- **The three §2.8 gate tests (recorded, not invented):**
+  - **Closed loop — NOT RUN.** *Reason:* manual gate (open a composer, type
+    `**bold**` in the pane, save; verify the saved body + the read path);
+    U8 has no dev server / seeded DB / live browser to drive a composer
+    in-process. The **automated floor covers the same contract** without a
+    browser: `WY5_SavedBodyIsByteIdentical` (pane HTML → byte-identical
+    hand-typeable Markdown) + `WY10_RoundTrip_BoldHeadingListLinkImageCode`
+    (`toMarkdown(renderPreview(md)) === md`, bold → `<strong>` →
+    `**bold**`). **Pass not assumed** — the next unit to land the runtime
+    records the manual pass (§2.8's rule).
+  - **Handoff — NOT RUN.** *Reason:* manual gate (a heading + list + link +
+    image + code block typed in the pane; the saved body must equal the
+    hand-typeable Markdown; the `MarkdownRenderer` read path must render it
+    identically; the `ContentImageIds` parse must be untouched). The
+    **automated floor covers the same contract**: `WY10_RoundTrip_…`
+    exercises exactly that corpus against the `renderPreview` mirror **and**
+    asserts RC's `ContentImageIds` picks up the `![alt](/content-image/{id})`
+    form (RC R·3 — zero server change) + `WY5_SavedBodyIsByteIdentical`
+    pins the byte-identity. **Pass not assumed** — the next unit to land the
+    runtime records the manual pass.
+  - **Part-vs-whole — PASS (automated).** The full WY test set is the
+    *whole*; closed-loop + handoff are the *parts*. All automated WY tests
+    pass together (suite line below). This is the binding automated evidence
+    U8 can produce in-process.
+- **Automated floor (the binding evidence):**
+  - **Build:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded,
+    1 warning** (the pre-existing `WysiwygSpec` CS8604 nullability warning
+    in `WysiwygEditorTests.cs`, present since U3's C# spec mirror — **not**
+    from U8; no new warning introduced). `npm run build` (in
+    `src/Kumunita.Web`) → **tsc green, 0 warnings**.
+  - **Suite line (verbatim):** `Kumunita.Web.Tests  Total: 167, Errors: 0,
+    Failed: 0, Skipped: 0, Not Run: 0, Time: 0.639s` — run in-process via
+    `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    (per AGENTS.md, **not** `dotnet test` / VS Test Explorer). **Total: 167,
+    Errors: 0, Failed: 0, Skipped: 0** — the full suite is green; matches
+    U7's recorded 167 (no tests added/removed in U8 — a recording unit).
+  - **WY tests present in `WysiwygEditorTests.cs` (counted, not remembered):
+    14**, all PASS: `WY10_RoundTrip_BoldHeadingListLinkImageCode`,
+    `WY3_Serializer_EmitsOnlyThePinnedSubset`, `WY3_Serializer_SkipsBlankElements`,
+    `WY3_Serializer_RejectsUnsafeImageSrc`, `WY3_Serializer_RejectsUnsafeLinkHref`,
+    `WY5_SavedBodyIsByteIdentical`, `WY6_Sanitizer_StripsDisallowedElements`,
+    `WY6_Sanitizer_StripsDisallowedAttributes`, `WY6_Sanitizer_StripsUnsafeHrefs`,
+    `CompiledRichEditorJs_ContainsContentEditable`,
+    `CompiledRichEditorJs_ContainsToMarkdown`,
+    `CompiledRichEditorJs_ContainsDomSplice`, `WY8_TscOnly_NoEditorDependency`,
+    `WY7_CodeViewIsReadOnlyMirror`.
+  - **Regression pins (both in `InlineEditorTests.cs`, both PASS):**
+    `RichEditorTextarea_IsNotDisabled_OrRemoved` (the textarea is never
+    disabled/removed — WY·2 / IE·1) + `CompiledRichEditorJs_StillExportsRePureFunctions`
+    (the 6 RE pure functions + `bindRichEditor` still exported — the frozen
+    RE surface). Both green in the 167-test run.
+- **Drift observation (recorded, not silently resolved — §2.9 / unit-series
+  rule 6):** §2.7 pins a **17-test** list, but the authored set is **14**.
+  Reconciling: **3 §2.7 names are absent** (never authored by U3–U7):
+  `WY9_PaneIsKeyboardOperable` (#12), `CompiledRichEditorJs_ContainsSanitizer`
+  (#15), `RichEditorExports_AreIntact` (#17) — their behaviors are
+  **indirectly covered** (WY·9 via the §2.6 CSS focus-ring rule; `sanitizeHtml`
+  via `WY6_Sanitizer_StripsDisallowed*` #7–#9 + U6's paste handler; the RE
+  exports via `CompiledRichEditorJs_StillExportsRePureFunctions` in
+  `InlineEditorTests`) — so no *contract* is unverified, but the three
+  **named** seam tests in §2.7 do not exist as tests. **1 authored name is
+  not in §2.7:** `CompiledRichEditorJs_ContainsDomSplice` (U5) — a newer,
+  stronger artifact pin (the Selection / Range API splice trio) §2.7's frozen
+  list never anticipated. **Net:** 14 = (11 of the 17 pinned) + (1
+  authored-not-pinned). No test fails; this is a **pin-list drift, not a
+  behavior drift**. Per §2.9 a later unit (U9's scope, or a future WY-2
+  lane) should reconcile §2.7's 17-name list with the 14-test authored
+  reality; U8 **does not** rewrite §2.7 (the 17 names are frozen once
+  written; a mismatch is recorded, not silently edited).
+- **`## U<m> — Drift pause` sections in this note:** **none** (U0–U7 each
+  closed with "No drift pause"; the single §2.4 sanitizer construction-drift
+  (regex → AST) was resolved in favor of the pinned behavior in U3's own
+  section). The drift observation above is new (surfaced by U8's count
+  reconciliation) and is recorded here + in the design doc's Run-result
+  section, **not** as a `## U<m> — Drift pause` unit-series pause — U8 has no
+  code to block on it.
+- **No `.csproj` change, no new route, no new dependency, no second
+  renderer.** `tsc`-only stands (WY·8); `package.json` is still
+  `typescript`-only. The read path (`MarkdownRenderer`) is untouched
+  (RC R·1). The saved body is byte-identical Markdown (RC R·3 / WY·5).
+- **Still-open drift:** the §2.7 17-name vs 14-authored pin-list
+  reconciliation (behavior covered; the three §2.7-named seam tests
+  `WY9_PaneIsKeyboardOperable` / `CompiledRichEditorJs_ContainsSanitizer` /
+  `RichEditorExports_AreIntact` absent; the authored
+  `CompiledRichEditorJs_ContainsDomSplice` not in §2.7) — open for U9 / a
+  future WY-2 lane.
+- **No drift pause.** U9 closes the lane (ADR 0033 → Accepted + ADR-index
+  row + the `ARCHITECTURE.md` `WYSIWYG inline editing` flip + the handoff
+  `## Summary`), per the lane register.
+
+## Summary
+
+- **Date:** 2026-09-16
+- **Lane:** WYSIWYG inline editing (`WY`) — **closed** by U9. ADR 0033 is
+  **Accepted**; the ADR index (`docs/adr/README.md`) carries the 0033 row;
+  `docs/ARCHITECTURE.md` records the WY lane on the `Kumunita.Web/`
+  `client/lib/` surface (the lane is client-only — there is no
+  bounded-context line for it). This `## Summary` is the **final** handoff
+  note — it is written for the **WY-2 agent** (if one comes); there is **no
+  U10** and the lane is **closed**.
+- **Gate (recorded by U8, 2026-09-16):** automated floor **167/167 green**
+  (`Kumunita.Web.Tests  Total: 167, Errors: 0, Failed: 0, Skipped: 0, Not
+  Run: 0, Time: 0.639s`, run in-process via `dotnet exec`). **14 WY tests**
+  in `WysiwygEditorTests.cs` + 2 regression pins in `InlineEditorTests.cs`
+  (`RichEditorTextarea_IsNotDisabled_OrRemoved`,
+  `CompiledRichEditorJs_StillExportsRePureFunctions`), all PASS. The
+  **closed-loop + handoff** manual gates are recorded as **not-run** (no
+  dev server / seeded DB / live browser in-process); the automated floor
+  covers the **same contract** (`WY5_SavedBodyIsByteIdentical` +
+  `WY10_RoundTrip_BoldHeadingListLinkImageCode`).
+- **Shipped units (U0–U8):**
+
+  | Unit | One-liner goal | Test count (WY tests / suite total) | Deviations |
+  |------|----------------|--------------------------------------|------------|
+  | U0 | Kickoff verification (the 16 editor blocks / 10 view files + the RC-pinned subset) | — | none |
+  | U1 | Design doc Part 1 — the 9 invariants (WY·1–WY·9) + the 10 FACES (WY1–WY10) | — | none |
+  | U2 | Design doc Part 2 — seams/contracts + 17 pinned test names + ADR 0033 draft | — | none |
+  | U3 | The load-bearing serializer `toMarkdown` + sanitizer `sanitizeHtml` + the 9 pure-function tests | 9 (suite 162) | §2.4 sanitizer: regex → **AST** construction (resolved in favor of the pinned behavior) |
+  | U4 | The editing loop — pane `contenteditable` + `input` sync + the one CSS focus-ring rule | +2 (suite 164) | none |
+  | U5 | The toolbar rework — splice DOM (the Selection / Range API), not Markdown | +2 (suite 166) | authored `CompiledRichEditorJs_ContainsDomSplice` (not in §2.7's frozen list) |
+  | U6 | The sanitizer wired into the `paste` handler (WY·6) | +0 (suite 166) | none |
+  | U7 | The code-view rework — the `</>` toggle reveals the read-only mirror (WY·7) | +1 (suite 167) | none |
+  | U8 | Run + record the WY acceptance gate (the 3-test gate from §2.8) | +0 (suite 167, recorded) | §2.7 17-name vs 14-authored **pin-list drift** (recorded, not resolved) |
+
+- **Named deferrals (each a future WY-2 candidate; none re-opened by WY):**
+  nested lists, blockquotes, tables, footnotes, strikethrough,
+  `execCommand`-based undo/redo (the browser's native `contenteditable`
+  undo is the floor; a custom undo/redo is a future lane), mobile-specific
+  editing UX, caret-mapping between the pane and the code view, and
+  localStorage persistence of the editing preference. Each is a **future**
+  lane, not a WY re-open.
+- **Still-open drift (carried to a future WY-2 lane, or reconcilable in a
+  follow-on):** the §2.7 **pin-list drift** — §2.7 pins a **17-test** list,
+  the authored set is **14**. Absent §2.7 names (behaviors **indirectly
+  covered**, so no contract is unverified): `WY9_PaneIsKeyboardOperable`,
+  `CompiledRichEditorJs_ContainsSanitizer`, `RichEditorExports_AreIntact`.
+  Authored-not-pinned: `CompiledRichEditorJs_ContainsDomSplice`. This is a
+  **pin-list drift, not a behavior drift** (167/167 green). U9 **does not**
+  rewrite §2.7's frozen pin list — it records the change here per the
+  drift-guard (§2.9 / unit-series rule 6) and the U8 record (the design
+  doc's "Run result (WY acceptance gate — 2026-09-16)" section + this note's
+  `## U8 — gate recorded` section carry the full record).
+- **Frozen base (unchanged by the lane close):** `tsc`-only (no editor
+  dependency in `package.json`, no `.csproj` change), `Body` as a Markdown
+  `string` (RC R·7), the read path untouched (one renderer —
+  `MarkdownRenderer`, RC R·1), the saved body byte-identical Markdown
+  (RC R·3 / WY·5), and the 10 composer surfaces unchanged in shape.
+- **Lane close (U9, 2026-09-16):** ADR 0033 flipped to **Accepted**; the
+  0033 row appended to `docs/adr/README.md`; the `ARCHITECTURE.md`
+  `client/lib/` line now records the WY lane (WY ✓ live, gate summary above);
+  this `## Summary` appended. Housekeeping: `wysiwyg-handoff-notes.md` +
+  `wysiwyg-u09-plan.md` moved `in-progress/` → `done/` (via `git mv`, history
+  preserved). The register `plan-wysiwyg.md` **stays at the top level** (like
+  `plan-rich-editor.md` / `plan-inline-editor.md`). **No U10 — the lane is
+  closed.**

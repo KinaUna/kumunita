@@ -47,11 +47,19 @@ public interface IUserInfoService
     Task<Group> CreateGroupAsync(string ownerId, string name, string? description, bool isPrivate = false);
 
     /// <summary>Add a user to a group (strong-consistency: the new membership is
-    /// live on the next <see cref="GetGroupIdsAsync"/> call).</summary>
+    /// live on the next <see cref="GetGroupIdsAsync"/> call).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>; otherwise the Owner/Admin base applies.</summary>
     Task AddGroupMemberAsync(string groupId, string userId, string addedBy);
 
     /// <summary>Remove a user from a group (strong-consistency: the loss of access is
-    /// live on the next <see cref="GetGroupIdsAsync"/> call — invariant C4).</summary>
+    /// live on the next <see cref="GetGroupIdsAsync"/> call — invariant C4).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>; otherwise the Owner/Admin base applies.</summary>
     Task RemoveGroupMemberAsync(string groupId, string userId, string removedBy);
 
     /// <summary>
@@ -119,6 +127,81 @@ public interface IUserInfoService
     /// this lane writes `Profile.AvatarId` only.
     /// </summary>
     Task SetProfileAvatarAsync(string subjectId, string? avatarId, string actorBy);
+
+    // ── Timezone addition (ADR 0019; the *single* user-override write lane,
+    // named; the ADR 0006-E compatible-addition idiom this file uses) ────────
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's <see cref="Profile.TimeZone"/>
+    /// IANA id — the user's <b>override</b> of the platform default (ADR 0019;
+    /// the fallback is <see cref="Localization.LocaleSettings.DefaultTimezone"/>
+    /// / the <c>UTC</c> floor). Mirrors <see cref="SetProfileAvatarAsync"/>
+    /// exactly (the C-MED·8 single write-lane shape): the self-scope check
+    /// happens at the Web boundary (the owner is the actor); this lane writes
+    /// <c>Profile.TimeZone</c> only. One session, one <c>SaveChangesAsync</c>;
+    /// no <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// Strong consistency (invariant C4): the new value is live on the very
+    /// next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileAvatarAsync"/> pin).</exception>
+    Task SetProfileTimezoneAsync(string subjectId, string? timezone, string actorBy);
+
+    // ── Date format addition (ADR 0020; the *single* user-override write
+    // lane for the resident's personal date-time format — the exact shape of
+    // SetProfileTimezoneAsync, the ADR 0006-E compatible-addition idiom) ──
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's <see cref="Profile.DateFormat"/>
+    /// .NET custom datetime format string — the user's <b>override</b> of the
+    /// platform default (ADR 0020; the fallback is <see
+    /// cref="Localization.LocaleSettings.DefaultDateFormat"/> / the
+    /// <see cref="Localization.DateFormat.FloorFormat"/> floor). Mirrors
+    /// <see cref="SetProfileTimezoneAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary (the
+    /// owner is the actor); this lane writes <c>Profile.DateFormat</c> only. One
+    /// session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// Strong consistency (invariant C4): the new value is live on the very
+    /// next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
+    Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy);
+
+    // ── Email & notification language addition (ADR 0061; the *single*
+    // write lane for the resident's outbound-channel language — the exact
+    // shape of SetProfileDateFormatAsync, the ADR 0006-E compatible-addition
+    // idiom) ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's
+    /// <see cref="Profile.EmailLanguage"/> BCP-47 code — the user's
+    /// <b>preference</b> for the language the platform writes to them in
+    /// (outbound account emails and event reminders). Unlike the other
+    /// overrides, this does not change the resident's own UI or rendering —
+    /// it is strictly the *outbound channel's* language. The read seam
+    /// (the email staging path) resolves the recipient's
+    /// <c>Profile.EmailLanguage</c> first, then the instance default
+    /// (<see cref="Localization.LocaleSettings.DefaultLanguageCode"/>), then
+    /// the <c>en</c> registry floor. Mirrors
+    /// <see cref="SetProfileDateFormatAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary (the
+    /// owner is the actor); this lane writes <c>Profile.EmailLanguage</c> only.
+    /// One session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// Strong consistency (invariant C4): the new value is live on the very
+    /// next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileDateFormatAsync"/> pin).</exception>
+    Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy);
 
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
@@ -308,8 +391,15 @@ public interface IUserInfoService
     /// <summary>
     /// Strong-consistency membership resolution for the posting gate
     /// (invariant C4): returns the set of <c>componentId</c> values the
-    /// account is a member of *at this instant* — from the live
-    /// <see cref="ComponentMembership"/> rows (no projection lag, no cache).
+    /// account is a member of *at this instant* — the live
+    /// <see cref="ComponentMembership"/> rows **∪** the enabled, mandatory
+    /// communities (ADR 0012: <see cref="Component.Mandatory"/> membership is
+    /// implicit — every verified resident is a member, and a disabled
+    /// component grants none even when mandatory) — with no projection lag,
+    /// no cache. This is the single "who is a member" definition: the
+    /// posting gate (<see cref="Posts.PostService"/>), the composer's
+    /// community picker, and the feed's directory all read through it, so a
+    /// mandatory toggle is live on the very next read.
     /// Mirrors <see cref="GetGroupIdsAsync"/> in shape and audit
     /// behavior: the **write** lanes
     /// (<see cref="SetCommunityMembershipAsync"/> /
@@ -345,13 +435,299 @@ public interface IUserInfoService
     /// <see cref="Posts.PostService.CreatePostAsync"/> call. A **no-op** when
     /// the pair has no row (does not throw) — admins editing a "set" of
     /// components per user are free to uncheck rows that were never there.
+    /// <b>ADR 0012: a <see cref="Component.Mandatory"/> community is a
+    /// no-op skip</b> (no row deleted, no audit appended — nothing changed):
+    /// membership there is implicit (<see cref="GetCommunityIdsAsync"/> still
+    /// returns it), and the <c>/admin</c> set form plus the self-leave route
+    /// must be able to call this lane on a mandatory pair without a hard
+    /// failure. The *moderator* removal lane
+    /// (<see cref="RemoveCommunityMemberAsync"/>) refuses the same pair with
+    /// an <see cref="InvalidOperationException"/> — the Web lane that wants
+    /// the surfaced message.
     /// Appends an <see cref="Authorization.AccessAudit"/> row (action
     /// "community.remove-member", targetKind "component", via Admin, outcome
-    /// Allow).
+    /// Allow) when a row is actually removed.
     /// </summary>
     /// <exception cref="ArgumentException"><paramref name="componentId"/> or
     /// <paramref name="userId"/> is null/whitespace.</exception>
     Task ClearCommunityMembershipAsync(string componentId, string userId, string actorId);
+
+    // ── ADR 0012 — mandatory communities + moderator member-management
+    // lanes (the community's <see cref="Identity.Roles.Moderator"/> scope ∪
+    // <see cref="Identity.Roles.GlobalAdmin"/> standing; ADR 0006-E
+    // compatible — appended to the owning module's public surface, additive)
+
+    /// <summary>
+    /// Set a community's <see cref="Component.Mandatory"/> flag (ADR 0012):
+    /// <c>true</c> makes every verified resident an implicit member (nobody
+    /// may be removed from it — <see cref="RemoveCommunityMemberAsync"/>
+    /// refuses, <see cref="ClearCommunityMembershipAsync"/> skips — and
+    /// nobody may leave it, the self-leave route is Web-gated on the flag);
+    /// <c>false</c> restores ordinary optional membership (explicit rows alone
+    /// then decide). **Standing gate — GlobalAdmin only** (thin token, decision
+    /// in Core): whether a community is mandatory is an *admin* call even
+    /// though the component's moderator governs its members (ADR 0012, product
+    /// decision) — the actor's <c>actorRoles</c> must carry
+    /// <see cref="Identity.Roles.GlobalAdmin"/>; a component-scoped moderator
+    /// (and anyone else) gets an <see cref="UnauthorizedAccessException"/>
+    /// (fail-closed). Strong consistency (invariant C4): the toggle is live
+    /// on the very next <see cref="GetCommunityIdsAsync"/>.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.set-mandatory" when switching on, "community.set-optional"
+    /// when off; targetKind "component", via <b>Admin</b> — the sole admitted
+    /// standing — outcome Allow) in the same transaction as the flag flip
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/> or
+    /// <paramref name="actorId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException"><paramref name="actorRoles"/>
+    /// lacks <see cref="Identity.Roles.GlobalAdmin"/>.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task SetCommunityMandatoryAsync(string componentId, bool mandatory, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// Add a resident to a community (the moderator ∪ GlobalAdmin side of
+    /// ADR 0012's optional-membership management): the same idempotent
+    /// <c>(componentId, userId)</c> upsert row as
+    /// <see cref="SetCommunityMembershipAsync"/> — a row on an already
+    /// mandatory community is a harmless no-op (the implicit union read
+    /// already includes them; kept so the forms round-trip without special
+    /// cases). **Standing gate** (thin token, decision in Core): the actor's
+    /// <c>actorRoles</c> must carry the <see cref="Identity.Roles
+    /// .ModeratorComponent(string)"/> scope claim for <paramref
+    /// name="componentId"/> ∪ <see cref="Identity.Roles.GlobalAdmin"/> — a
+    /// <see cref="UnauthorizedAccessException"/> otherwise. (Narrower than the
+    /// set-mandatory lane, which is GlobalAdmin-only.)
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.add-member", targetKind "component", via <b>Moderator</b>
+    /// when the actor holds the component's scope claim else Admin,
+    /// outcome Allow) in the same transaction (invariant C3).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>, bypassing the GlobalAdmin/moderator gate; the
+    /// existing standing applies otherwise.
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/>,
+    /// <paramref name="userId"/> or <paramref name="actorId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor's role set
+    /// carries neither standing.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id exists.</exception>
+    Task AddCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// Remove a resident's membership from a community (the moderator ∪
+    /// GlobalAdmin side of ADR 0012): deletes the <c>(componentId,
+    /// userId)</c> row; a **no-op** when the pair has no row (does not
+    /// throw — the set-form shape, consistent with the frozen admin lane).
+    /// **Mandatory communities refuse** (ADR 0012's invariant: no one is a
+    /// non-member of a mandatory community) — an <see
+    /// cref="InvalidOperationException"/> the Web lane surfaces, not a
+    /// silent skip (this lane is where the product message lives).
+    /// **Standing gate** as <see cref="AddCommunityMemberAsync"/> (component
+    /// scope ∪ GlobalAdmin — *not* the GlobalAdmin-only set-mandatory lane);
+    /// **no** target-standing gate — a community's own moderator *can* be
+    /// removed (unlike the ADR 0008 group owner's own row): moderator
+    /// standing outlives membership (they govern and post on the
+    /// <see cref="Identity.Roles.ModeratorComponent(string)"/> claim alone,
+    /// so no orphan state results; the GlobalAdmin role lane re-adds scope
+    /// when the membership matters again).
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// "community.remove-member", targetKind "component", via <b>Moderator</b>
+    /// when the actor holds the component's scope claim else Admin,
+    /// outcome Allow) in the same transaction (invariant C3).
+    /// GU (ADR 0028): the lane also admits the **guardian standing** — a
+    /// guardian curating their child's membership (an active link over
+    /// <paramref name="userId"/>) records the narrower standing
+    /// <c>Via: Guardian</c>, bypassing the GlobalAdmin/moderator gate; the
+    /// existing standing applies otherwise. The ADR 0012 mandatory-community
+    /// refusal is **preserved** (it fires regardless of standing).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="componentId"/>,
+    /// <paramref name="userId"/> or <paramref name="actorId"/> is
+    /// null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor's role set
+    /// carries neither standing.</exception>
+    /// <exception cref="InvalidOperationException">No component with that id
+    /// exists, or the community is <see cref="Component.Mandatory"/>.</exception>
+    Task RemoveCommunityMemberAsync(string componentId, string userId, string actorId, IReadOnlySet<string> actorRoles);
+
+    // ── ADR 0026 — group & community name/description translations ─────────
+    // The "separate feature" ADR 0021's scope boundary deferred (and ADR 0022
+    // shipped for posts/replies). Two documents in this context
+    // (GroupTranslation / CommunityTranslation, registered in M1DocTypes), an
+    // add-only write lane each (a hand-written AccessAudit row, C3), a plain
+    // read seam each (no decision, no audit — inherits the parent's reach),
+    // and a public standing probe each the Web uses to decide whether to show
+    // the "add a translation" form. ADR 0006-E compatible — additive to the
+    // owning module's public surface.
+
+    /// <summary>
+    /// The <b>read</b> seam for a group's user-added name/description
+    /// translations (ADR 0026): the <see cref="GroupTranslation"/> rows under
+    /// <paramref name="groupId"/>. Owns its <c>QuerySession</c> (the C3
+    /// read-lane shape). **Not an authorization surface** (the ADR 0022
+    /// "a read, not a decision" pin carried over): the row has no own audience
+    /// — its visibility inherits the group's owner∪member reach, which the
+    /// caller has already made — so this writes **no** audit row.
+    /// </summary>
+    Task<IReadOnlyList<GroupTranslation>> GetGroupTranslationsAsync(string groupId);
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group's name and/or description
+    /// into <paramref name="languageCode"/> (ADR 0026). In the caller's
+    /// in-flight session (C3 — the write + its <see cref="Authorization
+    /// .AccessAudit"/> row commit or roll back atomically). **At least one** of
+    /// <paramref name="name"/> / <paramref name="description"/> must be
+    /// non-blank (a translation with nothing in it is not a translation — an
+    /// <see cref="ArgumentException"/> otherwise). <paramref
+    /// name="languageCode"/> is the target language, written verbatim (a blank
+    /// target is a caller error). <b>Standing:</b> the group's <b>owner</b>
+    /// (<see cref="Authorization.AccessVia.Owner"/>), a <b>GlobalAdmin</b>, or
+    /// a <b>Translator</b> (both <see cref="Authorization.AccessVia.Admin"/>);
+    /// a group member and a component-moderator are denied. A denied actor
+    /// throws <see cref="UnauthorizedAccessException"/> before anything is
+    /// stored. One <c>SaveChangesAsync</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A blank target language, a blank
+    /// actor, or both name and description blank.</exception>
+    /// <exception cref="KeyNotFoundException">The group id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// owner / GlobalAdmin / Translator standings.</exception>
+    Task<GroupTranslation> AddGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Updates** an existing user-added translation of a group's name and/or
+    /// description (ADR 0048). Standing is the same as
+    /// <see cref="AddGroupTranslationAsync"/> (the group's owner, a GlobalAdmin,
+    /// or a Translator); a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. At least one of name / description
+    /// must be non-blank. One <c>SaveChangesAsync</c>; a hand-written
+    /// <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.update</c>) is stored in the caller's session.
+    /// </summary>
+    Task<GroupTranslation> UpdateGroupTranslationAsync(
+        string groupId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of a group's name and/or
+    /// description (ADR 0048). Standing is the same as
+    /// <see cref="AddGroupTranslationAsync"/>; a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing group or row is a
+    /// <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>; a
+    /// hand-written <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>grouptranslation.remove</c>) is stored in the caller's session.
+    /// </summary>
+    Task RemoveGroupTranslationAsync(
+        string groupId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// The public ADR 0026 standing probe the Web layer calls to decide
+    /// whether to render the group "add a translation" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is
+    /// <see cref="AddGroupTranslationAsync"/> standing check, which re-runs the
+    /// same rule server-side). Delegates to the same resolver the write lane
+    /// uses, so the display and the gate can never drift (ADR 0006-D).
+    /// <b>Standing:</b> the group's owner, a GlobalAdmin, or a Translator —
+    /// a group member and a component-moderator are not.
+    /// </summary>
+    bool CanTranslateGroup(string ownerId, string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// The <b>read</b> seam for a community's user-added name/description
+    /// translations (ADR 0026): the <see cref="CommunityTranslation"/> rows
+    /// under <paramref name="componentId"/>. Owns its <c>QuerySession</c> (the
+    /// C3 read-lane shape). **Not an authorization surface** (the ADR 0022
+    /// "a read, not a decision" pin carried over): the row has no own audience
+    /// — its visibility inherits the community's enabled visibility, which the
+    /// caller has already made — so this writes **no** audit row.
+    /// </summary>
+    Task<IReadOnlyList<CommunityTranslation>> GetCommunityTranslationsAsync(string componentId);
+
+    /// <summary>
+    /// Adds a **user-added translation** of a community's name and/or
+    /// description into <paramref name="languageCode"/> (ADR 0026). In the
+    /// caller's in-flight session (C3). **At least one** of
+    /// <paramref name="name"/> / <paramref name="description"/> must be
+    /// non-blank (an <see cref="ArgumentException"/> otherwise).
+    /// <paramref name="languageCode"/> is the target language, written verbatim.
+    /// <b>Standing:</b> a <b>GlobalAdmin</b> or a <b>Translator</b> (both
+    /// <see cref="Authorization.AccessVia.Admin"/>); a community has no owner,
+    /// so no <see cref="Authorization.AccessVia.Owner"/> branch, and a
+    /// component-moderator is denied (a moderator governs a community's
+    /// *members*, ADR 0012, not its name). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is stored.
+    /// One <c>SaveChangesAsync</c>.
+    /// </summary>
+    /// <exception cref="ArgumentException">A blank target language, a blank
+    /// actor, or both name and description blank.</exception>
+    /// <exception cref="KeyNotFoundException">The component id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds neither
+    /// the GlobalAdmin nor the Translator standing.</exception>
+    Task<CommunityTranslation> AddCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Updates** an existing user-added translation of a community's name
+    /// and/or description (ADR 0048). Standing is the same as
+    /// <see cref="AddCommunityTranslationAsync"/> (a GlobalAdmin or a
+    /// Translator); a denied actor throws <see cref="UnauthorizedAccessException"/>;
+    /// a missing component or row is a <see cref="KeyNotFoundException"/>. At
+    /// least one of name / description must be non-blank. One
+    /// <c>SaveChangesAsync</c>; a hand-written <see cref="Authorization
+    /// .AccessAudit"/> row (action <c>communitytranslation.update</c>) is
+    /// stored in the caller's session.
+    /// </summary>
+    Task<CommunityTranslation> UpdateCommunityTranslationAsync(
+        string componentId, string languageCode, string? name, string? description,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// **Removes** an existing user-added translation of a community's name
+    /// and/or description (ADR 0048). Standing is the same as
+    /// <see cref="AddCommunityTranslationAsync"/>; a denied actor throws
+    /// <see cref="UnauthorizedAccessException"/>; a missing component or row is
+    /// a <see cref="KeyNotFoundException"/>. One <c>SaveChangesAsync</c>; a
+    /// hand-written <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>communitytranslation.remove</c>) is stored in the caller's session.
+    /// </summary>
+    Task RemoveCommunityTranslationAsync(
+        string componentId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, Marten.IDocumentSession session);
+
+    /// <summary>
+    /// The public ADR 0026 standing probe the Web layer calls to decide
+    /// whether to render the community "add a translation" affordance (a
+    /// <b>display</b> pin, not a gate — the real deny is
+    /// <see cref="AddCommunityTranslationAsync"/> standing check, which re-runs
+    /// the same rule server-side). Delegates to the same resolver the write
+    /// lane uses, so the display and the gate can never drift (ADR 0006-D).
+    /// <b>Standing:</b> a GlobalAdmin or a Translator — a community has no
+    /// owner, so no Owner branch, and a component-moderator is not.
+    /// </summary>
+    bool CanTranslateCommunity(string actorId, IReadOnlySet<string> actorRoles);
+
+    /// <summary>
+    /// The <b>membership rows</b> of a single community (a
+    /// <see cref="Component"/> row) — the manage-page member list (ADR
+    /// 0012) and the candidate source for the add picker. The
+    /// <see cref="GetGroupMembersAsync"/> analog on the component axis: a
+    /// *candidate projection*, not an access decision — no
+    /// <see cref="Authorization.AccessAudit"/> row. Strong-consistency live
+    /// rows (C4): an add/remove in the same commit is live on the very next
+    /// call. Note this returns the **explicit rows only** — a mandatory
+    /// community's implicit members are *all* residents, which no list
+    /// enumerates; the manage surface shows the flag instead (the view's
+    /// job, not this read's).
+    /// </summary>
+    Task<IReadOnlyList<ComponentMembership>> GetCommunityMembersAsync(string componentId);
 
     // ── M2b additions (ADR 0006-E compatible lane — owner-invited group
     // membership: invite → accept/decline, plus the owner's cancel lane.
@@ -402,15 +778,30 @@ public interface IUserInfoService
     /// <c>TargetKind</c> "group", <see cref="Authorization.AccessVia.Owner"/> —
     /// the invitee's own standing; effective principal = the invitee).
     /// </summary>
-    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3), or the invitee is a supervised child with an active <see cref="GuardianLink"/> (GU gate — ADR 0028 §C / invariant G·2: their guardian must call <see cref="ApproveGroupInvitationAsync"/> instead).</exception>
     Task AcceptGroupInvitationAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// GU (ADR 0028): a **guardian** approves a **supervised child's** pending
+    /// group invitation — the accept write path (the membership lands) with the
+    /// **guardian** recorded as <c>ResolvedBy</c> and the audit row
+    /// <c>group.invite.approve</c> <c>Via: Guardian</c> (G·2). Precondition: an
+    /// **active** <see cref="GuardianLink"/> for (guardian, child) and a
+    /// <b>Pending</b> invitation on the child; a child with no active link is
+    /// refused (they use the self-lane
+    /// <see cref="AcceptGroupInvitationAsync"/> instead).
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/> for this (guardian, child) pair (G·3 deny-by-default — the Web surfaces a 404).</exception>
+    /// <exception cref="InvalidOperationException">No invitation for this (group, child) pair, or the row is not <c>Pending</c> (C-M2b·3).</exception>
+    Task<GroupInvitation> ApproveGroupInvitationAsync(string groupId, string childId, string guardianId);
 
     /// <summary>
     /// Resolve a pending invitation as <b>Declined</b> — the same self-lane and
     /// audit shape as <see cref="AcceptGroupInvitationAsync"/> (action
     /// <c>group.invite.decline</c>, <see cref="Authorization.AccessVia.Owner"/>),
     /// but <b>no</b> <see cref="GroupMembership"/> row is written — the invitee
-    /// simply never becomes a member.
+    /// simply never becomes a member. A supervised child may <b>always</b> say
+    /// no — this lane gets no GU gate (ADR 0028 §C).
     /// </summary>
     /// <exception cref="InvalidOperationException">No invitation for this (group, actor) pair (C-M2b·2 self-lane), or the row is not <c>Pending</c> (C-M2b·3).</exception>
     Task DeclineGroupInvitationAsync(string groupId, string actorId);
@@ -454,4 +845,128 @@ public interface IUserInfoService
     /// live on the very next call.
     /// </summary>
     Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForGroupAsync(string groupId);
+
+    // ── GU guardian lanes (ADR 0028) — additive, beside the membership lanes ──
+    // Account-scope supervision of a child's account (ADR 0028 §C). The standing
+    // is <c>AccessVia.Guardian</c> (the 9th value), resolved **live** off the
+    // active <see cref="GuardianLink"/> row (G·2) and **deny-by-default** (G·3).
+    // These lanes are **management** lanes on this surface — they are *not* on
+    // a <c>CanAsync</c> / <c>CanSeeAsync</c> content-decision path (G·1, the
+    // load-bearing honesty: a guardian has no standing to read the child's
+    // private content). ADR 0006-E compatible — appended to the owning
+    // module's public surface, additive; the frozen 4-method
+    // <c>IAuthorizationService</c> surface is byte-identical.
+
+    /// <summary>
+    /// Formation (ADR 0028 §C action 1; G·4 — creation is the standing basis).
+    /// Upserts the <c>(GuardianId, ChildId)</c> <see cref="GuardianLinkStatus
+    /// .Active"/> row: a duplicate pair is an <b>idempotent no-op</b> (the row is
+    /// left as-is and returned; not a throw). The Web's add-a-child form pairs
+    /// this with <c>IIdentityService.RegisterAsync</c> so account + link + audit
+    /// commit together (C3) — a created-but-unlinked account can never exist.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>guardian.create</c>, <c>TargetKind</c> "guardian-link",
+    /// <see cref="Authorization.AccessVia.Guardian"/>) in the same session
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    Task<GuardianLink> CreateGuardianLinkAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// GA-AR (ADR 0038 amendment): assign a second guardian to a child — the
+    /// conferral-based standing basis (vs. <see cref="CreateGuardianLinkAsync"/>'s
+    /// creation-based basis). Writes the <see cref="GuardianLink"/> row + TWO
+    /// audit rows in ONE commit (C3): (1) <c>guardian.create</c> with
+    /// <c>ActorId = guardianId</c> (the standing-holder, the GU seam's shape —
+    /// byte-identical to what <see cref="CreateGuardianLinkAsync"/> writes);
+    /// (2) <c>guardian.assign</c> with <c>ActorId = assignedById</c> (the
+    /// conferrer). Together they answer "who holds standing" AND "who
+    /// conferred it." The <see cref="GuardianLink"/> POCO is unchanged (S·3).
+    /// Idempotent for the (guardianId, childId) pair (S·6 — the G-A·4
+    /// precedent, inherited): a duplicate active row is a no-op — no second
+    /// row, no second pair of audit rows.
+    /// </summary>
+    /// <param name="childId">The supervised child's subject id.</param>
+    /// <param name="guardianId">The assigned guardian's subject id (the
+    /// standing-holder; the <c>GuardianLink.GuardianId</c> value; the
+    /// <c>guardian.create</c> audit row's <c>ActorId</c>).</param>
+    /// <param name="assignedById">The assigning guardian's subject id (the
+    /// conferrer; the <c>guardian.assign</c> audit row's
+    /// <c>ActorId</c>/<c>EffectivePrincipalId</c>).</param>
+    Task<GuardianLink> AssignGuardianLinkAsync(
+        string childId, string guardianId, string assignedById);
+
+    /// <summary>
+    /// Suspend the child (ADR 0028 §C action 2; G·2 — live standing off
+    /// <see cref="Profile.Blocked"/>). The **standing gate** runs first: an
+    /// <b>active</b> <see cref="GuardianLink"/> with
+    /// <see cref="GuardianLink.GuardianId"/> equal to <paramref name="guardianId"/>
+    /// must exist, else an <see cref="UnauthorizedAccessException"/> (the Web's
+    /// 404; G·2/G·3 deny-by-default). Then loads the child's <see cref="Profile"/>
+    /// by <see cref="Profile.SubjectId"/> (missing → <see
+    /// cref="InvalidOperationException"/>) and sets
+    /// <see cref="Profile.Blocked"/> = <c>true</c> — the <b>same flag</b>
+    /// <c>BlockedAccountMiddleware</c> + the directory already read (enforcement
+    /// parity). The GlobalAdmin <c>BlockAsync</c> / <c>UnblockAsync</c> are
+    /// **unchanged** (G·5). Appends an audit row (action <c>guardian.suspend</c>,
+    /// <c>TargetKind</c> "profile", <see cref="Authorization.AccessVia
+    /// .Guardian"/>) in the same session (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair — the actor has no standing.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="Profile"/> with that
+    /// <see cref="Profile.SubjectId"/> exists.</exception>
+    Task SuspendChildAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// Un-suspend the child (ADR 0028 §C action 2). Same <b>standing gate</b> as
+    /// <see cref="SuspendChildAsync"/> (an active link for the pair, else
+    /// <see cref="UnauthorizedAccessException"/>); loads the <see cref="Profile"/>
+    /// by <see cref="Profile.SubjectId"/> (missing → <see
+    /// cref="InvalidOperationException"/>) and sets
+    /// <see cref="Profile.Blocked"/> = <c>false</c> — standing restored live on
+    /// the next read (G·2). Appends an audit row (action
+    /// <c>guardian.unsuspend</c>, <c>TargetKind</c> "profile", <see
+    /// cref="Authorization.AccessVia.Guardian"/>) in the same session
+    /// (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="childId"/> or
+    /// <paramref name="guardianId"/> is null/whitespace.</exception>
+    /// <exception cref="UnauthorizedAccessException">No active <see cref="GuardianLink"/>
+    /// for this (guardian, child) pair — the actor has no standing.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="Profile"/> with that
+    /// <see cref="Profile.SubjectId"/> exists.</exception>
+    Task UnsuspendChildAsync(string childId, string guardianId);
+
+    /// <summary>
+    /// Independence — dissolve the link (ADR 0028 §C action 6). Loads the
+    /// <see cref="GuardianLink"/> by <paramref name="linkId"/> (missing → <see
+    /// cref="InvalidOperationException"/>). When <paramref name="viaAdmin"/> is
+    /// <c>false</c>, the actor <b>must be</b> the row's
+    /// <see cref="GuardianLink.GuardianId"/> (else <see
+    /// cref="UnauthorizedAccessException"/> — G·4, the guardian's own lane); when
+    /// <c>true</c>, no actor-identity check (the G·5 GlobalAdmin safety valve).
+    /// Moves the row <see cref="GuardianLinkStatus.Active"/> → <see
+    /// cref="GuardianLinkStatus.Dissolved"/> (<see cref="GuardianLink
+    /// .DissolvedAt"/>/<see cref="GuardianLink.DissolvedBy"/> stamped). The
+    /// child's memberships are **preserved** — a dissolve writes nothing to
+    /// membership and does <b>not</b> set <see cref="Profile.Blocked"/> (the
+    /// self-lanes restore on the next read, G·2/C4; un-suspend is a <b>separate</b>
+    /// act, the G·5 valve or <see cref="UnsuspendChildAsync"/>). Appends an
+    /// audit row (action <c>guardian.dissolve</c>, <c>TargetKind</c>
+    /// "guardian-link", <see cref="Authorization.AccessVia.Guardian"/> when
+    /// <paramref name="viaAdmin"/> is false else <see cref="Authorization
+    /// .AccessVia.Admin"/>) in the same session (invariant C3).
+    /// </summary>
+    /// <exception cref="ArgumentException"><paramref name="linkId"/> or
+    /// <paramref name="actorId"/> is null/whitespace.</exception>
+    /// <exception cref="InvalidOperationException">No <see cref="GuardianLink"/> with
+    /// that id exists.</exception>
+    /// <exception cref="UnauthorizedAccessException"><paramref name="viaAdmin"/> is
+    /// false and <paramref name="actorId"/> is not the row's
+    /// <see cref="GuardianLink.GuardianId"/>.</exception>
+    Task DissolveGuardianLinkAsync(string linkId, string actorId, bool viaAdmin);
 }

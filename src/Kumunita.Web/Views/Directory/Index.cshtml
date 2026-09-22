@@ -4,19 +4,30 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-7">
-        <h1>Directory</h1>
-        <p class="text-muted">Everyone in the neighborhood — every resident on the platform.</p>
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="directory.title">Directory</kw-l></h1>
+                    <p class="lede"><kw-l key="directory.lead">Everyone in the neighborhood — every resident on the platform.</kw-l></p>
+                </div>
+            </div>
+        </header>
 
         @if (Model.Profiles.Count == 0)
         {
             <div class="alert alert-info">
-                No residents on this neighborhood yet.
+                <kw-l key="directory.empty">No residents on this neighborhood yet.</kw-l>
             </div>
         }
         else
         {
-            <ul class="list-group">
+            @* Cards (variant C): the "bigger avatars" overview. The card is
+               the row's identity — avatar first, then name, address, and the
+               Verified badge on its own line. The .avatar-lg sizing comes
+               from site.css (U8) — the same endpoint + fallback pattern the
+               list version used, just a larger target. *@
+            <div class="dir-cards">
                 @foreach (var p in Model.Profiles)
                 {
                     @*
@@ -24,7 +35,7 @@
                       <img> src is always U7's serving endpoint (GET
                       /profile/avatar/{subjectId}, C-MED·3 — never a static
                       path; the gate + audit run on the endpoint, not on the
-                      <img>). The row's own SubjectId is the subject — the
+                      <img>). The card's own SubjectId is the subject — the
                       frozen VisibleProfile already carries it. The endpoint
                       fails closed to 404 (no avatar set, a denied audience
                       or a blocked profile — FACES M3–M5), so on load error
@@ -33,30 +44,31 @@
                     string avatarInitial = !string.IsNullOrWhiteSpace(p.DisplayName)
                         ? char.ToUpperInvariant(p.DisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
-                    <li class="list-group-item d-flex align-items-center justify-content-between">
-                        <span class="d-flex align-items-center gap-2">
-                            <span class="d-inline-flex align-items-center">
-                                <img class="avatar" src="/profile/avatar/@p.SubjectId" alt=""
-                                     data-avatar-fallback>
-                                <span class="avatar-mono" style="display:none;">@avatarInitial</span>
-                            </span>
-                            <span>
-                                <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
-                                @if (!string.IsNullOrEmpty(p.Address))
-                                {
-                                    <span class="text-muted small"> · @p.Address</span>
-                                }
-                            </span>
+                    <div class="dir-card">
+                        <span class="d-inline-flex align-items-center justify-content-center">
+                            <img class="avatar avatar-lg" src="/profile/avatar/@p.SubjectId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
                         </span>
-                        <span>
+                        <span class="dname">
+                            <a href="@Url.Action("Detail", "Directory", new { subjectId = p.SubjectId })">@p.DisplayName</a>
+                        </span>
+                        @if (!string.IsNullOrEmpty(p.Address))
+                        {
+                            <span class="daddr">@p.Address</span>
+                        }
+                        <span class="dfoot">
                             @if (p.Verified)
                             {
                                 <span class="badge text-bg-success">Verified</span>
                             }
                         </span>
-                    </li>
+                    </div>
                 }
-            </ul>
+            </div>
+
+            @* Whole-card click→nav is handled by client/lib/directory-card.js
+               (loaded in _Layout.cshtml — SECURITY.md §6 no-inline-script). *@
         }
     </div>
 </div>

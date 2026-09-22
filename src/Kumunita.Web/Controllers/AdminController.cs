@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -22,8 +23,70 @@ public sealed class AdminController(
     AppDbContext identities,
     IDocumentStore store,
     IIdentityService identity,
-    IUserInfoService userInfo) : Controller
+    IUserInfoService userInfo,
+    IPageService pages) : Controller
 {
+    // SP U03 (ADR 0043 D4) — the five shipped platform surfaces, in the
+    // footer-column order (about view first, then the four Page docs). The
+    // slugs are the ADR 0040 canonical `system/{slug}` paths; the bare-slug
+    // fallback mirrors StaticPagesController.Page (ADR 0040's pre-migration
+    // re-parent seam). `about` normally resolves to no id (ADR 0043 D1 — it
+    // is a view, not a seeded page): that is correct, not a defect.
+    private static readonly (string Slug, string Route)[] PlatformSurfaceRows =
+    {
+        ("about",   "/about"),
+        ("terms",   "/terms"),
+        ("help",    "/help"),
+        ("privacy", "/privacy"),
+        ("conduct", "/conduct"),
+    };
+
+    public static async Task<string?> ResolvePageIdAsync(IPageService pages, string slug)
+    {
+        Page? page;
+        try
+        {
+            page = await pages.GetByPathAsync($"system/{slug}");
+        }
+        catch (KeyNotFoundException)
+        {
+            try
+            {
+                page = await pages.GetByPathAsync(slug);
+            }
+            catch (KeyNotFoundException)
+            {
+                page = null;
+            }
+        }
+        return page?.Id;
+    }
+
+    /// <summary>
+    /// SP U03 (ADR 0043 D4) — composes the five <see cref="AdminIndexViewModel
+    /// .PlatformPageRow"/> rows in footer order, resolving each slug to a page id
+    /// (the edit target) via <see cref="ResolvePageIdAsync"/>. Pure: no EF Core
+    /// round-trip, no <see cref="AdminController"/> instance state — callable from
+    /// <see cref="Index"/> and from the test harness without a database.
+    /// <c>about</c> is a view, not a seeded page (ADR 0043 D1), so it normally
+    /// yields <c>PageId == null</c>; the other four resolve to their seeded
+    /// <c>system/{slug}</c> ids (or <c>null</c> if absent — preview-only).
+    /// </summary>
+    public static async Task<IReadOnlyList<AdminIndexViewModel.PlatformPageRow>>
+        BuildPlatformPagesAsync(IPageService pages)
+    {
+        var ids = await Task.WhenAll(
+            PlatformSurfaceRows.Select(r => ResolvePageIdAsync(pages, r.Slug)));
+        return ids
+            .Select((pageId, i) => new AdminIndexViewModel.PlatformPageRow
+            {
+                Slug   = PlatformSurfaceRows[i].Slug,
+                Route  = PlatformSurfaceRows[i].Route,
+                PageId = pageId
+            })
+            .ToList();
+    }
+
     private static string? AdminSubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         user.FindFirst(Kumunita.Core.Identity.ClaimTypes.Subject)?.Value;
 
@@ -113,15 +176,23 @@ public sealed class AdminController(
                 Description     = c.Description,
                 SortOrder       = c.SortOrder,
                 Enabled         = c.Enabled,
-                ModeratorAccess = c.ModeratorAccess
+                ModeratorAccess = c.ModeratorAccess,
+                Mandatory       = c.Mandatory
             })
             .ToList();
+
+        // SP U03 (ADR 0043 D4) — the "Platform pages" affordance (the five rows,
+        // in footer order, each with its resolved page id or null — see
+        // <see cref="BuildPlatformPagesAsync"/>). `about` is a view, not a page
+        // (ADR 0043 D1), so it lands as a preview-only row.
+        var platformPages = await BuildPlatformPagesAsync(pages);
 
         return View(new AdminIndexViewModel
         {
             Accounts    = accountsWithRoles,
             Components  = componentOptions,
-            Communities = communityRows
+            Communities = communityRows,
+            PlatformPages = platformPages
         });
     }
 
@@ -147,8 +218,27 @@ public sealed class AdminController(
         var admin = AdminSubjectId(User) ?? string.Empty;
         try
         {
-            await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
-            TempData["info"] = $"Community “{model.Name}” added.";
+            var created = await userInfo.CreateCommunityAsync(model.Name, model.Description, admin);
+            // ADR 0012 — the form's "mandatory" checkbox: the Core CreateAsync
+            // defaults Mandatory=false, so flip the flag on through the same
+            // GlobalAdmin-only audited lane (the admin's standing, never the
+            // moderator's). A second audit row (community.set-mandatory) is
+            // correct — it *is* a distinct, audited action.
+            if (model.Mandatory)
+            {
+                await userInfo.SetCommunityMandatoryAsync(created.Id, true, admin, KumunitaPrincipal.RoleSet(User));
+            }
+            TempData["info"] = model.Mandatory
+                ? $"Community “{model.Name}” added (mandatory — everyone in the neighborhood is a member)."
+                : $"Community “{model.Name}” added.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Unreachable in practice (this page is [Authorize(Roles=GlobalAdmin)]
+            // so RoleSet(User) carries GlobalAdmin), but the mandatory lane
+            // re-checks standing in Core (thin token) — fail closed.
+            TempData["error"] = "You are not permitted to set a community as mandatory.";
+            return RedirectToAction(nameof(Index));
         }
         catch (ArgumentException ex)
         {
@@ -226,6 +316,44 @@ public sealed class AdminController(
         return RedirectToAction(nameof(Index));
     }
 
+    // ── Mandatory toggle (the ADR 0012 GlobalAdmin decision, now reachable
+    // from the /admin list too — the same lane the community's manage page
+    // uses, so the standing rule is identical; only the surface changes) ────
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleCommunityMandatory([FromForm] string componentId, [FromForm] bool mandatory)
+    {
+        if (string.IsNullOrEmpty(componentId))
+            return RedirectToAction(nameof(Index));
+
+        var admin = AdminSubjectId(User) ?? string.Empty;
+        try
+        {
+            // RoleSet(User) carries GlobalAdmin (this page is
+            // [Authorize(Roles=GlobalAdmin)]) — the Core standing gate holds.
+            await userInfo.SetCommunityMandatoryAsync(componentId, mandatory, admin, KumunitaPrincipal.RoleSet(User));
+            TempData["info"] = mandatory
+                ? $"Community marked mandatory — everyone in the neighborhood is a member."
+                : $"Community marked optional — membership is now explicit again.";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Unreachable (page is GlobalAdmin-gated) but the Core lane
+            // re-checks standing (thin token) — fail closed.
+            TempData["error"] = "You are not permitted to set a community's mandatory standing.";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (ArgumentException)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["error"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SetRole(SetRoleViewModel model)
@@ -234,6 +362,18 @@ public sealed class AdminController(
             return RedirectToAction(nameof(Index));
 
         var admin = AdminSubjectId(User) ?? string.Empty;
+
+        // ADR 0030 — roles are independent: the form submits the *set* of elevated roles
+        // to grant. `Member` is the "nothing selected" state (the implicit
+        // verified-resident standing) and is never a real role, so it is filtered out
+        // (Core also guards this — only the three elevated roles are AddTo/RemoveFrom'd).
+        // An empty set means "no elevated role" (a plain Member).
+        var roles = model.RoleNames
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Where(r => r is Roles.Moderator or Roles.Translator or Roles.GlobalAdmin)
+            .Distinct()
+            .ToList();
+
         var componentIds = model.ComponentIds
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct()
@@ -241,15 +381,10 @@ public sealed class AdminController(
 
         try
         {
-            // "Member" is the "no elevated role" value (Core's SetRoleAsync removes any
-            // GlobalAdmin/Moderator when the role string is neither of those).
-            var role = string.IsNullOrWhiteSpace(model.Role) || model.Role == Kumunita.Core.Identity.Roles.Member
-                ? Kumunita.Core.Identity.Roles.Member
-                : model.Role;
             await identity.SetRoleAsync(
                 targetSubjectId: model.TargetSubjectId,
                 adminSubjectId: admin,
-                role: role,
+                roles: roles,
                 componentIds: componentIds);
         }
         catch (UnauthorizedAccessException)
@@ -265,7 +400,7 @@ public sealed class AdminController(
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["info"] = "Role updated.";
+        TempData["info"] = "Roles updated.";
         return RedirectToAction(nameof(Index));
     }
 
@@ -290,6 +425,14 @@ public sealed class AdminController(
         // on them regardless of Enabled state).
         var allComponents = (await userInfo.GetComponentsAsync(enabledOnly: false)).Select(c => c.Id).ToHashSet();
 
+        // ADR 0012 — the enabled mandatory ids (the union read in
+        // GetCommunityIdsAsync always carries them — see the scope note
+        // below the diff).
+        var mandatoryComponentIds = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            .Where(c => c.Mandatory)
+            .Select(c => c.Id)
+            .ToHashSet();
+
         var newSet = model.CommunityIds
             .Where(c => !string.IsNullOrWhiteSpace(c))
             .Distinct()
@@ -303,7 +446,15 @@ public sealed class AdminController(
         // loop tight).
         newSet.IntersectWith(allComponents);
 
-        var currentSet = (await userInfo.GetCommunityIdsAsync(model.TargetSubjectId)).ToHashSet();
+        // ADR 0012 — mandatory components are out of this form's scope: every
+        // verified resident is an implicit member (the union read in
+        // GetCommunityIdsAsync always includes an enabled mandatory id), so
+        // "unchecking" one would be a silent no-op (the Core lane skips it)
+        // and "checking" it a redundant row. Drop them from both sides of the
+        // diff so the added/removed counts stay honest.
+        newSet.ExceptWith(mandatoryComponentIds);
+        var currentSet = new HashSet<string>(await userInfo.GetCommunityIdsAsync(model.TargetSubjectId));
+        currentSet.ExceptWith(mandatoryComponentIds);
 
         var toAdd    = newSet.Except(currentSet).ToList();
         var toRemove = currentSet.Except(newSet).ToList();

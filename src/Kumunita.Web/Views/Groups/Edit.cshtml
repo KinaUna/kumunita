@@ -1,0 +1,117 @@
+@model Kumunita.Web.Models.GroupPostComposeViewModel
+@{
+    ViewData["Title"] = "Edit group post";
+    // The group's id and the post's id are the route's {id}/{postId} — this
+    // view is reached via GET /groups/{id}/posts/{postId}/edit (ADR 0016,
+    // the author-only group-post edit lane) and by the paired POST's failure
+    // re-render. The form carries title + body + the authored-in language
+    // tag (ADR 0018, amended 2026-09-13 — ADR 0016's editable surface
+    // extended); the group lane has no audience slot (G·8: the membership is
+    // the audience proxy) and no component picker (G·2 lane exclusivity); the
+    // group's id is never a form field (a form-bound group id would be a
+    // lane-bypass hole; the controller reads it from the route).
+    string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
+    string editPostId = (string?)ViewContext.RouteData.Values["postId"] ?? string.Empty;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <p><a class="text-muted" href="@($"/groups/{groupId}/posts/{editPostId}")">&larr; <kw-l key="groups.edit_back">back to the post</kw-l></a></p>
+
+        <h1><kw-l key="groups.edit_title">Edit your post</kw-l></h1>
+        <p class="text-muted">
+            <kw-l key="groups.edit_lede">You are editing your own post. Only you can edit it — the group membership decides who can see it, but only its author can change it. The group this post appears in is fixed; only the title, body, and language below are editable.</kw-l>
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form method="post" action="@($"/groups/{groupId}/posts/{editPostId}/edit")">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="title" style="font-weight:600;">
+                            <kw-l key="groups.edit_title_label">Title</kw-l>
+                        </label>
+                        <input class="form-control" type="text" id="title" name="Title"
+                               maxlength="120" value="@Model.Title"
+                               placeholder="optional" />
+                        <div class="text-muted small mt-1">
+                            <kw-l key="groups.edit_title_hint">A short headline (≤ 120 chars). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="body" style="font-weight:600;">
+                            <kw-l key="groups.edit_body_label">Body</kw-l>
+                        </label>
+                        <div class="rc-editor">
+                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                <partial name="_RichEditorToggle" />
+                            </div>
+                            <textarea class="form-control" id="body" name="Body" rows="6" required
+                                      placeholder="…" data-rich-editor>@Model.Body</textarea>
+                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;">
+                        <kw-l key="groups.edit_language_label">Language</kw-l>
+                    </label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="groups.edit_language_hint">The language you're writing this post in. This is only a tag — it is not translated — and it keeps the text findable later and lets a reader add their own language version if they want.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="groups.edit_submit">Save changes</kw-l></button>
+                <a class="btn btn-outline-secondary" href="@($"/groups/{groupId}/posts/{editPostId}")"><kw-l key="groups.edit_cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @* The rich editor (RE U03, client/lib/rich-editor.ts, tsc-built —
+       the toolbar + live preview pane. Self-wires the .rc-editor surface.
+       RE·3: no editor dependency. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

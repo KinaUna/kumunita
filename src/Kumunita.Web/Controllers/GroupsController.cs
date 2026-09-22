@@ -1,6 +1,9 @@
+using Kumunita.Core.Localization;
+using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
+using Marten;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,10 +35,43 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 [Route("groups")]
-public sealed class GroupsController(IUserInfoService userInfo) : Controller
+public sealed class GroupsController(
+    IUserInfoService userInfo,
+    PostService posts,
+    ILocalizationService localization,
+    IDocumentStore store,
+    // Back-link display name (the group name on the post-detail page's
+    // "back to the group" link) — the per-request translation read seam,
+    // used to resolve the group's stored name into the viewer's current
+    // language when a user-added name translation exists (the ADR 0026
+    // floor). **Optional** so the existing test-construction site (which
+    // builds this controller with four arguments) keeps compiling; DI
+    // always supplies the live ITranslationProvider in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// The group-post composer's + reply form's <b>authored-in language</b>
+    /// picker options (ADR 0018, ADR 0005 B) — the instance's **enabled**
+    /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>. Read through
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
+    /// seam, ADR 0005 D) — the exact catalog read the
+    /// <see cref="LocaleController.Index"/> page uses. The composer/reply form
+    /// leaves the selection empty by default so the *instance default* is what
+    /// the service materializes server-side at write time — the picker is the
+    /// set of choices, not the choice.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
+    {
+        var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
+        return catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => (l.Id, l.NativeName))
+            .ToList();
+    }
 
     /// <summary>
     /// The group list (F14): the groups the actor owns or is a member of, projected
@@ -225,7 +261,37 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
         // lane is owner ∪ GlobalAdmin (C-M2·3) — the view hides its form for
         // plain members and the route 404s their POST.
         var isOwner = group.OwnerId == actor;
+        // ── Group posts (ADR 0013) — the membership-scoped feed stays on the
+        //    detail page; the composer is its own page (GET/POST under
+        //    /groups/{id}/posts/new + /posts). Same lanes as the old feed
+        //    action: ListGroupFeedAsync is the single access decision + the
+        //    aggregate AccessAudit row (G·1/G·5), and the CanPost read is
+        //    the live GetGroupIdsAsync membership read (G·3 — the POST gate
+        //    stays the authoritative deny). The Detail page is member-scoped
+        //    by its owner ∪ member gate, so every viewer here is a member
+        //    and sees the feed + the "New post" button. ──
+        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: 1);
 
+        var groupPosts = new List<PostListItem>(feed.Visible.Count);
+        foreach (var post in feed.Visible)
+        {
+            var profile = await userInfo.GetProfileAsync(post.AuthorId);
+            var preview = MarkdownRenderer.PlainTextPreview(post.Body, 200);
+            groupPosts.Add(new PostListItem(
+                post.Id,
+                post.Title,
+                preview,
+                post.Created,
+                profile?.DisplayName ?? post.AuthorId,
+                post.AuthorId));
+        }
+
+        // CanPost: the SAME rule the CreateGroupPost gate enforces (G·3) —
+        // the live membership read; a display convenience that drives the
+        // composer's visibility (the POST gate is the authoritative deny).
+        var canPost = (await userInfo.GetGroupIdsAsync(actor)).Contains(group.Id);
+        // canPost gates the "New post" button (the standalone compose page
+        // at /groups/{id}/posts/new) — the POST gate is the authoritative deny.
         // m2b read lane #3 — the group's pending invitations (the owner's
         // invite surface: the pending list + cancel links). Read lane (no
         // audit, C-M2·2 carried); each row's display name via the same
@@ -257,6 +323,27 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
             })
             .ToList();
 
+        // ── ADR 0026 — group name/description translations ────────────────
+        // Rendered as a "a read, not a decision" surface (the same standing the
+        // ADR 0022 post-detail surface uses for PostTranslation rows): the
+        // group is already an authorized read for this actor (404 above if not
+        // visible), so the translation rows inherit that reach. The enabled
+        // catalog (ListLanguagesAsync, Enabled + SortOrder — the same read the
+        // ADR 0022 post surface uses) seeds the chips / "add a translation"
+        // candidate list. CanTranslate is the display convenience mirroring
+        // UserInfoService's AddGroupTranslationAsync standing check — the POST
+        // re-checks server-side, so this is not the gate.
+        var groupTranslations = await userInfo.GetGroupTranslationsAsync(group.Id);
+        var translationCodes = groupTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var catalog = await localization.ListLanguagesAsync();
+        var groupLanguages = catalog
+            .Where(l => l.Enabled)
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new LanguageOption(l.Id, l.NativeName, translationCodes.Contains(l.Id)))
+            .ToList();
+        var canTranslate = userInfo.CanTranslateGroup(
+            group.OwnerId, actor, KumunitaPrincipal.RoleSet(User));
+
         return View(new GroupDetailViewModel(
             group.Id,
             group.Name,
@@ -267,7 +354,15 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
             members,
             pendingInvitations,
             residentCandidates,
-            group.IsPrivate));
+            group.IsPrivate)
+        {
+            GroupPosts = groupPosts,
+            GroupPostsTotal = feed.Total,
+            CanPost = canPost,
+            GroupTranslations = groupTranslations,
+            Languages = groupLanguages,
+            CanTranslate = canTranslate,
+        });
     }
 
     // ── Shared write-path helper (M2 plan U10, line 152) ────────────────
@@ -441,6 +536,217 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
 
         TempData["info"] = $"You have left “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // ── ADR 0026: group name/description translations ──────────────────────
+
+    /// <summary>
+    /// Adds a **user-added translation** of the group's name and/or
+    /// description into <paramref name="languageCode"/> (ADR 0026):
+    /// <c>POST /groups/{id}/translations</c>. A thin Web lane (ADR 0006-D:
+    /// routes + shape) that delegates the write + standing decision to
+    /// <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .AddGroupTranslationAsync"/> (the standing — owner / GlobalAdmin /
+    /// Translator — is re-pinned server-side; the detail page's
+    /// <see cref="Kumunita.Web.Models.GroupDetailViewModel.CanTranslate"/> is
+    /// only the display affordance).
+    /// <para>
+    /// <b>Precondition:</b> the actor must be in the group's owner ∪ member
+    /// reachability projection (the <see cref="TryResolveWriteSurface"/> gate,
+    /// the same consistent 404 shape every other group write lane uses); the
+    /// group is already an authorized read for the actor, so the translation
+    /// write inherits that reach. A denied standing actor (a plain member)
+    /// is a 403 (<see cref="UnauthorizedAccessException"/> →
+    /// <see cref="Microsoft.AspNetCore.Mvc.Controller.Forbid"/>); a missing
+    /// group is a 404. At least one of name/description must be non-blank
+    /// (re-checked server-side by the seam).
+    /// </para>
+    /// <para>
+    /// <b>Session shape (C3):</b> the controller owns the
+    /// <see cref="Marten.IDocumentStore.LightweightSession()"/>; the service's
+    /// <c>SaveChangesAsync</c> is the single write — the
+    /// <see cref="Kumunita.Core.UserInfo.GroupTranslation"/> row and its
+    /// <c>AccessAudit</c> row commit atomically.
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? name,
+        [FromForm] string? description)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+        {
+            TempData["error"] = "A translation needs a name and/or description.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        // Reachability gate (owner ∪ member projection) — the consistent 404
+        // shape every other group write lane uses.
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.AddGroupTranslationAsync(
+                resolved.Group.Id,
+                languageCode,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(description) ? null : description,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var catalog = await localization.ListLanguagesAsync();
+        var langName = catalog.FirstOrDefault(l => l.Id == languageCode)?.NativeName ?? languageCode;
+        TempData["info"] = $"Translation added ({langName}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── ADR 0048 — edit + delete lanes for group translations ─────────────
+    // ADR 0026 was add-only; ADR 0048 lifts the "add-only" pin on the same
+    // standing matrix (group owner / GlobalAdmin / Translator). Failure
+    // shapes mirror the add lane (denied → 403; missing → 404).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the group's name
+    /// and/or description (ADR 0048):
+    /// <c>POST /groups/{id}/translations/update</c>. Thin Web lane; delegates
+    /// to <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .UpdateGroupTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? name,
+        [FromForm] string? description)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+        if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(description))
+        {
+            TempData["error"] = "A translation needs a name and/or description.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.UpdateGroupTranslationAsync(
+                resolved.Group.Id,
+                languageCode,
+                string.IsNullOrWhiteSpace(name) ? null : name,
+                string.IsNullOrWhiteSpace(description) ? null : description,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name2 = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name2}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the group's name
+    /// and/or description (ADR 0048):
+    /// <c>POST /groups/{id}/translations/remove</c>. Thin Web lane; delegates
+    /// to <see cref="Kumunita.Core.UserInfo.IUserInfoService
+    /// .RemoveGroupTranslationAsync"/>. Failure shapes mirror
+    /// <see cref="AddTranslation"/>.
+    /// </summary>
+    [HttpPost("{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTranslation(
+        [FromRoute] string id, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Forbid();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return RedirectToAction(nameof(Detail), new { id });
+        }
+
+        var resolved = await TryResolveWriteSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await userInfo.RemoveGroupTranslationAsync(resolved.Group.Id, languageCode, actor, actorRoles, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name2 = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name2}).";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
     // ── ADR 0009: the group's description (resident-facing display + the
@@ -710,5 +1016,1033 @@ public sealed class GroupsController(IUserInfoService userInfo) : Controller
 
         TempData["info"] = $"Cancelled the invitation for {subjectId}.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── Group posts (ADR 0013, group-posts milestone U7) — the membership
+    //    channel: feed / detail / create / reply under /groups/{id}/posts.
+    //    Thin HTTP (ADR 0006-D: routes + shape; the M2 thin-controller
+    //    precedent in this file): every access decision comes from
+    //    <see cref="PostService"/>'s group surface (U6), the membership lane
+    //    is the sole decision (G·1), the audience lane is never evaluated
+    //    (G·8), there is no moderator / break-glass branch to reach (G·4 —
+    //    *unavailable*, not deferred), and this controller never re-derives
+    //    access — no <c>IAuthorizationService</c> call here at all. ──
+
+    /// <summary>
+    /// A group post's <b>detail</b> + its one-level replies (ADR 0013,
+    /// G11 FACES): <c>GET /groups/{id}/posts/{postId}</c>. The service's
+    /// <see cref="PostService.GetGroupPostAsync"/> is the single detail
+    /// decision row (G·5, TargetId = the post id) and returns the replies
+    /// <b>as-is</b> under the parent's single group-lane decision (G·7 —
+    /// no second evaluation, no per-reply row). A missing post, a lane
+    /// mismatch, or a membership Deny all return <c>Post = null</c> (Core
+    /// doesn't distinguish — the audit row does); the controller maps that
+    /// to a 404 (the group lane's fail-closed shape — G·3/G·4, this file's
+    /// "a non-visible group 404s" precedent).
+    /// </summary>
+    [HttpGet("{id}/posts/{postId}")]
+    public async Task<IActionResult> GroupPostDetail(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        var result = await posts.GetGroupPostAsync(id, postId, actor);
+        if (result.Post is null)
+            return NotFound();
+
+        var authorProfile = await userInfo.GetProfileAsync(result.Post.AuthorId);
+
+        // ADR 0022 (group lane) — the post's user-added translations, the
+        // enabled-catalog language set the chips / "add a translation"
+        // candidate list render from, and the standing flag. On the group lane
+        // the standing is author ∪ GlobalAdmin only (the component-moderator
+        // branch is excluded by CanAddTranslation's isGroupLane flag — ADR 0007).
+        var postTranslations = await posts.GetPostTranslationsAsync(result.Post.Id);
+        var enabledLanguages = await SeedLanguagePickerAsync();
+        var translationCodes = postTranslations.Select(t => t.LanguageCode).ToHashSet();
+        var languages = enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, translationCodes.Contains(l.Code)))
+            .ToList();
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        var canTranslate = PostService.CanAddTranslation(
+            isGroupLane: true, result.Post.ComponentId, result.Post.AuthorId, actor, actorRoles);
+
+        var replyIds = result.Replies.Select(r => r.Id).ToList();
+        var allReplyTranslations = await posts.GetReplyTranslationsAsync(replyIds);
+        var translationsByReply = allReplyTranslations
+            .GroupBy(t => t.ReplyId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<Kumunita.Core.Posts.ReplyTranslation>)g.ToList());
+
+        var replyItems = new List<ReplyItem>(result.Replies.Count);
+        foreach (var reply in result.Replies)
+        {
+            var replyAuthorProfile = await userInfo.GetProfileAsync(reply.AuthorId);
+            // ADR 0022 (group lane) — the reply's standing is its parent's:
+            // author ∪ GlobalAdmin (no component-moderator branch, ADR 0007).
+            var canTranslateReply = PostService.CanAddTranslation(
+                isGroupLane: true, result.Post.ComponentId, reply.AuthorId, actor, actorRoles);
+            replyItems.Add(new ReplyItem(
+                reply.Id,
+                replyAuthorProfile?.DisplayName ?? reply.AuthorId,
+                reply.AuthorId,
+                reply.Body,
+                reply.Created,
+                reply.Modified,
+                reply.AuthorId == actor,
+                translationsByReply.TryGetValue(reply.Id, out var trs) ? trs : [],
+                canTranslateReply,
+                reply.DeletedAt,
+                reply.LanguageCode));
+        }
+
+        // ADR 0018 — the reply form's authored-in language picker options
+        // (the enabled catalog), stored on ViewData (the same read-only
+        // channel the post detail page uses — the detail VM is a projection,
+        // not a form-bound model).
+        ViewData["Reply_Languages"] = enabledLanguages;
+
+        // Back-link display name — the group's name in the viewer's language
+        // (the ADR 0026 floor, exactly the idiom the community-name surface
+        // uses; a read, not a decision: the post's single group-lane
+        // decision already ran in GetGroupPostAsync). A display gap, not an
+        // error: when no translation exists for the viewer's language the
+        // stored (authored) name stays.
+        string groupName = group.Name;
+        if (translationProvider is not null)
+        {
+            string gLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            var gTranslations = await userInfo.GetGroupTranslationsAsync(id);
+            var gMatch = gTranslations.FirstOrDefault(t => String.Equals(t.LanguageCode, gLang, StringComparison.OrdinalIgnoreCase));
+            if (gMatch is not null && !string.IsNullOrWhiteSpace(gMatch.Name))
+                groupName = gMatch.Name;
+        }
+
+        return View("PostDetail", new GroupPostDetailViewModel
+        {
+            GroupId = id,
+            Post = result.Post,
+            AuthorDisplayName = authorProfile?.DisplayName ?? result.Post.AuthorId,
+            AuthorSubjectId = result.Post.AuthorId,
+            Replies = replyItems,
+            IsAuthor = result.Post.AuthorId == actor,
+            PostTranslations = postTranslations,
+            Languages = languages,
+            CanTranslate = canTranslate,
+            OriginalLanguageCode = result.Post.LanguageCode, // TD·1/TD·4 (ADR 0027) — the authored-in code, read from the ADR 0018 field.
+            GroupDisplayName = groupName ?? group.Name,
+        });
+    }
+
+    /// <summary>
+    /// The group-post <b>composer's page</b> (the standalone compose surface
+    /// the detail page's "New post" button links to): <c>GET
+    /// /groups/{id}/posts/new</c>. Returns an empty
+    /// <see cref="GroupPostComposeViewModel"/> for <c>New.cshtml</c> (the U7
+    /// failure re-render view, now a first-class page). The group's identity
+    /// is the route's <c>{id}</c>; the membership lane that reaches this page
+    /// is the same owner ∪ member projection as the group's <see
+    /// cref="Detail"/> (the paired POST's gate is the authoritative deny,
+    /// G·3) — no separate re-gate here.
+    /// </summary>
+    [HttpGet("{id}/posts/new")]
+    public async Task<IActionResult> NewGroupPost(string id)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        return View("New", new GroupPostComposeViewModel
+        {
+            Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
+            // ADR 0018 — pre-select the instance default so the picker
+            // highlights the right option and a no-change submit is a
+            // concrete BCP-47 code (never an empty row).
+            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+        });
+    }
+
+    /// <summary>
+    /// The group-post <b>composer's POST</b> (ADR 0013, G5/G6 FACES):
+    /// <c>POST /groups/{id}/posts</c>. The form carries <b>title + body
+    /// only</b> (the <see cref="GroupPostComposeViewModel"/> shape — the
+    /// M3 composer minus the component picker and the audience slot; the
+    /// group's membership is the audience proxy, and the service writes the
+    /// post's <c>Audience</c> non-null and <b>empty</b> — G·8 — regardless
+    /// of anything on this form). The group's identity is the route's
+    /// <c>{id}</c>, never a form field (a form-bound group id would be a
+    /// lane-bypass hole). <para>
+    /// **Create gate (G·3):** <see
+    /// cref="PostService.CreateGroupPostAsync"/> <b>is</b> the group-lane
+    /// membership decision (the <see cref="IDocumentStore.LightweightSession"/>
+    /// lane — C3 same-transaction shape: the controller opens the session,
+    /// the service's <c>SaveChangesAsync</c> is the single write; the gate
+    /// row + the post commit atomically). A non-member (including a
+    /// non-member moderator or GlobalAdmin — G·4, no skip on this lane)
+    /// hits the <see cref="UnauthorizedAccessException"/> wall — mapped to
+    /// a 404 (the master register's "Web renders 404" pin; this file's
+    /// "a plain member's POST 404s" precedent).
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/posts")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateGroupPost(string id, [FromForm] GroupPostComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to post.");
+            return View("New", model);
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+
+        if (!model.IsValid)
+        {
+            // Re-render the standalone compose page, prefilled with what
+            // the actor typed (the GET /groups/{id}/posts/new shape).
+            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            return View("New", model);
+        }
+
+        var draft = new GroupPostDraft(
+            GroupId: id,
+            Title: string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+            Body: model.Body.Trim(),
+            LanguageCode: string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            ImageIds: ContentImageIds.ExtractContentImageIds(model.Body), // RC R·3 (U05) — server-side parse of the body's /content-image/{id} links; the client never sends the ids (drift pause b: the U04 field was inert, now wired).
+            AttachmentIds: AttachmentIds.ExtractAttachmentIds(model.Body), // ATT U7 (C-ATT·4) — server-side parse of the body's /attachment/{id} links; the client never sends the ids (parity with the image lane's group-post wire, C-ATT·9).
+            IsDraft: model.SaveAsDraft // ADR 0037 — draft mode: saved but invisible to all but the author until published.
+        );
+
+        // C3 same-transaction lane: the controller opens the
+        // <c>IDocumentStore.LightweightSession()</c>, the service's
+        // <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>New</c> precedent) — the gate's audit row and
+        // the new <c>Post</c> commit atomically.
+        await using var session = store.LightweightSession();
+
+        Post post;
+        try
+        {
+            post = await posts.CreateGroupPostAsync(draft, actor, session);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // G·3/G·4 — only group members may post to the channel; the
+            // gate's Deny row was persisted before the throw (G6 FACES).
+            // 404: the register's "Web renders 404" pin (a 403 on a POST
+            // would advertise a gate the UI doesn't offer).
+            return NotFound();
+        }
+
+        TempData["info"] = $"Post added to “{group.Name}”.";
+        return Redirect($"/groups/{id}/posts/{post.Id}");
+    }
+
+    // ── Group-post edit (ADR 0016, author-only) ──────────────────────────────
+
+    /// <summary>
+    /// The group-post <b>editor's page</b> (ADR 0016):
+    /// <c>GET /groups/{id}/posts/{postId}/edit</c>. The author-only edit
+    /// lane's GET — a mirror of the M3 <see cref="PostsController.Edit"/>
+    /// (ADR 0014) adapted to the group lane: the actor must be the post's
+    /// own author, and the post must be a **group** post of this group
+    /// (the group-lane identity check, G·2). A non-author, a non-group
+    /// post, a missing group, or a missing post all return a 404 (the group
+    /// lane's fail-closed shape — G·3/G·4, this file's "a non-visible group
+    /// 404s" precedent; deliberately **not** a 403, which would advertise a
+    /// gate the UI doesn't offer). <para>
+    /// The form is title + body + the authored-in language tag (ADR 0018,
+    /// amended 2026-09-13 — ADR 0016's editable surface extended) — the
+    /// group lane has no audience slot (G·8: the audience is non-null empty,
+    /// the membership is the audience proxy) and no component picker (G·2 lane
+    /// exclusivity: the post's <c>ComponentId</c> is empty and stays empty).
+    /// The edit reuses the <see cref="GroupPostComposeViewModel"/> shape
+    /// (title + body + language picker, the same "mirror, minus the audience
+    /// slot" as the composer).
+    /// </para>
+    /// </summary>
+    [HttpGet("{id}/posts/{postId}/edit")]
+    public async Task<IActionResult> EditGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        // Load the post in a lightweight read (the group-lane identity check
+        // + the author gate are the pre-render decisions; the POST's gate is
+        // the authoritative deny, mirroring the create lane's shape).
+        await using var read = store.LightweightSession();
+        var post = await read.LoadAsync<Post>(postId);
+        if (post is null || string.IsNullOrEmpty(post.GroupId) || post.GroupId != id)
+            return NotFound();
+
+        if (post.AuthorId != actor)
+            return NotFound();
+
+        return View("Edit", new GroupPostComposeViewModel
+        {
+            Title = post.Title,
+            Body = post.Body,
+            // ADR 0018 (amended 2026-09-13) — the authored-in language tag is
+            // editable on this lane (ADR 0016 surface extended): seed the
+            // picker from the enabled catalog and pre-select the post's
+            // stored tag (the ADR 0017 edit-lane precedent).
+            Languages = await SeedLanguagePickerAsync(),
+            LanguageCode = post.LanguageCode,
+        });
+    }
+
+    /// <summary>
+    /// The group-post <b>editor's POST</b> (ADR 0016, author-only):
+    /// <c>POST /groups/{id}/posts/{postId}/edit</c>. Re-writes the post's
+    /// title, body, and authored-in language tag (ADR 0018, amended
+    /// 2026-09-13) via <see cref="PostService.UpdateGroupPostAsync"/> —
+    /// the service is the decision: a non-author (even a GlobalAdmin, even a
+    /// member who is the post's *replier*) is denied with
+    /// <see cref="UnauthorizedAccessException"/>, and a non-group post or a
+    /// missing id is a <see cref="KeyNotFoundException"/> — both mapped to
+    /// the 404 fail-closed shape (G·3/G·4, the group lane's register pin).
+    /// The post's <c>GroupId</c> / <c>ComponentId</c> / <c>Audience</c> /
+    /// <c>AuthorId</c> / <c>Created</c> / <c>Status</c> are untouched (the
+    /// group lane's identity is immutable); the edit stamps
+    /// <c>Post.Modified</c> forward. One <c>SaveChangesAsync</c> (C3).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroupPost(
+        string id, string postId, [FromForm] GroupPostComposeViewModel model)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to edit.");
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null)
+            return NotFound();
+
+        if (!model.IsValid)
+        {
+            // Re-render the editor, prefilled with what the actor typed (the
+            // GET /groups/{id}/posts/{postId}/edit shape).
+            model.Languages = await SeedLanguagePickerAsync(); // ADR 0018 — re-seed on re-render
+            ModelState.AddModelError(nameof(model.Body), "A post needs some text.");
+            return View("Edit", model);
+        }
+
+        // C3 same-transaction lane: the controller opens the
+        // <c>IDocumentStore.LightweightSession()</c>, the service's
+        // <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>Edit</c> POST precedent) — the author gate and
+        // the write commit atomically.
+        await using var session = store.LightweightSession();
+
+        Post post;
+        try
+        {
+            post = await posts.UpdateGroupPostAsync(
+                postId, actor,
+                string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+                model.Body.Trim(),
+                string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode, // ADR 0018 (amended) — the authored-in tag
+                session,
+                AttachmentIds.ExtractAttachmentIds(model.Body.Trim())); // ATT U12 (C-ATT·4/8) — the group-post edit lane re-parses the re-submitted body (replace-style); the image edit lane stays byte-for-byte (C-ATT·9).
+        }
+        catch (KeyNotFoundException)
+        {
+            // Missing id or a non-group post (G·2 lane check failed): the
+            // 404 fail-closed shape (non-leaky about which ids are real).
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author: the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — the group lane's
+            // register pin, G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post updated.";
+        return Redirect($"/groups/{id}/posts/{post.Id}");
+    }
+
+    /// <summary>
+    /// A group-post <b>reply</b> (ADR 0013, G11 FACES):
+    /// <c>POST /groups/{id}/posts/{postId}/replies</c>. Exactly the M3
+    /// <c>Replies(id, body)</c> one-field form shape — a plain
+    /// <c>body</c> field, no per-reply audience (G·7: a reply inherits the
+    /// parent's single group-lane decision; <see
+    /// cref="PostService.CreateReplyAsync"/> is lane-neutral and is
+    /// <b>reused as-is</b> — no new Core seam, no group field on the
+    /// <c>PostReply</c>). Before opening a write session the parent's
+    /// group-lane decision is re-run via
+    /// <see cref="PostService.GetGroupPostAsync"/> (the same
+    /// <c>Post = null</c> fail-closed shape as <see cref="GroupPostDetail"/>'s
+    /// GET, mapped to a 404 here) — the reply lands only on a post the
+    /// viewer can currently see (C4 strong consistency: a member removed
+    /// in the gap between the detail render and the POST is denied).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GroupPostReply(string id, string postId, [FromForm] string? body, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            // A reply is a body-only write (G·7: no own audience, no
+            // title). Fail-closed to the detail page — the form is
+            // re-presented there.
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // Authz via the parent's single group-lane decision (G·7 — the
+        // reply inherits it, so the decision is the pre-write gate).
+        // GetGroupPostAsync returns Post = null for **both** "missing /
+        // lane mismatch" and "membership denied" (Core doesn't
+        // distinguish; the audit row does) — both map to the 404 fail-
+        // closed shape (the register's non-member-404 pin).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the M3
+        // PostsController <c>Replies</c> precedent).
+        await using var session = store.LightweightSession();
+        await posts.CreateReplyAsync(postId, actor, body, session, string.IsNullOrWhiteSpace(languageCode) ? null : languageCode); // ADR 0018 — the reply's own authored-in tag; null/empty ⇒ instance default.
+
+        TempData["info"] = "Reply added.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Group-reply edit (ADR 0016, author-only) ─────────────────────────────
+
+    /// <summary>
+    /// A group-post <b>reply's edit</b> (ADR 0016, author-only):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/edit</c>. A
+    /// body-only re-write (a reply carries no <c>Audience</c>, C-M3·1, and no
+    /// title) via <see cref="PostService.UpdateReplyAsync"/> — the service is
+    /// the decision: only the reply's own author may edit it (no moderator or
+    /// GlobalAdmin branch). Before writing, the parent's group-lane decision
+    /// is re-run via <see cref="PostService.GetGroupPostAsync"/> (the same
+    /// <c>Post = null</c> fail-closed shape as <see cref="GroupPostReply"/>,
+    /// mapped to a 404) and the reply must be **under this post** — both are
+    /// the group lane's non-leaky 404 posture (G·3/G·4; a non-member or a
+    /// reply not on this post 404s). A non-author is the
+    /// <see cref="UnauthorizedAccessException"/> wall, also mapped to the 404
+    /// fail-closed shape. The edit stamps <c>PostReply.Modified</c> forward
+    /// (null until first edited); <c>PostId</c> / <c>AuthorId</c> /
+    /// <c>Created</c> are untouched. One <c>SaveChangesAsync</c> (C3).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditGroupPostReply(
+        string id, string postId, string replyId, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A reply needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // The parent's single group-lane decision (G·7 — the reply inherits
+        // it) is the pre-write gate: a non-member, a missing post, or a lane
+        // mismatch all return Post = null → 404 (the group lane's non-leaky
+        // fail-closed shape, the register's non-member-404 pin).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // The reply must be **under this post** (a replyId on a different
+        // post is not reachable through this group lane — the 404 shape).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the
+        // <see cref="GroupPostReply"/> precedent).
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyAsync(replyId, actor, body, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            // Reply id not found → the 404 fail-closed shape.
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply updated.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Author soft-delete (ADR 0024, group lane — 404 fail-closed shape) ──
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a group post (ADR 0024):
+    /// <c>POST /groups/{id}/posts/{postId}/delete</c>. A thin Web lane
+    /// (ADR 0006-D) delegating the write + author-stand decision to
+    /// <see cref="PostService.DeletePostAsync"/> — the record is kept
+    /// (<see cref="Post.DeletedAt"/> stamped), never hard-deleted. The group
+    /// lane's non-leaky posture (G·3/G·4) maps both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// to a 404 (a 403 on a POST would advertise a gate the UI doesn't
+    /// offer). The parent's single group-lane decision is the pre-write gate
+    /// (the <see cref="EditGroupPostReply"/> precedent): a non-member / missing
+    /// post / lane mismatch 404s, and the reply/post must be on this group.
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7) is the pre-write gate:
+        // a non-member, a missing post, or a lane mismatch all return Post =
+        // null → 404 (the group lane's non-leaky fail-closed shape).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // C3 same-transaction lane: the controller owns the session; the
+        // service's <c>SaveChangesAsync</c> is the single write (the
+        // <see cref="EditGroupPost"/> precedent).
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeletePostAsync(postId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (a 403 on a POST would
+            // advertise a gate the UI doesn't offer — G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post deleted.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Publish a draft group post (ADR 0037): <c>POST
+    /// /groups/{id}/posts/{postId}/publish</c>. <b>Author-only</b> — the sole
+    /// lever that clears <see cref="Post.IsDraft"/> is the author's own choice
+    /// (a non-member, non-author, moderator, or GlobalAdmin is denied: a
+    /// group-lane draft is invisible to them, so they have no affordance to
+    /// reach this; the service re-pins the author gate server-side). The
+    /// group lane's non-leaky posture (G·3/G·4) maps both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// to a 404 (the <see cref="DeleteGroupPost"/> precedent — a 403 on a POST
+    /// would advertise a gate the UI doesn't offer). On success, redirect back
+    /// to the detail page (now live).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/publish")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> PublishGroupPost(string id, string postId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7) is the pre-write gate:
+        // a non-member, a missing post, a lane mismatch, or a draft the actor
+        // is not the author of all return Post = null → 404 (the group lane's
+        // non-leaky fail-closed shape, the ADR 0037 author-only draft gate).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.PublishPostAsync(postId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Non-author → the 404 fail-closed shape (G·3/G·4).
+            return NotFound();
+        }
+
+        TempData["info"] = "Post published.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Author <b>soft-deletes</b> a group-post reply (ADR 0024):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/delete</c>. The
+    /// record is kept (<see cref="PostReply.DeletedAt"/> stamped) — the detail
+    /// view renders a placeholder in its place and the reply still counts
+    /// toward the parent's count. Same group-lane 404 fail-closed shape as
+    /// <see cref="EditGroupPostReply"/> (both <see
+    /// cref="KeyNotFoundException"/> and <see cref="UnauthorizedAccessException"/>
+    /// map to a 404; the parent's single decision is the pre-write gate).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroupPostReply(string id, string postId, string replyId)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        // The parent's single group-lane decision (G·7 — the reply inherits it)
+        // is the pre-write gate (the <see cref="EditGroupPostReply"/> precedent).
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        // The reply must be **under this post** (a replyId on a different post
+        // is not reachable through this group lane — the 404 shape).
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.DeleteReplyAsync(replyId, actor, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Reply deleted.";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── Translations (ADR 0022, group lane) ────────────────────────────────
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group post into
+    /// <paramref name="languageCode"/> (ADR 0022, group lane):
+    /// <c>POST /groups/{id}/posts/{postId}/translations</c>. A thin Web lane
+    /// (ADR 0006-D) delegating the write + standing decision to
+    /// <see cref="PostService.AddPostTranslationAsync"/>. On the group lane the
+    /// standing is **author ∪ GlobalAdmin only** (the component-moderator
+    /// branch is excluded by the service's <c>isGroupLane</c> flag — ADR 0007:
+    /// a group has no component-moderator scope). A denied standing actor is a
+    /// 404 (the group lane's non-leaky fail-closed shape — a 403 on a POST would
+    /// advertise a gate; the register's non-member-404 pin).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddPostTranslation(
+        string id, string postId, [FromForm] string? languageCode, [FromForm] string? title, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        // The parent's single group-lane decision (G·7) is the precondition:
+        // non-member, missing post, or lane mismatch all return Post = null → 404.
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddPostTranslationAsync(
+                postId,
+                languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Denied standing → the group lane's 404 fail-closed shape (the
+            // EditGroupPostReply precedent; a 403 would advertise a gate).
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of a group post's reply into
+    /// <paramref name="languageCode"/> (ADR 0022, group lane):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations</c>.
+    /// Standing (author ∪ GlobalAdmin, no component-moderator branch — ADR 0007)
+    /// + fail-closed-404 shape mirror <see cref="AddPostTranslation"/>; the
+    /// reply must be under this post (the <see cref="EditGroupPostReply"/>
+    /// precedent).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.AddReplyTranslationAsync(
+                replyId,
+                languageCode,
+                body,
+                actor,
+                actorRoles,
+                session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation added ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    // ── ADR 0048 — edit + delete lanes for group post / reply translations ─
+    // ADR 0022 (group lane) was add-only; ADR 0048 lifts the "add-only" pin on
+    // the same standing matrix (author ∪ GlobalAdmin, no community moderator).
+    // Failure shapes mirror the add lane: the group lane's 404 fail-closed
+    // posture (a 403 would advertise a gate the group lane does not expose).
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of a group post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/translations/update</c>. Failure
+    /// shapes mirror <see cref="AddPostTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePostTranslation(
+        string id, string postId, [FromForm] string? languageCode, [FromForm] string? title, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdatePostTranslationAsync(
+                postId, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                body, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of a group post in
+    /// <paramref name="languageCode"/> (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/translations/remove</c>. Failure
+    /// shapes mirror <see cref="AddPostTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemovePostTranslation(
+        string id, string postId, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemovePostTranslationAsync(postId, languageCode, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of a group post's reply
+    /// (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations/update</c>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode, [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs some text.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.UpdateReplyTranslationAsync(replyId, languageCode, body, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation updated ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of a group post's reply
+    /// (ADR 0048):
+    /// <c>POST /groups/{id}/posts/{postId}/replies/{replyId}/translations/remove</c>.
+    /// Failure shapes mirror <see cref="AddReplyTranslation"/> (404 fail-closed).
+    /// </summary>
+    [HttpPost("{id}/posts/{postId}/replies/{replyId}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveReplyTranslation(
+        string id, string postId, string replyId, [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(postId) || string.IsNullOrEmpty(replyId))
+            return NotFound();
+
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/groups/{id}/posts/{postId}");
+        }
+
+        var parent = await posts.GetGroupPostAsync(id, postId, actor);
+        if (parent.Post is null)
+            return NotFound();
+        if (parent.Replies.All(r => r.Id != replyId))
+            return NotFound();
+
+        var actorRoles = KumunitaPrincipal.RoleSet(User);
+        await using var session = store.LightweightSession();
+        try
+        {
+            await posts.RemoveReplyTranslationAsync(replyId, languageCode, actor, actorRoles, session);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = $"Translation removed ({await SeedLanguageName(languageCode)}).";
+        return Redirect($"/groups/{id}/posts/{postId}");
+    }
+
+    /// <summary>
+    /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
+    /// <c>TempData</c> confirmation message (a display convenience — a
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> read, not a
+    /// decision). Falls back to the raw code when the language is not in the
+    /// catalog (a never-blank shape).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync();
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
     }
 }

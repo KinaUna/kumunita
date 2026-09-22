@@ -167,6 +167,127 @@ public sealed class ModerationService
     }
 
     /// <summary>
+    /// File a resident report against a <b>reply</b> (ADR 0023, the
+    /// reply-report-target lane). A **resident-facing intake** action —
+    /// exactly the same standing as <see cref="FileReportAsync"/>: it
+    /// makes **no** <see cref="IAuthorizationService"/> call (it is not
+    /// an access decision) and the Web-layer gate is the C-M3·1
+    /// "reply-inherits" rule — the caller must be able to see the
+    /// parent post (a reply has no own audience, no own audit row;
+    /// visibility is the parent post's single <c>Read</c> decision).
+    /// <para>
+    /// The <see cref="Report"/> row is the same M3b shape with one
+    /// additive field (ADR 0004 §B.1): <see cref="Report.ReplyId"/>
+    /// carries the reply's id (the target discriminator);
+    /// <see cref="Report.PostId"/> is populated from the reply's
+    /// parent post (so the queue/resolve read path stays on the single
+    /// post key and the C-M3·1 reply-inherits visibility rule is intact).
+    /// <see cref="Report.ComponentId"/> is carried from the parent
+    /// post's <c>ComponentId</c> (same as the post-report lane).
+    /// </para>
+    /// <para>
+    /// The <see cref="AccessAudit"/> row mirrors the post-report
+    /// filing audit with two differences: <c>Action =
+    /// "report.reply.file"</c> (distinct from the post lane's
+    /// <c>"report.file"</c>, so the audit log can distinguish which
+    /// target was reported) and <c>TargetKind = "reply"</c> /
+    /// <c>TargetId = replyId</c>. The <c>Via</c> tag is the same
+    /// pinned filing tag <see cref="AccessVia.Admin"/> (two negatives:
+    /// NOT <see cref="AccessVia.Report"/> — reserved for the
+    /// <c>Via = Report</c> read branch, C-M3b·2; NOT
+    /// <see cref="AccessVia.Owner"/> — the C1 owner-branch).
+    /// <c>Outcome</c> is <see cref="AccessOutcome.Allow"/> (intake
+    /// lane; no Deny path without a <c>CanAsync</c> call).
+    /// </para>
+    /// <para>
+    /// C3 / ADR 0006-C: the <see cref="Report"/> row and the
+    /// <see cref="AccessAudit"/> row are **both** staged into the
+    /// caller's <see cref="IDocumentSession"/> and committed in **one**
+    /// <c>SaveChangesAsync</c> — the same-transaction / no-partial-write
+    /// discipline (§2.3 item 4) holds.
+    /// </para>
+    /// </summary>
+    /// <param name="replyId">The reply the report is filed against
+    /// (must exist in the caller's session or a
+    /// <see cref="KeyNotFoundException"/> is thrown — no partial
+    /// write).</param>
+    /// <param name="actorId">The acting resident (the reporter).</param>
+    /// <param name="reason">Optional free-text reason (nullable).</param>
+    /// <param name="session">The caller's in-flight
+    /// <see cref="IDocumentSession"/> (the caller owns the
+    /// transaction, per the shared IDocumentSession-overload convention
+    /// C3 / ADR 0006-E).</param>
+    /// <returns>1 — one <see cref="Report"/> row created (the only
+    /// path past the guards wrote exactly one row).</returns>
+    public async Task<int> FileReplyReportAsync(
+        string replyId,
+        string actorId,
+        string? reason,
+        IDocumentSession session)
+    {
+        if (string.IsNullOrEmpty(replyId)) throw new ArgumentException("A reply id is required.", nameof(replyId));
+        if (string.IsNullOrEmpty(actorId)) throw new ArgumentException("A resident actor is required.", nameof(actorId));
+        if (session is null)               throw new ArgumentNullException(nameof(session));
+
+        // Load the reply from the caller's session — a missing reply is
+        // a failed call (no report row, no audit row — no partial write).
+        var reply = await session.LoadAsync<PostReply>(replyId).ConfigureAwait(false);
+        if (reply is null)
+            throw new KeyNotFoundException($"Reply '{replyId}' was not found; nothing to file a report against.");
+
+        // Load the parent post (the report's PostId is the parent's id,
+        // the component scope is carried from the parent — same as the
+        // post-report lane). The reply's PostId is non-null per the
+        // M3 POCO invariant, but guard anyway (defensive).
+        var post = await session.LoadAsync<Post>(reply.PostId).ConfigureAwait(false);
+        if (post is null)
+            throw new KeyNotFoundException($"Parent post '{reply.PostId}' was not found; cannot file a report against reply '{replyId}'.");
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Domain row: the report itself (ADR 0023 — the reply-report
+        // target lane; the same Status-literal pin as FileReportAsync:
+        // this lane sets the exact literal "filed").
+        var report = new Report
+        {
+            Id         = Guid.NewGuid().ToString("N"),
+            PostId     = post.Id,               // the parent post (C-M3·1 reply-inherits)
+            ReporterId = actorId,
+            ComponentId = post.ComponentId,     // carried from the parent post
+            Reason     = reason,
+            Status     = "filed",               // §2.3 item 2 — exact literal pin
+            At         = now,
+            ReplyId    = replyId                // the target discriminator (ADR 0023)
+        };
+
+        session.Store(report);
+
+        // Audit row: the write-lane audit (C3 / ADR 0006-C — Always On).
+        // Action and TargetKind distinguish this lane from the
+        // post-report filing lane (ADR 0023). Via is the same pinned
+        // filing tag (two negatives: not Report, not Owner).
+        var audit = new AccessAudit
+        {
+            Id                    = Guid.NewGuid().ToString("N"),
+            At                    = now,
+            ActorId               = actorId,
+            EffectivePrincipalId  = actorId,
+            Action                = "report.reply.file",
+            TargetKind            = "reply",
+            TargetId              = replyId,
+            Via                   = AccessVia.Admin,
+            Outcome               = AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+
+        // C3 — one SaveChangesAsync (ADR 0006-C; §2.3 item 4).
+        await session.SaveChangesAsync().ConfigureAwait(false);
+
+        return 1;
+    }
+
+    /// <summary>
     /// Assign a report to a standing moderator (F5; C-M3b·4, SoD).
     /// GlobalAdmin-gated write lane: calls
     /// <see cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource, Marten.IDocumentSession)"/>

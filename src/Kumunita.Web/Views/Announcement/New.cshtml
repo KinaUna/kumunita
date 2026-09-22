@@ -6,13 +6,9 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <h1>New announcement</h1>
+        <h1><kw-l key="announcements.new_title">New announcement</kw-l></h1>
         <p class="text-muted">
-            Platform notices visible outside the community feeds. A
-            <b>public</b> announcement is visible to everyone
-            (e.g. scheduled maintenance); a <b>resident</b> announcement
-            is visible to all signed-in users (e.g. "help us with X"
-            calls).
+            <kw-l key="announcements.new_lede">Announcements are notices that appear on their own, separate from the community feed. A public announcement is visible to everyone, including people who are not signed in (e.g. a maintenance window). A resident announcement is only visible to signed-in residents (e.g. a "help us with X" call).</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -47,10 +43,16 @@
         <form id="new-announcement-form" method="post" action="/announcements/new">
             @Html.AntiForgeryToken()
 
+            @* ADR 0037 — draft round-trip: after the first "save as draft" the
+               controller remembers this draft's id and re-renders with it set,
+               so a later save UPDATES the same draft (no duplicates). Empty on
+               a fresh composer; the model binder fills it back from this field. *@
+            <input type="hidden" name="DraftId" value="@Model.DraftId" />
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="scope" style="font-weight:600;">
-                        Who sees this?
+                        <kw-l key="announcements.scope_label">Who sees this?</kw-l>
                     </label>
                     <select class="form-control" id="scope" name="Scope" required>
                         @foreach (var s in Model.AllowedScopes)
@@ -58,17 +60,19 @@
                             string scopeValue = s.ToString();
                             bool isSelected = scopeValue == (Model.Scope ?? "Community");
                             <option value="@scopeValue" selected="@(isSelected ? "selected" : null)">
-                                @(s == AnnouncementScope.Public
-                                    ? "Everyone (public — visible to visitors and residents)"
-                                    : "Residents (community — visible only when signed in)")
+                                @if (s == AnnouncementScope.Public)
+                                {
+                                    <kw-l key="announcements.scope_public">Everyone (public) — visible to visitors and residents</kw-l>
+                                }
+                                else
+                                {
+                                    <kw-l key="announcements.scope_resident">Residents — visible only when signed in</kw-l>
+                                }
                             </option>
                         }
                     </select>
                     <div class="text-muted small mt-2">
-                        The platform's visibility split, not a per-user audience
-                        (unlike a <a href="/community" target="_blank">community post</a>).
-                        Public announcements are visible to anonymous visitors too —
-                        e.g. a maintenance window or an outage notice.
+                        <kw-l key="announcements.new_scope_hint">Public announcements are visible to everyone, including visitors who are not signed in (e.g. a maintenance window or an outage notice). Resident announcements are only visible to signed-in residents.</kw-l>
                     </div>
                 </div>
             </div>
@@ -77,28 +81,28 @@
 @if (Model.TargetCommunities.Count > 0)
 {
 <div class="card mb-4"><div class="card-body">
-<label class="form-label" for="community" style="font-weight:600;">Target community (optional)</label>
+<label class="form-label" for="community" style="font-weight:600;"><kw-l key="announcements.community_label">Send to a specific community (optional)</kw-l></label>
 <select class="form-control" id="community" name="CommunityId">
-<option value="" selected="@(Model.CommunityId is null ? "selected" : null)">All residents</option>
+<option value="" selected="@(Model.CommunityId is null ? "selected" : null)"><kw-l key="announcements.all_residents">All residents</kw-l></option>
 @foreach (var t in Model.TargetCommunities)
 {
 <option value="@t.Id" selected="@(Model.CommunityId == t.Id ? "selected" : null)">@t.Name</option>
 }
 </select>
-<div class="text-muted small mt-2">Leave as All residents to reach everyone, or pick a community to limit the audience. A public announcement always applies platform-wide.</div>
+<div class="text-muted small mt-2"><kw-l key="announcements.community_hint">Leave as All residents to send to everyone, or pick a community to limit who sees it.</kw-l></div>
 </div></div>
 }
 
 <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="title" style="font-weight:600;">
-                        Title
+                        <kw-l key="announcements.title_label">Title</kw-l>
                     </label>
                     <input class="form-control" type="text" id="title" name="Title"
                            maxlength="120" placeholder="optional"
                            value="@Model.Title" />
                     <div class="text-muted small mt-1">
-                        A short headline (≤ 120 chars).
+                        <kw-l key="announcements.title_hint">A short headline (up to 120 characters).</kw-l>
                     </div>
                 </div>
             </div>
@@ -106,12 +110,36 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="body" style="font-weight:600;">
-                        Body
+                        <kw-l key="announcements.body_label">Body</kw-l>
                     </label>
-                    <textarea class="form-control" id="body" name="Body"
-                              rows="6" required>@Model.Body</textarea>
+                    <div class="rc-editor">
+                        @* Image button ON — the announcement image lane is complete
+                           (RC U05 persists Announcement.ImageIds on create; the
+                           /content-image/{id} serve branch gates on the announcement's
+                           flat scope/communities visibility). *@
+                        <div class="rc-editor-toolbar" data-rich-editor>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control" id="body" name="Body"
+                                  rows="6" required data-rich-editor>@Model.Body</textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
                 </div>
             </div>
+
+            @* ADR 0018 — the authored-in language picker (shared New/Edit partial). *@
+            <partial name="_AnnouncementLanguagePicker" model="Model" />
 
             <div class="card mb-4">
                 <div class="card-body">
@@ -120,25 +148,44 @@
                                value="true" checked="@(Model.Pinned ? "checked" : null)" />
                         <input type="hidden" name="Pinned" value="false" />
                         <label class="form-check-label" for="pinned" style="font-weight:600;">
-                            Pin to the top of all pages
+                            <kw-l key="announcements.pin_label">Pin to the top of all pages</kw-l>
                         </label>
                         <div class="text-muted small mt-1">
-                            A pinned announcement is shown as a banner at the very top
-                            of every Kumunita page (including Home) in addition to
-                            the usual <b>Announcements</b> list.
-                            The visibility gate still applies: a <b>public</b> pin
-                            shows for every visitor; a <b>resident</b> pin shows
-                            only when a user is signed in.
-                            The most-recently-pinned announcement wins.
+                            <kw-l key="announcements.pin_hint">A pinned announcement also appears as a banner at the very top of every page (including Home), in addition to the usual Announcements list. Its visibility still follows the audience you picked above: a public pin shows to every visitor; a resident pin shows only when a user is signed in. If more than one is pinned, the most recently pinned one wins.</kw-l>
+                        </div>
+                    </div>
+
+                    @* ADR 0037 — save-as-draft: the announcement is saved but
+                       visible to no one (not even admins / the targeted
+                       community) until you publish it. The single-valued-bool
+                       checkbox + hidden pattern (the <c>Pinned</c> round-trip
+                       pin) guarantees the flag survives re-renders. *@
+                    <hr class="my-3" />
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="save-as-draft" name="SaveAsDraft"
+                               value="true" checked="@(Model.SaveAsDraft ? "checked" : null)" />
+                        <input type="hidden" name="SaveAsDraft" value="false" />
+                        <label class="form-check-label" for="save-as-draft" style="font-weight:600;">
+                            <kw-l key="posts.save_as_draft">Save as draft</kw-l>
+                        </label>
+                        <div class="text-muted small mt-1">
+                            <kw-l key="posts.save_as_draft_hint">A draft is saved but visible to no one — not even admins — until you publish it. You can find it under “My drafts”.</kw-l>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Create announcement</button>
-                <a href="/announcements" class="btn btn-link p-0">Cancel</a>
+                <button type="submit" class="btn btn-primary"><kw-l key="announcements.new_submit">Create announcement</kw-l></button>
+                <a href="/announcements" class="btn btn-link p-0"><kw-l key="announcements.cancel">Cancel</kw-l></a>
             </div>
         </form>
     </div>
 </div>
+
+@section Scripts {
+    @* The rich editor (RE U03, client/lib/rich-editor.ts, tsc-built —
+       the toolbar + live preview pane. Self-wires the .rc-editor surface.
+       RE·3: no editor dependency. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

@@ -1,0 +1,852 @@
+# Multilingual — UI wiring (`ML-UI`) — handoff notes
+
+> **Scratch tier.** One section per unit, **appended** (never rewritten). Each
+> unit writes exactly one short `## U#` section before it exits; the next unit
+> reads only that section + its own entry-read list (the three-tier contract,
+> `docs/plans-milestones/done/plan-multilingual-ui.md`). **U0** is this
+> session's kickoff — the verification unit that confirms the four gaps still
+> hold before any code unit runs.
+
+## U0 — Kickoff (this session)
+
+**Date:** 2026-09-12 · **Machine:** Windows (PowerShell terminal) · **Role:**
+verification + plan finalization only — **no code** in this session (U1 onward
+create their own `multilingual-ui-uNN-plan.md` as they start).
+
+**Why this lane exists (the `ML` gap, re-verified 2026-09-12):** the `ML`
+lane (ADR 0005) shipped the **seams** and two isolated admin/settings surfaces
+and closed green (370/370), but the **main platform UI is still
+English-only by construction**. Its acceptance gate tested the *part* (save a
+`TranslationResource` → the provider resolves it), never the *whole* (a view
+emitting a string through the provider, or a fresh instance having any `en`
+rows to be complete against). This lane closes that.
+
+**Four gaps — re-verified this session (the facts every unit codes against):**
+- **Gap 1 (no view resolves through the provider):** a search of every
+  `src/Kumunita.Web/Views/**/*.cshtml` finds **zero** references to
+  `ITranslationProvider` and **zero** custom `TagHelper`s (only the stock
+  `Microsoft.AspNetCore.Mvc.TagHelpers` via `_ViewImports.cshtml`
+  `@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers`). The only `@Html.*`
+  usage in any view is `@Html.AntiForgeryToken()`. Nav, footer, Home, Posts,
+  Groups, Directory, Profile, Account, Admin are all **hardcoded English**.
+- **Gap 2 (the `en` floor is not seeded):**
+  `FirstBootSeeder.SeedLanguageCatalogAsync` (lines ~236–251) stores only the
+  `LanguageCatalog` `en` row + the `LocaleSettings` singleton. It stores
+  **zero** `TranslationResource` rows and **zero** `LocalizedPage` rows. So
+  `LocalizationService.GetCompletenessAsync` (the M·12 view) computes the `en`
+  universe as **empty** for every language — M·12 and M·9's "en floor" are
+  both vacuous until U1 seeds the registry.
+- **Gap 3 (the admin editor is a free-form form):**
+  `Views/Languages/PreviewPage.cshtml`'s `SaveTranslation(code, key, text)`
+  asks the admin to **hand-type the key**; `Views/Languages/Index.cshtml` links
+  each row to `…/pages/terms` only — there is no per-key editor and no list of
+  the platform's actual strings.
+- **Gap 4 (discoverability):** `/admin/languages` has **no nav link anywhere**
+  (the "Admin" item in `_AccountNav.cshtml` routes to `Admin/Index`, the
+  accounts page). The picker (`/settings/language`, `LocaleController`) is
+  `[Authorize]`d and labeled "Settings" — a **signed-out** visitor cannot
+  choose a language.
+
+**Seams confirmed FROZEN (do not re-shape — the `ML` pin holds):**
+- `ITranslationProvider` + `TranslationProvider` — `GetAsync` / `GetManyAsync` /
+  `GetPageAsync` / `ResolveEffectiveLanguageAsync`; `ResolveChainAsync` builds
+  the effective → default → `en` chain (M·1/M·2), `GetAsync`'s floor is **the
+  key itself**, `GetPageAsync`'s floor is **null** (→ 404). All present,
+  working, HTTP-free (M·8).
+- `ILocalizationService` + `LocalizationService` — catalog mutations
+  (add/enable/disable/reorder/remove/set-default), `UpsertTranslationAsync`
+  (pair idiom, one `translation.save` audit row `Via=Admin`),
+  `UpsertPageAsync`, `GetCompletenessAsync` (computes missing = `en`-present
+  minus `code`-present), `GetTranslationAsync`, `GetPageAsync`. All present.
+- `LocaleCookie` (Web, `Security/`) — `Name = "kumunita.locale"`, `Read` /
+  `Write` (365-day, `HttpOnly`, `SameSite=Lax`) / `Clear`. The **only** Web
+  HTTP seam (M·5/M·8).
+- `M1DocTypes.cs` — `opts.Schema.For<TranslationResource>().UniqueIndex(Key,
+  LanguageCode)` + `opts.Schema.For<LocalizedPage>().UniqueIndex(Slug,
+  LanguageCode)` (lines ~93–95). Present.
+- DI — `DependencyInjection.cs` lines 138–139:
+  `AddTransient<ITranslationProvider, TranslationProvider>` +
+  `AddTransient<ILocalizationService, LocalizationService>`. Present.
+- The two content docs (`TranslationResource` / `LocalizedPage`) + `LanguageCatalog`
+  / `LocaleSettings` — present in `src/Kumunita.Core/Localization/`.
+
+**Only allowed ADDS for this lane (the `ML` drift rule holds):**
+- `KnownTranslationKeys` (new, `Kumunita.Core/Localization`) — U1.
+- One seeder step (new, `FirstBootSeeder`) — U1.
+- `LocalizeTagHelper` (new, `Kumunita.Web/TagHelpers`) — U2.
+- One optional additive batch read `GetTranslationsForAsync` on
+  `ILocalizationService` (new, `Localization/`) — U6, **only if** U6 needs it.
+- **Any other Core/Web ADD is a `## U<m> — Drift pause`.**
+
+**Roadmap state (re-verified):** `ML` is currently **Done** and `M4` is the
+single **Next** (the `ML` close, U9, moved them). This lane (`ML-UI`) lands
+**between `ML` and `M4`** — a named lane with a short ID (the `ML` / `GP` /
+media precedent). U9 (the close) adds `ML-UI` to the roadmap and moves the
+single-in-progress milestone from `M4` to `ML-UI`; `MilestonesTests.cs` updates
+with it. **M4/M5/M6 stay Events / Projects / Portability** — untouched.
+
+**Design decisions settled (D1/D2 — the ADR 0015 payload, U9):**
+- **D1 = TagHelper** (`<kw-l key="…">`), chosen over an `HtmlHelper`
+  extension. Reads `LocaleCookie.Read(HttpContext.Request)` and calls
+  `ITranslationProvider.GetAsync` (single, M·1/M·2 floor).
+- **D2 = curated bounded registry** (`KnownTranslationKeys` — key → `en`
+  source text) seeded as `en` `TranslationResource` rows by the seeder. Single
+  source of truth read by the seeder (U1), the admin editor (U6), and
+  completeness (U1's registry is the "known" universe).
+
+**Unit count: 9** — U1 (registry + seeder) · U2 (TagHelper + layout) · U3
+(Posts views) · U4 (Groups views) · U5 (remaining in-scope views) · U6
+(key-managed admin editor) · U7 (public picker + `/about`) · U8 (FACES tests
+L1–L9 + acceptance gate) · U9 (close: ADR 0015 + roadmap + folder moves).
+
+**Drift-pause count: 0** (this session is U0 only — verification, no code).
+
+## U1 — the canonical `en` registry + the seeder step
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded).
+
+**What was added (the two deliverables):**
+- **New** `src/Kumunita.Core/Localization/KnownTranslationKeys.cs` — the
+  closed, curated `en` registry (D2). `public static class KnownTranslationKeys`
+  with `public static IReadOnlyDictionary<string, string> EnValues { get; }`
+  (key → `en` source text) and `public static IReadOnlyCollection<string>
+  AllKeys => EnValues.Keys.ToList();` (`.Keys` is `KeyCollection<T>`, which
+  doesn't cast to `IReadOnlyCollection<T>` — a LINQ projection to `List<T>`
+  does; noted as the one build-fix in the session).
+- **Modified** `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs` — a new step
+  `SeedTranslationResourcesAsync` called from `SeedAsync` **after**
+  `SeedLanguageCatalogAsync` (the step-5 slot; the first-boot email stays
+  step 6). The class doc's "Five steps" → "Six steps" + a new `<li>` for the
+  step, to keep the doc in sync.
+
+**Key count: 52** (the closed in-scope set, grouped + commented by area):
+- nav 10 · footer 5 · settings 2 · home 3 · account 6 · posts 7 · groups 12 ·
+  directory 3 · profile 2 · admin 2.
+- **No UGC keys** (M·3 — post/reply/group/announcement bodies, group
+  descriptions, author display names are not keyed). **No moderation-only /
+  setup-flow / out-of-scope keys** — the registry is deliberately the curated
+  platform surface (nav, footer, language-picker labels, page headings, primary
+  action labels, empty-states), not "every string in every view".
+
+**Upsert semantics implemented (code-wins, `en`-only):**
+- **UI strings:** per key in `KnownTranslationKeys.EnValues`, query
+  `(Key, "en")` → `Store` a fresh row (`Id = Guid "N"`) if absent, or overwrite
+  `Text` in place if present. The query is scoped to `LanguageCode == "en"` —
+  **never reads or writes a non-`en` row** (admin translations for other
+  languages are untouched).
+- **Pages:** upserts the `en` `terms` + `help` `LocalizedPage` rows by
+  `(Slug, "en")` (title + Markdown body). **`about` is NOT seeded** — a fresh
+  instance's `/about` keeps its product-story view; an admin can create an
+  `about` page at runtime (the pinned U1 decision (b)).
+- **One `SaveChangesAsync`** at the end of the step (atomic), **no
+  `AccessAudit` row** (the seeder is not an actor — deliberately different from
+  the admin `LocalizationService.Upsert*` path, which writes an audit row), a
+  `LogInformation` on success.
+- **Upgrade-safe:** re-running adds any new registry keys and refreshes `en`
+  text to the code's current values; leaves non-`en` rows and admin-created
+  `about` untouched. Mirrors the `LocalizationService.Upsert*` pair idiom
+  (query-then-`Store`, surrogate `Id` "N" convention) — no re-shape of a frozen
+  seam, no new index (the `M1DocTypes` pins were confirmed present and left
+  alone).
+
+**Deviations:** none against the plan. The only build fix was the
+`AllKeys` `.Keys` → `.Keys.ToList()` projection (a C#-collection-typing detail,
+not a design change).
+
+**Spot-check (quick, non-test):** `KnownTranslationKeys.AllKeys` non-empty
+(44); `SeedTranslationResourcesAsync` wired into `SeedAsync`. (Full behavioral
+proof — `en` completeness 100%, fresh-instance nav in `en` — is U8's job, not
+U1's.)
+
+**Drift-pause count: 0.**
+
+## U2 — the `<kw-l>` TagHelper + the shared layout wiring
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded).
+
+**What was added (the four deliverables):**
+- **New** `src/Kumunita.Web/TagHelpers/LocalizeTagHelper.cs` — the
+  `<kw-l>` TagHelper (D1). `[HtmlTargetElement("kw-l", Attributes = "key")]`,
+  `public sealed class LocalizeTagHelper : TagHelper`, ctor-injected
+  `ITranslationProvider` + `IHttpContextAccessor`. `[HtmlAttributeName]
+  public string Key { get; set; } = "";`
+- **Modified** `Views/_ViewImports.cshtml` — added one line after the existing
+  `@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers`:
+  `@addTagHelper *, Kumunita.Web.TagHelpers` (existing line untouched).
+- **Modified** `Views/Shared/_Layout.cshtml` — **5 nav** labels
+  (`nav.home`, `nav.announcements`, `nav.community`, `nav.groups`,
+  `nav.directory`) + **5 footer** strings (`footer.tagline`,
+  `footer.copyright`, `footer.gtk_heading`, `footer.gtk_privacy`,
+  `footer.gtk_oss`) wrapped in `<kw-l key="…">en</kw-l>`. Left untouched: the
+  `<title>`/`@ViewData["Title"]`, the logo, the RepositoryInfo links, the
+  `<script>` tags, the `fullBleed` logic, `@RenderBody()`/`@RenderSectionAsync`,
+  and the footer's "Community" / "The project" column headings + their "Home" /
+  "Announcements" / "The feed" links (not in the registry — out-of-scope).
+- **Modified** `Views/Shared/_AccountNav.cshtml` — **6 labels**
+  (`nav.profile`, `settings.settings`, `nav.admin`, `nav.sign_out`,
+  `nav.sign_in`, `nav.sign_up`) wrapped in `<kw-l key="…">en</kw-l>`. Left
+  untouched: `@Html.AntiForgeryToken()`, the `asp-*`/`method` attributes, the
+  `KumunitaPrincipal.IsGlobalAdmin` check, the form structure.
+
+**16 `<kw-l>` elements placed** (5 nav + 5 footer + 6 account-nav). Each
+element's inner text is the exact `en` string from U1's registry (the M·1
+source floor, and what a fresh `en` instance renders identically).
+
+**`ProcessAsync` logic (as shipped):** read
+`_httpContextAccessor.HttpContext?.Request` → `LocaleCookie.Read(request)`
+(null-safe — a missing context degrades to "no preference") →
+`await _provider.GetAsync(Key, pref)` → `output.TagMode =
+TagMode.StartTagAndEndTag; output.Content.SetContent(text);`.
+
+**`SetContent` vs `SetHtmlContent` — chose `SetContent`.** The plan allows
+either. I chose `SetContent` (auto-escaping) because the resolved value is
+platform copy and the safer path against any injection from an admin-entered
+translation string; the element's inner `en` reference is still the source M·1
+floor. (The provider already resolves the value — escaping it again is
+harmless and conservative.)
+
+**One build-fix (recorded, per the unit-series "deviation" duty):** the plan's
+pinned-contract snippet used `context.ViewContext.HttpContext.Request`, but
+`TagHelperContext` does **not** expose `ViewContext` (first build failed:
+`error CS1061: 'TagHelperContext' does not contain a definition for
+'ViewContext'`). The idiomatic, repo-consistent fix is to ctor-inject
+`IHttpContextAccessor` (registered via `AddHttpContextAccessor()` at
+`Program.cs:209`; the same seam `ClaimsSource` ctor-injects and
+`Views/Directory/Detail.cshtml` `@inject`s). This is **not** a re-shape of a
+frozen seam and **not** a new DI registration — it uses the existing
+`IHttpContextAccessor` registration. The provider call is unchanged.
+
+**Deviations vs the plan:** only the `IHttpContextAccessor` substitution above
+(a C#-API correction to the pinned-contract *snippet's* intent, not a design
+change). Everything else — the TagHelper shape, the key set, the 16 placements,
+the frozen-seam non-touch — is exactly as planned.
+
+**Drift-pause count: 0.**
+
+## U3 — the Posts views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 3.5s)
++ the 7 `posts.*` keys present as `<kw-l>` elements in the three touched views.
+
+**What was changed (3 files modified, 0 new — the closed set):**
+- **`Views/Posts/Index.cshtml` — 3 keys:** `posts.write` (the `CanPost`-branch
+  "Write a post" primary button), `posts.empty_can_post` (the `CanPost`-branch
+  empty-feed `<text>`), `posts.empty` (the else-branch empty-feed `<text>`).
+- **`Views/Posts/New.cshtml` — 2 keys:** `posts.new_title` (the
+  `<h1>Write a post</h1>`), `posts.new_submit` (the form's submit button).
+- **`Views/Posts/Edit.cshtml` — 2 keys:** `posts.edit_title` (the
+  `<h1 class="mt-2">Edit post</h1>`), `posts.edit_save` (the form's submit
+  button).
+
+**7 `<kw-l>` elements placed** (3 + 2 + 2). Each wraps the **exact current
+English** as inner text (the M·1 source floor — a fresh `en` instance renders
+identically). The multi-line `posts.empty_can_post` value stays as a single
+wrapped line inside the existing `<text>` wrapper (the `@if`/`@else` structure
+untouched — text-only replacement). No `href`/`action`/`method`/`name`/`id`/
+`@Html.AntiForgeryToken()`/`@if`/`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`
+changed — only the visible English text that matched a `posts.*` key.
+
+**Left as-is (deliberate, recorded per the unit's instructions):**
+- **`ViewData["Title"] = "Write a post"`** (`New.cshtml`) and
+  **`= "Edit post"`** (`Edit.cshtml`) — localizing a browser-tab title requires
+  a C# `@{}` code line calling the provider (not a `<kw-l>` element), which is
+  outside U3's closed view-text scope. **Deliberate U3 limitation:** the tab
+  title stays `en`; the visible `<h1>` is what gets translated. If the tab title
+  should also be localized, that is a **U9 follow-on proposal** (not implemented
+  here). `Index.cshtml`'s `ViewData["Title"] = $"{Model.ComponentName}"` and
+  `Detail.cshtml`'s `= Model.Post.Title ?? "Post"` are dynamic (UGC-adjacent)
+  and likewise out of scope.
+- **`Detail.cshtml` left untouched** — scanned in full; **none** of the 7
+  `posts.*` exact strings appear. The page is the UGC-reading surface (post
+  body, replies, author name — M·3 / unit-series rule 4) plus out-of-scope
+  strings ("Edit" button, "Report this post", "Replies", "Reply", "back to the
+  post", "No replies yet"). Not a registry key, so not keyed.
+- **All out-of-scope strings in the touched views** (per the lane plan's
+  "explicitly out of scope" list): "Manage members", "Leave", "Communities" /
+  "Browse communities" / "All", the "Everyone" ADR 0012 badge, the
+  `@Model.Total post@…` hidden-count hint, the "community" helper paragraphs,
+  the "Title" label, the "optional" placeholder, the "No community feed…" /
+  "This post's community feed…" warnings, the audience-picker copy, the "Cancel"
+  buttons — none in the `posts.*` registry, so not keyed (rule 3).
+
+**Deviations vs the plan:** none. The 7 placements, the `ViewData["Title"]`
+left-as-is decision, and the `Detail.cshtml` non-touch are all exactly as the
+unit instructions specified.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).
+
+## U4 — the Groups views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 2.9s)
++ all 13 `groups.*` `<kw-l>` placements present in the four touched views.
+
+**What was changed (4 files modified, 0 new — the closed set):**
+- **`Views/Groups/Index.cshtml` — 4 keys:** `groups.title` (the
+  `<h1>Groups</h1>`), `groups.lead` (the `<p class="text-muted">` directly
+  below the `<h1>`), `groups.empty` (the **first sentence** of the compound
+  empty-state `<div class="alert alert-info">` — see Note 1), `groups.create`
+  (the bottom `<a class="btn btn-primary">Create a group</a>` button — see Note
+  1).
+- **`Views/Groups/Detail.cshtml` — 5 keys:** `groups.back_all` (the back-link
+  `<a class="text-muted">← All groups</a>` — entire text incl. arrow, Note 2),
+  `groups.posts_heading` (the `<h2 class="mb-0">Posts</h2>`),
+  `groups.new_post` (the `<a class="btn btn-primary">New post</a>` in the
+  `Model.CanPost` branch), `groups.posts_empty_can` (the `Model.CanPost`
+  empty-state `<text>`), `groups.posts_empty` (the else-branch empty-state
+  `<text>`).
+- **`Views/Groups/New.cshtml` — 3 keys:** `groups.new_back` (the back-link
+  `<a class="text-muted">&larr; back to the group</a>` — text after the arrow
+  only, Note 3), `groups.new_title` (the `<h1>Post to this group</h1>`),
+  `groups.new_submit` (the form's `<button type="submit">Post to group</button>`).
+- **`Views/Groups/PostDetail.cshtml` — 1 key:** `groups.new_back` (the
+  back-link `<a class="text-muted small">&larr; back to the group</a>` — text
+  after the arrow only, same as Note 3).
+
+**13 `<kw-l>` elements placed** (4 + 5 + 3 + 1). Each wraps the **exact current
+English** (matching the registry `en` value) as inner text (the M·1 source
+floor — a fresh `en` instance renders identically). All 12 registry `groups.*`
+keys verified to exactly match the current view text before replacing (the
+exact-match principle — no drift). The two empty-state `<text>` blocks
+(`groups.posts_empty_can` / `groups.posts_empty`) keep their `<text>` wrapper
+with the `<kw-l>` inside; the `@if (Model.CanPost)` / `@else` structure
+untouched — text-only replacement. No `href`/`action`/`method`/`name`/`id`/
+`@Html.AntiForgeryToken()`/`@if`/`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`/
+`ViewContext.RouteData` changed — only the visible English text that matched a
+`groups.*` key.
+
+**The three notes (and how each was resolved):**
+- **Note 1 — `groups.empty` compound message (Index.cshtml):** the empty-state
+  div is `No groups yet. <a>…Create one…</a> to organize residents (e.g. …)`.
+  The registry's `groups.empty` = "No groups yet." is **only the first
+  sentence** — wrapped just that part, left the rest of the compound message
+  (incl. the "Create one" link text) **as-is**. The `groups.create` key
+  ("Create a group") was applied to the **separate** bottom button (a
+  different string), **not** to the empty-state's "Create one" — a different
+  string, not a registry key.
+- **Note 2 — `groups.back_all` arrow (Detail.cshtml):** the registry value is
+  "← All groups" (with the arrow character). The view already used the literal
+  `←`, so the inner text is the exact registry value — the **entire** link text
+  (arrow + words) is wrapped: `<kw-l key="groups.back_all">← All groups</kw-l>`.
+- **Note 3 — `groups.new_back` arrow (New.cshtml + PostDetail.cshtml):** the
+  registry value is "back to the group" (**without** an arrow). The views use
+  `&larr; back to the group`; wrapped **only the text after the arrow**:
+  `&larr; <kw-l key="groups.new_back">back to the group</kw-l>`. The arrow
+  (`&larr;`) is a visual affordance, left outside the element — same in both
+  files (2 placements of the one key).
+
+**`ViewData["Title"]` — left as-is (U3 convention):** `Index.cshtml`
+`= "Groups"`, `New.cshtml` `= "Post to group"` (static) and `Detail.cshtml`
+`= Model.Name` / `PostDetail.cshtml` `= Model.Post.Title ?? "Post"`
+(dynamic/UGC) all left untouched. Localizing a browser-tab title requires a
+C# `@{}` line calling the provider (not a `<kw-l>` element) — outside U4's
+closed view-text scope, matching the U3 decision. If the tab title should
+also be localized, that is a **U9 follow-on proposal** (not implemented here).
+
+**Left as-is (deliberate, out-of-scope strings confirmed and not keyed —
+rule 3):**
+- **`Index.cshtml`:** the Invitations section ("Invitations", the
+  `@Model.Invitations.Count pending` badge, "Invited by", "Accept",
+  "Decline"), the "Create one" empty-state link, the "to organize residents
+  (e.g. …)" tail, `@g.Name` (UGC), `@g.MemberCount`.
+- **`Detail.cshtml`:** "Owned by", "You own this group", "Private" (badges),
+  `@Model.Description` (UGC), "About this group", "Description (optional)",
+  "Save description", "Privacy", "Private group", "Save" (the two owner/admin
+  forms), the group-post list items (title / body-preview / author / date —
+  UGC/M·3), the "…in this group; …shown to you" hidden-count hint, the
+  "Members" section (heading, "No members yet.", Remove / Leave buttons), the
+  invitation lanes ("Pending invitations", "Cancel invite", "Invite a
+  resident", "Invite", the resident-picker helper copy), all `@*…*@` design
+  comments.
+- **`New.cshtml`:** the "Your post will be visible to the current members…"
+  helper paragraph, the "Title" / "Body" labels, the "optional" placeholder,
+  the "A short headline (≤ 120 chars) …" helper, the "Cancel" link.
+- **`PostDetail.cshtml`:** the post title / body (UGC), the author name +
+  date, the "You can see this post because …" access-explanation line, the
+  replies section (heading, count, "No replies yet…", each reply's body /
+  author / date — UGC/M·3), the reply form ("Reply" heading/label/button, the
+  reply helper copy).
+
+None of these are in the `groups.*` registry, so none are keyed (unit-series
+rule 3 — never key an out-of-scope string; rule 4 — never wrap UGC).
+
+**Deviations vs the plan:** none. All 13 placements, the three notes, the
+`ViewData["Title"]` left-as-is decision, and the out-of-scope non-touch are
+exactly as the unit instructions specified. `Create.cshtml` (a separate view,
+not in U4's closed set — the in-scope surface is Index / Detail / New /
+PostDetail) was **not** read or touched.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).
+
+## U5 — the remaining in-scope views wired to `<kw-l>`
+
+**Date:** 2026-09-12 · **Kind:** code unit (view edits only) · **Exit:** build
+green (`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 7.4s)
++ all 16 `<kw-l>` placements present in the six touched views. **After U5 the
+view-wiring track (U2–U5) is complete** — every in-scope string in the registry
+is wired to a `<kw-l>` element.
+
+**What was changed (6 files modified, 0 new — the closed set):**
+- **`Views/Home/Index.cshtml` — 3 keys:** `home.eyebrow` (the
+  `<div class="eyebrow">Where this project stands</div>`), `home.lead` (the
+  `<p class="kmb-section-lead">` — see the `home.lead` note below), `home.support`
+  (the **first sentence** of the support `<p>`, before the mailto `<a>` — see
+  Note 1).
+- **`Views/Account/Login.cshtml` — 3 keys:** `account.login_title` (the
+  `<h1>Sign in</h1>`), `account.login_submit` (the submit button),
+  `account.login_no_account` (the **question text only** — see Note 2).
+- **`Views/Account/Signup.cshtml` — 3 keys:** `account.signup_title` (the
+  `<h1>Sign up</h1>`), `account.signup_submit` (the submit button),
+  `account.signup_has_account` (the **question text only** — see Note 2).
+- **`Views/Directory/Index.cshtml` — 3 keys:** `directory.title` (the
+  `<h1>Directory</h1>`), `directory.lead` (the `<p class="text-muted">` directly
+  below the `<h1>`), `directory.empty` (the `<div class="alert alert-info">`
+  content).
+- **`Views/Profile/Edit.cshtml` — 2 keys:** `profile.title` (the
+  `<h1>Your profile</h1>` — **not** the tab title "Edit your profile"),
+  `profile.save_avatar` (the disabled avatar-upload submit button).
+- **`Views/Admin/Index.cshtml` — 2 keys:** `admin.title` (the
+  `<h1>Admin</h1>`), `admin.verify` (the `<button class="btn btn-outline-primary">Verify</button>`
+  in the verify form).
+
+**16 `<kw-l>` elements placed** (3 + 3 + 3 + 3 + 2 + 2). Each wraps the **exact
+current English** (matching the registry `en` value) as inner text (the M·1
+source floor — a fresh `en` instance renders identically). No
+`href`/`action`/`method`/`name`/`id`/`asp-*`/`@Html.AntiForgeryToken()`/`@if`/
+`@foreach`/`@Url.Action`/`Model.*`/`TempData.*`/`@Model.CommunityName`/
+`Milestones.All`/`RepositoryInfo.Links` changed — only the visible English text
+that matched one of the 16 keys.
+
+**The two notes (and how each was resolved):**
+- **Note 1 — `home.support` is a substring (Home/Index.cshtml):** the view's
+  support `<p>` is a compound sentence: `Questions or feedback? Write to
+  <a href="mailto:@Model.SupportEmail">@Model.SupportEmail</a>.`. The registry's
+  `home.support` = "Questions or feedback? Write to" is **only the text before
+  the mailto link**. Wrapped **just that part**:
+  `<kw-l key="home.support">Questions or feedback? Write to</kw-l>
+  <a href="mailto:@Model.SupportEmail">…</a>.` — the `<a>` and the trailing `.`
+  are **left as-is** (dynamic / UGC-adjacent).
+- **Note 2 — the account cross-links (Login + Signup):** the "No account yet?"
+  (Login) and "Already have an account?" (Signup) strings are each followed by
+  a cross-link (`<a asp-action="Signup">Sign up</a>` /
+  `<a asp-action="Login">Sign in</a>`). Wrapped **only the question text**;
+  the cross-link `<a>` (and the trailing `.` on Signup) is **left as-is**. The
+  cross-link link text ("Sign up" / "Sign in") is **not** in the account
+  registry — it is cross-page navigation (the nav keys `nav.sign_in` /
+  `nav.sign_up` were already wired by U2 in `_AccountNav.cshtml`), so it is out
+  of U5's closed set.
+
+**`home.lead` multi-line paragraph handling (Home/Index.cshtml):** the view's
+lead paragraph was a **multi-line** block (4 source lines). Per the unit
+instructions, the **entire** paragraph is wrapped in a **single** `<kw-l>`
+element whose inner text is the **single-line registry value** (not the
+multi-line view formatting) — the TagHelper's `SetContent` emits the resolved
+text and the inner `en` is the source-readable M·1 floor. The rendered HTML is
+identical (whitespace inside the `<p>` collapses the same way).
+
+**`ViewData["Title"]` — left as-is (U3/U4 convention):** `Home` `= "Home"`,
+`Login` `= "Sign in"`, `Signup` `= "Sign up"`, `Directory` `= "Directory"`,
+`Profile/Edit` `= "Edit your profile"` (note: **different** from
+`profile.title` = "Your profile"), `Admin` `= "Admin"` — all browser-tab titles
+left untouched. Localizing a tab title requires a C# `@{}` line calling the
+provider (not a `<kw-l>` element), outside U5's closed view-text scope. If the
+tab titles should also be localized, that is a **U9 follow-on proposal** (not
+implemented here).
+
+**Left as-is (deliberate, out-of-scope strings confirmed and not keyed — rule
+3):**
+- **`Home/Index.cshtml`:** `ViewData["Title"]`, `@Model.CommunityName`
+  (dynamic/UGC), the milestone list (`Milestones.All` — dynamic), the repository
+  links (`RepositoryInfo.Links` — dynamic), the `@Model.SupportEmail` mailto
+  link + trailing `.`.
+- **`Account/Login.cshtml`:** `ViewData["Title"]`, the `@label asp-for="Email"`
+  / `"Password"` / `"RememberMe"` labels (model-bound), the "Sign up" cross-link
+  text, the **setup-token section** (`Model.ShowSetupLink` — "Received a
+  first-boot setup token? Complete setup." — **setup flow, explicitly out of
+  scope** per the lane plan), the `@if (TempData["info"])` / `Model.Error`
+  alerts.
+- **`Account/Signup.cshtml`:** `ViewData["Title"]`, the `@label asp-for=…`
+  labels (model-bound), the "Sign in" cross-link text, the "Never got the
+  confirmation email? Resend the confirmation email." section (model-conditional,
+  not in the registry).
+- **`Directory/Index.cshtml`:** `ViewData["Title"]`, the profile rows
+  (`@p.DisplayName`, `@p.Address` — UGC/UGC-adjacent), the "Verified" badge,
+  the avatar `<img>` + monogram, the U8-media design `@*…*@` comment.
+- **`Profile/Edit.cshtml`:** `ViewData["Title"]` ("Edit your profile"), the
+  "This is where you decide what other residents can see…" helper paragraph,
+  the "Your avatar" sub-heading, the avatar file input + helper text ("JPEG,
+  PNG, WebP or GIF · up to 5 MB…"), the profile-edit form fields (model-bound),
+  the "Your name + email" / "Your address + phone" / "Who can see what" headings,
+  the "Share my contact info" switch + helper, the `<partial>` audience editor,
+  the **`<button type="submit" class="btn btn-primary">Save</button>`** (the
+  profile-save button — **not** in the registry, confirmed present and left
+  untouched), the "Preview — how I appear" link.
+- **`Admin/Index.cshtml`:** `ViewData["Title"]`, the `<h2>Accounts</h2>`, the
+  account-count summary line, the "Verify an unverified account (safety valve)"
+  label, the "No unverified accounts to verify." empty state, the table headers
+  ("Account" / "Roles" / "Scope" / "Posting"), the account rows (UGC-adjacent),
+  the "unverified" / "blocked" badges, the "Set" / "Block" / "Unblock" action
+  buttons, the role/scope/post selects, the confirm() guards.
+
+None of these are in the 16-key closed set, so none are keyed (unit-series rule
+3 — never key an out-of-scope string; rule 4 — never wrap UGC).
+
+**Deviations vs the plan:** none. All 16 placements, the two notes, the
+`home.lead` single-line handling, the `ViewData["Title"]` left-as-is decision,
+and the out-of-scope non-touch (especially the Login setup-token section) are
+all exactly as the unit instructions specified.
+
+**Drift-pause count: 0** (no registry/value mismatch, no frozen-seam
+contradiction, no out-of-scope string attempted).
+
+## U6 — the key-managed admin translation editor
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded in 8.2s)
++ the new batch-read test passing in isolation
+(`-method …MLUI_U6_GetTranslationsFor_ReturnsRawRows_NoFallback` →
+`Total: 1, Errors: 0, Failed: 0`). **The admin-side Gap 3 is closed:** the
+editor lists the closed key set — no hand-typed key exists anywhere.
+
+**What was changed (5 files modified + 1 new — the closed set):**
+- **`ILocalizationService.cs` (D6-1):** added the pinned batch read,
+  verbatim signature `Task<IReadOnlyDictionary<string, string>>
+  GetTranslationsForAsync(string languageCode);` with XML doc in the seam's
+  M·4 read-path style (no audit — it is a read).
+- **`LocalizationService.cs` (D6-1):** implemented in the seam's read-path
+  style — one `QuerySession`, one query filtered on
+  `LanguageCode == languageCode`, `ConfigureAwait(false)`, an empty
+  `Dictionary` (ordinal comparer) for a code with no rows (never null), **no
+  fallback** (raw rows — the provider's M·2 fallback is the resident's path).
+- **`LanguagesController.cs`:** new `public async Task<IActionResult>
+  Translations(string code)` GET — builds rows from
+  `KnownTranslationKeys.AllKeys` in registry order, `EnReference` from
+  `KnownTranslationKeys.EnValues[key]`, `CurrentValue` from
+  `GetTranslationsForAsync(code)` (missing key → empty string); returns
+  `View("Translations", …)`. Nested public `TranslationEditorViewModel`
+  (`Code`, `IReadOnlyList<TranslationRow> Rows`) + `TranslationRow`
+  (`Key`, `EnReference`, `CurrentValue`) — the D6-5 pattern. Class
+  doc-comment's U6 sentence updated (the editor views are U6's; the
+  `SaveTranslation` / `SavePage` actions are the stable HTTP surface it built
+  against). **`SaveTranslation` itself is untouched** (frozen — D6-3).
+- **`Views/Languages/Translations.cshtml` (NEW, D6-4):** per-key list editor —
+  a back link to `/admin/languages`, a 52-row table (key `<code>` · `en`
+  reference · current value), each row a form POSTing `key` (hidden) + `text`
+  to `/admin/languages/@Model.Code/translations` with `@Html.AntiForgeryToken()`
+  (the exact D6-3 shape), `TempData["info"]` / `["error"]` alerts. The 52 rows
+  render from the model — **no hardcoded key list in the view**; the chrome
+  text is plain English (D6-4).
+- **`Views/Languages/Index.cshtml`:** each language row's actions cell gains a
+  **"UI strings"** button → `/admin/languages/@row.Code/translations`; the
+  existing "Edit pages" link (→ `…/pages/terms`) is kept.
+- **`Views/Languages/PreviewPage.cshtml`:** the hand-typed-key
+  "UI strings" form section is **deleted**; a "UI strings" link (same target)
+  added beside the back link. The static-page editor form and
+  `PageEditorViewModel` binding are untouched (D6-2).
+- **`LocalizationServiceTests.cs`:** new
+  `MLUI_U6_GetTranslationsFor_ReturnsRawRows_NoFallback` [Fact] — seeds two
+  `pl` rows + one `en`-only row, asserts exactly the two `pl` pairs are
+  returned (no fallback into `en`), and a code with no rows returns an empty
+  (not null) map. Matches the file's style.
+
+**FACES L5 / L6:** L5 (the closed-list editor, per-key, no hand-typed key) is
+now true in the admin surface; L6 (save → visible next request + exactly one
+`translation.save` audit row, `Via = Admin`) is inherited from the frozen
+`SaveTranslation` / `UpsertTranslationAsync` path, which this unit reuses
+without re-shaping. **FACES tests for the GET action are U8's job** (not
+written here, per the unit's scope).
+
+**Deviations vs the plan:** none — the D6-1 signature is verbatim, the D6-3
+save shape is byte-identical to the frozen action's binding, and no frozen
+seam was touched.
+
+**Drift-pause count: 0** (no key outside the registry was needed; the
+`SaveTranslation` / `UpsertTranslationAsync` seams are present and as the ML
+close record claims).
+
+## U7 — the public language picker (signed-out) + wire `/about`
+
+**Date:** 2026-09-12 · **Kind:** code unit · **Exit:** build green
+(`dotnet build Kumunita.slnx -c Debug` — all 4 projects succeeded) + the new
+Web-layer tests passing in the full Web run
+(`dotnet exec …Kumunita.Web.Tests.dll` → `Total: 94, Errors: 0, Failed: 0`,
+90 prior + 4 new). **Gap 4 (discoverability) is closed:** a signed-out visitor
+can pick a language, and `/about` now renders an admin-created `about`
+page or the product-story fallback.
+
+**What was changed (4 files modified + 3 new — the closed set):**
+- **`Controllers/PublicLocaleController.cs` (NEW, D7-1):** unauthenticated
+  `GET /language` (builds the **same** model as `LocaleController.Index` —
+  enabled catalog in `SortOrder`, `LocaleSettings` instance default via the
+  frozen `IDocumentStore` singleton load, current cookie) rendering the
+  compact `Views/PublicLocale/Index.cshtml`; and `POST /language`
+  (`code` → `LocaleCookie.Write`; `clear=1` → `LocaleCookie.Clear`),
+  `[ValidateAntiForgeryToken]`, `RedirectToAction(nameof(Index))`. Binds the
+  **existing** public nested types `LocaleController.LocaleSettingsViewModel`
+  / `LocaleOption` — **not** duplicated. `LocaleController` and
+  `Views/Locale/Index.cshtml` are untouched; `/settings/language` is still the
+  `[Authorize]`d route, `/language` is a separate route.
+- **`Views/PublicLocale/Index.cshtml` (NEW, D7-5):** the compact picker — one
+  `<select name="code">` over the enabled catalog, one submit, one `clear=1`
+  reset link, `TempData["info"]`/`["error"]` alerts. Chrome text is plain
+  English; the only translatable string is the nav link label (already keyed).
+  No "instance default" educational copy (that's the settings page).
+- **`Views/Shared/_AccountNav.cshtml` (D7-2):** **one** `Choose your language`
+  link → `/language`, wrapped in the **single new** `<kw-l key=
+  "settings.choose_language">` of this unit, placed **outside** the
+  `isAuthenticated` branches so it is visible to signed-in **and** signed-out
+  visitors (M·11). Signed-in users still also have the `settings.settings`
+  → `/settings/language` link (full settings vs. quick picker).
+- **`Views/Shared/_Layout.cshtml`:** the footer's About link is changed from
+  `asp-controller="Home" asp-action="About"` to `href="/about"`. **Justified
+  deviation:** that tag-helper is an **action lookup**, not a plain route —
+  after `HomeController.About` is deleted (D7-4) it would compose to
+  `/Home/About`, which does **not** match the `[HttpGet("/about")]` attribute
+  route (it would 404). A plain `href="/about"` matches the route (the same
+  idiom as the adjacent "Announcements" `<a href="/announcements">`), keeps
+  the link targeting `/about` (the exit checklist's requirement), and still
+  satisfies D7-6 (no new authz — it's an anonymous route). This is the only
+  out-of-named-set edit and is forced by D7-4 + the exit checklist.
+- **`Controllers/StaticPagesController.cs` (D7-4):** `Slugs` is now exactly
+  `{ "terms", "help", "about" }` (additive — `Terms`/`Help` behavior unchanged,
+  non-regression test added). New `GET /about` → `Page("about",
+  fallBackToProductStory: true)`. Constructor gains
+  `IOptions<CommunityOptions>` (mirroring `HomeController`'s ctor style). The
+  null branch: when the `about` page is **truly absent** (no row in any
+  language), it renders the **existing** product-story view via
+  `View("~/Views/Home/About", new HomeViewModel(…))` instead of a 404 —
+  L9's "truly absent" branch. `terms`/`help` still 404 when absent (M·2 page
+  floor preserved). Class doc-comment updated: the `/about` change the ML
+  close record had "recorded, not shipped" is now **shipped (ML-UI U7)**.
+- **`Controllers/HomeController.cs`:** `About()` action **deleted** (D7-4 —
+  one route, one owner). A NOTE comment marks the move to
+  `StaticPagesController.About`. Nothing else touched; `Index()`/`Error()`
+  intact.
+- **`tests/Kumunita.Web.Tests/PublicLocaleAndAboutTests.cs` (NEW):** 4 [Facts]
+  on the project's existing direct-construction harness (NSubstitute +
+  `DefaultHttpContext`), no TestServer:
+  (a) `GET /language` anonymous → enabled catalog in `SortOrder` + the
+  settings default flow through the model; (c) `GET /about` with **no** page
+  → the product-story view (`~/Views/Home/About`) with the `HomeViewModel`;
+  (d) `GET /about` with an `about` page → the `Page` view rendering that
+  `LocalizedPage`, with the `pl` preference handed to `GetPageAsync`;
+  plus a non-regression `GET /terms` absent → `NotFoundResult`.
+
+**FACES L3 / L9:** L9 is fully exercised here (both the product-story and
+localized-page branches). L3's *picker-reachable-unsigned-out* + *catalog
+shape* half is exercised (a). **Deferred to U8 (the authoritative FACES
+gate):** the `POST /language` → cookie-write assertion (M·11) — the direct
+harness has **no `ITempDataProvider`**, so the action's `TempData` write NREs
+before the cookie can be observed (the same reason the existing controller
+tests avoid any TempData-writing branch, e.g. `AdminControllerBlockTests`).
+U8's TestServer-backed gate verifies the actual `kumunita.locale` write
+end-to-end. **U8 owns the authoritative L3/L9 FACES tests either way.**
+
+**Why the pinned alternative was rejected (D7-4):** the pinned alternative —
+repointing the **existing** `HomeController.About` at `GetPageAsync("about")`
+— was rejected in favor of `StaticPagesController`. The `/about` route is a
+**static page** over the `LocalizedPage` engine (`MarkdownRenderer`, the
+"Last updated" line, the shared `Page.cshtml`), exactly like `terms`/`help`;
+the `StaticPagesController` guard list + `Page()` helper is the one owner of
+that engine. Adding a second `GetPageAsync` call site in `HomeController`
+would fork the rendering path and leave two owners of the static-page
+behavior. One route, one owner (D7-4) is the cleaner seam and matches the
+ML-close-record's stated intent.
+
+**Deviations vs the plan:** one forced edit — `_Layout.cshtml`'s footer
+About link changed to `href="/about"` (see above). It is **not** in the
+7-file deliverable list, but it is **required** for the exit checklist's
+"the link still targets `/about`" clause to hold after `HomeController.About`
+is removed (D7-4 forbids keeping that action). No frozen seam was touched;
+no registry key was added (D7-3 — `settings.choose_language` was reused).
+
+**Drift-pause count: 0** (no key outside the registry; the frozen
+`LocaleCookie` / `LocaleSettings` / `GetPageAsync` seams are present and as
+claimed).
+
+## U8 — the FACES gate (L1–L9 + the acceptance gate)
+
+**Date:** 2026-09-12 · **Kind:** test unit (no `src` code) · **Exit:** both
+assemblies green under the reliable runner (`dotnet build` + `dotnet exec`),
+the three gate [Facts] present, and this note appended **before** the folder
+move (U9's close owns the move — not this unit).
+
+**The gate's whole, recorded:**
+- **`Kumunita.Core.Tests` → Total: 291, Errors: 0, Failed: 0** (30.2s,
+  Testcontainers). The 19 `ML` anchors **and** the `MLUI_U6_*` test **and** the
+  new L1/L2/L4/L5-core/L6/L7/L8 + the three gate [Facts] run in the **same**
+  process — the part-vs-whole evidence.
+- **`Kumunita.Web.Tests` → Total: 100, Errors: 0, Failed: 0** (0.66s). The
+  new L3 (+ `clear=1`), L5-web, and L9 (three branches) join the existing
+  `PublicLocaleAndAboutTests` et al.
+
+**Two new test files, zero `src` changes, zero `.csproj` changes:**
+- **`tests/Kumunita.Core.Tests/MLUI_FacesTests.cs` (NEW)** — L1, L2, L4,
+  L5-core, L6, L7, L8 at the Core seams + the three gate [Facts]. Same
+  fixture/harness as `LocalizationServiceTests` (`IClassFixture<PostgresFixture>`
+  + the copied private helper set: `BootStoreAsync`, `SeedM1RowAsync`,
+  `Plant`, `AddLanguage`, `UpsertTranslation`, `UpsertPage`, `AuditRows`, plus
+  a new `SeedEnFloor` mirroring the seeder step).
+- **`tests/Kumunita.Web.Tests/MLUI_FacesTests.cs` (NEW)** — L3 (incl. the
+  `clear=1` branch + the `ITempDataProvider` fake), L5-web, L9 (three branches)
+  at the controller level, on the existing direct-construction harness
+  (NSubstitute + `DefaultHttpContext`, no TestServer — D8-3).
+
+**FACES test inventory (every [Fact] name, per project):**
+- **Core.Tests** — `MLUI_U8_L1_PreferenceResolvesNavKeyInPolish`;
+  `MLUI_U8_L2_MissingKeyFallsBackPerStringRestStaysPolish`;
+  `MLUI_U8_L4_FreshInstance_RendersEnglishFloor`;
+  `MLUI_U8_L5_BatchRead_ReanchoredOnRegistry`;
+  `MLUI_U8_L6_SaveRegistryKey_VisibleNextRequest_OneAuditRow`;
+  `MLUI_U8_L7_CompletenessRealForPl_FullForEn`;
+  `MLUI_U8_L8_UgcBodyAsAuthored_ProviderNeverConsultsUgc`;
+  `MLUI_U8_Gate_ClosedLoop_RegistryKeySave`;
+  `MLUI_U8_Gate_Handoff_DefaultPl_PerStringFallbackOnRegistry`;
+  `MLUI_U8_Gate_PartVsWhole_InheritedAnchorsHoldOnRegistry`.
+- **Web.Tests** — `MLUI_U8_L3_SavePreference_WritesLocaleCookie`;
+  `MLUI_U8_L3_ClearPreference_DeletesCookie`;
+  `MLUI_U8_L5_EditorListIsClosedRegistry`;
+  `MLUI_U8_L9_AboutAbsent_ProductStoryView`;
+  `MLUI_U8_L9_AboutEnPage_PrefPlNoPlRow_RendersEnPage`;
+  `MLUI_U8_L9_AboutPlPage_PrefPl_RendersPlPage`.
+
+**Three-gate mapping (which test = which gate):**
+- **Closed loop** → `MLUI_U8_Gate_ClosedLoop_RegistryKeySave` (L6's shape, a
+  registry key: save → visible on the next request + one `translation.save`
+  audit row, `Via = Admin`).
+- **Handoff** → `MLUI_U8_Gate_Handoff_DefaultPl_PerStringFallbackOnRegistry`
+  (default set to `pl`; a resident with **no** preference: a no-`pl` registry
+  key falls back to `en` while a sibling resolves `pl` — the `LocaleSettings`
+  change picked up live, per-string, M·2, re-anchored on registry keys).
+- **Part-vs-whole** → `MLUI_U8_Gate_PartVsWhole_InheritedAnchorsHoldOnRegistry`
+  (a thin [Fact] re-running the M1 + M9 + M12 assertions on registry keys in
+  sequence). **The real part-vs-whole evidence is the full-assembly run count
+  above** — the 19 `ML` anchors AND the new L/gate tests pass in the same
+  `Kumunita.Core.Tests` process (D8-10).
+
+**D8 deviations (recorded):**
+- **D8-4 (L3) — the U7 deferral is closed.** `PublicLocaleController.Save`
+  writes `TempData["info"]`, which NREs without an `ITempDataProvider`. The
+  test supplies a no-op `ITempDataProvider` via
+  `controller.TempData = new TempDataDictionary(HttpContext, provider)`
+  (set on the `Controller`, not the `ControllerContext` — `ControllerContext`
+  has no `TempData` member in this ASP.NET Core). The `Set-Cookie` header
+  (`kumunita.locale=pl`, `HttpOnly`, `SameSite=Lax`) is then asserted — the
+  frozen `LocaleCookie.Write` shape. The `clear=1` branch asserts the
+  deletion's epoch `Expires` (the `CookieOptions.Delete` idiom) — the header
+  is `kumunita.locale=; expires=Thu, 01 Jan 1970 00:00:00 …`, **not**
+  `Max-Age=0` (that literal was my first attempt's wrong guess; corrected).
+- **L5-web "no hand-typed key"** is asserted on the **model shape** (the
+  `TranslationEditorViewModel` exposes exactly `{ Code, Rows }` — no
+  free-form string input), not on `TranslationRow.Key`'s `CanWrite`
+  (init-accessors report `CanWrite == true`, so that reflection check is not
+  a discriminator). This is the faithful "assert on the types, not the HTML"
+  reading of D8-6.
+- **L4/L7 seeder mirroring (the blocker protocol's sanctioned path):**
+  `FirstBootSeeder.SeedTranslationResourcesAsync` is **private** and
+  `SeedAsync` needs the whole bootstrap dependency set, so the tests **mirror**
+  the seeder step's exact shape — an `en` `TranslationResource` row per key in
+  `KnownTranslationKeys.EnValues` (the `SeedM1RowAsync`-mirrors-
+  `SeedLanguageCatalogAsync` precedent). The registry is the single source of
+  truth both the seeder and the test read, so the mirror is exact.
+
+**D8-3 held:** no package added, no TestServer, no `WebApplicationFactory`.
+`Kumunita.Core` is reachable in `Web.Tests` transitively via `Kumunita.Web`,
+so `KnownTranslationKeys` / the controllers / `LocaleCookie` are all in scope
+with no `.csproj` change.
+
+**L8 UGC surface (D8-8):** asserted by reflection — no method on
+`ITranslationProvider` takes a `Post` / `PostReply` / `Group` (the surface
+never consults UGC, M·3); the post's `Body` is re-loaded byte-identical; the
+provider resolves a registry key + a page independently.
+
+**Drift-pause count: 0.** No shipped seam behaved differently than the U6/U7
+notes claim; no test required a harness feature that isn't present (the L3
+`ITempDataProvider` gap is a documented, expected part of the deferred
+assertion, closed exactly as D8-4 prescribes). **No `src` fix was needed —
+U8 did not fix code.**
+
+**Runner note (this session's environment quirk, for the next agent):** the
+file-edit tools updated the **editor buffer** (what `read_file`/`grep_search`
+see) but did **not** reliably flush to **disk** (what `dotnet build` compiles)
+for an already-open file. The reliable path that landed correct bytes on disk
+was `create_file` on a **new** path + terminal `Move-Item` to the canonical
+name, then `dotnet build`. If a test "fails with an assertion you already
+removed", suspect a stale disk copy — verify with the terminal's own
+`Get-Content`, not the workspace `read_file`.
+
+## U9 — the close
+
+**Date:** 2026-09-12 · **Kind:** doc/roadmap unit (no `src` beyond
+`Milestones.cs`; no new tests) · **Exit:** build green + the Web assembly
+green, `in-progress/` empty, references swept.
+
+**The lane is closed.** U1–U7 shipped the code, U8 recorded the gate (291/291
+Core, 100/100 Web). U9 settles D1/D2 as **ADR 0015** — "UI view-localization
+mechanics": **D1** a `<kw-l>` TagHelper resolves per request against
+`ITranslationProvider` (cookie via `LocaleCookie`, M·5/M·8) with the **key
+itself** as the last-resort floor (M·1); **D2** the curated bounded registry
+`KnownTranslationKeys` (keys **+** `en` source text) in Core, materialized
+`en`-only by the seeder, read by the seeder / the key-managed editor / the
+completeness view. It names the `ML` lane (ADR 0005) as the seam this one
+wires, records the `SetContent`-not-`SetHtmlContent` deviation (U2) and the
+un-localized `ViewData["Title"]` limitation (U3/U4/U5) as consequences, and
+cross-references ADR 0005 (the seam completed) + ADR 0013 (the named-lane
+precedent).
+
+**Deliverable set (1 new, 7 modified, 2 moved):**
+- **NEW** `docs/adr/0015-ui-view-localization-mechanics.md`.
+- **Modified** `docs/adr/README.md` — one index row after 0014.
+- **Modified** `src/Kumunita.Web/Milestones.cs` — the `ML-UI` row between
+  `ML` and `M4` (D9-2); `M4` stays the sole `StatusNext`.
+- **Modified** `tests/Kumunita.Web.Tests/MilestonesTests.cs` — the order pin
+  renamed to `Roadmap_Covers_M0_Through_M6_Plus_Named_Lanes_In_Order` with
+  `ML-UI` in the array; the done-set pin gains `"ML-UI"`; the
+  single-in-progress pin is **unchanged** (`M4` remains the sole `StatusNext`
+  — the point); the blank-title pin is untouched (it iterates the list).
+- **Modified** `README.md` — the status paragraph restated as **two** shipped
+  lanes (`ML` + `ML-UI`); the Features **Multilingual** bullet extended with
+  the live-UI facts (keep the ADR 0005 cite, **add** ADR 0015); the Roadmap
+  `ML` row **loses** its `/about` follow-on sentence (U7 shipped it) and a new
+  `ML-UI` row is added; the `docs/adr/` range bumped to 0001–0015.
+- **Modified** `docs/ARCHITECTURE.md` — the §2 named-lanes note gains `ML-UI`
+  (ADR 0015, shipped); the §9 `Localization/` tree note gains
+  `KnownTranslationKeys` + the `GetTranslationsForAsync` batch read; the §9
+  "Current state" gains the `ML-UI` sentence (seam wired into the in-scope
+  views, editor key-managed, picker public).
+- **Modified** `done/multilingual-handoff-notes.md` (the `ML` close record) —
+  exactly one appended line on the `/about` follow-on block: **shipped
+  (ML-UI U7, 2026-09-12)**. History not rewritten.
+- **This section** appended (step below), then the two `in-progress/` files
+  move to `done/`.
+
+**Gate counts (from U8, cited):** `Kumunita.Core.Tests` Total: 291, Errors: 0,
+Failed: 0 · `Kumunita.Web.Tests` Total: 100, Errors: 0, Failed: 0.
+
+**This unit's verification (D9-8 — build + the Web assembly only, no
+`Core.Tests` re-run):**
+- `dotnet build Kumunita.slnx -c Debug` → **Build succeeded. 0 Warning(s),
+  0 Error(s)** (the `Milestones.cs` edit compiles).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Kumunita.Web.Tests  Total: 100, Errors: 0, Failed: 0, Skipped: 0,
+  Not Run: 0, Time: 0.615s** — the count is **unchanged from U8** (U9 adds no
+  tests), as expected.
+
+**Folder moves + reference sweep (D9-7):** `plan-multilingual-ui.md` +
+`multilingual-ui-handoff-notes.md` moved `in-progress/` → `done/` (this unit's
+own, after this section is written). The nine `multilingual-ui-uNN-plan.md`
+files were already in `done/`. A repo-wide sweep re-pointed every surviving
+reference to those two files (this note's own header + the plan file's
+secondary-tier self-reference + the four unit plans U0/U3/U4/U5 that cite the
+master plan and the handoff note) from their `in-progress/` paths to their
+`done/` paths; **zero** references to the two files' old `in-progress/` paths
+survive. `in-progress/` is **empty** at exit.
+
+**Drift-pause count: 0.** No ADR fact required code verification beyond the
+U1/U2/U6/U7/U8 notes; the `MilestonesTests` pins matched the D9-2/D9-3 intent
+on first read (no `ML`-U9 discrepancy recorded).

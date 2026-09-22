@@ -1,0 +1,153 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.ManageCommunityViewModel
+@{
+    ViewData["Title"] = $"{Model.Name} — manage";
+
+    // ADR 0053 — the ADR 0026 translation surface moved off this page to the
+    // dedicated /community/translations/{id} page (linked from the header).
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Posts", new { componentId = Model.ComponentId })"><kw-l key="community.manage_back">← Back to the feed</kw-l></a></p>
+
+        @*
+            ADR 0012 — the surface under /community/manage/{id}: the
+            mandatory toggle (checked = everyone is a member), the member
+            list with per-row remove (hidden on mandatory), and the
+            add-picker. Standing is enforced by the route, not the button.
+        *@
+
+        <h1>@Model.Name</h1>
+
+        <p class="text-muted">
+            <kw-l key="community.manage_lede">Manage membership for this community.</kw-l>
+            @if (Model.ActorHasScopeClaim)
+            {
+                <span class="badge bg-success"><kw-l key="community.manage_moderate">You moderate this community</kw-l></span>
+            }
+            @if (!Model.Enabled)
+            {
+                <span class="badge bg-dark"><kw-l key="community.manage_disabled">Disabled</kw-l></span>
+            }
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        @*
+            ADR 0012 — the mandatory state. A single checkbox IS the whole
+            surface (the Groups "Private group" toggle shape, ADR 0010):
+            checked ⇒ Mandatory=true (everyone in the neighborhood is a
+            member; nobody can be removed or leave), cleared ⇒ false. The
+            value is bool form-bound — an unchecked checkbox omits the field
+            and binds to false, so one toggle covers both directions. The
+            route's standing gate is GlobalAdmin-only (mandatory state is
+            the admin's decision), and this form is offered only to them —
+            moderators see member management without it.
+        *@
+        @if (Model.CanSetMandatory)
+        {
+            <h2><kw-l key="community.manage_availability">Availability</kw-l></h2>
+            <form method="post" action="@Url.Action("SetMandatory", "Community", new { componentId = Model.ComponentId })">
+                @Html.AntiForgeryToken()
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="mandatory"
+                           name="Mandatory" value="true" @(Model.Mandatory ? "checked" : "") />
+                    <label class="form-check-label" for="mandatory">
+                        <kw-l key="community.manage_mandatory_label">Mandatory community — everyone in the neighborhood is a member</kw-l>
+                    </label>
+                </div>
+                <div class="form-text mt-1">
+                    <kw-l key="community.manage_mandatory_hint">Mandatory communities can't have members removed and can't be left; clear the checkbox to make membership optional again.</kw-l>
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">
+                    @if (Model.Mandatory)
+                    {
+                        <kw-l key="community.manage_make_optional">Make optional</kw-l>
+                    }
+                    else
+                    {
+                        <kw-l key="community.manage_make_mandatory">Make mandatory</kw-l>
+                    }
+                </button>
+            </form>
+        }
+
+        <h2 class="mt-4"><kw-l key="community.manage_members">Members</kw-l></h2>
+        @if (Model.Mandatory)
+        {
+            <p>
+                <kw-l key="community.manage_mandatory_note">This community is mandatory — everyone is a member, so there's no one to remove. The listed rows are explicit memberships, kept in case the community is made optional again.</kw-l>
+            </p>
+        }
+        @if (Model.Members.Count == 0)
+        {
+            <p class="text-muted"><kw-l key="community.manage_no_members">No explicit members yet — add some below.</kw-l></p>
+        }
+        @if (Model.Members.Count > 0)
+        {
+            <ul class="list-group">
+                @foreach (var m in Model.Members)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            @(m.DisplayName ?? m.SubjectId)
+                            @if (m.SubjectId == KumunitaPrincipal.SubjectId(User))
+                            {
+                                <span class="badge bg-secondary"><kw-l key="community.manage_you">You</kw-l></span>
+                            }
+                        </span>
+                        @if (!Model.Mandatory)
+                        {
+                            var removeLabel = m.DisplayName ?? "this member";
+                            <form method="post"
+                                  action="@Url.Action("RemoveMember", "Community", new { componentId = Model.ComponentId })"
+                                  class="d-inline"
+                                  data-confirm="Remove @removeLabel from @Model.Name?">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="UserId" value="@m.SubjectId" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="community.manage_remove">Remove</kw-l></button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        @*
+            The add picker: non-blocked profiles that aren't already members
+            (the controller computed this from the live profile candidate read —
+            nothing is pre-filtered on the client; the form is only offered to
+            the actor who can act on it).
+        *@
+        <h2 class="mt-4"><kw-l key="community.manage_add_member">Add a member</kw-l></h2>
+        @if (Model.Candidates.Count == 0)
+        {
+            <p class="text-muted"><kw-l key="community.manage_all_members">Everyone in the neighborhood is already a member here.</kw-l></p>
+        }
+        @if (Model.Candidates.Count > 0)
+        {
+            <form method="post" action="@Url.Action("AddMember", "Community", new { componentId = Model.ComponentId })">
+                @Html.AntiForgeryToken()
+                <div class="input-group">
+                    <select class="form-select" id="addUser" name="UserId" required>
+                        <option value="" disabled selected><kw-l key="community.manage_pick_resident">Pick a resident to add…</kw-l></option>
+                        @foreach (var c in Model.Candidates)
+                        {
+                            <option value="@c.SubjectId">@(c.DisplayName ?? c.SubjectId)</option>
+                        }
+                    </select>
+                    <button type="submit" class="btn btn-primary">Add to @Model.Name</button>
+                </div>
+            </form>
+        }
+
+    </div>
+</div>

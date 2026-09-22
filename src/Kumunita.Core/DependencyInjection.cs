@@ -71,7 +71,14 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Posts.PostService>(sp => new Posts.PostService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // TG (ADR 0044, U8b) — the tag-lane write seam (the
+            // AttachToPostAsync / AttachToPageAsync / AddTagTranslationAsync
+            // lanes). The registration composes the frozen seams only (the
+            // ADR 0006-D lane pin) — the PostService's new ctor param is a
+            // new dependency on PostService, not a new seam on a frozen
+            // interface (§2.6).
+            sp.GetRequiredService<Tags.ITagService>()));
 
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
@@ -81,6 +88,35 @@ public static class ServiceCollectionExtensions
         // scope-vs-role split lives inside CreateAsync, not in a
         // separate IUserInfoService / IAuthorizationService pairing).
         services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
+
+        // PG (ADR 0039, plan U01): the pages-side service seam (bounded
+        // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
+        // translatable knowledge tree" lane that absorbs the static-page lane
+        // in U07) — a store-composing service kept behind an interface so the
+        // Web-side consumer (the U04 PageController) can be tested without a
+        // live Postgres (the same "AddTransient with the store injected" shape
+        // as IAnnouncementService above; U02/U03 add the read/write methods —
+        // this unit is the seam + registration only).
+        services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<Tags.ITagService>()));
+
+        // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
+        // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes
+        // only the frozen seams: IAuthorizationService + ITranslationProvider,
+        // never a new AccessVia value beyond Owner/Admin). The write lanes
+        // (AttachToPostAsync / AttachToPageAsync / AddTagTranslationAsync) take
+        // the caller's IDocumentSession (C3) and the standing probes are pure;
+        // U6's read lane (ListForActorAsync / ListPostsByTagAsync /
+        // ListPagesByTagAsync / SuggestAsync) composes IAuthorizationService (the
+        // content's own Read decision — C-TG·3 / C-TG·2) + ITranslationProvider
+        // (display-name resolution, ADR 0005 / D5) over the host-registered
+        // Marten IDocumentStore. The registration composes the frozen seams only
+        // (the ADR 0006-D lane pin) — the ADR 0006-D seam is never a new seam.
+        services.AddTransient<Tags.ITagService>(sp => new Tags.TagService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>()));
 
         // M3b (plan U7):
         // (bounded context Kumunita.Core.Moderation) pairing the two frozen M1/M2
@@ -126,6 +162,31 @@ public static class ServiceCollectionExtensions
         // PostService above). Resolved by the Web serving lane (U7) + upload
         // lane (U6); never touched by the raw volume directly (C-MED·6).
         services.AddTransient<IMediaStore, LocalVolumeMediaStore>();
+
+        // Multilingual (ML, ADR 0005; plan U4): the two Core seams U2/U3 shipped —
+        // the per-request read path (ITranslationProvider, U2) and the admin
+        // management seam (ILocalizationService, U3). Both take the host-registered
+        // Marten IDocumentStore (the same "AddTransient with the store injected"
+        // shape as IMediaStore above). Core stays HTTP-free (M·8): neither touches
+        // an HttpRequest or a cookie — the Web layer passes the preferred language
+        // as a plain BCP-47 string (M·5). Languages are data, not config (M·4):
+        // an admin edit takes effect on the next request, no rebuild.
+        services.AddTransient<Localization.ITranslationProvider, Localization.TranslationProvider>();
+        services.AddTransient<Localization.ILocalizationService, Localization.LocalizationService>();
+
+        // M4 (ADR 0054, plan U01): the Events bounded context's service seam (bounded
+        // context Kumunita.Core.Events — the "coordination" arrow: the Event + EventRsvp
+        // documents, the IEventService read/write surface, and the §6.4 reminder job).
+        // A store-composing service kept behind an interface so the Web-side consumer
+        // (the EventController, U05) can be tested without a live Postgres (the same
+        // "AddTransient with the store injected" shape as IAnnouncementService /
+        // IPageService above). U03/U04 land the read + write lanes; this unit is the
+        // seam + registration only (the EventService skeleton throws
+        // NotImplementedException until then — the "logic lands in U03/U04" pin).
+        services.AddTransient<Events.IEventService>(sp => new Events.EventService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
         return services;
     }
 }

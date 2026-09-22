@@ -1,0 +1,26 @@
+@*
+    The _PageForm composer's client-side scripts (rich editor + grant-picker
+    sync + the ADR 0041 visibility-block toggling).
+
+    Kept in its OWN partial (not inside _PageForm.cshtml) because a `@section`
+    declared in a partial is a known Razor gotcha: the section is not reliably
+    registered with the layout's `RenderSectionAsync`, so the whole block
+    (including the `change` listener that reveals #page-individual-block) can
+    be silently dropped. The two consuming views (New.cshtml / Edit.cshtml)
+    declare `@section Scripts` in the VIEW file and include this partial —
+    matching every other view in the app (Login, Signup, Posts, Profile,
+    Groups all declare their `@section` in the view, never in a partial).
+*@
+<script type="module" src="~/js/lib/rich-editor.js"></script>
+@* TG U8 — the composer tag-input autocomplete (client/lib/tag-suggest.ts,
+   tsc-built, no editor dependency — the RE·3 idiom). Self-wires any
+   input[data-tag-suggest]; on a `PageKind.User` blog page that is the Tags
+   field the _PageForm renders (the `System`-page composer renders **no**
+   input, C-TG·6 — the module self-wire finds nothing and is a no-op there).
+   The filter + ≤ 10 cap are server-side via POST /api/tags/suggest
+   (the SuggestAsync seam, C-TG·2 / C-TG·4). *@
+<script type="module" src="~/js/lib/tag-suggest.js"></script>
+<partial name="_GrantPickerScripts" />
+@* Visibility toggling handled by client/lib/page-form-visibility.js (loaded in
+   _Layout.cshtml — SECURITY.md §6). Grant-picker sync handled by
+   client/lib/grant-picker-sync.js (also loaded in _Layout.cshtml). *@

@@ -1,0 +1,37 @@
+@model Kumunita.Web.Controllers.AdminSignupController.SignupAdminViewModel
+@{
+    ViewData["Title"] = "Admin — Sign-up";
+}
+
+<a href="/admin" class="text-muted small">&larr; <kw-l key="nav.admin">Admin</kw-l></a>
+
+<h1 class="mt-2"><kw-l key="admin.signup_title">Sign-up</kw-l></h1>
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success" role="alert">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger" role="alert">@err</div>
+}
+
+<p class="text-muted">
+    <kw-l key="admin.signup_lede">Whether new residents may create an account on their own. Closing the gate makes sign-up invitation-only — existing residents are unaffected.</kw-l>
+</p>
+
+<form method="post" action="/admin/signup">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="isOpen" class="form-label"><kw-l key="admin.signup_title">Sign-up</kw-l></label>
+            <select class="form-select" name="isOpen" id="isOpen">
+                <option value="True" selected="@(Model.IsOpen ? "selected" : null)"><kw-l key="admin.signup_open">Open — residents can sign up</kw-l></option>
+                <option value="False" selected="@(!Model.IsOpen ? "selected" : null)"><kw-l key="admin.signup_invitation_only">Invitation-only — new self-service accounts are gated</kw-l></option>
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.signup_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

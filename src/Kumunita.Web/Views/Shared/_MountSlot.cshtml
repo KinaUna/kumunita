@@ -1,0 +1,26 @@
+@using Kumunita.Core.Pages
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Pages.IPageService Pages
+@{
+    // The layout's mount-point slot (ADR 0039 §3.8): resolve "the page
+    // mounted at this slot" to a /pages/… href, or omit. Slot is supplied
+    // by the caller via @partial name="…" for="MountSlot" … — the slot name
+    // (e.g. "footer/community", "help/account") is an open set; the
+    // resolver is generic over it.
+    //
+    // Display, NOT access (ADR 0039 §3.8): no Read decision is made here —
+    // a mounted page the caller cannot read still resolves to a href.
+    // Opening it is the page's own Show action (403 on denied, 404 on
+    // absent). A slot with no mounted page renders nothing.
+    var slot = (string?)ViewData["MountSlot"];
+    if (!string.IsNullOrWhiteSpace(slot))
+    {
+        var resolved = await PageMountResolver.ResolveAsync(Pages, slot);
+        if (resolved is not null)
+        {
+            <li>
+                <a href="@resolved.Value.Href">@resolved.Value.Title</a>
+            </li>
+        }
+    }
+}

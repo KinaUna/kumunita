@@ -66,6 +66,49 @@ non-unique index on `(userId, consumedAt)`, registered alongside `KumunitaFeatur
 via `StoreOptions.Storage.Add<T>()`. This is an ADR-gated carve-out: any future
 hand-rolled `mt` table must be justified the same way (operator-written, no in-app
 write path) and named in the ADR.
+
+#### B.2 — Additive document fields that are *queried*: pin the query form, or backfill
+
+B.1's dev-loop / boot path keeps the `mt` **tables** in sync with code — but the
+documents are JSONB rows: an additive POCO field (a `bool` flag, a `string?`, an
+empty list) adds no column, so rows written before the field existed simply
+**lack the key** in their `data` JSON. That is fine while the field is read into
+memory only (System.Text.Json deserialization applies the C# default), and it
+becomes a landmine the moment the field enters a `Query<T>().Where(...)`
+predicate: Marten translates the predicate against the JSONB, and Postgres
+three-valued logic means a missing key evaluates to `NULL`, not to the C#
+default. Concretely (Marten 9, verified against the live catalog 2026-09-16):
+
+| C# intent | C# form | SQL emitted | Row missing the key |
+|---|---|---|---|
+| "not a draft" | `p.IsDraft == false` | `data->'IsDraft' = 'false'::jsonb` | `NULL` ⇒ **row dropped** |
+| "not a draft" | `!p.IsDraft` | `data->'IsDraft' IS DISTINCT FROM 'true'::jsonb` | `true` ⇒ row kept |
+
+The two C# forms are semantically identical once deserialized, and produce
+**opposite** results on pre-existing rows. This bit us once: ADR 0037's draft
+lane added `IsDraft` to `Post` and `Announcement` in the same commit;
+`PostService` filtered `!p.IsDraft` (survived), `AnnouncementService` filtered
+`a.IsDraft == false` (silently hid **every** pre-existing announcement from
+every viewer, incl. a GlobalAdmin — no error, no 500, just an empty list).
+
+**Rule:** when an additive document field is added to a **query** predicate,
+use the negation form (`!flag`, not `flag == false`; `flag == true` is safe
+either way — a missing key already fails that comparison). Review gate: the
+ADR 0006 module-boundary review of the service seam is the place a reviewer
+catches the form, since the query lives in `Kumunita.Core`.
+
+**Alternative — one-shot backfill:** if the semantic genuinely needs
+strict-equality filtering, ship the field *and* a one-shot idempotent data
+statement that materializes the default on pre-existing rows, e.g.
+`UPDATE mt.mt_doc_announcement SET data = data || jsonb_build_object('IsDraft', false)
+WHERE data ? 'IsDraft' IS FALSE;` — the boolean is a real JSON `false`
+(`jsonb_build_object` with a `bool` argument), not the string `'false'`
+(which deserializes into a C# `bool` property as a type mismatch, and fails
+the same `= 'false'` comparison anyway). This repo has no data-migration
+ledger (the §B applied-state contract is DDL delta-detection only), so a
+backfill is operator-run or boot-gated, which is why the **query-form rule
+is the preferred default**: it costs nothing and needs no runbook.
+
 - **Identity:** standard EF Core migrations, applied at startup.
 - **Applied at boot in all environments (incl. production):** the versioned steps only —
   `mt` feature changes (delta-detected, so a pristine database gets its initial state

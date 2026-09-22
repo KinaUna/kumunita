@@ -1,0 +1,166 @@
+@using Kumunita.Web.Security
+@model Kumunita.Web.Models.CommunityTranslationViewModel
+@{
+    ViewData["Title"] = $"{Model.Name} — translations";
+
+    // ADR 0026 — translation helpers (mirrors the ADR 0022 post-detail
+    // helpers): the enabled-catalog language set with its HasTranslation
+    // flag, the set the "add a translation" form offers, and a code→
+    // native-name resolver for the chips (never blank — falls back to the
+    // code itself).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    var missingLanguages = Model.Languages.Where(l => !l.HasTranslation).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <p><a class="text-muted" href="@Url.Action("Index", "Posts", new { componentId = Model.ComponentId })"><kw-l key="community.manage_back">← Back to the feed</kw-l></a></p>
+
+        @*
+            ADR 0026 / ADR 0053 — the community name/description translation
+            surface on its own page (split off from /community/manage/{id},
+            the ADR 0012 membership surface). Mirrors the ADR 0022
+            post-detail render exactly: the available translations as
+            expandable chips (native <details>, no JS), and for each
+            supported language lacking a row an "Add a <lang> translation"
+            form — the latter offered only when Model.CanTranslate (GlobalAdmin
+            ∪ Translator; a component-moderator may view the rows but is
+            denied — the route's standing gate is the real wall, the form is
+            just not offered here).
+        *@
+        @* The community name is a data value, so it renders OUTSIDE the
+           <kw-l> (kw-l emits the resolved text verbatim and would drop an
+           embedded @Model.Name) — same shape as the post-detail "@Model.Title
+           + badge" split (ADR 0015 §C data-value exclusion). *@
+        <h1><kw-l key="community.translations_page_title">Translations</kw-l> — @Model.Name</h1>
+        <p class="text-muted">
+            <kw-l key="community.translations_page_lede">Name and description translations for this community.</kw-l>
+        </p>
+        @if (!Model.CanTranslate)
+        {
+            <p class="text-muted"><kw-l key="community.translations_view_only">You can view the translations; only a GlobalAdmin or a Translator can add, edit, or remove them.</kw-l></p>
+        }
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success" role="alert">@info</div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+
+        @if (Model.CommunityTranslations.Count > 0 || Model.CanTranslate)
+        {
+            <div class="mb-3 border-top pt-3 mt-3">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="text-muted small fw-semibold">
+                        <kw-l key="community.translations_label">Translations</kw-l>
+                    </span>
+                    @if (Model.CommunityTranslations.Count == 0)
+                    {
+                        <span class="text-muted small"><kw-l key="community.translations_none">None yet</kw-l></span>
+                    }
+                    else
+                    {
+                        @foreach (var t in Model.CommunityTranslations.OrderBy(x => x.LanguageCode))
+                        {
+                            <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
+                        }
+                    }
+                </div>
+
+                @foreach (var t in Model.CommunityTranslations)
+                {
+                    <details class="mb-1" open>
+                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
+                        <div class="ms-2">
+                            @if (!string.IsNullOrWhiteSpace(t.Name))
+                            {
+                                <h5 class="mt-1">@t.Name</h5>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <p class="mb-0">@t.Description</p>
+                            }
+
+                            @* ADR 0048 — edit + remove lane. Offered only to
+                               standing-holders (the same gate as the add lane
+                               below). *@
+                            @if (Model.CanTranslate)
+                            {
+                                <hr class="my-2" />
+                                <form method="post"
+                                      action="@($"/community/translations/{Model.ComponentId}/update")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <label class="form-label small">
+                                        <kw-l key="community.translation_name_label">Name</kw-l>
+                                        <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <input class="form-control form-control-sm mb-2" name="name"
+                                           value="@t.Name" />
+                                    <label class="form-label small">
+                                        <kw-l key="community.translation_desc_label">Description</kw-l>
+                                        <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <textarea class="form-control form-control-sm mb-2"
+                                              name="description" rows="3" placeholder="…">@t.Description</textarea>
+                                    <div class="form-text mb-2">
+                                        <kw-l key="community.translation_min_one">At least one of name or description is required.</kw-l>
+                                    </div>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <kw-l key="community.translation_save">Save translation</kw-l>
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      action="@($"/community/translations/{Model.ComponentId}/remove")"
+                                      class="mt-2" data-confirm="Remove this translation?">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@t.LanguageCode" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <kw-l key="posts.translation_remove">Remove</kw-l>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </details>
+                }
+
+                @if (Model.CanTranslate)
+                {
+                    @foreach (var lang in missingLanguages)
+                    {
+                        <details class="mb-1">
+                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                <kw-l key="community.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                            </summary>
+                            <form class="ms-2" method="post"
+                                  action="@($"/community/translations/{Model.ComponentId}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                <label class="form-label small" for="community-t-name">
+                                    <kw-l key="community.translation_name_label">Name</kw-l>
+                                    <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <input class="form-control form-control-sm mb-2" id="community-t-name"
+                                       name="name" value="@Model.Name" />
+                                <label class="form-label small" for="community-t-desc">
+                                    <kw-l key="community.translation_desc_label">Description</kw-l>
+                                    <span class="text-muted">(<kw-l key="community.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <textarea class="form-control form-control-sm mb-2" id="community-t-desc"
+                                          name="description" rows="3" placeholder="…">@Model.Description</textarea>
+                                <div class="form-text mb-2"><kw-l key="community.translation_min_one">At least one of name or description is required.</kw-l></div>
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <kw-l key="community.translation_save">Save translation</kw-l>
+                                </button>
+                            </form>
+                        </details>
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>

@@ -13,17 +13,17 @@ public class MilestonesTests
         Milestones.All.Select(m => m.Id);
 
     [Fact]
-    public void Roadmap_Covers_M0_Through_M6_In_Order()
+    public void Roadmap_Covers_M0_Through_M6_Plus_Named_Lanes_In_Order()
     {
         Assert.Equal(
-            new[] { "M0", "M1", "M2", "M3", "M4", "M5", "M6" },
+            new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "M5", "M6" },
             Ids.ToList());
     }
 
     [Fact]
-    public void M0_Through_M3_Are_Marked_Done()
+    public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,11 +31,11 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M4_Is_The_Single_InProgress_Milestone()
+    public void M5_Is_The_Single_InProgress_Milestone()
     {
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Single(next);
-        Assert.Equal("M4", next[0].Id);
+        Assert.Equal("M5", next[0].Id);
     }
 
     [Fact]

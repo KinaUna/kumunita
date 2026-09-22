@@ -329,6 +329,294 @@ public class AuthorizationServiceTests(PostgresFixture fixture) : IClassFixture<
         Assert.Equal(AccessVia.Moderator, decision.Via);
     }
 
+    // ── ADR 0036 — Community-visible branch ──────────────────────────────
+    //
+    // The 4th decision branch (after owner / moderation / break-glass,
+    // before the public / grant-match branches): a resource whose
+    // Audience.Community is true AND whose ComponentId the actor is a
+    // member of is visible, via AccessVia.Community. This is the default
+    // for new community posts (the Web composer seeds it true); existing
+    // posts have it false (the old owner-only behavior). Exercised
+    // through the DB-backed seam (the branch lives in the private Decide,
+    // not the public static EvaluateAudience test seam).
+
+    private async Task<string> SeedCommunityWithMemberAsync(
+        IDocumentStore store, UserInfoService userInfo,
+        string componentId, string member)
+    {
+        // Enabled, non-mandatory component; the member is added via the
+        // explicit ComponentMembership lane (the strong-consistency write
+        // seam GetCommunityIdsAsync reads).
+        await using (var session = store.OpenSession(new SessionOptions()))
+        {
+            session.Store(new Component
+            {
+                Id = componentId,
+                Name = "Community 0036",
+                Enabled = true,
+                Mandatory = false,
+            });
+            await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+        await userInfo.SetCommunityMembershipAsync(componentId, member, "u-root-0036");
+        return componentId;
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagAndMember_Allows_ViaCommunity()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-member-0036";
+        const string componentId = "comp-0036-member";
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, actor);
+
+        // Community flag on, empty grants (the "all community members"
+        // shape), component set — the actor is a member → Allow, via
+        // Community (not Audience: the grants list is empty, so the
+        // MatchGroups branch would deny; the Community branch short-
+        // circuits before it).
+        var audience = new Audience(AudienceMode.Any, []) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-member",
+            TargetKind = "post",
+            OwnerId = "u-other-0036",
+            ComponentId = componentId,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Community, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagButNotMember_Denies()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string nonMember = "u-nonmember-0036";
+        const string member = "u-member-0036b";
+        const string componentId = "comp-0036-nonmember";
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, member);
+
+        // The actor is NOT a member of the component — the Community
+        // branch fails (communityIds lacks the component), and the
+        // grants are empty so MatchGroups denies too.
+        var audience = new Audience(AudienceMode.Any, []) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-nonmember",
+            TargetKind = "post",
+            OwnerId = "u-other-0036b",
+            ComponentId = componentId,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(nonMember, AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagButNullComponent_Inert()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-member-0036c";
+        const string componentId = "comp-0036-null";
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, actor);
+
+        // Community flag on but the target has NO ComponentId (the group-
+        // post shape: empty ComponentId + non-null empty audience). The
+        // branch requires a non-null ComponentId, so it is inert — the
+        // actor's membership of *some* other component does not grant
+        // access. Grants empty → MatchGroups denies.
+        var audience = new Audience(AudienceMode.Any, []) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-nullcomp",
+            TargetKind = "post",
+            OwnerId = "u-other-0036c",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagFalse_EmptyGrants_OwnerOnly()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string member = "u-member-0036d";
+        const string owner = "u-owner-0036d";
+        const string componentId = "comp-0036-off";
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, member);
+
+        // The pre-ADR-0036 shape: Community false, empty grants. A
+        // community member who is NOT the owner gets no Community branch
+        // (flag false) and no grant match (empty) → Deny. Only the owner
+        // (owner branch) can see it — the old owner-only behavior,
+        // preserved for existing posts.
+        var audience = new Audience(AudienceMode.Any, []); // Community defaults false
+        var target = new TestResource
+        {
+            Id = "post-0036-off",
+            TargetKind = "post",
+            OwnerId = owner,
+            ComponentId = componentId,
+            Audience = audience,
+        };
+
+        var memberDecision = await auth.CanAsync(member, AccessAction.Read, target);
+        Assert.False(memberDecision.Allowed);
+
+        var ownerDecision = await auth.CanAsync(owner, AccessAction.Read, target);
+        Assert.True(ownerDecision.Allowed);
+        Assert.Equal(AccessVia.Owner, ownerDecision.Via);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagPlusExplicitGrant_BothVisible()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string member = "u-member-0036e";
+        const string grantedUser = "u-granted-0036e";
+        const string componentId = "comp-0036-both";
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, member);
+
+        // Community on AND an explicit user grant. The community member
+        // sees it via Community; the explicitly granted user (not a
+        // community member) sees it via the MatchGroups branch.
+        var audience = new Audience(AudienceMode.Any,
+            [new AudienceGrant(GrantKind.User, grantedUser)]) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-both",
+            TargetKind = "post",
+            OwnerId = "u-other-0036e",
+            ComponentId = componentId,
+            Audience = audience,
+        };
+
+        var memberDecision = await auth.CanAsync(member, AccessAction.Read, target);
+        Assert.True(memberDecision.Allowed);
+        Assert.Equal(AccessVia.Community, memberDecision.Via);
+
+        var grantedDecision = await auth.CanAsync(grantedUser, AccessAction.Read, target);
+        Assert.True(grantedDecision.Allowed);
+        Assert.Equal(AccessVia.Audience, grantedDecision.Via);
+    }
+
+    // ── ADR 0041 — All-residents branch ──────────────────────────────
+    //
+    // The 4.5 decision branch (after the community branch, before the
+    // public branch): a resource whose Audience.AllResidents is true is
+    // visible to ANY signed-in actor (a non-empty actorId), regardless of
+    // community membership or grants. Anonymous (empty actorId) is denied
+    // (the public branch is the world-readable shape; this is resident-only).
+    // The owner branch (1) still wins — an owner of an AllResidents resource
+    // is allowed via Owner, not via Resident (the branch ordering is the
+    // pin: the more specific branch fires first).
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_SignedInActor_Allows_ViaResident()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-resident-0041";
+        const string owner = "u-owner-0041";
+
+        // AllResidents flag on, empty grants, NO ComponentId (the flag is
+        // the whole decision — no community membership required). A signed-in
+        // actor who is NOT the owner and NOT a member of any community sees
+        // it via the new Resident branch (not Audience: the grants list is
+        // empty, so the MatchGroups branch would deny).
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-resident",
+            TargetKind = "post",
+            OwnerId = owner,
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Resident, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_AnonymousActor_Denies()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+
+        // Anonymous (empty actorId) is denied — the AllResidents branch
+        // requires a signed-in actor. The public branch (audience = null)
+        // is the world-readable shape; a non-null audience with
+        // AllResidents = true is resident-only.
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-anon",
+            TargetKind = "post",
+            OwnerId = "u-other-0041",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync("", AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlag_OwnerStillWins_ViaOwner()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string owner = "u-owner-0041b";
+
+        // The owner branch (1) fires before the AllResidents branch (4.5) —
+        // the owner is allowed via Owner, not via Resident (the branch
+        // ordering is the pin: the more specific branch wins).
+        var audience = new Audience(AudienceMode.Any, []) { AllResidents = true };
+        var target = new TestResource
+        {
+            Id = "post-0041-owner",
+            TargetKind = "post",
+            OwnerId = owner,
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(owner, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Owner, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0041_AllResidentsFlagFalse_EmptyGrants_Denies()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-nonmember-0041c";
+
+        // AllResidents flag OFF, empty grants, no ComponentId — the pre-ADR-0041
+        // shape. A signed-in actor who is NOT the owner gets no branch match
+        // (owner fails, community fails, AllResidents fails, public fails
+        // because the audience is non-null, MatchGroups denies on empty
+        // grants) → Deny.
+        var audience = new Audience(AudienceMode.Any, []); // AllResidents defaults false
+        var target = new TestResource
+        {
+            Id = "post-0041-off",
+            TargetKind = "post",
+            OwnerId = "u-other-0041c",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.False(decision.Allowed);
+    }
+
     // ── Invariant C6 — bulk equals per-CanAsync aggregate ───────────────
 
     [Fact]

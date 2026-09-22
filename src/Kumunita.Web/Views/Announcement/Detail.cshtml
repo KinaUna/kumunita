@@ -1,0 +1,293 @@
+@model Kumunita.Web.Models.AnnouncementDetailViewModel
+@using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Announcement" : Model.Title;
+
+    string badgeClass = Model.Scope == AnnouncementScope.Public
+        ? "text-bg-secondary"
+        : "text-bg-primary";
+
+    // ADR 0029 — translation display (TD / ADR 0027, carried to announcements):
+    // the authored-in language is the first, default-visible variant, each
+    // user-added translation is a hidden variant, and the chip row is a
+    // selector that swaps them. The "add a translation" candidate list
+    // excludes the authored-in language (missingLanguages).
+    var langNames = Model.Languages.ToDictionary(l => l.Code, l => l.NativeName);
+    var originalCode = Model.OriginalLanguageCode;
+    var missingLanguages = Model.Languages
+        .Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // ADR 0049 — the announcement's **default-visible** variant is the
+    // viewer's current language when a translation exists in it, else the
+    // authored-in language (the ADR 0027 floor). The ADR 0027 click-to-swap +
+    // return path are untouched — only *which* variant shows first changes.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool originalHidden = Model.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/announcements" class="btn btn-link p-0">
+                <kw-l key="announcements.detail_back">&larr; Back to the announcements</kw-l>
+            </a>
+        </p>
+
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <span class="badge @badgeClass">
+                @if (Model.Scope == AnnouncementScope.Public)
+                {
+                    <kw-l key="announcements.scope_everyone">everyone</kw-l>
+                }
+                else if (Model.CommunityDisplayName is not null)
+                {
+                    @Model.CommunityDisplayName
+                }
+                else
+                {
+                    <kw-l key="announcements.scope_residents">residents</kw-l>
+                }
+            </span>
+            @if (Model.Pinned)
+            {
+                <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
+                    <kw-l key="announcements.pinned_badge">pinned</kw-l>
+                </span>
+            }
+            @* ADR 0037 — the draft surface: GetAsync returns a draft to the
+               author only, so IsAuthor ⇔ IsDraft here. The badge is visible
+               to the one viewer who may act on it; Publish is the sole lever
+               that clears the flag (the author-only lane). *@
+            @if (Model.IsDraft && Model.IsAuthor)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">
+                    <kw-l key="posts.draft_badge">Draft</kw-l>
+                </span>
+                <form class="d-inline" method="post" action="/announcements/@Model.Id/publish">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-success">
+                        <kw-l key="posts.publish">Publish</kw-l>
+                    </button>
+                </form>
+            }
+            @* The Edit affordance (only when the caller's role split allows it —
+               the same CanEditAnnouncement rule the /announcements index uses,
+               carried to the detail page; the service's write-lane re-check at
+               POST is the real gate, so a non-authorized viewer never sees it). *@
+            @if (Model.CanEdit)
+            {
+                <a class="btn btn-sm btn-outline-primary ms-auto"
+                   href="/announcements/@Model.Id/edit">
+                    <kw-l key="announcements.edit_button">Edit</kw-l>
+                </a>
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                @* TD (ADR 0027) — the authored-in language is the first,
+                   default-visible variant; each added translation is a hidden
+                   variant; the chip row is a selector that swaps them. The
+                   title + body are the announcement's toggle scope. *@
+                <div data-td-group="announcement">
+                    @* Original variant — default-visible unless ADR 0049
+                       auto-selects a translation of it into the viewer's
+                       language (originalHidden); the swap + return path
+                       (ADR 0027) are unchanged either way. *@
+                    <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                         @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                        <h1 class="mb-1">
+                            @if (string.IsNullOrWhiteSpace(Model.Title))
+                            {
+                                <span class="text-body-tertiary"><kw-l key="announcements.detail_untitled">Untitled announcement</kw-l></span>
+                            }
+                            else
+                            {
+                                @Model.Title
+                            }
+                        </h1>
+                        @* The full body (the /announcements list shows the
+                           first 250 characters and links here). Rendered
+                           through the one MarkdownRenderer (R·1). *@
+                        <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Body))</div>
+                    </div>
+
+                    @* One variant per user-added translation — hidden by
+                       default, EXCEPT the one matching the viewer's current
+                       language, which ADR 0049 shows first (in place of the
+                       original); the rest stay hidden behind their chip. *@
+                    @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                    {
+                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                            @if (!string.IsNullOrWhiteSpace(t.Title))
+                            {
+                                <h1 class="mb-1">@t.Title</h1>
+                            }
+                            <div class="mb-3 rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                        </div>
+                    }
+
+                    @* The chip row — a selector. The original chip is always
+                       present (TD·1); one chip per added translation (TD·2). *@
+                    <div class="mb-3 border-top pt-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="text-muted small fw-semibold">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </span>
+                            <button type="button" class="badge text-bg-light border"
+                                    data-translation-chip data-td-group="announcement"
+                                    data-td-variant="@Model.OriginalLanguageCode">
+                                @LangName(Model.OriginalLanguageCode)
+                            </button>
+                            @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="announcement"
+                                        data-td-variant="@t.LanguageCode">
+                                    @LangName(t.LanguageCode)
+                                </button>
+                            }
+                        </div>
+
+                        @* ADR 0048 — edit + remove lane for the announcement's
+                           existing translations. Pre-filled from the existing
+                           row; the add lane below is unchanged. The standing
+                           gate (Model.CanTranslate) is the same for both. *@
+                        @if (Model.CanTranslate)
+                        {
+                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <details class="mb-1">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                    </summary>
+                                    <div class="ms-2">
+                                        <form method="post" action="@($"/announcements/{Model.Id}/translations/update")">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <label class="form-label small">
+                                                @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" name="title"
+                                                   value="@existing.Title" />
+                                            <label class="form-label small">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="@($"/announcements/{Model.Id}/translations/remove")"
+                                              class="mt-2" data-confirm="Remove this translation?">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </details>
+                            }
+
+                            @* The "add a translation" lane — one form per supported
+                               language that has no translation yet, offered only to
+                               a standing-holder (GlobalAdmin / Translator / a
+                               community Moderator of a targeted community). The
+                               authored-in language is excluded. The ADR 0029 route
+                               action is the service's write seam. *@
+                            @foreach (var lang in missingLanguages)
+                            {
+                                <details class="mb-1">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                                    </summary>
+                                    <form class="ms-2" method="post"
+                                          action="@($"/announcements/{Model.Id}/translations")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@lang.Code" />
+                                        <label class="form-label small" for="ann-t-title">
+                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" id="ann-t-title"
+                                               name="title" value="@Model.Title" />
+                                        <label class="form-label small" for="ann-t-body">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        @* RE U06 — toolbar + live preview (image OFF: RC's
+                                           announcement image serve branch is inert-404 [RC U03
+                                           drift pause]; RE·3 forbids inventing that seam). The
+                                           name="body" / id / required shape is preserved exactly. *@
+                                        <div class="rc-editor">
+                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                                <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                                <partial name="_RichEditorToggle" />
+                                            </div>
+                                            <textarea class="form-control form-control-sm mb-2" id="ann-t-body"
+                                                      name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                </details>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+            @* Author avatar (the Directory pattern): the <img> links the audited
+               serving lane (GET /profile/avatar/{subjectId}) and on its
+               fail-closed 404 the monogram sibling takes over. *@
+            @{
+                string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
+                    ? char.ToUpperInvariant(Model.AuthorDisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
+            }
+            <div class="d-flex align-items-center gap-2 bg-white text-muted small px-3 py-2">
+                <span class="d-inline-flex align-items-center">
+                    <img class="avatar" src="/profile/avatar/@Model.AuthorSubjectId" alt=""
+                         data-avatar-fallback>
+                    <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                </span>
+                <span>
+                    <kw-l key="announcements.by">by</kw-l> @Model.AuthorDisplayName — <kw-dt dt="@Model.Created" format="g"></kw-dt>
+                    @if (Model.Modified is not null)
+                    {
+                        <span> — <kw-l key="announcements.edited">edited</kw-l> <kw-dt dt="@Model.Modified.Value" format="g"></kw-dt></span>
+                    }
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @* RE U06 — the rich editor (client/lib/rich-editor.ts, tsc-built).
+       Self-wires the one .rc-editor block on this page (the
+       name="body" announcement translation textarea); the image
+       button is omitted (data-rich-editor-no-image — RC's
+       announcement image serve branch is inert-404; RE·3).
+       RE·3: no editor dependency. *@
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

@@ -1,0 +1,332 @@
+@model Kumunita.Web.Models.EventDetailViewModel
+@using Kumunita.Core.Events
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Event.Title) ? "Event" : Model.Event.Title;
+
+    // ADR 0059 — translation helpers (in scope for the card body below): the
+    // enabled-catalog language set with its HasTranslation flag, the set the
+    // "add a translation" form offers, and a code→native-name resolver for the
+    // chips (never blank — falls back to the code itself).
+    var langNames = Model.LanguageOptions.ToDictionary(l => l.Code, l => l.NativeName);
+    // ADR 0027 (TD·4) — the authored-in language (TD·1) is a first-class variant,
+    // so the event's "Add a …" candidate list excludes it.
+    var originalCode = Model.OriginalLanguageCode;
+    var missingLanguages = Model.LanguageOptions.Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
+    string LangName(string code) => langNames.TryGetValue(code, out var n) ? n : code;
+
+    // ADR 0049 — the event's **default-visible** variant is the viewer's current
+    // language when a translation exists in it, else the authored-in language
+    // (the ADR 0027 floor). The ADR 0027 click-to-swap + return path are
+    // untouched — only *which* variant shows first changes.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool originalHidden = Model.Translations.Any(t => String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/events" class="btn btn-link p-0"><kw-l key="events.back">← Back to events</kw-l></a>
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @if (Model.ComponentDisplayName is not null)
+            {
+                <span class="badge text-bg-light border">@Model.ComponentDisplayName</span>
+            }
+            @* ADR 0037 — the draft surface: GetAsync returns a draft to the
+               author only, so IsDraft ⇔ IsAuthor here. The badge is visible to
+               the one viewer who may act on it; Publish is the sole lever that
+               clears the flag (the author-only lane). *@
+            @if (Model.Event.IsDraft)
+            {
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public"><kw-l key="events.draft">Draft</kw-l></span>
+                @if (Model.CanPublish)
+                {
+                    <form class="d-inline" method="post" action="/events/@Model.Event.Id/publish">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-success"><kw-l key="events.publish">Publish</kw-l></button>
+                    </form>
+                }
+            }
+            @if (Model.CanEdit)
+            {
+                <a class="btn btn-sm btn-outline-primary ms-auto" href="/events/@Model.Event.Id/edit"><kw-l key="events.edit">Edit</kw-l></a>
+            }
+            @if (Model.CanDelete)
+            {
+                <form class="d-inline" method="post" action="/events/@Model.Event.Id/delete"
+                      data-confirm="Delete this event? This cannot be undone.">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="events.delete">Delete</kw-l></button>
+                </form>
+            }
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                @* Shared metadata (author / time / location) — outside the
+                   translation variants: it is not language-specific. *@
+                <div class="text-muted mb-3">
+                    @Model.AuthorDisplayName —
+                    <kw-dt dt="@Model.Event.Start" format="g"></kw-dt> to
+                    <kw-dt dt="@Model.Event.End" format="g"></kw-dt>
+                    @if (string.IsNullOrWhiteSpace(Model.Event.Location))
+                    {
+                        <!-- no location -->
+                    }
+                    else
+                    {
+                        <span class="ms-2">· @Model.Event.Location</span>
+                    }
+                </div>
+
+                @* ADR 0059 (ADR 0027 chip-swap) — the authored-in language is the
+                   first, default-visible variant; each added translation is a
+                   hidden variant; the chip row is a selector that swaps them.
+                   ADR 0049 auto-selects the viewer's current-language variant as
+                   default-visible when one exists (originalHidden). This group
+                   wrapper is the event's toggle scope. *@
+                <div data-td-group="event">
+                    @* Original variant — default-visible unless ADR 0049
+                       auto-selects a translation of it into the viewer's
+                       language (originalHidden); the swap + return path (ADR
+                       0027) are unchanged either way. *@
+                    <div class="td-variant" data-td-variant="@originalCode"
+                         @(originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                        <h1 class="mb-1">
+                            @if (string.IsNullOrWhiteSpace(Model.Event.Title))
+                            {
+                                <span class="text-body-tertiary"><kw-l key="events.untitled">Untitled event</kw-l></span>
+                            }
+                            else
+                            {
+                                @Model.Event.Title
+                            }
+                        </h1>
+                        @* The full body — rendered through the one MarkdownRenderer (R·1). *@
+                        <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(Model.Event.Body))</div>
+                    </div>
+
+                    @* One variant per user-added translation — hidden by default,
+                       EXCEPT the one matching the viewer's current language, which
+                       ADR 0049 shows first (in place of the original); the rest
+                       stay hidden behind their chip. *@
+                    @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                    {
+                        bool tDefault = String.Equals(t.LanguageCode, defaultVariant, StringComparison.OrdinalIgnoreCase);
+                        <div class="td-variant" data-td-variant="@t.LanguageCode"
+                             @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                            @if (!string.IsNullOrWhiteSpace(t.Title))
+                            {
+                                <h1 class="mb-1">@t.Title</h1>
+                            }
+                            <div class="rc-body">@Html.Raw(MarkdownRenderer.RenderHtml(t.Body))</div>
+                        </div>
+                    }
+
+                    @* The chip row — a selector. The original chip is always
+                       present (TD·1); one chip per added translation (TD·2). *@
+                    <div class="mt-3 border-top pt-3">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="text-muted small fw-semibold">
+                                <kw-l key="posts.translations_label">Translations</kw-l>
+                            </span>
+                            <button type="button" class="badge text-bg-light border"
+                                    data-translation-chip data-td-group="event"
+                                    data-td-variant="@originalCode">
+                                @LangName(originalCode)
+                            </button>
+                            @foreach (var t in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <button type="button" class="badge text-bg-light border"
+                                        data-translation-chip data-td-group="event"
+                                        data-td-variant="@t.LanguageCode">
+                                    @LangName(t.LanguageCode)
+                                </button>
+                            }
+                        </div>
+
+                        @* ADR 0059 — add / edit / remove lanes for the event's
+                           translations (the same standing matrix, ADR 0021 /
+                           0030). For each language that already has a row, offer
+                           an "Edit" (pre-filled) + "Remove" (confirm) control;
+                           the add lane offers one form per supported language
+                           that has no translation yet (missingLanguages). *@
+                        @if (Model.CanTranslate)
+                        {
+                            @foreach (var existing in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <details class="mb-1 mt-2">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                    </summary>
+                                    <div class="ms-2">
+                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/update")">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <label class="form-label small">
+                                                @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
+                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" name="title"
+                                                   value="@existing.Title" />
+                                            <label class="form-label small">
+                                                <kw-l key="posts.translation_body_label">Body</kw-l>
+                                            </label>
+                                            <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <kw-l key="posts.translation_save">Save translation</kw-l>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/remove")"
+                                              class="mt-2" data-confirm="Remove this translation?">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </details>
+                            }
+
+                            @foreach (var lang in missingLanguages)
+                            {
+                                <details class="mb-1 mt-2">
+                                    <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                        <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
+                                    </summary>
+                                    <form class="ms-2" method="post"
+                                          action="@($"/events/@Model.Event.Id/translations")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@lang.Code" />
+                                        <label class="form-label small" for="event-t-title">
+                                            @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" id="event-t-title"
+                                               name="title" value="@Model.Event.Title" />
+                                        <label class="form-label small" for="event-t-body">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <div class="rc-editor">
+                                            <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                <partial name="_RichEditorToggle" />
+                                            </div>
+                                            <textarea class="form-control form-control-sm mb-2" id="event-t-body"
+                                                      name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
+                                            <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                </details>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @* Created / edited — the remaining Event timestamps (ADR 0019 /
+                   0020), rendered by the one <kw-dt> TagHelper (the per-request
+                   timezone + format resolver). Mirrors the Announcement Detail
+                   footer (a value → text, an unset Modified renders nothing). *@
+                <div class="text-muted small mt-3">
+                    <kw-l key="events.created">Created</kw-l>
+                    <kw-dt dt="@Model.Event.Created" format="g"></kw-dt>
+                    @if (Model.Event.Modified is not null)
+                    {
+                        <span> · <kw-l key="events.edited">edited</kw-l>
+                            <kw-dt dt="@Model.Event.Modified.Value" format="g"></kw-dt></span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* The RSVP surface (ADR 0054 §3.2): the owner-only list (the author
+           sees their own event's RSVPs; a non-author sees only their own
+           RSVP) + the last-write-wins RSVP form (Going / Maybe / No). *@
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 mb-3"><kw-l key="events.rsvp">RSVP</kw-l></h2>
+
+                <form method="post" action="/events/@Model.Event.Id/rsvp" class="d-flex gap-2 align-items-center">
+                    @Html.AntiForgeryToken()
+                    @if (Model.MyRsvp is not null)
+                    {
+                        <span class="text-muted small me-2"><kw-l key="events.rsvp_you">You're going to:</kw-l>
+                            <b>@Model.MyRsvp.Status</b></span>
+                    }
+                    @foreach (var status in new[] { RsvpStatus.Going, RsvpStatus.Maybe, RsvpStatus.No })
+                    {
+                        var checkedMark = Model.MyRsvp is not null && Model.MyRsvp.Status == status ? "checked" : null;
+                        <input class="btn-check" type="radio" name="status" id="@($"rsvp-{status}")"
+                               value="@status" @checkedMark autocomplete="off" />
+                        <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@status</label>
+                    }
+                    <button type="submit" class="btn btn-primary btn-sm"><kw-l key="events.rsvp_update">Update</kw-l></button>
+                </form>
+
+                @if (Model.Rsvps.Count > 0)
+                {
+                    <hr class="my-3" />
+                    <h3 class="h6 mb-2 text-muted"><kw-l key="events.rsvp_responses">Responses</kw-l></h3>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var rsvp in Model.Rsvps)
+                        {
+                            @* RSVPing resident (the Directory pattern): the <img>
+                               links the audited serving lane (GET
+                               /profile/avatar/{subjectId}) and avatar.ts hides it
+                               on the 404, falling back to the initial monogram. *@
+                            var rsvpInitial = !string.IsNullOrWhiteSpace(rsvp.DisplayName)
+                                ? char.ToUpperInvariant(rsvp.DisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <li class="d-flex justify-content-between py-1 align-items-center">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar" src="/profile/avatar/@rsvp.Rsvp.UserId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono" style="display:none;">@rsvpInitial</span>
+                                    <span class="ms-2">@rsvp.DisplayName</span>
+                                </span>
+                                <span>
+                                    <span class="badge @(rsvp.Rsvp.Status == RsvpStatus.Going ? "text-bg-success" : (rsvp.Rsvp.Status == RsvpStatus.Maybe ? "text-bg-warning" : "text-bg-secondary"))">
+                                        @rsvp.Rsvp.Status
+                                    </span>
+                                    <span class="text-muted small ms-2"><kw-dt dt="@rsvp.Rsvp.At" format="g"></kw-dt></span>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>

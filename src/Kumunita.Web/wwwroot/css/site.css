@@ -198,6 +198,12 @@
   --kmb-tint-a: #eff3ef;     /* cool green-tinted section band   */
   --kmb-tint-b: #f6f1e7;     /* warm cream section band          */
   --kmb-border: #dde3dd;
+  --kmb-border-soft: #e6e4dd;  /* hairline separators (row borders inside cards) */
+  --kmb-radius: 12px;          /* cards, panels */
+  --kmb-radius-lg: 16px;       /* large ledger containers */
+  --kmb-radius-chip: 8px;      /* pills, list-item targets, small panels */
+  --kmb-hover-border: #c9d3ca; /* border on card/row hover */
+  --kmb-hover-row: #fdfdfb;    /* row hover fill (announcements ledger)   */
   --kmb-space-section: clamp(4.5rem, 8vw, 7rem);
   --kmb-space-section-sm: 3rem;
   --kmb-overlap: 3.25rem;    /* how far feature cards sink into the next band */
@@ -215,6 +221,9 @@ body {
 }
 body.kmb-page-fullbleed {
   margin-bottom: 0; /* full-bleed landing pages carry their own rhythm */
+}
+body.kmb-page-fullbleed .navbar {
+  margin-bottom: 0; /* the full-bleed hero starts flush below the navbar */
 }
 
 .lead {
@@ -333,6 +342,13 @@ body.kmb-page-fullbleed {
 .kmb-hero-lead {
   font-size: 1.125rem;
   line-height: 1.65;
+}
+/* Supporting hero copy (the scope + FIG lines beneath the main lead): a touch
+   smaller and calmer, so it reads as context rather than a headline. */
+.kmb-hero-sub {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.9;
 }
 .kmb-section-lead {
   color: #46534b;
@@ -493,7 +509,7 @@ body.kmb-page-fullbleed {
 .kmb-features-band {
   background-color: #142e22;
   padding-top: var(--kmb-space-section-sm);
-  padding-bottom: 0;
+  padding-bottom: 0.625rem; /* small breathing room below the cards */
 }
 .kmb-features-row {
   margin-bottom: calc(var(--kmb-overlap) * -1);
@@ -537,29 +553,6 @@ body.kmb-page-fullbleed {
 .kmb-feat-card p {
   margin-bottom: 0;
   color: #46534b; /* muted ink, still AA on white */
-}
-
-/* --- Stat band ------------------------------------------------------------------- */
-.kmb-stats {
-  border-block: 1px solid var(--kmb-border);
-}
-.kmb-stat {
-  text-align: center;
-  padding: 1.75rem 1rem;
-}
-.kmb-stat-value {
-  font-family: var(--bs-heading-font-family);
-  font-weight: 700;
-  font-size: clamp(2.25rem, 4vw, 3rem);
-  line-height: 1.1;
-  color: #1c4532;
-}
-.kmb-stat-label {
-  font-family: var(--bs-heading-font-family);
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--kmb-muted);
 }
 
 /* --- Roadmap list (home) ----------------------------------------------------------- */
@@ -689,8 +682,8 @@ body.kmb-page-fullbleed {
    (the resident's initial, or an empty circle when the surface has no
    display-name channel), takes its place — no broken-image icon. */
 .avatar {
-  width: 24px;
-  height: 24px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   object-fit: cover;
   display: block;
@@ -700,25 +693,433 @@ body.kmb-page-fullbleed {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background-color: var(--kmb-tint-a);
   border: 1px solid var(--kmb-border);
   color: var(--kmb-ink-soft);
   font-family: var(--bs-heading-font-family);
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 600;
   line-height: 1;
   flex: none;
   user-select: none;
 }
 .avatar.avatar-lg {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
 }
 .avatar-mono.avatar-lg {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   font-size: 1.5rem;
 }
+/* The compact size used by the navbar account toggle (the toggle is ~32px tall). */
+.avatar.avatar-sm {
+  width: 28px;
+  height: 28px;
+}
+.avatar-mono.avatar-sm {
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+}
+
+/* --- Rich-content bodies (RC U06) ------------------------------------------
+   Every UGC body (post / group-post / announcement + replies + translations)
+   renders through the one MarkdownRenderer (R·1) into this container. The
+   .markdown static-page wrapper carries no rules of its own, so this block
+   gives the UGC bodies the site's base typography (Lora body serif, the site's
+   type scale, the ink-tinted neutrals + radius tokens) plus the RC image
+   sizing. Boring: no shadows, no new palette. */
+.rc-body {
+  line-height: var(--bs-body-line-height);
+  overflow-wrap: break-word;
+}
+.rc-body > * + * {
+  margin-top: 0.75em;
+}
+.rc-body h1,
+.rc-body h2,
+.rc-body h3,
+.rc-body h4,
+.rc-body h5,
+.rc-body h6 {
+  font-family: var(--bs-heading-font-family);
+  font-weight: var(--bs-heading-font-weight);
+  line-height: var(--bs-heading-line-height);
+  margin-top: 1.25em;
+  margin-bottom: 0.375em;
+}
+.rc-body ul,
+.rc-body ol {
+  padding-left: 1.5rem;
+}
+.rc-body li + li {
+  margin-top: 0.25em;
+}
+.rc-body code {
+  font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  background-color: rgba(31, 42, 37, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: var(--bs-border-radius-sm);
+}
+.rc-body pre {
+  background-color: rgba(31, 42, 37, 0.05);
+  border: 1px solid var(--kmb-border);
+  padding: 0.625em 0.875em;
+  border-radius: var(--bs-border-radius);
+  overflow-x: auto;
+}
+.rc-body pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.rc-body a {
+  text-underline-offset: 2px;
+}
+
+/* RC image (the U02 emission <img … class="rc-image" loading="lazy" /> carries
+   no width/height — CSS owns sizing). Register-pinned values. */
+.rc-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5rem 0;
+  display: block;
+}
+
+/* --- Rich editor (RE U03) -------------------------------------------------
+   The authoring surface (D1): a toolbar row, a source textarea row, then a
+   read-only rendered preview row — each on its own row, full width. The
+   preview wraps its output in <div class="rc-body rc-editor-pane"> so it
+   inherits the RC body typography (.rc-body) — **no** re-definition of
+   .rc-body or .rc-image. Boring: no shadows, no new palette, no grid
+   framework. */
+.rc-editor {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+.rc-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--kmb-border, rgba(31, 42, 37, 0.15));
+  border-radius: var(--bs-border-radius);
+  background-color: rgba(31, 42, 37, 0.03);
+}
+.rc-editor-toolbar .rc-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  background: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  border-radius: var(--bs-border-radius-sm);
+  cursor: pointer;
+  color: inherit;
+}
+/* Icon buttons (Link / Image / Attach file): center the inline SVG both
+   vertically and horizontally — the padding above is tuned for text, so give
+   the icon a small gap on each side and vertical-center it. */
+.rc-editor-toolbar .rc-btn svg {
+  display: block;
+  margin: 0 auto;
+  width: 1rem;
+  height: 1rem;
+}
+.rc-editor-toolbar .rc-btn:hover {
+  background-color: rgba(31, 42, 37, 0.08);
+  border-color: var(--kmb-border, rgba(31, 42, 37, 0.15));
+}
+.rc-editor-toolbar .rc-btn:focus-visible {
+  outline: 2px solid var(--bs-primary, #0d6efd);
+  outline-offset: 1px;
+}
+/* Active state (set at runtime by the binder when the caret/selection is
+   inside bold / italic / code, or the current block is H1 / H2 / H3): a
+   filled "on" look that reads clearly stronger than the hover state. */
+.rc-editor-toolbar .rc-btn.rc-btn-active {
+  background-color: rgba(13, 110, 253, 0.14);
+  border-color: var(--bs-primary, #0d6efd);
+  color: var(--bs-primary, #0d6efd);
+  font-weight: 600;
+}
+.rc-editor-pane {
+  min-height: 6rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--kmb-border, rgba(31, 42, 37, 0.15));
+  border-radius: var(--bs-border-radius);
+  background-color: rgba(31, 42, 37, 0.02);
+}
+/* WY U4 (design doc §2.6) — the a11y focus ring (WY·9): the pane is
+   keyboard-operable, set `contenteditable="true"` by the binder at
+   runtime (never in the Razor). Added, not re-shaped — the existing
+   `.rc-editor-pane` rule above is untouched. */
+.rc-editor-pane[contenteditable="true"] { cursor: text; outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 1px; }
+.rc-editor textarea[data-rich-editor] {
+  min-height: 6rem;
+  font-family: var(--bs-font-monospace, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+/* --- Inline editor (IE U1) — the source is hidden by default (IE·1) ---
+   Hiding is a CSS class (display: none), never `disabled` (which would
+   break form binding) and never the `hidden` attribute (which would
+   remove it from tab order + the form-submit set). RE·1 unchanged: the
+   textarea is still the single source of truth the server binds. */
+.rc-editor textarea.rc-editor-source-hidden {
+  display: none;
+}
+
+
+/* --- Kumunita page layouts ("Airy" A for announcements / community /
+   groups / pages; "Cards" C for the directory) ---------------------------
+   The chosen variant set (design mocks, .tmp/designs — variant A for
+   /announcements, /community, /groups and /pages; variant C for
+   /directory). Tokens come from the :root block above; this file adds
+   only what the mocks introduced (the soft hairline, the radii, the
+   hover fills) plus the scoped .airy-* / .dir-cards* component classes.
+   Boring: no shadows, no new palette. */
+
+/* A: page header (h1 + optional lede, action row on the right). */
+.airy-head { margin-bottom: 2.5rem; }
+.airy-head h1 {
+  font-size: 2.5rem;
+  letter-spacing: -0.015em;
+  line-height: var(--bs-heading-line-height);
+  margin-bottom: 0;
+}
+.airy-head .lede {
+  font-family: var(--bs-body-font-family);
+  font-size: 1.0625rem;
+  color: var(--kmb-ink-soft);
+  max-width: 62ch;
+  margin-top: 0.75rem;
+}
+.airy-head .head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* A: the announcements ledger — one bordered container, generous rows. */
+.airy-ann-list {
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.airy-ann-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  padding: 1.75rem 2rem;
+  border-top: 1px solid var(--kmb-border-soft);
+}
+.airy-ann-row:first-child { border-top: 0; }
+.airy-ann-row:hover { background: var(--kmb-hover-row); }
+.airy-ann-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--kmb-ink);
+}
+.airy-ann-title a { color: inherit; }
+.airy-ann-title a:hover { color: var(--bs-primary); }
+.airy-ann-preview {
+  font-family: var(--bs-body-font-family);
+  font-size: 1rem;
+  color: var(--kmb-ink-soft);
+  margin-top: 0.375rem;
+  max-width: 68ch;
+}
+.airy-ann-meta {
+  margin-top: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  color: var(--kmb-muted);
+}
+.airy-ann-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+.airy-ann-actions { display: flex; gap: 0.75rem; }
+.link-quiet { font-size: 0.875rem; font-weight: 500; color: var(--kmb-muted); }
+.link-quiet:hover { color: var(--bs-primary); }
+
+/* A: community — left rail (the community switcher moves out of the
+   nav-pills into a sidebar) + the feed of post cards. */
+.airy-comm-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 2.75rem;
+  align-items: start;
+}
+.airy-side-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--kmb-muted);
+  margin-bottom: 0.625rem;
+}
+.airy-side-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.airy-side-list a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5625rem 0.875rem;
+  border-radius: var(--kmb-radius-chip);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--kmb-ink-soft);
+}
+.airy-side-list a:hover { background: var(--kmb-tint-a); color: var(--bs-primary); text-decoration: none; }
+.airy-side-list a.active { background: var(--kmb-tint-a); color: var(--bs-primary); font-weight: 600; }
+.airy-side-note {
+  margin-top: 1.25rem;
+  padding: 0.875rem 1rem;
+  background: var(--kmb-tint-a);
+  border-radius: var(--kmb-radius-chip);
+  font-size: 0.8125rem;
+  color: var(--kmb-ink-soft);
+}
+.airy-feed { display: flex; flex-direction: column; gap: 1rem; }
+.airy-post-card {
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.375rem 1.625rem;
+}
+.airy-post-card:hover { border-color: var(--kmb-hover-border); }
+.airy-post-title { font-size: 1.0625rem; font-weight: 600; line-height: 1.35; }
+.airy-post-title a { color: inherit; }
+.airy-post-title a:hover { color: var(--bs-primary); }
+.airy-post-chip { margin-left: 0.5rem; }
+.airy-post-preview {
+  font-family: var(--bs-body-font-family);
+  font-size: 0.9375rem;
+  color: var(--kmb-ink-soft);
+  margin-top: 0.5rem;
+}
+.airy-post-meta {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--kmb-border-soft);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--kmb-muted);
+}
+
+/* A: groups — the pending-invitations panel (warm) + the 2-up group grid. */
+.airy-invite {
+  background: var(--kmb-tint-b);
+  border: 1px solid #ead9be;
+  border-inline-start: 3px solid var(--kmb-amber);
+  border-radius: var(--kmb-radius);
+  padding: 1.125rem 1.5rem;
+  margin-bottom: 2rem;
+}
+.airy-invite h2 { font-size: 1.0625rem; margin-bottom: 0.625rem; }
+.airy-invite-row { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; flex-wrap: wrap; }
+.airy-invite-row + .airy-invite-row { border-top: 1px solid #ead9be; }
+.airy-invite-row .name { font-weight: 600; color: var(--kmb-ink); }
+.airy-invite-row .by { font-size: 0.875rem; color: var(--kmb-muted); }
+.airy-invite-row .row-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+.airy-group-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.airy-group-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.125rem 1.375rem;
+}
+.airy-group-card:hover { border-color: var(--kmb-hover-border); }
+.airy-group-card .gname { font-size: 1rem; font-weight: 600; color: var(--kmb-ink); }
+.airy-group-card .gname a { color: inherit; }
+.airy-group-card .gname a:hover { color: var(--bs-primary); }
+.airy-group-card .gcount { margin-left: auto; font-size: 0.8125rem; color: var(--kmb-muted); text-align: right; white-space: nowrap; }
+
+/* A: pages — the tree becomes a bordered ledger (indentation kept;
+   each row links full-width via the inner <a>). */
+.airy-page-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius-lg);
+  overflow: hidden;
+}
+.airy-page-list li { padding: 1rem 1.5rem; border-bottom: 1px solid var(--kmb-border-soft); }
+.airy-page-list li:last-child { border-bottom: 0; }
+.airy-page-list a {
+  font-family: var(--bs-body-font-family);
+  font-size: 1.0625rem;
+  color: var(--kmb-ink);
+  text-decoration: none;
+}
+.airy-page-list a:hover { color: var(--bs-primary); }
+
+/* C: directory — the cards grid (the "bigger avatars" overview). */
+.dir-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1rem;
+}
+.dir-card {
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius);
+  padding: 1.5rem 1.25rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+.dir-card { cursor: pointer; }
+.dir-card:hover { border-color: var(--kmb-hover-border); }
+.dir-card .dname { font-weight: 600; font-size: 1rem; }
+.dir-card .dname a { color: var(--kmb-ink); text-decoration: none; }
+.dir-card .dname a:hover { color: var(--bs-primary); }
+.dir-card .daddr { font-family: var(--bs-body-font-family); font-size: 0.875rem; color: var(--kmb-muted); }
+.dir-card .dfoot { min-height: 1.25rem; margin-top: 0.25rem; }
+
+/* Responsive collapse (mobile-first: single column until md+). */
+@media (max-width: 767.98px) {
+  .airy-head h1 { font-size: 2rem; }
+  .airy-ann-row { grid-template-columns: 1fr; padding: 1.25rem 1.25rem; }
+  .airy-ann-side { align-items: flex-start; }
+  .airy-comm-layout { grid-template-columns: 1fr; gap: 1.5rem; }
+  .airy-side-list { flex-direction: row; flex-wrap: wrap; gap: 0.375rem; }
+  .airy-side-note { display: none; } /* the mandatory badge reappears in the head */
+  .airy-group-grid { grid-template-columns: 1fr; }
+  .airy-page-list li { padding: 0.75rem 1rem; }
+}
+

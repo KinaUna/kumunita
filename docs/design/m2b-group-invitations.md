@@ -24,7 +24,7 @@ record of *why*.
 
 M2b adds the invitation lane on top of that, per the
 user-approved decisions in the plan
-(`docs/plans-milestones/plan-m2b-owner-invited-group-membership-(invite-acceptdecline).md`):
+(`docs/plans-milestones/done/plan-m2b-owner-invited-group-membership-(invite-acceptdecline).md`):
 
 - **Direction:** the **owner invites**, the **invitee resolves** (accept /
   decline). No join-request flow — that would open the reader to

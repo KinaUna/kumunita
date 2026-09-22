@@ -64,22 +64,18 @@ namespace Kumunita.Web.Controllers;
 /// <c>Kumunita.Web</c>; Core keeps the HTTP-free seam).
 /// </para>
 /// <para>
-/// <b>U7 addition (ADR 0011; C-MED·1/2/3/5):</b> the ctor also takes
-/// <c>IAuthorizationService</c> — the <c>Avatar</c> serving action's frozen
-/// single decision path (<see cref="Kumunita.Core.Authorization.AccessAction.Read"/>
-/// on the profile via
-/// <see cref="Kumunita.Core.UserInfo.ProfileToAuditableResource"/>, the audit
-/// row committed by the seam in its own commit — C-MED·2: Allow <i>and</i>
-/// Deny, the action never re-implements). This is the serving-lane
-/// <b>contract</b> every follow-on lane copies — FACES M1–M6 (design doc
-/// §2.5). No new <c>AccessAction</c> / <c>AccessVia</c> id (C-MED·1).
+/// <b>ADR 0057:</b> the <c>Avatar</c> serving lane no longer takes
+/// <c>IAuthorizationService</c> — avatars are visible to every signed-in
+/// resident by construction (the "all platform users" lane), so there is no
+/// per-viewer <c>CanAsync</c> decision and no <c>AccessAudit</c> row. The
+/// ctor no longer carries <c>IAuthorizationService</c>; the directory/preview
+/// lanes still route their contact decision through <c>DirectoryService</c>.
 /// </para>
 /// </summary>
 [Authorize]
 public sealed class ProfileController(
     IUserInfoService userInfo,
     DirectoryService directory,
-    Kumunita.Core.Authorization.IAuthorizationService authz,
     IMediaStore media,
     IOptions<MediaOptions> mediaOpts) : Controller
 {
@@ -117,6 +113,7 @@ public sealed class ProfileController(
             DisplayName = savedProfile?.DisplayName ?? string.Empty,
             Email = savedProfile?.Email ?? string.Empty,
             Address = savedProfile?.Address ?? string.Empty,
+            Phone = savedProfile?.Phone ?? string.Empty,
         };
 
         // The profile-level gate is non-nullable on the Profile document —
@@ -139,8 +136,8 @@ public sealed class ProfileController(
         // Grant-picker option lists (the M2 editor's UX layer over the frozen
         // Grants transport). These travel on ViewBag (the standard read-only
         // view-data channel) rather than as model properties, because the
-        // U11 "exactly six form fields" pin
-        // (ProfileEditViewModel_Has_Exactly_Six_FormFields) forbids adding
+        // U11 "exactly seven form fields" pin
+        // (ProfileEditViewModel_Has_Exactly_Seven_FormFields) forbids adding
         // a new settable write surface to ProfileEditViewModel. The
         // _AudienceEditor partial reads them via @ViewBag (the editor name
         // key — "Visibility" / "ContactVisibility" — selects the right
@@ -401,15 +398,14 @@ public sealed class ProfileController(
     /// stored <see cref="Kumunita.Core.Media.MediaObject.ContentType"/>
     /// (C-MED·5).
     /// <para>
-    /// <b>FACES M1–M6 mapping (design doc §2.5):</b>
-    /// M6 (unsigned) → <c>Challenge()</c>; M5 (unknown profile) →
-    /// <c>404</c>; M4 (blocked profile) → <c>404</c> <i>before</i> the
-    /// decision (blocked supersedes — no <c>CanAsync</c> call, no audit row;
-    /// the repo's fail-closed idiom in <see cref="DirectoryService"/>); M3
-    /// (denied audience) → <c>404</c> <i>after</i> the seam (audit already
-    /// committed); M1 (owner) / M2 (authorized other) → the same
-    /// <c>CanAsync</c> call's owner/audience branch → <c>200</c> + stored
-    /// <c>Content-Type</c>. No avatar set (AvatarId empty) → <c>404</c>.
+    /// <b>FACES mapping:</b> M6 (unsigned) → <c>Challenge()</c>; M5 (unknown
+    /// profile) → <c>404</c>; M4 (blocked profile) → <c>404</c> <i>before</i>
+    /// anything else (blocked supersedes — the repo's fail-closed idiom in
+    /// <see cref="DirectoryService"/>); no avatar set (<c>AvatarId</c> empty)
+    /// → <c>404</c>. Otherwise any signed-in resident is served the avatar —
+    /// there is <b>no audience decision</b> and no <c>AccessAudit</c> row (ADR
+    /// 0057: avatars are "all platform users" by construction, so a new
+    /// resident seeing an existing avatar is not a permission change to audit).
     /// </para>
     /// </summary>
     [HttpGet("/profile/avatar/{subjectId}")]
@@ -420,15 +416,13 @@ public sealed class ProfileController(
 
         var profile = await userInfo.GetProfileAsync(subjectId);
         if (profile is null) return NotFound();            // M5 (unknown profile)
-        if (profile.Blocked) return NotFound();            // M4 (blocked supersedes — no decision, no audit row)
+        if (profile.Blocked) return NotFound();            // M4 (blocked supersedes)
         if (string.IsNullOrEmpty(profile.AvatarId)) return NotFound(); // no avatar set → fail-closed 404
 
-        // One decision (C-MED·1 single path; C-MED·2 audit committed by the seam —
-        // Allow and Deny both land):
-        var decision = await authz.CanAsync(viewer, AccessAction.Read, new ProfileToAuditableResource(profile));
-        if (!decision.Allowed) return NotFound();          // M3 (Deny → 404; audit already committed)
-        // M1 (owner) + M2 (authorized other) auto-allow through the same call.
-
+        // ADR 0057: avatars are visible to every signed-in resident — the
+        // "all platform users" lane. There is no per-viewer audience decision
+        // and no audit row (unlike the gated contact block); the only failures
+        // are the structural ones above (unsigned / unknown / blocked / unset).
         // C-MED·7: the mt catalog (the reference) and the volume (the bytes)
         // are distinct — the action bridges the two via IMediaStore; a
         // missing doc or a missing byte is a fail-closed 404 (never a 500):
@@ -463,6 +457,7 @@ public sealed class ProfileController(
         {
             Mode = audience.Mode == AudienceMode.All ? "All" : "Any",
             Grants = grants,
+            AllResidentsVisible = audience.AllResidents,
         };
     }
 }

@@ -38,7 +38,10 @@ All per-instance identity and integration is env. The *image* is identical every
 | `DataProtection__KeysDirectory` | Recommended | No | Persistent directory holding the data-protection keyring — keeps sign-in + antiforgery state across redeploys (COOLIFY §5.2). Omit = in-memory (sessions die on restart) |
 | `Media__RootPath` | Recommended | No | The dedicated media volume mount (content-addressed byte store, ADR 0011). The in-code default (`{appDir}/media`) sits **inside the image layer** — in prod this must point at an operator-provided attached volume, or uploads are lost on redeploy, same discipline as `DataProtection__KeysDirectory` |
 | `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
-| `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The extension point for follow-on lanes (group logos, attachments) |
+| `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The image lane's raster-only gate; the extension point this row was sized to leave open for follow-on lanes |
+| `Media__AttachmentAllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive, for the **attachment (download) lane** (ADR 0034, lane `ATT`) — **distinct** from the image lane's `Media__AllowedContentTypes`. Default: `application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv, application/zip, image/jpeg, image/png, image/webp, image/gif` (SVG excluded; the four raster types included so a photo can be attached *as a download*). Same `Media__MaxBytes` cap. Guards-before-write: empty → 400, oversize → 413, disallowed → 415 (SECURITY.md §3(e)) |
+| `SampleData__Enabled` | Optional | No | First-boot mock-neighborhood seeder (ADR 0055 / 0056) **plus** the warm-boot sample-event translation backfill (ADR 0060). Default **absent/`false`** — a real deployment omits it, so neither lane is reachable by construction. Set `true` only for a **deployed demo site** (`Production` + fresh DB): the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo accounts get random high-entropy passwords, and a single credentials summary is emailed to the seed admin's address through the durable outbox. In `Development` it instead uses the documented weak demo credentials (README §Running table). The content seed is first-boot only (pristine-DB gate); on a warm boot the flag also triggers the create-if-missing, idempotent, never-clobbering backfill of the sample events' missing `de`/`fr`/`da` `EventTranslation` rows (ADR 0060) |
+| `Health__Token` | Optional | Yes | Shared-secret for the full `/health` diagnostic payload (SECURITY.md §6 / M3). When set, the detailed fields (`mail`, `mailDetail`, `emailDeadLetters`, `build`) require either the `X-Health-Token` header to match this value, or an authenticated GlobalAdmin session. The minimal liveness probe (`status`, `database`, `app`, `elapsedMs`) stays anonymous (Coolify / edge-proxy health check relies on it). **Default absent/empty** — the full payload is always visible (back-compat). Recommended for production: `openssl rand -hex 24` |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -78,6 +81,23 @@ a **one-time setup credential** (invalidated on first use) → a verification em
 sent → default components (Safety, Maintenance, Social, Governance) are seeded → the
 language catalog is seeded (source language `en` enabled and set as default).
 Re-running the seeder is a no-op once the admin exists.
+
+> **Sample data — opt-in (ADR 0055 / 0056 / 0060):** when `SampleData__Enabled=true` the
+> first-boot lane seeds a mock neighborhood (residents, groups, posts/replies,
+> events/RSVPs, tags, a blog, de/fr/da event translations) so a fresh instance is
+> immediately exercisable. It is gated on `SampleData__Enabled` **and** first-boot, so a
+> real deployment that never sets the flag never runs it. On a **warm** boot the same
+> flag additionally backfills any *missing* sample-event `de`/`fr`/`da` translations
+> — create-if-missing, idempotent, and never overwriting a Translator's in-app edit
+> (ADR 0060), so an instance whose first boot predates the event-translation lane
+> picks them up on the next redeploy. Two postures: in `Development`
+> it uses the documented weak demo credentials (README §Running table); on a deployed
+> demo site (`Production` + the flag) the seed admin keeps its `SeedAdmin__`
+> setup-token lane, the other demo accounts get random high-entropy passwords, and a
+> single credentials summary is emailed to the seed admin's address through the
+> durable outbox. The demo logins are `@examplium.com` (kept distinct from the real
+> `kumunita.com`). See the README §Running "Sample data & demo accounts" table, and
+> **Procedure 12** (deploying a demo site) for the step-by-step.
 
 **Languages are in-app data, not config.** Supported languages, the default language,
 and all translations live in the DB (`mt` schema; admin-managed under
@@ -151,7 +171,11 @@ is no registry, and the inventory's "Version (Commit)" comes from the deployed a
 
 **Second restore surface — the media volume (ADR 0011):** the *byte payload* of
 avatars lives on the dedicated volume at `Media__RootPath`, not in Postgres; the
-dump carries only the catalog (the `MediaObject` rows). So:
+dump carries only the catalog (the `MediaObject` rows). The **attachment
+(payload bytes of the ADR 0034 download lane) live on this same volume** — one
+volume, two route families (`/content-image/{id}` + `/attachment/{id}`), one
+catalog, one snapshot (C-ATT·1; C-MED·7 unchanged — no new restore surface).
+So:
 
 - **Snapshot the volume in the same backup set as its dump** — a
   `media-<date>.tgz` of `Media__RootPath`, taken just before that `pg_dump`
@@ -279,7 +303,10 @@ Most of this is an **in-app GlobalAdmin** action; a few need the operator at the
 
 Security and privacy are the product's top priority — the threat model, data classes,
 and the full control map live in `docs/SECURITY.md`. This checklist is the operational
-slice of that map.
+slice of that map. The *verification* of these controls — cadence, owners, and the
+run-anywhere checklists (including deployment checks D-1…D-8) — lives in
+`docs/SECURITY-AUDIT.md`; this section says *what* must be true, that document says
+*when and by whom we check it, and where we record that we did*.
 
 - **Network:** expose only 80/443 (and SSH, key-only). **Postgres must not be public** —
   bind to the internal/localhost or Coolify network.
@@ -316,12 +343,21 @@ slice of that map.
   - **2FA (decided):** TOTP (ASP.NET Identity built-in) + recovery codes — **required
     for GlobalAdmin**, recommended for Moderator, not offered for Members. A
     break-glass-elevated account must have 2FA before it keeps the standing (§9 step 3).
-  - **Content-Security-Policy (decided):** `default-src 'self'`,
-    `style-src 'self' 'unsafe-inline'`; **no inline `on*` attributes or inline
-    `<script>` in Razor views** (use the `client/*.ts` modules). The header is a
-    one-line change — the cost of relaxing it later is hunting down inline handlers,
-    so the code discipline is what's pinned. Any future third-party script: scoped
-    `script-src` entry + SRI, decided per case (SECURITY.md §6).
+  - **Content-Security-Policy (shipped, strict — L1 + strict flip):** the header is
+    set in code (`Program.cs`, before `UseRouting`) so every response in every
+    environment carries it — it no longer depends on a Caddy edge that may be
+    misconfigured or absent. The directive set enforces the full strict rule from
+    the original 2026-08-27 decision: `script-src 'self'` (no inline script, no
+    `unsafe-inline` — every interactive behavior lives in `client/lib/*.ts`
+    modules, self-wiring ES modules loaded from `_Layout.cshtml`), no external
+    resource origin (`default-src 'self'`), no external form/connector target
+    (`form-action`/`connect-src 'self'`), no `<base>` injection (`base-uri
+    'self'`), clickjacking (`frame-ancestors 'self'`), `object-src 'none'`, and
+    the inline style the views rely on (`style-src 'self' 'unsafe-inline'` —
+    inline `style=` attributes are Bootstrap utility patterns, not a script
+    vector). `img-src` adds `data:`/`blob:` (the WYSIWYG local-preview pane).
+    Any future third-party script: scoped `script-src` entry + SRI, decided per
+    case (SECURITY.md §6).
 - **CAPTCHA — deferred by default (decision):** signup is email-verification-gated and
   rate-limited, so a bot that can't verify the email can't join — no CAPTCHA is needed
   today. Revisit and add one (e.g. Turnstile, self-hosted or cloud, per-instance site
@@ -346,6 +382,97 @@ slice of that map.
 | Date | What happened | Impact | Action taken | Follow-up | Who |
 |------|---------------|--------|--------------|-----------|-----|
 |      |               |        |              |           |     |
+
+### 12. Deploy a demo site (sample data)
+
+A **deployed demo site** is a throwaway `Production` instance a prospective
+neighborhood can click through, pre-populated with the mock neighborhood (ADR
+0055 / 0056). It is a **separate app + dedicated Postgres** (the one-instance-per
+neighborhood topology, ADR 0002) — never a real neighborhood's database. It is
+**disposable by design**: treat its data as scratch, and never let it become a real
+deployment (wipe + re-seed, or provision fresh, when it outlives its purpose).
+
+What makes it a *demo* instance (vs. a real one) is the env set, not the image:
+`SampleData__Enabled=true` (first-boot only) plus the `examplium.com` naming. In the
+**deploy posture** the seed admin keeps its `SeedAdmin__` setup-token lane, the other
+demo accounts get random high-entropy passwords, and a single credentials summary is
+emailed to the seed admin's address through the durable outbox — no weak credential is
+stored on the public instance (the README §Running table is the **Development**
+credential set, not this one).
+
+1. Provision a fresh app + dedicated Postgres exactly as **Procedure 1**, but with the
+   demo identity: `Community__Name` (e.g. "Kumunita Demo Residents"),
+   `Community__SupportEmail` (e.g. `demo@examplium.com`), a strong DB password, a real
+   SMTP relay, `Verification__BaseUrl` = the demo domain, `Media__RootPath` +
+   `DataProtection__KeysDirectory` on a volume, and `SampleData__Enabled=true`.
+2. Set `SeedAdmin__Email` to the **operator's real admin address** (the credentials
+   e-mail and the setup e-mail both land there) and `SeedAdmin__Token` to a freshly
+   generated one-time token (Procedure 2). Store the token in the secrets manager.
+3. Deploy against a **fresh** Postgres (the pristine-DB gate is what makes the seeder
+   run). Confirm `/health` is OK.
+4. Open the site's first-boot setup link, **complete the admin setup** (set the admin
+   password; the token is invalidated on first use), then **remove `SeedAdmin__*` from
+   env** (Procedure 2, step 4).
+5. **Capture the credentials e-mail** in the admin inbox — it lists each demo account's
+   e-mail → random password. Store the ones you need (secrets manager) and **delete the
+   e-mail** (it is sensitive; the body says so).
+6. Exercise the demo (feed, groups, posts, events, RSVPs, the language switcher, the
+   resident blog). Verify the pinned "Test Platform" announcement is visible to a
+   signed-out visitor (it is the most visible thing on a demo instance and tells them
+   this is not real and to keep private data off it).
+7. Record it in the **Instance inventory** with a `Notes` marker such as
+   `DEMO — disposable, sample data (ADR 0056)` so it is never mistaken for a real
+   neighborhood.
+
+Teardown / reset: `docker compose down -v` (dev) or delete the Coolify app + its Postgres
+addon and re-run steps 1–5 for a fresh seed — the content seeder is first-boot only and
+idempotent, so a warm DB will not re-seed or duplicate (the pristine gate keeps it from
+re-running). The one warm-boot write is the sample-event translation backfill
+(create-if-missing, idempotent, ADR 0060) — it never duplicates and never clobbers a
+Translator's edit. Do **not** point a real neighborhood's `Community__Name` / Postgres at this
+instance; if a demo site is ever going to carry real residents, provision a **real**
+instance (Procedure 1, without `SampleData__Enabled`) and migrate the residents in —
+a demo DB is not a real DB.
+
+### 13. Review the user guides (periodic check)
+
+The resident-facing guides live in the `help/` subtree of the page tree (ADR 0057) —
+they are `Page` docs, not a second doc set. Two checks keep them honest; this
+procedure is the **periodic** one (the **event-based** one is the lane's own
+Definition of Done: a resident-facing change ships *with* its guide update).
+
+**Owner:** the community **GlobalAdmin** (in-product, not the host operator).
+**Cadence:** **quarterly**, or after any release that changed a resident-facing
+feature, whichever is sooner.
+
+1. Open the guide registry (the single source the seeder and the tests both read):
+   `FirstBootSeeder.GuidePages()` in `src/Kumunita.Core/Bootstrap/FirstBootSeeder.cs`,
+   cross-checked against the registry table in `docs/guides/CONVENTIONS.md`. They must
+   list the same slugs.
+2. For **each** guide, open its current `en` body in the in-app editor
+   (`/pages/help/{slug}`), and follow it **as a resident would** — sign in as a demo
+   resident, do the steps in order, note where the page and the product disagree.
+3. Mark each row **current** / **needs update** / **feature retired** in the review
+   notes below.
+4. **needs update** → open a lane (a ticket) that ships the guide's `en` body fix in the
+   seeder's `GuidePages()` array, the matching `CONVENTIONS.md` row, and the
+   `UG_GuideRegistryTests` drift pin in the same commit (ADR 0057 D3.2 / D4).
+5. **feature retired** → soft-delete the guide (a GlobalAdmin, the ADR 0024
+   author-lane shape) and remove its row from `GuidePages()` + `CONVENTIONS.md` +
+   the drift pin in the same commit.
+6. **A new resident-facing feature shipped since the last review** → confirm it has a
+   guide row (the event-based check, ADR 0057 D3.2). If not, open a lane to add one
+   (a guide documents a shipped feature; it is added in the feature's lane, not
+   silently).
+7. Stamp **Last reviewed:** below, and record any open lanes.
+
+> **Last reviewed:** _not yet run — first review due at the first quarterly boundary
+> after ADR 0057 ships._
+> **Open lanes from review:** _none._
+
+The periodic check is the **safety net** for the event-based check: a lane that
+*should* have updated a guide but didn't is caught by the next quarterly review, not
+by a resident hitting a wall (ADR 0057 D3.3).
 
 ---
 

@@ -1,10 +1,22 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1c4532" />
+    @* RC U05 (drift pause e, resolved): the anti-forgery token for the fetch-based
+       page modules (client/lib/api.ts). api.ts reads <meta name="anti-forgery-token">
+       and sends it in the RequestVerificationToken header — the header [ValidateAntiForgeryToken]
+       accepts by convention. The value is the RequestToken from the same IAntiforgery
+       that @Html.AntiForgeryToken() on every existing form draws on, so the upload fetch
+       (POST /content-image) is CSRF-aware. (GetAndStoreTokens is the canonical way to get the
+       bare token string in a model-less layout; the avatar lane never needed this because it
+       form-POSTs, but the content-image upload is the first fetch-based consumer.) *@
+    <meta name="anti-forgery-token" content="@Antiforgery.GetAndStoreTokens(Context).RequestToken" />
     <title>@ViewData["Title"] - Kumunita</title>
+    <link rel="icon" type="image/png" href="~/images/logo/kumunita_k_logo_64x64.png" />
+    <link rel="apple-touch-icon" href="~/images/logo/kumunita_k_logo_64x64.png" />
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
@@ -30,20 +42,50 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index"><kw-l key="nav.home">Home</kw-l></a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" href="/announcements">Announcements</a>
+                            <a class="nav-link text-dark" href="/announcements"><kw-l key="nav.announcements">Announcements</kw-l></a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections">Community</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index">Groups</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index">Directory</a>
-                        </li>
+                        @* Community/Groups/Pages/Directory are resident-only —
+                           hidden when signed out (the Home + Announcements links
+                           remain public). *@
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Posts" asp-action="AllSections"><kw-l key="nav.community">Community</kw-l></a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Groups" asp-action="Index"><kw-l key="nav.groups">Groups</kw-l></a>
+                            </li>
+                            @* M4 (ADR 0054) — the events feed (the "content-with-time"
+                               lane): upcoming events the resident may read + RSVP.
+                               [Authorize] on the EventController ⇒ resident-only,
+                               so it lives in this signed-in block (one entry, not
+                               three — the feed / detail / composer are one surface). *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/events"><kw-l key="nav.events">Events</kw-l></a>
+                            </li>
+                            @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
+                               view). Display, not access — the tree is CanSeeAsync(Read)
+                               -filtered and the composer button is standing-gated. The
+                               full nav redesign is deferred to later milestones; this
+                               makes the knowledge tree reachable for now. *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/pages"><kw-l key="nav.pages">Pages</kw-l></a>
+                            </li>
+                            @* ADR 0044 (TG lane) — the tag browse surface (the
+                               distinct tags used on content the viewer may
+                               already read, each linking to its by-tag view).
+                               [Authorize] on the TagController ⇒ resident-only,
+                               so it lives in this signed-in block. *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/tags"><kw-l key="nav.tags">Tags</kw-l></a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Directory" asp-action="Index"><kw-l key="nav.directory">Directory</kw-l></a>
+                            </li>
+                        }
                     </ul>
 
                     <partial name="_AccountNav" />
@@ -69,20 +111,36 @@
             <div class="row g-4">
                 <div class="col-12 col-md-5 col-lg-4">
                     <p class="navbar-brand mb-2">Kumunita</p>
-                    <p class="mb-2" style="max-width: 34ch;">
-                        A private home for one neighborhood — the feed, the groups
-                        and the pinned notes. What happens on your street stays on
-                        your street.
-                    </p>
-                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita · self-hosted by your community</p>
+                    <p class="mb-2" style="max-width: 34ch;"><kw-l key="footer.tagline">A private home for one neighborhood — the feed, the groups and the pinned notes. What happens on your street stays on your street.</kw-l></p>
+                    <p class="small mb-0">&copy; @DateTime.Now.Year Kumunita <kw-l key="footer.copyright">· self-hosted by your community</kw-l></p>
                 </div>
                 <div class="col-6 col-md-4 col-lg-2">
                     <h3>Community</h3>
                     <ul class="list-unstyled d-grid gap-2">
                         <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
-                        <li><a asp-area="" asp-controller="Home" asp-action="About">About</a></li>
+                        @* ADR 0039 §3.8 — the mount-point resolver (footer/community slot):
+                           the page mounted here renders as a link; an unmounted slot
+                           renders nothing. Display, not access — the Show action is
+                           the Read decision. *@
+                        @{ ViewData["MountSlot"] = "footer/community"; }
+                        <partial name="_MountSlot" />
                         <li><a href="/announcements">Announcements</a></li>
                         <li><a asp-controller="Posts" asp-action="AllSections">The feed</a></li>
+                    </ul>
+                </div>
+                @* SP U03 (ADR 0043 D4) — the footer "Platform" column: the five
+                   shipped platform surfaces, linked **unconditionally** for every
+                   visitor (floor-honesty — no existence probe, no @if: a link whose
+                   page is absent from the tree lands on its existing floor). The
+                   navbar is deliberately untouched (the recorded D4 decision). *@
+                <div class="col-6 col-md-4 col-lg-2">
+                    <h3><kw-l key="footer.platform.heading">Platform</kw-l></h3>
+                    <ul class="list-unstyled d-grid gap-2">
+                        <li><a href="/about"><kw-l key="footer.platform.about">About</kw-l></a></li>
+                        <li><a href="/terms"><kw-l key="footer.platform.terms">Terms of use</kw-l></a></li>
+                        <li><a href="/help"><kw-l key="footer.platform.help">Help</kw-l></a></li>
+                        <li><a href="/privacy"><kw-l key="footer.platform.privacy">Privacy</kw-l></a></li>
+                        <li><a href="/conduct"><kw-l key="footer.platform.conduct">Code of conduct</kw-l></a></li>
                     </ul>
                 </div>
                 <div class="col-6 col-md-4 col-lg-3">
@@ -97,14 +155,9 @@
                     </ul>
                 </div>
                 <div class="col-12 col-md-3 col-lg-3">
-                    <h3>Good to know</h3>
-                    <p class="small mb-2">
-                        Private by default: each post's audience is chosen by its author,
-                        and everything is readable by you, not the world.
-                    </p>
-                    <p class="small mb-0">
-                        Kumunita is open source — the code, the decisions, the docs.
-                    </p>
+                    <h3><kw-l key="footer.gtk_heading">Good to know</kw-l></h3>
+                    <p class="small mb-2"><kw-l key="footer.gtk_privacy">Private by default: each post's audience is chosen by its author, and everything is readable by you, not the world.</kw-l></p>
+                    <p class="small mb-0"><kw-l key="footer.gtk_oss">Kumunita is open source — the code, the decisions, the docs.</kw-l></p>
                 </div>
             </div>
         </div>
@@ -114,6 +167,32 @@
     <!-- Avatar monogram fallback (client/lib/avatar.ts, tsc-built — SECURITY.md §6:
          no inline on*/<script> in Razor views; the U8 onerror it replaced is per img) -->
     <script type="module" src="~/js/lib/avatar.js"></script>
+    <!-- Avatar upload gating (client/lib/avatar-upload.ts, tsc-built — SECURITY.md §6:
+         no inline on*/<script> in Razor views; disables "Save avatar" until a file is chosen) -->
+    <script type="module" src="~/js/lib/avatar-upload.js"></script>
+    <!-- Translation display swap (client/lib/translation-swap.ts, tsc-built — TD / ADR 0027:
+         click-to-swap toggles the pre-rendered .td-variant containers; display-only, no fetch) -->
+    <script type="module" src="~/js/lib/translation-swap.js"></script>
+    <!-- Confirm-before-submit (SECURITY.md §6 no-inline-script; replaces the
+         onsubmit="return confirm(..." pattern across ~18 views) -->
+    <script type="module" src="~/js/lib/confirm.js"></script>
+    <!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
+         onclick="this.form.reset()" pattern) -->
+    <script type="module" src="~/js/lib/reset-form.js"></script>
+    <!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
+    <script type="module" src="~/js/lib/audience-toggle.js"></script>
+    <!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->
+    <script type="module" src="~/js/lib/name-filter.js"></script>
+    <!-- Admin edit-row toggle (SECURITY.md §6; Admin/Index collapsed rows) -->
+    <script type="module" src="~/js/lib/admin-edit-toggle.js"></script>
+    <!-- Directory-card click→nav (SECURITY.md §6; Directory/Index whole-card) -->
+    <script type="module" src="~/js/lib/directory-card.js"></script>
+    <!-- Pinned-announcement dismissal (SECURITY.md §6; per-announcement sessionStorage) -->
+    <script type="module" src="~/js/lib/pinned-announcement.js"></script>
+    <!-- Page-form visibility (SECURITY.md §6; ADR 0041 scope/individual blocks) -->
+    <script type="module" src="~/js/lib/page-form-visibility.js"></script>
+    <!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
+    <script type="module" src="~/js/lib/grant-picker-sync.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

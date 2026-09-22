@@ -1,0 +1,265 @@
+@model Kumunita.Web.Models.EventEditorModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Edit event";
+    string[] modes = { "Any", "All" };
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="events.edit_event">Edit event</kw-l></h1>
+        <p class="text-muted">
+            <kw-l key="events.edit_lead">Update this event's details. Your audience choice is the sole access boundary — the community pick is only a filter.</kw-l>
+        </p>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form id="edit-event-form" method="post" action="/events/@Model.Id/edit">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-label" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></div>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="120" required value="@Model.Title" />
+                    <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="start" name="Start" required
+                                   value="@Model.Start.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="end" name="End" required
+                                   value="@Model.End.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="events.time_hint">The time the event runs. Shown to viewers in their own timezone.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
+                            <input class="form-control" type="text" id="location" name="Location"
+                                   placeholder="optional" value="@Model.Location" />
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label" for="capacity" style="font-weight:600;"><kw-l key="events.capacity">Capacity</kw-l></label>
+                            <input class="form-control" type="number" min="1" id="capacity" name="Capacity"
+                                   placeholder="optional" value="@Model.Capacity" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="events.location_hint">Location and capacity are display details only — they do not limit who can RSVP.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control" id="body" name="Body" rows="6" required data-rich-editor>@Model.Body</textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.Components.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="component" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-control" id="component" name="ComponentId">
+                            <option value="" selected="@(Model.ComponentId is null ? "selected" : null)"><kw-l key="events.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="events.community_hint">The community this event appears under — a filter, not an access limit.</kw-l>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;"><kw-l key="common.language">Language</kw-l></label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="posts.language_hint">The language you're writing this event in. This is only a tag — it is not translated — and it keeps the text findable later.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
+                    <input class="form-control" type="text" id="tags"
+                           data-tag-suggest
+                           maxlength="64"
+                           placeholder="e.g. cleanup, social, garden" />
+                    <div class="text-muted small mt-1">
+                        <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this event.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;"><kw-l key="events.audience_heading">Audience — who can see this event</kw-l></h6>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.CommunityVisible"
+                               id="aud-community" data-audience-toggle
+                               value="true"
+                               @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
+                        <label class="form-check-label fw-semibold" for="aud-community">
+                            <kw-l key="posts.audience_all_members">Everyone</kw-l>
+                        </label>
+                        <div class="text-muted small ms-4">
+                            <kw-l key="events.audience_default">The default — everyone can see this event. Turn it off only if you want to narrow who can see it.</kw-l>
+                        </div>
+                    </div>
+
+                    <hr class="my-3" />
+
+                    <div id="audience-restricted" data-audience-panel
+                         class="audience-restricted"
+                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
+                        <div class="form-label mt-2" style="font-weight:600;">
+                            <kw-l key="posts.audience_combine">How the picks combine</kw-l>
+                        </div>
+                        @foreach (var m in modes)
+                        {
+                            var checkedMark =
+                                string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                    ? "checked"
+                                    : null;
+                            <div class="form-check" style="margin-left:0.5rem;">
+                                <input class="form-check-input" type="radio"
+                                       name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                       value="@m" @checkedMark required />
+                                <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                    @m
+                                    @if (m == "Any")
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_any">a viewer matches if they're on any of the picks</kw-l>
+                                    }
+                                    else
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_all">a viewer must be on every pick — an empty list denies everyone</kw-l>
+                                    }
+                                </label>
+                            </div>
+                        }
+
+                        <partial name="_GrantPickers" model="@(new GrantPickersModel
+                        {
+                            EditorName = "Audience",
+                            Editor     = Model.Audience
+                                        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                            Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                            Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                        })" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               name="ReminderEnabled"
+                               id="reminders"
+                               value="true"
+                               @(Model.ReminderEnabled ? "checked" : null) />
+                        <input type="hidden" name="ReminderEnabled" value="false" />
+                        <label class="form-check-label fw-semibold" for="reminders">
+                            <kw-l key="events.reminder">Send the 24-hour reminder to those who RSVP "Going"</kw-l>
+                        </label>
+                        <div class="text-muted small ms-4">
+                            <kw-l key="events.reminder_hint">A reminder is sent the day before the event to everyone who is going. Turn this off to skip it.</kw-l>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="events.save_changes">Save changes</kw-l></button>
+                <a href="/events/@Model.Id" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <script type="module" src="~/js/lib/tag-suggest.js"></script>
+    <partial name="_GrantPickerScripts" />
+    @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6). *@
+}

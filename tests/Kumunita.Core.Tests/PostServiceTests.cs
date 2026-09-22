@@ -1,6 +1,7 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -1415,5 +1416,492 @@ public class PostServiceTests(PostgresFixture fixture) : IClassFixture<PostgresF
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => RunInSession(store, async s =>
                 await svc.CreatePostAsync(draft, author, new HashSet<string> { Roles.Member }, s)));
+    }
+
+    // ── Post-edit lane (UpdatePostAsync) ──────────────────────────────
+    //
+    // The M3 post lane is author-only for edits: the author may re-write
+    // Title/Body/Audience (the audience is written verbatim, ADR 0001-B),
+    // a non-author is denied even at GlobalAdmin (a moderator's lever over
+    // a post is Hide/Remove, not re-writing text), and the immutable
+    // identity fields (ComponentId/AuthorId/Created/Status/GroupId) are
+    // never touched. A missing id fails closed with KeyNotFoundException
+    // (the Web layer maps that to a 403, not a 404, to stay non-leaky).
+
+    [Fact]
+    public async Task UpdatePost_Author_Allows_FieldsUpdated_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-author";
+        const string postId = "edit-post-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Title = "old title", Body = "old body", Created = created,
+            Modified = created,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var newAudience = Audience(GrantKind.User, "u-edit-newmember");
+        var loadedBefore = await LoadPostAsync(store, postId);
+        var beforeModified = loadedBefore.Modified;
+
+        var updated = await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "new title", "new body", newAudience, null, s));
+
+        Assert.Equal("new title", updated.Title);
+        Assert.Equal("new body", updated.Body);
+        Assert.Equal(newAudience.Mode, updated.Audience.Mode);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(updated.Audience));
+
+        // The DB row carries the same shape.
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal("new title", persisted.Title);
+        Assert.Equal("new body", persisted.Body);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(persisted.Audience));
+        // Modified was stamped forward from its prior value.
+        Assert.True(persisted.Modified >= beforeModified);
+    }
+
+    [Fact]
+    public async Task UpdatePost_AuthorAudienceWrittenVerbatim()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-verbatim";
+        const string postId = "edit-post-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        // A non-default shape: `All` mode + two grant kinds (user + group),
+        // proving the nested Audience document round-trips bit-identically.
+        var newAudience = new Audience(
+            AudienceMode.All,
+            [
+                new AudienceGrant(GrantKind.User, author),
+                new AudienceGrant(GrantKind.Group, "g-edit-verbatim"),
+            ]);
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b", newAudience, null, s));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal(AudienceMode.All, persisted.Audience.Mode);
+        Assert.Equal(GrantsOf(newAudience), GrantsOf(persisted.Audience));
+    }
+
+    [Fact]
+    public async Task UpdatePost_DoesNotTouchImmutableFields()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-immutable";
+        const string postId = "edit-post-3";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+        var groupId = "g-edit-immutable";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = created, Modified = created,
+            GroupId = groupId, Status = PostStatus.Active,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "new title", "new body",
+                Audience(GrantKind.User, author), null, s));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal(ComponentId, persisted.ComponentId);
+        Assert.Equal(author, persisted.AuthorId);
+        Assert.Equal(created, persisted.Created);
+        Assert.Equal(groupId, persisted.GroupId);
+        Assert.Equal(PostStatus.Active, persisted.Status);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_ChangesLanguageTag_PersistsNewCode()
+    {
+        // ADR 0018 (amended 2026-09-13, ADR 0014) — the authored-in language
+        // tag is editable on this lane: a non-empty code is written verbatim
+        // (the author can correct the language the post was written in).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang";
+        const string postId = "edit-post-lang";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), "pl", s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_Author_BlankLanguage_ResolvesInstanceDefault()
+    {
+        // ADR 0018 (amended) — a blank submission on the edit lane is
+        // re-materialized through the shared resolver: it never blanks a
+        // stored tag, it falls back to the instance default (here "pl",
+        // planted as the LocaleSettings singleton).
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-lang-blank";
+        const string postId = "edit-post-lang-blank";
+
+        await Plant(store, new LocaleSettings { Id = LocaleSettings.SingletonId, DefaultLanguageCode = "pl" });
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            LanguageCode = "en",
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await RunInSession(store, async s =>
+            await svc.UpdatePostAsync(postId, author, "t", "b",
+                Audience(GrantKind.User, author), null, s));
+
+        Assert.Equal("pl", (await LoadPostAsync(store, postId)).LanguageCode);
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_Member_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner";
+        const string stranger = "u-edit-stranger";
+        const string postId = "edit-post-4";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, stranger, "t", "b",
+                    Audience(GrantKind.User, stranger), null, s)));
+        Assert.Contains("Only the author", ex.Message);
+
+        // The post is unchanged.
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Equal("body", persisted.Body);
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_GlobalAdmin_Denies()
+    {
+        // Author-only gate: even a GlobalAdmin who is not the author cannot
+        // re-write the post's text. (A moderator's lever over a post is
+        // Hide/Remove, not edit — see PostService.UpdatePostAsync.)
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner-admin";
+        const string admin = "u-edit-admin";
+        const string postId = "edit-post-5";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, admin, "t", "b",
+                    Audience(GrantKind.User, admin), null, s)));
+    }
+
+    [Fact]
+    public async Task UpdatePost_NonAuthor_ModeratorAssignedToComponent_Denies()
+    {
+        // A component moderator who is NOT the author is still denied — the
+        // edit lane has no moderator branch at all.
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-owner-mod";
+        const string moderator = "u-edit-moderator";
+        const string postId = "edit-post-6";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new ModeratorAssignment
+        {
+            Id = "ma-edit",
+            UserId = moderator,
+            ComponentId = ComponentId,
+            GrantedBy = "u-edit-admin",
+            At = DateTimeOffset.UtcNow
+        });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync(postId, moderator, "t", "b",
+                    Audience(GrantKind.User, moderator), null, s)));
+    }
+
+    [Fact]
+    public async Task UpdatePost_MissingPostKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-edit-anyone";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.UpdatePostAsync("no-such-post", author, "t", "b",
+                    Audience(GrantKind.User, author), null, s)));
+    }
+
+    // ── ADR 0024 — author soft-delete lanes (component lane) ──────────────
+    //
+    // A sibling of the ADR 0014 edit-lane tests above, adapted to soft-delete:
+    // only the post's / reply's own author may delete; a non-author is denied
+    // even at GlobalAdmin (no moderator / break-glass branch — the M3b
+    // Hide/Remove surface is a separate concern); a missing id is
+    // KeyNotFoundException. The record is **kept** (DeletedAt stamped,
+    // Modified moved forward, never hard-deleted), and the feeds now exclude
+    // the deleted post while GetPostAsync still returns it (the placeholder
+    // shape — replies remain visible).
+
+    [Fact]
+    public async Task DeletePost_Author_Allows_DeletedAtStamped_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-author";
+        const string postId = "del-post-1";
+        var created = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "old body", Created = created, Modified = created,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var loadedBefore = await LoadPostAsync(store, postId);
+        var beforeModified = loadedBefore.Modified;
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeletePostAsync(postId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.NotNull(persisted.DeletedAt);
+        Assert.True(persisted.Modified >= beforeModified);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old body", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeletePost_NonAuthor_Denies_EvenAtGlobalAdmin()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-owner";
+        const string admin = "u-del-admin";
+        const string postId = "del-post-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = postId, ComponentId = ComponentId, AuthorId = author,
+            Body = "body", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync(postId, admin, s)));
+
+        var persisted = await LoadPostAsync(store, postId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeletePost_MissingPostKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeletePostAsync("no-such-post", author, s)));
+    }
+
+    [Fact]
+    public async Task DeletePost_ThenFeed_ExcludesPost_ButDetailStillReturnsIt()
+    {
+        // ADR 0024 — the two-halves shape on the component lane: the feed
+        // hides a deleted post, but the detail lane still returns it (the
+        // placeholder shape — replies remain visible).
+        var store = await BootStoreAsync();
+        var (userInfo, _, svc) = Services(store);
+        const string author = "u-del-feed";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-live", ComponentId = ComponentId, AuthorId = author,
+            Body = "live", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new Post
+        {
+            Id = "del-gone", ComponentId = ComponentId, AuthorId = author,
+            Body = "gone", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+
+        var before = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.Equal(2, before.Visible.Count(p => p.Id is "del-live" or "del-gone"));
+
+        await RunInSession(store, async s =>
+            await svc.DeletePostAsync("del-gone", author, s));
+
+        var after = await svc.ListFeedAsync(ComponentId, author, page: 1);
+        Assert.DoesNotContain(after.Visible, p => p.Id == "del-gone");
+        Assert.Contains(after.Visible, p => p.Id == "del-live");
+
+        // … but the detail lane still returns it (the placeholder shape).
+        var detail = await svc.GetPostAsync("del-gone", author);
+        Assert.NotNull(detail.Post);
+        Assert.NotNull(detail.Post.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_Author_Allows_DeletedAtStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-author";
+        const string replyId = "del-reply-1";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post", AuthorId = author,
+            Body = "old reply", Created = DateTimeOffset.UtcNow,
+        });
+
+        var deleted = await RunInSession(store, async s =>
+            await svc.DeleteReplyAsync(replyId, author, s));
+
+        Assert.NotNull(deleted.DeletedAt);
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.NotNull(persisted.DeletedAt);
+        // The record is kept (soft-delete — never hard-deleted).
+        Assert.Equal("old reply", persisted.Body);
+        Assert.Equal(author, persisted.AuthorId);
+    }
+
+    [Fact]
+    public async Task DeleteReply_NonAuthor_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-owner";
+        const string stranger = "u-del-reply-stranger";
+        const string replyId = "del-reply-2";
+
+        await Plant(store, new Component { Id = ComponentId, Name = "Safety", Enabled = true });
+        await Plant(store, new Post
+        {
+            Id = "del-reply-post2", ComponentId = ComponentId, AuthorId = author,
+            Body = "parent", Created = DateTimeOffset.UtcNow,
+            Audience = Audience(GrantKind.User, author),
+        });
+        await Plant(store, new PostReply
+        {
+            Id = replyId, PostId = "del-reply-post2", AuthorId = author,
+            Body = "old", Created = DateTimeOffset.UtcNow,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync(replyId, stranger, s)));
+
+        var persisted = await LoadReplyAsync(store, replyId);
+        Assert.Null(persisted.DeletedAt);
+    }
+
+    [Fact]
+    public async Task DeleteReply_MissingReplyKey_MissingOrUnknownKey()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-del-reply-anyone";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(
+            () => RunInSession(store, async s =>
+                await svc.DeleteReplyAsync("no-such-reply", author, s)));
+    }
+
+    // ── Post-edit shared helpers ───────────────────────────────────────
+
+    private static async Task<Post> LoadPostAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<Post>(id, ct);
+        Assert.NotNull(loaded);
+        return loaded!;
+    }
+
+    private static async Task<PostReply> LoadReplyAsync(IDocumentStore store, string id)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var r = store.QuerySession();
+        var loaded = await r.LoadAsync<PostReply>(id, ct);
+        Assert.NotNull(loaded);
+        return loaded!;
     }
 }

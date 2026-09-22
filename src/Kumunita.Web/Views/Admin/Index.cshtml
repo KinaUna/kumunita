@@ -4,7 +4,7 @@
     ViewData["Title"] = "Admin";
 }
 
-<h1>Admin</h1>
+<h1><kw-l key="admin.title">Admin</kw-l></h1>
 
 @if (TempData["info"] is string info)
 {
@@ -14,6 +14,72 @@
 {
     <div class="alert alert-danger">@err</div>
 }
+
+<h2>Platform</h2>
+<p class="text-muted">
+    Instance-wide management — the languages the platform supports (add / enable /
+    set the default, and edit the translated UI strings and static pages), the
+    access audit log, and the break-glass elevation path.
+</p>
+<div class="d-flex gap-2 flex-wrap mb-4">
+    <a href="/admin/languages" class="btn btn-outline-primary">Manage languages</a>
+    <a href="/admin/timezone" class="btn btn-outline-primary"><kw-l key="admin.timezone_label">Default time zone</kw-l></a>
+    <a href="/admin/dateformat" class="btn btn-outline-primary"><kw-l key="admin.dateformat_label">Default date &amp; time format</kw-l></a>
+    <a href="/admin/signup" class="btn btn-outline-primary"><kw-l key="admin.signup_title">Sign-up</kw-l></a>
+    <a asp-action="Audit" class="btn btn-outline-secondary">Access audit log</a>
+    <a asp-action="BreakGlass" class="btn btn-outline-secondary">Break-glass</a>
+</div>
+
+@* SP U03 (ADR 0043 D4) — the "Platform pages" affordance: the five shipped
+   platform surfaces, each with a preview link (the route — always present)
+   and, for the four Page-backed surfaces, an edit link (id-based,
+   /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
+   view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
+<h3>Platform pages</h3>
+<p class="text-muted">
+    The five pages a fresh instance ships with. "Preview" opens the page as
+    residents see it; "Edit" opens the page editor (admins only). "About" is
+    the product story — preview only.
+</p>
+<table class="table table-sm align-middle mb-4">
+    <thead>
+        <tr>
+            <th>Surface</th>
+            <th>Route</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @* Row labels are plain text (the admin view's local convention — mostly
+           non-kw-l English; an interpolated kw-l key would break the
+           KwLRegistryConsistencyTests static key scan). The labels match the
+           footer.platform.* registry values by design. *@
+        @{
+            var platformLabels = new Dictionary<string, string>
+            {
+                ["about"]   = "About",
+                ["terms"]   = "Terms of use",
+                ["help"]    = "Help",
+                ["privacy"] = "Privacy",
+                ["conduct"] = "Code of conduct",
+            };
+        }
+        @foreach (var row in Model.PlatformPages)
+        {
+            <tr>
+                <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
+                <td><code>@row.Route</code></td>
+                <td class="text-end">
+                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
+                    @if (row.PageId is not null)
+                    {
+                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-primary">Edit</a>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
 
 <h2>Accounts</h2>
 <p class="text-muted">
@@ -30,7 +96,7 @@
                 <option value="@a.SubjectId">@a.Email ?? a.DisplayName ?? a.SubjectId (unverified)</option>
             }
         </select>
-        <button class="btn btn-outline-primary" type="submit">Verify</button>
+        <button class="btn btn-outline-primary" type="submit"><kw-l key="admin.verify">Verify</kw-l></button>
     </div>
     @if (Model.UnverifiedCount == 0)
     {
@@ -118,12 +184,26 @@
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="targetSubjectId" value="@a.SubjectId" />
 
-                            <label class="visually-hidden">Role</label>
-                            <select name="role" class="form-select form-select-sm me-2">
-                                <option value="@Roles.Member" selected="@(a.Roles.Count == 0 ? "selected" : null)">Member (no elevated role)</option>
-                                <option value="@Roles.Moderator" selected="@(a.Roles.Contains(Roles.Moderator) ? "selected" : null)">Moderator</option>
-                                <option value="@Roles.GlobalAdmin" selected="@(a.Roles.Contains(Roles.GlobalAdmin) ? "selected" : null)">GlobalAdmin</option>
-                            </select>
+                            <label class="visually-hidden">Roles</label>
+                            @* ADR 0030 — roles are independent/composable: three checkboxes
+                               (any combination), not a single-select. Nothing checked = a
+                               plain Member (the implicit verified-resident standing). *@
+                            <span class="text-muted small me-1" title="Nothing checked = plain Member">roles:</span>
+                            <label title="GlobalAdmin" aria-label="GlobalAdmin" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.GlobalAdmin"
+                                       checked="@(a.Roles.Contains(Roles.GlobalAdmin) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">GlobalAdmin</span>
+                            </label>
+                            <label title="Moderator" aria-label="Moderator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.Moderator"
+                                       checked="@(a.Roles.Contains(Roles.Moderator) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">Moderator</span>
+                            </label>
+                            <label title="Translator" aria-label="Translator" style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
+                                <input type="checkbox" name="roleNames" value="@Roles.Translator"
+                                       checked="@(a.Roles.Contains(Roles.Translator) ? "checked" : null)" />
+                                <span class="badge text-bg-light border">Translator</span>
+                            </label>
 
                             @if (Model.Components.Any())
                             {
@@ -156,10 +236,16 @@
                                 <span class="text-muted small me-1">post:</span>
                                 @foreach (var c in Model.Components)
                                 {
-                                    <label title="@c.Name" aria-label="@c.Name"
+                                    // ADR 0012 — a mandatory community is a member of
+                                    // everyone: shown checked (the union read already
+                                    // includes it) and locked, since unchecking is a
+                                    // server-side no-op and re-checking a redundant row.
+                                    var cMandatory = Model.Communities.FirstOrDefault(x => x.Id == c.Id)?.Mandatory == true;
+                                    <label title="@(cMandatory ? c.Name + " (mandatory — everyone is a member)" : c.Name)" aria-label="@c.Name"
                                            style="cursor:pointer; vertical-align:middle; margin-right:.25rem;">
                                         <input type="checkbox" name="communityIds" value="@c.Id"
-                                               checked="@(a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
+                                               @(cMandatory ? "disabled" : null)
+                                               checked="@(cMandatory || a.CommunityIds.Contains(c.Id) ? "checked" : null)" />
                                         <span class="badge text-bg-light border">@c.Name</span>
                                     </label>
                                 }
@@ -186,7 +272,7 @@
                                 <form method="post"
                                       asp-action="@_action"
                                       class="d-inline-flex ms-2"
-                                      onsubmit="return confirm('@_confirm');">
+                                      data-confirm="@_confirm">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="subjectId" value="@a.SubjectId" />
                                     <button class="btn btn-sm @(a.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
@@ -202,8 +288,9 @@
     </table>
 </div>
 
-@* The "scope" checkbox set is only meaningful when the selected role is Moderator; the
-   Core SetRoleAsync ignores componentIds for non-Moderator targets (deletes them). *@
+@* ADR 0030 — roles are independent checkboxes (any combination). The "scope" checkbox
+   set is meaningful only when the Moderator checkbox is checked; the Core SetRoleAsync
+   clears component scope for a non-Moderator target (deletes the assignment rows). *@
 
 <h2 class="mt-5">Communities</h2>
 <p class="text-muted">
@@ -215,14 +302,19 @@
 @* ── Add community ── *@
 <form method="post" asp-action="AddCommunity" class="mb-4">
     @Html.AntiForgeryToken()
-    <div class="row g-2 align-items-end">
-        <div class="col-md-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-3">
             <label for="addName" class="form-label">Name</label>
             <input name="Name" id="addName" type="text" class="form-control" maxlength="100" required autocomplete="off" />
         </div>
-        <div class="col-md-5">
+        <div class="col-md-4">
             <label for="addDesc" class="form-label">Description (optional)</label>
             <input name="Description" id="addDesc" type="text" class="form-control" maxlength="500" autocomplete="off" />
+        </div>
+        <div class="col-md-2 d-flex align-items-center ps-2">
+            <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
+            <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
+                   title="Everyone in the neighborhood is a member — no one can be removed or leave it.">Mandatory</label>
         </div>
         <div class="col-md-3 text-end">
             <button class="btn btn-primary" type="submit">Add community</button>
@@ -278,9 +370,28 @@ else
                             {
                                 <span class="badge text-bg-warning">disabled</span>
                             }
+                            @* ADR 0012 — the mandatory badge: everyone is a member;
+                               toggled here (the Make optional / Make mandatory
+                               button) or on the community's manage page — both
+                               are the GlobalAdmin-only lane, never the
+                               moderator's. *@
+                            @if (c.Mandatory)
+                            {
+                                <span class="badge text-bg-dark" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
+                            }
                         </td>
                         <td class="text-end">
                             <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary me-1">Edit</a>
+                            <form method="post" asp-action="ToggleCommunityMandatory" class="d-inline-flex me-1">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="componentId" value="@c.Id" />
+                                <input type="hidden" name="mandatory" value="@(c.Mandatory ? "false" : "true")" />
+                                <button class="btn btn-sm @(c.Mandatory ? "btn-dark" : "btn-outline-dark")"
+                                        type="submit"
+                                        title="@(c.Mandatory ? "Make optional — membership is explicit rows again." : "Make mandatory — everyone in the neighborhood becomes a member.")">
+                                    @(c.Mandatory ? "Make optional" : "Make mandatory")
+                                </button>
+                            </form>
                             <form method="post" asp-action="ToggleCommunityEnabled" class="d-inline-flex">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="componentId" value="@c.Id" />
@@ -324,14 +435,6 @@ else
         </table>
     </div>
 
-    @* Minimal toggle script — no dependency on Bootstrap JS for the collapse *@
-    <script>
-        document.querySelectorAll('[data-edit-toggle]').forEach(function (btn) {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                var row = document.querySelector(btn.getAttribute('data-edit-toggle'));
-                if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
-            });
-        });
-    </script>
+    @* Edit-row toggle is handled by client/lib/admin-edit-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6 no-inline-script rule). *@
 }

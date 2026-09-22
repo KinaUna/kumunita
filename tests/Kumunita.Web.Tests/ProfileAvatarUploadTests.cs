@@ -237,7 +237,6 @@ public class ProfileAvatarUploadTests
         var controller = new ProfileController(
             userInfo,
             new DirectoryService(userInfo, authz),
-            authz,
             media,
             Options.Create(mediaOptions));
 

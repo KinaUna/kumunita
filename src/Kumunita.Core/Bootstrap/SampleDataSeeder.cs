@@ -1,0 +1,1225 @@
+using Kumunita.Core.Announcements;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Events;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Pages;
+using Kumunita.Core.Posts;
+using Kumunita.Core.Tags;
+using Kumunita.Core.UserInfo;
+using Marten;
+using Marten.Services;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
+
+namespace Kumunita.Core.Bootstrap;
+
+/// <summary>
+/// <b>Development-only sample data</b> (a mock neighborhood). Runs on a <b>pristine</b>
+/// database — the same outer <see cref="DbBootstrap.IsPristineAsync"/> gate that
+/// <see cref="FirstBootSeeder"/> runs under — so a fresh
+/// <c>docker compose down -v && docker compose up --build</c> (dev) or a fresh
+/// deployed demo instance (ADR 0056) comes up immediately populated with accounts
+/// (a scoped moderator, a translator, several verified residents), groups,
+/// announcements, community + group posts with replies, published events with RSVPs,
+/// tags, and a resident blog. It is gated on <c>SampleData__Enabled</c> <b>and</b> the
+/// pristine-DB check (see <c>Program.cs</c>, ADR 0056): a real deployment never carries
+/// the flag, so the seeder is unreachable by construction. In the deploy posture (a
+/// <c>Production</c> instance with the flag set) the demo accounts get random
+/// high-entropy passwords handed to the seed admin by e-mail through the durable
+/// outbox, and the admin keeps its <c>SeedAdmin__</c> token lane (no weak credential
+/// is stored on a public instance).
+/// <para>
+/// <b>Idempotent + pristine-gated.</b> Like <see cref="FirstBootSeeder"/>, every step is
+/// a create-if-missing no-op (accounts keyed by e-mail, content keyed by its own ids) and
+/// the pristine outer gate keeps it from touching a warm database. <b>No e-mail</b> is
+/// staged (the seeder is not a user-facing sign-up — there is no <see cref="IMailerStage"/>
+/// dependency, which also sidesteps the Wolverine <c>IMessageContext</c> requirement the
+/// outbox staging needs).
+/// <para>
+/// <b>Session discipline (invariant C3):</b> the EF / <c>identity</c>-side writes (accounts,
+/// roles, passwords) commit per <see cref="UserManager"/> call; every <c>mt</c>-side
+/// document (profiles, groups, content, translations) is stored in a <b>single</b>
+/// <see cref="IDocumentSession"/> and committed once. The component-mandatory flags ride
+/// the <see cref="IUserInfoService.SetCommunityMandatoryAsync"/> write lane (its own
+/// session + audit row) because that is the single sanctioned writer for
+/// <c>Component.Mandatory</c> (ADR 0012).
+/// <para>
+/// <b>Visibility model.</b> The four seeded communities are marked <b>mandatory</b>
+/// (ADR 0012), so <b>every verified resident is a member of every board</b> and the
+/// default community-visible posts (<see cref="Audience.Community"/> = true) are visible
+/// to all of them without per-account grant rows. A content item's audience therefore only
+/// needs the flat <c>Community = true</c> shape — no per-user grants.
+/// </summary>
+public static class SampleDataSeeder
+{
+    // ── Demo credentials (Development-only; printed in the log on first boot so a
+    //    developer can pick one up). All meet the app's password policy (Program.cs:
+    //    RequiredLength = 8, RequireNonAlphanumeric = false). ────────────────────────
+    public const string AdminEmail = "admin@examplium.com";
+    public const string AdminPassword = "Admin123!";
+    public const string ModeratorEmail = "moderator@examplium.com";
+    public const string ModeratorPassword = "Mod1234!";
+    public const string TranslatorEmail = "translator@examplium.com";
+    public const string TranslatorPassword = "Trans123!";
+    public const string ResidentPassword = "Resident123!";
+
+    private static readonly IReadOnlySet<string> GlobalAdminRoles =
+        new HashSet<string> { Roles.GlobalAdmin };
+
+    private static string Id() => Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// Store the de / fr / da <see cref="Kumunita.Core.Events.EventTranslation"/> rows for
+    /// one sample event from the <see cref="EventTranslationBaselines"/> registry, if that
+    /// event's English title is one of the sample events (all four are; an event added
+    /// without baselines is simply skipped). Shared by <see cref="SeedAsync"/> (a fresh
+    /// instance) so both it and <see cref="BackfillEventTranslationsAsync"/> agree on the
+    /// exact de / fr / da text (the ADR 0060 D1 "one registry, two lanes" shape).
+    /// </summary>
+    private static void StoreEventTranslations(
+        IDocumentSession session, string eventId, string englishTitle,
+        string authorId, DateTimeOffset created)
+    {
+        if (!EventTranslationBaselines.TryGetValue(englishTitle, out var baselines))
+            return;
+        foreach (var baseline in baselines)
+        {
+            session.Store(new EventTranslation
+            {
+                Id = Id(),
+                EventId = eventId,
+                LanguageCode = baseline.Code,
+                Title = baseline.Title,
+                Body = baseline.Body,
+                AuthorId = authorId,
+                Created = created,
+            });
+        }
+    }
+
+    /// <summary>
+    /// The (language → title / body) baseline for one sample event — the code-owned
+    /// de / fr / da text the sample neighborhood ships as
+    /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0059), seeded by
+    /// <see cref="SeedAsync"/> and re-applied, create-if-missing, by
+    /// <see cref="BackfillEventTranslationsAsync"/> (ADR 0060).
+    /// </summary>
+    public readonly record struct EventTranslationBaseline(string Code, string? Title, string Body);
+
+    /// <summary>
+    /// The code-owned de / fr / da translation baselines for the sample events, keyed
+    /// by the event's **English title** (the seeder's stable, human-readable key —
+    /// within the sample, events are identified by their content, not by id).
+    /// <see cref="SeedAsync"/> and <see cref="BackfillEventTranslationsAsync"/> read the
+    /// **same** set, so a fresh instance and a backfilled one carry identical de / fr / da
+    /// rows (the ADR 0042 D1 / ADR 0047 D2 "one registry, two lanes" shape — ADR 0060 D1).
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<EventTranslationBaseline>> EventTranslationBaselines { get; }
+        = new Dictionary<string, IReadOnlyList<EventTranslationBaseline>>
+    {
+        ["Community Cleanup Day"] =
+        [
+            new("de", "Gemeinschaftlicher Aufräumtag", "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum."),
+            new("fr", "Journée de nettoyage communautaire", "Gants et sacs fournis. Rendez-vous à la porte à **09:30**, terminé pour **12:00**.\n\nCafé et pâtisseries ensuite dans la salle communautaire."),
+            new("da", "Fælles ryddedag", "Handsker og poser leveres. Møde ved porten **09:30**, færdig kl. **12:00**.\n\nBagefter kaffe og kage i fælleslokalet."),
+        ],
+        ["Potluck in the Green"] =
+        [
+            new("de", "Potluck auf dem Grün", "Ein Gericht pro Person, kommt ab **14:00**. Bringt einen Stuhl mit, wenn ihr einen habt."),
+            new("fr", "Repas partagé sur la pelouse", "Un plat chacun, arrivez à partir de **14:00**. Apportez une chaise si vous en avez."),
+            new("da", "Fællesspisning på græsset", "En ret hver, ankom fra **14:00**. Tag en stol med, hvis du har en."),
+        ],
+        ["Tool Library Launch"] =
+        [
+            new("de", "Eröffnung der Werkzeugbibliothek", "Bohrer, Leitern, Hochdruckreiniger — leihen statt kaufen. Treffen im Gemeinschaftsraum, um das Regal aufzubauen."),
+            new("fr", "Lancement de la bibliothèque d'outils", "Perceuses, échelles, nettoyeurs haute pression — empruntez au lieu d'acheter. Rendez-vous dans la salle communautaire pour installer l'étagère."),
+            new("da", "Åbning af værktøjbiblioteket", "Bor, stiger, trykrenser — lån i stedet for at købe. Møde i fælleslokalet for at sætte hylden op."),
+        ],
+        ["Neighborhood Walk"] =
+        [
+            new("de", "Nachbarschaftsspaziergang", "Eine gemächliche Runde durch den Kiez, danach Kaffee. Kinderwagen willkommen — die Strecke ist flach."),
+            new("fr", "Bal de quartier", "Une boucle tranquille du quartier, café à la fin. Poussettes bienvenues — c'est plat tout du long."),
+            new("da", "Naboregang", "En rolig tur rundt om blokken, kaffe bagefter. Børnevogne er velkomne — det er fladt hele vejen."),
+        ],
+    };
+
+    /// <summary>
+    /// Runs the sample-data steps. Called once by <c>Program.cs</c> on a pristine DB,
+    /// only when <c>SampleData__Enabled</c> is set (ADR 0056). In the Development
+    /// environment it takes the weak-credential posture; otherwise (a deployed demo
+    /// site) it takes the deploy posture — random passwords + a credentials e-mail to
+    /// the seed admin.
+    /// </summary>
+    public static async Task SeedAsync(
+        AppDbContext identity,
+        IDocumentStore mt,
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IUserInfoService userInfo,
+        IMailerStage? mailer = null,
+        string? adminEmail = null,
+        ILogger logger = default!,
+        CancellationToken ct = default)
+    {
+        // Two postures, one seeder (ADR 0056):
+        //  · Development (mailer == null) — the documented weak demo credentials
+        //    (README table), printed to the log; the seed admin also gets a weak demo
+        //    password on top of its setup-token lane.
+        //  · Deploy (mailer != null) — the seed admin stays on its <c>SeedAdmin__</c>
+        //    setup-token lane (no weak password), the other demo accounts get random
+        //    high-entropy passwords, and a single credentials summary is staged to the
+        //    seed admin's e-mail through the durable outbox (below) — no weak
+        //    credential is stored on a public instance.
+        bool deployPosture = mailer is not null;
+        string adminAccountEmail = (deployPosture && adminEmail is not null) ? adminEmail : AdminEmail;
+        string? adminPw      = deployPosture ? null : AdminPassword;
+        string? moderatorPw  = deployPosture ? RandomPassword() : ModeratorPassword;
+        string? translatorPw = deployPosture ? RandomPassword() : TranslatorPassword;
+        string? annaPw       = deployPosture ? RandomPassword() : ResidentPassword;
+        string? benPw        = deployPosture ? RandomPassword() : ResidentPassword;
+        string? carlaPw      = deployPosture ? RandomPassword() : ResidentPassword;
+        string? davidPw      = deployPosture ? RandomPassword() : ResidentPassword;
+
+        logger.LogInformation(
+            deployPosture
+                ? "Sample data: seeding the mock neighborhood (deploy posture, pristine DB)."
+                : "Development sample data: seeding the mock neighborhood (Development-only, pristine DB).");
+
+        // ── 1. Accounts ────────────────────────────────────────────────────────────────
+        // The seeded admin (FirstBootSeeder) already exists with a setup token but no
+        // password — in Development EnsureUserAsync adds the demo password; in the deploy
+        // posture a null password is a no-op, so the account keeps its token lane (no weak
+        // credential). The other demo accounts are created fresh. All are verified
+        // residents (Member standing is implicit).
+        var admin   = await EnsureUserAsync(userManager, roleManager, mt,
+            adminAccountEmail, adminPw, "Alex Admin",
+            elevatedRole: Roles.GlobalAdmin, logger: logger, ct: ct);
+
+        var maria   = await EnsureUserAsync(userManager, roleManager, mt,
+            ModeratorEmail, moderatorPw, "Maria Moderator",
+            elevatedRole: Roles.Moderator, logger: logger, ct: ct);
+
+        var sophie    = await EnsureUserAsync(userManager, roleManager, mt,
+            TranslatorEmail, translatorPw, "Sophie Translate",
+            elevatedRole: Roles.Translator, logger: logger, ct: ct);
+
+        var anna    = await EnsureUserAsync(userManager, roleManager, mt,
+            "anna@examplium.com", annaPw, "Anna Kowalska",
+            contactVisibility: true, timeZone: "Europe/Warsaw", logger: logger, ct: ct);
+
+        var ben     = await EnsureUserAsync(userManager, roleManager, mt,
+            "ben@examplium.com", benPw, "Ben Nowak", logger: logger, ct: ct);
+
+        var carla   = await EnsureUserAsync(userManager, roleManager, mt,
+            "carla@examplium.com", carlaPw, "Carla Kubiak",
+            contactVisibility: true, logger: logger, ct: ct);
+
+        var david   = await EnsureUserAsync(userManager, roleManager, mt,
+            "david@examplium.com", davidPw, "David Lis",
+            timeZone: "Europe/Prague", logger: logger, ct: ct);
+
+        // ── 2. Components are mandatory (ADR 0012) — every verified resident is a member
+        //    of every board, so the flat `Community = true` posts below are visible to all.
+        //    Rides the sanctioned write lane (own session + audit row). ───────────────
+        foreach (var componentId in new[] { "safety", "maintenance", "social", "governance" })
+        {
+            await userInfo.SetCommunityMandatoryAsync(componentId, true, admin.Id, GlobalAdminRoles);
+        }
+
+        // Maria's component standing (ADR 0003) — the `Moderator` EF role is already on her
+        // account (above); the assignment rows are what mint her `moderator:{id}` claims at
+        // sign-in (IdentityService.GetBySubjectAsync). Stored directly (bootstrap writer,
+        // the FirstBootSeeder posture) in the single content session below.
+
+        // ── 3. All `mt`-side sample content — one session, one commit (invariant C3). ──
+        var now = DateTimeOffset.UtcNow;
+        await using var session = mt.OpenSession(new SessionOptions());
+
+        // Groups (a private family group + a public street group) + memberships.
+        var family = new Group
+        {
+            Id = Id(), Name = "Kowalski Family",
+            Description = "Anna and Ben's household — a private organizing group (ADR 0010).",
+            IsPrivate = true, OwnerId = anna.Id, Created = now.AddDays(-40)
+        };
+        var green = new Group
+        {
+            Id = Id(), Name = "Street Green",
+            Description = "Neighbors working on the shared green by the playground.",
+            IsPrivate = false, OwnerId = carla.Id, Created = now.AddDays(-35)
+        };
+        session.Store(family);
+        session.Store(green);
+        session.Store(new GroupMembership { Id = Id(), GroupId = family.Id, UserId = anna.Id, AddedBy = anna.Id, At = now.AddDays(-40) });
+        session.Store(new GroupMembership { Id = Id(), GroupId = family.Id, UserId = ben.Id, AddedBy = anna.Id, At = now.AddDays(-40) });
+        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = carla.Id, AddedBy = carla.Id, At = now.AddDays(-35) });
+        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = anna.Id, AddedBy = carla.Id, At = now.AddDays(-34) });
+        session.Store(new GroupMembership { Id = Id(), GroupId = green.Id, UserId = david.Id, AddedBy = carla.Id, At = now.AddDays(-33) });
+
+        // Maria's moderator scope (safety + social) — what her `moderator:{id}` claims are
+        // minted from at sign-in (she holds the `Moderator` EF role).
+        session.Store(new ModeratorAssignment { Id = Id(), UserId = maria.Id, ComponentId = "safety", GrantedBy = admin.Id, At = now.AddDays(-30) });
+        session.Store(new ModeratorAssignment { Id = Id(), UserId = maria.Id, ComponentId = "social", GrantedBy = admin.Id, At = now.AddDays(-30) });
+
+        // ── Tags (+ a couple of translations) — labels, never gates (C-TG·1). ───────────
+        var tagCleanup  = new Tag { Id = Id(), Slug = "cleanup", Name = "Cleanup", LanguageCode = "en", CreatedBy = anna.Id, Created = now.AddDays(-30) };
+        var tagNotice   = new Tag { Id = Id(), Slug = "notice", Name = "Notice", LanguageCode = "en", CreatedBy = admin.Id, Created = now.AddDays(-30) };
+        var tagRecipe   = new Tag { Id = Id(), Slug = "recipe", Name = "Recipe", LanguageCode = "en", CreatedBy = carla.Id, Created = now.AddDays(-20) };
+        session.Store(tagCleanup);
+        session.Store(tagNotice);
+        session.Store(tagRecipe);
+        session.Store(new TagTranslation { Id = Id(), TagId = tagCleanup.Id, LanguageCode = "de", Name = "Säuberung", AuthorId = admin.Id, Created = now.AddDays(-28) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRecipe.Id, LanguageCode = "fr", Name = "Recette", AuthorId = admin.Id, Created = now.AddDays(-18) });
+
+        // ── Announcements (Public pinned / Community flat / Community targeted) ─────────
+        var welcome = new Announcement
+        {
+            Id = Id(), AuthorId = admin.Id,
+            Title = "Welcome to the neighborhood board",
+            Body = "This is a demo instance of **Kumunita**, a self-hosted platform for one\n\nneighborhood. Everything you see here is sample data — free to edit, hide, or delete while you explore.",
+            Scope = AnnouncementScope.Public, CommunityId = null, Pinned = true,
+            LanguageCode = "en", Created = now.AddDays(-14)
+        };
+        var volunteers = new Announcement
+        {
+            Id = Id(), AuthorId = maria.Id,
+            Title = "Volunteers needed for the Saturday cleanup",
+            Body = "We're clearing the back lane on **Saturday**. Bring gloves; we supply the bags.",
+            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
+            LanguageCode = "en", Created = now.AddDays(-3)
+        };
+        var alarm = new Announcement
+        {
+            Id = Id(), AuthorId = admin.Id,
+            Title = "Fire-alarm test this week",
+            Body = "Expect the building alarm to sound on **Thursday 09:00–09:30**. It is a test — please do not use the fire stairs unless they are actually in use.",
+            Scope = AnnouncementScope.Community, CommunityId = "safety", Pinned = false,
+            LanguageCode = "en", Created = now.AddDays(-1)
+        };
+        // A leading pinned, admin-authored test-platform notice (the most visible
+        // thing on a demo instance — it tells visitors this is not real and to keep
+        // private data off it). Pinned like `welcome`, Public scope (everyone), newest
+        // so it sorts to the top of the pinned set.
+        var testPlatform = new Announcement
+        {
+            Id = Id(), AuthorId = admin.Id,
+            Title = "Test Platform",
+            Body = "This is a test platform - not intended for real use.\n\nServices may stop working at any time, data may be deleted at any time, and changes may happen at any time.\n\nThis test platform is currently open for new users to sign-up, so anyone can try it out, so don't share any real or private information here.",
+            Scope = AnnouncementScope.Public, CommunityId = null, Pinned = true,
+            LanguageCode = "en", Created = now
+        };
+        session.Store(welcome);
+        session.Store(testPlatform);
+        session.Store(volunteers);
+        session.Store(alarm);
+        // Translation lane demos (ADR 0029 — a `GlobalAdmin`/`Translator` standing).
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = welcome.Id, LanguageCode = "de",
+            Title = "Willkommen im Nachbarschaftsbrett",
+            Body = "Dies ist eine Demo-Instanz von **Kumunita**. Alle Inhalte hier sind Beispieldaten — frei zum Bearbeiten, Verbergen oder Löschen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-13)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = alarm.Id, LanguageCode = "fr",
+            Title = "Essai des alarmes incendie cette semaine",
+            Body = "Le système d'alarme doit retentir **jeudi de 09:00 à 09:30**. C'est un essai — n'utilisez les escaliers de secours que s'ils sont réellement en usage.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        // ── Community posts (+ replies + a tag + a translation) ─────────────────────────
+        var communityAudience = () => new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { Community = true };
+
+        var postRecycling = new Post
+        {
+            Id = Id(), ComponentId = "safety", AuthorId = anna.Id,
+            Title = "New recycling schedule from next month",
+            Body = "The city is moving glass to **Tuesdays** and paper to **Fridays** starting the 1st.\n\nDoes anyone have the new leaflet? I can print copies for the lobby.",
+            Audience = communityAudience(),
+            Created = now.AddDays(-5), Modified = now.AddDays(-4),
+            LanguageCode = "en", TagIds = [tagNotice.Id]
+        };
+        var postPotluck = new Post
+        {
+            Id = Id(), ComponentId = "social", AuthorId = carla.Id,
+            Title = "Potluck in the green this weekend?",
+            Body = "Anyone up for a simple potluck under the tree on **Sunday**? No pressure — one dish each, drinks on the house (mine).",
+            Audience = communityAudience(),
+            Created = now.AddDays(-2), LanguageCode = "en", TagIds = [tagRecipe.Id]
+        };
+        var postMinutes = new Post
+        {
+            Id = Id(), ComponentId = "governance", AuthorId = david.Id,
+            Title = "Monthly meeting minutes (draft for comment)",
+            Body = "Summary of last week's building meeting:\n\n- Approved the garden-bed plan\n- Deferred the fence repaint to next season\n- Collected 3 € for the shared toolbox\n\nFlag anything you disagree with before it is finalized.",
+            Audience = communityAudience(),
+            Created = now.AddDays(-1), LanguageCode = "en", TagIds = [tagNotice.Id]
+        };
+        session.Store(postRecycling);
+        session.Store(postPotluck);
+        session.Store(postMinutes);
+
+        var reply1 = new PostReply
+        {
+            Id = Id(), PostId = postRecycling.Id, AuthorId = ben.Id,
+            Body = "I have the leaflet — it's on the notice board, page 2. Glass *and* the bottle bank both moved.",
+            Created = now.AddDays(-4), LanguageCode = "en"
+        };
+        var reply2 = new PostReply
+        {
+            Id = Id(), PostId = postRecycling.Id, AuthorId = anna.Id,
+            Body = "Perfect, thanks Ben — I'll grab it and print the copies today.",
+            Created = now.AddDays(-4).AddHours(1), LanguageCode = "en"
+        };
+        var reply3 = new PostReply
+        {
+            Id = Id(), PostId = postPotluck.Id, AuthorId = david.Id,
+            Body = "In! I'll bring a big salad. What about 14:00?",
+            Created = now.AddDays(-1), LanguageCode = "en"
+        };
+        session.Store(reply1);
+        session.Store(reply2);
+        session.Store(reply3);
+
+        // A post + reply translation (ADR 0022 — user-added, not machine-translated).
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postRecycling.Id, LanguageCode = "de",
+            Title = "Neue Recyclingsch abende ab nächstem Monat",
+            Body = "Die Stadt verschiebt Glas auf **Dienstag** und Papier auf **Freitag**, ab dem 1.\n\nHat jemand das neue Faltblatt? Ich drucke gerne Kopien für die Lobby.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply1.Id, LanguageCode = "de",
+            Body = "Ich habe das Faltblatt — es ist am Schwarzen Brett, Seite 2. Glas *und* die Flaschensammlung wurden beide verlegt.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+
+        // ── A group post (the GP lane — GroupId set, ComponentId empty, empty audience) ─
+        var groupPost = new Post
+        {
+            Id = Id(), ComponentId = string.Empty, GroupId = green.Id, AuthorId = carla.Id,
+            Title = "Green-plot plan for spring",
+            Body = "Rough plan for the shared beds:\n\n- North bed: herbs (basil, parsley)\n- South bed: tomatoes\n\nVote in the thread and I'll finalize the seed list.",
+            Audience = new Audience(),   // group-lane post: owner ∪ member, no audience grants
+            Created = now.AddDays(-2), LanguageCode = "en"
+        };
+        session.Store(groupPost);
+        var groupReply = new PostReply
+        {
+            Id = Id(), PostId = groupPost.Id, AuthorId = anna.Id,
+            Body = "Herbs in the north bed sounds right — it's shadier. I can bring basil starts.",
+            Created = now.AddDays(-2).AddHours(3), LanguageCode = "en"
+        };
+        session.Store(groupReply);
+
+        // A group name translation (ADR 0026 — a `GlobalAdmin`/`Translator` standing).
+        session.Store(new GroupTranslation
+        {
+            Id = Id(), GroupId = green.Id, LanguageCode = "de",
+            Name = "Straßengrün", Description = "Nachbarn, die das gemeinsame Grün neben dem Spielplatz pflegen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-30)
+        });
+
+        // ── Published events (+ RSVPs) — IsDraft=false so they appear in the feed ───────
+        var eventAudience = () => new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true };
+
+        var cleanup = new Event
+        {
+            Id = Id(), Title = "Community Cleanup Day",
+            Body = "Gloves and bags provided. Meet at the gate **09:30**, done by **12:00**.\n\nCoffee and pastries afterwards at the community room.",
+            ComponentId = "safety", AuthorId = maria.Id,
+            Start = now.AddDays(5), End = now.AddDays(5).AddHours(3),
+            Location = "Back lane, near the gate", Capacity = 20,
+            Audience = eventAudience(),
+            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
+            LanguageCode = "en", TagIds = [tagCleanup.Id],
+            Created = now.AddDays(-2), Modified = now
+        };
+        var potluck = new Event
+        {
+            Id = Id(), Title = "Potluck in the Green",
+            Body = "One dish each, arrive from **14:00**. Bring a chair if you have one.",
+            ComponentId = "social", AuthorId = carla.Id,
+            Start = now.AddDays(12), End = now.AddDays(12).AddHours(3),
+            Location = "The shared green, under the tree", Capacity = null,
+            Audience = eventAudience(),
+            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
+            LanguageCode = "en", Created = now.AddDays(-1)
+        };
+        session.Store(cleanup);
+        session.Store(potluck);
+
+        // User-added event translations (ADR 0059 — author ∪ GlobalAdmin ∪ Translator
+        // standing, not machine-translated): the de / fr / da rows for both seeded
+        // events, so the ADR 0027 chip-swap + ADR 0051 feed display have something to
+        // exercise on the Detail page. The text comes from the one baseline registry
+        // (ADR 0060 D1) that the warm-boot BackfillEventTranslationsAsync also reads,
+        // so a fresh and a backfilled instance agree on the de / fr / da rows.
+        StoreEventTranslations(session, cleanup.Id, cleanup.Title, sophie.Id, now.AddDays(-3));
+        StoreEventTranslations(session, potluck.Id, potluck.Title, sophie.Id, now.AddDays(-3));
+
+        // RSVPs — one row per (event, resident); a mix of Going / Maybe / No.
+        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddDays(-1) });
+        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = ben.Id, Status = RsvpStatus.Going, At = now.AddDays(-1).AddHours(2) });
+        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = carla.Id, Status = RsvpStatus.Maybe, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = david.Id, Status = RsvpStatus.No, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = carla.Id, Status = RsvpStatus.Going, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddHours(1) });
+        session.Store(new EventRsvp { Id = Id(), EventId = potluck.Id, UserId = ben.Id, Status = RsvpStatus.Maybe, At = now.AddHours(2) });
+
+        // ── A resident blog (PageKind.User) — the /blog feed surface (ADR 0040) ─────────
+        // Root page = Kind=User, ParentId=null, AuthorId=anna (GetBlogRootAsync shape).
+        var blogRoot = new Page
+        {
+            Id = Id(), ParentId = null, Slug = "my-corner",
+            Title = "Anna's corner of the street",
+            Body = "A little space for notes about the block — the kind of thing you'd otherwise post on the group chat and then no one finds again.",
+            Audience = null,           // public (world-readable) — a blog page may be public
+            AuthorId = anna.Id, Kind = PageKind.User,
+            ComponentId = null, LanguageCode = "en",
+            Created = now.AddDays(-6), Modified = now.AddDays(-6),
+            IsDraft = false, IsDeleted = false
+        };
+        var blogPost = new Page
+        {
+            Id = Id(), ParentId = blogRoot.Id, Slug = "the-bench-by-the-gate",
+            Title = "The bench by the gate",
+            Body = "There's a bench most of us have stopped noticing. It gets the sun first in the morning and the pigeons claim it by nine.\n\nI keep meaning to wipe it down for the people who use it to read. Small thing, but it's ours.",
+            Audience = null,
+            AuthorId = anna.Id, Kind = PageKind.User,
+            ComponentId = null, LanguageCode = "en", TagIds = [tagRecipe.Id],
+            Created = now.AddDays(-3), Modified = now.AddDays(-3),
+            IsDraft = false, IsDeleted = false
+        };
+        session.Store(blogRoot);
+        session.Store(blogPost);
+        // A page translation (ADR 0039 lane — a `GlobalAdmin`/`Translator` standing).
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogRoot.Id, LanguageCode = "de",
+            Title = "Annas Ecke der Straße",
+            Body = "Ein kleiner Raum für Notizen über den Block — genau die Dinge, die man sonst in den Gruppenchat schreibt und dann niemand wieder findet.",
+            AuthorId = sophie.Id, Created = now.AddDays(-5)
+        });
+
+        // ── Sample-content expansion (doubling the neighborhood) ─────────────────────
+
+        // Enable every catalog language for the demo. Danish ships DISABLED
+        // (FirstBootSeeder seeds it awaiting an admin's enable); the sample wants
+        // the full selector, so flip it on here. Dev-only: this session only ever
+        // runs under the Development ∧ first-boot gate, so a real deployment's
+        // catalog is left to its own admin. Load-then-Store (idempotent shape).
+        var danish = await session.LoadAsync<LanguageCatalog>("da", ct);
+        if (danish is not null && !danish.Enabled)
+        {
+            danish.Enabled = true;
+            session.Store(danish);
+        }
+
+        // Three more tags — each with a full de/fr/da translation matrix so the
+        // now-enabled Danish lane is visibly exercised in the demo.
+        var tagRepair   = new Tag { Id = Id(), Slug = "repair",   Name = "Repair",   LanguageCode = "en", CreatedBy = ben.Id,   Created = now.AddDays(-25) };
+        var tagQuestion = new Tag { Id = Id(), Slug = "question", Name = "Question", LanguageCode = "en", CreatedBy = david.Id, Created = now.AddDays(-25) };
+        var tagGarden   = new Tag { Id = Id(), Slug = "garden",   Name = "Garden",   LanguageCode = "en", CreatedBy = carla.Id, Created = now.AddDays(-25) };
+        session.Store(tagRepair);
+        session.Store(tagQuestion);
+        session.Store(tagGarden);
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "de", Name = "Reparatur", AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "fr", Name = "Réparation", AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRepair.Id,   LanguageCode = "da", Name = "Reparation", AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "de", Name = "Frage",     AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "fr", Name = "Question",  AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagQuestion.Id, LanguageCode = "da", Name = "Spørgsmål", AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "de", Name = "Garten",    AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "fr", Name = "Jardin",    AuthorId = sophie.Id, Created = now.AddDays(-24) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagGarden.Id,   LanguageCode = "da", Name = "Have",      AuthorId = sophie.Id, Created = now.AddDays(-24) });
+
+        // Three more announcements — the first carries a full de/fr/da translation
+        // set so every enabled language shows up in the demo, not just de/fr.
+        var waterDrop = new Announcement
+        {
+            Id = Id(), AuthorId = ben.Id,
+            Title = "Water pressure drop on Friday morning",
+            Body = "The supply will be interrupted **Friday 07:00–11:00** for main-line work. Keep a jug of water on hand.",
+            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
+            LanguageCode = "en", Created = now.AddDays(-2)
+        };
+        var roomHours = new Announcement
+        {
+            Id = Id(), AuthorId = admin.Id,
+            Title = "Community room now open evenings",
+            Body = "From next week the room is open **weekdays 18:00–22:00** for anyone who wants a quiet place to work or read.",
+            Scope = AnnouncementScope.Community, CommunityId = null, Pinned = false,
+            LanguageCode = "en", Created = now.AddDays(-1)
+        };
+        var umbrella = new Announcement
+        {
+            Id = Id(), AuthorId = carla.Id,
+            Title = "Lost & found — a black umbrella",
+            Body = "Someone left a black umbrella by the notice board. It's safe with me — claim it at the green.",
+            Scope = AnnouncementScope.Community, CommunityId = "social", Pinned = false,
+            LanguageCode = "en", Created = now
+        };
+        session.Store(waterDrop);
+        session.Store(roomHours);
+        session.Store(umbrella);
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "de",
+            Title = "Wasserausfall am Freitagmorgen",
+            Body = "Die Wasserversorgung wird **freitags von 07:00 bis 11:00** wegen Arbeiten an der Hauptleitung unterbrochen. Halten Sie eine Flasche Wasser bereit.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "fr",
+            Title = "Baisse de pression le vendredi matin",
+            Body = "La distribution sera interrompue **vendredi de 07:00 à 11:00** pour des travaux sur la conduite principale. Gardez une bouteille d'eau à portée de main.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = waterDrop.Id, LanguageCode = "da",
+            Title = "Vandafspærring fredag morgen",
+            Body = "Vandforsyningen er afbrudt **fredag kl. 07:00–11:00** pga. hovedledningsarbejde. Hold en flaske vand klar.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "de",
+            Title = "Gemeinschaftsraum jetzt auch abends offen",
+            Body = "Ab nächster Woche ist der Raum **werktags von 18:00 bis 22:00** für alle offen, die einen ruhigen Ort zum Arbeiten oder Lesen suchen.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "fr",
+            Title = "La salle communautaire ouverte en soirée",
+            Body = "À partir de la semaine prochaine, la salle est ouverte **en semaine de 18:00 à 22:00** pour quiconque cherche un endroit calme pour travailler ou lire.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "de",
+            Title = "Fundsachen — ein schwarzer Schirm",
+            Body = "Jemand hat einen schwarzen Schirm neben dem Schwarzen Brett liegen gelassen. Er ist bei mir sicher — hol ihn am Grün ab.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "fr",
+            Title = "Objets trouvés — un parapluie noir",
+            Body = "Quelqu'un a laissé un parapluie noir près du panneau d'affichage. Il est en sécurité chez moi — venez le récupérer au jardin.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        // Three more community posts (+ replies) across the boards.
+        var postElectrician = new Post
+        {
+            Id = Id(), ComponentId = "maintenance", AuthorId = ben.Id,
+            Title = "Know a good local electrician?",
+            Body = "Our kitchen fuse keeps tripping. If anyone has used a local electrician this year, I'd be grateful for a recommendation.",
+            Audience = communityAudience(),
+            Created = now.AddDays(-3), LanguageCode = "en", TagIds = [tagRepair.Id, tagQuestion.Id]
+        };
+        var postSeedlings = new Post
+        {
+            Id = Id(), ComponentId = "maintenance", AuthorId = carla.Id,
+            Title = "Free seedlings in the recycling corner",
+            Body = "I've got a tray of tomato and basil seedlings on the shelf by the bins — first come, first served.",
+            Audience = communityAudience(),
+            Created = now.AddDays(-1), LanguageCode = "en", TagIds = [tagGarden.Id]
+        };
+        var postStreetName = new Post
+        {
+            Id = Id(), ComponentId = "governance", AuthorId = david.Id,
+            Title = "Where does the street name come from?",
+            Body = "Half the block calls it one thing, the map says another. Does anyone know the story behind it?",
+            Audience = communityAudience(),
+            Created = now, LanguageCode = "en", TagIds = [tagQuestion.Id]
+        };
+        session.Store(postElectrician);
+        session.Store(postSeedlings);
+        session.Store(postStreetName);
+        session.Store(new PostReply { Id = Id(), PostId = postElectrician.Id, AuthorId = anna.Id, Body = "The one on the corner — he fixed my boiler last spring, fair price.", Created = now.AddDays(-2), LanguageCode = "en" });
+        session.Store(new PostReply { Id = Id(), PostId = postSeedlings.Id, AuthorId = david.Id, Body = "Just took two! Thanks Carla.", Created = now.AddHours(-6), LanguageCode = "en" });
+        session.Store(new PostReply { Id = Id(), PostId = postStreetName.Id, AuthorId = carla.Id, Body = "It's named after the old mill at the river bend, I'm fairly sure.", Created = now.AddHours(-3), LanguageCode = "en" });
+        session.Store(new PostReply { Id = Id(), PostId = postStreetName.Id, AuthorId = anna.Id, Body = "That matches the plaque at the gate — nice.", Created = now.AddHours(-1), LanguageCode = "en" });
+
+        // A post + reply translation so the extra posts carry a non-English view too.
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postElectrician.Id, LanguageCode = "de",
+            Title = "Kennt ihr einen guten lokalen Elektriker?",
+            Body = "Unsere Küchen-Sicherung springt ständig raus. Wenn jemand dieses Jahr einen Elektriker in der Nähe genutzt hat, wäre ich für eine Empfehlung dankbar.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+
+        // A second group post (the GP lane) under Street Green + a reply.
+        var groupPostCompost = new Post
+        {
+            Id = Id(), ComponentId = string.Empty, GroupId = green.Id, AuthorId = david.Id,
+            Title = "Compost bin — who's on this week?",
+            Body = "The bin is ready to swap. Can anyone take a turn turning it this week? It's due on Monday.",
+            Audience = new Audience(),   // group-lane post: owner ∪ member, no audience grants
+            Created = now.AddDays(-1), LanguageCode = "en"
+        };
+        session.Store(groupPostCompost);
+        session.Store(new PostReply { Id = Id(), PostId = groupPostCompost.Id, AuthorId = carla.Id, Body = "I'll do the turn on Monday morning.", Created = now, LanguageCode = "en" });
+
+        // Two more published events (+ RSVPs) so the calendar has a fuller arc.
+        var toolLibrary = new Event
+        {
+            Id = Id(), Title = "Tool Library Launch",
+            Body = "Drills, ladders, pressure washers — borrow instead of buying. Meet in the community room to set up the shelf.",
+            ComponentId = "maintenance", AuthorId = maria.Id,
+            Start = now.AddDays(9), End = now.AddDays(9).AddHours(2),
+            Location = "Community room", Capacity = 15,
+            Audience = eventAudience(),
+            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
+            LanguageCode = "en", TagIds = [tagRepair.Id],
+            Created = now.AddDays(-1), Modified = now
+        };
+        var walk = new Event
+        {
+            Id = Id(), Title = "Neighborhood Walk",
+            Body = "A slow loop of the block, coffee at the end. Strollers welcome — it's flat the whole way.",
+            ComponentId = "social", AuthorId = carla.Id,
+            Start = now.AddDays(18), End = now.AddDays(18).AddHours(1),
+            Location = "Meeting at the green", Capacity = null,
+            Audience = eventAudience(),
+            ReminderEnabled = true, IsDraft = false, IsDeleted = false,
+            LanguageCode = "en", Created = now
+        };
+        session.Store(toolLibrary);
+        session.Store(walk);
+        // The two later events carry the same de / fr / da baseline set (ADR 0059 /
+        // ADR 0060 D1) so every seeded event exercises the translation lane.
+        StoreEventTranslations(session, toolLibrary.Id, toolLibrary.Title, sophie.Id, now);
+        StoreEventTranslations(session, walk.Id, walk.Title, sophie.Id, now);
+        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = ben.Id,   Status = RsvpStatus.Going, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = anna.Id,  Status = RsvpStatus.Going, At = now.AddHours(1) });
+        session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = david.Id, Status = RsvpStatus.Maybe, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = anna.Id,  Status = RsvpStatus.Going, At = now });
+        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = carla.Id, Status = RsvpStatus.Going, At = now.AddHours(1) });
+        session.Store(new EventRsvp { Id = Id(), EventId = walk.Id, UserId = maria.Id, Status = RsvpStatus.Maybe, At = now.AddHours(2) });
+
+        // A second resident blog post (+ a German translation) under Anna's root.
+        var blogPost2 = new Page
+        {
+            Id = Id(), ParentId = blogRoot.Id, Slug = "the-corner-shops-bell",
+            Title = "The corner shop's old bell",
+            Body = "The little bell above the old corner shop still rings when someone opens the door. No one runs it now, but the sound has stayed — a small reminder the street used to be busier.",
+            Audience = null,
+            AuthorId = anna.Id, Kind = PageKind.User,
+            ComponentId = null, LanguageCode = "en",
+            Created = now.AddDays(-1), Modified = now.AddDays(-1),
+            IsDraft = false, IsDeleted = false
+        };
+        session.Store(blogPost2);
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogPost2.Id, LanguageCode = "de",
+            Title = "Die alte Glocke des Eckladens",
+            Body = "Die kleine Glocke über dem alten Eckladen klingelt immer noch, wenn jemand die Tür öffnet. Niemand führt den Laden mehr, aber der Klang ist geblieben — eine kleine Erinnerung daran, dass die Straße einmal geschäftiger war.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        // ── Danish coverage pass (a GlobalAdmin/Translator standing — the user-added
+        //    translation lanes, ADR 0022 posts/replies, 0026 group, 0029 announcements,
+        //    0039 pages, and the tags lane, mirroring the de/fr rows above). The
+        //    expansion items already carry `da`; the rest of the neighborhood now does
+        //    too, so the demo is translatable into all four enabled languages
+        //    (en/de/fr/da) instead of falling back to English on nearly every `da` view.
+        // ── Communities (ADR 0026 — GlobalAdmin/Translator standing) ─────────────────
+        // Four default components — de/fr/da matrix so the sidebar reads natively.
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "de",
+            Name = "Sicherheit", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "fr",
+            Name = "Sécurité", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "safety", LanguageCode = "da",
+            Name = "Sikkerhed", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "de",
+            Name = "Wartung", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "fr",
+            Name = "Entretien", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "maintenance", LanguageCode = "da",
+            Name = "Vedligeholdelse", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "de",
+            Name = "Soziales", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "fr",
+            Name = "Social", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "social", LanguageCode = "da",
+            Name = "Socialt", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "de",
+            Name = "Gemeinschaftsführung", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "fr",
+            Name = "Gouvernance", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        session.Store(new CommunityTranslation
+        {
+            Id = Id(), ComponentId = "governance", LanguageCode = "da",
+            Name = "Forvaltning", AuthorId = sophie.Id, Created = now.AddDays(-38)
+        });
+        // ── Tags ─────────────────────────────────────────────────────────────────────
+        session.Store(new TagTranslation { Id = Id(), TagId = tagCleanup.Id, LanguageCode = "da", Name = "Rengøring",  AuthorId = sophie.Id, Created = now.AddDays(-27) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagNotice.Id,  LanguageCode = "da", Name = "Meddelelse", AuthorId = sophie.Id, Created = now.AddDays(-27) });
+        session.Store(new TagTranslation { Id = Id(), TagId = tagRecipe.Id,  LanguageCode = "da", Name = "Opskrift",   AuthorId = sophie.Id, Created = now.AddDays(-17) });
+
+        // ── Announcements ────────────────────────────────────────────────────────────
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = welcome.Id, LanguageCode = "da",
+            Title = "Velkommen til naboskabet",
+            Body = "Dette er en demo-instans af **Kumunita**, en selvhostet platform til ét nabolag.\n\nAlt, hvad du ser her, er eksempeldata — fri til at redigere, skjule eller slette, mens du udforsker.",
+            AuthorId = sophie.Id, Created = now.AddDays(-13)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = volunteers.Id, LanguageCode = "da",
+            Title = "Frivillige søges til oprydning lørdag",
+            Body = "Vi rydder bagvejen på **lørdag**. Tag handsker med — vi stiller med poser.",
+            AuthorId = sophie.Id, Created = now.AddDays(-3)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = alarm.Id, LanguageCode = "da",
+            Title = "Test af brandalarmer denne uge",
+            Body = "Bygningens alarm vil lyde **torsdag 09:00–09:30**. Det er en test — brug venligst ikke evakueringsstigerne, medmindre de faktisk er i brug.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = testPlatform.Id, LanguageCode = "da",
+            Title = "Testplatform",
+            Body = "Dette er en testplatform — ikke beregnet til reel brug.\n\nTjenester kan holde op med at virke når som helst, data kan slettes når som helst, og der kan ske ændringer når som helst.\n\nDenne testplatform er i øjeblikket åben for, at nye brugere kan tilmelde sig, så alle kan prøve den — del derfor ikke nogen reel eller privat information her.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = roomHours.Id, LanguageCode = "da",
+            Title = "Fælleslokalet åbent om aftenen",
+            Body = "Fra næste uge er lokalet åbent **ukedage 18:00–22:00** for alle, der vil have et stille sted at arbejde eller læse.",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new AnnouncementTranslation
+        {
+            Id = Id(), AnnouncementId = umbrella.Id, LanguageCode = "da",
+            Title = "Fundne genstande — en sort paraply",
+            Body = "Noen har efterladt en sort paraply ved opslagstavlen. Den er i god behold hos mig — hent den på den fælles grønflade.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        // ── Community posts + replies ────────────────────────────────────────────────
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postRecycling.Id, LanguageCode = "da",
+            Title = "Nyt genbrugsprogram fra næste måned",
+            Body = "Byen flytter glas til **tirsdage** og papir til **fredage**, fra den 1.\n\nHar nogen det nye foldeseddel? Jeg kan trykke eksemplarer til entréen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postPotluck.Id, LanguageCode = "da",
+            Title = "Fællesmåltid på grønfladen i weekenden?",
+            Body = "Har nogen lyst til en simpel fællesmad under træet **søndag**? Ingen pres — en ret hver, drikkevarer på huset (mine).",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postMinutes.Id, LanguageCode = "da",
+            Title = "Notater fra månedsmøde (udkast til kommentar)",
+            Body = "Opsummering af bygningsmødet sidste uge:\n\n- Godkendte plan for havebedene\n- Udsatte ommalet af hegn til næste sæson\n- Indsamlet 3 € til fælleværktøjskassen\n\nMeld dig, hvis du er uenig i noget, inden det afsluttes.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postElectrician.Id, LanguageCode = "da",
+            Title = "Kender I en god lokal elektriker?",
+            Body = "Vores køkkensikring slår fra konstant. Hvis nogen har brugt en lokal elektriker i år, vil jeg sætte pris på en anbefaling.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postSeedlings.Id, LanguageCode = "da",
+            Title = "Gratis frøplanter i genbrugshjørnet",
+            Body = "Jeg har en bakke med tomat- og basilikumfrøplanter på hylden ved sønderboksene — de første får, de første tager.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = postStreetName.Id, LanguageCode = "da",
+            Title = "Hvor kommer gadenavnet fra?",
+            Body = "Halvdelen af kvarteret kalder det for ét, kortet siger noget andet. Veder nogen historien bagved det?",
+            AuthorId = sophie.Id, Created = now
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply1.Id, LanguageCode = "da",
+            Body = "Jeg har foldesedlen — den er på opslagstavlen, side 2. Både glas *og* flaskeopsamlingen er flyttet.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply2.Id, LanguageCode = "da",
+            Body = "Perfekt, tak Ben — jeg henter den og trykker eksemplarerne i dag.",
+            AuthorId = sophie.Id, Created = now.AddDays(-4)
+        });
+        session.Store(new ReplyTranslation
+        {
+            Id = Id(), ReplyId = reply3.Id, LanguageCode = "da",
+            Body = "Jeg er med! Jeg tager en stor salat med. Hvad med 14:00?",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+
+        // ── Group posts + group name/description ─────────────────────────────────────
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = groupPost.Id, LanguageCode = "da",
+            Title = "Plan for grønfladen til foråret",
+            Body = "Udkast til de fælles bed:\n\n- Nordbed: urter (basilikum, persille)\n- Syd­bed: tomater\n\nStem i tråden, så afslutter jeg frølisten.",
+            AuthorId = sophie.Id, Created = now.AddDays(-2)
+        });
+        session.Store(new PostTranslation
+        {
+            Id = Id(), PostId = groupPostCompost.Id, LanguageCode = "da",
+            Title = "Kompostkassen — hvem er på denne uge?",
+            Body = "Kassen er klar til at skiftes. Kan nogen tage en tur ved at vende den denne uge? Den forfalder mandag.",
+            AuthorId = sophie.Id, Created = now.AddDays(-1)
+        });
+        session.Store(new GroupTranslation
+        {
+            Id = Id(), GroupId = green.Id, LanguageCode = "da",
+            Name = "Gadegrønt", Description = "Naboer, der arbejder på den fælles grønflade ved legepladsen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-30)
+        });
+        session.Store(new GroupTranslation
+        {
+            Id = Id(), GroupId = family.Id, LanguageCode = "da",
+            Name = "Familien Kowalski", Description = "Anna og Bens husholdning — en privat organiseringsgruppe (ADR 0010).",
+            AuthorId = sophie.Id, Created = now.AddDays(-40)
+        });
+
+        // ── Resident blog ────────────────────────────────────────────────────────────
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogRoot.Id, LanguageCode = "da",
+            Title = "Annas hjørne af gaden",
+            Body = "Et lille sted til noter om kvarteret — den slags, man ellers poster i gruppechat, og som ingen finder igen.",
+            AuthorId = sophie.Id, Created = now.AddDays(-5)
+        });
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogPost.Id, LanguageCode = "da",
+            Title = "Bænken ved porten",
+            Body = "Der er en bænk, som de fleste af os er gået glip af. Den får solen først om morgenen, og duerne har erobret den ved ni.\n\nJeg bliver ved med at skulle pudse den for folk, der bruger den til at læse. Lille ting, men den er vores.",
+            AuthorId = sophie.Id, Created = now.AddDays(-3)
+        });
+        session.Store(new PageTranslation
+        {
+            Id = Id(), PageId = blogPost2.Id, LanguageCode = "da",
+            Title = "Hjørnebutikkens gamle klokke",
+            Body = "Den lille klokke over hjørnebutikken klinger stadig, når nogen åbner døren. Ingen driver butikken længere, men lyden er geblevet — en lille påmindelse om, at gaden engang var mere travl.",
+            AuthorId = sophie.Id, Created = now
+        });
+
+        await session.SaveChangesAsync();
+
+        // Deploy posture (ADR 0056): hand the demo credentials to the instance's admin
+        // through the durable outbox (one OutboxEmail, idempotency-keyed) — the only place
+        // they exist beyond the hashed EF store. No-op in Development (mailer is null).
+        if (deployPosture && mailer is not null)
+        {
+            await using var emailSession = mt.OpenSession(new SessionOptions());
+            await mailer.StageAsync(emailSession,
+                idempotencyKey: $"sampledata:{admin.Id}",
+                recipient: adminAccountEmail,
+                subject: "Kumunita: demo-instance credentials",
+                body: SampleDataCredentialsBody(moderatorPw, translatorPw, annaPw, benPw, carlaPw, davidPw),
+                ct: ct);
+            await emailSession.SaveChangesAsync();
+            logger.LogInformation(
+                "Sample data (deploy): credentials staged to the seed admin's outbox ({Admin}).",
+                adminAccountEmail);
+        }
+
+        if (deployPosture)
+        {
+            logger.LogInformation(
+                "Sample data (deploy posture): complete. Demo credentials were emailed to the " +
+                "seed admin ({Admin}); the admin account keeps its SeedAdmin__ setup-token lane " +
+                "(no weak credential stored).", adminAccountEmail);
+        }
+        else
+        {
+            logger.LogInformation(
+                "Development sample data: complete. Accounts — {Admin} ({AdminPassword}), {Mod} ({ModPassword}), {Trans} ({TransPassword}), " +
+                "anna/ben/carla/david@examplium.com (all {ResPassword}).",
+                AdminEmail, AdminPassword, ModeratorEmail, ModeratorPassword, TranslatorEmail, TranslatorPassword, ResidentPassword);
+        }
+    }
+
+    /// <summary>
+    /// **Warm-boot backfill** of the sample events' de / fr / da
+    /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0060). An instance whose
+    /// first boot predates the sample event translations has the four sample events
+    /// (authored in <c>en</c>) but no de / fr / da rows, so a German / French / Danish-speaking
+    /// resident sees only the English variant on the events feed and detail. This lane closes
+    /// that gap the same way ADR 0047 D2 / ADR 0052 do for the canonical pages and the
+    /// UI-string catalog.
+    /// <para>
+    /// **Create-if-missing only** (the ADR 0042 D1 invariant): an existing
+    /// <c>(EventId, LanguageCode)</c> row is skipped, never refreshed — the Translator's
+    /// in-app edit of a sample event's translation (the ADR 0059 lane) is never clobbered by a
+    /// later deploy. The <c>en</c> authored-in row is the event's own title / body and is never
+    /// read or written here.
+    /// </para>
+    /// <para>
+    /// **Scope guard.** It runs only when <c>SampleData__Enabled</c> is set (the caller's gate,
+    /// ADR 0056) and only touches events whose title is one of the sample events (the
+    /// <see cref="EventTranslationBaselines"/> registry). On a real neighborhood — which never
+    /// carries the flag — this method is unreachable by construction, exactly like
+    /// <see cref="SeedAsync"/>. Idempotent: a second run finds every row it created on the first
+    /// and skips (the ADR 0042 D1 skip path).
+    /// </para>
+    /// </summary>
+    public static async Task BackfillEventTranslationsAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var allEvents = await session.Query<Event>()
+            .Where(e => e.IsDeleted == false)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        foreach (var (englishTitle, baselines) in EventTranslationBaselines)
+        {
+            // Match by the sample event's stable English title (the registry's key) —
+            // within a sample neighborhood the events are identified by their content,
+            // not by id. On a real neighborhood no sample event exists, so this is a
+            // no-op for every key.
+            var eventRow = allEvents.FirstOrDefault(e => e.Title == englishTitle);
+            if (eventRow is null)
+                continue;   // this sample event is absent — nothing to backfill for it.
+
+            foreach (var baseline in baselines)
+            {
+                var existing = await session
+                    .Query<EventTranslation>()
+                    .Where(t => t.EventId == eventRow.Id && t.LanguageCode == baseline.Code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new EventTranslation
+                    {
+                        Id = Id(),
+                        EventId = eventRow.Id,
+                        LanguageCode = baseline.Code,
+                        Title = baseline.Title,
+                        Body = baseline.Body,
+                        AuthorId = string.Empty,   // sample / platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Find-or-create a verified-resident account: the EF/<c>identity</c>-side write
+    /// (account + password + roles) commits per <see cref="UserManager"/> call; the
+    /// <c>mt</c>-side <see cref="Profile"/> is stored in its own session. Idempotent —
+    /// keyed by e-mail — so a warm re-run (the pristine gate normally prevents one) is a
+    /// no-or-refresh.
+    /// <para>
+    /// <paramref name="contactVisibility"/> sets the opt-in contact-block audience
+    /// (any signed-in resident may see the e-mail — the <see cref="Audience.AllResidents"/>
+    /// branch, which needs no component target). <paramref name="timeZone"/> /
+    /// <paramref name="dateFormat"/> are the resident overrides of the platform defaults
+    /// (ADR 0019 / ADR 0020); left null the instance default applies.
+    /// </para>
+    /// </summary>
+    private static async Task<User> EnsureUserAsync(
+        UserManager<User> userManager,
+        RoleManager<IdentityRole> roleManager,
+        IDocumentStore mt,
+        string email,
+        string? password,
+        string displayName,
+        bool contactVisibility = false,
+        string? timeZone = null,
+        string? dateFormat = null,
+        string? elevatedRole = null,
+        ILogger logger = default!,
+        CancellationToken ct = default)
+    {
+        var existing = await userManager.FindByEmailAsync(email);
+        if (existing is null)
+        {
+            // Ensure the elevated role row exists (FirstBootSeeder already creates
+            // GlobalAdmin/Moderator/Translator; be explicit so the seeder is self-contained).
+            if (elevatedRole is not null && await roleManager.FindByNameAsync(elevatedRole) is null)
+                await roleManager.CreateAsync(new IdentityRole(elevatedRole));
+
+            existing = new User { Id = Id(), Email = email, UserName = email };
+            await userManager.CreateAsync(existing);
+            if (!string.IsNullOrEmpty(password))
+            {
+                var pwResult = await userManager.AddPasswordAsync(existing, password);
+                if (!pwResult.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Failed to set the demo password for '{email}': {string.Join(", ", pwResult.Errors.Select(e => e.Description))}");
+            }
+            if (elevatedRole is not null)
+                await userManager.AddToRoleAsync(existing, elevatedRole);
+        }
+        else
+        {
+            // Idempotent: add the password only if the account has none (the seeded
+            // admin is created without a password — the setup-token lane). A null
+            // password (the deploy-posture admin, ADR 0056) is a no-op: the account
+            // keeps its token lane and gets no weak credential.
+            if (string.IsNullOrEmpty(existing.PasswordHash) && !string.IsNullOrEmpty(password))
+            {
+                var pwResult = await userManager.AddPasswordAsync(existing, password);
+                if (!pwResult.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Failed to set the demo password for '{email}': {string.Join(", ", pwResult.Errors.Select(e => e.Description))}");
+            }
+            if (elevatedRole is not null)
+                await userManager.AddToRoleAsync(existing, elevatedRole);
+        }
+
+        // The mt-side Profile — verified resident, self-only visibility default, optional
+        // opt-in contact block + tz/format overrides.
+        await using var session = mt.OpenSession(new SessionOptions());
+        var profile = await session.LoadAsync<Profile>(existing.Id, ct);
+        profile ??= new Profile { SubjectId = existing.Id };
+        profile.DisplayName = displayName;
+        profile.Email = email;
+        profile.Verified = true;
+        if (profile.Visibility is null)
+            profile.Visibility = new Audience();
+        profile.ContactVisibility = contactVisibility
+            ? new Audience(AudienceMode.Any, Array.Empty<AudienceGrant>()) { AllResidents = true }
+            : profile.ContactVisibility;
+        if (timeZone is not null)
+            profile.TimeZone = timeZone;
+        if (dateFormat is not null)
+            profile.DateFormat = dateFormat;
+        session.Store(profile);
+        await session.SaveChangesAsync();
+
+        if (logger is not null)
+            logger.LogDebug("Sample data: ensured account {Email} ({Name}).", email, displayName);
+        return existing;
+    }
+
+    /// <summary>
+    /// A random 32-character high-entropy password for a deploy-posture demo account.
+    /// CSPRNG-backed (<see cref="System.Security.Cryptography.RandomNumberGenerator"/>)
+    /// over the full alphanumeric alphabet, and guaranteed to contain at least one
+    /// uppercase, one lowercase, and one digit — the app's Identity password policy
+    /// requires all three (only the *non-alphanumeric* requirement is relaxed by
+    /// <c>Program.cs</c>; <c>RequireUppercase</c> / <c>RequireLowercase</c> /
+    /// <c>RequireDigit</c> keep their ASP.NET Core defaults). Distinct per account,
+    /// and never derived from, or printed alongside, the seed admin's own credential
+    /// (ADR 0056).
+    /// </summary>
+    private static string RandomPassword()
+    {
+        const int length = 32;
+        const string upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const string lower = "abcdefghijklmnopqrstuvwxyz";
+        const string digit = "0123456789";
+        const string alphabet = upper + lower + digit;
+
+        var chars = new char[length];
+        // Seed one guaranteed member of each required class, fill the rest from the
+        // full alphabet, then shuffle (CSPRNG Fisher–Yates) so no position is predictable.
+        chars[0] = upper[System.Security.Cryptography.RandomNumberGenerator.GetInt32(upper.Length)];
+        chars[1] = lower[System.Security.Cryptography.RandomNumberGenerator.GetInt32(lower.Length)];
+        chars[2] = digit[System.Security.Cryptography.RandomNumberGenerator.GetInt32(digit.Length)];
+        for (var i = 3; i < length; i++)
+            chars[i] = alphabet[System.Security.Cryptography.RandomNumberGenerator.GetInt32(alphabet.Length)];
+        for (var i = length - 1; i > 0; i--)
+        {
+            var j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// The deploy-posture credentials e-mail body (ADR 0056): the demo accounts' e-mail +
+    /// generated password, one per line, plus the note that the seed-admin account keeps
+    /// its <c>SeedAdmin__</c> setup-token lane (its own credential is the one-time token
+    /// from the first-boot setup e-mail). Staged once through the durable outbox to the
+    /// seed admin; the operator is told to delete it once captured.
+    /// </summary>
+    private static string SampleDataCredentialsBody(
+        string? moderatorPw, string? translatorPw,
+        string? annaPw, string? benPw, string? carlaPw, string? davidPw)
+    {
+        var lines = new List<string>
+        {
+            "A Kumunita instance has seeded a demo neighborhood (sample data).",
+            "Demo account credentials (e-mail → password):",
+            "",
+            $"{ModeratorEmail}  →  {moderatorPw}",
+            $"{TranslatorEmail}  →  {translatorPw}",
+            $"anna@examplium.com  →  {annaPw}",
+            $"ben@examplium.com  →  {benPw}",
+            $"carla@examplium.com  →  {carlaPw}",
+            $"david@examplium.com  →  {davidPw}",
+            "",
+            "Your own admin account keeps its one-time setup-token lane; use the setup link " +
+            "from the first-boot setup e-mail to set your admin password.",
+            "",
+            "Treat this e-mail as sensitive and delete it once you have the credentials."
+        };
+        return string.Join("\n", lines);
+    }
+}

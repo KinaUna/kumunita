@@ -8,9 +8,9 @@
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
         <p>
-            <a class="text-muted" href="@Url.Action("Edit","Profile")">← Back to the editor</a>
+            <a class="text-muted" href="@Url.Action("Edit","Profile")"><kw-l key="profile.preview_back">← Back to the editor</kw-l></a>
         </p>
-        <h1>Preview — how I appear</h1>
+        <h1><kw-l key="profile.preview_title">Preview — how I appear</kw-l></h1>
 
         @*
           U8 of the media feature: the avatar of the profile being previewed.
@@ -40,49 +40,37 @@
                     <span class="avatar-mono avatar-lg" style="display:none;"></span>
                 </span>
                 <span class="text-muted small">
-                    Your avatar, as it appears next to your name in the
-                    neighbor directory.
+                    <kw-l key="profile.preview_avatar_note">Your avatar, as it appears next to your name in the neighbor directory.</kw-l>
                 </span>
             </div>
         }
 
         <p class="text-muted">
-            Read-only "view as" (the F6 preview pin): the same
-            <c>ContactVisibility</c> opt-in decision the directory detail
-            uses, with <b>@Model.AsDisplayName</b> standing in as the viewer.
-            This <b>does not</b> change anything in the saved profile — the
-            preview is a composition read, never a write (M2's scope pin; the
-            only write lane is
-            <a asp-controller="Profile" asp-action="Edit">the editor</a>).
-            <br/>
-            <br/>
-            The contact-block decision (when an opt-in audience exists) still
-            commits its own <c>AccessAudit</c> row (C3, F6's preview pin:
-            "a preview is an evaluation, not an exemption") — that's the
-            <c>DirectoryService.PreviewAsAsync</c>'s job, not this view
-            model's.
+            <kw-l key="profile.preview_readonly_lead">This is a read-only preview. It shows how your profile appears to </kw-l>
+            <b>@Model.AsDisplayName</b>
+            <kw-l key="profile.preview_readonly_tail"> in the neighbor directory. It doesn't change anything in your saved profile — to make a change, </kw-l>
+            <a asp-controller="Profile" asp-action="Edit"><kw-l key="profile.preview_edit_link">edit your profile</kw-l></a>.
         </p>
 
         @if (Model.ShowContactBlock)
         {
             <div class="alert alert-success">
-                <b>Visible.</b> As <b>@Model.AsDisplayName</b>, you would
-                see this contact block on the directory detail.
+                <b><kw-l key="profile.preview_visible_badge">Visible.</kw-l></b> As <b>@Model.AsDisplayName</b>, <kw-l key="profile.preview_visible_tail">you would see this contact block in the neighbor directory.</kw-l>
             </div>
             <dl class="row mt-3">
                 @if (!string.IsNullOrEmpty(Model.Address))
                 {
-                    <dt class="col-sm-3">Address</dt>
+                    <dt class="col-sm-3"><kw-l key="profile.contact_address">Address</kw-l></dt>
                     <dd class="col-sm-9">@Model.Address</dd>
                 }
                 @if (!string.IsNullOrEmpty(Model.Email))
                 {
-                    <dt class="col-sm-3">Email</dt>
+                    <dt class="col-sm-3"><kw-l key="profile.contact_email">Email</kw-l></dt>
                     <dd class="col-sm-9"><a href="mailto:@Model.Email">@Model.Email</a></dd>
                 }
                 @if (!string.IsNullOrEmpty(Model.Phone))
                 {
-                    <dt class="col-sm-3">Phone</dt>
+                    <dt class="col-sm-3"><kw-l key="profile.contact_phone">Phone</kw-l></dt>
                     <dd class="col-sm-9">@Model.Phone</dd>
                 }
             </dl>
@@ -90,18 +78,14 @@
         else
         {
             <div class="alert alert-secondary">
-                <b>Contact hidden.</b> As <b>@Model.AsDisplayName</b>, you
-                would <b>not</b> see a contact block — either the contact
-                opt-in is off (no audience, the §2.4 "null ⇒ not opted in"
-                pin) or an existing audience did not allow it. The profile
-                itself (name + verified badge) still renders in the
-                directory; only the contact block is gated.
+                <b><kw-l key="profile.preview_hidden_badge">Contact hidden.</kw-l></b> As <b>@Model.AsDisplayName</b>, you
+                <b><kw-l key="profile.preview_hidden_tail">would not see a contact block. Your name (and verified badge, if you have one) still shows in the directory — only the contact details are hidden.</kw-l></b>
             </div>
         }
 
         <div class="d-flex gap-2 mt-4">
             <a class="btn btn-primary" href="@Url.Action("Edit","Profile")">
-                Edit profile
+                <kw-l key="profile.edit_profile_btn">Edit profile</kw-l>
             </a>
         </div>
     </div>

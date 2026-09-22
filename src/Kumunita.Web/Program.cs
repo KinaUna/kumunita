@@ -9,10 +9,13 @@ using Kumunita.Web.SideEffects;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Marten;
 using Marten.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using System.Net.Mail;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -38,6 +41,12 @@ builder.Services.AddSingleton<ILogger>(sp => sp.GetRequiredService<ILoggerFactor
 // Per-instance identity: same image everywhere, different config (ADR 0002).
 builder.Services.Configure<CommunityOptions>(
     builder.Configuration.GetSection(CommunityOptions.SectionName));
+
+// /health full-payload gate (M3): when Health__Token is set, the detailed
+// diagnostic payload requires the X-Health-Token header (or a GlobalAdmin
+// session). The minimal liveness probe stays anonymous (Coolify / edge proxy).
+builder.Services.Configure<HealthOptions>(
+    builder.Configuration.GetSection(HealthOptions.SectionName));
 
 // Media (plan U2): per-instance media-store config (ADR 0011). Same bind shape
 // as CommunityOptions — `Media__*` (OPS.md); the RootPath default + the raster
@@ -85,6 +94,27 @@ var marten = builder.Services.AddMarten(opts =>
     // no business-key index (the M3 "string Id" convention). ADR 0004 §B.1. Without
     // this call the MediaObject doc is invisible to Marten (C-MED·7 drift).
     MediaDocTypes.Configure(opts);
+
+    // PG (ADR 0039, plan U01): the Pages bounded context's documents (Page +
+    // PageTranslation, ADR 0004 §B.1 additive — the two business-key unique
+    // indexes: (ParentId, Slug) and (PageId, LanguageCode)). Without this call
+    // the docs are invisible to Marten (the M3/Media precedent).
+    PageDocTypes.Configure(opts);
+
+    // TG (ADR 0044 D1, plan U3): the Tags bounded context's documents (Tag +
+    // TagTranslation, ADR 0004 §B.1 additive — the (TagId, LanguageCode)
+    // business-key unique index, tg_tr_uidx_tag_lang). Without this call
+    // the docs are invisible to Marten (the M3/Media/Page precedent).
+    TagDocTypes.Configure(opts);
+
+    // M4 (ADR 0054, plan U01): the Events bounded context's documents (Event +
+    // EventRsvp, ADR 0004 §B.1 — the two new docs on a new parallel surface, not
+    // additive on an existing one: the (ComponentId, Start) feed-ordering index on
+    // Event and the (EventId, UserId) UNIQUE index on EventRsvp — the last-write-wins
+    // concurrency exception, the ADR 0054 §3.2 pin). Without this call the docs are
+    // invisible to Marten (the M3/Media/Page/Tag precedent). The Event/EventRsvp
+    // POCOs are new; the existing Post/Announcement/Page surfaces are untouched.
+    M4DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
@@ -104,6 +134,37 @@ if (builder.Environment.IsDevelopment())
 // so Web is the composition root and registers IUserInfoService (→ UserInfoService)
 // here; the service's only dependency is the IDocumentStore above.
 builder.Services.AddKumunitaCore();
+
+// M4 (ADR 0054 §3.6, plan U08): the EventReminders §6.4 job's window config
+// (Kumunita.Core.Events.EventReminderOptions — the AuditPurgeOptions precedent,
+// a config POCO bound per-instance, not improvised). AddOptions<T>() here the
+// way Core's AddKumunitaCore does it for AuditPurgeOptions: the handler
+// (SideEffects/EventReminderHandler) resolves IOptions<EventReminderOptions>.
+builder.Services.AddOptions<Kumunita.Core.Events.EventReminderOptions>();
+
+// ADR 0019 — the per-request effective-time-zone resolver (scoped: one instance
+// per request, the first GetAsync call resolves the actor's Profile.TimeZone
+// override → the instance default → the UTC floor and caches it; the kw-dt
+// TagHelper and the /settings + /admin timezone surfaces resolve through it, so
+// a page's many timestamps are one profile read + one default read, not N of
+// each). Web-layer (it reads the request principal — ADR 0006-D holds: the two
+// Core seams it composes, IUserInfoService + ILocalizationService, stay
+// HTTP-free; the actor's subject id is minted from the signed-in claim here).
+builder.Services.AddScoped<
+    Kumunita.Web.Localization.EffectiveTimezoneResolver,
+    Kumunita.Web.Localization.EffectiveTimezoneResolver>();
+
+// ADR 0020 — the per-request effective date-time format resolver (scoped: one
+// instance per request, the first GetAsync call resolves the actor's
+// Profile.DateFormat override → the instance default → the floor and caches
+// it; the kw-dt TagHelper and the /settings + /admin date-format surfaces
+// resolve through it, so a page's many timestamps are one profile read + one
+// default read, not N of each). Web-layer, the exact companion to
+// EffectiveTimezoneResolver above (zone + format are independent resident
+// choices: ADR 0019 + ADR 0020).
+builder.Services.AddScoped<
+    Kumunita.Web.Localization.EffectiveDateFormatResolver,
+    Kumunita.Web.Localization.EffectiveDateFormatResolver>();
 
 // Identity (the only EF Core in the tree, ADR 0004): same Postgres, `identity` schema.
 builder.Services.AddDbContext<AppDbContext>(opts => opts.UseNpgsql(kumunitaConnection));
@@ -127,6 +188,48 @@ builder.Services.AddIdentity<User, IdentityRole>(opts =>
     })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddClaimsPrincipalFactory<KumunitaClaimsPrincipalFactory>();
+
+// Rate limiting (SECURITY.md §5 control "Rate limiting (register / login /
+// report), per-IP" — A2). Per-endpoint fixed-window policies on the
+// anonymous write surfaces (signup, resend, login) and the resident-facing
+// report-intake lane. Partitioned by client IP (resolved via UseForwardedHeaders
+// behind the Caddy edge, so the real client IP — not the proxy's — is used).
+// A 429 response is returned when the policy's limit is exceeded.
+builder.Services.AddRateLimiter(opts =>
+{
+    // A reusable fixed-window policy: allow `limit` requests per `window`
+    // per partition key (the resolved client IP — real IP behind the edge).
+    // AddPolicy takes a Func<HttpContext, RateLimitPartition<TPartitionKey>>.
+    static void AddWindow(RateLimiterOptions o, string policyName, int limit, TimeSpan window)
+    {
+        o.AddPolicy(policyName, (context) =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = limit,
+                    Window = window,
+                    AutoReplenishment = true
+                }));
+    }
+
+    // Login: 5 attempts per 15 minutes per IP (per-account lockout already
+    // covers the same-account brute-force; this covers cross-account stuffing).
+    AddWindow(opts, "login", limit: 5, window: TimeSpan.FromMinutes(15));
+
+    // Signup: 5 per hour per IP (account-creation flood).
+    AddWindow(opts, "signup", limit: 5, window: TimeSpan.FromHours(1));
+
+    // Resend verification: 5 per hour per IP (email-bombing surface).
+    AddWindow(opts, "resend", limit: 5, window: TimeSpan.FromHours(1));
+
+    // Report filing: 10 per hour per IP (authorization-escalation surface per
+    // SECURITY.md — a resident can file reports against content they can see).
+    AddWindow(opts, "report", limit: 10, window: TimeSpan.FromHours(1));
+
+    // Setup (admin first-boot token): 5 per 15 minutes per IP (token brute-force).
+    AddWindow(opts, "setup", limit: 5, window: TimeSpan.FromMinutes(15));
+});
 
 // ASP.NET Core Identity automatically wires a SecurityStampValidator into the
 // .AspNetCore.Identity.Application cookie, with a default ValidationInterval of
@@ -213,6 +316,13 @@ builder.Services.AddHttpContextAccessor();
 // token TtlDays bound from Verification__TtlDays (default 14 in the class doc).
 builder.Services.Configure<SeedAdminOptions>(
     builder.Configuration.GetSection(SeedAdminOptions.SectionName));
+
+// Sample-data opt-in (ADR 0056): the mock-neighborhood seeder runs only when this
+// flag is true AND the database is pristine — an explicit per-instance decision,
+// not a side effect of the environment. Absence is the default: real deployments
+// never carry it, so the seeder is unreachable by construction.
+builder.Services.Configure<SampleDataOptions>(
+    builder.Configuration.GetSection(SampleDataOptions.SectionName));
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP
@@ -328,11 +438,56 @@ if (!app.Environment.IsDevelopment())
 // No app-level HTTP→HTTPS redirect: in production TLS terminates at the edge
 // (Coolify/Let's Encrypt, in front of the plain-HTTP container); the "https"
 // dev launch profile binds an https port directly when you want one locally.
+
+// Content-Security-Policy (L1 / OPS §10 / SECURITY.md §6) — shipped in code so
+// every response carries it, in every environment (not just a Caddy edge that
+// may be misconfigured or absent). The directive set enforces the strict
+// no-inline-script rule (OPS §10 "code discipline"): script-src is 'self'
+// only — every interactive behavior lives in client/lib/*.ts modules
+// (self-wiring ES modules loaded from _Layout.cshtml), never in inline
+// <script> blocks or on* attributes in Razor views. style-src retains
+// 'unsafe-inline' because the views use inline style= attributes (Bootstrap
+// utility patterns, dynamic d-none toggles) and extracting every inline style
+// to a stylesheet is not justified for the risk profile.
+//
+// img-src adds blob: (the WYSIWYG local-preview pane renders a blob: image,
+// rich-editor.ts) and data: (inline data-URI thumbnails) on top of 'self'.
+var csp =
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "form-action 'self'; " +
+    "base-uri 'self'; " +
+    "frame-ancestors 'self'; " +
+    "object-src 'none'";
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Content-Security-Policy"] = csp;
+    await next();
+});
+
 app.UseRouting();
+
+// Rate limiting (H1) — must run AFTER UseRouting so per-endpoint policies
+// (declared via [EnableRateLimiting] on the controller action) are resolved
+// from the matched endpoint. The partition key is the resolved client IP
+// (UseForwardedHeaders restored it earlier in the non-dev pipeline; in dev
+// the key is the loopback — still functional for local flood-throttling).
+app.UseRateLimiter();
 
 app.UseAuthentication();
 
 app.UseMiddleware<BlockedAccountMiddleware>();
+
+// M4 — privilege-revocation enforcement: re-reads the DB role set on every
+// request for principals carrying elevated roles, and signs them out if the
+// role set changed while the session was live. Registered after block
+// enforcement (a blocked user is signed out unconditionally) and before
+// authorization (so the gate sees a current claim set).
+app.UseMiddleware<PrivilegedStampMiddleware>();
 
 app.UseAuthorization();
 
@@ -354,14 +509,90 @@ await app.StartAsync();
 // OutboxEmail envelope via Wolverine IMessageContext, which — like the
 // AuditPurgeTick publish below — requires the host to be started
 // (WolverineRuntime.AssertHasStarted), so any earlier placement breaks first boot.
+//
+// Capture the first-boot (pristine) signal NOW — before ApplyAsync runs
+// MigrateAsync, which creates the identity schema and would flip the pristine
+// check to false. The sample-data seeder below is create-once, so it must run
+// on first boot only; the gate reads this pre-migration value.
+bool firstBoot;
+await using (var probeScope = app.Services.CreateAsyncScope())
+{
+    firstBoot = await DbBootstrap.IsPristineAsync(
+        probeScope.ServiceProvider.GetRequiredService<AppDbContext>());
+}
 await SchemaBootstrap.ApplyAsync(app.Services);
 
-// Kick off the AuditPurge recurring job (SideEffects/AuditPurgeHandler) on boot.
-// The TimeoutMessage type bakes in a 1-day delay, so publishing one fresh tick
-// schedules the first purge to run tomorrow; AuditPurgeHandler self-reschedules
-// (returns a new AuditPurgeTick) after each run so the cadence continues. Idempotent:
-// the purge is a no-op when no rows are expired, so a double-schedule across two
-// consecutive boots is harmless.
+// Sample data (a mock neighborhood): a fresh `docker compose down -v &&
+// docker compose up --build` (dev) or a fresh deployed demo instance (ADR 0056)
+// comes up already populated with a scoped moderator, a translator, several
+// verified residents, groups, announcements, posts/replies, events/RSVPs, tags,
+// and a resident blog — so it is immediately exercisable. It runs on the same
+// first-boot gate as FirstBootSeeder (the `firstBoot` flag above — the content
+// stores are create-once, so re-running on a warm DB would duplicate every
+// group/announcement/post) and only when SampleData__Enabled=true — an explicit
+// per-instance opt-in, never a side effect of the environment. A real deployment
+// never carries the flag, so the seeder is unreachable by construction (ADR 0055/0056).
+//
+// Two postures, one seeder (ADR 0056):
+//  · Development  — the documented weak demo credentials (README table); the
+//    seed admin keeps the SeedAdmin__ token lane plus a weak demo password.
+//  · Production   — the seed admin stays on its SeedAdmin__ token lane (no weak
+//    password), the other demo accounts get random high-entropy passwords, and
+//    a single credentials summary is staged to the seed admin's e-mail through
+//    the durable outbox. No weak credential is ever stored on a public instance.
+//
+// This must run AFTER StartAsync for the same reason SchemaBootstrap does
+// (scoped EF/identity + mt/document writers, and the component-mandatory write
+// lane opens its own session), so the scoped services are resolved in an async
+// scope exactly like the tick publishes below.
+var sampleDataOpts = app.Services.GetRequiredService<IOptions<SampleDataOptions>>().Value;
+var seedAdminOpts  = app.Services.GetRequiredService<IOptions<SeedAdminOptions>>().Value;
+if (sampleDataOpts.Enabled && firstBoot)
+{
+    bool deployPosture = !app.Environment.IsDevelopment()
+                         && !string.IsNullOrWhiteSpace(seedAdminOpts.Email);
+    await using var sampleScope = app.Services.CreateAsyncScope();
+    var sampleSp = sampleScope.ServiceProvider;
+    await SampleDataSeeder.SeedAsync(
+        sampleSp.GetRequiredService<AppDbContext>(),
+        sampleSp.GetRequiredService<IDocumentStore>(),
+        sampleSp.GetRequiredService<UserManager<User>>(),
+        sampleSp.GetRequiredService<RoleManager<IdentityRole>>(),
+        sampleSp.GetRequiredService<Kumunita.Core.UserInfo.IUserInfoService>(),
+        deployPosture
+            ? sampleSp.GetRequiredService<IMailerStage>()
+            : null,
+        deployPosture ? seedAdminOpts.Email : null,
+        sampleSp.GetRequiredService<ILogger>());
+}
+else if (sampleDataOpts.Enabled && !firstBoot)
+{
+    // Warm-boot backfill (ADR 0060): an instance whose first boot predates the
+    // sample events' de / fr / da translations has the four sample events (authored
+    // in en) but no translation rows, so a German / French / Danish-speaking
+    // resident sees only the English variant. Fill in the missing rows —
+    // create-if-missing only (never clobbers a Translator's in-app edit, the
+    // ADR 0042 D1 invariant), idempotent (a second boot finds every row and
+    // skips). Sample-data-specific, so — unlike the platform-wide canonical-page
+    // backfills SchemaBootstrap runs — it is gated on the SampleData__Enabled flag
+    // and is a no-op on a real neighborhood (which never carries the flag).
+    await using var backfillScope = app.Services.CreateAsyncScope();
+    var backfillSp = backfillScope.ServiceProvider;
+    var backfillStore = backfillSp.GetRequiredService<IDocumentStore>();
+    await using var backfillSession = backfillStore.OpenSession(new Marten.Services.SessionOptions());
+    await SampleDataSeeder.BackfillEventTranslationsAsync(backfillSession, default);
+    backfillSp.GetRequiredService<ILogger>().LogInformation(
+        "Warm-boot: backfilled missing de/fr/da translations for the sample events (create-if-missing, idempotent).");
+}
+
+// Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
+// SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a
+// 1-day delay, so publishing one fresh tick each schedules the first run for
+// tomorrow; each handler self-reschedules (returns a new tick) after each run so
+// the cadence continues. Idempotent: the purge is a no-op when no rows are
+// expired, and the reminder service is a no-op when nothing is in the window
+// (the existing-OutboxEmail-key check is the no-double-send guard), so a
+// double-schedule across two consecutive boots is harmless.
 //
 // This must run AFTER StartAsync: Wolverine's IMessageBus asserts that the
 // underlying IHost has started (WolverineRuntime.AssertHasStarted), so any publish
@@ -371,6 +602,7 @@ await SchemaBootstrap.ApplyAsync(app.Services);
 await using var startupScope = app.Services.CreateAsyncScope();
 var bus = startupScope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
 await bus.PublishAsync(new AuditPurgeTick());
+await bus.PublishAsync(new EventReminderTick());
 
 try
 {

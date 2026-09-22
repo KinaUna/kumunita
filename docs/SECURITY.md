@@ -2,9 +2,11 @@
 
 Security and privacy are the **highest-priority requirements** of this product, not
 features to add. This document is the single source for *what we protect, from whom,
-and why*. It complements `ARCHITECTURE.md` (how the mechanisms work) and `OPS.md`
-§10 (the operational checklist). Rationale for identity/authorization decisions lives
-in `adr/0001` and `adr/0003`.
+and why*. It complements `ARCHITECTURE.md` (how the mechanisms work), `OPS.md`
+§10 (the operational hardening checklist), and `SECURITY-AUDIT.md` (the audit
+program — the cadence, owners, and run-anywhere checklists that verify the controls
+here actually hold, and where each run is recorded). Rationale for
+identity/authorization decisions lives in `adr/0001` and `adr/0003`.
 
 Status: pre-M0, design-level. Update this document when a control changes, a threat is
 accepted, or an open item below is decided — and record non-obvious decisions as ADRs.
@@ -80,6 +82,7 @@ How each class is stored and what its loss means.
 | **(c) Audit & moderation** | `AccessAudit`, `Report`, `AdminOverride` | `mt` | **High, asymmetric** — reveals *who accessed what*, incl. *denied* items (see §3.1) |
 | **(d) Secrets** | DB/SMTP credentials, seed token, backup keys | env / secrets manager / object store | Critical — full instance compromise |
 | **(e) Media & uploaded bytes** | raster avatars (jpeg/png/webp/gif) — identifying images of residents — and the `MediaObject` catalog (hash id, original filename, size, first-storer) | bytes: dedicated volume (OPS.md §4/§5, second restore surface); catalog: `mt` (ADR 0011) | High — a face is identity material; served **only** through an auth + audit-gated app endpoint (never a static path), raster-only (SVG excluded as a script vector) |
+| **(e) Attachment files (ADR 0034, lane `ATT`)** | user-attached files (PDF / Office docs / text / csv / zip / raster) on posts, replies, announcements — arbitrary resident content — cataloged by the **same** `MediaObject` doc on the **same** volume as (e) above | same volume + same `mt` catalog as (e); the owning doc carries `AttachmentIds` (additive, zero migrations, ADR 0004 §B.1) | High — same as (e): served **only** through the auth + audit-gated `GET /attachment/{id}` endpoint (never a static path), a **separate** file allowlist (SVG excluded, `Media__AttachmentAllowedContentTypes`), `Content-Disposition: attachment` + `nosniff` (a download, not an inline render — C-ATT·2/8), every miss a 404 (orphan-safe — C-ATT·7) |
 
 ### 3.1 The audit log is a disclosure surface (accepted by design)
 
@@ -93,6 +96,11 @@ log an accountability mechanism ("prove what happened", OPS.md §9) — but it m
 - Do not "fix" it by dropping `targetId` or denials — that removes the accountability
   the community is promised.
 
+**"Minor" is not a stored data class.** A child's status as a supervised account is
+carried by the `GuardianLink` row (ADR 0028), not by a stored age or birthdate — so the
+guardian lane adds a *control* without adding a sensitive PII field. This keeps rule 5
+(minimize: "what we don't store, we can't leak") intact even as the feature lands.
+
 ## 4. Assumed adversaries
 
 Ranked by realism at this scale. Each maps to the controls that answer it.
@@ -105,6 +113,7 @@ Ranked by realism at this scale. Each maps to the controls that answer it.
 | A4 | **Malicious / hostile GlobalAdmin** | read everything, suppress others, extend their power | two-admin standing practice; no in-app `AdminOverride` creation; operator-only break-glass; `BreakGlass`-tagged audit (ADR 0003, ARCHITECTURE.md §4.5) |
 | A5 | **Third parties & operator path** (SMTP provider, object store, VPS host, operator mistake) | leak data at B4/B5, misconfigure | encryption at rest + at source, scoped keys, SPF/DKIM/DMARC, least-privilege DB user, backups-verified (OPS.md §4, §7, §10) |
 | A6 | **Supply chain** (base image, NuGet/npm) | malicious or stale dependency | pinned image + package versions; rebuild on base updates (OPS.md §10); two-project solution with no heavy runtime deps (ADR 0001) |
+| A7 | **The hostile or over-reaching guardian** (a parent supervising a child's account) | over a minor who may not contest it out-of-platform, use the supervision lane to silence the child (suspend without cause), or try to grow the lane beyond account-level control into reading the child's private content | standing comes from *creating* the account, no self-serve claim over a stranger (ADR 0028 G·4); the lane is **account-scope only** — the content path has no guardian branch, so the exposure is never the child's private life (ADR 0028 G·1); the **safety valve**: a GlobalAdmin dissolves any link or un-suspends any account, audited `Via: Admin` (ADR 0028 G·5) |
 
 **Not assumed (documented, not designed for):** nation-state actors; VPS-level physical
 access; a compromised Coolify platform. If the deployment context changes, add them.
@@ -123,7 +132,7 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Rate limiting (register / login / report), per-IP | A2 | §6 (mechanism decided); OPS.md §10 (endpoints + XFF) |
 | Identity account lockout, per-account (defaults) | A2 | OPS.md §10 — pairs with rate limiting; see division of labor there |
 | **2FA (TOTP): required for GlobalAdmin**, recommended for Moderator | A3, A4 | §6 (decided); OPS.md §10; break-glass step OPS.md §9 |
-| Content-Security-Policy `default-src 'self'` + no-inline-script rule | A3 (XSS) | §6 (decided); OPS.md §10 |
+| Content-Security-Policy `script-src 'self'` (strict, no inline script) + origin pinning (shipped) | A3 (XSS) | §6 (decided); OPS.md §10 (shipped in `Program.cs`) |
 | PBKDF2 password hashing (Identity default; iteration count documented) | A2, A3 | §6 (decided) |
 | CAPTCHA (deferred, documented decision) | A2 | OPS.md §10 |
 | Report-gated, audited moderator access | A4 (and protects A3's privacy from mods) | ADR 0003 |
@@ -132,10 +141,12 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Non-superuser DB, internal-only | A1, A5 | OPS.md §10 |
 | Encrypted offsite backups + verified restores | A5, disaster | OPS.md §4–5 |
 | Pinned image + packages | A6 | OPS.md §10 |
+| Guardian standing is creation-based, account-scope (no content read), and community-reversible | A7 | ADR 0028 G·4/G·1/G·5; the content path has no `Via: Guardian` branch; GlobalAdmin dissolve/un-suspend audited `Via: Admin` |
 | SPF / DKIM / DMARC, stable From: | phishing-as-us (A3 impersonation) | OPS.md §7 |
 | Audit log (always-on, tiered retention) | accountability for A3, A4 | ARCHITECTURE.md §5 |
 | Media served only through an auth + audit endpoint (never static; one frozen `CanAsync(Read)` call commits the Allow **and** Deny rows) | A1 (scraping), A3 | ADR 0011 (C-MED·1/2/3); design doc §2.3 |
 | Upload type/size allowlist at the edge — raster only (SVG = excluded script vector), 5 MiB cap, self-only write lane | A3 (payload-as-XSS, self-impersonation of others) | ADR 0011 (C-MED·5/8); `Media__*` keys (OPS.md) |
+| **Attachment lane (ADR 0034):** served only through `GET /attachment/{id}` (never static); the owning post / reply (parent post) / announcement's **single** `Read` decision; **every miss a 404** (store-miss, orphan, Deny) — existence never leaks; **one `Deny` row** on a UGC (post/reply) Deny, **zero rows** on every other 404 (announcement ⇒ zero rows); `Content-Disposition: attachment` + `nosniff` + stored `Content-Type` (a download, not an inline render); a **separate** file allowlist (SVG excluded); the `AttachmentIds` id is derived **server-side** from the body (never client-sent); a removed link ⇒ inert bytes (orphan-safe, never hard-deleted) | A1 (scraping), A3 (payload-as-XSS, self-impersonation) | ADR 0034 (C-ATT·1–10); design doc `file-attachments-design.md`; `Media__AttachmentAllowedContentTypes` (OPS.md) |
 
 ## 6. Decisions & open items
 
@@ -205,7 +216,10 @@ and never leave the box. If a machine-translation feature is ever enabled: the
 provider is a third-party boundary like B4 — **audience-restricted content is never
 sent to it** — translation is per-item, user-initiated, and always labeled
 "machine translation", and this decision is re-recorded here before shipping
-(ADR 0005 C).
+(ADR 0005 C). The **authored-in language tag** on `Post` / `PostReply` /
+`Announcement` (ADR 0018) is **not** a translation step — it is a BCP-47
+metadata field (for future search and reader-added language versions), carries
+no content to a third party, and changes none of this posture.
 
 ### Open items (decide before shipping the surface they protect)
 
@@ -213,7 +227,7 @@ sent to it** — translation is per-item, user-initiated, and always labeled
 |------|----------|-----------------|
 | Log hygiene: sanitize user-supplied strings (newlines/CR) before logging so logs can't be forged | A3 (log integrity) | M1 |
 | Named invariant tests (empty-audience-denies, delegation action-scope) referenced from ARCHITECTURE.md §4.4 | A3 | M1 |
-| **Sign-up is currently open, self-service** (verification email + admin manual-verify valve, M1) — an acceptable interim state because the user base is the development team. The default must become **invitation-only**: an admin invites a resident, and they self-serve their own password from an invitation link rather than registering on their own. Decide the mechanism (token lifecycle, expiry, admin UX) before the community is open to residents beyond that team — this is the control that answers A2 better than rate-limiting alone. | A2 (signup bots) | After the M2–M3 development circle; before wider rollout |
+| **Sign-up gate (ADR 0050) + the invitation mechanism it closes to.** The gate is landed: a GlobalAdmin flips the instance open / invitation-only (`/admin/signup`; `LocaleSettings.IsSignupOpen`, `true` floor), and when closed the `/account/signup` write lane and the nav/login sign-up affordances are authoritative — new self-service accounts are refused (existing residents unaffected). That is the control that answers A2 better than rate-limiting alone. **Still open:** the *invitation mechanism* a closed instance closes the door *to* — an invited resident self-serves their password from an admin-sent link rather than registering (token lifecycle, expiry, admin UX). Decide it before the community is open to residents beyond the development team. | A2 (signup bots) | Gate: landed (ADR 0050); invitation mechanism: before wider rollout |
 
 Decisions taken here should link back into OPS.md §10 (checklist) and, where they
 

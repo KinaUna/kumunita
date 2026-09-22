@@ -59,6 +59,8 @@ public static class M1DocTypes
         opts.Schema.For<GroupInvitation>()
                .UniqueIndex(i => i.GroupId, i => i.UserId);   // business key
         opts.Schema.For<DelegationGrant>();
+        // GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)
+        opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);
         opts.Schema.For<Component>();
         opts.Schema.For<ModeratorAssignment>();
         // Posting right: one row per (component, user) pair, the same business-key
@@ -79,12 +81,32 @@ public static class M1DocTypes
         opts.Schema.For<OutboxEmail>();
         opts.Schema.For<EmailDeadLetter>();
 
-        // Localization (ADR 0005): the language catalog + the per-instance default.
-        // The seeder materializes the `en` row and a default of `en` on first boot;
-        // the full TranslationResource/LocalizedPage surface lands with M6's
-        // localization work (the ADR's module surface, not the first-boot lane).
+        // Localization (ADR 0005, the ML lane): the language catalog + the
+        // per-instance default (the seeder materializes the `en` row and a default
+        // of `en` on first boot — already shipped), plus the UI-string content doc
+        // this lane ships (the ADR's module surface on top of that seed). The pair
+        // idiom (surrogate Id + unique index on the business-key pair) is the
+        // GroupMembership / ComponentMembership convention: one text per key per
+        // language. Rows are **retained** when a language is removed (M·7) — that
+        // retention is the ILocalizationService's job (U3), not a delete here.
+        // (The static-page doc retired in PG U07 — ADR 0039: the `Page`/
+        // `PageTranslation` docs on the Pages context own that surface now.)
         opts.Schema.For<LanguageCatalog>();
         opts.Schema.For<LocaleSettings>();
+        opts.Schema.For<TranslationResource>()
+               .UniqueIndex(t => t.Key, t => t.LanguageCode);   // business key (one text per key per language)
+
+        // Group / community name+description translations (ADR 0026; the
+        // "separate feature" ADR 0021's scope boundary deferred, the same
+        // user-authored lane ADR 0022 shipped for posts/replies). Each is one
+        // row per (parent, language) pair — the (GroupId|ComponentId,
+        // LanguageCode) unique index enforces that at the DB layer (the
+        // GroupMembership / ComponentMembership business-key convention; the
+        // surrogate Id is the document identity).
+        opts.Schema.For<GroupTranslation>()
+               .UniqueIndex(t => t.GroupId, t => t.LanguageCode);
+        opts.Schema.For<CommunityTranslation>()
+               .UniqueIndex(t => t.ComponentId, t => t.LanguageCode);
 
         // Authorization (audit only — AdminOverride is hand-rolled, see AuthorizationFeature)
         opts.Schema.For<AccessAudit>();

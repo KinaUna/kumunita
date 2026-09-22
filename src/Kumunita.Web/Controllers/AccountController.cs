@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Marten;
 
@@ -41,16 +42,33 @@ public sealed class AccountController(
 
     [AllowAnonymous]
     [HttpGet]
-    public IActionResult Signup() =>
-        User.Identity?.IsAuthenticated == true
-            ? Redirect("/profile/edit")
-            : View(new SignupViewModel());
+    public async Task<IActionResult> Signup()
+    {
+        if (User.Identity?.IsAuthenticated == true)
+            return Redirect("/profile/edit");
+
+        // ADR 0050 — the sign-up gate (the admin-settled instance value, the
+        // `true` floor). Closed → the invitation-only notice instead of the form;
+        // the gate is authoritative (an authenticated admin still creates accounts
+        // through the Guardian / admin lanes, not this self-service surface).
+        if (!await identity.IsSignupOpenAsync())
+            return View("SignupClosed", new SignupClosedViewModel());
+
+        return View(new SignupViewModel());
+    }
 
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Signup(SignupViewModel model)
     {
+        // ADR 0050 — the gate is authoritative on the write path too (the GET hides
+        // the form, but the POST is the actual account-creation surface): a closed
+        // gate denies the self-service write. A resident who is *invited* is added
+        // by an administrator, not through this endpoint.
+        if (!await identity.IsSignupOpenAsync())
+            return View("SignupClosed", new SignupClosedViewModel());
+
         if (!ModelState.IsValid)
             return View(model);
 
@@ -83,22 +101,25 @@ public sealed class AccountController(
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("resend")]
     public async Task<IActionResult> ResendVerification(ResendVerificationViewModel model)
     {
         if (!ModelState.IsValid)
             return View(model);
 
-        var result = await identity.ResendVerificationEmailAsync(model.Email);
-        if (result.Success)
-        {
-            TempData["info"] =
-                $"If there is an unverified account with email '{model.Email}', a new " +
-                "verification link is on its way. Check your inbox (and your spam folder).";
-            return RedirectToAction(nameof(Login));
-        }
-
-        ModelState.AddModelError(string.Empty, result.Reason ?? "Could not resend the verification email.");
-        return View(model);
+        await identity.ResendVerificationEmailAsync(model.Email);
+        // M1 — uniform response: whether or not an account exists for this email
+        // (and whether the per-account attempt bound is exhausted), the response is
+        // identical. The Core service returns different Reason strings for the two
+        // failure modes; both must produce the SAME response so an attacker probing
+        // which emails are registered cannot distinguish them. The uniform message
+        // is "if an unverified account exists, a link is on its way" — true for the
+        // fresh-account path, false for the no-account / exhausted paths, but the
+        // resident cannot tell which is which.
+        TempData["info"] =
+            $"If there is an unverified account with email '{model.Email}', a new " +
+            "verification link is on its way. Check your inbox (and your spam folder).";
+        return RedirectToAction(nameof(Login));
     }
 
     // ── Verify (the one designed handoff) ───────────────────────────────────────────────
@@ -192,12 +213,24 @@ public sealed class AccountController(
         // with a real password.
         var showSetupLink = !await identity.IsFirstBootSetupCompleteAsync();
 
-        return View(new LoginViewModel { ReturnUrl = returnUrl, Error = errorText, ShowSetupLink = showSetupLink });
+        // ADR 0050 — the sign-up gate (the `true` floor): when closed, the view
+        // suppresses the "No account yet? Sign up." affordance (a closed gate has
+        // no self-service signup surface to point at).
+        var signupOpen = await identity.IsSignupOpenAsync();
+
+        return View(new LoginViewModel
+        {
+            ReturnUrl = returnUrl,
+            Error = errorText,
+            ShowSetupLink = showSetupLink,
+            SignupOpen = signupOpen,
+        });
     }
 
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)

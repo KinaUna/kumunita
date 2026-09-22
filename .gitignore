@@ -13,8 +13,15 @@ node_modules/
 .env
 certs/
 
+# Browser-test harness scratch (kept in-repo so the file:// URL is trusted)
+.tmp/
+
 # Local settings for Claude
 /.claude/settings.local.json
+
+# Local dev-only config (carries the dev DB password; the committed .example
+# shows the shape). Keep the .json.example committed, the .json itself secret.
+appsettings.*.Local.json
 
 # Generated front-end — rebuild with `npm run build` in src/Kumunita.Web
 src/Kumunita.Web/wwwroot/js/

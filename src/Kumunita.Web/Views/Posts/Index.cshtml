@@ -4,20 +4,82 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-7">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <h1 style="display:inline;">@Model.ComponentName</h1>
-                <span class="text-muted ms-3">(feed)</span>
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    @* On the all-sections feed (ComponentId empty) the header is
+                       the platform UI string (posts.feed_all_sections); on a
+                       single-community feed it is the community's name (ADR 0026,
+                       UGC — rendered as authored). *@
+                    <h1>
+                        @if (string.IsNullOrEmpty(Model.ComponentId))
+                        {
+                            <kw-l key="posts.feed_all_sections">Community</kw-l>
+                        }
+                        else
+                        {
+                            @Model.ComponentName
+                        }
+                    </h1>
+                    @* ADR 0012 — the mandatory badge: single-community feeds only
+                       (the all-sections feed keeps this false). On mobile the
+                       side-note is hidden, so this is its stand-in. *@
+                    @if (Model.IsMandatory)
+                    {
+                        <span class="badge bg-dark ms-2" title="Everyone in the neighborhood is a member of this community — no one can be removed or leave it.">
+                            <kw-l key="community.mandatory_badge">Everyone — mandatory</kw-l>
+                        </span>
+                    }
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                @* ADR 0012 — the moderator's member-management lane (the
+                   route at /community/manage/{id} is the real SoD wall; this
+                   link is offered only to the standing that route accepts). *@
+                @if (Model.CanManageCommunity)
+                {
+                    <a class="btn btn-outline-secondary"
+                       href="@Url.Action("Manage", "Community", new { componentId = Model.ComponentId })">
+                        <kw-l key="community.feed_manage_members">Manage members</kw-l>
+                    </a>
+                }
+                @* ADR 0053 — the community name/description translation lane,
+                   now on its own page (split off the members page). Offered to
+                   anyone with community-translation standing (GlobalAdmin ∪
+                   Translator); a moderator-only viewer is still admitted to
+                   the page read-only by the route. *@
+                @if (Model.CanTranslateCommunity)
+                {
+                    <a class="btn btn-outline-secondary"
+                       href="@Url.Action("Translations", "Community", new { componentId = Model.ComponentId })">
+                        <kw-l key="community.feed_translations">Translations</kw-l>
+                    </a>
+                }
+                @if (Model.CanPost)
+                {
+                    <a class="btn btn-primary"
+                       href="@Url.Action("New","Posts")">
+                        <kw-l key="posts.write">Write a post</kw-l>
+                    </a>
+                }
+                @* ADR 0012 / the ADR 0008 self-leave shape: offered to exactly
+                   a member without management standing on an optional
+                   community. The POST lane's target user is *this* viewer
+                   (minted server-side in the controller — never a form field);
+                   a mandatory community never reaches this branch (CanLeave
+                   is false, and the route re-checks the flag server-side). *@
+                @if (Model.CanLeaveCommunity)
+                {
+                    <form method="post"
+                          action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
+                          data-confirm="Leave @Model.ComponentName?">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger">Leave</button>
+                    </form>
+                }
+                </div>
             </div>
-            @if (Model.CanPost)
-            {
-                <a class="btn btn-primary"
-                   href="@Url.Action("New","Posts")">
-                    Write a post
-                </a>
-            }
-        </div>
+        </header>
 
         @if (TempData["info"] is string info)
         {
@@ -34,89 +96,111 @@
             </div>
         }
 
-        @* Individual-community links — the viewer's own community directory:
-           only the communities they have access to (same rule as the
-           "Write a post" button above). An "All" pill (first) links back to
-           the all-sections feed (/community, Posts.AllSections); the current
-           pill is highlighted — on the single-community feed (Model.ComponentId
-           set) that's the community's own pill, on the all-sections feed (no
-           ComponentId) it's "All". Hidden when the viewer has no reachable
-           communities (the bootstrap edge — the empty-feed branch below
-           already covers it). *@
-        @if (Model.Communities.Count > 0)
-        {
-            <div class="mb-3">
-                <div class="small text-muted mb-1">
-                    @(Model.ComponentId != null ? "Communities" : "Browse communities")
+        <div class="airy-comm-layout">
+        <aside>
+            @* Individual-community links — the viewer's own community directory:
+               only the communities they have access to (same rule as the
+               "Write a post" button above). An "All" entry (first) links back
+               to the all-sections feed (/community, Posts.AllSections); the
+               current entry is highlighted — on the single-community feed
+               (Model.ComponentId set) that's the community's own entry, on the
+               all-sections feed (no ComponentId) it's "All". The whole rail is
+               hidden when the viewer has no reachable communities (the
+               bootstrap edge — the empty-feed branch below already covers it). *@
+            @if (Model.Communities.Count > 0)
+            {
+                <div class="airy-side-label">
+                    <kw-l key="community.browse">Communities</kw-l>
                 </div>
-                <ul class="nav nav-pills flex-wrap">
-                    <li class="nav-item">
-                        <a class="nav-link @(string.IsNullOrEmpty(Model.ComponentId) ? "active" : "text-dark text-decoration-none")"
+                <ul class="airy-side-list">
+                    <li>
+                        <a class="@(string.IsNullOrEmpty(Model.ComponentId) ? "active" : "")"
                            href="@Url.Action("AllSections", "Posts")">
-                           All
+                            <kw-l key="community.all">All</kw-l>
                         </a>
                     </li>
                     @foreach (var c in Model.Communities)
                     {
                         var isCurrent = Model.ComponentId == c.Id;
-                        <li class="nav-item">
-                            <a class="nav-link @(isCurrent ? "active" : "text-dark text-decoration-none")"
+                        <li>
+                            <a class="@(isCurrent ? "active" : "")"
                                href="@Url.Action("Index", "Posts", new { componentId = c.Id })">
                                @c.Name
                             </a>
                         </li>
                     }
                 </ul>
-            </div>
-        }
+                @* ADR 0012 — the mandatory note (single-community feeds only);
+                   its head-badge stand-in serves small screens where the rail
+                   collapses. *@
+                @if (Model.IsMandatory)
+                {
+                    <div class="airy-side-note">
+                        <kw-l key="community.mandatory_note">This is the neighborhood's mandatory community — everyone here belongs to it; no one can be removed or leave it.</kw-l>
+                    </div>
+                }
+            }
+        </aside>
 
+        <div>
         @if (Model.Items.Count == 0)
         {
             <div class="alert alert-info">
                 @if (Model.CanPost)
                 {
-                    <text>No posts yet here. Write the first one — it will be visible only to
-                    the audience you choose in the composer below the title.</text>
+                    <text><kw-l key="posts.empty_can_post">No posts yet here. Write the first one — it will be visible only to
+                    the audience you choose in the composer below the title.</kw-l></text>
                 }
                 else
                 {
-                    <text>No posts here yet.</text>
+                    <text><kw-l key="posts.empty">No posts here yet.</kw-l></text>
                 }
             </div>
         }
         else
         {
-            <ul class="list-group">
+            <div class="airy-feed">
                 @foreach (var p in Model.Items)
                 {
-                    <li class="list-group-item d-flex justify-content-between align-items-start">
-                        <div class="pe-3">
-                            <a href="@Url.Action("Detail","Posts", new { id = p.Id })"
-                               class="text-decoration-none fw-semibold">
+                    @* Author avatar (the Directory pattern): the <img> links the
+                       audited serving lane (GET /profile/avatar/{subjectId}) and
+                       on its fail-closed 404 the monogram sibling takes over. *@
+                    string authorAvatarInitial = !string.IsNullOrWhiteSpace(p.AuthorDisplayName)
+                        ? char.ToUpperInvariant(p.AuthorDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <div class="airy-post-card">
+                        <div class="airy-post-title">
+                            <a href="@Url.Action("Detail","Posts", new { id = p.Id })">
                                 @(!string.IsNullOrWhiteSpace(p.Title) ? p.Title : (p.BodyPreview.Length <= 60 ? p.BodyPreview : p.BodyPreview[..60] + "…"))
                             </a>
                             @if (!string.IsNullOrEmpty(p.ComponentName))
                             {
                                 @if (!string.IsNullOrEmpty(p.ComponentId))
                                 {
-                                    <a class="badge text-bg-light ms-2 text-decoration-none"
+                                    <a class="badge text-bg-light ms-2 text-decoration-none airy-post-chip"
                                        href="@Url.Action("Index","Posts", new { componentId = p.ComponentId })"
                                        title="@p.ComponentName">@p.ComponentName</a>
                                 }
                                 else
                                 {
-                                    <span class="badge text-bg-light ms-2" title="@p.ComponentName">@p.ComponentName</span>
+                                    <span class="badge text-bg-light ms-2 airy-post-chip" title="@p.ComponentName">@p.ComponentName</span>
                                 }
                             }
-                            <p class="mb-0 text-muted small mt-1">@p.BodyPreview</p>
                         </div>
-                        <div class="text-end text-muted small">
-                            <div>@p.AuthorDisplayName</div>
-                            <div>@p.Created.LocalDateTime.ToString("d")</div>
+                        <p class="airy-post-preview mb-0">@p.BodyPreview</p>
+                        <div class="airy-post-meta">
+                            <span class="d-inline-flex align-items-center">
+                                <img class="avatar" src="/profile/avatar/@p.AuthorSubjectId" alt=""
+                                     data-avatar-fallback>
+                                <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                            </span>
+                            <span>@p.AuthorDisplayName</span>
+                            <span>·</span>
+                            <span><kw-dt dt="@p.Created" format="g"></kw-dt></span>
                         </div>
-                    </li>
+                    </div>
                 }
-            </ul>
+            </div>
 
             @if (Model.Total > Model.Items.Count)
             {
@@ -130,5 +214,7 @@
                 </p>
             }
         }
+        </div>
+        </div>
     </div>
 </div>

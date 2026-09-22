@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "critter-stack-docs": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["D:\\mcp\\Critter_Tools\\mcp-server\\src\\index.js"]
+    }
+  }
+}

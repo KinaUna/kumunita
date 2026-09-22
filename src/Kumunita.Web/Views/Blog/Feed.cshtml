@@ -1,0 +1,75 @@
+@model Kumunita.Web.Models.BlogViewModel
+@{
+    var hasName = Model.AuthorDisplayName is string dn && !string.IsNullOrWhiteSpace(dn);
+    var heading = hasName ? $"{Model.AuthorDisplayName}'s blog" : "Blog";
+    ViewData["Title"] = heading;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h1 class="mb-0">@heading</h1>
+            @if (Model.IsOwner && User?.Identity?.IsAuthenticated == true)
+            {
+                @* ADR 0040 — the "New blog page" affordance is on the author's
+                   own feed only (another resident's feed is read-only). It
+                   routes to the composer, which — for a resident — opens on
+                   a blog page (kind = User, their own namespace). *@
+                <a class="btn btn-sm btn-primary ms-auto" href="/pages/new">
+                    <kw-l key="blog.new_page">New blog page</kw-l>
+                </a>
+            }
+        </div>
+
+        @if (TempData["info"] is string info)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @info
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["error"] is string err)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @err
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (Model.Posts.Count == 0)
+        {
+            <div class="alert alert-info">
+                @if (Model.IsOwner)
+                {
+                    <kw-l key="blog.empty_own">You have no blog pages yet. Create your first — it becomes the root of your blog, and you can nest more under it.</kw-l>
+                }
+                else
+                {
+                    <kw-l key="blog.empty_other">This resident has no blog pages yet.</kw-l>
+                }
+            </div>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var post in Model.Posts)
+                {
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2">
+                        <div>
+                            <a class="fw-semibold text-decoration-none" href="@post.Href">@post.Title</a>
+                            @if (post.IsDraft && Model.IsOwner)
+                            {
+                                <span class="badge bg-warning text-dark ms-2" title="A draft — only you can see it until you publish it.">
+                                    <kw-l key="blog.draft">Draft</kw-l>
+                                </span>
+                            }
+                        </div>
+                        <span class="text-muted small text-nowrap" title="@post.Modified.ToString("u")">
+                            @post.Modified.ToString("g")
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</div>

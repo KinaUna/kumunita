@@ -5,7 +5,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
-        <h1>Sign in</h1>
+        <h1><kw-l key="account.login_title">Sign in</kw-l></h1>
 
         @if (TempData["info"] is string info)
         {
@@ -35,21 +35,32 @@
 
             <div class="mb-3 form-check">
                 <input asp-for="RememberMe" class="form-check-input" />
-                <label asp-for="RememberMe" class="form-check-label"></label>
+                <label class="form-check-label mb-0">
+                    <kw-l key="account.login_remember">Remember me</kw-l>
+                </label>
             </div>
 
-            <button type="submit" class="btn btn-primary">Sign in</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="account.login_submit">Sign in</kw-l></button>
         </form>
 
         <p class="mt-3 text-muted">
-            No account yet? <a asp-action="Signup">Sign up</a>
+            @* ADR 0050 — the sign-up gate: the "No account yet? Sign up." affordance
+               is suppressed when the admin gate is closed (invitation-only) — a
+               closed gate has no self-service signup surface to point at. *@
+            @if (Model.SignupOpen)
+            {
+                <kw-l key="account.login_no_account">No account yet?</kw-l>
+                <a asp-action="Signup"><kw-l key="account.login_signup">Sign up</kw-l></a>
+            }
             @if (Model.ShowSetupLink)
             {
-                <text>.<br />
-                Received a first-boot setup token? <a asp-controller="AdminSetup" asp-action="Setup"
-                    asp-route-returnUrl="@Model.ReturnUrl">Complete setup</a>.</text>
+                if (Model.SignupOpen)
+                {
+                    <text> </text>
+                }
+                <kw-l key="account.login_setup_hint">Received a first-boot setup token?</kw-l> <a asp-controller="AdminSetup" asp-action="Setup" asp-route-returnUrl="@Model.ReturnUrl"><kw-l key="account.login_setup_link">Complete setup</kw-l></a>
             }
-            else
+            else if (Model.SignupOpen)
             {
                 <text>.</text>
             }

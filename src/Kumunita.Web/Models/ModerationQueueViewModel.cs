@@ -60,6 +60,14 @@ public sealed class ModerationQueueViewModel
 /// decision), the <c>Reason</c> (verbatim, no truncation), the
 /// <c>Status</c> (the §2.3 item-2 literal), and the <c>At</c> stamp
 /// (UTC, as written by U4's <c>FileReportAsync</c>).
+/// <para>
+/// ADR 0023 (the reply-report-target lane): <see cref="ReplyId"/> is
+/// the target discriminator — <c>null</c> for a post-targeted report
+/// (the original M3b shape), non-<c>null</c> for a reply-targeted one.
+/// <see cref="ReplyAuthorName"/> is the reply's author's display name
+/// (a <c>IUserInfoService.GetProfileAsync</c> read — a read, not a
+/// decision; the UGC name is rendered as-is, never translated — M·3).
+/// </para>
 /// </summary>
 public sealed record ReportRow(
     string Id,
@@ -69,4 +77,6 @@ public sealed record ReportRow(
     string? ReporterName,
     string? Reason,
     string? Status,
-    DateTimeOffset At);
+    DateTimeOffset At,
+    string? ReplyId = null,
+    string? ReplyAuthorName = null);

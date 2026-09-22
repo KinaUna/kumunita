@@ -3,10 +3,9 @@
     ViewData["Title"] = "Admin — Audit";
 }
 
-<h1>Access audit</h1>
+<h1><kw-l key="admin.audit_title">Access audit</kw-l></h1>
 <p class="text-muted">
-    Every access decision on audience-restricted content — Allow and Deny — plus admin
-    actions and bulk list aggregate rows. Always-on; purged on a per-instance tier (§6.4).
+    <kw-l key="admin.audit_lede">Every access decision on audience-restricted content — Allow and Deny — plus admin actions and bulk list aggregate rows. Always-on; purged on a per-instance tier (§6.4).</kw-l>
 </p>
 
 <form method="get" class="row g-2 mb-3">
@@ -29,7 +28,7 @@
         </select>
     </div>
     <div class="col-auto">
-        <button class="btn btn-sm btn-outline-primary" type="submit">Filter</button>
+        <button class="btn btn-sm btn-outline-primary" type="submit"><kw-l key="admin.audit_filter">Filter</kw-l></button>
     </div>
 </form>
 
@@ -37,14 +36,14 @@
     <table class="table table-sm table-striped align-middle">
         <thead>
             <tr>
-                <th>At (UTC)</th>
-                <th>Actor</th>
-                <th>Effective</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Aggregate</th>
-                <th>Via</th>
-                <th>Outcome</th>
+                <th><kw-l key="admin.audit_th_at">At (UTC)</kw-l></th>
+                <th><kw-l key="admin.audit_th_actor">Actor</kw-l></th>
+                <th><kw-l key="admin.audit_th_effective">Effective</kw-l></th>
+                <th><kw-l key="admin.audit_th_action">Action</kw-l></th>
+                <th><kw-l key="admin.audit_th_target">Target</kw-l></th>
+                <th><kw-l key="admin.audit_th_aggregate">Aggregate</kw-l></th>
+                <th><kw-l key="admin.audit_th_via">Via</kw-l></th>
+                <th><kw-l key="admin.audit_th_outcome">Outcome</kw-l></th>
             </tr>
         </thead>
         <tbody>

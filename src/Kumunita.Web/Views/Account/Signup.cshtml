@@ -5,7 +5,7 @@
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
-        <h1>Sign up</h1>
+        <h1><kw-l key="account.signup_title">Sign up</kw-l></h1>
         <form asp-action="Signup" method="post">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger"></div>
@@ -34,7 +34,7 @@
                 <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
             </div>
 
-            <button type="submit" class="btn btn-primary">Sign up</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="account.signup_submit">Sign up</kw-l></button>
         </form>
 
         @if (Model is { EmailAlreadyExists: true })
@@ -46,7 +46,7 @@
         }
 
         <p class="mt-3 text-muted">
-            Already have an account? <a asp-action="Login">Sign in</a>.
+            <kw-l key="account.signup_has_account">Already have an account?</kw-l> <a asp-action="Login">Sign in</a>.
         </p>
     </div>
 </div>

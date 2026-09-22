@@ -1,19 +1,31 @@
 @model Kumunita.Web.Models.AnnouncementIndexViewModel
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = "Announcements";
     bool isGlobalAdmin = Kumunita.Web.Security.KumunitaPrincipal.IsGlobalAdmin(User);
     bool isModerator = User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.Moderator) ?? false;
+    string? subjectId = (User?.Identity?.IsAuthenticated == true) ? Kumunita.Web.Security.KumunitaPrincipal.SubjectId(User) : null;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
-        <h1>Announcements</h1>
-        <p class="text-muted">
-            Platform notices: public ones are visible to everyone (e.g.
-            scheduled maintenance); resident-only ones are visible to all
-            signed-in users (e.g. "help us with X" calls).
-        </p>
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="announcements.index_title">Announcements</kw-l></h1>
+                    <p class="lede">
+                        <kw-l key="announcements.index_lede">Platform notices: public ones are visible to everyone (e.g. scheduled maintenance); resident-only ones are visible to all signed-in users (e.g. "help us with X" calls).</kw-l>
+                    </p>
+                </div>
+                @if (isGlobalAdmin || isModerator || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value.StartsWith("moderator:")) ?? false))
+                {
+                    <a class="btn btn-outline-primary" href="/announcements/new">
+                        <kw-l key="announcements.new_button">New announcement</kw-l>
+                    </a>
+                }
+            </div>
+        </header>
 
         @if (TempData["info"] is string info)
         {
@@ -30,78 +42,101 @@
             </div>
         }
 
-        <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">All announcements</span>
-                @if (isGlobalAdmin || isModerator || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value.StartsWith("moderator:")) ?? false))
-                {
-                    <a class="btn btn-sm btn-outline-primary" href="/announcements/new">
-                        New announcement
-                    </a>
-                }
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    @if (Model.Announcements.Count == 0)
-                    {
-                        <li class="list-group-item text-muted">
-                            No announcements yet.
-                        </li>
-                    }
-                    @foreach (var a in Model.Announcements)
-                    {
-                        var badgeClass = a.Scope == AnnouncementScope.Public
-                            ? "text-bg-secondary"
-                            : "text-bg-primary";
-                        bool canEdit = isGlobalAdmin || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && isModerator) || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false));
+        <div class="airy-ann-list">
+            @if (Model.Announcements.Count == 0)
+            {
+                <div class="p-4 text-muted">
+                    <kw-l key="announcements.empty">No announcements yet.</kw-l>
+                </div>
+            }
+            @foreach (var a in Model.Announcements)
+            {
+                var badgeClass = a.Scope == AnnouncementScope.Public
+                    ? "text-bg-secondary"
+                    : "text-bg-primary";
+                // Edit affordance — mirrors the controller's CanEditAnnouncement
+                // (and the service's EnsureEditPermissionAsync gate at POST):
+                // Public → GlobalAdmin; flat "all residents" (Community, no
+                // target) → the author or a GlobalAdmin (a community moderator
+                // who did not author it is denied, ADR 0017); community-
+                // targeted → that community's moderator or a GlobalAdmin.
+                bool canEdit = (a.Scope == AnnouncementScope.Public && isGlobalAdmin)
+                    || (a.Scope == AnnouncementScope.Community && a.CommunityId is null && (isGlobalAdmin || (subjectId is not null && a.AuthorSubjectId == subjectId)))
+                    || (a.Scope == AnnouncementScope.Community && a.CommunityId is not null && (isGlobalAdmin || (User?.Claims.Any(c => c.Type == Kumunita.Core.Identity.ClaimTypes.Role && c.Value == Kumunita.Core.Identity.Roles.ModeratorComponent(a.CommunityId)) ?? false)));
+                // Author avatar monogram fallback (the Directory pattern —
+                // avatar.ts hides the <img> on the 404 the serving lane
+                // fails closed to; see site.css).
+                string authorAvatarInitial = !string.IsNullOrWhiteSpace(a.AuthorDisplayName)
+                    ? char.ToUpperInvariant(a.AuthorDisplayName.TrimStart()[0]).ToString()
+                    : string.Empty;
 
-                        <li class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="me-3">
-                                    @if (!string.IsNullOrWhiteSpace(a.Title))
-                                    {
-                                        <h5 class="mb-1">@a.Title</h5>
-                                    }
-                                    <div class="text-body">
-                                        @a.Body
-                                    </div>
-                                    <div class="text-muted small mt-1">
-                                        by @a.AuthorDisplayName — @a.Created.DateTime.ToString("ddd, MMM d yyyy")
-                                    </div>
-                                </div>
-                                <div class="d-flex flex-column align-items-end gap-2">
-                                    <span class="badge @badgeClass">
-                                        @(a.Scope == AnnouncementScope.Public ? "everyone" : (a.CommunityDisplayName is not null ? a.CommunityDisplayName : "residents"))
-                                    </span>
-                                    @if (a.Pinned)
-                                    {
-                                        <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
-                                            pinned
-                                        </span>
-                                    }
-                                    @if (canEdit)
-                                    {
-                                        <a class="btn btn-sm btn-link p-0" href="/announcements/@a.Id/edit">
-                                            Edit
-                                        </a>
-                                    }
-                                    @if (isGlobalAdmin)
-                                    {
-                                        <form method="post" action="/announcements/@a.Id/delete"
-                                              onsubmit="return confirm('Delete this announcement? This cannot be undone.');"
-                                              style="margin:0; display:inline;">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0">
-                                                Delete
-                                            </button>
-                                        </form>
-                                    }
-                                </div>
-                            </div>
-                        </li>
-                    }
-                </ul>
-            </div>
+                @* The body is long by design (a pinned announcement can
+                   run to pages) — the list shows only the first 250
+                   characters; the full text lives at the row's detail
+                   view (GET /announcements/{id}). *@
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })">@a.Title</a>
+                        </h3>
+                        <p class="airy-ann-preview mb-2">
+                            @MarkdownRenderer.PlainTextPreview(a.Body, 250)
+                            <a href="@Url.Action("Detail", "Announcement", new { id = a.Id })"><kw-l key="announcements.read_more">Read more…</kw-l></a>
+                        </p>
+                        <div class="airy-ann-meta">
+                            <span class="d-inline-flex align-items-center">
+                                <img class="avatar" src="/profile/avatar/@a.AuthorSubjectId" alt=""
+                                     data-avatar-fallback>
+                                <span class="avatar-mono" style="display:none;">@authorAvatarInitial</span>
+                            </span>
+                            <span>@a.AuthorDisplayName — <kw-dt dt="@a.Created" format="g"></kw-dt></span>
+                        </div>
+                    </div>
+                    <div class="airy-ann-side">
+                        <div class="d-flex gap-2 flex-wrap justify-content-end">
+                            <span class="badge @badgeClass">
+                                @if (a.Scope == AnnouncementScope.Public)
+                                {
+                                    <kw-l key="announcements.scope_everyone">everyone</kw-l>
+                                }
+                                else if (a.CommunityDisplayName is not null)
+                                {
+                                    @a.CommunityDisplayName
+                                }
+                                else
+                                {
+                                    <kw-l key="announcements.scope_residents">residents</kw-l>
+                                }
+                            </span>
+                            @if (a.Pinned)
+                            {
+                                <span class="badge text-bg-warning" title="Shown as a banner at the top of every page">
+                                    <kw-l key="announcements.pinned_badge">pinned</kw-l>
+                                </span>
+                            }
+                        </div>
+                        <div class="airy-ann-actions">
+                            @if (canEdit)
+                            {
+                                <a class="link-quiet small text-decoration-none" href="/announcements/@a.Id/edit">
+                                    <kw-l key="announcements.edit_button">Edit</kw-l>
+                                </a>
+                            }
+                            @if (isGlobalAdmin)
+                            {
+                                <form method="post" action="/announcements/@a.Id/delete"
+                                      data-confirm="Delete this announcement? This cannot be undone.""
+                                      style="margin:0; display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="link-quiet small text-danger text-decoration-none border-0 bg-transparent p-0">
+                                        <kw-l key="announcements.delete">Delete</kw-l>
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>

@@ -7,14 +7,12 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-7">
-        <h1>Your profile</h1>
+        <h1><kw-l key="profile.title">Your profile</kw-l></h1>
         <p class="text-muted">
-            This is where you decide what other residents can see about you.
-            Whatever you choose here is exactly what the neighbor directory
-            shows — no surprises.
+            <kw-l key="profile.edit_lede">This is where you decide what other residents can see about you. Whatever you choose here is exactly what the neighbor directory shows — no surprises.</kw-l>
         </p>
 
-        <h5 class="mt-4 mb-2" style="font-weight:600;">Your avatar</h5>
+        <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.avatar_heading">Your avatar</kw-l></h5>
         @*
           U8 of the media feature (design doc §2.4; C-MED·5/6/8): the avatar
           upload is its OWN write lane (U6's AvatarUpload — POST /profile/avatar,
@@ -47,27 +45,26 @@
             @if (!string.IsNullOrEmpty(avatarSubject))
             {
                 <span class="d-inline-flex align-items-center">
-                    <img class="avatar" src="/profile/avatar/@avatarSubject" alt=""
+                    <img class="avatar avatar-lg" src="/profile/avatar/@avatarSubject" alt=""
                          data-avatar-fallback>
-                    <span class="avatar-mono" style="display:none;">@avatarInitial</span>
+                    <span class="avatar-mono avatar-lg" style="display:none;">@avatarInitial</span>
                 </span>
             }
             else
             {
-                <span class="avatar-mono">@avatarInitial</span>
+                <span class="avatar-mono avatar-lg">@avatarInitial</span>
             }
-            <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+            <form method="post" action="/profile/avatar" enctype="multipart/form-data" data-avatar-upload>
                 @Html.AntiForgeryToken()
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <input type="file" name="file" required
                            accept="image/jpeg,image/png,image/webp,image/gif"
                            aria-label="Avatar image"
                            class="form-control form-control-sm">
-                    <button type="submit" class="btn btn-primary btn-sm">Save avatar</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled><kw-l key="profile.save_avatar">Save avatar</kw-l></button>
                 </div>
                 <div class="form-text small">
-                    JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the
-                    avatar currently shown in the directory.
+                    <kw-l key="profile.avatar_hint">JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the avatar currently shown in the directory.</kw-l>
                 </div>
             </form>
         </div>
@@ -81,7 +78,7 @@
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger"></div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;">Your name + email</h5>
+            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.name_email_heading">Your name + email</kw-l></h5>
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label asp-for="DisplayName" class="form-label"></label>
@@ -95,7 +92,7 @@
                 </div>
             </div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;">Your address (optional)</h5>
+            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.address_heading">Your address + phone (optional)</kw-l></h5>
             <div class="row g-2">
                 <div class="col-sm-12">
                     <label asp-for="Address" class="form-label"></label>
@@ -103,14 +100,23 @@
                            placeholder="Street — shown to neighbors when you opt in below" />
                     <span asp-validation-for="Address" class="text-danger"></span>
                     <div class="form-text small">
-                        Shown on the directory list and detail only when you've also
-                        opted in the contact block below; leave empty to keep your
-                        street private to this profile.
+                        <kw-l key="profile.address_hint">Shown on the directory list and detail only when you've also opted in the contact block below; leave empty to keep your street private to this profile.</kw-l>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-sm-6">
+                    <label asp-for="Phone" class="form-label"></label>
+                    <input asp-for="Phone" class="form-control" maxlength="32"
+                           placeholder="Phone — shown to neighbors when you opt in below" />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
+                    <div class="form-text small">
+                        <kw-l key="profile.phone_hint">Shown on the directory detail only when you've opted in the contact block below; leave empty to keep your number private to this profile.</kw-l>
                     </div>
                 </div>
             </div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;">Who can see what</h5>
+            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.who_heading">Who can see what</kw-l></h5>
 
             @* The two audience editors share ONE partial (the U11 "only one
                _AudienceEditor.cshtml exists" pin). Each invocation is
@@ -134,13 +140,10 @@
                        value="true"
                        @(Model.OptInContactVisibility ? "checked" : null) />
                 <label class="form-check-label" for="optin-contact">
-                    <b>Share my contact info (address, email, phone)</b>
+                    <b><kw-l key="profile.optin_contact">Share my contact info (address, email, phone)</kw-l></b>
                     <br/>
                     <span class="text-muted small">
-                        Leave this off if you'd rather keep your address,
-                        email, and phone completely hidden from the
-                        directory. When it's on, you choose <i>who</i> can see
-                        it in the box below.
+                        <kw-l key="profile.optin_contact_note">Leave this off if you'd rather keep your address, email, and phone completely hidden from the directory. When it's on, you choose who can see it in the box below.</kw-l>
                     </span>
                 </label>
             </div>
@@ -152,10 +155,10 @@
             <partial name="_AudienceEditor" model="Model" />
 
             <div class="d-flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="submit" class="btn btn-primary"><kw-l key="profile.save">Save</kw-l></button>
                 <a class="btn btn-outline-secondary"
                    href="@Url.Action("Preview","Profile")">
-                    Preview — how I appear
+                    <kw-l key="profile.preview_link">Preview — how I appear</kw-l>
                 </a>
             </div>
         </form>

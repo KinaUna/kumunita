@@ -56,6 +56,19 @@ public interface IIdentityService
     Task<ResendVerificationResult> ResendVerificationEmailAsync(string email);
 
     /// <summary>
+    /// GA (ADR 0038): resolve an email to a subject id (the assign
+    /// form's one external identifier). A read — no audit row, no
+    /// mutation. Returns the subject id, or null if the email has no
+    /// account (the Web's user-presentable error surface — the ADR
+    /// 0008 "a non-guardian learns nothing" shape: a null return, not
+    /// an exception that names the email). ADR 0006-E compatible
+    /// ADD — the M1 lifecycle ADD precedent (the
+    /// <c>ResendVerificationEmailAsync</c> shape, a read over
+    /// <c>userManager.FindByEmailAsync</c>).
+    /// </summary>
+    Task<string?> FindSubjectByEmailAsync(string email);
+
+    /// <summary>
     /// Consume a verification link (the resident clicked the link — the handoff ends
     /// on-platform): set <see cref="Profile.Verified"/>, mark the token consumed, audit
     /// (<c>via: Owner</c> — the resident verifying their own account).
@@ -120,16 +133,25 @@ public interface IIdentityService
     Task ConsumeBreakGlassAsync(string subjectId, string token);
 
     /// <summary>
-    /// Role promote/demote + component-scope assignment (ADR 0003): a GlobalAdmin promotes
-    /// to / demotes from <c>GlobalAdmin</c> or <c>Moderator</c>; for a <c>Moderator</c>,
-    /// <paramref name="componentIds"/> is the complete scope (null/empty clears it — the
-    /// only standing-moderator path is <c>moderatorAccess</c>, invariant C5). Rotates the
-    /// security stamp (invalidates existing sessions — a demoted account loses the
-    /// elevated access immediately, not at cookie expiry, OPS §10). Appends an audit row
-    /// <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call this.
+    /// Role promote/demote + component-scope assignment (ADR 0003; the <c>Translator</c>
+    /// lane is ADR 0021; **role independence** — any combination of elevated roles — is
+    /// ADR 0030): a GlobalAdmin sets the target's **set** of elevated roles, <paramref
+    /// name="roles"/> — any subset of <c>GlobalAdmin</c>, <c>Moderator</c>, and
+    /// <c>Translator</c> (an account may hold more than one at once; e.g. a GlobalAdmin
+    /// who also holds <c>Translator</c> to stand in for the community's translators).
+    /// <c>Member</c> is the implicit verified-resident standing and is never carried in
+    /// the set; an **empty** set means "no elevated role" (a plain Member). For a
+    /// <c>Moderator</c>, <paramref name="componentIds"/> is the complete scope
+    /// (null/empty clears it — the only standing-moderator path is
+    /// <c>moderatorAccess</c>, invariant C5); a <c>Translator</c> holds no component
+    /// scope, so <paramref name="componentIds"/> applies only when <c>Moderator</c> is
+    /// in the set. Rotates the security stamp (invalidates existing sessions — a demoted
+    /// account loses the standing immediately, not at cookie expiry, OPS §10). Appends
+    /// an audit row <c>(via: Admin, action: "role")</c>. Only a GlobalAdmin may call
+    /// this.
     /// </summary>
-    Task SetRoleAsync(string targetSubjectId, string adminSubjectId, string role,
-        IReadOnlyList<string>? componentIds);
+    Task SetRoleAsync(string targetSubjectId, string adminSubjectId,
+        IReadOnlyCollection<string> roles, IReadOnlyList<string>? componentIds);
 
     /// <summary>
     /// Change password (self-serve, or a GlobalAdmin reset): rotates the security stamp
@@ -137,4 +159,30 @@ public interface IIdentityService
     /// <c>(via: Owner | Admin)</c>.
     /// </summary>
     Task ChangePasswordAsync(string subjectId, string newPassword, bool byAdmin);
+
+    // ── Signup policy (ADR 0050 — the admin-managed open / invitation-only gate) ──
+
+    /// <summary>
+    /// Whether self-service sign-up is currently open on this instance (ADR 0050).
+    /// The Web's <c>AccountController</c> reads this to hide the public <c>Sign up</c>
+    /// surface and to deny the signup write when it is closed (the README's deferred
+    /// "Invitation-only sign-up" item — the long-term default the community should
+    /// run under once it widens beyond the development circle). A read (no audit
+    /// row); the <c>true</c> floor — a missing singleton or a null value both yield
+    /// <c>true</c>, so a fresh instance ships with sign-up open.
+    /// </summary>
+    Task<bool> IsSignupOpenAsync();
+
+    /// <summary>
+    /// Set whether self-service sign-up is open (ADR 0050): a GlobalAdmin flips the
+    /// instance-wide gate — <c>true</c> opens the public <c>Sign up</c> surface
+    /// (the development-circle default), <c>false</c> closes it (the invitation-only
+    /// state: existing residents are unaffected; only new self-service accounts are
+    /// gated). Writes the <see cref="Kumunita.Core.Localization.LocaleSettings.IsSignupOpen"/>
+    /// singleton and appends exactly one <c>AccessAudit</c> row
+    /// (<c>via: Admin</c>, action <c>"signup.set-open"</c>, target "signup") in the
+    /// same session (C3 — no silent, unaudited access). Only a GlobalAdmin may call
+    /// this; the Web's <c>AdminSignupController</c> enforces the gate.
+    /// </summary>
+    Task SetSignupOpenAsync(bool open, string adminSubjectId);
 }

@@ -7,13 +7,12 @@
     <div class="col-md-8 col-lg-7">
         <p>
             <a href="@Url.Action("Index", "Groups")" class="btn btn-link p-0">
-                &larr; Back to groups
+                <kw-l key="groups.create_back">&larr; Back to groups</kw-l>
             </a>
         </p>
-        <h1>Create a group</h1>
+        <h1><kw-l key="groups.create_title">Create a group</kw-l></h1>
         <p class="text-muted">
-            A name for a community of residents (e.g. "Building 4", "Volunteers", "Bike owners").
-            You own the group — you can add and remove members from the group's detail page (M2, plan U10).
+            <kw-l key="groups.create_lede">A name for a community of residents (e.g. "Building 4", "Volunteers", "Bike owners"). You own the group — you can add and remove members from the group's detail page (M2, plan U10).</kw-l>
         </p>
 
         <form asp-action="Create" method="post">
@@ -29,7 +28,7 @@
                 <label asp-for="Description" class="form-label"></label>
                 <textarea asp-for="Description" class="form-control" rows="3" maxlength="500"></textarea>
                 <span asp-validation-for="Description" class="text-danger"></span>
-                <div class="form-text">Optional — a short note other residents will see.</div>
+                <div class="form-text"><kw-l key="groups.create_desc_hint">Optional — a short note other residents will see.</kw-l></div>
             </div>
 
             <div class="mb-3">
@@ -38,14 +37,11 @@
                     <label asp-for="IsPrivate" class="form-check-label"></label>
                 </div>
                 <div class="form-text">
-                    A private group (e.g. a family) is hidden from everyone else's
-                    grant/access lists — only people you add as members can use it.
-                    A public group (e.g. "Mushroom hunters") shows up as an option
-                    in other residents' pickers.
+                    <kw-l key="groups.create_private_hint">A private group (e.g. a family) is hidden from everyone else's grant/access lists — only people you add as members can use it. A public group (e.g. "Mushroom hunters") shows up as an option in other residents' pickers.</kw-l>
                 </div>
             </div>
 
-            <button type="submit" class="btn btn-primary">Create group</button>
+            <button type="submit" class="btn btn-primary"><kw-l key="groups.create_submit">Create group</kw-l></button>
         </form>
     </div>
 </div>

@@ -26,6 +26,16 @@ public static class M3DocTypes
         opts.Schema.For<Post>();
         opts.Schema.For<PostReply>();
 
+        // User-added translations (ADR 0022; the "separate, later feature" ADR
+        // 0018 deferred). Each is one row per (parent, language) pair — the
+        // (PostId|ReplyId, LanguageCode) unique index enforces that at the DB
+        // layer (the M1 ComponentMembership / GroupMembership business-key
+        // convention; the surrogate Id is the document identity).
+        opts.Schema.For<PostTranslation>()
+               .UniqueIndex(t => t.PostId, t => t.LanguageCode);
+        opts.Schema.For<ReplyTranslation>()
+               .UniqueIndex(t => t.ReplyId, t => t.LanguageCode);
+
         // Report: table-in-M3 / flow-in-M3b (design doc §2.2 + §2.6 flag). The
         // table is registered now for forward compatibility; the workflow
         // (file / assign / unlock / resolve) is M3b's, and M3b will add the
@@ -36,5 +46,24 @@ public static class M3DocTypes
         // + community-scope, flat two-fixed-audience split; see
         // Announcements.AnnouncementScope for the visibility contract).
         opts.Schema.For<Announcement>();
+
+        // User-added announcements translations (ADR 0029; the same
+        // user-authored-not-machine-translated lane ADR 0022 shipped for
+        // posts/replies and ADR 0026 for group/community names, carried over
+        // to the Announcements bounded context). One row per (announcement,
+        // language) pair — the (AnnouncementId, LanguageCode) unique index
+        // enforces that at the DB layer (the ComponentMembership /
+        // GroupMembership business-key convention; the surrogate Id is the
+        // document identity).
+        //
+        // An explicit short index name is required: the auto-derived
+        // `mt_doc_announcementtranslation_uidx_announcement_idlanguage_code`
+        // is 65 chars — one over Postgres's 64-char NAMEDATALEN limit (the
+        // Weasel migrator's PostgresqlIdentifierTooLongException). The
+        // PostTranslation / ReplyTranslation counterparts are short enough
+        // to use the default; this one is not.
+        opts.Schema.For<AnnouncementTranslation>()
+               .UniqueIndex("ann_tr_uidx_ann_lang",
+                            t => t.AnnouncementId, t => t.LanguageCode);
     }
 }

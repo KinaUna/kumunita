@@ -26,7 +26,9 @@ architecture is organized through. Two concrete mappings are worth keeping in vi
   | **M3** posts, components, moderation | **understanding → decision** — a signal reaches its audience; a report links to a moderator |
   | **M4** events, RSVP, reminders | **coordination** — a decision becomes an owned, scheduled, reminded action |
   | **M5** projects (goals, tasks, contributors) | **coordination → outcome** — many signals re-linked into one goal with owners |
-  | **M6** portability, iCal, notifications, search, multilingual | **outcome + world seams** — the loop closes *into* the residents' lives (ADR 0005) |
+  | **M6** portability, iCal, notifications, search | **outcome + world seams** — the loop closes *into* the residents' lives |
+
+  (Named lanes — `GP` group posts, media (ADR 0011), `ML` multilingual (ADR 0005), and `ML-UI` live-UI multilingual (ADR 0015) — ship on their own design docs and value-chain steps, not as M-letter rows in this table; `ML` and `ML-UI` are *shipped* lanes, `GP` and media likewise.)
 
 - **The seams are the architecture.** The "modular monolith" in §3 is the
   integration discipline applied: few stable module interfaces over one process,
@@ -68,7 +70,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   ├── ARCHITECTURE.md
     │   ├── SECURITY.md             # threat model, data classes, control map
     │   ├── OPS.md                  # operations runbook
-    │   ├── adr/                    # 0001–0011
+    │   ├── adr/                    # 0001–0053 (the running decision ledger — append-only, highest number = newest)
     │   ├── design/                 # per-milestone design docs (M1: m1-identity-access.md)
     │   └── philosophy/             # development philosophy (START-HERE.md, templates/)
     ├── src/
@@ -79,16 +81,18 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── M3DocTypes.cs       # M3 + M3b Marten-native doc registration (Post, PostReply, Report, Announcement)
     │   │   ├── MediaDocTypes.cs    # M4-adjacent Marten-native doc registration (MediaObject) — ADR 0011
     │   │   ├── Bootstrap/          # SchemaBootstrap, FirstBootSeeder
-    │   │   ├── Identity/           # IdentityModule (M1) + DbBootstrap (first-boot pristine gate); also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004)
-    │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService
+    │   │   ├── Identity/           # IdentityModule (M1) + DbBootstrap (first-boot pristine gate); also the side-effect seam: ISmtpSender/SmtpSender, IMailerStage/OutboxEmailStager, EmailDeadLetterWriter; AppDbContext lives here (EF Core, `identity` schema, ADR 0004); GA ✓ (ADR 0038) — `IIdentityService.FindSubjectByEmailAsync` (the email → subject id resolution; G-A·2 no-leak shape: null on unknown email, no auto-create)
+    │   │   ├── UserInfo/           # UserInfoModule (M1) + M2 directory/profile-editor/groups surface: DirectoryService (list/detail/preview), Profile, Group, DelegationGrant, Component, IUserInfoService; GU ✓ (ADR 0028) — GuardianLink (account-scope supervision: suspend / membership curation / invitation approval; **no content read**, G·1) + the `AccessVia.Guardian` standing (the 9th value) + the IUserInfoService guardian seams (formation / suspend / dissolve); see design/guardian-controls-design.md § GU — Closed (recorded) (2026-09-14); GA ✓ (ADR 0038) — the Detail view's "other guardians" list: the `GuardianItem` record + the `MembershipEditorModel.GuardianItems` field (the assigned guardian's display name; G-A·3 identical-in-kind pin — the standing is identical to the creator's, no content read); see design/guardian-assignment-design.md § GA — Closed (recorded) (2026-09-17)
     │   │   ├── Authorization/      # AuthorizationModule (M1) — audiences, policy, audit; AuditPurgeService (Wolverine-free tiering); AdminOverride (break-glass read path)
-    │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
-    │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; the "platform announcements" lane
+    │   │   ├── Posts/              # M3 ✓ — Post / PostReply / Report docs + PostService (feed/detail/create/reply) + component-organized feeds; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); see design/m3-posts-design.md § Run result (M3 acceptance gate — 2026-09-04)
+    │   │   ├── Announcements/      # M3b ✓ — Announcement (public + community scope, flat two-way split) + AnnouncementService; RC ✓ (ADR 0025) — `ImageIds` (R·7) + the serving route's owner-branch (R·4); the "platform announcements" lane
     │   │   ├── Moderation/         # M3b ✓ — ModerationService (file/assign/unlock/resolve) + the `Via = Report` read branch + the hide/remove lanes; see design/m3b-moderation.md § M3b — Closed (recorded) (2026-09-09)
-    │   │   ├── Localization/       # ADR 0005 — LanguageCatalog, LocaleSettings (shipped in M1's surface); TranslationResource / LocalizedPage land with M6's admin UI
-    │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11)
+    │   │   ├── Localization/       # ADR 0005 ✓ (ML) — LanguageCatalog, LocaleSettings (M1 seed) + TranslationResource (the UI-string content doc) + ITranslationProvider (read) / ILocalizationService (admin) + LanguageCompleteness; ADR 0015 ✓ (ML-UI) adds KnownTranslationKeys (the closed en registry, D2) + the GetTranslationsForAsync batch read on ILocalizationService; the static-page content lane moved to the Pages context (ADR 0039 retired `LocalizedPage`); see design/multilingual-design.md § Multilingual — Closed (recorded) (2026-09-12)
+    │   │   ├── Media/              # ADR 0011 ✓ — MediaObject catalog doc + IMediaStore / IMediaFileStore (content-addressed volume bytes, HTTP-free) + MediaOptions; the profile-avatar reference lane; ADR 0025 ✓ (RC) — the content-image lane (same store, same catalog); ADR 0034 ✓ (ATT) — the file-attachment (download) lane: a separate route + allowlist + `Content-Disposition: attachment` over the same store (one store, one volume, one catalog — C-ATT·1/3); see design/media-file-storage-design.md § Media — Closed (recorded) (2026-09-11) + design/file-attachments-design.md § File attachments — Closed (recorded) (2026-09-16)
+    │   │   ├── Pages/              # ADR 0039–0043 ✓ (PG) — Page + PageTranslation docs (a hierarchical, audience-restricted, translatable knowledge tree) + PageService (mount / read / edit / translate) + PageToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService); ADR 0040 ✓ (PG) — PageKind (System vs blog) + the read-only /blog feeds; ADR 0041 ✓ — the Audience.AllResidents flag; ADR 0043 ✓ (SP) — the four canonical system pages (/terms /help /privacy /conduct) as PageKind.System rows; absorbs + retires the LocalizedPage static-page lane; see design/pages-design.md
+    │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
-    │   │   ├── Events/             # M4 — not yet created
+    │   │   ├── Events/             # M4 ✓ (ADR 0054) — Event + EventRsvp docs + EventService (feed/detail/compose + last-write-wins RSVP) + EventToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService) + the EventReminders §6.4 job (EventReminderService/Handler/Tick over the M1 durable-email trio) + the author ∪ GlobalAdmin standing matrix enforced **server-side** in the EventService (the edit/delete write lanes carry the principal's actorRoles, the AnnouncementService/PageService precedent — the GlobalAdmin override is exercised in the service, not deferred to the Web boundary; the audit row tags the branch: Owner/Admin); gate 2026-09-21: Core 668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests green together; re-verified after U13's GlobalAdmin-override seam fix: Core 670/670 + Web 351/351, the 25 M4 seam tests (T01–T25) green together; see design/m4-events-design.md § Run result (M4 acceptance gate — 2026-09-21)
     │   │   └── Projects/           # M5 — not yet created
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
@@ -102,7 +106,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │       ├── Views/              # Razor views + Layout; per-feature folders (Account, Admin, AdminSetup, Announcement, Directory, Groups, Home, Moderation, Posts, Profile, Shared)
     │       ├── package.json / tsconfig.json   # tsc-only TS build (no bundler)
     │       ├── client/             # plain TS sources
-    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash
+    │       │   └── lib/            # api.ts (CSRF-aware fetch, §7), toasts, flash, insert-image.ts (RC 0025 upload lane), rich-editor.ts (RE 0031 / IE 0032 / WY 0033 composer surface: the toolbar, the rendered pane, the `contenteditable` editing surface, the read-only code-view mirror), dom-to-markdown.ts (WY 0033 ✓ live — `toMarkdown` serializer + `sanitizeHtml` sanitizer, the inverse of `renderPreview`; gate 167/167 green, closed-loop + handoff manual gates recorded as not-run with the automated floor covering the same contract)
     │       └── wwwroot/            # js/ (tsc output, compiled — not source), css/, lib/ (bootstrap + jQuery validation)
     └── tests/
         ├── Kumunita.Core.Tests/    # XUnit; PostgresFixture = one shared postgres:18 per class,
@@ -112,9 +116,9 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
 
 Two projects. `Core` holds all business logic behind interfaces and never references
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
-layer. `Web` is a thin HTTP/Razor/TS shell. `Events/` and `Projects/` (M4 and M5
-respectively) are marked *not yet created* — the next milestone additions per the §3
-feature module list.
+layer. `Web` is a thin HTTP/Razor/TS shell. `Projects/` (M5) is marked *not
+yet created* — the next milestone addition per the §3 feature module list
+(`Events/`, M4, is live — ADR 0054).
 
 ## 3. Modular monolith & bounded contexts
 
@@ -124,16 +128,32 @@ the seam for later extraction.
 - **IdentityModule** — authentication; issues the thin principal.
 - **UserInfoModule** — who people are: profiles, groups, delegation.
 - **AuthorizationModule** — what they may do: audiences, policy, audit.
-- **LocalizationModule** — language catalog, default language, translated UI
-  strings and static pages (ADR 0005); consumed by the presentation layer, never
-  by feature authorization.
-- **Feature modules** — Directory, Posts, Events, Projects, Moderation, Media.
+- **LocalizationModule** — language catalog, default language, and translated UI
+  strings (ADR 0005); consumed by the presentation layer, never by feature
+  authorization. (Static pages live in the `Pages` context now, ADR 0039.)
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054). (Projects is M5 — planned, not yet created, per the §3 tree above.)
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:
   content-addressed payloads on a dedicated volume behind the HTTP-free
   `IMediaStore` seam, cataloged in `mt`, served only through an audited app
-  endpoint (the profile avatar is the reference lane).
+  endpoint (the profile avatar is the reference lane). The same store now
+  carries **two** lanes over **one** volume + **one** catalog (C-ATT·1/3):
+  the **content-image** lane (ADR 0025, `GET /content-image/{id}`, inline
+  `<img>`) and the **file-attachment** download lane (ADR 0034,
+  `GET /attachment/{id}`, `Content-Disposition: attachment` + `nosniff`). The
+  attachment lane is a **separate** lane — a separate route, a separate
+  allowlist (`MediaOptions.AttachmentAllowedContentTypes`, distinct from the
+  image `AllowedContentTypes`), and download semantics — over the **same**
+  `IMediaStore` / `MediaObject` / `MaxBytes`. The owning doc carries an
+  additive `AttachmentIds` POCO field on `Post` / `PostReply` / `Announcement`
+  (ADR 0004 §B.1, **zero migrations**), **separate** from `ImageIds`; the
+  ids are derived **server-side** from the body (Core never parses a body,
+  C-ATT·4). The serve route reuses the owning resource's single
+  `CanAsync(…Read…)` decision — a **reply resolves its parent post's** decision
+  (C-ATT·8; a document-session load, **no new `PostService`** seam), a post
+  its own, an announcement its flat scope gate (zero `AccessAudit` rows).
+  Every miss is a 404; one `Deny` row on a UGC deny, zero elsewhere (C-ATT·7/10).
 
 Dependency rule: feature modules depend on the three identity/access modules (and Marten),
 never the reverse. AuthorizationModule may call UserInfoModule to resolve groups; it never
@@ -183,6 +203,14 @@ swap mechanical (the cookie simply becomes an OIDC `sub`).
       Task<VisibleSet> CanSeeAsync(string actorId, Action action,
                                    IEnumerable<IAuditableResource> candidates);
       // VisibleSet = { visible: [ { id, via: Owner|Audience|Delegation } ], hiddenCount }
+      // Group lane (ADR 0013, group posts milestone) — membership is the SOLE
+      // decision: CanSeeGroupAsync(actorId, groupId, targetPostId?) for
+      // detail/create-gate (one decision audit row) and
+      // CanSeeGroupFeedAsync(actorId, groupId, candidateCount) for the feed
+      // (one aggregate row). Via = Group, or Delegation when an in-scope
+      // `read` grant acts with the owner's membership. There is NO moderator
+      // and NO break-glass branch (G·4 — "nobody peeks", standing not
+      // available), and the audience lane is never evaluated.
     }
 
 ### 4.3 Access model
@@ -317,6 +345,7 @@ UserInfoModule
   // (Deliberate vocabulary: in ASP.NET a "principal" is the *actor*, so the grant
   // fields avoid that word — see §4.2.)
   DelegationGrant  { id, ownerId, delegateId, scope: [action], from, to?, revokedBy? }
+  GuardianLink     { id, guardianId, childId, status: Active|Dissolved, createdAt, dissolvedAt?, dissolvedBy? }   // GU (ADR 0028): the account-scope supervision link (standing off an Active row, G·2); dissolve one-way (G·5)
 
   // `householdId` is display/metadata ONLY (future group-helper: "family from
   // household", §10). The authorization path never reads it — household-based
@@ -326,13 +355,22 @@ Content
   Component        { id, name, description, icon, sortOrder, enabled, moderatorAccess }
   Post             { id, kind: Announcement|Discussion, componentId?, authorId, title, body,
                      audience, pinned, hidden, created, updated }
+  // Group lane (ADR 0013, group posts milestone): a group post is a Post with
+  // `groupId` non-empty — membership is the sole access decision, `audience`
+  // is written non-null and empty (never evaluated), `componentId` empty (the
+  // post is excluded from component + "all sections" feeds); PostReply is
+  // unchanged (lane-neutral) — a reply inherits the parent's single
+  // group-lane decision.
   PostReply        { id, postId, authorId, body, created }
   Audience         { mode: Any|All, grants: [ { kind: User|Group, id } ] }   (embedded)
 
-Events
-  Event            { id, title, description, componentId?, authorId, start, end, location?,
-                     capacity?, audience, rsvpRequired }
-  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }
+Events (M4 ✓ — ADR 0054; the names below are the canonical field set the
+shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md §3.1)
+  Event            { id, title, body, componentId?, authorId, start, end, location?,
+                     capacity?, audience, reminderEnabled, isDraft, isDeleted,
+                     languageCode, tagIds, imageIds, attachmentIds,
+                     created, modified? }
+  EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }   // (eventId, userId) unique — last-write-wins (ADR 0054 §3.2)
 
 Projects
   Project          { id, title, description, componentId?, ownerId, status, audience, created }
@@ -352,7 +390,7 @@ Moderation / audit
   // visibleCount/hiddenCount instead of a single targetId
   AccessAudit      { id, at, actorId, effectivePrincipalId?, action, targetKind, targetId?,
                      visibleCount?, hiddenCount?,
-                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin,
+                     via: Owner|Audience|Moderator|Report|Delegation|BreakGlass|Admin|Group,
                      outcome: Allow|Deny }
 
 Email outbox
@@ -477,8 +515,8 @@ Explicitly not used: event sourcing, distributed workflows.
   validates it on all non-GET endpoints (enforced, not opt-in — see OPS.md §10).
 - **Strings:** all user-facing text is resolved server-side through the localization
   provider (Razor tag helper over `TranslationResource`); `client/*.ts` holds logic, not
-  display strings. Static pages (terms, about, help) are `LocalizedPage` Markdown rendered
-  by a single page engine (§9, ADR 0005).
+  display strings. Static pages (terms, help, privacy, conduct) are `PageKind.System`
+  page docs rendered by the single page engine (§9, ADR 0039–0043).
 
 ## 8. Deployment & configuration
 
@@ -523,16 +561,45 @@ dead-letter count is non-zero — §6.2); scheduled `pg_dump` + offsite copy.
 
 ## 9. Localization (multilingual)
 
-Design and rationale in ADR 0005; this is the operating shape. **Current state:** the
-shipped surface is the first-boot seed of the language catalog + instance default
-(`LanguageCatalog`, `LocaleSettings`; M1). Everything below — the translation provider,
-user preference, the admin surface, `LocalizedPage` — lands with M6 (see
-`M1DocTypes.cs` and the README roadmap).
+Design and rationale in ADR 0005; this is the operating shape. **Current state: the
+`ML` lane is shipped** (2026-09-12 — see `design/multilingual-design.md`
+§ Multilingual — Closed) — the two content documents (`TranslationResource` /
+`LocalizedPage`), the `ITranslationProvider` read seam, the `ILocalizationService`
+admin seam, the `LocaleCookie` preference, and the `/admin/languages` + settings +
+`/terms`/`/help` Web surface are all live. **`ML-UI` (ADR 0015, 2026-09-12) then
+wired that seam into the views** — the full platform UI surface (251 keys,
+the registry's completeness universe equals exactly what the views emit)
+resolves per request through a `<kw-l>` TagHelper against the provider, the
+`en` floor is the `KnownTranslationKeys` registry's own source text (code is
+the floor — the first-boot seeder's `en` rows are a stored copy, no reseed is
+ever needed), the admin editor is key-managed (a closed list, no hand-typed
+key), and the picker is public (signed-out residents can choose a language) —
+closing the `/about` follow-on the `ML` record had left open. The `SP` lane
+(ADR 0043) widened the static-page routes from three to the **five-surface
+set**: `/privacy` + `/conduct` join the hard-coded routes (404 floor, ADR
+0043 D2) alongside `/terms` / `/help`; the four `Page`-backed surfaces (terms
+/ help / privacy / conduct) are seeded under the `system/` root, `/about`
+stays the product-story **view** (not a seeded page, ADR 0043 D1), and the
+footer now carries an unconditional "Platform" column linking all five (ADR
+0043 D4).
 
-- **What is translatable:** UI strings and platform static pages (terms, about,
-  help) — §5 documents. UGC is always rendered **as authored**; machine
+- **What is translatable:** UI strings and platform static pages (terms, help,
+  privacy, conduct — the `PageKind.System` pages, §9) — §5 documents. UGC is always rendered **as authored**; machine
   translation is deferred and, if it ever ships, per-item opt-in with a
-  third-party-boundary review (ADR 0005 C, SECURITY.md §6).
+  third-party-boundary review (ADR 0005 C, SECURITY.md §6). Separately, each UGC
+  document carries an **authored-in language tag** (`LanguageCode` on `Post` /
+  `PostReply` / `Announcement`, ADR 0018) — a BCP-47 metadata field for future
+  search and reader-added language versions, resolved to a concrete code at
+  write time (instance default → `en`); it translates nothing. The **TD lane**
+  (ADR 0027) builds on that tag at the **display** layer only: on the
+  post/reply detail surface the authored-in code is surfaced **additively**
+  (as `OriginalLanguageCode` on `PostDetailViewModel` /
+  `GroupPostDetailViewModel` / `ReplyItem`, read from the ADR 0018 field) and
+  rendered as the first, default-visible variant chip, toggled by a small
+  server-rendered / client-`display`-toggle swap. It adds **no** document and
+  **no** migration (ADR 0004 §B.1 is not engaged — the field already exists)
+  and leaves the ADR 0022 add-translation write lane untouched; the swap is a
+  presentation concern, not a data, schema, or authorization one (TD·7).
 - **Storage:** languages, the default, and all translations are data in `mt` —
   not env, not image config. Admins add/remove languages and set the default
   in-app; the change is effective on the next request, no redeploy.
@@ -573,7 +640,28 @@ user preference, the admin surface, `LocalizedPage` — lands with M6 (see
 - **Geo zones**: metadata on resources/residents; display filtering only, never core access.
 - **Group helpers**: new UserInfoModule methods (SuggestNeighbors, SuggestFamily) that
   populate groups — a convenience, not a new authorization concept.
-- **MCP / API**: `Core` has no HTTP dependency, so a minimal-API or MCP project can call the
+- **MCP / API**: `Core` has no HTTP dependency, so a minimal-API or MCP project can call 
+
+### M4 → M5 deferrals (carried forward — design/m4-events-design.md §5)
+
+M4 shipped the events surface **additively and reusing** (ADR 0054). The
+following were **deliberately not** in M4's own scope and are follow-on lanes
+(own design doc + ADR each) or M6 work — the M5 close should carry this list
+so the out-of-scope boundary stays honest. (One item below — event
+translations — has since shipped as its own lane, ADR 0059; it is listed here
+to keep the M4 boundary honest, not as a live deferral.)
+
+- **Event translations** — the `Event` is authored-in-language (ADR 0018);
+  the ADR 0022/0026/0029 user-added translation lane **now** extends to events
+  as a separate named lane (ADR 0059 — `EventTranslation` + the add / update /
+  remove seams + the ADR 0027/0049/0051 display).
+- **Group events** — a `Group`-scoped event channel (the ADR 0013
+  membership-lane precedent would be the shape).
+- **Per-resident reminder settings** — "remind me N hours before" is a
+  follow-on lane; the single 24-hour-before email is the M4 surface.
+- **iCal export** — the `events.ics` endpoint stays M6 (Portability).
+- **No admission queue** — `Capacity` is display metadata; `Going` RSVPs are
+  the truth (a waitlist/spot-release would be a new ADR).the
   same services later.
 - **Calendar**: an `events.ics` endpoint when needed.
 - **Cross-neighborhood migration**: versioned JSON export/import service (not built yet).
