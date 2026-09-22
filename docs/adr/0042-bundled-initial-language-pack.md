@@ -146,9 +146,9 @@ The keys below are the **closed contract** for the `about` surface: U01
 registers exactly these in `EnValues` with the exact current English copy
 of `Views/StaticPages/About.cshtml`, U02 / U03 translate exactly these,
 and U05 wraps the view against exactly these names. The list is derived
-from the view as of 2026-09-18; the in-scope copy is the **visible
-English strings only** — the `TODO(counts)` placeholder values (and the
-band's own TODO) are out of scope, the `@Model.CommunityName` hero heading
+from the view as of 2026-09-18 (amended 2026-09-22 when the stats band was
+removed); the in-scope copy is the **visible
+English strings only** — the `@Model.CommunityName` hero heading
 is a data value, the `@Model.SupportEmail`-containing contact strings are
 C#-built fragments (D3 exclusions), and the `RepositoryInfo.Links` labels
 are data.
@@ -165,20 +165,17 @@ are data.
 | `about.features.groups.body` | `Garden swap, book club, street watch — a group for whatever the neighbourhood already does.` | feature card 2 |
 | `about.features.pinned.title` | `Pinned where it matters` | feature card 3 |
 | `about.features.pinned.body` | `Water cuts, roadworks, the new speed bumps — notes that stay put instead of scrolling away.` | feature card 3 |
-| `about.stats.neighbors` | `neighbors on board` | stats band, label 1 |
-| `about.stats.groups` | `groups & communities` | stats band, label 2 |
-| `about.stats.posts` | `posts & threads this month` | stats band, label 3 |
-| `about.stats.pinned` | `pinned notes out now` | stats band, label 4 |
 | `about.project.eyebrow` | `Open source` | project section eyebrow |
 | `about.project.heading` | `The code, the decisions, the design docs` | project section heading |
 | `about.project.lead` | `If you're curious how it works — or if you're about to host it for your neighbourhood — everything is public.` | project section lead |
 
-**Explicitly not keys (recorded so they are not read as drift):** the four
-stats-band *values* (placeholder `TODO(counts)`, the band's own TODO stays);
-the hero `<h1>` (`@Model.CommunityName` — a data value); the contact-CTA
+**Explicitly not keys (recorded so they are not read as drift):** the
+hero `<h1>` (`@Model.CommunityName` — a data value); the contact-CTA
 strings (they embed `@Model.SupportEmail` — C#-built fragments, D3); the
 repository link labels (`RepositoryInfo.Links` — data); all SVG / class
-markup (hardcoded by construction).
+markup (hardcoded by construction). The four `about.stats.*` keys were part
+of this contract until 2026-09-22, when the placeholder stats band was
+removed from the view and the keys deregistered.
 
 ### D6 — Scope
 
@@ -199,7 +196,7 @@ per-string fallback, warm-boot no-op, Web surface).
 
 **Out:** machine translation (ADR 0005 C); additional languages (in-app by
 an admin — the design); a warm-reseed / upgrade-push mechanism (D1
-asymmetry); the `TODO(counts)` stats values; the `Milestones.cs` / README /
+asymmetry); the `Milestones.cs` / README /
 `MilestonesTests` trio until the lane ships.
 
 ## Consequences
@@ -246,6 +243,7 @@ asymmetry); the `TODO(counts)` stats values; the `Milestones.cs` / README /
   bundled in a future image: re-run the D2 bar for that language and
   record the choice here by amendment (the register rule is per-language,
   D2, so a new language picks its own).
-- **The `TODO(counts)` stats band lands** real counts: the band's *values*
-  remain data (D5), but if the band is replaced or the labels reworded,
-  the D5 list is the contract to amend.
+- If a **stats/counters band is ever re-added** to the about view with real
+  counts, new `about.*` keys would enter this D5 contract: extend the
+  table, the registry (en + de/fr baselines), and the D5 test pins
+  together, as one change.

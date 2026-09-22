@@ -980,10 +980,6 @@ public static class KnownTranslationKeys
             ["about.features.pinned.body"] =
                 "Water cuts, roadworks, the new speed bumps — notes that stay " +
                 "put instead of scrolling away.",
-            ["about.stats.neighbors"]  = "neighbors on board",
-            ["about.stats.groups"]     = "groups & communities",
-            ["about.stats.posts"]      = "posts & threads this month",
-            ["about.stats.pinned"]     = "pinned notes out now",
             ["about.project.eyebrow"]  = "Open source",
             ["about.project.heading"]  = "The code, the decisions, the design docs",
             ["about.project.lead"] =
@@ -1912,10 +1908,6 @@ public static class KnownTranslationKeys
             ["about.features.pinned.body"] =
                 "Wasserschnitt, Straßenarbeiten, die neuen Poller — " +
                 "Notizen, die stehen bleiben statt wegzuscrollen.",
-            ["about.stats.neighbors"]  = "Anwohner:innen an Bord",
-            ["about.stats.groups"]     = "Gruppen & Gemeinschaften",
-            ["about.stats.posts"]      = "Beiträge & Threads diesen Monat",
-            ["about.stats.pinned"]     = "gepinnte Notizen aktuell",
             ["about.project.eyebrow"]  = "Open Source",
             ["about.project.heading"]  = "Der Code, die Entscheidungen, die Design-Doku",
             ["about.project.lead"] =
@@ -2846,10 +2838,6 @@ public static class KnownTranslationKeys
             ["about.features.pinned.body"] =
                 "Coupures d'eau, travaux de rue, les nouveaux " +
                 "ralentisseurs — des notes qui restent en place au lieu de défiler.",
-            ["about.stats.neighbors"]  = "habitants à bord",
-            ["about.stats.groups"]     = "groupes & communautés",
-            ["about.stats.posts"]      = "publications & fils ce mois-ci",
-            ["about.stats.pinned"]     = "notes épinglées en cours",
             ["about.project.eyebrow"]  = "Open source",
             ["about.project.heading"]  = "Le code, les décisions, la doc de design",
             ["about.project.lead"] =
@@ -3775,10 +3763,6 @@ public static class KnownTranslationKeys
                 "Vandskæringer, vejarbejder, de nye " +
                 "hastighedsdæmpere — noter, der bliver ved " +
                 "i stedet for at rulle væk.",
-            ["about.stats.neighbors"]  = "beboere om bord",
-            ["about.stats.groups"]     = "grupper & fællesskaber",
-            ["about.stats.posts"]      = "indlæg & tråde denne måned",
-            ["about.stats.pinned"]     = "faste noter lige nu",
             ["about.project.eyebrow"]  = "Open source",
             ["about.project.heading"]  = "Koden, beslutningerne, design-dokumentationen",
             ["about.project.lead"] =

@@ -308,11 +308,12 @@ public class PublicLocaleAndAboutTests
         });
     }
 
-    // ── (e) U05: the about view wraps exactly the 17 D5 keys ─────────────────
+    // ── (e) U05: the about view wraps exactly the 13 D5 keys ─────────────────
 
     /// <summary>
-    /// The ADR 0042 D5 closed contract: the 17 <c>about.*</c> keys are the
-    /// stable key list U01–U05 code against. U01 registered them in
+    /// The ADR 0042 D5 closed contract: the 13 <c>about.*</c> keys are the
+    /// stable key list U01–U05 code against (the four about.stats.* keys were
+    /// removed with the stats band on 2026-09-22). U01 registered them in
     /// <see cref="KnownTranslationKeys.EnValues"/>, U02/U03 translated them,
     /// and U05 wraps the view against exactly these names. The
     /// <see cref="KwLRegistryConsistencyTests"/> cover the *registry-side*
@@ -321,13 +322,13 @@ public class PublicLocaleAndAboutTests
     /// About.cshtml), so a future view edit that drops a wrap is caught
     /// immediately.
     /// </summary>
-    [Fact(DisplayName = "About.cshtml wraps all 17 ADR 0042 D5 about.* keys in kw-l")]
+    [Fact(DisplayName = "About.cshtml wraps all 13 ADR 0042 D5 about.* keys in kw-l")]
     public void About_View_Wraps_All_D5_Keys()
     {
         var aboutView = ResolveAboutView();
         var text = File.ReadAllText(aboutView);
 
-        // The closed D5 key list — exactly these 17, in order (ADR 0042 D5).
+        // The closed D5 key list — exactly these 13, in order (ADR 0042 D5).
         var d5Keys = new[]
         {
             "about.eyebrow",
@@ -340,16 +341,12 @@ public class PublicLocaleAndAboutTests
             "about.features.groups.body",
             "about.features.pinned.title",
             "about.features.pinned.body",
-            "about.stats.neighbors",
-            "about.stats.groups",
-            "about.stats.posts",
-            "about.stats.pinned",
             "about.project.eyebrow",
             "about.project.heading",
             "about.project.lead",
         };
 
-        Assert.True(d5Keys.Length == 17,
+        Assert.True(d5Keys.Length == 13,
             "The D5 list length changed — update this test to match ADR 0042 D5.");
 
         // Every D5 key must appear as kw-l key="…" in the view.
@@ -361,7 +358,7 @@ public class PublicLocaleAndAboutTests
             "D5 about.* key(s) not wrapped in kw-l in About.cshtml:\n" +
             string.Join("\n", missing.Select(k => $"  {k}")));
 
-        // The view must NOT wrap any about.* key beyond the 17 D5 keys —
+        // The view must NOT wrap any about.* key beyond the 13 D5 keys —
         // a stray wrap of an unregistered key would render the raw key to
         // the resident (the PG-lane regression KwLRegistryConsistencyTests
         // guards against, checked here for the about.* namespace specifically).

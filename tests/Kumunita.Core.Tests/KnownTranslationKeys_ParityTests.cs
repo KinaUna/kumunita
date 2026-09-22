@@ -20,11 +20,11 @@ namespace Kumunita.Core.Tests;
 ///
 /// <para>
 /// The <c>about.*</c> half is the LS U01 pin specifically (ADR 0042 D5): the
-/// closed 17-key contract exists in the registry, and each one carries its
+/// closed 13-key contract exists in the registry, and each one carries its
 /// exact current English copy (non-empty). The values themselves are the
 /// ADR's locked text — the byte-level match against the ADR is enforced by
 /// the non-emptiness + the U05 byte-identical-English view render, not by
-/// re-quoting 17 strings in a test (that would drift from the registry it
+/// re-quoting 13 strings in a test (that would drift from the registry it
 /// pins, the same trap the registry's doc-comment warns against).
 /// </para>
 ///
@@ -69,8 +69,9 @@ public class KnownTranslationKeys_ParityTests
     [Fact(DisplayName = "about.* the ADR 0042 D5 contract is fully registered with non-empty en values")]
     public void About_Keys_From_Adr_0042_D5_Are_Registered_NonEmpty()
     {
-        // The D5 closed contract — 17 keys (the stable names U02 / U03
-        // translate against and U05 wraps the view against).
+        // The D5 closed contract — 13 keys (the stable names U02 / U03
+        // translate against and U05 wraps the view against). The four
+        // about.stats.* keys were removed with the stats band on 2026-09-22.
         var d5Keys = new[]
         {
             "about.eyebrow",
@@ -83,16 +84,12 @@ public class KnownTranslationKeys_ParityTests
             "about.features.groups.body",
             "about.features.pinned.title",
             "about.features.pinned.body",
-            "about.stats.neighbors",
-            "about.stats.groups",
-            "about.stats.posts",
-            "about.stats.pinned",
             "about.project.eyebrow",
             "about.project.heading",
             "about.project.lead",
         };
 
-        Assert.Equal(17, d5Keys.Length);
+        Assert.Equal(13, d5Keys.Length);
 
         foreach (var key in d5Keys)
         {
@@ -104,7 +101,7 @@ public class KnownTranslationKeys_ParityTests
         }
 
         // The D5 list is closed: every about.* key in the registry is one of
-        // the 17 contract keys (no drift in either direction).
+        // the 13 contract keys (no drift in either direction).
         var registryAboutKeys =
             KnownTranslationKeys.AllKeys.Where(k => k.StartsWith("about.")).ToList();
         Assert.Equal(d5Keys.OrderBy(k => k).ToList(),

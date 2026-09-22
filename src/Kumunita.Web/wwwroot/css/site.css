@@ -555,29 +555,6 @@ body.kmb-page-fullbleed .navbar {
   color: #46534b; /* muted ink, still AA on white */
 }
 
-/* --- Stat band ------------------------------------------------------------------- */
-.kmb-stats {
-  border-block: 1px solid var(--kmb-border);
-}
-.kmb-stat {
-  text-align: center;
-  padding: 1.75rem 1rem;
-}
-.kmb-stat-value {
-  font-family: var(--bs-heading-font-family);
-  font-weight: 700;
-  font-size: clamp(2.25rem, 4vw, 3rem);
-  line-height: 1.1;
-  color: #1c4532;
-}
-.kmb-stat-label {
-  font-family: var(--bs-heading-font-family);
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--kmb-muted);
-}
-
 /* --- Roadmap list (home) ----------------------------------------------------------- */
 .kmb-roadmap {
   list-style: none;
