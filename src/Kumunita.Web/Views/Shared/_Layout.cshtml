@@ -144,12 +144,12 @@
                     </ul>
                 </div>
                 <div class="col-6 col-md-4 col-lg-3">
-                    <h3>The project</h3>
+                    <h3><kw-l key="footer.project.heading">The project</kw-l></h3>
                     <ul class="list-unstyled d-grid gap-2">
                         @foreach (var link in RepositoryInfo.Links)
                         {
                             <li>
-                                <a href="@link.Url" target="_blank" rel="noopener noreferrer">@link.Label</a>
+                                <a href="@link.Url" target="_blank" rel="noopener noreferrer"><kw-l key="@link.Key">@link.Label</kw-l></a>
                             </li>
                         }
                     </ul>

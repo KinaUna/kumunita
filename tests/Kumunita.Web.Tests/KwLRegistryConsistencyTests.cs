@@ -69,13 +69,25 @@ public sealed class KwLRegistryConsistencyTests
         // Collect the (file, key) pairs across every .cshtml under Views/ so a
         // failure reports exactly where the unregistered key was used — not just
         // that one is missing.
+        //
+        // A key whose value starts with '@' is a Razor expression (e.g.
+        // key="@link.Key" on the RepositoryInfo.Links foreach on home / about /
+        // footer) — resolved at runtime from C# data, not a static literal. Those
+        // are not checkable by a text scan; they are pinned separately by
+        // RepositoryInfoTests.Repository_Link_Keys_Are_Registered (and render the
+        // provider floor's English if unregistered, so a typo degrades gracefully).
         var usages = new List<(string File, string Key)>();
         foreach (var file in views.EnumerateFiles("*.cshtml", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(views.FullName, file.FullName);
             foreach (Match m in KeyAttr.Matches(File.ReadAllText(file.FullName)))
             {
-                usages.Add((relative, m.Groups[1].Value));
+                var key = m.Groups[1].Value;
+                if (key.StartsWith('@'))
+                {
+                    continue;   // dynamic key (a C# expression), not a static literal
+                }
+                usages.Add((relative, key));
             }
         }
 

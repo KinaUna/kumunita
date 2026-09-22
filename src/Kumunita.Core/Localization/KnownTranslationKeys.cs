@@ -210,6 +210,14 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Help",
             ["footer.platform.privacy"] = "Privacy",
             ["footer.platform.conduct"] = "Code of conduct",
+            // The "The project" column (home / about / footer): the heading plus
+            // the three RepositoryInfo.Links labels (repo.source_code /
+            // repo.documentation / repo.non_technical) — emitted via a dynamic
+            // kw-l key from the link list, so the labels resolve per-language.
+            ["footer.project.heading"] = "The project",
+            ["repo.source_code"]      = "Source code",
+            ["repo.documentation"]    = "Documentation",
+            ["repo.non_technical"]    = "For non-technical residents",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Settings",
@@ -1277,6 +1285,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Hilfe",
             ["footer.platform.privacy"] = "Datenschutz",
             ["footer.platform.conduct"] = "Verhaltenskodex",
+            // Die Spalte "Das Projekt" (home / about / footer): Überschriften
+            // + die drei RepositoryInfo.Links-Labels (über dynamische kw-l-Keys
+            // aus der Linkliste, damit sie pro Sprache aufgelöst werden).
+            ["footer.project.heading"] = "Das Projekt",
+            ["repo.source_code"]      = "Quellcode",
+            ["repo.documentation"]    = "Dokumentation",
+            ["repo.non_technical"]    = "Für nicht-technische Anwohnende",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Einstellungen",
@@ -2294,6 +2309,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Aide",
             ["footer.platform.privacy"] = "Confidentialité",
             ["footer.platform.conduct"] = "Règles de conduite",
+            // La colonne « Le projet » (home / about / footer) : le titre + les
+            // trois libellés RepositoryInfo.Links (émis via une clé kw-l dynamique
+            // depuis la liste de liens, résolue selon la langue).
+            ["footer.project.heading"] = "Le projet",
+            ["repo.source_code"]      = "Code source",
+            ["repo.documentation"]    = "Documentation",
+            ["repo.non_technical"]    = "Pour les habitants non techniques",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Paramètres",
@@ -3313,6 +3335,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Hjælp",
             ["footer.platform.privacy"] = "Privatliv",
             ["footer.platform.conduct"] = "Adfærdskodeks",
+            // Søjlen "Projektet" (home / about / footer): overskriften + de tre
+            // RepositoryInfo.Links-labels (udgivet via et dynamisk kw-l-nøgle fra
+            // linklisten, løst op efter sprog).
+            ["footer.project.heading"] = "Projektet",
+            ["repo.source_code"]      = "Kildekode",
+            ["repo.documentation"]    = "Dokumentation",
+            ["repo.non_technical"]    = "For ikke-tekniske naboer",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Indstillinger",
