@@ -74,7 +74,7 @@
                         <kw-l key="announcements.edit_button">Edit</kw-l>
                     </a>
                     <form class="d-inline" method="post" action="/pages/@Model.Id/delete"
-                          onsubmit="return confirm('Delete this page?');">
+                          data-confirm="Delete this page?">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-sm btn-outline-danger">
                             <kw-l key="pages.delete">Delete</kw-l>
@@ -171,7 +171,7 @@
                                             </button>
                                         </form>
                                         <form method="post" action="@($"/pages/{Model.Id}/translations/remove")"
-                                              class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                              class="mt-2" data-confirm="Remove this translation?">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">

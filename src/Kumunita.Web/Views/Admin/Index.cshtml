@@ -272,7 +272,7 @@
                                 <form method="post"
                                       asp-action="@_action"
                                       class="d-inline-flex ms-2"
-                                      onsubmit="return confirm('@_confirm');">
+                                      data-confirm="@_confirm">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="subjectId" value="@a.SubjectId" />
                                     <button class="btn btn-sm @(a.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
@@ -435,14 +435,6 @@ else
         </table>
     </div>
 
-    @* Minimal toggle script — no dependency on Bootstrap JS for the collapse *@
-    <script>
-        document.querySelectorAll('[data-edit-toggle]').forEach(function (btn) {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault();
-                var row = document.querySelector(btn.getAttribute('data-edit-toggle'));
-                if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
-            });
-        });
-    </script>
+    @* Edit-row toggle is handled by client/lib/admin-edit-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6 no-inline-script rule). *@
 }

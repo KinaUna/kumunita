@@ -110,7 +110,7 @@
                             <form method="post"
                                   action="@Url.Action("RemoveMember", "Community", new { componentId = Model.ComponentId })"
                                   class="d-inline"
-                                  onsubmit="return confirm('Remove @removeLabel from @Model.Name?');">
+                                  data-confirm="Remove @removeLabel from @Model.Name?">
                                 @Html.AntiForgeryToken()
                                 <input type="hidden" name="UserId" value="@m.SubjectId" />
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="community.manage_remove">Remove</kw-l></button>

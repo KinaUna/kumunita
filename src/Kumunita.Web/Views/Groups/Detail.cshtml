@@ -195,7 +195,7 @@
                                 </form>
                                 <form method="post"
                                       action="@($"/groups/{Model.GroupId}/translations/remove")"
-                                      class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                      class="mt-2" data-confirm="Remove this translation?">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -407,6 +407,7 @@
                     <div class="col-sm-8">
                         <label class="visually-hidden" for="invite-filter">Filter residents</label>
                         <input type="text" class="form-control" id="invite-filter"
+                               data-name-filter="invite-subjectId"
                                placeholder="Filter by name…" autocomplete="off" />
                         <label class="visually-hidden" for="invite-subjectId">Resident</label>
                         <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
@@ -425,21 +426,8 @@
                         <button type="submit" class="btn btn-primary">Invite</button>
                     </div>
                 </form>
-                <script>
-                    // Client-side name filter (contains, case-insensitive) — same
-                    // pattern as the add-member form below.
-                    (function () {
-                        var filter = document.getElementById("invite-filter");
-                        var list = document.getElementById("invite-subjectId");
-                        filter.addEventListener("input", function () {
-                            var q = filter.value.trim().toLowerCase();
-                            for (var i = 0; i < list.options.length; i++) {
-                                list.options[i].hidden =
-                                    q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
-                            }
-                        });
-                    })();
-                </script>
+                @* Name filter handled by client/lib/name-filter.js
+                   (loaded in _Layout.cshtml — SECURITY.md §6). *@
             }
             else
             {
@@ -471,6 +459,7 @@
                 <div class="col-sm-8">
                     <label class="visually-hidden" for="add-member-filter">Filter residents</label>
                     <input type="text" class="form-control" id="add-member-filter"
+                           data-name-filter="add-subjectId"
                            placeholder="Filter by name…" autocomplete="off" />
                     <label class="visually-hidden" for="add-subjectId">Resident</label>
                     <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
@@ -487,21 +476,8 @@
                     <button type="submit" class="btn btn-primary">Add</button>
                 </div>
             </form>
-            <script>
-                // Client-side name filter (contains, case-insensitive): hide the
-                // options that don't match what's typed in the filter box above.
-                (function () {
-                    var filter = document.getElementById("add-member-filter");
-                    var list = document.getElementById("add-subjectId");
-                    filter.addEventListener("input", function () {
-                        var q = filter.value.trim().toLowerCase();
-                        for (var i = 0; i < list.options.length; i++) {
-                            list.options[i].hidden =
-                                q !== "" && list.options[i].text.toLowerCase().indexOf(q) === -1;
-                        }
-                    });
-                })();
-            </script>
+            @* Name filter handled by client/lib/name-filter.js
+               (loaded in _Layout.cshtml — SECURITY.md §6). *@
         }
         else
         {

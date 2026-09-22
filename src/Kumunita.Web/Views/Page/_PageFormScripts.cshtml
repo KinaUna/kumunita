@@ -21,30 +21,6 @@
    (the SuggestAsync seam, C-TG·2 / C-TG·4). *@
 <script type="module" src="~/js/lib/tag-suggest.js"></script>
 <partial name="_GrantPickerScripts" />
-<script>
-(function () {
-    'use strict';
-    // ADR 0041 — two visibility blocks, both hidden when IsPublic is on:
-    // 1. The scope dropdown (hidden when IsPublic is on).
-    // 2. The detailed audience editor (hidden when IsPublic is on OR
-    //    the scope dropdown is not "Individual").
-    var publicBox = document.getElementById('is-public');
-    var scopeBlock = document.getElementById('page-scope-block');
-    var individualBlock = document.getElementById('page-individual-block');
-    var scopeSelect = document.getElementById('scope');
-
-    function refresh() {
-        var isPublic = publicBox.checked;
-        scopeBlock.classList.toggle('d-none', isPublic);
-        var showIndividual = !isPublic && scopeSelect.value === 'Individual';
-        individualBlock.classList.toggle('d-none', !showIndividual);
-    }
-
-    if (publicBox) {
-        publicBox.addEventListener('change', refresh);
-    }
-    if (scopeSelect) {
-        scopeSelect.addEventListener('change', refresh);
-    }
-})();
-</script>
+@* Visibility toggling handled by client/lib/page-form-visibility.js (loaded in
+   _Layout.cshtml — SECURITY.md §6). Grant-picker sync handled by
+   client/lib/grant-picker-sync.js (also loaded in _Layout.cshtml). *@

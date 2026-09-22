@@ -132,7 +132,7 @@ privilege surface? If so, add a row here and in the relevant checklist.
 | Rate limiting (register / login / report), per-IP | A2 | §6 (mechanism decided); OPS.md §10 (endpoints + XFF) |
 | Identity account lockout, per-account (defaults) | A2 | OPS.md §10 — pairs with rate limiting; see division of labor there |
 | **2FA (TOTP): required for GlobalAdmin**, recommended for Moderator | A3, A4 | §6 (decided); OPS.md §10; break-glass step OPS.md §9 |
-| Content-Security-Policy `default-src 'self'` + no-inline-script rule | A3 (XSS) | §6 (decided); OPS.md §10 |
+| Content-Security-Policy `script-src 'self'` (strict, no inline script) + origin pinning (shipped) | A3 (XSS) | §6 (decided); OPS.md §10 (shipped in `Program.cs`) |
 | PBKDF2 password hashing (Identity default; iteration count documented) | A2, A3 | §6 (decided) |
 | CAPTCHA (deferred, documented decision) | A2 | OPS.md §10 |
 | Report-gated, audited moderator access | A4 (and protects A3's privacy from mods) | ADR 0003 |

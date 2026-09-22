@@ -125,7 +125,7 @@
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/announcements/@a.Id/delete"
-                                      onsubmit="return confirm('Delete this announcement? This cannot be undone.');"
+                                      data-confirm="Delete this announcement? This cannot be undone.""
                                       style="margin:0; display:inline;">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="link-quiet small text-danger text-decoration-none border-0 bg-transparent p-0">

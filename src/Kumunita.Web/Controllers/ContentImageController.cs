@@ -20,9 +20,9 @@ namespace Kumunita.Web.Controllers;
 /// <ul>
 /// <li>UGC post → exactly one <see cref="IAuthorizationService.CanAsync"/>
 /// (Allow ⇒ serve; Deny ⇒ <b>404</b>, not 403 — the avatar precedent).</li>
-/// <li>UGC reply → <b>404</b> (drift pause: no <c>PostReplyToAuditableResource</c>;
-/// C-M3·1 — the reply's decision IS the parent post's, but resolving the parent
-/// is outside U03's scope).</li>
+/// <li>UGC reply → resolve the parent post and authorize against it with one
+/// <see cref="IAuthorizationService.CanAsync"/> (the reply's decision IS the parent
+/// post's, C-M3·1); Deny ⇒ <b>404</b> (not 403) + one <c>Deny</c> audit row.</li>
 /// <li>UGC announcement → serve when the caller passes the announcement's flat
 /// scope/communities read gate (<see cref="IAnnouncementService.GetAsync"/>),
 /// else <b>404</b> (no <c>CanAsync</c> + no <c>AccessAudit</c> row — announcements
@@ -42,7 +42,8 @@ public sealed class ContentImageController(
     IAuthorizationService authz,
     PostService posts,
     IAnnouncementService announcements,
-    IOptions<MediaOptions> mediaOpts) : Controller
+    IOptions<MediaOptions> mediaOpts,
+    Marten.IDocumentStore store) : Controller
 {
     /// <summary>
     /// <c>GET /content-image/{id}</c> — the single serving action. The id
@@ -82,11 +83,29 @@ public sealed class ContentImageController(
         var reply = await posts.FindReplyByImageIdAsync(id);
         if (reply is not null)
         {
-            // Drift pause: no PostReplyToAuditableResource exists (C-M3·1 —
-            // the reply's decision IS the parent post's, but resolving the
-            // parent is outside U03's scope). Fail-closed 404, zero audit
-            // rows (no CanAsync called).
-            return NotFound();
+            // ── Step 4 (UGC reply, C-M3·1): resolve the parent post and
+            // authorize against IT (the reply's decision IS the parent post's).
+            // The parent load is a raw document read (no CanAsync, no audit
+            // row). Fail-closed: a missing parent is an orphan → 404, zero
+            // audit rows.
+            Post? parent = null;
+            await using (var s = store.QuerySession())
+            {
+                parent = await s.LoadAsync<Post>(reply.PostId);
+            }
+            if (parent is null) return NotFound(); // orphan reply → 404 (zero rows)
+
+            var actorId = KumunitaPrincipal.SubjectId(User) ?? "";
+            // Group-lane parent (GroupId non-empty) → the membership lane
+            // (ADR 0013 G·1/G·2/G·8); component parent (GroupId empty) →
+            // the audience lane (the M3 read decision). The shared seam is
+            // PostReadDecision.ResolveAsync — one call, one audit row.
+            var decision = await PostReadDecision.ResolveAsync(parent, actorId, authz);
+            if (!decision.Allowed) return NotFound(); // Deny → 404 (not 403) + one Deny row (by the decision)
+            // ── Step 5: serve ─────────────────────────────────────────
+            var stream = await media.OpenReadAsync(id);
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+            return File(stream, stored.ContentType);
         }
 
         var announcement = await announcements.FindByImageIdAsync(id);

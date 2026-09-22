@@ -87,7 +87,7 @@
                             </a>
                             <form class="d-inline ms-1" method="post"
                                   action="@($"/posts/{postId}/delete")"
-                                  onsubmit="return confirm('Delete this post? Your replies will remain visible.');">
+                                  data-confirm="Delete this post? Your replies will remain visible.">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-danger">
                                     <kw-l key="posts.delete">Delete</kw-l>
@@ -223,7 +223,7 @@
                                                 </button>
                                             </form>
                                             <form method="post" action="@($"/posts/{postId}/translations/remove")"
-                                                  class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                                  class="mt-2" data-confirm="Remove this translation?">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -438,7 +438,7 @@
                                                         </button>
                                                     </form>
                                                     <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/remove")"
-                                                          class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                                          class="mt-2" data-confirm="Remove this translation?">
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                                         <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -552,7 +552,7 @@
                                         </details>
                                         <form class="d-inline" method="post"
                                               action="@($"/posts/{postId}/replies/{r.Id}/delete")"
-                                              onsubmit="return confirm('Delete this reply? It will be replaced by a note. The record is kept.');">
+                                              data-confirm="Delete this reply? It will be replaced by a note. The record is kept.">
                                             @Html.AntiForgeryToken()
                                             <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">
                                                 <kw-l key="posts.reply_delete">Delete</kw-l>

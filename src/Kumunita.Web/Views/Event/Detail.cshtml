@@ -74,7 +74,7 @@
             @if (Model.CanDelete)
             {
                 <form class="d-inline" method="post" action="/events/@Model.Event.Id/delete"
-                      onsubmit="return confirm('Delete this event? This cannot be undone.');">
+                      data-confirm="Delete this event? This cannot be undone.">
                     @Html.AntiForgeryToken()
                     <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="events.delete">Delete</kw-l></button>
                 </form>
@@ -198,7 +198,7 @@
                                             </button>
                                         </form>
                                         <form method="post" action="@($"/events/@Model.Event.Id/translations/remove")"
-                                              class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                              class="mt-2" data-confirm="Remove this translation?">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">

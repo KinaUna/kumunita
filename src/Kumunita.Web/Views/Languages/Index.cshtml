@@ -150,7 +150,7 @@
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/admin/languages/@row.Code" class="d-inline"
-                                      onsubmit="return confirm('Remove @row.Code? Its translation rows are retained and will be restored if the language is re-added.');">
+                                      data-confirm="Remove @row.Code? Its translation rows are retained and will be restored if the language is re-added.">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="btn btn-outline-danger">Remove</button>
                                 </form>

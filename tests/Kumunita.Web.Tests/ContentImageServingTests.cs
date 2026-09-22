@@ -63,8 +63,15 @@
 //   <b>decision + HTTP</b> layer, which the Core tests cannot reach) is
 //   documented per-name below, so a future unit that adds a substitutable
 //   seam (e.g. an interface over the reverse lookup, or Testcontainers in
-//   Web.Tests) can lift each one out of this pause verbatim.
-// ═══════════════════════════════════════════════════════════════════════════
+//   Web.Tests) can lift each one out of this pause verbatim.//
+// NOTE (L3, 2026): the reply branch's <b>behavior</b> was later resolved —
+// <see cref="Kumunita.Web.Controllers.ContentImageController.Serve"/> now
+// resolves the parent post and authorizes against it (mirroring the
+// attachment lane's C-ATT·8), replacing the old flat-404 "drift pause."
+// The <b>seam gap</b> documented above (the sealed <c>PostService</c>
+// reverse-lookup is undrivable from this NSubstitute-only Web harness) is
+// unchanged: the reply branch is still undrivable here for the same reason,
+// and the 4 pinned tests remain paused for the seam, not the behavior.// ═══════════════════════════════════════════════════════════════════════════
 
 namespace Kumunita.Web.Tests;
 

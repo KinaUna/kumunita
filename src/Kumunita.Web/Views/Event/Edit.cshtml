@@ -174,7 +174,7 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox"
                                name="Audience.CommunityVisible"
-                               id="aud-community"
+                               id="aud-community" data-audience-toggle
                                value="true"
                                @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
                         <label class="form-check-label fw-semibold" for="aud-community">
@@ -187,7 +187,7 @@
 
                     <hr class="my-3" />
 
-                    <div id="audience-restricted"
+                    <div id="audience-restricted" data-audience-panel
                          class="audience-restricted"
                          @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
                         <div class="form-label mt-2" style="font-weight:600;">
@@ -260,18 +260,6 @@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
     <script type="module" src="~/js/lib/tag-suggest.js"></script>
     <partial name="_GrantPickerScripts" />
-    <script>
-    (function () {
-        'use strict';
-        var communityBox  = document.getElementById('aud-community');
-        var restrictedDiv = document.getElementById('audience-restricted');
-        if (!communityBox || !restrictedDiv) { return; }
-
-        function sync() {
-            restrictedDiv.classList.toggle('d-none', communityBox.checked);
-        }
-
-        communityBox.addEventListener('change', sync);
-    })();
-    </script>
+    @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6). *@
 }

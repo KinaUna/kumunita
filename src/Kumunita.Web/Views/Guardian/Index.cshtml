@@ -55,7 +55,7 @@
                         {
                             <form method="post"
                                   action="@Url.Action("Suspend", "Guardian", new { childId = item.ChildId })"
-                                  onsubmit="return confirm('Suspend this child account? They will be blocked until you un-suspend them.');">
+                                  data-confirm="Suspend this child account? They will be blocked until you un-suspend them.">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="guardian.suspend">Suspend</kw-l></button>
                             </form>

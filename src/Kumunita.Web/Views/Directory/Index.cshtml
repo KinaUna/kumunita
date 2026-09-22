@@ -67,20 +67,8 @@
                 }
             </div>
 
-            <script>
-                // Whole-card click → profile detail. The card's only link is the
-                // name anchor (.dname a); clicking it already navigates, so the
-                // handler skips it and covers every other card region.
-                (function () {
-                    document.querySelectorAll('.dir-card').forEach(function (card) {
-                        card.addEventListener('click', function (e) {
-                            if (e.target.closest('a')) return; // already navigating
-                            var a = card.querySelector('.dname a');
-                            if (a) window.location.href = a.getAttribute('href');
-                        });
-                    });
-                })();
-            </script>
+            @* Whole-card click→nav is handled by client/lib/directory-card.js
+               (loaded in _Layout.cshtml — SECURITY.md §6 no-inline-script). *@
         }
     </div>
 </div>

@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy to appsettings.Development.Local.json (git-ignored) with your local dev Postgres credentials. The password must match the kumunita role created by dev-db-init/01-app-role.sql. For the standard local dev layout the password is kumunita (weak-by-design, local-only).",
+  "ConnectionStrings": {
+    "Kumunita": "Host=localhost;Port=5433;Database=kumunita;Username=kumunita;Password=<your-local-dev-password>;Include Error Detail=true"
+  }
+}

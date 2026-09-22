@@ -161,7 +161,7 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox"
                                name="Audience.CommunityVisible"
-                               id="aud-community"
+                               id="aud-community" data-audience-toggle
                                value="true"
                                @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
                         <label class="form-check-label fw-semibold" for="aud-community">
@@ -181,7 +181,7 @@
                        _GrantPickers stays the ONLY form-bound grant field
                        (the U11 / F13 single-source pin) regardless of
                        visibility. *@
-                    <div id="audience-restricted"
+                    <div id="audience-restricted" data-audience-panel
                          class="audience-restricted"
                          @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
                         <div class="form-label mt-2" style="font-weight:600;">
@@ -282,8 +282,9 @@
 
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary"><kw-l key="posts.new_submit">Post it</kw-l></button>
-                <button type="button" class="btn btn-outline-secondary"
-                        onclick="this.form.reset();"><kw-l key="common.cancel">Cancel</kw-l></button>
+                <button type="button" class="btn btn-outline-secondary" data-reset-form>
+                    <kw-l key="common.cancel">Cancel</kw-l>
+                </button>
             </div>
         </form>
     </div>
@@ -318,22 +319,6 @@
        "additional" audience alongside the community grant — see
        posts.audience_restrict_hint). Pure CSS-class toggle, no
        server-side re-render. *@
-    <script>
-    (function () {
-        'use strict';
-        var communityBox  = document.getElementById('aud-community');
-        var restrictedDiv = document.getElementById('audience-restricted');
-        if (!communityBox || !restrictedDiv) { return; }
-
-        function sync() {
-            // Visible when the community grant is OFF (the poster wants
-            // a granular audience) — the server-rendered state is
-            // authoritative on load (already-correct class), this only
-            // reacts to user changes.
-            restrictedDiv.classList.toggle('d-none', communityBox.checked);
-        }
-
-        communityBox.addEventListener('change', sync);
-    })();
-    </script>
+    @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6). *@
 }

@@ -116,7 +116,7 @@
                                 </form>
                                 <form method="post"
                                       action="@($"/community/translations/{Model.ComponentId}/remove")"
-                                      class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                      class="mt-2" data-confirm="Remove this translation?">
                                     @Html.AntiForgeryToken()
                                     <input type="hidden" name="languageCode" value="@t.LanguageCode" />
                                     <button type="submit" class="btn btn-sm btn-outline-danger">

@@ -173,6 +173,26 @@
     <!-- Translation display swap (client/lib/translation-swap.ts, tsc-built — TD / ADR 0027:
          click-to-swap toggles the pre-rendered .td-variant containers; display-only, no fetch) -->
     <script type="module" src="~/js/lib/translation-swap.js"></script>
+    <!-- Confirm-before-submit (SECURITY.md §6 no-inline-script; replaces the
+         onsubmit="return confirm(..." pattern across ~18 views) -->
+    <script type="module" src="~/js/lib/confirm.js"></script>
+    <!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
+         onclick="this.form.reset()" pattern) -->
+    <script type="module" src="~/js/lib/reset-form.js"></script>
+    <!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
+    <script type="module" src="~/js/lib/audience-toggle.js"></script>
+    <!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->
+    <script type="module" src="~/js/lib/name-filter.js"></script>
+    <!-- Admin edit-row toggle (SECURITY.md §6; Admin/Index collapsed rows) -->
+    <script type="module" src="~/js/lib/admin-edit-toggle.js"></script>
+    <!-- Directory-card click→nav (SECURITY.md §6; Directory/Index whole-card) -->
+    <script type="module" src="~/js/lib/directory-card.js"></script>
+    <!-- Pinned-announcement dismissal (SECURITY.md §6; per-announcement sessionStorage) -->
+    <script type="module" src="~/js/lib/pinned-announcement.js"></script>
+    <!-- Page-form visibility (SECURITY.md §6; ADR 0041 scope/individual blocks) -->
+    <script type="module" src="~/js/lib/page-form-visibility.js"></script>
+    <!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
+    <script type="module" src="~/js/lib/grant-picker-sync.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

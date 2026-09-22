@@ -124,7 +124,7 @@
         <h2 class="mt-4"><kw-l key="guardian.handover">Hand over the account</kw-l></h2>
         <p class="text-muted"><kw-l key="guardian.handover_hint">Dissolving the guardianship hands the account to the child. Their memberships are preserved, and their own self-serve lanes come back on the next read.</kw-l></p>
         <form method="post" action="@Url.Action("Dissolve", "Guardian", new { childId = Model.ChildId })"
-              onsubmit="return confirm('Hand over this account to the child? This dissolves your guardianship over it.')">
+              data-confirm="Hand over this account to the child? This dissolves your guardianship over it.">
             @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-danger"><kw-l key="guardian.dissolve">Dissolve guardianship</kw-l></button>
         </form>

@@ -68,30 +68,6 @@
             </div>
         </div>
 
-        <script>
-            // Persist the per-announcement dismissal in sessionStorage so the
-            // banner stays hidden for the rest of the browser session (across
-            // every page, but not across browser restarts). The key is per
-            // announcement id, so a future admin pinning a different one will
-            // surface for the user again.
-            (function () {
-                var banner = document.querySelector('.kumunita-pinned-announcement');
-                if (!banner) return;
-                var key = banner.querySelector('[data-dismiss-key]')
-                    .getAttribute('data-dismiss-key');
-                var btn = banner.querySelector('.btn-close');
-
-                if (sessionStorage.getItem(key)) {
-                    banner.style.display = 'none';
-                    return;
-                }
-
-                if (btn) {
-                    btn.addEventListener('click', function () {
-                        sessionStorage.setItem(key, '1');
-                    });
-                }
-            })();
-        </script>
+        <script type="module" src="~/js/lib/pinned-announcement.js"></script>
     }
 }

@@ -72,7 +72,7 @@
                 {
                     <form method="post"
                           action="@Url.Action("Leave", "Community", new { componentId = Model.ComponentId })"
-                          onsubmit="return confirm('Leave @Model.ComponentName?');">
+                          data-confirm="Leave @Model.ComponentName?">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-outline-danger">Leave</button>
                     </form>

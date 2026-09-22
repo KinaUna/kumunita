@@ -343,12 +343,21 @@ run-anywhere checklists (including deployment checks D-1…D-8) — lives in
   - **2FA (decided):** TOTP (ASP.NET Identity built-in) + recovery codes — **required
     for GlobalAdmin**, recommended for Moderator, not offered for Members. A
     break-glass-elevated account must have 2FA before it keeps the standing (§9 step 3).
-  - **Content-Security-Policy (decided):** `default-src 'self'`,
-    `style-src 'self' 'unsafe-inline'`; **no inline `on*` attributes or inline
-    `<script>` in Razor views** (use the `client/*.ts` modules). The header is a
-    one-line change — the cost of relaxing it later is hunting down inline handlers,
-    so the code discipline is what's pinned. Any future third-party script: scoped
-    `script-src` entry + SRI, decided per case (SECURITY.md §6).
+  - **Content-Security-Policy (shipped, strict — L1 + strict flip):** the header is
+    set in code (`Program.cs`, before `UseRouting`) so every response in every
+    environment carries it — it no longer depends on a Caddy edge that may be
+    misconfigured or absent. The directive set enforces the full strict rule from
+    the original 2026-08-27 decision: `script-src 'self'` (no inline script, no
+    `unsafe-inline` — every interactive behavior lives in `client/lib/*.ts`
+    modules, self-wiring ES modules loaded from `_Layout.cshtml`), no external
+    resource origin (`default-src 'self'`), no external form/connector target
+    (`form-action`/`connect-src 'self'`), no `<base>` injection (`base-uri
+    'self'`), clickjacking (`frame-ancestors 'self'`), `object-src 'none'`, and
+    the inline style the views rely on (`style-src 'self' 'unsafe-inline'` —
+    inline `style=` attributes are Bootstrap utility patterns, not a script
+    vector). `img-src` adds `data:`/`blob:` (the WYSIWYG local-preview pane).
+    Any future third-party script: scoped `script-src` entry + SRI, decided per
+    case (SECURITY.md §6).
 - **CAPTCHA — deferred by default (decision):** signup is email-verification-gated and
   rate-limited, so a bot that can't verify the email can't join — no CAPTCHA is needed
   today. Revisit and add one (e.g. Turnstile, self-hosted or cloud, per-instance site

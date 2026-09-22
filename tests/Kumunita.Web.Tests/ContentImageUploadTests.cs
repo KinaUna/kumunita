@@ -274,14 +274,20 @@ public class ContentImageUploadTests
         var authz = Substitute.For<IAuthorizationService>();
         var media = Substitute.For<IMediaStore>();
         var announcements = Substitute.For<IAnnouncementService>();
-        var posts = new PostService(userInfo, authz, Substitute.For<IDocumentStore>());
+        // The Upload action never touches the store, so the same substitute the
+        // sealed PostService ctor requires suffices for both the PostService and
+        // the ContentImageController (L3 added the store for the reply branch,
+        // which Upload does not reach).
+        var store = Substitute.For<IDocumentStore>();
+        var posts = new PostService(userInfo, authz, store);
 
         var controller = new ContentImageController(
             media,
             authz,
             posts,
             announcements,
-            Options.Create(mediaOptions));
+            Options.Create(mediaOptions),
+            store);
 
         var httpContext = new DefaultHttpContext();
         httpContext.User = new ClaimsPrincipal(

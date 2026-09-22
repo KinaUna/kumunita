@@ -314,9 +314,13 @@ ever re-running its content on a warm database — the only warm-boot write is t
 create-if-missing sample-event translation backfill, ADR 0060).
 
 *Dev (no app container):* `docker compose up -d db`,
-`npm run build` in `src/Kumunita.Web/`, then
+`npm run build` in `src/Kumunita.Web/`, copy
+`src/Kumunita.Web/appsettings.Development.Local.json.example` to
+`appsettings.Development.Local.json` (git-ignored — carries the dev DB
+password; default `kumunita`), then
 `dotnet run --project src/Kumunita.Web` (settings from
-`appsettings.Development.json`, DB on `localhost:5433`).
+`appsettings.Development.json` + `appsettings.Development.Local.json`,
+DB on `localhost:5433`).
 
 *Prod:* one neighborhood per instance — identical image + dedicated Postgres +
 env per the [OPS.md configuration reference](docs/OPS.md), TLS via

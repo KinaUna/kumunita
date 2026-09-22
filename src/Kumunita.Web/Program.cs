@@ -438,6 +438,37 @@ if (!app.Environment.IsDevelopment())
 // No app-level HTTP→HTTPS redirect: in production TLS terminates at the edge
 // (Coolify/Let's Encrypt, in front of the plain-HTTP container); the "https"
 // dev launch profile binds an https port directly when you want one locally.
+
+// Content-Security-Policy (L1 / OPS §10 / SECURITY.md §6) — shipped in code so
+// every response carries it, in every environment (not just a Caddy edge that
+// may be misconfigured or absent). The directive set enforces the strict
+// no-inline-script rule (OPS §10 "code discipline"): script-src is 'self'
+// only — every interactive behavior lives in client/lib/*.ts modules
+// (self-wiring ES modules loaded from _Layout.cshtml), never in inline
+// <script> blocks or on* attributes in Razor views. style-src retains
+// 'unsafe-inline' because the views use inline style= attributes (Bootstrap
+// utility patterns, dynamic d-none toggles) and extracting every inline style
+// to a stylesheet is not justified for the risk profile.
+//
+// img-src adds blob: (the WYSIWYG local-preview pane renders a blob: image,
+// rich-editor.ts) and data: (inline data-URI thumbnails) on top of 'self'.
+var csp =
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "font-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "form-action 'self'; " +
+    "base-uri 'self'; " +
+    "frame-ancestors 'self'; " +
+    "object-src 'none'";
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Content-Security-Policy"] = csp;
+    await next();
+});
+
 app.UseRouting();
 
 // Rate limiting (H1) — must run AFTER UseRouting so per-endpoint policies

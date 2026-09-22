@@ -270,7 +270,7 @@
         {
             <form class="d-inline mt-2" method="post"
                   action="/pages/@Model.PageId/reset-seeded"
-                  onsubmit="return confirm('Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.');">
+                  data-confirm="Reset this page to the seeded text? Any edits you made to the body (English) and to its German / French / Danish translations will be overwritten with the seeded baseline. The rest of the page (audience, parent, etc.) is untouched.">
                 @Html.AntiForgeryToken()
                 <button type="submit" class="btn btn-outline-danger">
                     <kw-l key="pages.resetSeeded">Reset to seeded text</kw-l>
