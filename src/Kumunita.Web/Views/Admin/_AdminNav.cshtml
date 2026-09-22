@@ -1,0 +1,34 @@
+@* The /admin section sub-nav (ADR 0062). A small nav-tabs strip shared by the
+   five admin pages so an admin can jump between sections without scrolling back
+   to the dashboard. The active tab is derived from the current action name (the
+   AdminController owns all five GET actions; the audit / break-glass pages
+   belong to the security section). *@
+@{
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "Index";
+    var inSecurity = action is "Audit" or "BreakGlass";
+    var tabs = new (string Label, string Href)[]
+    {
+        ("Overview",    "/admin"),
+        ("Accounts",    "/admin/accounts"),
+        ("Communities", "/admin/communities"),
+        ("Platform",    "/admin/platform"),
+        ("Security",    "/admin/security"),
+    };
+    var activeLabel = inSecurity ? "Security" : action switch
+    {
+        "Accounts"    => "Accounts",
+        "Communities" => "Communities",
+        "Platform"    => "Platform",
+        "Security"    => "Security",
+        _             => "Overview",
+    };
+}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    @foreach (var tab in tabs)
+    {
+        var isActive = tab.Label == activeLabel;
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">@tab.Label</a>
+        </li>
+    }
+</ul>

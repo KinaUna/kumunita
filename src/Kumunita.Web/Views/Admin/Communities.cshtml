@@ -1,0 +1,154 @@
+@model Kumunita.Web.Models.AdminCommunitiesViewModel
+@{
+    ViewData["Title"] = "Admin — Communities";
+}
+
+<h1>Communities</h1>
+<p class="text-muted">
+    @Model.Communities.Count community(ies), @Model.DisabledCommunityCount disabled.
+    Adding a community creates a new <code>/community/{id}</code> feed. Disabling one
+    hides it from the feed but keeps its posts and assignments (re-enable to restore).
+</p>
+
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@* ── Add community ── *@
+<div class="card mb-4">
+    <div class="card-body py-3">
+        <form method="post" asp-action="AddCommunity">
+            @Html.AntiForgeryToken()
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label for="addName" class="form-label small mb-1">Name</label>
+                    <input name="Name" id="addName" type="text" class="form-control form-control-sm" maxlength="100" required autocomplete="off" />
+                </div>
+                <div class="col-md-4">
+                    <label for="addDesc" class="form-label small mb-1">Description (optional)</label>
+                    <input name="Description" id="addDesc" type="text" class="form-control form-control-sm" maxlength="500" autocomplete="off" />
+                </div>
+                <div class="col-md-2 d-flex align-items-center ps-2">
+                    <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
+                    <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
+                           title="Everyone in the neighborhood is a member — no one can be removed or leave it.">Mandatory</label>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn btn-primary btn-sm" type="submit">Add community</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.Communities.Count == 0)
+{
+    <div class="text-muted small">No communities yet. Use the form above to add the first one.</div>
+}
+else
+{
+    <div class="row g-3">
+        @foreach (var c in Model.Communities)
+        {
+            <div class="col-md-6">
+                <div class="card @(c.Enabled ? "" : "border-warning")">
+                    <div class="card-header py-2 d-flex align-items-center justify-content-between gap-2">
+                        <div class="flex-grow-1">
+                            <span class="fw-semibold">@c.Name</span>
+                            @if (c.Enabled)
+                            {
+                                <span class="badge text-bg-success ms-2">enabled</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-warning ms-2">disabled</span>
+                            }
+                            @if (c.Mandatory)
+                            {
+                                <span class="badge text-bg-dark ms-1" title="Everyone in the neighborhood is a member — no one can be removed or leave it.">mandatory</span>
+                            }
+                            @if (c.ModeratorAccess)
+                            {
+                                <span class="badge text-bg-secondary ms-1" title="Standing moderator scope is ON for this community.">mod scope</span>
+                            }
+                        </div>
+                        <a href="#" data-edit-toggle="#edit-@c.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    </div>
+                    <div class="card-body py-2">
+                        @if (!string.IsNullOrWhiteSpace(c.Description))
+                        {
+                            <div class="text-muted small">@c.Description</div>
+                        }
+                        else
+                        {
+                            <div class="text-muted small fst-italic">No description.</div>
+                        }
+                        <div class="text-muted small mt-1">Sort: @c.SortOrder</div>
+                    </div>
+                    <div class="card-footer py-2 border-0">
+                        <div class="d-flex gap-2 flex-wrap">
+                            @* ADR 0012 — the mandatory lane: GlobalAdmin only, never the moderator's. *@
+                            <form method="post" asp-action="ToggleCommunityMandatory" class="d-inline-flex">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="componentId" value="@c.Id" />
+                                <input type="hidden" name="mandatory" value="@(c.Mandatory ? "false" : "true")" />
+                                <button class="btn btn-sm @(c.Mandatory ? "btn-outline-warning" : "btn-outline-secondary")"
+                                        type="submit"
+                                        title="@(c.Mandatory ? "Make optional — membership is explicit rows again." : "Make mandatory — everyone in the neighborhood becomes a member.")">
+                                    @(c.Mandatory ? "Make optional" : "Make mandatory")
+                                </button>
+                            </form>
+                            <form method="post" asp-action="ToggleCommunityEnabled" class="d-inline-flex">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="componentId" value="@c.Id" />
+                                <input type="hidden" name="enabled" value="@(c.Enabled ? "false" : "true")" />
+                                <button class="btn btn-sm @(c.Enabled ? "btn-outline-warning" : "btn-outline-success")"
+                                        type="submit"
+                                        title="@(c.Enabled ? "Hide from the feed — posts and assignments are kept." : "Restore this community to the feed.")">
+                                    @(c.Enabled ? "Disable" : "Re-enable")
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    @* Edit form — toggled by the Edit button in the card header; uses the
+                       same data-edit-toggle mechanism as before (admin-edit-toggle.ts). *@
+                    <div id="edit-@c.Id" style="display:none" class="border-top bg-light">
+                        <div class="p-3">
+                            <form method="post" asp-action="UpdateCommunity">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="ComponentId" value="@c.Id" />
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-4">
+                                        <label class="form-label small mb-1">Name</label>
+                                        <input type="text" name="Name" value="@c.Name" class="form-control form-control-sm" maxlength="100" required />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label small mb-1">Description</label>
+                                        <input type="text" name="Description" value="@c.Description" class="form-control form-control-sm" maxlength="500" />
+                                    </div>
+                                    <div class="col-2">
+                                        <label class="form-label small mb-1">Sort</label>
+                                        <input type="number" name="SortOrder" value="@c.SortOrder" class="form-control form-control-sm" min="0" step="1" />
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="btn btn-sm btn-primary w-100" type="submit">Save</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* Edit toggle is handled by client/lib/admin-edit-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6 no-inline-script rule). *@
+}
