@@ -1,0 +1,103 @@
+@model Kumunita.Web.Models.AdminPlatformViewModel
+@{
+    ViewData["Title"] = "Admin — Platform";
+}
+
+<h1>Platform</h1>
+<p class="text-muted">
+    Instance-wide management — the platform's languages and translated UI strings,
+    the default time zone and date &amp; time format, the sign-up gate, the access
+    audit log, and the break-glass elevation path.
+</p>
+
+@await Html.PartialAsync("_AdminNav.cshtml")
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@* Each surface is a list-group item with a title + one-line description, so an
+   admin can tell what each one does without clicking. The copy is plain English —
+   this view's local convention (the admin shell is mostly non-kw-l English). *@
+<div class="list-group mb-4">
+    <a href="/admin/languages" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Languages</div>
+        <small class="text-muted">Which languages the platform supports, and the translated UI strings and static pages.</small>
+    </a>
+    <a href="/admin/timezone" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Time zone</div>
+        <small class="text-muted">The platform-default time zone residents' timestamps fall back to when they set no preference.</small>
+    </a>
+    <a href="/admin/dateformat" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Date &amp; time format</div>
+        <small class="text-muted">The platform-default date &amp; time format for residents' timestamps.</small>
+    </a>
+    <a href="/admin/signup" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Sign-up</div>
+        <small class="text-muted">Whether new residents may create an account on their own — close it for invitation-only sign-up.</small>
+    </a>
+    <a asp-action="Audit" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Access audit log</div>
+        <small class="text-muted">A record of who was allowed or denied access to restricted content, plus admin actions.</small>
+    </a>
+    <a asp-action="BreakGlass" class="list-group-item list-group-item-action">
+        <div class="fw-semibold">Break-glass</div>
+        <small class="text-muted">The one-time elevation path for emergencies.</small>
+    </a>
+</div>
+
+@* SP U03 (ADR 0043 D4) — the "Platform pages" affordance: the five shipped
+   platform surfaces, each with a preview link (the route — always present)
+   and, for the four Page-backed surfaces, an edit link (id-based,
+   /pages/{id}/edit — only when the slug resolved to a page id; `about` is a
+   view, not a seeded page (ADR 0043 D1), so it is preview-only). *@
+<h3>Platform pages</h3>
+<p class="text-muted">
+    The five pages a fresh instance ships with. "Preview" opens the page as
+    residents see it; "Edit" opens the page editor (admins only). "About" is
+    the product story — preview only.
+</p>
+<table class="table table-sm align-middle mb-4">
+    <thead>
+        <tr>
+            <th>Surface</th>
+            <th>Route</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @* Row labels are plain text (the admin view's local convention — mostly
+           non-kw-l English; an interpolated kw-l key would break the
+           KwLRegistryConsistencyTests static key scan). The labels match the
+           footer.platform.* registry values by design. *@
+        @{
+            var platformLabels = new Dictionary<string, string>
+            {
+                ["about"]   = "About",
+                ["terms"]   = "Terms of use",
+                ["help"]    = "Help",
+                ["privacy"] = "Privacy",
+                ["conduct"] = "Code of conduct",
+            };
+        }
+        @foreach (var row in Model.PlatformPages)
+        {
+            <tr>
+                <td class="fw-semibold">@(platformLabels.TryGetValue(row.Slug, out var label) ? label : row.Slug)</td>
+                <td><code>@row.Route</code></td>
+                <td class="text-end">
+                    <a href="@row.Route" class="btn btn-sm btn-outline-secondary">Preview</a>
+                    @if (row.PageId is not null)
+                    {
+                        <a href="/pages/@row.PageId/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

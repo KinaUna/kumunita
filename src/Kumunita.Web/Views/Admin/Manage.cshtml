@@ -1,0 +1,201 @@
+@model Kumunita.Web.Models.AdminAccountManageViewModel
+@using Kumunita.Core.Identity
+@{
+    ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
+}
+
+@if (TempData["info"] is string info)
+{
+    <div class="alert alert-success">@info</div>
+}
+@if (TempData["error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
+        <li class="breadcrumb-item active" aria-current="page">
+            @(Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId)
+        </li>
+    </ol>
+</nav>
+
+<div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+    <div>
+        <h1 class="mb-1" style="font-size: 1.5rem;">
+            @(Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId)
+        </h1>
+        @if (Model.Account.Email is not null
+            && Model.Account.DisplayName != Model.Account.Email)
+        {
+            <div class="text-muted">@Model.Account.Email</div>
+        }
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+            @if (Model.Account.Roles.Count == 0)
+            {
+                <span class="badge text-bg-light border">Member</span>
+            }
+            @foreach (var r in Model.Account.Roles)
+            {
+                <span class="badge text-bg-secondary">@r</span>
+            }
+            @if (!Model.Account.Verified)
+            {
+                <span class="badge text-bg-warning">unverified</span>
+            }
+            @if (Model.Account.Blocked)
+            {
+                <span class="badge text-bg-danger">blocked</span>
+            }
+        </div>
+    </div>
+
+    @* Block / Unblock — the same guard the shell used: an admin cannot block
+       themselves (the controller refuses it too), but the Unblock button is
+       still offered on their own row if they are currently blocked (so an
+       admin blocked by another admin can self-restore). *@
+    @{
+        var showBlockOrUnblock = !(Model.IsSelf && !Model.Account.Blocked);
+        if (showBlockOrUnblock)
+        {
+            var action = Model.Account.Blocked ? "Unblock" : "Block";
+            var confirm = Model.Account.Blocked
+                ? "Unblock this account? Their standing will be restored."
+                : "Block this account? It loses all standing until unblocked.";
+            <form method="post" asp-action="@action" data-confirm="@confirm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="subjectId" value="@Model.Account.SubjectId" />
+                <button class="btn @(Model.Account.Blocked ? "btn-outline-success" : "btn-outline-danger")" type="submit">
+                    @action
+                </button>
+            </form>
+        }
+    }
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">Standing</div>
+    <div class="card-body">
+        @* Two forms on the same page (roles/scope + posting membership): both
+           submit to the same page and are independent writes (the Core lanes
+           touch different data — see the ComponentMembership vs ModeratorAssignment
+           distinction in the Core docs). The fields are laid out as fieldsets
+           (with a visible legend) rather than the shell's inline checkbox pile-up. *@
+        <form method="post" asp-action="SetRole" class="mb-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="targetSubjectId" value="@Model.Account.SubjectId" />
+
+            <fieldset class="mb-3">
+                <legend class="h6">Roles</legend>
+                <p class="text-muted small mb-2">
+                    Independent — a resident may hold any combination (ADR 0030).
+                    Nothing checked = a plain Member.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox"
+                               id="role-@Roles.GlobalAdmin"
+                               name="roleNames" value="@Roles.GlobalAdmin"
+                               checked="@(Model.Account.Roles.Contains(Roles.GlobalAdmin) ? "checked" : null)" />
+                        <label class="form-check-label" for="role-@Roles.GlobalAdmin">@Roles.GlobalAdmin</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox"
+                               id="role-@Roles.Moderator"
+                               name="roleNames" value="@Roles.Moderator"
+                               checked="@(Model.Account.Roles.Contains(Roles.Moderator) ? "checked" : null)" />
+                        <label class="form-check-label" for="role-@Roles.Moderator">@Roles.Moderator</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox"
+                               id="role-@Roles.Translator"
+                               name="roleNames" value="@Roles.Translator"
+                               checked="@(Model.Account.Roles.Contains(Roles.Translator) ? "checked" : null)" />
+                        <label class="form-check-label" for="role-@Roles.Translator">@Roles.Translator</label>
+                    </div>
+                </div>
+            </fieldset>
+
+            @if (Model.Components.Count > 0)
+            {
+                <fieldset class="mb-3">
+                    <legend class="h6">Moderator scope</legend>
+                    <p class="text-muted small mb-2">
+                        The communities this account may moderate. Meaningful only
+                        when the Moderator role is checked — the Core lane clears
+                        scope rows when the Moderator role is off.
+                    </p>
+                    <div class="d-flex gap-3 flex-wrap">
+                        @foreach (var c in Model.Components)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="scope-@c.Id"
+                                       name="componentIds" value="@c.Id"
+                                       checked="@(Model.Account.ComponentIds.Contains(c.Id) ? "checked" : null)" />
+                                <label class="form-check-label" for="scope-@c.Id">@c.Name</label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+            }
+
+            <button class="btn btn-primary" type="submit">Save roles</button>
+        </form>
+
+        <hr class="my-4" />
+
+        @if (Model.Communities.Count > 0)
+        {
+            @* Posting membership — the communities this account may POST to.
+               A distinct data row from the moderator scope above (a moderator
+               may govern a community they cannot post to, and a member may
+               post to a community they do not moderate). Mandatory communities
+               (ADR 0012) render disabled: everyone is a member, unchecking is
+               a server-side no-op. *@
+            <form method="post" asp-action="SetCommunityMembership">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="targetSubjectId" value="@Model.Account.SubjectId" />
+                <fieldset>
+                    <legend class="h6">Posting membership</legend>
+                    <p class="text-muted small mb-2">
+                        The communities this account may post to.
+                        @* Disabled communities are still listed (a membership row may
+                           exist on one whose feed 404s); the admin needs to see it
+                           to remove it. Mandatory communities are locked. *@
+                        @(Model.DisabledCommunityIds.Count > 0
+                            ? "Disabled communities are also listed — remove their membership if you want it gone."
+                            : "")
+                    </p>
+                    <div class="d-flex gap-3 flex-wrap">
+                        @foreach (var c in Model.Communities)
+                        {
+                            var cMandatory = c.Mandatory;
+                            var disabled = !c.Enabled;
+                            <div class="form-check @(cMandatory || disabled ? "text-muted" : null)">
+                                <input class="form-check-input" type="checkbox"
+                                       id="post-@c.Id"
+                                       name="communityIds" value="@c.Id"
+                                       @(cMandatory ? "disabled" : null)
+                                       checked="@(cMandatory || Model.Account.CommunityIds.Contains(c.Id) ? "checked" : null)" />
+                                <label class="form-check-label" for="post-@c.Id"
+                                       title="@(cMandatory ? c.Name + " (mandatory — everyone is a member)"
+                                                          : disabled ? c.Name + " (disabled community)"
+                                                                     : c.Name)">
+                                    @c.Name
+                                    @(cMandatory ? " (mandatory)" : null)
+                                    @(disabled ? " (disabled)" : null)
+                                </label>
+                            </div>
+                        }
+                    </div>
+                </fieldset>
+                <button class="btn btn-primary mt-2" type="submit">Save membership</button>
+            </form>
+        }
+    </div>
+</div>
+
+<a href="/admin" class="btn btn-link">← Back to the admin overview</a>

@@ -12,8 +12,10 @@
             <kw-l key="profile.edit_lede">This is where you decide what other residents can see about you. Whatever you choose here is exactly what the neighbor directory shows — no surprises.</kw-l>
         </p>
 
-        <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.avatar_heading">Your avatar</kw-l></h5>
-        @*
+        <div class="card mb-4">
+            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.avatar_heading">Your avatar</kw-l></span></div>
+            <div class="card-body">
+            @*
           U8 of the media feature (design doc §2.4; C-MED·5/6/8): the avatar
           upload is its OWN write lane (U6's AvatarUpload — POST /profile/avatar,
           [ValidateAntiForgeryToken]), so this is a SEPARATE <form> (a nested
@@ -61,7 +63,7 @@
                            accept="image/jpeg,image/png,image/webp,image/gif"
                            aria-label="Avatar image"
                            class="form-control form-control-sm">
-                    <button type="submit" class="btn btn-primary btn-sm" disabled><kw-l key="profile.save_avatar">Save avatar</kw-l></button>
+                    <button type="submit" class="btn btn-primary" disabled><kw-l key="profile.save_avatar">Save avatar</kw-l></button>
                 </div>
                 <div class="form-text small">
                     <kw-l key="profile.avatar_hint">JPEG, PNG, WebP or GIF · up to 5 MB. Saving replaces the avatar currently shown in the directory.</kw-l>
@@ -73,12 +75,16 @@
         {
             <div class="alert alert-success" role="alert">@info</div>
         }
+        </div>
+        </div>
 
         <form method="post" action="@Url.Action("Edit","Profile")">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="All" class="text-danger"></div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.name_email_heading">Your name + email</kw-l></h5>
+            <div class="card mb-4">
+            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.name_email_heading">Your name + email</kw-l></span></div>
+            <div class="card-body">
             <div class="row g-2">
                 <div class="col-sm-6">
                     <label asp-for="DisplayName" class="form-label"></label>
@@ -91,10 +97,14 @@
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
             </div>
+            </div>
+        </div>
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.address_heading">Your address + phone (optional)</kw-l></h5>
+        <div class="card mb-4">
+            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.address_heading">Your address + phone (optional)</kw-l></span></div>
+            <div class="card-body">
             <div class="row g-2">
-                <div class="col-sm-12">
+                <div class="col-sm-6">
                     <label asp-for="Address" class="form-label"></label>
                     <input asp-for="Address" class="form-control" maxlength="200"
                            placeholder="Street — shown to neighbors when you opt in below" />
@@ -103,21 +113,49 @@
                         <kw-l key="profile.address_hint">Shown on the directory list and detail only when you've also opted in the contact block below; leave empty to keep your street private to this profile.</kw-l>
                     </div>
                 </div>
-            </div>
-            <div class="row g-2 mt-1">
                 <div class="col-sm-6">
                     <label asp-for="Phone" class="form-label"></label>
                     <input asp-for="Phone" class="form-control" maxlength="32"
                            placeholder="Phone — shown to neighbors when you opt in below" />
-                    <span asp-validation-for="Phone" class="text-danger"></span>
+                    <span asp-for="Phone" class="text-danger"></span>
                     <div class="form-text small">
                         <kw-l key="profile.phone_hint">Shown on the directory detail only when you've opted in the contact block below; leave empty to keep your number private to this profile.</kw-l>
                     </div>
                 </div>
             </div>
+            <hr class="my-4" />
 
-            <h5 class="mt-4 mb-2" style="font-weight:600;"><kw-l key="profile.who_heading">Who can see what</kw-l></h5>
+            @* The §2.4 "null ==> short-circuit" opt-in gate. A checkbox in
+               the parent, not a second editor block: unchecked leaves
+               ContactVisibility at the "null" shape (the patch emits null),
+               checked enables the editor block below. *@
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input"
+                       type="checkbox" id="optin-contact"
+                       name="OptInContactVisibility"
+                       value="true"
+                       @(Model.OptInContactVisibility ? "checked" : null) />
+                <label class="form-check-label" for="optin-contact">
+                    <b><kw-l key="profile.optin_contact">Share my contact info (address, email, phone)</kw-l></b>
+                    <span class="text-muted small d-block">
+                        <kw-l key="profile.optin_contact_note">Leave this off if you'd rather keep your address, email, and phone completely hidden from the directory. When it's on, you choose who can see it in the box below.</kw-l>
+                    </span>
+                </label>
+            </div>
 
+            @{
+                ViewContext.ViewData["EditorName"] = "ContactVisibility";
+                ViewContext.ViewData["OptIn"] = Model.OptInContactVisibility;
+            }
+            <div class="kmb-nested-card">
+                <partial name="_AudienceEditor" model="Model" />
+            </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header"><span class="kmb-card-title"><kw-l key="profile.who_heading">Who can see what</kw-l></span></div>
+            <div class="card-body">
             @* The two audience editors share ONE partial (the U11 "only one
                _AudienceEditor.cshtml exists" pin). Each invocation is
                discriminated by ViewData["EditorName"] — the partial's form
@@ -128,31 +166,8 @@
                 ViewContext.ViewData["OptIn"] = true;
             }
             <partial name="_AudienceEditor" model="Model" />
-
-            @* The §2.4 "null ==> short-circuit" opt-in gate. A checkbox in
-               the parent, not a second editor block: unchecked leaves
-               ContactVisibility at the "null" shape (the patch emits null),
-               checked enables the editor block below. *@
-            <div class="form-check form-switch mt-3 mb-3">
-                <input class="form-check-input"
-                       type="checkbox" id="optin-contact"
-                       name="OptInContactVisibility"
-                       value="true"
-                       @(Model.OptInContactVisibility ? "checked" : null) />
-                <label class="form-check-label" for="optin-contact">
-                    <b><kw-l key="profile.optin_contact">Share my contact info (address, email, phone)</kw-l></b>
-                    <br/>
-                    <span class="text-muted small">
-                        <kw-l key="profile.optin_contact_note">Leave this off if you'd rather keep your address, email, and phone completely hidden from the directory. When it's on, you choose who can see it in the box below.</kw-l>
-                    </span>
-                </label>
             </div>
-
-            @{
-                ViewContext.ViewData["EditorName"] = "ContactVisibility";
-                ViewContext.ViewData["OptIn"] = Model.OptInContactVisibility;
-            }
-            <partial name="_AudienceEditor" model="Model" />
+        </div>
 
             <div class="d-flex gap-2 mt-4">
                 <button type="submit" class="btn btn-primary"><kw-l key="profile.save">Save</kw-l></button>
