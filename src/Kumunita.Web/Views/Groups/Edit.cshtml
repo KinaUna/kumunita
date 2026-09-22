@@ -1,4 +1,7 @@
 @model Kumunita.Web.Models.GroupPostComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit group post";
     // The group's id and the post's id are the route's {id}/{postId} — this
@@ -12,6 +15,8 @@
     // lane-bypass hole; the controller reads it from the route).
     string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
     string editPostId = (string?)ViewContext.RouteData.Values["postId"] ?? string.Empty;
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -49,7 +54,7 @@
                         </label>
                         <input class="form-control" type="text" id="title" name="Title"
                                maxlength="120" value="@Model.Title"
-                               placeholder="optional" />
+                               placeholder="@optionalPlaceholder" />
                         <div class="text-muted small mt-1">
                             <kw-l key="groups.edit_title_hint">A short headline (≤ 120 chars). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
                         </div>

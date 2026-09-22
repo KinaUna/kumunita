@@ -1,6 +1,12 @@
 @model Kumunita.Web.Models.MembershipEditorModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Manage a child account";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var groupIdPlaceholder     = await Translation.GetAsync("guardian.group_id_label", _kwL);
+    var communityIdPlaceholder = await Translation.GetAsync("guardian.community_id_label", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -55,7 +61,7 @@
               class="input-group justify-content-start">
             @Html.AntiForgeryToken()
             <input type="hidden" name="add" value="true" />
-            <input type="text" name="groupId" class="form-control" style="max-width: 260px;" placeholder="Group id" required />
+            <input type="text" name="groupId" class="form-control" style="max-width: 260px;" placeholder="@groupIdPlaceholder" required />
             <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
         </form>
 
@@ -85,7 +91,7 @@
               class="input-group justify-content-start">
             @Html.AntiForgeryToken()
             <input type="hidden" name="add" value="true" />
-            <input type="text" name="communityId" class="form-control" style="max-width: 260px;" placeholder="Community id" required />
+            <input type="text" name="communityId" class="form-control" style="max-width: 260px;" placeholder="@communityIdPlaceholder" required />
             <button type="submit" class="btn btn-outline-primary"><kw-l key="common.add">Add</kw-l></button>
         </form>
 

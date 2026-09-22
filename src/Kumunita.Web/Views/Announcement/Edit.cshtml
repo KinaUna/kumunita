@@ -1,7 +1,12 @@
 @model Kumunita.Web.Models.AnnouncementComposeViewModel
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit announcement";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -93,7 +98,7 @@
                         <kw-l key="announcements.title_label">Title</kw-l>
                     </label>
                     <input class="form-control" type="text" id="title" name="Title"
-                           maxlength="120" placeholder="optional"
+                           maxlength="120" placeholder="@optionalPlaceholder"
                            value="@Model.Title" />
                     <div class="text-muted small mt-1">
                         <kw-l key="announcements.title_hint">A short headline (up to 120 characters).</kw-l>

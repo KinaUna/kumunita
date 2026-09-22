@@ -6,6 +6,12 @@
 @{
     ViewData["Title"] = Model.Post.Title ?? "Post";
     string postId = Model.Post.Id;
+    // Render-time localization of the report-reason placeholder (the <kw-l>
+    // TagHelper always emits a <kw-l> element, so it can't sit inside a
+    // placeholder="..." attribute — resolve server-side, the _GrantPickers / Profile/Edit
+    // pattern). Same chain the <kw-l> TagHelper uses (M·5/M·8, ADR 0049).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var reportReasonPlaceholder = await Translation.GetAsync("posts.report_reason_placeholder", _kwL);
     // Author avatar monogram fallback (the Directory pattern — avatar.ts hides
     // the <img> on the 404 the serving lane fails closed to; see site.css).
     string authorAvatarInitial = !string.IsNullOrWhiteSpace(Model.AuthorDisplayName)
@@ -328,7 +334,7 @@
                         <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted small">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
                     </label>
                     <textarea class="form-control mb-3" id="report-reason" name="reason" rows="2"
-                              placeholder="Optionally add a reason for a moderator…"></textarea>
+                              placeholder="@reportReasonPlaceholder"></textarea>
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="text-muted small">
                             <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
@@ -584,7 +590,7 @@
                                     <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
                                 </label>
                                 <textarea class="form-control mb-2" name="reason" rows="2"
-                                          placeholder="Optionally add a reason for a moderator…"></textarea>
+                                          placeholder="@reportReasonPlaceholder"></textarea>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="text-muted small">
                                         <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>

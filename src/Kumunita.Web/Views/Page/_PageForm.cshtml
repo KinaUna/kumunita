@@ -1,4 +1,7 @@
 @model Kumunita.Web.Models.PageComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     // The composer / edit form body (one form, one editor — the ADR 0039 §3.8
     // "one editor, one renderer" pin). Shared between New.cshtml and
@@ -7,6 +10,8 @@
     bool isEdit   = Model.PageId is not null;
     string action = isEdit ? $"/pages/{Model.PageId}/edit" : "/pages/new";
     string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var tagsExample = await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -150,7 +155,7 @@
                         <input class="form-control" type="text" id="tags"
                                data-tag-suggest
                                maxlength="64"
-                               placeholder="e.g. sanitation, budget, maple-street" />
+                           placeholder="@tagsExample" />
                         <div class="text-muted small mt-1">
                             <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
                         </div>

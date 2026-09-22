@@ -19,13 +19,13 @@
             <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
             <div class="mb-3">
-                <label asp-for="Name" class="form-label"></label>
+                <label asp-for="Name" class="form-label"><kw-l key="groups.name_label">Group name</kw-l></label>
                 <input asp-for="Name" class="form-control" maxlength="100" required />
                 <span asp-validation-for="Name" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Description" class="form-label"></label>
+                <label asp-for="Description" class="form-label"><kw-l key="groups.about_desc_label">Description (optional)</kw-l></label>
                 <textarea asp-for="Description" class="form-control" rows="3" maxlength="500"></textarea>
                 <span asp-validation-for="Description" class="text-danger"></span>
                 <div class="form-text"><kw-l key="groups.create_desc_hint">Optional — a short note other residents will see.</kw-l></div>
@@ -34,7 +34,7 @@
             <div class="mb-3">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" asp-for="IsPrivate" />
-                    <label asp-for="IsPrivate" class="form-check-label"></label>
+                    <label asp-for="IsPrivate" class="form-check-label"><kw-l key="groups.private_label">Private group</kw-l></label>
                 </div>
                 <div class="form-text">
                     <kw-l key="groups.create_private_hint">A private group (e.g. a family) is hidden from everyone else's grant/access lists — only people you add as members can use it. A public group (e.g. "Mushroom hunters") shows up as an option in other residents' pickers.</kw-l>

@@ -1,4 +1,7 @@
 @model Kumunita.Web.Models.GroupPostComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Post to group";
     // The group's id is the route's {id} — this view is reached via
@@ -8,6 +11,8 @@
     // hole; the controller mints GroupPostDraft.GroupId from the route —
     // ADR 0013, G·3).
     string groupId = (string?)ViewContext.RouteData.Values["id"] ?? string.Empty;
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -45,7 +50,7 @@
                         </label>
                         <input class="form-control" type="text" id="title" name="Title"
                                maxlength="120" value="@Model.Title"
-                               placeholder="optional" />
+                               placeholder="@optionalPlaceholder" />
                         <div class="text-muted small mt-1">
                             <kw-l key="posts.title_hint">A short headline (up to 120 characters). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
                         </div>

@@ -1,8 +1,19 @@
 @using Kumunita.Web.Models
 @using Kumunita.Web.Security
 @model ProfileEditViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit your profile";
+
+    // Resolve the per-request effective language once (the same chain the
+    // <kw-l> TagHelper resolves UI strings through — M·5/M·8, ADR 0049) so the
+    // provider-resolved field placeholders land in the same language as the
+    // surrounding markup. The field labels are <kw-l> elements below.
+    var kwlLang = await EffectiveLanguageCode.ResolveAsync(
+        ViewContext.HttpContext?.Request, Localization, Translation);
+    var addressPlaceholder = await Translation.GetAsync("profile.address_placeholder", kwlLang);
+    var phonePlaceholder = await Translation.GetAsync("profile.phone_placeholder", kwlLang);
 }
 
 <div class="row justify-content-center">
@@ -87,12 +98,12 @@
             <div class="card-body">
             <div class="row g-2">
                 <div class="col-sm-6">
-                    <label asp-for="DisplayName" class="form-label"></label>
+                    <label for="DisplayName" class="form-label"><kw-l key="profile.display_name_label">Display name</kw-l></label>
                     <input asp-for="DisplayName" class="form-control" required maxlength="100" />
                     <span asp-validation-for="DisplayName" class="text-danger"></span>
                 </div>
                 <div class="col-sm-6">
-                    <label asp-for="Email" class="form-label"></label>
+                    <label asp-for="Email" class="form-label"><kw-l key="common.email">Email</kw-l></label>
                     <input asp-for="Email" class="form-control" required type="email" />
                     <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
@@ -105,18 +116,18 @@
             <div class="card-body">
             <div class="row g-2">
                 <div class="col-sm-6">
-                    <label asp-for="Address" class="form-label"></label>
+                    <label for="Address" class="form-label"><kw-l key="profile.address_label">Address (the street you live at)</kw-l></label>
                     <input asp-for="Address" class="form-control" maxlength="200"
-                           placeholder="Street — shown to neighbors when you opt in below" />
+                           placeholder="@addressPlaceholder" />
                     <span asp-validation-for="Address" class="text-danger"></span>
                     <div class="form-text small">
                         <kw-l key="profile.address_hint">Shown on the directory list and detail only when you've also opted in the contact block below; leave empty to keep your street private to this profile.</kw-l>
                     </div>
                 </div>
                 <div class="col-sm-6">
-                    <label asp-for="Phone" class="form-label"></label>
+                    <label for="Phone" class="form-label"><kw-l key="profile.phone_label">Phone number</kw-l></label>
                     <input asp-for="Phone" class="form-control" maxlength="32"
-                           placeholder="Phone — shown to neighbors when you opt in below" />
+                           placeholder="@phonePlaceholder" />
                     <span asp-for="Phone" class="text-danger"></span>
                     <div class="form-text small">
                         <kw-l key="profile.phone_hint">Shown on the directory detail only when you've opted in the contact block below; leave empty to keep your number private to this profile.</kw-l>

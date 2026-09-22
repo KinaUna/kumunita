@@ -29,19 +29,19 @@
             <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
             <div class="mb-3">
-                <label asp-for="DisplayName" class="form-label"></label>
+                <label asp-for="DisplayName" class="form-label"><kw-l key="common.display_name">Display name</kw-l></label>
                 <input asp-for="DisplayName" class="form-control" maxlength="100" required />
                 <span asp-validation-for="DisplayName" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Email" class="form-label"></label>
+                <label asp-for="Email" class="form-label"><kw-l key="common.email">Email</kw-l></label>
                 <input asp-for="Email" class="form-control" maxlength="255" required />
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Password" class="form-label"></label>
+                <label asp-for="Password" class="form-label"><kw-l key="common.password">Password</kw-l></label>
                 <input asp-for="Password" class="form-control" minlength="8" required />
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>
