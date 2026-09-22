@@ -1247,6 +1247,21 @@ public static class FirstBootSeeder
              "**To hand over the account.** When the child is ready, open their " +
              "page and click **Dissolve guardianship**. Their memberships are " +
              "kept, and their own controls come back on the next read.\n"),
+            ("being-a-child", "Being a child on Kumunita",
+             "## Being a child on Kumunita\n\n" +
+             "A child account is one your parent set up for you. It works like a " +
+             "normal account — you read the feed, write posts, and reply — with a " +
+             "few things your parent handles for you.\n\n" +
+             "**What stays yours.** Your posts, replies, and profile are yours. " +
+             "Your parent can't read them, even though they set up the account.\n\n" +
+             "**What your parent handles.** Your parent decides which groups and " +
+             "communities you're in, and can suspend or un-suspend your account.\n\n" +
+             "**Group invitations.** You'll see an invitation under **Invitations**. " +
+             "You can always **Decline**. To **Accept**, your parent has to approve " +
+             "it first — ask them to approve it for you.\n\n" +
+             "**When you're ready to take over.** When your parent hands the " +
+             "account over, your own controls come back: you can accept group " +
+             "invitations yourself and manage your own groups and communities.\n"),
         ];
     }
 
@@ -1482,6 +1497,26 @@ public static class FirstBootSeeder
              "und klicke auf **Vormundschaft auflösen**. Die Mitgliedschaften " +
              "bleiben erhalten, und die eigenen Kontrollen kommen beim nächsten " +
              "Lesen zurück.\n"),
+            ("being-a-child", "Ein Kinderkonto nutzen",
+             "## Ein Kinderkonto nutzen\n\n" +
+             "Ein Kinderkonto ist eines, das deine Eltern für dich eingerichtet " +
+             "haben. Es funktioniert wie ein normales Konto — du liest den Feed, " +
+             "schreibst Beiträge und antwortest — nur ein paar Dinge übernehmen " +
+             "deine Eltern für dich.\n\n" +
+             "**Was dir gehört.** Deine Beiträge, Antworten und dein Profil gehören " +
+             "dir. Deine Eltern können sie nicht lesen, auch wenn sie das Konto " +
+             "eingerichtet haben.\n\n" +
+             "**Was deine Eltern übernehmen.** Deine Eltern entscheiden, in welchen " +
+             "Gruppen und Gemeinschaften du bist, und können dein Konto sperren " +
+             "oder wieder aktivieren.\n\n" +
+             "**Gruppeneinladungen.** Eine Einladung findest du unter " +
+             "**Einladungen**. Du kannst sie immer **Ablehnen**. Um sie " +
+             "**Anzunehmen**, müssen deine Eltern sie erst genehmigen — bitte sie, " +
+             "sie für dich zu genehmigen.\n\n" +
+             "**Wenn du bereit bist, es selbst zu übernehmen.** Wenn deine Eltern " +
+             "dir das Konto übergeben, kommen deine eigenen Kontrollen zurück: Du " +
+             "kannst Gruppeneinladungen selbst annehmen und deine eigenen Gruppen " +
+             "und Gemeinschaften verwalten.\n"),
         ];
     }
 
@@ -1710,6 +1745,24 @@ public static class FirstBootSeeder
              "clique sur **Dissoudre la tutelle**. Ses adhésions sont " +
              "conservées, et ses propres contrôles reviennent à la prochaine " +
              "lecture.\n"),
+            ("being-a-child", "Utiliser un compte enfant",
+             "## Utiliser un compte enfant\n\n" +
+             "Un compte enfant est celui que ton parent a créé pour toi. Il " +
+             "fonctionne comme un compte normal — tu lis le fil, tu écris des " +
+             "publications et tu réponds — à quelques près que ton parent gère " +
+             "pour toi.\n\n" +
+             "**Ce qui te reste.** Tes publications, tes réponses et ton profil te " +
+             "restent. Ton parent ne peut pas les lire, même s'il a créé le compte.\n\n" +
+             "**Ce que ton parent gère.** Ton parent décide de quels groupes et " +
+             "communautés tu fais partie, et peut suspendre ou réactiver ton compte.\n\n" +
+             "**Invitations de groupe.** Tu verras une invitation sous " +
+             "**Invitations**. Tu peux toujours **Refuser**. Pour l'**Accepter**, " +
+             "ton parent doit d'abord l'approuver — demande-lui de l'approuver " +
+             "pour toi.\n\n" +
+             "**Quand tu es prêt à prendre la main.** Quand ton parent te transfère " +
+             "le compte, tes propres contrôles reviennent : tu peux accepter les " +
+             "invitations de groupe toi-même et gérer tes propres groupes et " +
+             "communautés.\n"),
         ];
     }
 
@@ -1921,6 +1974,24 @@ public static class FirstBootSeeder
              "**Giv kontoen videre.** Når barnet er klar, åbner du dets side og " +
              "klikker på **Afløs værgemodet**. Medlemskaberne bevares, og " +
              "barnets egne kontroller kommer tilbage ved næste læsning.\n"),
+            ("being-a-child", "At bruge en barnkonto",
+             "## At bruge en barnkonto\n\n" +
+             "En barnkonto er en, dine forældre har oprettet til dig. Den virker " +
+             "som en normal konto — du læser feedet, skriver indlæg og svarer — " +
+             "bortset fra, at dine forældre klarer et par ting for dig.\n\n" +
+             "**Hvad der er dit.** Dine indlæg, svar og profil er dine. Dine " +
+             "forældre kan ikke læse dem, selvom de har oprettet kontoen.\n\n" +
+             "**Hvad dine forældre klarer.** Dine forældre beslutter, hvilke " +
+             "grupper og fællesskaber, du tilhører, og de kan suspendere eller " +
+             "genoprette din konto.\n\n" +
+             "**Gruppeinvitationer.** Du finder invitationen under " +
+             "**Indladelser**. Du kan altid klikke på **Afvis**. For at " +
+             "klikke på **Acceptér**, skal dine forældre først godkende den — " +
+             "bed dem godkende den for dig.\n\n" +
+             "**Når du er klar til at overtage.** Når dine forældre giver kontoen " +
+             "videre til dig, kommer dine egne kontroller tilbage: Du kan selv " +
+             "acceptere gruppeinvitationer og styre dine egne grupper og " +
+             "fællesskaber.\n"),
         ];
     }
 
@@ -1981,7 +2052,8 @@ public static class FirstBootSeeder
              "- [Language](/pages/system/help/language) — your language, time zone, and date format\n" +
              "- [Events](/pages/system/help/events) — the feed, RSVP, reminders\n" +
              "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
-             "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n\n" +
+             "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
+             "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -2074,7 +2146,8 @@ public static class FirstBootSeeder
              "- [Sprache](/pages/system/help/language) — Deine Sprache, Zeitzone und das Datumsformat\n" +
              "- [Termine](/pages/system/help/events) — Der Feed, RSVP, Erinnerungen\n" +
              "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
-             "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n\n" +
+             "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
+             "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -2172,7 +2245,8 @@ public static class FirstBootSeeder
              "- [Langue](/pages/system/help/language) — Ta langue, ton fuseau horaire et ton format de date\n" +
              "- [Événements](/pages/system/help/events) — Le fil, la participation, les rappels\n" +
              "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
-             "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n\n" +
+             "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
+             "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -2267,7 +2341,8 @@ public static class FirstBootSeeder
              "- [Sprog](/pages/system/help/language) — Dit sprog, din tidzone og dit datoformat\n" +
              "- [Begivenheder](/pages/system/help/events) — Feeden, deltagelse, påmindelser\n" +
              "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
-             "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n\n" +
+             "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
+             "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",

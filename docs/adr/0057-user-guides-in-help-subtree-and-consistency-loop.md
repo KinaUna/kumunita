@@ -85,7 +85,7 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
 
 ### D1 — The guides are `Page` docs nested under the canonical `help` page
 
-- The seeded guide set is **exactly nine** `Page` docs, each a **direct
+- The seeded guide set is **exactly ten** `Page` docs, each a **direct
   child of the canonical `help` page** (ADR 0043 D1, `system/help`), each
   `Kind = System` (ADR 0040), each `Audience = null` (public — the ADR 0039
   §3.4 shape, world-readable; a resident's *first* question is "how do I …"
@@ -93,7 +93,7 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   (authored-in `en`), each `AuthorId = string.Empty` (platform content, no
   resident author — the ADR 0043 D1 shape), each `IsDraft = false` and
   `IsDeleted = false`.
-- The **nine** seeded guides (closed set, `en` only; a new guide is a new
+- The **ten** seeded guides (closed set, `en` only; a new guide is a new
   lane, not a silent addition — the ADR 0040 `PageKind` closed-set rule
   applied to the guide set):
 
@@ -108,9 +108,10 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   | `events` | how an event works: the feed, the detail view, RSVP, the day-before reminder | ADR 0054 |
   | `translator` | what the `Translator` role may and may not do, in plain language | ADR 0021 |
   | `child-accounts` | the guardian's child accounts: what a guardian may and may not do (suspend, memberships, invitation approval, assign a second guardian, hand-over), and the privacy boundary (no reading the child's content) | ADR 0028 / 0038 |
+  | `being-a-child` | the child's own view of a child account: what stays theirs (posts/replies/profile the guardian can't read), what the guardian handles (memberships, suspend), group invitations (decline always open, accept needs guardian approval), and hand-over restoring the child's own controls | ADR 0028 / 0038 |
 
 - **`getting-started` is the index of the guides** — it is the `help` page's
-  *first* child, and its body links to the other eight. A resident who
+  *first* child, and its body links to the other nine. A resident who
   arrives at `/pages/help` (the tree browse) sees `help` →
   `getting-started` → the rest; a resident who arrives at `/help` (the
   hard-coded route, ADR 0043 D2) reads the `help` page's *own* body (the
@@ -122,7 +123,7 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
   floor, and the `de`/`fr`/`da` baseline arrays gain the matching new bullet
   to keep the "structure preserved" parity — the ADR 0042 D2 bar).
 - **A guide that documents a feature not yet shipped is not seeded.**
-  The eight above are the current shipped surface (M0–M4 + the `ML`/`LS`/`SP`/
+  The nine above are the current shipped surface (M0–M4 + the `ML`/`LS`/`SP`/
   `RC`/`RE`/`TG`/`PG`/`GU`/`GA`/`TR`/`TZ`/`DF` lanes). **M5 (Projects), M6
   (Portability, iCal, notifications, search), and the deferred items
   (SECURITY.md §6 A2, the invitation mechanism, group logos, in-browser
@@ -147,7 +148,7 @@ lane's own Definition of Done; the *periodic* check is the OPS procedure).
 - **A non-`en` guide body ships as a curated `de`/`fr`/`da` baseline**
   (**amended 2026-09-21** — superseding the original "ship `en`-only"
   decision). On a pristine DB the guides now carry a `de`/`fr`/`da`
-  `PageTranslation` row each (9 guides × 3 languages = 27 rows), seeded
+  `PageTranslation` row each (10 guides × 3 languages = 30 rows), seeded
   by `FirstBootSeeder.SeedGuideTranslationsAsync` from the hand-curated
   registries `DeGuidePages()` / `FrGuidePages()` / `DaGuidePages()` — the
   **same shape** as the four-surface set's baselines
@@ -289,13 +290,13 @@ it's ceremony" rule):
     `system`, not new roots — the ADR 0039 §3.3 forest shape, unchanged).
   - **The `de`/`fr`/`da` baselines are attached, one per guide per
     language** (**amended 2026-09-21**, following D2) — the guides ship a
-    `de`/`fr`/`da` `PageTranslation` row each (9 guides × 3 languages =
-    27 rows), on the guide's *own* `Id` (the ADR 0042 D6 parentage
+    `de`/`fr`/`da` `PageTranslation` row each (10 guides × 3 languages =
+    30 rows), on the guide's *own* `Id` (the ADR 0042 D6 parentage
     distinction, unchanged), authored by the platform (`AuthorId` empty),
     and the *first-boot* state has exactly that set. The test that
     previously pinned "no `PageTranslation` row is attached to a guide"
     (`UG_Guides_NoPageTranslationRows_AtFirstBoot`) is now flipped to
-    `UG_Guides_DaFrDaBaselines_AtFirstBoot` (asserts 9 × 3 rows, one per
+    `UG_Guides_DaFrDaBaselines_AtFirstBoot` (asserts 10 × 3 rows, one per
     language, platform-authored) plus an idempotency pin
     (`UG_GuideBaselineIdempotency_AcrossTwoBoots`) and a backfill pin
     (`UG_BackfillGuideTranslations_CreatesAbsent_NeverClobbers_HumanEdit`).
@@ -314,7 +315,7 @@ it's ceremony" rule):
   array of `(Slug, Title, Body)` tuples (the same shape as
   `EnDefaultPages()`, D4). The **conventions doc**
   (`docs/guides/CONVENTIONS.md`) is the **human-facing** view of the
-  registry: the taxonomy (the nine slugs + the ADR each one documents),
+  registry: the taxonomy (the ten slugs + the ADR each one documents),
   the *writing rules* (plain language, the resident's steps, no code
   jargon, the ADR 0042 D2 bar for the `en` floor), the *consistency loop*
   (D3, in the resident's words), and the *review procedure* (the OPS.md
@@ -340,7 +341,7 @@ it's ceremony" rule):
 - **The `help` page is promoted from a leaf to a folder-with-index.**
   ADR 0039 §3.3 already names this shape as valid ("a page is either a
   *folder* … or a *leaf*, or both ('folder-with-index')"). The `help`
-  page's body gains a **`## Guides` section** listing all nine guides as
+  page's body gains a **`## Guides` section** listing all ten guides as
   absolute links (`/pages/system/help/{slug}`); the four existing bullets
   are unchanged (the ADR 0042 D2 "structure preserved" parity — the
   `de`/`fr`/`da` baseline arrays in `DeDefaultPages()` /
