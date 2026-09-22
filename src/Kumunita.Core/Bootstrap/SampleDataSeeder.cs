@@ -70,6 +70,81 @@ public static class SampleDataSeeder
     private static string Id() => Guid.NewGuid().ToString("N");
 
     /// <summary>
+    /// Store the de / fr / da <see cref="Kumunita.Core.Events.EventTranslation"/> rows for
+    /// one sample event from the <see cref="EventTranslationBaselines"/> registry, if that
+    /// event's English title is one of the sample events (all four are; an event added
+    /// without baselines is simply skipped). Shared by <see cref="SeedAsync"/> (a fresh
+    /// instance) so both it and <see cref="BackfillEventTranslationsAsync"/> agree on the
+    /// exact de / fr / da text (the ADR 0060 D1 "one registry, two lanes" shape).
+    /// </summary>
+    private static void StoreEventTranslations(
+        IDocumentSession session, string eventId, string englishTitle,
+        string authorId, DateTimeOffset created)
+    {
+        if (!EventTranslationBaselines.TryGetValue(englishTitle, out var baselines))
+            return;
+        foreach (var baseline in baselines)
+        {
+            session.Store(new EventTranslation
+            {
+                Id = Id(),
+                EventId = eventId,
+                LanguageCode = baseline.Code,
+                Title = baseline.Title,
+                Body = baseline.Body,
+                AuthorId = authorId,
+                Created = created,
+            });
+        }
+    }
+
+    /// <summary>
+    /// The (language → title / body) baseline for one sample event — the code-owned
+    /// de / fr / da text the sample neighborhood ships as
+    /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0059), seeded by
+    /// <see cref="SeedAsync"/> and re-applied, create-if-missing, by
+    /// <see cref="BackfillEventTranslationsAsync"/> (ADR 0060).
+    /// </summary>
+    public readonly record struct EventTranslationBaseline(string Code, string? Title, string Body);
+
+    /// <summary>
+    /// The code-owned de / fr / da translation baselines for the sample events, keyed
+    /// by the event's **English title** (the seeder's stable, human-readable key —
+    /// within the sample, events are identified by their content, not by id).
+    /// <see cref="SeedAsync"/> and <see cref="BackfillEventTranslationsAsync"/> read the
+    /// **same** set, so a fresh instance and a backfilled one carry identical de / fr / da
+    /// rows (the ADR 0042 D1 / ADR 0047 D2 "one registry, two lanes" shape — ADR 0060 D1).
+    /// </summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<EventTranslationBaseline>> EventTranslationBaselines { get; }
+        = new Dictionary<string, IReadOnlyList<EventTranslationBaseline>>
+    {
+        ["Community Cleanup Day"] =
+        [
+            new("de", "Gemeinschaftlicher Aufräumtag", "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum."),
+            new("fr", "Journée de nettoyage communautaire", "Gants et sacs fournis. Rendez-vous à la porte à **09:30**, terminé pour **12:00**.\n\nCafé et pâtisseries ensuite dans la salle communautaire."),
+            new("da", "Fælles ryddedag", "Handsker og poser leveres. Møde ved porten **09:30**, færdig kl. **12:00**.\n\nBagefter kaffe og kage i fælleslokalet."),
+        ],
+        ["Potluck in the Green"] =
+        [
+            new("de", "Potluck auf dem Grün", "Ein Gericht pro Person, kommt ab **14:00**. Bringt einen Stuhl mit, wenn ihr einen habt."),
+            new("fr", "Repas partagé sur la pelouse", "Un plat chacun, arrivez à partir de **14:00**. Apportez une chaise si vous en avez."),
+            new("da", "Fællesspisning på græsset", "En ret hver, ankom fra **14:00**. Tag en stol med, hvis du har en."),
+        ],
+        ["Tool Library Launch"] =
+        [
+            new("de", "Eröffnung der Werkzeugbibliothek", "Bohrer, Leitern, Hochdruckreiniger — leihen statt kaufen. Treffen im Gemeinschaftsraum, um das Regal aufzubauen."),
+            new("fr", "Lancement de la bibliothèque d'outils", "Perceuses, échelles, nettoyeurs haute pression — empruntez au lieu d'acheter. Rendez-vous dans la salle communautaire pour installer l'étagère."),
+            new("da", "Åbning af værktøjbiblioteket", "Bor, stiger, trykrenser — lån i stedet for at købe. Møde i fælleslokalet for at sætte hylden op."),
+        ],
+        ["Neighborhood Walk"] =
+        [
+            new("de", "Nachbarschaftsspaziergang", "Eine gemächliche Runde durch den Kiez, danach Kaffee. Kinderwagen willkommen — die Strecke ist flach."),
+            new("fr", "Bal de quartier", "Une boucle tranquille du quartier, café à la fin. Poussettes bienvenues — c'est plat tout du long."),
+            new("da", "Naboregang", "En rolig tur rundt om blokken, kaffe bagefter. Børnevogne er velkomne — det er fladt hele vejen."),
+        ],
+    };
+
+    /// <summary>
     /// Runs the sample-data steps. Called once by <c>Program.cs</c> on a pristine DB,
     /// only when <c>SampleData__Enabled</c> is set (ADR 0056). In the Development
     /// environment it takes the weak-credential posture; otherwise (a deployed demo
@@ -378,17 +453,14 @@ public static class SampleDataSeeder
         session.Store(cleanup);
         session.Store(potluck);
 
-        // A user-added event translation (ADR 0059 — author ∪ GlobalAdmin ∪
-        // Translator standing, not machine-translated): a German row for the
-        // Community Cleanup Day, so the ADR 0027 chip-swap + ADR 0051 feed
-        // display have something to exercise on the Detail page.
-        session.Store(new EventTranslation
-        {
-            Id = Id(), EventId = cleanup.Id, LanguageCode = "de",
-            Title = "Gemeinschaftlicher Aufräumtag",
-            Body = "Handschuhe und Tüten gestellt. Treffen am Tor **09:30**, fertig bis **12:00**.\n\nAnschließend Kaffee und Gebäck im Gemeinschaftsraum.",
-            AuthorId = sophie.Id, Created = now.AddDays(-3)
-        });
+        // User-added event translations (ADR 0059 — author ∪ GlobalAdmin ∪ Translator
+        // standing, not machine-translated): the de / fr / da rows for both seeded
+        // events, so the ADR 0027 chip-swap + ADR 0051 feed display have something to
+        // exercise on the Detail page. The text comes from the one baseline registry
+        // (ADR 0060 D1) that the warm-boot BackfillEventTranslationsAsync also reads,
+        // so a fresh and a backfilled instance agree on the de / fr / da rows.
+        StoreEventTranslations(session, cleanup.Id, cleanup.Title, sophie.Id, now.AddDays(-3));
+        StoreEventTranslations(session, potluck.Id, potluck.Title, sophie.Id, now.AddDays(-3));
 
         // RSVPs — one row per (event, resident); a mix of Going / Maybe / No.
         session.Store(new EventRsvp { Id = Id(), EventId = cleanup.Id, UserId = anna.Id, Status = RsvpStatus.Going, At = now.AddDays(-1) });
@@ -625,6 +697,10 @@ public static class SampleDataSeeder
         };
         session.Store(toolLibrary);
         session.Store(walk);
+        // The two later events carry the same de / fr / da baseline set (ADR 0059 /
+        // ADR 0060 D1) so every seeded event exercises the translation lane.
+        StoreEventTranslations(session, toolLibrary.Id, toolLibrary.Title, sophie.Id, now);
+        StoreEventTranslations(session, walk.Id, walk.Title, sophie.Id, now);
         session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = ben.Id,   Status = RsvpStatus.Going, At = now });
         session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = anna.Id,  Status = RsvpStatus.Going, At = now.AddHours(1) });
         session.Store(new EventRsvp { Id = Id(), EventId = toolLibrary.Id, UserId = david.Id, Status = RsvpStatus.Maybe, At = now });
@@ -917,6 +993,78 @@ public static class SampleDataSeeder
                 "anna/ben/carla/david@examplium.com (all {ResPassword}).",
                 AdminEmail, AdminPassword, ModeratorEmail, ModeratorPassword, TranslatorEmail, TranslatorPassword, ResidentPassword);
         }
+    }
+
+    /// <summary>
+    /// **Warm-boot backfill** of the sample events' de / fr / da
+    /// <see cref="Kumunita.Core.Events.EventTranslation"/> rows (ADR 0060). An instance whose
+    /// first boot predates the sample event translations has the four sample events
+    /// (authored in <c>en</c>) but no de / fr / da rows, so a German / French / Danish-speaking
+    /// resident sees only the English variant on the events feed and detail. This lane closes
+    /// that gap the same way ADR 0047 D2 / ADR 0052 do for the canonical pages and the
+    /// UI-string catalog.
+    /// <para>
+    /// **Create-if-missing only** (the ADR 0042 D1 invariant): an existing
+    /// <c>(EventId, LanguageCode)</c> row is skipped, never refreshed — the Translator's
+    /// in-app edit of a sample event's translation (the ADR 0059 lane) is never clobbered by a
+    /// later deploy. The <c>en</c> authored-in row is the event's own title / body and is never
+    /// read or written here.
+    /// </para>
+    /// <para>
+    /// **Scope guard.** It runs only when <c>SampleData__Enabled</c> is set (the caller's gate,
+    /// ADR 0056) and only touches events whose title is one of the sample events (the
+    /// <see cref="EventTranslationBaselines"/> registry). On a real neighborhood — which never
+    /// carries the flag — this method is unreachable by construction, exactly like
+    /// <see cref="SeedAsync"/>. Idempotent: a second run finds every row it created on the first
+    /// and skips (the ADR 0042 D1 skip path).
+    /// </para>
+    /// </summary>
+    public static async Task BackfillEventTranslationsAsync(
+        IDocumentSession session,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var allEvents = await session.Query<Event>()
+            .Where(e => e.IsDeleted == false)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        foreach (var (englishTitle, baselines) in EventTranslationBaselines)
+        {
+            // Match by the sample event's stable English title (the registry's key) —
+            // within a sample neighborhood the events are identified by their content,
+            // not by id. On a real neighborhood no sample event exists, so this is a
+            // no-op for every key.
+            var eventRow = allEvents.FirstOrDefault(e => e.Title == englishTitle);
+            if (eventRow is null)
+                continue;   // this sample event is absent — nothing to backfill for it.
+
+            foreach (var baseline in baselines)
+            {
+                var existing = await session
+                    .Query<EventTranslation>()
+                    .Where(t => t.EventId == eventRow.Id && t.LanguageCode == baseline.Code)
+                    .FirstOrDefaultAsync(ct)
+                    .ConfigureAwait(false);
+
+                if (existing is null)
+                {
+                    session.Store(new EventTranslation
+                    {
+                        Id = Id(),
+                        EventId = eventRow.Id,
+                        LanguageCode = baseline.Code,
+                        Title = baseline.Title,
+                        Body = baseline.Body,
+                        AuthorId = string.Empty,   // sample / platform content — no resident author
+                        Created = now,
+                    });
+                }
+                // else: skip — create-if-missing (never overwrite; ADR 0042 D1).
+            }
+        }
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     /// <summary>

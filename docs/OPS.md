@@ -40,7 +40,7 @@ All per-instance identity and integration is env. The *image* is identical every
 | `Media__MaxBytes` | Optional | No | Max upload payload in bytes (default `5242880` = 5 MiB; `0` = no cap). Enforced at the upload boundary before any byte is written |
 | `Media__AllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive (default `image/jpeg,image/png,image/webp,image/gif` — SVG deliberately excluded, SECURITY.md §3(e)). The image lane's raster-only gate; the extension point this row was sized to leave open for follow-on lanes |
 | `Media__AttachmentAllowedContentTypes` | Optional | No | Comma-sep Content-Type allowlist, case-insensitive, for the **attachment (download) lane** (ADR 0034, lane `ATT`) — **distinct** from the image lane's `Media__AllowedContentTypes`. Default: `application/pdf, application/msword, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/plain, text/csv, application/zip, image/jpeg, image/png, image/webp, image/gif` (SVG excluded; the four raster types included so a photo can be attached *as a download*). Same `Media__MaxBytes` cap. Guards-before-write: empty → 400, oversize → 413, disallowed → 415 (SECURITY.md §3(e)) |
-| `SampleData__Enabled` | Optional | No | First-boot mock-neighborhood seeder (ADR 0055 / 0056). Default **absent/`false`** — a real deployment omits it, so the seeder is unreachable by construction. Set `true` only for a **deployed demo site** (`Production` + fresh DB): the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo accounts get random high-entropy passwords, and a single credentials summary is emailed to the seed admin's address through the durable outbox. In `Development` it instead uses the documented weak demo credentials (README §Running table). First-boot only (pristine-DB gate) |
+| `SampleData__Enabled` | Optional | No | First-boot mock-neighborhood seeder (ADR 0055 / 0056) **plus** the warm-boot sample-event translation backfill (ADR 0060). Default **absent/`false`** — a real deployment omits it, so neither lane is reachable by construction. Set `true` only for a **deployed demo site** (`Production` + fresh DB): the seed admin keeps its `SeedAdmin__` setup-token lane, the other demo accounts get random high-entropy passwords, and a single credentials summary is emailed to the seed admin's address through the durable outbox. In `Development` it instead uses the documented weak demo credentials (README §Running table). The content seed is first-boot only (pristine-DB gate); on a warm boot the flag also triggers the create-if-missing, idempotent, never-clobbering backfill of the sample events' missing `de`/`fr`/`da` `EventTranslation` rows (ADR 0060) |
 
 Connection string example:
 `Host=db;Port=5432;Database=kumunita;Username=kumunita;Password=____;Include Error Detail=true`
@@ -81,11 +81,15 @@ sent → default components (Safety, Maintenance, Social, Governance) are seeded
 language catalog is seeded (source language `en` enabled and set as default).
 Re-running the seeder is a no-op once the admin exists.
 
-> **Sample data — opt-in (ADR 0055 / 0056):** when `SampleData__Enabled=true` the
+> **Sample data — opt-in (ADR 0055 / 0056 / 0060):** when `SampleData__Enabled=true` the
 > first-boot lane seeds a mock neighborhood (residents, groups, posts/replies,
-> events/RSVPs, tags, a blog, de/fr translations) so a fresh instance is immediately
-> exercisable. It is gated on `SampleData__Enabled` **and** first-boot, so a real
-> deployment that never sets the flag never runs it. Two postures: in `Development`
+> events/RSVPs, tags, a blog, de/fr/da event translations) so a fresh instance is
+> immediately exercisable. It is gated on `SampleData__Enabled` **and** first-boot, so a
+> real deployment that never sets the flag never runs it. On a **warm** boot the same
+> flag additionally backfills any *missing* sample-event `de`/`fr`/`da` translations
+> — create-if-missing, idempotent, and never overwriting a Translator's in-app edit
+> (ADR 0060), so an instance whose first boot predates the event-translation lane
+> picks them up on the next redeploy. Two postures: in `Development`
 > it uses the documented weak demo credentials (README §Running table); on a deployed
 > demo site (`Production` + the flag) the seed admin keeps its `SeedAdmin__`
 > setup-token lane, the other demo accounts get random high-entropy passwords, and a
@@ -408,9 +412,11 @@ credential set, not this one).
    neighborhood.
 
 Teardown / reset: `docker compose down -v` (dev) or delete the Coolify app + its Postgres
-addon and re-run steps 1–5 for a fresh seed — the seeder is first-boot only and
+addon and re-run steps 1–5 for a fresh seed — the content seeder is first-boot only and
 idempotent, so a warm DB will not re-seed or duplicate (the pristine gate keeps it from
-re-running). Do **not** point a real neighborhood's `Community__Name` / Postgres at this
+re-running). The one warm-boot write is the sample-event translation backfill
+(create-if-missing, idempotent, ADR 0060) — it never duplicates and never clobbers a
+Translator's edit. Do **not** point a real neighborhood's `Community__Name` / Postgres at this
 instance; if a demo site is ever going to carry real residents, provision a **real**
 instance (Procedure 1, without `SampleData__Enabled`) and migrate the residents in —
 a demo DB is not a real DB.

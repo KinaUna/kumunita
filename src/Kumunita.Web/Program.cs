@@ -470,6 +470,25 @@ if (sampleDataOpts.Enabled && firstBoot)
         deployPosture ? seedAdminOpts.Email : null,
         sampleSp.GetRequiredService<ILogger>());
 }
+else if (sampleDataOpts.Enabled && !firstBoot)
+{
+    // Warm-boot backfill (ADR 0060): an instance whose first boot predates the
+    // sample events' de / fr / da translations has the four sample events (authored
+    // in en) but no translation rows, so a German / French / Danish-speaking
+    // resident sees only the English variant. Fill in the missing rows —
+    // create-if-missing only (never clobbers a Translator's in-app edit, the
+    // ADR 0042 D1 invariant), idempotent (a second boot finds every row and
+    // skips). Sample-data-specific, so — unlike the platform-wide canonical-page
+    // backfills SchemaBootstrap runs — it is gated on the SampleData__Enabled flag
+    // and is a no-op on a real neighborhood (which never carries the flag).
+    await using var backfillScope = app.Services.CreateAsyncScope();
+    var backfillSp = backfillScope.ServiceProvider;
+    var backfillStore = backfillSp.GetRequiredService<IDocumentStore>();
+    await using var backfillSession = backfillStore.OpenSession(new Marten.Services.SessionOptions());
+    await SampleDataSeeder.BackfillEventTranslationsAsync(backfillSession, default);
+    backfillSp.GetRequiredService<ILogger>().LogInformation(
+        "Warm-boot: backfilled missing de/fr/da translations for the sample events (create-if-missing, idempotent).");
+}
 
 // Kick off the recurring §6.4 jobs (SideEffects/AuditPurgeHandler +
 // SideEffects/EventReminderHandler) on boot. The TimeoutMessage types bake in a

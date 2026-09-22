@@ -226,7 +226,7 @@ stays trivial and the authorization rules can grow freely.
 - **User guides** (`UG`, ADR 0057) — resident-facing how-to guides living in the `help/` subtree of the page tree: a **closed, code-owned, `en`-only registry** in the seeder (a `Page` doc under the existing `help` page — the existing editor, renderer, translator, and authorization are *reused*, not duplicated), with a **three-layer consistency loop** that keeps them honest as features change — **where** (they sit in the page tree, so the standing matrix applies), **when** (a resident-facing change's lane must ship its guide update as part of its Definition of Done), and **how often** (a periodic GlobalAdmin review, `OPS.md` §13). Non-`en` guide bodies are community-owned through the existing translation lane — never machine-translated. Guides are seeded on first boot **and backfilled on upgrade** (`BackfillUserGuidesAsync`, create-if-missing) so an existing instance gets them without a reseed; a community-edited guide is never clobbered. **Done.**
 - **Reset to seeded text** (`RS`, ADR 0058) — a "Reset to seeded text" button on the page editor (edit lane only, and only for a page whose slug is one of the **seeded** platform pages / guides) that overwrites that page's `en` title/body **and** its `de`/`fr`/`da` translation rows with the code-owned seeded baseline (the same registries the seeder writes on first boot) — so, as new features land, an admin can re-seed a help page to the latest shipped text in one click, then re-customize on top of it. **Destructive by design** (a customized body / translation is *replaced* — the button's `confirm()` is the guard; the standing is the **edit standing**, ADR 0040 §3.7: a system page is GlobalAdmin-only, a blog page is author ∪ GlobalAdmin). A page with no seeded baseline has nothing to reset to (the button is hidden; a hand-crafted POST is a 400 form error). One `SaveChangesAsync` + a `page.reset` audit row. **Done.**
 - **M4** — Events, RSVPs, reminders: a `Event` + `EventRsvp` doc in a new `Kumunita.Core.Events` context; the upcoming-events feed, the detail view (the one `MarkdownRenderer` body, the `kw-dt` timestamps), the WYSIWYG composer, the audience (ADR 0001-B / 0036 *reused*), the draft / soft-delete / tag / media / authored-in-language lanes (*reused*, not extended), the last-write-wins RSVP (owner-only list), and the day-before reminder email through the M1 durable-email trio (the `EventReminders` §6.4 self-rescheduling job). **Done** (ADR 0054). *Deliberately not in M4 (follow-on lanes, own ADRs): group events, per-resident reminder settings, iCal export (M6). Event translations left out of M4's own scope shipped as the `ET` lane (ADR 0059) below.*
-- **Event translations** (`ET`, ADR 0059) — the **user-added translation lane** (ADR 0022 / 0029 / 0048) carried to the events surface: an `EventTranslation` doc (title + body) on the `M4DocTypes` surface with a `(EventId, LanguageCode)` unique index, four `IEventService` seams (read / add / **update** / **remove** — the full lane, the ADR 0048 shape), the standing **author ∪ `Translator` ∪ `GlobalAdmin`** (ADR 0021 / 0030; **no** component-moderator branch — events have none, ADR 0054 §5), one `eventtranslation.*` audit row per write, the ADR 0027 chip-swap + ADR 0049 default-visible variant on the detail page, and the ADR 0051 viewer-language selection on the `/events` feed. **Done.**
+- **Event translations** (`ET`, ADR 0059) — the **user-added translation lane** (ADR 0022 / 0029 / 0048) carried to the events surface: an `EventTranslation` doc (title + body) on the `M4DocTypes` surface with a `(EventId, LanguageCode)` unique index, four `IEventService` seams (read / add / **update** / **remove** — the full lane, the ADR 0048 shape), the standing **author ∪ `Translator` ∪ `GlobalAdmin`** (ADR 0021 / 0030; **no** component-moderator branch — events have none, ADR 0054 §5), one `eventtranslation.*` audit row per write, the ADR 0027 chip-swap + ADR 0049 default-visible variant on the detail page, and the ADR 0051 viewer-language selection on the `/events` feed. **Done.** A `SampleData__Enabled` instance whose first boot predates this lane gets the sample events' `de`/`fr`/`da` rows backfilled on the next warm boot — create-if-missing, idempotent, never overwriting a Translator's edit (ADR 0060).
 - **M5** — Projects (goals, tasks, contributors).
 - **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
 
@@ -269,10 +269,13 @@ exactly once, and subsequent boots are a no-op.
 
 **Sample data & demo accounts.** On a **fresh** database, the first-boot lane can seed a
 mock neighborhood so an instance is immediately exercisable — residents, groups, community
-+ group posts with replies, events with RSVPs, tags, a resident blog, and de/fr translations
-(ADR 0055, extended by ADR 0056). It is **opt-in via `SampleData__Enabled=true`** and
-first-boot only, so a real deployment that never sets the flag can never see it. Two
-postures, one seeder (ADR 0056):
++ group posts with replies, events with RSVPs, tags, a resident blog, and de/fr/da event
+translations (ADR 0055, extended by ADR 0056). It is **opt-in via `SampleData__Enabled=true`**
+and first-boot only, so a real deployment that never sets the flag can never see it. A
+`SampleData__Enabled` instance that was already booted also gets the **missing** sample
+event `de` / `fr` / `da` translations backfilled on every warm boot — create-if-missing,
+idempotent, never overwriting a Translator's in-app edit (ADR 0060). Two postures, one
+seeder (ADR 0056):
 
 - **Development** (local dev loop, `appsettings.Development.json` / `docker-compose.yml`
   already set the flag) — the documented weak demo credentials below, printed to the log;
@@ -291,7 +294,7 @@ kept distinct from the real `kumunita.com`):
 |---|---|---|---|
 | Admin | `admin@examplium.com` | `Admin123!` | `GlobalAdmin` (the seeded first-boot admin, now with a password) |
 | Maria | `moderator@examplium.com` | `Mod1234!` | `Moderator` scoped to Safety + Social |
-| Sophie | `translator@examplium.com` | `Trans123!` | `Translator` (authors the de/fr translation rows) |
+| Sophie | `translator@examplium.com` | `Trans123!` | `Translator` (authors the de/fr/da translation rows) |
 | Anna | `anna@examplium.com` | `Resident123!` | resident; contact-opted-in; Warsaw timezone |
 | Ben | `ben@examplium.com` | `Resident123!` | resident |
 | Carla | `carla@examplium.com` | `Resident123!` | resident; contact-opted-in; owns the public "Street Green" group |
@@ -307,7 +310,8 @@ step-by-step (including the disposable-DB caveat) is [OPS.md Procedure 12](docs/
 
 Wipe everything with `docker compose down -v` and rebuild — the seeder re-seeds on the
 next first boot (it is idempotent: keyed by e-mail, and the pristine gate keeps it from
-ever re-running on a warm database).
+ever re-running its content on a warm database — the only warm-boot write is the
+create-if-missing sample-event translation backfill, ADR 0060).
 
 *Dev (no app container):* `docker compose up -d db`,
 `npm run build` in `src/Kumunita.Web/`, then
