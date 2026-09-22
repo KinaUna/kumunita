@@ -61,6 +61,7 @@ public sealed class LocaleController(
         Profile? profile = subject is null ? null : await userInfo.GetProfileAsync(subject);
         string? currentTz = profile?.TimeZone;
         string? currentDf = profile?.DateFormat;
+        string? currentEl = profile?.EmailLanguage;
 
         // The instance default (M·1: preference → default → "en").
         // ILocalizationService does not expose a GetDefaultLanguageAsync;
@@ -83,12 +84,13 @@ public sealed class LocaleController(
         var browserCode = string.IsNullOrWhiteSpace(saved)
             ? RequestLanguage.Browser(Request, enabledRows)
             : null;
+        var languageOptions = enabledRows
+            .Select(l => new LocaleOption(l.Id, l.NativeName))
+            .ToList();
 
         var model = new LocaleSettingsViewModel
         {
-            Languages = enabledRows
-                .Select(l => new LocaleOption(l.Id, l.NativeName))
-                .ToList(),
+            Languages = languageOptions,
             CurrentCode = saved,
             BrowserCode = browserCode,
             DefaultCode = defaultCode,
@@ -101,6 +103,21 @@ public sealed class LocaleController(
                 defaultTz: await localization.GetDefaultTimezoneAsync()),
             DateFormat = BuildDateFormatSection(subject, currentDf,
                 defaultFmt: await localization.GetDefaultDateFormatAsync()),
+
+            // ADR 0061 — the email & notification language section: the
+            // actor's saved outbound-language override (or null = instance
+            // default), pre-selected against the enabled catalog; the
+            // instance default is the "default" marker. Reuses the enabled
+            // catalog list (Languages) for its picker.
+            EmailLanguage = subject is null
+                ? null
+                : new LocaleSettingsViewModel.EmailLanguageSettings
+                {
+                    Languages = languageOptions,
+                    CurrentCode = currentEl,
+                    SelectedCode = string.IsNullOrWhiteSpace(currentEl) ? defaultCode : currentEl,
+                    DefaultCode = defaultCode,
+                },
         };
 
         return View(model);
@@ -287,6 +304,52 @@ public sealed class LocaleController(
         return RedirectToAction(nameof(Index));
     }
 
+    /// <summary>
+    /// <c>POST /settings/email-language</c> — the email &amp; notification
+    /// language section save (ADR 0061). With a <c>code</c> form value:
+    /// <see cref="IUserInfoService.SetProfileEmailLanguageAsync"/> (sets the
+    /// override; the self-scope check is this page's <c>[Authorize]</c> gate +
+    /// the actor being the subject). With <c>clear=1</c>: the same lane with a
+    /// <c>null</c> value (the "reset to instance default" action — the next
+    /// outbound email resolves to the instance default). A missing profile
+    /// (an edge-case pre-bootstrap account) fails closed: the lane throws
+    /// <c>KeyNotFoundException</c> and we surface the error + redirect (the
+    /// <c>SetProfileDateFormatAsync</c> pin).
+    /// </summary>
+    [HttpPost("/settings/email-language")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveEmailLanguage(string? code, string? clear)
+    {
+        var subject = SubjectId(User);
+        if (string.IsNullOrEmpty(subject))
+            return RedirectToAction(nameof(Index));
+
+        try
+        {
+            if (clear == "1")
+            {
+                // null ⇒ clear (the lane stores + saves, so the clear persists
+                // — the next outbound email resolves to the instance default).
+                await userInfo.SetProfileEmailLanguageAsync(subject, null, subject);
+                TempData["info"] = "Email & notification language reset — the instance default will be used.";
+            }
+            else if (!string.IsNullOrWhiteSpace(code))
+            {
+                await userInfo.SetProfileEmailLanguageAsync(subject, code, subject);
+                TempData["info"] = "Email & notification language set — your next email will use it.";
+            }
+        }
+        catch (KeyNotFoundException)
+        {
+            // A pre-bootstrap edge (no profile row). Fail closed + surface the
+            // error; the lane never load-or-creates (the
+            // SetProfileDateFormatAsync pin), so nothing is half-written.
+            TempData["error"] = "Your profile is not available — sign out and back in.";
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── View model (public nested type so the Razor view can bind to it) ──
 
     public sealed class LocaleSettingsViewModel
@@ -312,6 +375,38 @@ public sealed class LocaleController(
         /// when the caller has no subject (the public quick picker renders the
         /// language section only).</summary>
         public DateFormatSettings? DateFormat { get; init; }
+
+        /// <summary>The email &amp; notification language section (ADR 0061),
+        /// or <c>null</c> when the caller has no subject (the public quick
+        /// picker renders the language section only). Reuses the enabled
+        /// catalog list (<see cref="Languages"/>) as its picker.</summary>
+        public EmailLanguageSettings? EmailLanguage { get; init; }
+
+        /// <summary>The email &amp; notification language section of the
+        /// settings page (ADR 0061) — the resident's
+        /// <see cref="Kumunita.Core.UserInfo.Profile.EmailLanguage"/>
+        /// override for the language the platform writes to them in (outbound
+        /// account emails + event reminders). The same picker shape as the
+        /// other sections (the enabled catalog), but <c>null</c> is the
+        /// "use the instance default" state, not a concrete code.</summary>
+        public sealed class EmailLanguageSettings
+        {
+            /// <summary>The enabled catalog (code → native name) the picker
+            /// offers — the same set as <see cref="Languages"/>.</summary>
+            public List<LocaleOption> Languages { get; init; } = new();
+
+            /// <summary>The resident's saved outbound-language code, or
+            /// <c>null</c> (no override — the instance default applies).</summary>
+            public string? CurrentCode { get; init; }
+
+            /// <summary>The code pre-selected in the picker (the override if
+            /// set, else the instance default).</summary>
+            public string? SelectedCode { get; init; }
+
+            /// <summary>The instance default (the "default" marker in the
+            /// picker).</summary>
+            public string? DefaultCode { get; init; }
+        }
 
         /// <summary>The time-zone section of the settings page (ADR 0019) —
         /// the former <c>TimezoneController.TimezoneSettingsViewModel</c>,

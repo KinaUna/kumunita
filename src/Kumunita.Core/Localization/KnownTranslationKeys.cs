@@ -87,6 +87,7 @@ public static class KnownTranslationKeys
             ["common.optional"] = "optional",
             ["common.add"]      = "Add",
             ["common.remove"]   = "Remove",
+            ["common.filter"]   = "Filter",
             ["nav.announcements"] = "Announcements",
             ["nav.community"]     = "Community",
             ["nav.groups"]        = "Groups",
@@ -1028,6 +1029,94 @@ public static class KnownTranslationKeys
                 "So we develop Kumunita by the same rule we ask of it: quality is the quality of the linkage, not the count of the features. The guidelines repeat at every scale — a module, a feature, a community, the people who build it — which is why the whole project follows them, and why the philosophy is documented in the open.",
             ["platform.scope_eyebrow"] = "For any group",
             ["platform.fig_eyebrow"] = "The philosophy",
+
+            // ── events (M4 — ADR 0054: the /Events lane; index, detail, composer) ──
+            ["events.title"] = "Events",
+            ["events.lede"] =
+                "Upcoming events around the neighborhood — see what's on, and RSVP.",
+            ["events.new_event"] = "New event",
+            ["events.new_lead"] =
+                "Share an upcoming event with the neighborhood. By default it is visible to everyone; " +
+                "turn that off in the audience section only if you want to narrow who can see it.",
+            ["events.edit_event"] = "Edit event",
+            ["events.edit_lead"] =
+                "Update this event's details. Your audience choice is the sole access boundary — " +
+                "the community pick is only a filter.",
+            ["events.title_hint"] = "A short headline for the event.",
+            ["events.start"] = "Start",
+            ["events.end"] = "End",
+            ["events.time_hint"] =
+                "The time the event runs. Shown to viewers in their own timezone.",
+            ["events.location"] = "Location",
+            ["events.capacity"] = "Capacity",
+            ["events.location_hint"] =
+                "Location and capacity are display details only — they do not limit who can RSVP.",
+            ["events.all_communities"] = "All communities",
+            ["events.community_hint"] =
+                "The community this event appears under — a filter, not an access limit.",
+            ["events.tags_placeholder"] = "e.g. cleanup, social, garden",
+            ["events.audience_heading"] = "Audience — who can see this event",
+            ["events.audience_default"] =
+                "The default — everyone can see this event. Turn it off only if you want to narrow who can see it.",
+            ["events.audience_mode_any"] = "a viewer matches if they're on any of the picks",
+            ["events.audience_mode_all"] =
+                "a viewer must be on every pick — an empty list denies everyone",
+            ["events.reminder"] = "Send the 24-hour reminder to those who RSVP \"Going\"",
+            ["events.reminder_hint"] =
+                "A reminder is sent the day before the event to everyone who is going. Turn this off to skip it.",
+            ["events.create"] = "Create event",
+            ["events.save_changes"] = "Save changes",
+            ["events.empty"] = "No upcoming events yet.",
+            ["events.back"] = "← Back to events",
+            ["events.draft"] = "Draft",
+            ["events.draft_title"] = "Only you can see this — it is not yet public",
+            ["events.publish"] = "Publish",
+            ["events.edit"] = "Edit",
+            ["events.delete"] = "Delete",
+            ["events.delete_confirm"] = "Delete this event? This cannot be undone.",
+            ["events.untitled"] = "Untitled event",
+            ["events.rsvp"] = "RSVP",
+            ["events.rsvp_you"] = "You're going to:",
+            ["events.rsvp_responses"] = "Responses",
+            ["events.rsvp_update"] = "Update",
+            ["events.remove_translation_confirm"] = "Remove this translation?",
+
+            // ── grant (the shared "Who to grant to" picker — the C#-built "Select all" + count) ──
+            ["grant.select_all"] = "Select all",
+            ["grant.label_residences"] = "Residences",
+            ["grant.label_groups"] = "Groups",
+            ["grant.count_selected"] = "{0} of {1} selected",
+
+            // ── profile (the _AudienceEditor empty-contact warning; the inline <b> words are split) ──
+            ["profile.audience_empty_warning_lead"] = "Heads up:",
+            ["profile.audience_empty_warning_body"] =
+                "you haven't picked anyone or any group below, so your contact details are currently hidden from",
+            ["profile.audience_empty_warning_everyone"] = "everyone",
+            ["profile.audience_empty_warning_tail"] =
+                ". Add a person or group if you'd like to share them.",
+
+            // ── settings (the email & notification-language section of /settings/language) ──
+            ["settings.email_title"] = "Email & notification language",
+            ["settings.email_lede"] =
+                "Pick the language the platform writes to you in — account emails and event reminders. " +
+                "Your choice is saved on your account.",
+            ["settings.email_label"] = "Email & notification language",
+            ["settings.email_note"] =
+                "If you choose a language, your emails and reminders are sent in it. " +
+                "If you reset it, the instance default is used.",
+            ["settings.email_save"] = "Save",
+            ["settings.email_reset"] = "Reset to instance default",
+            ["settings.email_reset_confirm"] =
+                "Reset your email & notification language to the instance default?",
+
+            // ── email (outbound mail bodies — {0}/{1} are the runtime placeholders) ──
+            ["email.verify_subject"] = "Verify your Kumunita account",
+            ["email.verify_body"] =
+                "Hi {0},\n\nYour Kumunita account is set to verify on its first sign-in. " +
+                "Open this one-time link to confirm the account (it also signs you in):\n\n{1}\n\n" +
+                "If you didn't create this account, you can ignore this message.",
+            ["email.reminder_subject"] = "Reminder: {0}",
+            ["email.reminder_body"] = "**{0}** is coming up: {1}{2}.",
         };
 
     /// <summary>
@@ -1063,6 +1152,7 @@ public static class KnownTranslationKeys
             ["common.optional"] = "optional",
             ["common.add"]      = "Hinzufügen",
             ["common.remove"]   = "Entfernen",
+            ["common.filter"]   = "Filter",
             ["nav.announcements"] = "Ankündigungen",
             ["nav.community"]     = "Gemeinschaft",
             ["nav.groups"]        = "Gruppen",
@@ -1956,6 +2046,94 @@ public static class KnownTranslationKeys
                 "Also entwickeln wir Kumunita nach derselben Regel, die wir von ihr verlangen: Die Qualität ist die Qualität der Verknüpfung, nicht die Anzahl der Funktionen. Die Richtlinien wiederholen sich in jeder Skalenebene — ein Modul, eine Funktion, eine Gemeinschaft, die Menschen, die sie bauen — deshalb folgt ihnen das ganze Projekt, und deshalb ist die Philosophie öffentlich dokumentiert.",
             ["platform.scope_eyebrow"] = "Für jede Gruppe",
             ["platform.fig_eyebrow"] = "Die Philosophie",
+
+            // ── events (M4 — ADR 0054: die /Events-Fläche; Index, Detail, Composer) ──
+            ["events.title"] = "Veranstaltungen",
+            ["events.lede"] =
+                "Bevorstehende Veranstaltungen in der Nachbarschaft — schau, was los ist, und gib deine Teilnahme an.",
+            ["events.new_event"] = "Neue Veranstaltung",
+            ["events.new_lead"] =
+                "Teile eine bevorstehende Veranstaltung mit der Nachbarschaft. Standardmäßig kann sie jeder sehen; " +
+                "schalte dies im Abschnitt „Zielgruppe“ nur aus, wenn du einschränken möchtest, wer sie sehen kann.",
+            ["events.edit_event"] = "Veranstaltung bearbeiten",
+            ["events.edit_lead"] =
+                "Aktualisiere die Details dieser Veranstaltung. Deine Wahl der Zielgruppe ist die einzige Zugangsgrenze — " +
+                "die Gemeindeauswahl ist nur ein Filter.",
+            ["events.title_hint"] = "Eine kurze Schlagzeile für die Veranstaltung.",
+            ["events.start"] = "Beginn",
+            ["events.end"] = "Ende",
+            ["events.time_hint"] =
+                "Die Zeit, in der die Veranstaltung stattfindet. Besucher sehen sie in ihrer eigenen Zeitzone.",
+            ["events.location"] = "Ort",
+            ["events.capacity"] = "Kapazität",
+            ["events.location_hint"] =
+                "Ort und Kapazität sind nur Anzeigedetails — sie beschränken nicht, wer eine Teilnahme angeben kann.",
+            ["events.all_communities"] = "Alle Gemeinden",
+            ["events.community_hint"] =
+                "Die Gemeinde, unter der diese Veranstaltung erscheint — ein Filter, keine Zugangsgrenze.",
+            ["events.tags_placeholder"] = "z. B. Reinigung, Treffen, Garten",
+            ["events.audience_heading"] = "Zielgruppe — wer diese Veranstaltung sehen kann",
+            ["events.audience_default"] =
+                "Standard — jeder kann diese Veranstaltung sehen. Schalte es nur aus, wenn du einschränken möchtest, wer sie sehen kann.",
+            ["events.audience_mode_any"] = "ein Zuschauer trifft zu, wenn er auf einer der Auswahlen steht",
+            ["events.audience_mode_all"] =
+                "ein Zuschauer muss auf jeder Auswahl stehen — eine leere Liste verweigert allen",
+            ["events.reminder"] = "Sende die 24-Stunden-Erinnerung an alle, die \"Going\" angegeben haben",
+            ["events.reminder_hint"] =
+                "Eine Erinnerung wird einen Tag vor der Veranstaltung an alle Gesandten gesendet. Schalte sie aus, um sie zu überspringen.",
+            ["events.create"] = "Veranstaltung erstellen",
+            ["events.save_changes"] = "Änderungen speichern",
+            ["events.empty"] = "Noch keine bevorstehenden Veranstaltungen.",
+            ["events.back"] = "← Zurück zu den Veranstaltungen",
+            ["events.draft"] = "Entwurf",
+            ["events.draft_title"] = "Nur du kannst dies sehen — es ist noch nicht öffentlich",
+            ["events.publish"] = "Veröffentlichen",
+            ["events.edit"] = "Bearbeiten",
+            ["events.delete"] = "Löschen",
+            ["events.delete_confirm"] = "Diese Veranstaltung löschen? Das kann nicht rückgängig gemacht werden.",
+            ["events.untitled"] = "Namenlose Veranstaltung",
+            ["events.rsvp"] = "Teilnahme",
+            ["events.rsvp_you"] = "Du gibst an:",
+            ["events.rsvp_responses"] = "Antworten",
+            ["events.rsvp_update"] = "Aktualisieren",
+            ["events.remove_translation_confirm"] = "Diese Übersetzung entfernen?",
+
+            // ── grant (der gemeinsame „Wem zugewiesen"-Picker — C#-gebaut „Alle auswählen" + Zähler) ──
+            ["grant.select_all"] = "Alle auswählen",
+            ["grant.label_residences"] = "Anwohner",
+            ["grant.label_groups"] = "Gruppen",
+            ["grant.count_selected"] = "{0} von {1} ausgewählt",
+
+            // ── profile (die _AudienceEditor-Warnung; die inline-<b>-Wörter sind getrennt) ──
+            ["profile.audience_empty_warning_lead"] = "Achtung:",
+            ["profile.audience_empty_warning_body"] =
+                "du hast unten niemanden und keine Gruppe ausgewählt, daher sind deine Kontaktdaten derzeit für",
+            ["profile.audience_empty_warning_everyone"] = "alle",
+            ["profile.audience_empty_warning_tail"] =
+                "verborgen. Füge eine Person oder Gruppe hinzu, wenn du sie teilen möchtest.",
+
+            // ── settings (der Abschnitt „E-Mail- und Benachrichtigungssprache" unter /settings/language) ──
+            ["settings.email_title"] = "E-Mail- und Benachrichtigungssprache",
+            ["settings.email_lede"] =
+                "Wähle die Sprache, in der die Plattform dir schreibt — Kontomails und Veranstaltungserinnerungen. " +
+                "Deine Wahl wird auf deinem Konto gespeichert.",
+            ["settings.email_label"] = "E-Mail- und Benachrichtigungssprache",
+            ["settings.email_note"] =
+                "Wählst du eine Sprache, werden deine Mails und Erinnerungen in ihr gesendet. " +
+                "Setzt du sie zurück, wird die Instanzstandardsprache verwendet.",
+            ["settings.email_save"] = "Speichern",
+            ["settings.email_reset"] = "Auf Instanzstandard zurücksetzen",
+            ["settings.email_reset_confirm"] =
+                "E-Mail- und Benachrichtigungssprache auf den Instanzstandard zurücksetzen?",
+
+            // ── email (ausgehende Mails — {0}/{1} sind die Laufzeit-Platzhalter) ──
+            ["email.verify_subject"] = "Verifiziere dein Kumunita-Konto",
+            ["email.verify_body"] =
+                "Hallo {0},\n\nDein Kumunita-Konto wird bei der ersten Anmeldung verifiziert. " +
+                "Öffne diesen einmaligen Link, um das Konto zu bestätigen (dabei wirst du auch angemeldet):\n\n{1}\n\n" +
+                "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
+            ["email.reminder_subject"] = "Erinnerung: {0}",
+            ["email.reminder_body"] = "**{0}** steht bevor: {1}{2}.",
         };
 
     /// <summary>
@@ -1988,6 +2166,7 @@ public static class KnownTranslationKeys
             ["common.optional"] = "facultatif",
             ["common.add"]      = "Ajouter",
             ["common.remove"]   = "Retirer",
+            ["common.filter"]   = "Filtrer",
             ["nav.announcements"] = "Annonces",
             ["nav.community"]     = "Communauté",
             ["nav.groups"]        = "Groupes",
@@ -2886,6 +3065,94 @@ public static class KnownTranslationKeys
                 "Nous développons donc Kumunita selon la même règle que nous lui demandons : la qualité, c'est la qualité du lien, pas le nombre de fonctions. Les lignes directrices se répètent à chaque échelle — un module, une fonction, une communauté, les gens qui la construisent — c'est pourquoi tout le projet les suit, et pourquoi la philosophie est documentée en public.",
             ["platform.scope_eyebrow"] = "Pour tout groupe",
             ["platform.fig_eyebrow"] = "La philosophie",
+
+            // ── events (M4 — ADR 0054 : la surface /Events ; index, détail, composer) ──
+            ["events.title"] = "Événements",
+            ["events.lede"] =
+                "Les événements à venir dans le quartier — découvre ce qui est prévu et indique ta présence.",
+            ["events.new_event"] = "Nouvel événement",
+            ["events.new_lead"] =
+                "Partage un événement à venir avec le quartier. Par défaut, il est visible par tout le monde ; " +
+                "désactive-le dans la section « Public » seulement si tu veux restreindre qui peut le voir.",
+            ["events.edit_event"] = "Modifier l'événement",
+            ["events.edit_lead"] =
+                "Mets à jour les détails de cet événement. Ton choix du public est la seule limite d'accès — " +
+                "le choix de la communauté n'est qu'un filtre.",
+            ["events.title_hint"] = "Un titre court pour l'événement.",
+            ["events.start"] = "Début",
+            ["events.end"] = "Fin",
+            ["events.time_hint"] =
+                "Le moment où l'événement a lieu. Les visiteurs le voient dans leur propre fuseau horaire.",
+            ["events.location"] = "Lieu",
+            ["events.capacity"] = "Capacité",
+            ["events.location_hint"] =
+                "Le lieu et la capacité sont des détails d'affichage seulement — ils ne limitent pas qui peut indiquer sa présence.",
+            ["events.all_communities"] = "Toutes les communautés",
+            ["events.community_hint"] =
+                "La communauté sous laquelle cet événement apparaît — un filtre, pas une limite d'accès.",
+            ["events.tags_placeholder"] = "ex. nettoyage, rencontre, jardin",
+            ["events.audience_heading"] = "Public — qui peut voir cet événement",
+            ["events.audience_default"] =
+                "Par défaut — tout le monde peut voir cet événement. Désactive-le seulement si tu veux restreindre qui peut le voir.",
+            ["events.audience_mode_any"] = "un spectateur correspond s'il est sur l'un des choix",
+            ["events.audience_mode_all"] =
+                "un spectateur doit être sur chaque choix — une liste vide refuse à tous",
+            ["events.reminder"] = "Envoyer le rappel de 24 heures à ceux qui indiquent \"Going\"",
+            ["events.reminder_hint"] =
+                "Un rappel est envoyé la veille de l'événement à tous ceux qui viennent. Désactive-le pour le passer.",
+            ["events.create"] = "Créer l'événement",
+            ["events.save_changes"] = "Enregistrer les modifications",
+            ["events.empty"] = "Aucun événement à venir pour l'instant.",
+            ["events.back"] = "← Retour aux événements",
+            ["events.draft"] = "Brouillon",
+            ["events.draft_title"] = "Seul tu peux voir cela — ce n'est pas encore public",
+            ["events.publish"] = "Publier",
+            ["events.edit"] = "Modifier",
+            ["events.delete"] = "Supprimer",
+            ["events.delete_confirm"] = "Supprimer cet événement ? Cela ne peut pas être annulé.",
+            ["events.untitled"] = "Événement sans titre",
+            ["events.rsvp"] = "Présence",
+            ["events.rsvp_you"] = "Tu indiques :",
+            ["events.rsvp_responses"] = "Réponses",
+            ["events.rsvp_update"] = "Mettre à jour",
+            ["events.remove_translation_confirm"] = "Supprimer cette traduction ?",
+
+            // ── grant (le picker « À qui accorder » — C# « Tout sélectionner » + compteur) ──
+            ["grant.select_all"] = "Tout sélectionner",
+            ["grant.label_residences"] = "Résidents",
+            ["grant.label_groups"] = "Groupes",
+            ["grant.count_selected"] = "{0} sur {1} sélectionné(s)",
+
+            // ── profile (l'avertissement _AudienceEditor ; les mots <b> inline sont séparés) ──
+            ["profile.audience_empty_warning_lead"] = "Attention :",
+            ["profile.audience_empty_warning_body"] =
+                "tu n'as choisi personne et aucun groupe ci-dessous, donc tes coordonnées sont actuellement cachées de",
+            ["profile.audience_empty_warning_everyone"] = "tout le monde",
+            ["profile.audience_empty_warning_tail"] =
+                ". Ajoute une personne ou un groupe si tu souhaites les partager.",
+
+            // ── settings (la section « Langue des e-mails et des notifications » sous /settings/language) ──
+            ["settings.email_title"] = "Langue des e-mails et des notifications",
+            ["settings.email_lede"] =
+                "Choisis la langue dans laquelle la plateforme t'écrit — e-mails du compte et rappels d'événement. " +
+                "Ton choix est enregistré sur ton compte.",
+            ["settings.email_label"] = "Langue des e-mails et des notifications",
+            ["settings.email_note"] =
+                "Si tu choisis une langue, tes e-mails et tes rappels sont envoyés dans celle-ci. " +
+                "Si tu réinitialises, la langue par défaut de l'instance est utilisée.",
+            ["settings.email_save"] = "Enregistrer",
+            ["settings.email_reset"] = "Réinitialiser à la valeur par défaut",
+            ["settings.email_reset_confirm"] =
+                "Réinitialiser la langue des e-mails et des notifications à la valeur par défaut ?",
+
+            // ── email (e-mails sortants — {0}/{1} sont les placeholders d'exécution) ──
+            ["email.verify_subject"] = "Vérifie ton compte Kumunita",
+            ["email.verify_body"] =
+                "Bonjour {0},\n\nTon compte Kumunita est à vérifier lors de ta première connexion. " +
+                "Ouvre ce lien à usage unique pour confirmer le compte (il te connecte aussi) :\n\n{1}\n\n" +
+                "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
+            ["email.reminder_subject"] = "Rappel : {0}",
+            ["email.reminder_body"] = "**{0}** arrive : {1}{2}.",
         };
 
     /// <summary>
@@ -2919,6 +3186,7 @@ public static class KnownTranslationKeys
             ["common.optional"] = "valgfrit",
             ["common.add"]      = "Tilføj",
             ["common.remove"]   = "Fjern",
+            ["common.filter"]   = "Filtrér",
             ["nav.announcements"] = "Meddelelser",
             ["nav.community"]     = "Fællesskab",
             ["nav.groups"]        = "Grupper",
@@ -3811,6 +4079,94 @@ public static class KnownTranslationKeys
                 "Så udvikler vi Kumunita efter den samme regel, vi stiller til den: kvalitet er sammenhængenes kvalitet, ikke funktionernes antal. Retningslinjerne gentager sig i alle skalaer — en modul, en funktion, et fællesskab, de mennesker, der bygger det — derfor følger hele projektet dem, og derfor er filosofien dokumenteret i det åbne.",
             ["platform.scope_eyebrow"] = "Til enhver gruppe",
             ["platform.fig_eyebrow"] = "Filosofien",
+
+            // ── events (M4 — ADR 0054: /Events-området; index, detaljer, composer) ──
+            ["events.title"] = "Arrangementer",
+            ["events.lede"] =
+                "Kommende arrangementer i kvarteret — se, hvad der sker, og tilmeld dig.",
+            ["events.new_event"] = "Nyt arrangement",
+            ["events.new_lead"] =
+                "Del et kommende arrangement med kvarteret. Som standard kan alle se det; " +
+                "slå det fra i sektionen « Publikum » kun, hvis du vil begrænse, hvem der kan se det.",
+            ["events.edit_event"] = "Rediger arrangement",
+            ["events.edit_lead"] =
+                "Opdater dette arrangements detaljer. Dine valg af publikum er den eneste adgangsgrænse — " +
+                "fællesskabsvalget er kun et filter.",
+            ["events.title_hint"] = "En kort overskrift til arrangementet.",
+            ["events.start"] = "Start",
+            ["events.end"] = "Slut",
+            ["events.time_hint"] =
+                "Den tid, arrangementet foregår. Seere ser det i deres egen tidszone.",
+            ["events.location"] = "Sted",
+            ["events.capacity"] = "Kapacitet",
+            ["events.location_hint"] =
+                "Sted og kapacitet er kun visningsdetaljer — de begrænser ikke, hvem der kan tilmelde sig.",
+            ["events.all_communities"] = "Alle fællesskaber",
+            ["events.community_hint"] =
+                "Det fællesskab, dette arrangement optræder under — et filter, ikke en adgangsgrænse.",
+            ["events.tags_placeholder"] = "fx oprydning, socialt, have",
+            ["events.audience_heading"] = "Publikum — hvem der kan se dette arrangement",
+            ["events.audience_default"] =
+                "Standard — alle kan se dette arrangement. Slå det kun fra, hvis du vil begrænse, hvem der kan se det.",
+            ["events.audience_mode_any"] = "en tilskuer matcher, hvis de er på et af valgmulighederne",
+            ["events.audience_mode_all"] =
+                "en tilskuer skal være på hver valgmulighed — en tom liste nægter alle",
+            ["events.reminder"] = "Send påmindelsen 24 timer før til dem, der svarer \"Going\"",
+            ["events.reminder_hint"] =
+                "En påmindelse sendes dagen før arrangementet til alle, der er med. Slå den fra for at springe den over.",
+            ["events.create"] = "Opret arrangement",
+            ["events.save_changes"] = "Gem ændringer",
+            ["events.empty"] = "Ingen kommende arrangementer endnu.",
+            ["events.back"] = "← Tilbage til arrangementer",
+            ["events.draft"] = "Udkast",
+            ["events.draft_title"] = "Kun du kan se dette — det er ikke endnu offentligt",
+            ["events.publish"] = "Udgiv",
+            ["events.edit"] = "Rediger",
+            ["events.delete"] = "Slet",
+            ["events.delete_confirm"] = "Slet dette arrangement? Det kan ikke fortrydes.",
+            ["events.untitled"] = "Arrangement uden titel",
+            ["events.rsvp"] = "Deltagelse",
+            ["events.rsvp_you"] = "Du svarer:",
+            ["events.rsvp_responses"] = "Svar",
+            ["events.rsvp_update"] = "Opdater",
+            ["events.remove_translation_confirm"] = "Fjern denne oversættelse?",
+
+            // ── grant (den fælles « Hvem du giver adgang til »-picker — C# « Vælg alle » + tæller) ──
+            ["grant.select_all"] = "Vælg alle",
+            ["grant.label_residences"] = "Beboere",
+            ["grant.label_groups"] = "Grupper",
+            ["grant.count_selected"] = "{0} af {1} valgt",
+
+            // ── profile (_AudienceEditor-advarslen; <b>-ordene inline er adskilt) ──
+            ["profile.audience_empty_warning_lead"] = "Pas på:",
+            ["profile.audience_empty_warning_body"] =
+                "du har ikke valgt nogen personer eller grupper nedenunder, så dine kontaktoplysninger er i øjeblikket skjult for",
+            ["profile.audience_empty_warning_everyone"] = "alle",
+            ["profile.audience_empty_warning_tail"] =
+                ". Tilføj en person eller gruppe, hvis du vil dele dem.",
+
+            // ── settings (sektionen « Sprog til e-mail og beskeder » under /settings/language) ──
+            ["settings.email_title"] = "Sprog til e-mail og beskeder",
+            ["settings.email_lede"] =
+                "Vælg det sprog, platformen skriver til dig på — kontoer og arrangementspåmindelser. " +
+                "Dit valg gemmes på din konto.",
+            ["settings.email_label"] = "Sprog til e-mail og beskeder",
+            ["settings.email_note"] =
+                "Vælger du et sprog, sendes dine e-mails og påmindelser på det. " +
+                "Nulstiller du det, bruges instancens standardsprog.",
+            ["settings.email_save"] = "Gem",
+            ["settings.email_reset"] = "Nulstil til standardsprog",
+            ["settings.email_reset_confirm"] =
+                "Nulstil sprog til e-mail og beskeder til standardsproget?",
+
+            // ── email (udgående e-mails — {0}/{1} er kørselsplaceholders) ──
+            ["email.verify_subject"] = "Bekræft din Kumunita-konto",
+            ["email.verify_body"] =
+                "Hej {0},\n\nDin Kumunita-konto skal bekræftes ved din første login. " +
+                "Åbn dette engangsklink for at bekræfte kontoen (den logger dig også ind):\n\n{1}\n\n" +
+                "Hvis du ikke har oprettet denne konto, kan du ignorere denne besked.",
+            ["email.reminder_subject"] = "Påmindelse: {0}",
+            ["email.reminder_body"] = "**{0}** er på vej: {1}{2}.",
         };
 
     /// <summary>

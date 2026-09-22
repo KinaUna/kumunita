@@ -53,7 +53,8 @@ public static class EventReminderHandler
         IDocumentStore store,
         IOptions<EventReminderOptions> options,
         IMailerStage mailer,
-        ILocalizationService localization)
+        ILocalizationService localization,
+        ITranslationProvider translationProvider)
     {
         // `now` is passed explicitly to the service so the window boundary is
         // deterministic under Wolverine's test-time control; using UtcNow here
@@ -62,13 +63,16 @@ public static class EventReminderHandler
         // seam (the host resolves the real OutboxEmailStager in production); the
         // localization seam is the ADR 0019 / 0020 platform-default read (the
         // reminder's "when" renders in each recipient's own time zone +
-        // date-time format, falling back to these defaults).
+        // date-time format, falling back to these defaults); the translation
+        // provider is the ADR 0061 outbound-channel language (the reminder's
+        // subject/body resolve in each recipient's Profile.EmailLanguage).
         await EventReminderService.SendRemindersAsync(
             store,
             options.Value,
             DateTimeOffset.UtcNow,
             mailer,
-            localization);
+            localization,
+            translationProvider);
 
         // Self-reschedule: return a fresh EventReminderTick so the recurring
         // schedule carries forward (the TimeoutMessage's 1-day delay is baked into

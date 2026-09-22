@@ -7,9 +7,9 @@
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
-        <h1>New event</h1>
+        <h1><kw-l key="events.new_event">New event</kw-l></h1>
         <p class="text-muted">
-            Share an upcoming event with the neighborhood. By default it is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.
+            <kw-l key="events.new_lead">Share an upcoming event with the neighborhood. By default it is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.</kw-l>
         </p>
 
         @if (TempData["info"] is string info)
@@ -47,10 +47,10 @@
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <div class="form-label" style="font-weight:600;">Title</div>
+                    <div class="form-label" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></div>
                     <input class="form-control" type="text" id="title" name="Title"
                            maxlength="120" required value="@Model.Title" />
-                    <div class="text-muted small mt-1">A short headline for the event.</div>
+                    <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
                 </div>
             </div>
 
@@ -58,18 +58,18 @@
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col">
-                            <label class="form-label" for="start" style="font-weight:600;">Start</label>
+                            <label class="form-label" for="start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
                             <input class="form-control" type="datetime-local" id="start" name="Start" required
                                    value="@Model.Start.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                         <div class="col">
-                            <label class="form-label" for="end" style="font-weight:600;">End</label>
+                            <label class="form-label" for="end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
                             <input class="form-control" type="datetime-local" id="end" name="End" required
                                    value="@Model.End.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                     </div>
                     <div class="text-muted small mt-2">
-                        The time the event runs. Shown to viewers in their own timezone.
+                        <kw-l key="events.time_hint">The time the event runs. Shown to viewers in their own timezone.</kw-l>
                     </div>
                 </div>
             </div>
@@ -78,25 +78,25 @@
                 <div class="card-body">
                     <div class="row g-2">
                         <div class="col">
-                            <label class="form-label" for="location" style="font-weight:600;">Location</label>
+                            <label class="form-label" for="location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
                             <input class="form-control" type="text" id="location" name="Location"
                                    placeholder="optional" value="@Model.Location" />
                         </div>
                         <div class="col-sm-4">
-                            <label class="form-label" for="capacity" style="font-weight:600;">Capacity</label>
+                            <label class="form-label" for="capacity" style="font-weight:600;"><kw-l key="events.capacity">Capacity</kw-l></label>
                             <input class="form-control" type="number" min="1" id="capacity" name="Capacity"
                                    placeholder="optional" value="@Model.Capacity" />
                         </div>
                     </div>
                     <div class="text-muted small mt-2">
-                        Location and capacity are display details only — they do not limit who can RSVP.
+                        <kw-l key="events.location_hint">Location and capacity are display details only — they do not limit who can RSVP.</kw-l>
                     </div>
                 </div>
             </div>
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <label class="form-label" for="body" style="font-weight:600;">Body</label>
+                    <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
                     <div class="rc-editor">
                         <div class="rc-editor-toolbar" data-rich-editor>
                             <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
@@ -122,16 +122,16 @@
             {
                 <div class="card mb-4">
                     <div class="card-body">
-                        <label class="form-label" for="component" style="font-weight:600;">Community</label>
+                        <label class="form-label" for="component" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
                         <select class="form-control" id="component" name="ComponentId">
-                            <option value="" selected="@(Model.ComponentId is null ? "selected" : null)">All communities</option>
+                            <option value="" selected="@(Model.ComponentId is null ? "selected" : null)"><kw-l key="events.all_communities">All communities</kw-l></option>
                             @foreach (var (id, name) in Model.Components)
                             {
                                 <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">@name</option>
                             }
                         </select>
                         <div class="text-muted small mt-2">
-                            The community this event appears under — a filter, not an access limit.
+                            <kw-l key="events.community_hint">The community this event appears under — a filter, not an access limit.</kw-l>
                         </div>
                     </div>
                 </div>
@@ -139,7 +139,7 @@
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <label class="form-label" for="language" style="font-weight:600;">Language</label>
+                    <label class="form-label" for="language" style="font-weight:600;"><kw-l key="common.language">Language</kw-l></label>
                     <select class="form-control" id="language" name="LanguageCode">
                         @foreach (var (languageCode, nativeName) in Model.Languages)
                         {
@@ -156,7 +156,7 @@
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <label class="form-label" for="tags" style="font-weight:600;">Tags</label>
+                    <label class="form-label" for="tags" style="font-weight:600;"><kw-l key="nav.tags">Tags</kw-l></label>
                     <input class="form-control" type="text" id="tags"
                            data-tag-suggest
                            maxlength="64"
@@ -169,7 +169,7 @@
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <h6 class="card-title" style="font-weight:600;">Audience — who can see this event</h6>
+                    <h6 class="card-title" style="font-weight:600;"><kw-l key="events.audience_heading">Audience — who can see this event</kw-l></h6>
 
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox"
@@ -181,17 +181,7 @@
                             <kw-l key="posts.audience_all_members">Everyone</kw-l>
                         </label>
                         <div class="text-muted small ms-4">
-                            The default — everyone can see this event. Turn it off only if you want to narrow who can see it.
-                        </div>
-                    </div>
-
-                    <hr class="my-3" />
-
-                    <div id="audience-restricted"
-                         class="audience-restricted"
-                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
-                        <div class="form-label mt-2" style="font-weight:600;">
-                            <kw-l key="posts.audience_combine">How the picks combine</kw-l>
+                            <kw-l key="events.audience_default">The default — everyone can see this event. Turn it off only if you want to narrow who can see it.</kw-l>
                         </div>
                         @foreach (var m in modes)
                         {
@@ -204,9 +194,15 @@
                                        name="Audience.Mode" id="@($"aud-mode-{m}")"
                                        value="@m" @checkedMark required />
                                 <label class="form-check-label" for="@($"aud-mode-{m}")">
-                                    @m @(" — " + (m == "Any"
-                                        ? "a viewer matches if they're on any of the picks"
-                                        : "a viewer must be on every pick — an empty list denies everyone"))
+                                    @m
+                                    @if (m == "Any")
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_any">a viewer matches if they're on any of the picks</kw-l>
+                                    }
+                                    else
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_all">a viewer must be on every pick — an empty list denies everyone</kw-l>
+                                    }
                                 </label>
                             </div>
                         }
@@ -233,10 +229,10 @@
                                @(Model.ReminderEnabled ? "checked" : null) />
                         <input type="hidden" name="ReminderEnabled" value="false" />
                         <label class="form-check-label fw-semibold" for="reminders">
-                            Send the 24-hour reminder to those who RSVP "Going"
+                            <kw-l key="events.reminder">Send the 24-hour reminder to those who RSVP "Going"</kw-l>
                         </label>
                         <div class="text-muted small ms-4">
-                            A reminder is sent the day before the event to everyone who is going. Turn this off to skip it.
+                            <kw-l key="events.reminder_hint">A reminder is sent the day before the event to everyone who is going. Turn this off to skip it.</kw-l>
                         </div>
                     </div>
 
@@ -260,7 +256,7 @@
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Create event</button>
+                <button type="submit" class="btn btn-primary"><kw-l key="events.create">Create event</kw-l></button>
                 <a href="/events" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
             </div>
         </form>

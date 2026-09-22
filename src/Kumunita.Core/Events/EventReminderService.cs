@@ -82,6 +82,12 @@ public static class EventReminderService
     /// <param name="now">Injection point for tests (pin "now" so the window boundary is deterministic).</param>
     /// <param name="mailer">The <b>frozen</b> <see cref="IMailerStage"/> (the C3 envelope — the host
     /// resolves the real <c>OutboxEmailStager</c> in production; a recording fake in the harness).</param>
+    /// <param name="localization">The platform-default time zone + date-time format resolver (ADR 0019 / 0020).</param>
+    /// <param name="translationProvider">Optional (ADR 0061) — resolves the reminder's subject/body in
+    /// each recipient's <see cref="Profile.EmailLanguage"/> (→ platform default → <c>en</c> floor).
+    /// When <c>null</c> (e.g. the test harness) the English subject/body are kept verbatim, so the
+    /// frozen English fallback is preserved and the 7 direct call sites in
+    /// <c>EventReminderServiceTests</c> keep compiling unchanged.</param>
     /// <param name="ct">Cancellation.</param>
     public static async Task SendRemindersAsync(
         IDocumentStore store,
@@ -89,6 +95,7 @@ public static class EventReminderService
         DateTimeOffset now,
         IMailerStage mailer,
         ILocalizationService localization,
+        ITranslationProvider? translationProvider = null,
         CancellationToken ct = default)
     {
         if (store is null) throw new ArgumentNullException(nameof(store));
@@ -184,12 +191,19 @@ public static class EventReminderService
                         continue;                                  // already sent this tick
                     if (!profiles.TryGetValue(userId, out var profile) || string.IsNullOrWhiteSpace(profile?.Email))
                         continue;                                  // no delivery address
+                    // ADR 0061: the subject/body are resolved in the recipient's
+                    // EmailLanguage (→ platform default → en floor) when a provider is wired in;
+                    // otherwise the frozen English fallback is used verbatim (the test-harness path).
+                    var (subject, body) = translationProvider is null
+                        ? (($"Reminder: {ev.Title}"),
+                           BuildReminderBody(ev, profile, defaultZoneId, defaultFormat))
+                        : await BuildLocalizedReminder(ev, profile, defaultZoneId, defaultFormat, translationProvider);
                     await mailer.StageAsync(
                         session,
                         idempotencyKey: key,
                         recipient: profile!.Email!,
-                        subject: $"Reminder: {ev.Title}",
-                        body: BuildReminderBody(ev, profile, defaultZoneId, defaultFormat),
+                        subject: subject,
+                        body: body,
                         ct: ct);
                     staged++;
                 }
@@ -213,6 +227,42 @@ public static class EventReminderService
         var where = string.IsNullOrWhiteSpace(ev.Location) ? string.Empty : $", {ev.Location}";
         return $"**{ev.Title}** is coming up: {when}{where}. " +
                (string.IsNullOrWhiteSpace(ev.Body) ? string.Empty : ev.Body);
+    }
+
+    /// <summary>
+    /// The ADR 0061 localized reminder: the subject + the fixed "coming up" prefix are resolved
+    /// through <paramref name="provider"/> in the recipient's <see cref="Profile.EmailLanguage"/>
+    /// (→ platform default → <c>en</c> floor), then <see cref="System.String.Format"/> with the
+    /// registry placeholders (<c>{0}</c>=title, <c>{1}</c>=when, <c>{2}</c>=where). The event's own
+    /// UGC body (authored in its own language, ADR 0018) is appended after the localized prefix —
+    /// exactly the shape <see cref="BuildReminderBody"/> produces for the English fallback, so the
+    /// two paths read identically apart from the surrounding words.
+    /// </summary>
+    private static async Task<(string Subject, string Body)> BuildLocalizedReminder(
+        Event ev, Profile? recipient, string defaultZoneId, string defaultFormat, ITranslationProvider provider)
+    {
+        string? lang = recipient?.EmailLanguage;
+        string when = FormatEventInstant(
+            ev.Start,
+            recipient?.TimeZone, defaultZoneId,
+            recipient?.DateFormat, defaultFormat);
+        var where = string.IsNullOrWhiteSpace(ev.Location) ? string.Empty : $", {ev.Location}";
+
+        string subject = System.String.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            await provider.GetAsync("email.reminder_subject", lang),
+            ev.Title);
+
+        string prefix = System.String.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            await provider.GetAsync("email.reminder_body", lang),
+            ev.Title, when, where);
+
+        string body = string.IsNullOrWhiteSpace(ev.Body)
+            ? prefix
+            : prefix + " " + ev.Body;
+
+        return (subject, body);
     }
 
     /// <summary>

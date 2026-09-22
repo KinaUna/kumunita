@@ -1283,6 +1283,29 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
     }
 
     /// <inheritdoc />
+    public async Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy)
+    {
+        // ADR 0061 — the user's outbound-channel language write lane. Mirrors
+        // SetProfileDateFormatAsync exactly (the C-MED·8 single write-lane
+        // shape): the self-scope check happens at the Web boundary (the owner
+        // is the actor); this lane writes Profile.EmailLanguage only. One
+        // session, one SaveChangesAsync (C3); no audit row (a Profile field
+        // write — the UpsertProfileAsync shape, "not an access decision").
+        // Fail closed on a missing profile (never load-or-create, the
+        // SetProfileDateFormatAsync pin). Strong consistency (C4): the new
+        // value is live on the very next GetProfileAsync call.
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var profile = await session.LoadAsync<Profile>(subjectId).ConfigureAwait(false);
+        if (profile is null)
+            throw new KeyNotFoundException($"Profile not found: {subjectId}");
+
+        profile.EmailLanguage = emailLanguage;
+        session.Store(profile);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Component>> SeedComponentsAsync()
     {
         // Upsert the four defaults by their stable identity — for the known set,

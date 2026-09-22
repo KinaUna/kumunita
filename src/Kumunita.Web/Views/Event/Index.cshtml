@@ -9,12 +9,12 @@
         <header class="airy-head">
             <div class="head-row">
                 <div>
-                    <h1>Events</h1>
+                    <h1><kw-l key="events.title">Events</kw-l></h1>
                     <p class="lede">
-                        Upcoming events around the neighborhood — see what's on, and RSVP.
+                        <kw-l key="events.lede">Upcoming events around the neighborhood — see what's on, and RSVP.</kw-l>
                     </p>
                 </div>
-                <a class="btn btn-outline-primary" href="/events/new">New event</a>
+                <a class="btn btn-outline-primary" href="/events/new"><kw-l key="events.new_event">New event</kw-l></a>
             </div>
         </header>
 
@@ -38,16 +38,16 @@
             <form method="get" action="/events" class="mb-4">
                 <div class="d-flex gap-2 align-items-end">
                     <div>
-                        <label class="form-label" for="component-filter" style="font-weight:600;">Community</label>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
                         <select class="form-select" id="component-filter" name="componentId">
-                            <option value="">All communities</option>
+                            <option value=""><kw-l key="events.all_communities">All communities</kw-l></option>
                             @foreach (var (id, name) in Model.Components)
                             {
                                 <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
                             }
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-outline-secondary">Filter</button>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
                 </div>
             </form>
         }
@@ -55,7 +55,7 @@
         <div class="airy-ann-list">
             @if (Model.Events.Count == 0)
             {
-                <div class="p-4 text-muted">No upcoming events yet.</div>
+                <div class="p-4 text-muted"><kw-l key="events.empty">No upcoming events yet.</kw-l></div>
             }
             @foreach (var row in Model.Events)
             {

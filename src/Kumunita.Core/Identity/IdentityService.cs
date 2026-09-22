@@ -38,7 +38,8 @@ public sealed class IdentityService(
     IClaimsSource claimsSource,
     IMailerStage mailer,
     IOptions<VerificationOptions> verificationOptions,
-    Microsoft.Extensions.Logging.ILogger<IdentityService> logger) : IIdentityService
+    Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
+    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -119,11 +120,14 @@ public sealed class IdentityService(
             Visibility = new Authorization.Audience()   // self-only (owner branch author; C1 denies the rest)
         });
         session.Store(token);
+        var verifyLink = VerificationLink(token.Id);
+        var (verifySubject, verifyBody) = await BuildVerificationEmailAsync(
+            displayName, verifyLink, preferredLanguage: null);
         await mailer.StageAsync(session,
                     idempotencyKey: $"verify:{user.Id}:1",
                     recipient: email,
-                    subject: "Verify your Kumunita account",
-                    body: VerificationBody(displayName, VerificationLink(token.Id)),
+                    subject: verifySubject,
+                    body: verifyBody,
                     ct: default);
         await session.SaveChangesAsync();
 
@@ -161,13 +165,15 @@ public sealed class IdentityService(
             var now = DateTimeOffset.UtcNow;
             var token = NewVerifyToken(user.Id ?? string.Empty, now, attempt: nextAttempt);
             session.Store(token);
+            var resendName = profile?.DisplayName ?? user.Email ?? "there";
+            var resendLink = VerificationLink(token.Id);
+            var (resendSubject, resendBody) = await BuildVerificationEmailAsync(
+                resendName, resendLink, preferredLanguage: profile?.EmailLanguage);
             await mailer.StageAsync(session,
                 idempotencyKey: $"verify:{user.Id}:{nextAttempt}",
                 recipient: email,
-                subject: "Verify your Kumunita account",
-                body: VerificationBody(
-                    profile?.DisplayName ?? user.Email ?? "there",
-                    VerificationLink(token.Id)),
+                subject: resendSubject,
+                body: resendBody,
                 ct: default);
             await session.SaveChangesAsync();
 
@@ -675,6 +681,28 @@ public sealed class IdentityService(
         $"Hi {displayName},\n\nYour Kumunita account is set to verify on its first sign-in. " +
         $"Open this one-time link to confirm the account (it also signs you in):\n\n{verifyLink}\n\n" +
         "If you didn't create this account, you can ignore this message.";
+
+    /// <summary>
+    /// ADR 0061 — the verification email's subject + body, resolved through the
+    /// <see cref="Kumunita.Core.Localization.ITranslationProvider"/> when one is
+    /// available (per-recipient preferred language → instance default →
+    /// <c>en</c> floor), with the English literals as the fallback for the two
+    /// test sites that construct <see cref="IdentityService"/> directly without a
+    /// provider. The body template's <c>{0}</c>/<c>{1}</c> placeholders are the
+    /// resident's display name and the one-time verify link (ADR 0061 / the
+    /// <c>email.verify_body</c> registry entry).
+    /// </summary>
+    private async Task<(string Subject, string Body)> BuildVerificationEmailAsync(
+        string displayName, string verifyLink, string? preferredLanguage)
+    {
+        if (translationProvider is null)
+            return ("Verify your Kumunita account", VerificationBody(displayName, verifyLink));
+
+        string subject = await translationProvider.GetAsync("email.verify_subject", preferredLanguage);
+        string bodyTemplate = await translationProvider.GetAsync("email.verify_body", preferredLanguage);
+        string body = string.Format(bodyTemplate, displayName, verifyLink);
+        return (subject, body);
+    }
 }
 
 

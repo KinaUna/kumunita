@@ -29,7 +29,7 @@
 <div class="row justify-content-center">
     <div class="col-md-10 col-lg-9">
         <p>
-            <a href="/events" class="btn btn-link p-0">&larr; Back to events</a>
+            <a href="/events" class="btn btn-link p-0"><kw-l key="events.back">← Back to events</kw-l></a>
         </p>
 
         @if (TempData["info"] is string info)
@@ -58,25 +58,25 @@
                clears the flag (the author-only lane). *@
             @if (Model.Event.IsDraft)
             {
-                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public">Draft</span>
+                <span class="badge text-bg-warning" title="Only you can see this — it is not yet public"><kw-l key="events.draft">Draft</kw-l></span>
                 @if (Model.CanPublish)
                 {
                     <form class="d-inline" method="post" action="/events/@Model.Event.Id/publish">
                         @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-sm btn-success">Publish</button>
+                        <button type="submit" class="btn btn-sm btn-success"><kw-l key="events.publish">Publish</kw-l></button>
                     </form>
                 }
             }
             @if (Model.CanEdit)
             {
-                <a class="btn btn-sm btn-outline-primary ms-auto" href="/events/@Model.Event.Id/edit">Edit</a>
+                <a class="btn btn-sm btn-outline-primary ms-auto" href="/events/@Model.Event.Id/edit"><kw-l key="events.edit">Edit</kw-l></a>
             }
             @if (Model.CanDelete)
             {
                 <form class="d-inline" method="post" action="/events/@Model.Event.Id/delete"
                       onsubmit="return confirm('Delete this event? This cannot be undone.');">
                     @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="events.delete">Delete</kw-l></button>
                 </form>
             }
         </div>
@@ -115,7 +115,7 @@
                         <h1 class="mb-1">
                             @if (string.IsNullOrWhiteSpace(Model.Event.Title))
                             {
-                                <span class="text-body-tertiary">Untitled event</span>
+                                <span class="text-body-tertiary"><kw-l key="events.untitled">Untitled event</kw-l></span>
                             }
                             else
                             {
@@ -276,13 +276,13 @@
            RSVP) + the last-write-wins RSVP form (Going / Maybe / No). *@
         <div class="card">
             <div class="card-body">
-                <h2 class="h5 mb-3">RSVP</h2>
+                <h2 class="h5 mb-3"><kw-l key="events.rsvp">RSVP</kw-l></h2>
 
                 <form method="post" action="/events/@Model.Event.Id/rsvp" class="d-flex gap-2 align-items-center">
                     @Html.AntiForgeryToken()
                     @if (Model.MyRsvp is not null)
                     {
-                        <span class="text-muted small me-2">You're going to:
+                        <span class="text-muted small me-2"><kw-l key="events.rsvp_you">You're going to:</kw-l>
                             <b>@Model.MyRsvp.Status</b></span>
                     }
                     @foreach (var status in new[] { RsvpStatus.Going, RsvpStatus.Maybe, RsvpStatus.No })
@@ -292,13 +292,13 @@
                                value="@status" @checkedMark autocomplete="off" />
                         <label class="btn btn-outline-primary btn-sm" for="@($"rsvp-{status}")">@status</label>
                     }
-                    <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><kw-l key="events.rsvp_update">Update</kw-l></button>
                 </form>
 
                 @if (Model.Rsvps.Count > 0)
                 {
                     <hr class="my-3" />
-                    <h3 class="h6 mb-2 text-muted">Responses</h3>
+                    <h3 class="h6 mb-2 text-muted"><kw-l key="events.rsvp_responses">Responses</kw-l></h3>
                     <ul class="list-unstyled mb-0">
                         @foreach (var rsvp in Model.Rsvps)
                         {

@@ -173,6 +173,36 @@ public interface IUserInfoService
     /// never load-or-creates, the <see cref="SetProfileTimezoneAsync"/> pin).</exception>
     Task SetProfileDateFormatAsync(string subjectId, string? formatString, string actorBy);
 
+    // ── Email & notification language addition (ADR 0061; the *single*
+    // write lane for the resident's outbound-channel language — the exact
+    // shape of SetProfileDateFormatAsync, the ADR 0006-E compatible-addition
+    // idiom) ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Set (or clear, with null) the resident's
+    /// <see cref="Profile.EmailLanguage"/> BCP-47 code — the user's
+    /// <b>preference</b> for the language the platform writes to them in
+    /// (outbound account emails and event reminders). Unlike the other
+    /// overrides, this does not change the resident's own UI or rendering —
+    /// it is strictly the *outbound channel's* language. The read seam
+    /// (the email staging path) resolves the recipient's
+    /// <c>Profile.EmailLanguage</c> first, then the instance default
+    /// (<see cref="Localization.LocaleSettings.DefaultLanguageCode"/>), then
+    /// the <c>en</c> registry floor. Mirrors
+    /// <see cref="SetProfileDateFormatAsync"/> exactly (the C-MED·8 single
+    /// write-lane shape): the self-scope check happens at the Web boundary (the
+    /// owner is the actor); this lane writes <c>Profile.EmailLanguage</c> only.
+    /// One session, one <c>SaveChangesAsync</c>; no
+    /// <see cref="Authorization.AccessAudit"/> row (a profile field write —
+    /// the <see cref="UpsertProfileAsync"/> shape, "not an access decision").
+    /// Strong consistency (invariant C4): the new value is live on the very
+    /// next <see cref="GetProfileAsync"/> call.
+    /// </summary>
+    /// <exception cref="System.Collections.Generic.KeyNotFoundException">
+    /// No profile with that <c>subjectId</c> exists (fail closed — the lane
+    /// never load-or-creates, the <see cref="SetProfileDateFormatAsync"/> pin).</exception>
+    Task SetProfileEmailLanguageAsync(string subjectId, string? emailLanguage, string actorBy);
+
     // ── M3 additions (ADR 0006-E compatible lane — added to the owning
     // module's public surface, named) ──────────────────────────────────────
 

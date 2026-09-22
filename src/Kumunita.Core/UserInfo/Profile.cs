@@ -123,6 +123,27 @@ public sealed class Profile
     /// *additive* field (ADR 0004 §B.1), like <see cref="TimeZone"/>.
     /// </summary>
     public string? DateFormat { get; set; }
+
+    /// <summary>
+    /// The resident's <b>email &amp; notification language</b> — a BCP-47
+    /// language code (e.g. <c>de</c>, <c>fr</c>, <c>da</c>) — the user's
+    /// <b>preference</b> for the language the platform writes to them in:
+    /// outbound account emails (verification) and event reminders resolve their
+    /// body/subject through this code first, then the instance default
+    /// (<see cref="Localization.LocaleSettings.DefaultLanguageCode"/>), then the
+    /// <c>en</c> registry floor (ADR 0005 / the provider floor). Unlike the
+    /// other overrides above, this does not change the resident's own UI or
+    /// rendering — it is strictly the *outbound channel's* language, so a
+    /// resident who browses in one language can still choose to receive their
+    /// emails in another. Stored as the BCP-47 code itself (not a preset id) so
+    /// it round-trips with <see cref="System.Globalization.CultureInfo"/> and the
+    /// <c>TranslationProvider</c>'s HTTP-free resolution path. Nullable:
+    /// <c>null</c> means the resident uses the instance default (the "preference
+    /// if present" shape, the same resolution order as the UI language
+    /// preference). An *additive* field (ADR 0004 §B.1), like
+    /// <see cref="TimeZone"/> and <see cref="DateFormat"/>.
+    /// </summary>
+    public string? EmailLanguage { get; set; }
 }
 
 /// <summary>A profile contact-surface update (the M1 bootstrap surface — the author's own
