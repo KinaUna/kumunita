@@ -996,7 +996,207 @@ public class EventControllerTests
             Arg.Any<CancellationToken>());
     }
 
+    // ── EV-CAL — the calendar pin set (ADR 0063, design §5.4 — 3 pins) ──────
+    //
+    // The <c>GET /events/calendar</c> action is thin (ADR 0006-D): the
+    // anchor → window math is <b>this</b> layer's (the seam is
+    // window-span-agnostic — design §5.1), so the Web pins assert the
+    // window-start instant the action derives from the viewer's effective
+    // zone (C-EV·5), the ±1-month <c>yyyy-MM-dd</c> nav anchors (C-EV·7),
+    // and the verbatim <c>componentId</c> pass-through (C-M3·2 / C-EV·3).
+    // The seam + the <c>EffectiveTimezoneResolver</c> are the NSubstitute
+    // substitutes (no live Postgres — the M4 controller harness shape).
+
+    /// <summary>
+    /// No <c>from</c> query ⇒ the anchor is <b>today in the viewer's
+    /// effective zone</b> (C-EV·5): the window start passed to the seam is
+    /// that zone's local midnight of today, converted to UTC (a
+    /// fixed-offset zone's midnight is a distinct UTC instant from the
+    /// UTC-midnight floor), the window end is start + 30d, and the model's
+    /// <see cref="EventCalendarViewModel.FromAnchor"/> is the zone's today
+    /// as <c>yyyy-MM-dd</c>. The zone is driven through the resolver's
+    /// platform-default seam (<c>GetDefaultTimezoneAsync</c> → a real IANA
+    /// zone, <c>Europe/Berlin</c>), so the <c>UTC</c> floor is not what's
+    /// under test here. The expected instant is computed before and after
+    /// the call, so a zone-local midnight rollover during the test can't
+    /// flake the pin.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_DefaultFromIsTodayInEffectiveZone()
+    {
+        const string subject = "subj-cal-default";
+        const string zoneId = "Europe/Berlin";
+        var zone = EffectiveTimezoneResolver.TryConvert(zoneId)!;
+
+        var events = Substitute.For<IEventService>();
+        DateTimeOffset? capturedStart = null;
+        DateTimeOffset? capturedEnd = null;
+        events.ListInRangeAsync(
+                Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedStart = callInfo.ArgAt<DateTimeOffset>(0);
+                capturedEnd = callInfo.ArgAt<DateTimeOffset>(1);
+                return Array.Empty<Event>();
+            });
+
+        var controller = BuildCalendarController(events, zoneId, roles: [Roles.Member], subjectId: subject);
+
+        var expectedBefore = ExpectZoneMidnightUtc(zone, DateTime.UtcNow);
+        var result = await controller.Calendar(null, null);
+        var expectedAfter = ExpectZoneMidnightUtc(zone, DateTime.UtcNow);
+
+        // The seam saw [zone-midnight-today-as-UTC, +30d) (C-EV·5 — the
+        // window is anchored on the viewer's zone, not the UTC floor).
+        Assert.True(
+            capturedStart == expectedBefore || capturedStart == expectedAfter,
+            $"Window start {capturedStart} is neither the zone's midnight-today as UTC ({expectedBefore}) nor one rollover away ({expectedAfter}).");
+        Assert.Equal(capturedStart!.Value.AddDays(30), capturedEnd);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
+        // The FromAnchor is the zone-local date of the window start — the
+        // captured windowStart converted back to the zone gives the anchor
+        // date unambiguously (no UTC-date off-by-one).
+        var anchorDate = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone).Date;
+        Assert.Equal(anchorDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), vm.FromAnchor);
+        Assert.Equal(zone.Id, vm.TimeZoneId);
+
+        await events.Received(1).ListInRangeAsync(
+            Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), null, subject, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A <c>from</c> anchor of <c>2026-08-15</c> shifts the window: the seam
+    /// receives <c>[2026-08-15 zone-local midnight as UTC, +30d)</c>, and the
+    /// model carries the anchor's ±1-month nav links as <c>yyyy-MM-dd</c>
+    /// (<see cref="EventCalendarViewModel.PrevAnchor"/> =
+    /// <c>2026-07-15</c>, <see cref="EventCalendarViewModel.NextAnchor"/> =
+    /// <c>2026-09-15</c>) — the C-EV·7 pre-rendered plain-GET-link targets.
+    /// </summary>
+    [Fact]
+    public async Task Calendar_FromShiftsWindow_AndPrevNextLinks()
+    {
+        const string subject = "subj-cal-shift";
+        var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
+
+        var events = Substitute.For<IEventService>();
+        DateTimeOffset? capturedStart = null;
+        DateTimeOffset? capturedEnd = null;
+        events.ListInRangeAsync(
+                Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedStart = callInfo.ArgAt<DateTimeOffset>(0);
+                capturedEnd = callInfo.ArgAt<DateTimeOffset>(1);
+                return Array.Empty<Event>();
+            });
+
+        var controller = BuildCalendarController(events, zone.Id, roles: [Roles.Member], subjectId: subject);
+
+        var result = await controller.Calendar("2026-08-15", null);
+
+        // The window is anchored on the <c>from</c> date's zone-local
+        // midnight (not the caller's clock) — the §5.2 window-math pin.
+        var expectedStartUtc = new DateTimeOffset(
+            new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Unspecified),
+            zone.GetUtcOffset(new DateTime(2026, 8, 15))).ToUniversalTime();
+        Assert.Equal(expectedStartUtc, capturedStart);
+        Assert.Equal(expectedStartUtc.AddDays(30), capturedEnd);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
+        Assert.Equal("2026-08-15", vm.FromAnchor);
+        Assert.Equal("2026-07-15", vm.PrevAnchor);
+        Assert.Equal("2026-09-15", vm.NextAnchor);
+
+        await events.Received(1).ListInRangeAsync(
+            expectedStartUtc, expectedStartUtc.AddDays(30), null, subject, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The <c>componentId</c> query reaches the seam <b>verbatim</b>
+    /// (C-M3·2 / C-EV·3 — a filter, never a gate) and is carried on the view
+    /// model's <see cref="EventCalendarViewModel.CurrentComponentId"/>
+    /// (the view's filter picker re-renders it selected).
+    /// </summary>
+    [Fact]
+    public async Task Calendar_PassesComponentFilter_ToSeam()
+    {
+        const string subject = "subj-cal-filter";
+        const string component = "component-filter-001";
+        var zone = EffectiveTimezoneResolver.TryConvert("Europe/Berlin")!;
+
+        var events = Substitute.For<IEventService>();
+        events.ListInRangeAsync(
+                Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(),
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Event>());
+
+        var controller = BuildCalendarController(events, zone.Id, roles: [Roles.Member], subjectId: subject);
+
+        var result = await controller.Calendar("2026-09-01", component);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
+        Assert.Equal(component, vm.CurrentComponentId);
+
+        await events.Received(1).ListInRangeAsync(
+            Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), component, subject, Arg.Any<CancellationToken>());
+    }
+
     // ── Harness ────────────────────────────────────────────────────────────────
+
+    /// <summary>The anchor date's zone-local midnight as a UTC instant — the
+    /// §5.2 window math (<c>anchor → zone-local midnight → UTC</c>), factored
+    /// so the test's expectation and the controller's derivation share one
+    /// expression.</summary>
+    private static DateTimeOffset ExpectZoneMidnightUtc(System.TimeZoneInfo zone, DateTime nowUtc)
+    {
+        var anchorDate = System.TimeZoneInfo.ConvertTimeFromUtc(nowUtc, zone).Date;
+        return new DateTimeOffset(anchorDate, zone.GetUtcOffset(anchorDate)).ToUniversalTime();
+    }
+
+    /// <summary>
+    /// Builds an <see cref="EventController"/> whose effective zone is the
+    /// given IANA <paramref name="zoneId"/> — driven through the resolver's
+    /// own seams (the <see cref="Kumunita.Core.Localization.ILocalizationService.GetDefaultTimezoneAsync"/>
+    /// platform-default seam returns the zone id; the resolver's
+    /// profile → default → UTC resolution order is covered by its own tests,
+    /// so here the <em>zone</em> is the given and the action's window math
+    /// is the pin). Everything else mirrors <see cref="Build"/>.
+    /// </summary>
+    private static EventController BuildCalendarController(
+        IEventService events,
+        string zoneId,
+        string[]? roles,
+        string? subjectId)
+    {
+        var userInfoImpl = Substitute.For<IUserInfoService>();
+        userInfoImpl.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var localization = DefaultLocalization();
+        localization.GetDefaultTimezoneAsync().Returns(zoneId);
+        var timezone = new EffectiveTimezoneResolver(userInfoImpl, localization, new HttpContextAccessor());
+
+        var controller = new EventController(events, userInfoImpl, localization, Substitute.For<IDocumentStore>(), timezone);
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var claims = new List<Claim>();
+        if (subjectId is not null)
+            claims.Add(new Claim(Kumunita.Core.Identity.ClaimTypes.Subject, subjectId));
+        if (roles is { Length: > 0 })
+            claims.AddRange(roles.Select(r => new Claim(Kumunita.Core.Identity.ClaimTypes.Role, r)));
+
+        if (claims.Count > 0)
+            controller.ControllerContext.HttpContext.User =
+                new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
+
+        controller.TempData = new TempDataDictionary(new DefaultHttpContext(), new NoOpTempDataProvider());
+        return controller;
+    }
 
     private static Event SampleEvent(
         string id,
