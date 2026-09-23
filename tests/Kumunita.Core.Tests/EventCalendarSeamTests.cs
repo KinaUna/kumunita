@@ -496,7 +496,7 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
         Assert.DoesNotContain("day-before", ids);
         Assert.DoesNotContain("day-after", ids);
         // Exactly the anchor-day event — the window is tight, not a superset.
-        Assert.Equal(1, ids.Count);
+        Assert.Single(ids);
     }
 
     // EV_Range_SevenDayWindow_OnlyThoseDays (design §6.3) — a 7-day window

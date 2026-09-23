@@ -7,6 +7,13 @@
     <IsPackable>false</IsPackable>
     <!-- xunit.v3 (Microsoft.Testing.Platform). Microsoft.NET.Test.Sdk + VSTest bridge
          register the project with VS Test Explorer; `dotnet test` continues to work via MTP. -->
+    <!-- xUnit1051 (pass TestContext.Current.CancellationToken): accepted house-style.
+         This suite drives live Postgres via Testcontainers (one scratch DB per test),
+         so threading the test cancellation token into every service seam call is not
+         worth the diff; the sibling PostServiceTests already mixes both idioms. Kept as
+         an accepted noise rule (see docs/plans-milestones/done/m4/m4-handoff-notes.md:
+         "house-style warnings — 26× xUnit1051 nullable-CancellationToken"). -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

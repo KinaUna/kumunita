@@ -1319,7 +1319,9 @@ public class EventControllerTests
         var anchorFromStart = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone).Date;
         var daysInMonth = System.DateTime.DaysInMonth(anchorFromStart.Year, anchorFromStart.Month);
         Assert.Equal(ExpectZoneMidnightUtc(zone, anchorFromStart.AddDays(daysInMonth)), capturedEnd);
-        Assert.Equal(TimeSpan.FromDays(daysInMonth), capturedEnd.Value - capturedStart.Value);
+        // `!` — capturedEnd is set by the NSubstitute capture callback (the window end
+        // the controller passed in), so it is guaranteed non-null here (CS8629).
+        Assert.Equal(TimeSpan.FromDays(daysInMonth), capturedEnd!.Value - capturedStart.Value);
 
         var view = Assert.IsType<ViewResult>(result);
         var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);

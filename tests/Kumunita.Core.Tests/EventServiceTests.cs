@@ -524,7 +524,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var @event = new Event { Id = "s2-ev", AuthorId = "u-s2", IsDraft = true };
 
         await_ThrowsUnauthorized(() => EventService.CheckCreateStanding("", new HashSet<string> { Roles.Member }, @event));
-        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding(null, new HashSet<string> { Roles.Member }, @event));
+        // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
+        // these; the Core layer re-checks). `null!` documents the intentional null
+        // instead of tripping CS8625 (null → non-nullable `string actorId`).
+        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding(null!, new HashSet<string> { Roles.Member }, @event));
     }
 
     // ── 13 — M4_CheckCreateStanding_NullEvent_404 ────────────────────────────
@@ -628,7 +631,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal("Bring gloves", ev.Body);
         Assert.True(ev.IsDraft);
         Assert.Equal("en", ev.LanguageCode);          // ADR 0018 — the instance-default floor ("" → en).
-        Assert.NotNull(ev.Created);
+        // (ev.Created is a non-nullable DateTimeOffset — Assert.NotNull on a value
+        // type is meaningless, xUnit2002 — so there is no Created assert here.)
 
         var rows = await EventAuditRows(store);
         var create = Assert.Single(rows);
@@ -665,7 +669,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // The stored row carries the audience verbatim (bit-identical to the input).
         Assert.NotNull(ev.Audience);
-        Assert.Equal(1, ev.Audience!.Grants.Count);
+        Assert.Single(ev.Audience!.Grants);
         Assert.Equal(GrantKind.User, ev.Audience.Grants[0].Kind);
         Assert.Equal(grantee, ev.Audience.Grants[0].Id);
 
@@ -1002,7 +1006,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // Exactly one RSVP row for this resident on this event.
         var all = await svc.GetRsvpsAsync(ev.Id);
-        Assert.Single(all.Where(r => r.UserId == rsvp1));
+        Assert.Single(all, r => r.UserId == rsvp1);
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == rsvp1).Status);
     }
 
@@ -1068,14 +1072,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         // The create lane wrote exactly one row (event.create).
         var before = await EventAuditRows(store);
-        Assert.Equal(1, before.Count);
+        Assert.Single(before);
         Assert.Equal("event.create", before.Single().Action);
 
         // The RSVP lane must add **no** audit row.
         await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
 
         var after = await EventAuditRows(store);
-        Assert.Equal(1, after.Count);                          // still exactly one (the create).
+        Assert.Single(after);                                  // still exactly one (the create).
         Assert.DoesNotContain(after, r => r.Action == "event.rsvp");   // no such action exists.
     }
 
@@ -1372,9 +1376,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         var all = await svc.GetRsvpsAsync(ev.Id);
         Assert.Equal(2, all.Count);                                            // exactly 2 rows.
-        Assert.Single(all.Where(r => r.UserId == r1));                         // r1: one row.
+        Assert.Single(all, r => r.UserId == r1);                               // r1: one row.
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == r1).Status);  // last write won.
-        Assert.Single(all.Where(r => r.UserId == r2));                         // r2: one row.
+        Assert.Single(all, r => r.UserId == r2);                               // r2: one row.
         Assert.Equal(RsvpStatus.Going, all.Single(r => r.UserId == r2).Status);
     }
 
@@ -1778,7 +1782,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal("Aufräumtag", row.Title);
         Assert.Equal("Kommunikationstest", row.Body);
         Assert.Equal(author, row.AuthorId);
-        Assert.NotNull(row.Created);
+        // (row.Created is a non-nullable DateTimeOffset — Assert.NotNull on a value
+        // type is meaningless, xUnit2002 — so there is no Created assert here.)
 
         // The row is readable back through the read seam.
         var read = await svc.GetEventTranslationsAsync(evId);
@@ -2350,7 +2355,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var (_, _, svc) = Services(store);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(""));
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(null));
+        // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
+        // these; the Core layer re-checks). `null!` documents the intentional null
+        // instead of tripping CS8625 (null → non-nullable `string actorId`).
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(null!));
 
         // No audit row from the denied read (the GetMyRsvpAsync posture).
         Assert.Empty(await EventAuditRows(store));

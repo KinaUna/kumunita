@@ -813,8 +813,11 @@ public sealed class EventController : Controller
 
         var request = new CreateEventRequest
         {
-            Title = model.Title,
-            Body = model.Body,
+            // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
+            // above returns unless both are non-whitespace (the [Required] pin), so
+            // this assignment can never actually store a null (CS8601).
+            Title = model.Title!,
+            Body = model.Body!,
             ComponentId = model.ComponentId,
             Start = model.Start,
             End = model.End,
@@ -971,8 +974,11 @@ public sealed class EventController : Controller
 
         var request = new UpdateEventRequest
         {
-            Title = model.Title,
-            Body = model.Body,
+            // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
+            // above returns unless both are non-whitespace (the [Required] pin), so
+            // this assignment can never actually store a null (CS8601).
+            Title = model.Title!,
+            Body = model.Body!,
             ComponentId = model.ComponentId,
             Start = model.Start,
             End = model.End,
