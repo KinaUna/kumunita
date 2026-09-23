@@ -1142,3 +1142,15 @@ body.kmb-page-fullbleed .navbar {
   .airy-page-list li { padding: 0.75rem 1rem; }
 }
 
+/* EV-CAL (ADR 0063) — the overlap ring. `client/lib/events-calendar.ts`
+   adds this class to every chip whose [startUtc, endUtc) half-open interval
+   intersects another's (C-EV·4 — a display flag, never an access decision);
+   it also sets a `title` hint the browser surfaces as a native tooltip. The
+   ring is a soft outline (no layout shift) plus a warm tint so the clash is
+   visible at a glance; the `title` stays the native tooltip (no custom
+   positioning, so it never traps the pointer). */
+.event-chip-overlap {
+  box-shadow: 0 0 0 2px var(--kmb-amber-soft);
+  background: color-mix(in srgb, var(--kmb-amber-soft) 14%, #fff);
+}
+
