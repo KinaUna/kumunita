@@ -297,7 +297,9 @@ public sealed record EventRow(
     string? ComponentId,
     string? ComponentDisplayName,
     bool IsDraft,
-    bool IsDeleted);
+    bool IsDeleted,
+    DateTimeOffset StartUtc = default,
+    DateTimeOffset EndUtc = default);
 
 /// <summary>
 /// The <b>feed</b> view model (the <c>GET /events</c> read surface —
@@ -327,6 +329,42 @@ public sealed record EventIndexViewModel(
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
     int CurrentPage);
+
+/// <summary>
+/// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read
+/// surface — ADR 0063; the <see cref="Kumunita.Core.Events.IEventService
+/// .ListInRangeAsync"/> window, a rolling 30-day anchor in the viewer's
+/// effective zone).
+/// <para>
+/// **<see cref="FromAnchor"/> / <see cref="PrevAnchor"/> /
+/// <see cref="NextAnchor"/>** are the month anchor and its ±1-month
+/// neighbors, each <c>yyyy-MM-dd</c> in the viewer's effective zone —
+/// pre-rendered plain-GET-link targets (C-EV·7: nav is plain GET links;
+/// the server re-renders, the authorization re-runs per request).
+/// <see cref="MonthLabel"/> is the anchor's month name + year in the UI
+/// culture (a display string, not a zone-driven calculation).
+/// </para>
+/// <para>
+/// **<see cref="Components"/>** (the filter picker's options) is the
+/// enabled <c>Component</c> set — a *filter* (C-M3·2), never a gate;
+/// <see cref="CurrentComponentId"/> is the selected filter (null ⇒
+/// unfiltered).
+/// </para>
+/// <para>
+/// **<see cref="TimeZoneId"/>** is the effective zone id (ADR 0019) —
+/// C-EV·5: a **display** input only (the client distributes chips into
+/// day-columns via <c>Intl</c>), **never** an authorization input.
+/// </para>
+/// </summary>
+public sealed record EventCalendarViewModel(
+    IReadOnlyList<EventRow> Events,
+    string FromAnchor,
+    string? PrevAnchor,
+    string? NextAnchor,
+    string MonthLabel,
+    string? CurrentComponentId,
+    IReadOnlyList<(string Id, string Name)> Components,
+    string TimeZoneId);
 
 /// <summary>
 /// The <b>detail</b> view model (the <c>GET /events/{id}</c> read
