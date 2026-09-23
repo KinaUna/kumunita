@@ -212,3 +212,88 @@ section + its own entry-read list.
 - Next: **U07** — acceptance gate (run + record the three-test gate) + close
   (roadmap trio, ARCHITECTURE.md sync, README, handoff summary, move the
   lane folder `in-progress/ev-dwm/` → `done/ev-dwm/`).
+
+## U07 — acceptance gate + close
+
+- **Gate (design doc §6.6 "Run result", recorded 2026-09-23):** the
+  three-test gate is **PASS / PASS / PASS** — **closed loop** (the anchor
+  day's event reaches Day *and* Week *and* Month via the 3 window pins + the
+  unchanged `AccessAudit` row, C-DWM·2), **handoff** (the same
+  `CanSeeAsync(Read)` gate runs per view — a day/week/month page leaks
+  nothing a feed page would not), **part-vs-whole** (U06's 9 pinned tests
+  9/9 pass; Web assembly **375 run, 0 failed**; Core assembly **716 run,
+  0 failed**). One U06 drift note (Month `WindowDays` span: the
+  browser-verified 34-column Sept-2026 shape vs the "5–6 full weeks / 35–42"
+  prose) is **resolved** — U07 aligned the design-doc prose (§3.4 / F3 /
+  §6.1 / §6.2) to the implementation ("Monday-first, the month's day count +
+  the Monday-first leading offset"). No other drift pauses in this note.
+- **Roadmap trio closed:** `Milestones.cs` — `EV-DWM` `StatusNext`→
+  `StatusDone`, `M5` `StatusPlanned`→`StatusNext`; `MilestonesTests.cs` —
+  the single-in-progress pin reverts to `M5_Is_The_Single_InProgress_Milestone`
+  (id `"M5"`), the `Shipped` list gains `"EV-DWM"`, `Ids` unchanged;
+  `README.md` — the `EV-DWM` row moves In progress→**Done**, the `M5` row
+  Planned→**In progress** (plus the status-line at ~L49). **M5 is now the
+  single in-progress milestone.**
+- **`ARCHITECTURE.md`** — the events-surface note under the `Event` /
+  `EventRsvp` field set gains the `EV-DWM` block (the three views, the one
+  additive `?view=` selector, the per-view window in the controller, the new
+  `events-calendar-time.ts` module, zero Core change — ADR 0064).
+- **Drift reconciliation:** the U06 drift note's recommended resolution is
+  applied (prose → implementation; the 34-column Sept-2026 shape is the
+  shipped behavior U05 verified in the browser).
+- **No code, no build** (U06's build is the last code build; the only C#
+  changed in this unit is `Milestones.cs` + `MilestonesTests.cs` — the
+  roadmap trio — which U06's Web.Tests run re-verifies green: 375/0,
+  MilestonesTests included).
+- **Lane folder moved** `docs/plans-milestones/in-progress/ev-dwm/` →
+  `docs/plans-milestones/done/ev-dwm/` (the per-lane subfolder convention —
+  matches `done/events-calendar/`). The top-level `plan-ev-dwm.md` stays
+  put as the persistent lane register.
+- **This is the last handoff note for the lane** — the `## Summary` below is
+  the handoff for the next agent (the one who opens a future lane, e.g. a
+  week-start override or the overlap-lane algorithm).
+
+## Summary
+
+| Unit | Goal (one line) | Tests | Deviations |
+|------|-----------------|-------|------------|
+| **U00** | Design doc Part 1 — context, scope, D1–D7, C-DWM·1…9, FACES F1–F8. No code. | — (docs-only) | none |
+| **U01** | Design doc Part 2 (exact shapes, 9 pinned tests, gate, drift-guard) + ADR 0064 + roadmap open. | 368/0 (Web, incl. the new `EV_DWM_Is_The_Single_InProgress_Milestone` pin) | none |
+| **U02** | `EventCalendarViewModel` additive fields + the `Calendar` action's `?view=` engine (per-view window + nav-by-view-unit + label). Zero Core change. | 368/0 (Web) | conformed 2 stale EV-CAL pins to the frozen calendar-month window (resolved, not a drift pause) |
+| **U03** | Month view (chip grid reframed to a true calendar month) + the Day/Week/Month toggle. Month is the default. | 368/0 (Web) | none |
+| **U04** | Week view (7-column time grid, Monday-start) + the new `client/lib/events-calendar-time.ts`. | 368/0 (Web) | none |
+| **U05** | Day view (1-column time grid reusing the time module) + the `site.css` time-grid + toggle rules + the 3 `kw-l` keys × 4 languages. | 368/0 (Web) | none |
+| **U06** | The 9 pinned tests — 2 Core additive window pins + 7 Web `?view=` engine pins. No gate. | 9/9 pass (Web 375/0, Core 716/0) | drift note: the Month `WindowDays` grid span (34 columns, browser-verified) vs the design-doc prose "5–6 full weeks" — **resolved by U07** |
+| **U07** | Acceptance gate (recorded) + close (roadmap trio, ARCHITECTURE.md, handoff summary, folder move). | 9/9 pass (U06's, carried as the part-vs-whole evidence) | none |
+
+**Out-of-scope / future-lane list** (ADR 0064 D7, named with a one-line
+candidate lane each):
+
+- **Event creation / RSVP / drag-to-reschedule from the calendar** — the
+  detail page owns RSVP (ADR 0063 D7 unchanged); a future lane would add
+  the calendar-side write surface.
+- **iCal export** — **M6** (Portability) owns the `events.ics` endpoint.
+- **Recurring-event model** — a new `Event` doc field + the recurrence
+  expansion in `ListInRangeAsync` or a derived-row projection; a future
+  M4-adjacent lane.
+- **Year view** — a fourth `?view=year` value on the same selector + a
+  12-month mini-grid; a future lane.
+- **Multi-event column packing / overlap-lane algorithm** — overlapping
+  blocks today render side-by-side or stacked; a proper lane-algorithm
+  (like Google Calendar's side-by-side columns) is a display nicety, a
+  future lane.
+- **Week-start resident override** — the platform default is **Monday**
+  (C-DWM·5); a per-resident week-start is a new override surface (the ADR
+  0019 / 0020 shape applied to the week-start), a future lane.
+- **New notification** — the calendar views are display-only; a
+  notification lane (e.g. "an event you're following starts tomorrow")
+  is a future lane.
+- **Server-side overlap or time-positioning API** — both stay
+  client-side display concerns (C-DWM·4); a future lane only if the
+  client-side cost becomes measurable.
+
+**The lane is closed.** `EV-DWM` is `StatusDone`; `M5` (Projects) is the
+single in-progress milestone. The design doc ends with the gate Run result
+(§6.6); the handoff note has its `## Summary` (this section); the lane
+folder is in `done/ev-dwm/`. The top-level `plan-ev-dwm.md` stays as the
+persistent lane register. **M5 stays Projects; M6 stays Portability.**

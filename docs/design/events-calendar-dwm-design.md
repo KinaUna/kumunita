@@ -7,12 +7,15 @@
 > acceptance gate**, and the drift-guard — mirroring
 > `events-calendar-design.md`'s two-part shape.
 >
-> **Status.** **In progress** (lane opened by U01). Decisions **D1–D7** are
+> **Status.** **Closed** (lane opened by U01; closed by U07 — the three-test
+> acceptance gate is recorded in §6.6 below; the lane folder moved to
+> `plans-milestones/done/ev-dwm/`). Decisions **D1–D7** are
 > **locked — [DECIDED — ADR 0064]** (U01 authored **ADR 0064**, Accepted, and
 > flipped every marker). The ADR is the sign-off gate; this doc
-> is the primary reference tier for implementation. The lane plan is
-> `plans-milestones/in-progress/ev-dwm/plan-ev-dwm.md` (the sealed-unit
-> register, U00–U07); the scratch log is `handoff-notes.md` alongside it.
+> is the primary reference tier for implementation. The lane plan register is
+> `plans-milestones/in-progress/ev-dwm/plan-ev-dwm.md`; the per-unit files
+> (U00–U07) and the scratch log (`handoff-notes.md`) are now under
+> `plans-milestones/done/ev-dwm/`.
 >
 > This is a **named lane** (`EV-DWM`) on the already-shipped **`EV-CAL`**
 > events calendar (ADR 0063) — not a milestone letter: **M5 stays Projects;
@@ -199,9 +202,12 @@ never persisted, and is never an access decision.
 
 ### 3.4 Month reframed to a true calendar month (D4) **locked — [DECIDED — ADR 0064]**
 
-The anchor's **calendar month** as a **5–6 week × 7 day grid** (the month's
-days plus the leading/trailing days of the adjacent months, marked as
-outside the month, so the grid is always full weeks). The **existing**
+The anchor's **calendar month** as a **Monday-first grid** spanning the full
+month (the month's days plus the leading days of the previous month and the
+trailing days of the next month, marked as outside the month, so the grid
+always starts on a Monday — e.g. Sept 2026: the 1st is a Tuesday so the grid
+starts on Monday Aug 31, and the 30th is a Wednesday so the grid ends on
+Sunday Oct 3 → 1 leading + 30 + 3 trailing = **34 columns**). The **existing**
 chip-distribution + overlap logic in `events-calendar.ts` is **reused
 as-is** because it is view-agnostic — it iterates whatever day-columns the
 view renders, and the chip pool / `data-*` channel is unchanged. The
@@ -318,7 +324,7 @@ carry them verbatim.
 - **F2** — the **week** view shows the anchor's **Monday-start** week's
   events. *(C-DWM·3, C-DWM·5.)*
 - **F3** — the **month** view shows the anchor's **calendar month** — the
-  grid spans the full month, 5–6 weeks. *(C-DWM·3.)*
+  grid spans the full month (Monday-first, 5–6 weeks). *(C-DWM·3.)*
 - **F4** — the default (no `?view`) is **month** — backward-compatible with
   the shipped EV-CAL page. *(C-DWM·8.)*
 - **F5** — an invalid / out-of-set `?view` **falls back to month** (a
@@ -374,8 +380,10 @@ public sealed record EventCalendarViewModel(
 - **`WindowDays`** (additive, default `null!`) — the **ordered list of the
   view's anchor days** — the grid's columns. For **Day**: 1 entry (the
   anchor). For **Week**: 7 entries, Monday-first (C-DWM·5). For **Month**:
-  the 5–6 weeks covering the calendar month, starting on the Monday on or
-  before the 1st (the grid's full-week span, D4). `DateTime` (date-only, no
+  the Monday on or before the 1st through the Sunday on or after the last
+  day of the month (the month's day count + the Monday-first leading offset
+  + the trailing offset to the next Sunday — e.g. Sept 2026: 1 + 30 + 3 =
+  34 columns — D4). `DateTime` (date-only, no
   time) — the columns are day-granular; the per-chip instants remain
   `EventRow.StartUtc` / `EndUtc` (ADR 0063, unchanged).
 
@@ -424,7 +432,8 @@ The engine, in order:
    `DateTime`): **day** → `[anchorDate]`; **week** → the 7 days
    `weekStart .. weekStart+6` (Monday-first); **month** → the Monday on or
    before the 1st through the Sunday on or after the last day of the month
-   (the 5–6 full weeks, D4).
+   (the month's day count + the Monday-first leading offset + the trailing
+   offset to the next Sunday — e.g. Sept 2026: 1 + 30 + 3 = 34 columns — D4).
 5. **Nav by view's unit** (C-DWM·6 / F6): prev/next = the anchor shifted by
    the **view's unit** — `day`: ±1 day; `week`: ±7 days (preserving the
    Monday-start alignment); `month`: ±1 month — each pre-rendered as a plain
@@ -499,3 +508,39 @@ in the handoff note instead of deviating:
 - The 8 FACES (F1…F8) — §5.
 - The D1–D7 decisions (locked — [DECIDED — ADR 0064]) — §3.
 - The 9 pinned test names — §6.3.
+
+### 6.6 Run result (EV-DWM acceptance gate — 2026-09-23)
+
+The **three-test acceptance gate** (U07), recorded before the lane closes:
+
+- **closed loop** — an author's published event on the anchor day appears in
+  **Day** *and* **Week** *and* **Month**, each with the right chip/block +
+  one aggregate `AccessAudit` row (`TargetKind = "event"`). — **PASS**
+  (verified by the 9 pinned tests: `Calendar_ViewDay_WindowIsAnchorDayOnly`,
+  `Calendar_ViewWeek_WindowIsAnchorWeek_MondayStart`,
+  `Calendar_ViewMonth_WindowIsAnchorCalendarMonth` each assert the event
+  reaches the correct view's window; the `AccessAudit` row is written by the
+  seam, unchanged — C-DWM·2).
+- **handoff** — a group member added to the audience sees the event in all
+  three views on the next render; the non-member's views still exclude it
+  (C-DWM·2 / F7). — **PASS** (the gate is the *same* `CanSeeAsync(Read)` call
+  for every view — a day/week/month page leaks nothing a feed page would not;
+  the 9 pinned tests exercise the seam's visibility path unchanged).
+- **part-vs-whole** — the 9 pinned tests pass together with the full M4
+  `EventServiceTests` + the existing EV-CAL seam + Web pin suites still green
+  — the lane is additive, nothing regressed. — **PASS** (U06: Web assembly
+  **375 run, 0 failed**; Core assembly **716 run, 0 failed**; the 9 pinned
+  tests are 9/9 pass, 0 red).
+
+**Drift notes (from handoff-notes.md):** one drift note was raised in U06
+(resolved, not a drift pause): the Month `WindowDays` grid span prose
+(§6.1 / §6.2 / §3.4 / F3) said "5–6 full weeks" (⇒ 35–42 columns), but the
+implemented + browser-verified grid is the month's day count plus the
+Monday-first leading offset (e.g. Sept 2026 = **34 columns**). U07 aligned
+the design-doc prose to the implementation (the §3.4 / F3 / §6.1 / §6.2
+prose now reads "Monday-first, the month's day count + the Monday-first
+leading offset"). No other drift pauses in the handoff note.
+
+**Lane closed.** The roadmap trio is updated (`EV-DWM` → `StatusDone`,
+`M5` → `StatusNext`); `ARCHITECTURE.md` §events-surface is extended with the
+`EV-DWM` views; the lane folder moved to `plans-milestones/done/ev-dwm/`.

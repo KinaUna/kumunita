@@ -380,6 +380,20 @@ shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md 
   // `AccessAudit` row mirroring `ListUpcomingAsync`). Display-only, zero
   // document changes — no new doc, schema, or seed; the M4 surface untouched.
 
+  // Events calendar views (EV-DWM ✓ — ADR 0064): the same `GET /events/calendar`
+  // surface turned into the three named views residents expect — Day,
+  // Week (Monday-start, time-ruler), and Month (true calendar month) — over the
+  // same already-authorized event set, the same `ListInRangeAsync` seam, the
+  // same `CanSeeAsync(Read)` gate, and the same chip + client-side-overlap
+  // model. One additive `?view=` selector (day|week|month) on the existing
+  // route + a view-appropriate anchor window computed in the controller
+  // (1 day / the anchor's Monday-start week / the anchor's calendar month);
+  // Day + Week are time-ruler grids (hour rows + time-positioned blocks via a
+  // new plain-TS module `client/lib/events-calendar-time.ts`, tsc-only, zero
+  // dependencies) and Month reuses the existing `events-calendar.ts` untouched.
+  // Zero Core change — the `ListInRangeAsync` seam is reused unchanged (it is
+  // already window-agnostic); no new doc, schema, seed, seam, or dependency.
+
 Projects
   Project          { id, title, description, componentId?, ownerId, status, audience, created }
   ProjectTask      { id, projectId, title, assigneeId?, done, order }
