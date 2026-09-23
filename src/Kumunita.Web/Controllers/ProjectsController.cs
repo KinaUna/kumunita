@@ -722,4 +722,568 @@ public sealed class ProjectsController : Controller
         TempData["info"] = "To-do deleted.";
         return Redirect("/projects/todos");
     }
+
+    // ── Board read lanes (U08) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Projects one <see cref="KanbanBoard"/> to a <see cref="BoardRow"/>
+    /// (the shared row shape — the board feed + the board's own row on the
+    /// detail page), using the caller-resolved name lookups.
+    /// </summary>
+    private static BoardRow ProjectBoardRow(
+        KanbanBoard board,
+        IReadOnlyDictionary<string, string> authorNames,
+        IReadOnlyDictionary<string, string> componentNames)
+    {
+        string AuthorName(string id) =>
+            string.IsNullOrEmpty(id) ? string.Empty
+                : (authorNames.TryGetValue(id, out var n) ? n : id);
+
+        return new BoardRow(
+            Id: board.Id,
+            Title: board.Title,
+            Description: board.Description,
+            AuthorId: board.AuthorId,
+            AuthorDisplayName: AuthorName(board.AuthorId),
+            ComponentId: board.ComponentId,
+            ComponentDisplayName: board.ComponentId is not null && componentNames.TryGetValue(board.ComponentId, out var cn) ? cn : null,
+            LanguageCode: board.LanguageCode,
+            Created: board.Created,
+            Modified: board.Modified);
+    }
+
+    /// <summary>
+    /// <c>GET /projects/boards</c> — the board feed (F2 — a to-do can be
+    /// placed on several boards / appears on each; the service's
+    /// <see cref="IProjectService.ListBoardsAsync"/>
+    /// <c>CanSeeAsync(Read)</c> gate is the sole reader — FACES are the
+    /// service's; the controller's <c>ForbidResult</c> / <c>NotFound</c>
+    /// split is the C3 pin only). The <paramref name="componentId"/> query
+    /// is a *filter, never a gate* (C-M3·2). Author + component display
+    /// names are *read* lookups (never access decisions).
+    /// </summary>
+    [HttpGet("/projects/boards")]
+    public async Task<IActionResult> BoardsIndex(string? componentId, int page = 1)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        IReadOnlyList<KanbanBoard> boards;
+        try
+        {
+            boards = await projects.ListBoardsAsync(componentId, actorId, page, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        var authorIds = boards
+            .Select(b => b.AuthorId)
+            .Where(a => a is not null && a.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var subjectId in authorIds)
+            names[subjectId] = await ResolveDisplayNameAsync(subjectId);
+
+        var componentNames = await ResolveComponentNamesAsync();
+        var rows = boards.Select(b => ProjectBoardRow(b, names, componentNames)).ToList();
+
+        var vm = new BoardIndexViewModel(
+            Boards: rows,
+            Components: await SeedComponentPickerAsync(),
+            CurrentComponentId: componentId,
+            CurrentPage: page);
+
+        return View("BoardIndex", vm);
+    }
+
+    /// <summary>
+    /// <c>GET /projects/boards/{id}</c> — the board detail (the **two-level
+    /// decision**, C-M5·3 — F3: a board is gated by its own <c>Audience</c>;
+    /// a to-do on the board is visible iff **both** are visible — the
+    /// service's <see cref="IProjectService.GetBoardAsync"/> already ran the
+    /// board's single <c>CanAsync(Read)</c> entry gate + each card's own
+    /// <c>CanAsync(Read)</c>; a denied card is **not returned**, not just
+    /// hidden). The card <see cref="BoardItemPlacement"/> rows are resolved
+    /// via a read-only <see cref="IDocumentStore"/> query (a display
+    /// convenience — the M4 <c>EventController</c> / U07
+    /// <c>TodoDetail</c> idiom; never a gate). A missing board is 404, a
+    /// denied actor 403 (the C3 split).
+    /// </summary>
+    [HttpGet("/projects/boards/{id}")]
+    public async Task<IActionResult> BoardDetail(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        BoardDetailResult result;
+        try
+        {
+            result = await projects.GetBoardAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // The card placements (BoardItemPlacement rows for this board) — a
+        // read convenience, never a gate (the audience decision already ran
+        // in GetBoardAsync's two-level decision, C-M5·3).
+        IReadOnlyList<BoardItemPlacement> placements = [];
+        await using (var session = store.QuerySession())
+        {
+            placements = await session.Query<BoardItemPlacement>()
+                .Where(p => p.BoardId == id)
+                .ToListAsync(HttpContext.RequestAborted);
+        }
+        var placementByKey = placements
+            .ToDictionary(p => (p.LaneId, p.TodoItemId));
+
+        // Collect all the subject ids (board author + all card assignees)
+        // for display-name resolution (a read, never a decision).
+        var allCards = result.Lanes.SelectMany(l => l.Cards).ToList();
+        var subjectIds = new[] { result.Board.AuthorId }
+            .Concat(allCards.Select(c => c.AssigneeId))
+            .Where(a => a is not null && a.Length > 0)
+            .Select(a => a!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var subjectId in subjectIds)
+            names[subjectId] = await ResolveDisplayNameAsync(subjectId);
+
+        var componentNames = await ResolveComponentNamesAsync();
+        var boardRow = ProjectBoardRow(result.Board, names, componentNames);
+
+        var laneRows = new List<LaneDetailRow>();
+        foreach (var laneDetail in result.Lanes)
+        {
+            var cards = laneDetail.Cards.Select(card =>
+            {
+                placementByKey.TryGetValue((laneDetail.Lane.Id, card.Id), out var p);
+                return new TodoCardRow(
+                    PlacementId: p?.Id ?? string.Empty,
+                    TodoId: card.Id,
+                    Title: card.Title,
+                    Status: card.Status,
+                    AssigneeId: card.AssigneeId,
+                    AssigneeDisplayName: string.IsNullOrEmpty(card.AssigneeId)
+                        ? null
+                        : (names.TryGetValue(card.AssigneeId, out var an) ? an : card.AssigneeId),
+                    Order: p?.Order ?? 0);
+            }).ToList();
+
+            laneRows.Add(new LaneDetailRow(
+                LaneId: laneDetail.Lane.Id,
+                Title: laneDetail.Lane.Title,
+                Status: laneDetail.Lane.Status,
+                MaxItems: laneDetail.Lane.MaxItems,
+                Order: laneDetail.Lane.Order,
+                Cards: cards));
+        }
+
+        var vm = new BoardDetailViewModel(Board: boardRow, Lanes: laneRows);
+        return View("BoardDetail", vm);
+    }
+
+    // ── Board write lanes (U08) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// <c>GET /projects/boards/new</c> — the board composer (any signed-in
+    /// resident becomes the author — §2.5 <c>Owner</c>). Seeds the audience
+    /// editor (the M2 single-source pin, ADR 0001-B — the sole access
+    /// boundary), the authored-in language picker (ADR 0018), the component
+    /// feed-organizer picker (C-M3·2), and the grant-picker option lists
+    /// (the M2/M3/M4 shared <c>_GrantPickers</c> partial).
+    /// </summary>
+    [HttpGet("/projects/boards/new")]
+    public async Task<IActionResult> BoardCreateGet()
+    {
+        var model = new BoardEditorModel
+        {
+            Audience = new AudienceEditorModel
+            {
+                Mode = "Any",
+                Grants = "[]",
+            },
+            Languages = await SeedLanguagePickerAsync(),
+            Components = await SeedComponentPickerAsync(),
+        };
+        await SeedGrantPickerOptionsAsync();
+        return View("BoardNew", model);
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards</c> — the board create write lane (any
+    /// signed-in resident becomes the author; F8 — a refused write is a
+    /// 403). Validates the shape (<see cref="BoardEditorModel.IsValid"/>),
+    /// writes through <see cref="IProjectService.CreateBoardAsync"/> (the
+    /// service opens its own write session + audit row, C3), redirects to
+    /// the new board's <c>/projects/boards/{id}</c> (the M4 redirect-after-
+    /// POST pattern). The audience's <see
+    /// cref="AudienceEditorModel.BuildAudience()"/> is the single
+    /// deserialization site (the M2 single-source pin, ADR 0001-B).
+    /// </summary>
+    [HttpPost("/projects/boards")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardCreatePost([FromForm] BoardEditorModel model)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to create a board.");
+            return View("BoardNew", model);
+        }
+
+        // Re-seed the pickers so a failed-shape re-render below still shows
+        // the language + component + grant options.
+        model.Languages = await SeedLanguagePickerAsync();
+        model.Components = await SeedComponentPickerAsync();
+        await SeedGrantPickerOptionsAsync();
+
+        if (!model.IsValid)
+        {
+            if (string.IsNullOrWhiteSpace(model.Title))
+                ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            if (model.Audience is null || !model.Audience.IsValid)
+                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            return View("BoardNew", model);
+        }
+
+        var request = new CreateBoardRequest
+        {
+            Title = model.Title!,
+            Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            ComponentId = string.IsNullOrWhiteSpace(model.ComponentId) ? null : model.ComponentId,
+            Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
+            LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+            Lanes = model.Lanes
+                .Where(l => !string.IsNullOrWhiteSpace(l.Title))
+                .Select((l, i) => new CreateLaneRequest
+                {
+                    Title = l.Title!,
+                    Status = string.IsNullOrWhiteSpace(l.Status) ? null : l.Status,
+                    MaxItems = l.MaxItems,
+                    Order = l.Order ?? i,
+                })
+                .ToList(),
+        };
+
+        KanbanBoard board;
+        try
+        {
+            board = await projects.CreateBoardAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ModelState.AddModelError(string.Empty, "You do not have permission to create a board.");
+            return View("BoardNew", model);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Board created.";
+        return Redirect($"/projects/boards/{board.Id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}</c> — the lane-update
+    /// write lane (sets the lane's <c>Title</c> / <c>Status</c> /
+    /// <c>MaxItems</c> / <c>Order</c> — the F4 / F5 / F6 FACES the lane's
+    /// <c>Status</c> / <c>MaxItems</c> fields are the input to — the
+    /// service's pins, the §2.3 pin). **Creator ∪ GlobalAdmin** over the
+    /// board (C-M5·6) — the service's server-side standing gate; a missing
+    /// id is 404, a denied actor 403 (the C3 split).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LaneUpdatePost(string id, string laneId, [FromForm] LaneEditorModel model)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(model.Title))
+        {
+            // The board Razor views land in U10 (no dedicated lane-edit view
+            // in U08) — a malformed shape redirects back to the board with a
+            // message (the M4 "a form is a shape" precedent).
+            TempData["error"] = "A lane title is required.";
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        var request = new UpdateLaneRequest
+        {
+            Title = string.IsNullOrWhiteSpace(model.Title) ? null : model.Title,
+            Status = model.Status,
+            MaxItems = model.MaxItems,
+            Order = model.Order,
+        };
+
+        try
+        {
+            await projects.UpdateLaneAsync(laneId, actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Lane updated.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/delete</c> — the board soft-delete
+    /// write lane (the cascade to the board's <see cref="KanbanLane"/> rows
+    /// + <see cref="BoardItemPlacement"/> rows is the service's — the §2.3
+    /// pin; F2: a to-do on a deleted board is still standalone — the
+    /// placement rows are deleted, the to-do is untouched). **Creator ∪
+    /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardDeletePost(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.DeleteBoardAsync(id, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Board deleted.";
+        return Redirect("/projects/boards");
+    }
+
+    // ── Board placement + reorder lanes (U08) ───────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/
+    /// move-up</c> — the within-lane reorder (F4 / F5 / F6 — the service's
+    /// <see cref="IProjectService.MoveTodoWithinLaneAsync"/>
+    /// <c>"up"</c> pin). **Creator ∪ assignee ∪ GlobalAdmin** over the
+    /// to-do (C-M5·6) — the service's server-side standing gate; a missing
+    /// placement is 404, a denied actor 403 (the C3 split); a lane-limit
+    /// refusal is a form error (the M4 "a form is a shape" precedent).
+    /// </summary>
+    [HttpPost("/projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/move-up")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveUpPost(string boardId, string laneId, string placementId)
+    {
+        return await ReorderCardAsync(boardId, placementId, "up");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/
+    /// move-down</c> — the within-lane reorder (F4 / F5 / F6 — the service's
+    /// <see cref="IProjectService.MoveTodoWithinLaneAsync"/>
+    /// <c>"down"</c> pin).
+    /// </summary>
+    [HttpPost("/projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/move-down")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveDownPost(string boardId, string laneId, string placementId)
+    {
+        return await ReorderCardAsync(boardId, placementId, "down");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/
+    /// move-left</c> — the adjacent-lane change (F4 / F5 / F6 — the service's
+    /// <see cref="IProjectService.MoveTodoToAdjacentLaneAsync"/>
+    /// <c>"left"</c> pin).
+    /// </summary>
+    [HttpPost("/projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/move-left")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveLeftPost(string boardId, string laneId, string placementId)
+    {
+        return await AdjacentLaneAsync(boardId, placementId, "left");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/
+    /// move-right</c> — the adjacent-lane change (F4 / F5 / F6 — the
+    /// service's <see cref="IProjectService.MoveTodoToAdjacentLaneAsync"/>
+    /// <c>"right"</c> pin).
+    /// </summary>
+    [HttpPost("/projects/boards/{boardId}/lanes/{laneId}/cards/{placementId}/move-right")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveRightPost(string boardId, string laneId, string placementId)
+    {
+        return await AdjacentLaneAsync(boardId, placementId, "right");
+    }
+
+    /// <summary>
+    /// Shared implementation for the within-lane reorder endpoints
+    /// (move-up / move-down) — calls
+    /// <see cref="IProjectService.MoveTodoWithinLaneAsync"/>; the C3 split
+    /// + the lane-limit refusal catch.
+    /// </summary>
+    private async Task<IActionResult> ReorderCardAsync(string boardId, string placementId, string direction)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.MoveTodoWithinLaneAsync(placementId, direction, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) or another shape refusal —
+            // a form error, not a 500 (the M4 "a form is a shape" precedent).
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{boardId}");
+        }
+
+        TempData["info"] = $"Card moved {direction}.";
+        return Redirect($"/projects/boards/{boardId}");
+    }
+
+    /// <summary>
+    /// Shared implementation for the adjacent-lane reorder endpoints
+    /// (move-left / move-right) — calls
+    /// <see cref="IProjectService.MoveTodoToAdjacentLaneAsync"/>; the C3
+    /// split + the lane-limit refusal catch.
+    /// </summary>
+    private async Task<IActionResult> AdjacentLaneAsync(string boardId, string placementId, string direction)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.MoveTodoToAdjacentLaneAsync(placementId, direction, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) or another shape refusal —
+            // a form error, not a 500 (the M4 "a form is a shape" precedent).
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{boardId}");
+        }
+
+        TempData["info"] = $"Card moved {direction}.";
+        return Redirect($"/projects/boards/{boardId}");
+    }
+
+    // ── Copy-to / move-to board lanes (U08) ─────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/copy-to</c> — the F10 copy-to-board
+    /// lane (the service's <see cref="IProjectService.CopyTodoToBoardAsync"/>
+    /// pin: **duplicates** the to-do, original untouched). **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the to-do (C-M5·6) — the service's
+    /// server-side standing gate; a missing id is 404, a denied actor 403
+    /// (the C3 split); a lane-limit refusal on the target's first lane is a
+    /// form error (the M4 "a form is a shape" precedent).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/copy-to")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CopyToBoardPost(string id, [FromForm] string? targetBoardId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(targetBoardId))
+        {
+            TempData["error"] = "Choose a target board.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.CopyTodoToBoardAsync(id, targetBoardId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) on the target's first
+            // lane — a form error, not a 500.
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{targetBoardId}");
+        }
+
+        TempData["info"] = "To-do copied to board.";
+        return Redirect($"/projects/boards/{targetBoardId}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/move-to</c> — the F10 move-to-board
+    /// lane (the service's <see cref="IProjectService.MoveTodoToBoardAsync"/>
+    /// pin: **relocates** the placement — the to-do is on the target board,
+    /// not both). **Creator ∪ assignee ∪ GlobalAdmin** over the to-do
+    /// (C-M5·6) — the service's server-side standing gate; a missing id is
+    /// 404, a denied actor 403 (the C3 split); a lane-limit refusal on the
+    /// target's first lane is a form error (the M4 "a form is a shape"
+    /// precedent).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/move-to")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveToBoardPost(string id, [FromForm] string? targetBoardId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(targetBoardId))
+        {
+            TempData["error"] = "Choose a target board.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.MoveTodoToBoardAsync(id, targetBoardId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) on the target's first
+            // lane — a form error, not a 500.
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{targetBoardId}");
+        }
+
+        TempData["info"] = "To-do moved to board.";
+        return Redirect($"/projects/boards/{targetBoardId}");
+    }
 }
