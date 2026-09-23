@@ -372,6 +372,14 @@ shipped `Kumunita.Core.Events.Event` doc carries — design/m4-events-design.md 
                      created, modified? }
   EventRsvp        { id, eventId, userId, status: Going|Maybe|No, at }   // (eventId, userId) unique — last-write-wins (ADR 0054 §3.2)
 
+  // Events calendar (EV-CAL ✓ — ADR 0063): a second, display-only view over the
+  // same data — `GET /events/calendar` renders a month-anchored, rolling 30-day
+  // window (overlap pairs highlighted client-side, prev/next/today navigation)
+  // served by the one additive read seam `IEventService.ListInRangeAsync`
+  // (the candidate filter + `CanSeeAsync(Read)` gate + one aggregate
+  // `AccessAudit` row mirroring `ListUpcomingAsync`). Display-only, zero
+  // document changes — no new doc, schema, or seed; the M4 surface untouched.
+
 Projects
   Project          { id, title, description, componentId?, ownerId, status, audience, created }
   ProjectTask      { id, projectId, title, assigneeId?, done, order }
