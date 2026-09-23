@@ -41,7 +41,8 @@ public static class Milestones
         new("UG", "User guides — resident-facing how-to guides in the `help/` subtree of the page tree (en-only floor; the three-layer consistency loop: where / when / how-often; the `UG` named lane; ADR 0057)", StatusDone),
         new("M4", "Events, RSVPs & reminders (a `Event` + `EventRsvp` doc in a new `Kumunita.Core.Events` context; RSVPs + a day-before reminder email (the `EventReminders` §6.4 job); reuses the `Audience` doc, the frozen `IAuthorizationService` via an `EventToAuditableResource` adapter, the ADR 0025/0031 WYSIWYG editor, the ADR 0019/0020 `kw-dt` timestamps, and the M1 durable-email trio; ADR 0054)", StatusDone),
         new("EV-CAL", "Events calendar — a month-anchored overview of the caller's visible events over a rolling 30-day window (overlap pairs highlighted; prev/next/today navigation to go back in time); one additive read seam on `IEventService` + one view; display-only, zero document changes (ADR 0063)", StatusDone),
-        new("M5", "Projects — goals, tasks, contributors", StatusNext),
+        new("EV-DWM", "Events calendar day/week/month views — Day, Week (Monday-start, time-ruler), and Month (true calendar month) views over the same authorized events; one additive `?view=` selector on the existing route + per-view window in the controller; zero Core change (ADR 0064)", StatusNext),
+        new("M5", "Projects — goals, tasks, contributors", StatusPlanned),
         new("M6", "Portability (export/import), iCal, notifications, search", StatusPlanned),
     };
 

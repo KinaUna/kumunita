@@ -1,15 +1,15 @@
 # Events calendar Day/Week/Month views (`EV-DWM`) — the three calendar views — design
 
 > **Two parts.** Part 1 (U00) is "What this lane is / the existing surface /
-> the design decisions / the invariants / the FACES"; Part 2 (U01, §5 below)
+> the design decisions / the invariants / the FACES"; Part 2 (U01, §6 below)
 > is "The exact shapes" — the exact view-model + controller + TS shapes every
 > unit codes against, the **9 pinned test names**, the **three-test
 > acceptance gate**, and the drift-guard — mirroring
 > `events-calendar-design.md`'s two-part shape.
 >
 > **Status.** **In progress** (lane opened by U01). Decisions **D1–D7** are
-> **[PROPOSED]** (U01 authors **ADR 0064**, Accepted, and flips every marker
-> to `locked — [DECIDED — ADR 0064]`). The ADR is the sign-off gate; this doc
+> **locked — [DECIDED — ADR 0064]** (U01 authored **ADR 0064**, Accepted, and
+> flipped every marker). The ADR is the sign-off gate; this doc
 > is the primary reference tier for implementation. The lane plan is
 > `plans-milestones/in-progress/ev-dwm/plan-ev-dwm.md` (the sealed-unit
 > register, U00–U07); the scratch log is `handoff-notes.md` alongside it.
@@ -143,11 +143,11 @@ Read directly, not assumed:
 
 ## 3. The design decisions
 
-Each decision below is **[PROPOSED]** until U01 authors **ADR 0064** and
-flips every marker to `locked — [DECIDED — ADR 0064]`. U02–U06 code against
-the *locked* text.
+Each decision below is **locked — [DECIDED — ADR 0064]** (U01 authored
+**ADR 0064**, Accepted, and flipped every marker). U02–U06 code against this
+locked text.
 
-### 3.1 Zero Core change (D1) **[PROPOSED]**
+### 3.1 Zero Core change (D1) **locked — [DECIDED — ADR 0064]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
 `M4DocTypes` is untouched; no `FeatureSchemaBase` migration; the boot paths
@@ -161,7 +161,7 @@ additive `EventCalendarViewModel` fields (`View`, `WindowDays`, and
 on the existing `Calendar` action, and the view / TS / CSS / key changes
 (the C-DWM·1 pin).
 
-### 3.2 The `?view=` selector + per-view window (D2) **[PROPOSED]**
+### 3.2 The `?view=` selector + per-view window (D2) **locked — [DECIDED — ADR 0064]**
 
 `?view=day|week|month` on the **existing** `GET /events/calendar` route
 (no new route — C-DWM·8). The window is computed **in the controller**, in
@@ -181,7 +181,7 @@ an error (C-DWM·3). The `?from=` anchor and `?componentId=` filter keep
 their EV-CAL semantics (`componentId` a filter, never a gate — C-M3·2 /
 C-EV·3).
 
-### 3.3 Day + Week as time-ruler grids (D3) **[PROPOSED]**
+### 3.3 Day + Week as time-ruler grids (D3) **locked — [DECIDED — ADR 0064]**
 
 Day and Week are **time-ruler grids**: a `00:00`–`24:00` hour-ruler column
 plus one day-column per shown day (Day = 1 column, Week = 7 columns,
@@ -197,7 +197,7 @@ interval touches, each clipped to its day's 24h range). All of it is a
 client-side display concern (C-DWM·4): it writes no row, calls no seam, is
 never persisted, and is never an access decision.
 
-### 3.4 Month reframed to a true calendar month (D4) **[PROPOSED]**
+### 3.4 Month reframed to a true calendar month (D4) **locked — [DECIDED — ADR 0064]**
 
 The anchor's **calendar month** as a **5–6 week × 7 day grid** (the month's
 days plus the leading/trailing days of the adjacent months, marked as
@@ -209,7 +209,7 @@ shipped 30-day flat run becomes the calendar month — the backward-
 compatible default view (C-DWM·8), with the *data window* changing from a
 flat 30 days to the calendar month's span (D2).
 
-### 3.5 The Day/Week/Month toggle + navigation (D5) **[PROPOSED]**
+### 3.5 The Day/Week/Month toggle + navigation (D5) **locked — [DECIDED — ADR 0064]**
 
 The header carries **three view buttons** (Day / Week / Month), each a
 **plain GET link** with `?view=` + the current `?from=` + `?componentId=`
@@ -224,7 +224,7 @@ and the authorization re-runs per request (C-EV·7 carried). The view-appropriat
 month) is a computed display string rendered through the existing `kw-dt`
 TagHelper / UI culture — **not** a registry key (D6).
 
-### 3.6 The `kw-l` keys (D6) **[PROPOSED]**
+### 3.6 The `kw-l` keys (D6) **locked — [DECIDED — ADR 0064]**
 
 Exactly **3 new keys** under `events.calendar.view.*` in **all four** seeded
 languages (en/de/fr/da) in `KnownTranslationKeys.cs`:
@@ -237,7 +237,7 @@ range / a month name) are **computed display strings** rendered through
 `kw-dt` / the UI culture — dates, not UI nouns, so they are **not** registry
 keys (C-DWM·9).
 
-### 3.7 Out of scope (future lanes) (D7) **[PROPOSED]**
+### 3.7 Out of scope (future lanes) (D7) **locked — [DECIDED — ADR 0064]**
 
 No event creation from the calendar; no RSVP from the calendar (the detail
 page owns RSVP — ADR 0063 D7 unchanged); no drag-to-reschedule; no iCal
@@ -332,5 +332,170 @@ carry them verbatim.
   `componentId` filter is still a filter, not a gate; the selector writes no
   row). *(C-DWM·2, C-DWM·3.)*
 
-<!-- Part 2 (U01): the exact view-model + controller + TS shapes, the 9 pinned
-     test names, the three-test acceptance gate, and the drift-guard. -->
+## 6. The exact shapes (Part 2)
+
+Part 1 (U00) pinned *what* the lane is and *why* (D1–D7, C-DWM·1…9, F1–F8).
+This part pins the *exact* shapes every implementation unit (U02–U06) codes
+against — the exact view-model, the `Calendar` action engine, the new TS
+module's contract, the **9 pinned test names**, the three-test acceptance
+gate, and the drift-guard. U02–U06 implement against this text; a mismatch is
+a `## U<m> — Drift pause` (§6.5). All decisions are **locked — [DECIDED —
+ADR 0064]**.
+
+### 6.1 The view-model (exact C#)
+
+`EventCalendarViewModel` (`Kumunita.Web/Models/EventEditorModel.cs`, ~L359)
+gains **exactly two additive fields** (defaulted, so no other call site
+breaks) + a **generalization**. The frozen shape is:
+
+```csharp
+public sealed record EventCalendarViewModel(
+    IReadOnlyList<EventRow> Events,
+    string FromAnchor,
+    string? PrevAnchor,
+    string? NextAnchor,
+    string Label,                          // was MonthLabel — now view-appropriate
+    string? CurrentComponentId,
+    IReadOnlyList<(string Id, string Name)> Components,
+    string TimeZoneId,
+    string View = "month",                 // additive — "day" | "week" | "month"
+    IReadOnlyList<DateTime> WindowDays = null!);  // additive — the grid's ordered day-columns
+```
+
+- **`Label`** (was `MonthLabel`) — the view-appropriate display string: a
+  full date for **Day**, a date range for **Week**, a month name + year for
+  **Month**. A computed display string in the UI culture — **not** a registry
+  key (D6 / C-DWM·9). The rename touches the one existing
+  `Calendar.cshtml` reference (`@Model.MonthLabel`, ~L57) — allowed; U03
+  owns that view.
+- **`View`** (additive, default `"month"`) — echoes the resolved
+  `?view=` back to the view so the toggle can render the active button
+  pressed. `"day"` / `"week"` / `"month"`.
+- **`WindowDays`** (additive, default `null!`) — the **ordered list of the
+  view's anchor days** — the grid's columns. For **Day**: 1 entry (the
+  anchor). For **Week**: 7 entries, Monday-first (C-DWM·5). For **Month**:
+  the 5–6 weeks covering the calendar month, starting on the Monday on or
+  before the 1st (the grid's full-week span, D4). `DateTime` (date-only, no
+  time) — the columns are day-granular; the per-chip instants remain
+  `EventRow.StartUtc` / `EndUtc` (ADR 0063, unchanged).
+
+Nothing else changes on the record: `Events`, `FromAnchor`, `PrevAnchor`,
+`NextAnchor`, `CurrentComponentId`, `Components`, `TimeZoneId` are
+unchanged; `EventRow`'s additive `StartUtc` / `EndUtc` fields (ADR 0063) are
+reused unchanged.
+
+### 6.2 The `Calendar` action engine (exact C#)
+
+`EventController.Calendar` (`Kumunita.Web/Controllers/EventController.cs`,
+~L317) gains **one** parameter and becomes view-appropriate:
+
+```csharp
+[HttpGet("/events/calendar")]
+public async Task<IActionResult> Calendar(string? from, string? componentId, string? view)
+```
+
+The engine, in order:
+
+1. **Parse `view`** (default + invalid/out-of-set fallback = `"month"`,
+   C-DWM·3 / F5): the accepted set is exactly `{"day","week","month"}`
+   (case-insensitive compare; an unparseable / missing / out-of-set value
+   resolves to `"month"` — a **display fallback, not an error**).
+2. **Parse `from`** (default: today in the effective zone) → the **anchor
+   date** — the existing `DateTime.TryParse(from, InvariantCulture,
+   DateTimeStyles.None)` → `.Date` shape, falling back to
+   `nowInZone.Date` (unchanged from the EV-CAL action).
+3. **Compute the window per view** in the effective zone (ADR 0019; each
+   bound = the anchor's local midnight at that date, converted to UTC via
+   `zone.GetUtcOffset` → the existing `new DateTime(y,m,d,0,0,0,
+   Unspecified)` → `GetUtcOffset` → `ToUniversalTime` shape):
+   - **`day`** — `[anchorLocalStartUtc, anchorLocalStartUtc + 1d)` (F1);
+   - **`week`** — `[weekStartLocalStartUtc, weekStartLocalStartUtc + 7d)`
+     where `weekStartLocalStartUtc` = the anchor's **Monday** (local) at
+     midnight → UTC (C-DWM·5; F2). `Monday` = `anchorDate` minus
+     `((int)anchorDate.DayOfWeek + 6) % 7` days (ISO Monday-start).
+   - **`month`** — `[monthStartLocalStartUtc, monthStartLocalStartUtc +
+     <days-in-month>)` (the anchor's **calendar month**; the span =
+     `DateTime.DaysInMonth(year, month)` — the controller's existing
+     `AddMonths(1)`-equivalent handles February's shorter span, D2; F3).
+   Call **`ListInRangeAsync(windowStartUtc, windowEndUtc, componentId,
+   actorId, ct)`** — the seam is **unchanged** (C-DWM·1 / D1). `Take(30)`
+   stays the service's backstop.
+4. **Build `WindowDays`** = the ordered local days of the grid (date-only
+   `DateTime`): **day** → `[anchorDate]`; **week** → the 7 days
+   `weekStart .. weekStart+6` (Monday-first); **month** → the Monday on or
+   before the 1st through the Sunday on or after the last day of the month
+   (the 5–6 full weeks, D4).
+5. **Nav by view's unit** (C-DWM·6 / F6): prev/next = the anchor shifted by
+   the **view's unit** — `day`: ±1 day; `week`: ±7 days (preserving the
+   Monday-start alignment); `month`: ±1 month — each pre-rendered as a plain
+   GET link `?from=<yyyy-MM-dd>&view=<view>&componentId=<id>` with `?view=`
+   + `?componentId=` riding along. **Today** resets the anchor to the zone's
+   today and preserves `?view=`. No POST, no client state, no round-trip JS.
+6. **`Label`** = the view-appropriate display string, in the UI culture
+   (rendered through the existing `kw-dt` / `CultureInfo.CurrentCulture`
+   path, D6): **Day** → a full date (e.g. `GetDayName` + day + month +
+   year); **Week** → a `Mon d – Mon d` range; **Month** → month name + year
+   (the existing `GetMonthName(m) + " " + y` shape). A computed display
+   string, **not** a registry key.
+7. **Map rows** (unchanged from the EV-CAL action): `authorId` /
+   `componentId` display-name read lookups (never a gate), `EventRow`
+   construction with `StartUtc` / `EndUtc` set explicitly. **Build the view
+   model** passing the new `View` / `WindowDays` / `Label` fields. **Return**
+   `View(vm)`.
+
+No other action changes; the controller stays thin (ADR 0006-D); no seam on
+`IEventService` / `IAuthorizationService` / `IUserInfoService` /
+`IIdentityService` is touched (C-DWM·1 / D1).
+
+### 6.3 The pinned tests (exact names, 9)
+
+**2 Core additive window pins** (`tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs`
+— the lane adds **no** seam; these re-exercise the *existing*
+`ListInRangeAsync` with narrower windows to prove C-DWM·1's window-agnostic
+claim):
+
+- `EV_Range_OneDayWindow_OnlyThatDay`
+- `EV_Range_SevenDayWindow_OnlyThoseDays`
+
+**7 Web pins** (appended to `tests/Kumunita.Web.Tests/EventControllerTests.cs`):
+
+- `Calendar_DefaultViewIsMonth_BackwardCompat`
+- `Calendar_ViewDay_WindowIsAnchorDayOnly`
+- `Calendar_ViewWeek_WindowIsAnchorWeek_MondayStart`
+- `Calendar_ViewMonth_WindowIsAnchorCalendarMonth`
+- `Calendar_InvalidViewFallsBackToMonth`
+- `Calendar_ViewRidesAlongInPrevNextNavLinks`
+- `Calendar_Label_IsViewAppropriate`
+
+### 6.4 The acceptance gate (U07 records)
+
+The **three-test acceptance gate** (the EV-CAL U09 precedent) — recorded by
+U07, run before the lane closes:
+
+- **closed loop** — an author's published event on the anchor day appears in
+  **Day** *and* **Week** *and* **Month**, each with the right chip/block +
+  one aggregate `AccessAudit` row (`TargetKind = "event"`).
+- **handoff** — a group member added to the audience sees the event in all
+  three views on the next render; the non-member's views still exclude it
+  (C-DWM·2 / F7).
+- **part-vs-whole** — the 9 pinned tests pass together with the full M4
+  `EventServiceTests` + the existing EV-CAL seam + Web pin suites still green
+  — the lane is additive, nothing regressed.
+
+### 6.5 The drift-guard (frozen once written)
+
+The following are **frozen pins**; a unit whose entry reads reveal the design
+doc is out of date relative to any of them records `## U<m> — Drift pause`
+in the handoff note instead of deviating:
+
+- The `EventCalendarViewModel` shape (+ the 2 additive fields `View` /
+  `WindowDays` + the `MonthLabel`→`Label` generalization) — §6.1.
+- The `Calendar(string? from, string? componentId, string? view)` signature
+  — §6.2.
+- The per-view window math (day / week Monday-start / month calendar-month)
+  — §6.2.
+- The 3 `kw-l` key names (`events.calendar.view.day` / `.week` / `.month`).
+- The 9 invariants (C-DWM·1…C-DWM·9) — §4.
+- The 8 FACES (F1…F8) — §5.
+- The D1–D7 decisions (locked — [DECIDED — ADR 0064]) — §3.
+- The 9 pinned test names — §6.3.
