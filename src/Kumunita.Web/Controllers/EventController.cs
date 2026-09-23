@@ -464,6 +464,24 @@ public sealed class EventController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0049 — the calendar is a list surface, so each row shows the
+        // event's title in the viewer's current language when a translation
+        // exists, else the authored-in title (the ADR 0022 floor) — exactly
+        // the feed's <see cref="ApplyEventTranslationAsync"/> idiom (ADR 0051).
+        // A read, not a decision: the <c>CanSeeAsync</c> gate already ran in
+        // ListInRangeAsync. The body is not on the chip, so only the title is
+        // surfaced here; one effective-language read per request, a null
+        // <c>translationProvider</c> (test construction) is a no-op (the
+        // authored-in title stays). The resolved code is also reused below to
+        // render the nav label (day/month names) in the same language.
+        string? effectiveLangCode = null;
+        if (translationProvider is not null)
+        {
+            effectiveLangCode = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var e in events)
+                await ApplyEventTranslationAsync(e, effectiveLangCode);
+        }
+
         // Author display names (a *read* lookup, never an access decision —
         // the audience gate already ran in ListInRangeAsync). Missing profile
         // → the raw subject id (the feed action's idiom).
@@ -526,11 +544,19 @@ public sealed class EventController : Controller
         var prevAnchor = prevDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         var nextAnchor = nextDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        // Label — the view-appropriate display string in the UI culture
-        // (ADR 0064 §6.2 step 6; a computed display string, **not** a
-        // registry key — C-DWM·9): Day → full date; Week → "Mon d – Mon d"
-        // range; Month → month name + year (the EV-CAL shape).
-        var fmt = CultureInfo.CurrentCulture.DateTimeFormat;
+        // Label — the view-appropriate display string in the viewer's language
+        // (ADR 0064 §6.2 step 6; a computed display string, **not** a registry
+        // key — C-DWM·9): Day → full date; Week → "Mon d – Mon d" range;
+        // Month → month name + year (the EV-CAL shape). Rendered in the
+        // request's effective language (ADR 0049) so day/month names match the
+        // language the resident is reading the platform in; a null
+        // <c>effectiveLangCode</c> (no translation provider — test
+        // construction) falls to the ambient current culture (the
+        // <c>Calendar_Label_IsViewAppropriate</c> pin, invariant/en-GB).
+        CultureInfo labelCulture = effectiveLangCode is not null
+            ? CultureInfo.GetCultureInfo(effectiveLangCode)
+            : CultureInfo.CurrentCulture;
+        var fmt = labelCulture.DateTimeFormat;
         string label;
         if (resolvedView == "day")
         {

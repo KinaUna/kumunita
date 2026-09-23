@@ -1170,15 +1170,26 @@ body.kmb-page-fullbleed .navbar {
   color: var(--bs-primary);
 }
 
+/* EV-DWM (ADR 0064) — the Month chip grid: a fixed 7-column CSS grid so
+   every day-cell is the same width (a true calendar lattice) regardless of
+   viewport. A `minmax(0, 1fr)` track keeps long chips from blowing a column
+   out; the shared gap is what used to come from the `.row g-2` gutters. */
+.events-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 /* EV-DWM (ADR 0064) — the Month chip grid's cells: a soft border on each
    day-cell so the 7-column × 5–6-week grid reads as a calendar (a visible
-   lattice) even when a cell is empty. The `.row g-2` gutters leave a hair's
-   gap between cells, so the borders tile into a clean grid without doubling
-   (each cell's own border + the gutter = one visible line between cells). */
+   lattice) even when a cell is empty, plus a shared min-height so empty and
+   chip-filled cells line up in equal rows (uniform cell sizing). */
 .events-calendar-day {
   border: 1px solid var(--kmb-border-soft);
   border-radius: var(--kmb-radius-chip);
   background: #fff;
+  min-height: 4.5rem;
+  min-width: 0;
 }
 
 /* EV-DWM (ADR 0064, U03) — Month as a true calendar month (D4): the

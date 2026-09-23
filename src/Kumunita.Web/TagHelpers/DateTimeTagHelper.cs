@@ -77,6 +77,22 @@ public sealed class DateTimeTagHelper : TagHelper
     [HtmlAttributeName]
     public string Format { get; set; } = "g";
 
+    /// <summary>
+    /// When <c>true</c>, render the converted instant as the **time only**
+    /// (<c>HH:mm</c>, 24-hour) instead of the effective <see cref="Format"/> —
+    /// for a list/calendar surface where a time-of-day is what the resident
+    /// needs and a date would be redundant (the calendar grid already supplies
+    /// the day). The effective time zone still applies (the same
+    /// <see cref="EffectiveTimezoneResolver"/> conversion as the full form),
+    /// and <c>HH:mm</c> matches the platform's 24-hour clock convention (ADR
+    /// 0020 — every preset is a 24-hour clock), so the time reads the same on
+    /// every resident's screen. <c>false</c> (the default) renders the
+    /// effective format, exactly as before — every existing <c>kw-dt</c> is
+    /// unchanged.
+    /// </summary>
+    [HtmlAttributeName]
+    public bool TimeOnly { get; set; }
+
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
         // A null/blank instant renders nothing (a Modified the author has not
@@ -96,17 +112,20 @@ public sealed class DateTimeTagHelper : TagHelper
         // always does in practice, so the attribute is superseded by the
         // setting). Resolved per request (cached by the resolver) so a page's
         // many timestamps are one profile read + one default read, not N of
-        // each — the same shape as the zone resolution above.
-        var fmt = await _formatResolver.GetAsync();
+        // each — the same shape as the zone resolution above. Time-only mode
+        // renders the 24-hour `HH:mm` (the platform convention, ADR 0020) and
+        // does not need the format string at all.
         // The conversion is applied **first** (UTC instant → the effective
-        // zone's wall-clock time), then the effective format is applied to the
-        // result. The zone and the format are independent choices (ADR 0019
-        // zone, ADR 0020 format) and both are resident-controlled — neither is
-        // the culture (render with the invariant culture, so the zone/format,
+        // zone's wall-clock time), then the format is applied to the result.
+        // The zone and the format are independent choices (ADR 0019 zone, ADR
+        // 0020 format) and both are resident-controlled — neither is the
+        // culture (render with the invariant culture, so the zone/format,
         // not the host's locale, are what the resident sees).
         var utc = Dt.Value.UtcDateTime;
         var wallTime = utc + tz.GetUtcOffset(utc);
-        var rendered = wallTime.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
+        var rendered = TimeOnly
+            ? wallTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+            : wallTime.ToString(await _formatResolver.GetAsync(), System.Globalization.CultureInfo.InvariantCulture);
 
         // SetContent auto-escapes (the safer choice — the kw-l TagHelper uses
         // the same idiom); the element's inner reference is the pre-conversion

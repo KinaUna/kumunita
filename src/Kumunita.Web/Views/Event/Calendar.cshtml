@@ -206,7 +206,7 @@
                              data-title="@row.Title"
                              data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="g"></kw-dt></span>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" TimeOnly></kw-dt></span>
                         </div>
                     }
                 </div>
@@ -227,13 +227,13 @@
                      into each day-column an event touches, using
                      Intl + data-time-zone (C-EV·5 display-only; the zone
                      id is never an authorization input). -->
-                <div class="row g-2 events-calendar-grid">
+                <div class="events-calendar-grid">
                     @foreach (var day in days)
                     {
-                        <div class="col-6 col-sm-4 col-md-3 col-lg events-calendar-day @(IsOutsideMonth(day) ? "events-calendar-day-outside" : null)"
+                        <div class="events-calendar-day @(IsOutsideMonth(day) ? "events-calendar-day-outside" : null)"
                              data-date="@day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)">
                             <div class="events-calendar-day-label text-muted small mb-1">
-                                <kw-dt dt="@day" format="ddd d"></kw-dt>
+                                @day.Day
                             </div>
                             <div class="event-chip-stack"></div>
                         </div>
@@ -255,7 +255,7 @@
                              data-title="@row.Title"
                              data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="g"></kw-dt></span>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" TimeOnly></kw-dt></span>
                         </div>
                     }
                 </div>
