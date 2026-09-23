@@ -36,6 +36,11 @@ public sealed class EventService : IEventService
 {
     private const int PageSize = 30;
 
+    // EV-CAL (ADR 0063 D2) — the calendar window's result-count backstop
+    // (re-purposing the PageSize = 30 precedent as a window bound; the 30-day
+    // *span* is the controller's policy, not the service's).
+    private const int WindowCap = 30;
+
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
@@ -80,6 +85,53 @@ public sealed class EventService : IEventService
         // Standalone form (no IDocumentSession overload): this is a plain read
         // with no in-flight caller transaction (the M2 ListAsync precedent), so
         // the standalone method's own commit is the correct C3 lane.
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(e => new EventToAuditableResource(e)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(e => visibleIds.Contains(e.Id)).ToList();
+    }
+
+    /// <summary>
+    /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — <see
+    /// cref="ListUpcomingAsync"/> restricted to the window predicate
+    /// <c>Start &gt;= windowStartUtc &amp;&amp; Start &lt; windowEndUtc</c>
+    /// (an event is in the window on the day it <b>starts</b>; the multi-day
+    /// chip repeat is a display concern, U06). Mirrors that method's body
+    /// verbatim: same candidate filter (<c>!IsDeleted &amp;&amp; !IsDraft</c>,
+    /// optional <c>ComponentId</c> filter — C-M3·2, a filter never a gate,
+    /// C-EV·3), the same single <see cref="IAuthorizationService.CanSeeAsync(string, AccessAction, System.Collections.Generic.IEnumerable{IAuditableResource})"/>
+    /// standalone gate (C6, one matching pass; C-EV·2, one aggregate
+    /// <see cref="AccessAudit"/> row <c>TargetKind = "event"</c> via the
+    /// <see cref="EventToAuditableResource"/>), then the <c>visibleIds</c>
+    /// filter. <b>C-EV·1</b>: shows exactly what <see
+    /// cref="ListUpcomingAsync"/> would for this window. The result is capped
+    /// at <see cref="WindowCap"/> (a backstop, not the 30-day policy — the span
+    /// lives in the controller, U04).
+    /// </summary>
+    public async Task<IReadOnlyList<Event>> ListInRangeAsync(
+        DateTimeOffset windowStartUtc,
+        DateTimeOffset windowEndUtc,
+        string? componentId,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        await using var session = _store.QuerySession();
+        IQueryable<Event> q = session.Query<Event>()
+            .Where(e => !e.IsDeleted && !e.IsDraft)
+            .Where(e => e.Start >= windowStartUtc && e.Start < windowEndUtc);
+        if (componentId is not null)
+            q = q.Where(e => e.ComponentId == componentId);
+        var candidates = await q.OrderBy(e => e.Start).Take(WindowCap).ToListAsync(ct).ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<Event>();
+
+        // C6 — one shared matching pass; C-EV·2 — one aggregate audit row
+        // (TargetKind "event"), from that single call (the ListUpcomingAsync shape).
+        // Standalone form (no IDocumentSession overload): this is a plain read
+        // with no in-flight caller transaction (the ListUpcomingAsync precedent).
         var visibleSet = await _authorization
             .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(e => new EventToAuditableResource(e)))
             .ConfigureAwait(false);

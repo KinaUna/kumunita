@@ -33,6 +33,26 @@ public interface IEventService
     Task<IReadOnlyList<Event>> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
 
     /// <summary>
+    /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set
+    /// restricted to <c>[windowStartUtc, windowEndUtc)</c>: an event is in the
+    /// window on the day it <b>starts</b> (<c>Start &gt;= windowStartUtc &amp;&amp;
+    /// Start &lt; windowEndUtc</c>, inclusive start / exclusive end). Same candidate
+    /// filter as <see cref="ListUpcomingAsync"/> (<c>!IsDeleted &amp;&amp; !IsDraft</c>,
+    /// optional <c>ComponentId</c> filter — C-M3·2, a filter never a gate), the
+    /// same single <c>CanSeeAsync(Read)</c> gate over
+    /// <see cref="EventToAuditableResource"/> (C-EV·2, one aggregate
+    /// <c>AccessAudit</c> row, <c>TargetKind = "event"</c>), the same standalone
+    /// form (no in-flight caller transaction). <b>C-EV·1</b>: shows exactly what
+    /// <see cref="ListUpcomingAsync"/> would for this window.
+    /// </summary>
+    Task<IReadOnlyList<Event>> ListInRangeAsync(
+        DateTimeOffset windowStartUtc,
+        DateTimeOffset windowEndUtc,
+        string? componentId,
+        string actorId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// One event (the detail view) — a single <c>CanAsync(actorId, Read, adapter)</c>
     /// decision (the <c>EventToAuditableResource</c>, U02). <c>KeyNotFoundException</c>
     /// (404) on absent, <c>UnauthorizedAccessException</c> (403) on denied — the
