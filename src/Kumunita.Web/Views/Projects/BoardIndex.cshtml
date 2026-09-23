@@ -18,6 +18,10 @@
             </div>
         </header>
 
+        @* The To-dos / Boards tab strip (the _AdminNav.cshtml idiom): start from
+           a to-do or from a board — both entry points are first-class. *@
+        <partial name="_ProjectsTabs" />
+
         @if (Model.Components.Count > 0)
         {
             <form method="get" action="/projects/boards" class="mb-4">

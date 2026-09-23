@@ -1,0 +1,29 @@
+@* The /projects section sub-nav (the _AdminNav.cshtml Bootstrap nav-tabs
+   idiom, ADR 0062). Two tabs — To-dos and Boards — so a resident can jump
+   between the to-do feed and the board feed without scrolling back to the
+   nav. The active tab is derived from the current action name (the
+   ProjectsController owns both GET actions: TodosIndex and BoardsIndex). *@
+@{
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "TodosIndex";
+    var tabs = new (string LabelKey, string Label, string Href)[]
+    {
+        ("projects.todo.title",  "To-dos", "/projects/todos"),
+        ("projects.board.title", "Boards", "/projects/boards"),
+    };
+    var activeLabel = action switch
+    {
+        "BoardsIndex" => "Boards",
+        _             => "To-dos",
+    };
+}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    @foreach (var tab in tabs)
+    {
+        var isActive = tab.Label == activeLabel;
+        <li class="nav-item" role="presentation">
+            <a class="nav-link @(isActive ? "active" : string.Empty)" href="@tab.Href">
+                <kw-l key="@tab.LabelKey">@tab.Label</kw-l>
+            </a>
+        </li>
+    }
+</ul>
