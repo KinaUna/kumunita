@@ -438,6 +438,127 @@ public class EventCalendarSeamTests(PostgresFixture fixture) : IClassFixture<Pos
             "ev-a", (await svc.ListInRangeAsync(WindowStart, WindowEnd, compA, nonMember)).Select(e => e.Id));
     }
 
+    // ── EV-DWM — additive window pins (C-DWM·1; design §6.3) ───────────────
+    //
+    // The EV-DWM lane adds **no** seam: <see cref="IEventService
+    // .ListInRangeAsync"/> is reused, unchanged. These two pins re-exercise
+    // the *existing* seam with narrower (1-day / 7-day) windows than the
+    // 31-day EV-CAL window above, proving C-DWM·1's "the seam is already
+    // window-agnostic" claim — day/week/month windows are *caller policy* in
+    // the controller, and the seam honors whatever span it is asked for.
+
+    // EV_Range_OneDayWindow_OnlyThatDay (design §6.3) — a 1-day window
+    // returns *only* the event that starts on that day; the day-before and
+    // day-after events are excluded by the <c>Start &gt;= windowStartUtc
+    // &amp;&amp; Start &lt; windowEndUtc</c> predicate. Proves the seam honors an
+    // arbitrary 1-day window (C-DWM·1).
+    [Fact]
+    public async Task EV_Range_OneDayWindow_OnlyThatDay()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-dwm-1-author";
+        const string resident = "u-dwm-1-resident";
+
+        // Anchor day = 2026-09-15 (UTC-midnight bounds — the zone is the
+        // controller's display concern, not the seam's; the seam is UTC).
+        var dayStartUtc = new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero);
+        var dayEndUtc = dayStartUtc.AddDays(1);
+
+        await Plant(store, new Event
+        {
+            Id = "on-anchor-day", AuthorId = author,
+            Title = "On anchor day", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 15, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null, // public
+        });
+        await Plant(store, new Event
+        {
+            Id = "day-before", AuthorId = author,
+            Title = "Day before", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 14, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "day-after", AuthorId = author,
+            Title = "Day after", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 16, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var result = await svc.ListInRangeAsync(dayStartUtc, dayEndUtc, null, resident);
+        var ids = result.Select(e => e.Id).ToList();
+        Assert.Contains("on-anchor-day", ids);
+        Assert.DoesNotContain("day-before", ids);
+        Assert.DoesNotContain("day-after", ids);
+        // Exactly the anchor-day event — the window is tight, not a superset.
+        Assert.Equal(1, ids.Count);
+    }
+
+    // EV_Range_SevenDayWindow_OnlyThoseDays (design §6.3) — a 7-day window
+    // returns *only* the events whose start falls inside it; events the day
+    // before the start bound and the day after the end bound are excluded.
+    // Proves the seam honors an arbitrary 7-day window (C-DWM·1) — the
+    // controller's week policy, not the seam's.
+    [Fact]
+    public async Task EV_Range_SevenDayWindow_OnlyThoseDays()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-dwm-2-author";
+        const string resident = "u-dwm-2-resident";
+
+        // A 7-day window anchored on 2026-09-14 (a Monday) through
+        // 2026-09-20 (inclusive), i.e. [2026-09-14T00:00Z, 2026-09-21T00:00Z).
+        var weekStartUtc = new DateTimeOffset(2026, 9, 14, 0, 0, 0, TimeSpan.Zero);
+        var weekEndUtc = weekStartUtc.AddDays(7);
+
+        await Plant(store, new Event
+        {
+            Id = "in-week-1", AuthorId = author,
+            Title = "In week (day 1)", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 14, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 14, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "in-week-2", AuthorId = author,
+            Title = "In week (last day)", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 20, 18, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 20, 20, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "day-before-week", AuthorId = author,
+            Title = "Day before week", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 13, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new Event
+        {
+            Id = "day-after-week", AuthorId = author,
+            Title = "Day after week", Body = "b",
+            Start = new DateTimeOffset(2026, 9, 21, 9, 0, 0, TimeSpan.Zero),
+            End = new DateTimeOffset(2026, 9, 21, 12, 0, 0, TimeSpan.Zero),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var result = await svc.ListInRangeAsync(weekStartUtc, weekEndUtc, null, resident);
+        var ids = result.Select(e => e.Id).ToList();
+        Assert.Contains("in-week-1", ids);
+        Assert.Contains("in-week-2", ids);
+        Assert.DoesNotContain("day-before-week", ids);
+        Assert.DoesNotContain("day-after-week", ids);
+        Assert.Equal(2, ids.Count);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // Test plumbing (mirrors EventServiceTests verbatim).
     // ════════════════════════════════════════════════════════════════════════

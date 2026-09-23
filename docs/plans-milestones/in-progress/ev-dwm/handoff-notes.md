@@ -175,3 +175,40 @@ section + its own entry-read list.
   labels en Day/Week/Month · de Tag/Woche/Monat · fr Jour/Semaine/Mois ·
   da Dag/Uge/Måned. No drift.
 - Next: **U06** — the 9 pinned tests (2 Core window pins + 7 Web pins).
+
+## U06 — 9 pinned tests
+
+- **2 files, both append-only (no new Core code — C-DWM·1):**
+  `tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs` (2 additive window
+  pins re-exercising the *existing* `ListInRangeAsync`) +
+  `tests/Kumunita.Web.Tests/EventControllerTests.cs` (7 NSubstitute `?view=`
+  engine pins). **No `IEventService` / `EventService` / Core document /
+  `M4DocTypes` / boot-path touched** (verified: the only C# diff is the two
+  test files; the design doc is untouched).
+- **9 names (verbatim, design §6.3):** `EV_Range_OneDayWindow_OnlyThatDay`,
+  `EV_Range_SevenDayWindow_OnlyThoseDays`; `Calendar_DefaultViewIsMonth_BackwardCompat`,
+  `Calendar_ViewDay_WindowIsAnchorDayOnly`, `Calendar_ViewWeek_WindowIsAnchorWeek_MondayStart`,
+  `Calendar_ViewMonth_WindowIsAnchorCalendarMonth`, `Calendar_InvalidViewFallsBackToMonth`,
+  `Calendar_ViewRidesAlongInPrevNextNavLinks`, `Calendar_Label_IsViewAppropriate`.
+- **Pass/red:** **9/9 pass, 0 red** — Web assembly 375/0 (the
+  `EventControllerTests` class is 42/0, incl. the 7 new + the 3 existing
+  EV-CAL calendar pins); Core assembly 716/0 (the `EventCalendarSeamTests`
+  class is 12/0, incl. the 2 new + the 10 existing EV-CAL seam pins). `dotnet
+  build Kumunita.slnx -c Debug` 0 errors (1 pre-existing CS8629 warning in
+  the adjacent EV-CAL test — not introduced here).
+- **Drift note (for U07's drift-guard):** design §6.1/§6.2 prose pins the
+  Month `WindowDays` grid as "the **5–6 full weeks** covering the calendar
+  month" (⇒ 35–42 columns), but the **implemented + U05-browser-verified**
+  grid is the month's own day count plus the Monday-first leading offset
+  (e.g. Sept 2026 = 30 + 4 = **34 columns**, 08-31 … 09-27). I anchored the
+  two Month pins (`Calendar_DefaultViewIsMonth_BackwardCompat`,
+  `Calendar_ViewMonth_WindowIsAnchorCalendarMonth`) to that **actual concrete
+  span** (grid Monday-first, contains the 1st + last day, count ≥ the month's
+  day count) rather than the 35–42 prose range, since U05 already verified
+  the 34-column shape in the browser and it is the shipped behavior. U07
+  should reconcile the design-doc prose with the implemented span (one or the
+  other is the doc-§6.1 `WindowDays` pin; recommend aligning the prose to the
+  "month's day count + leading Monday offset" implementation).
+- Next: **U07** — acceptance gate (run + record the three-test gate) + close
+  (roadmap trio, ARCHITECTURE.md sync, README, handoff summary, move the
+  lane folder `in-progress/ev-dwm/` → `done/ev-dwm/`).
