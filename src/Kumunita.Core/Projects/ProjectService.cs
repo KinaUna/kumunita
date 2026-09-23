@@ -1027,21 +1027,503 @@ public sealed class ProjectService : IProjectService
     private static bool ListsEqual(IReadOnlyList<string> a, IReadOnlyList<string> b)
         => new HashSet<string>(a, StringComparer.Ordinal).SetEquals(b);
 
-    // --- Placement + reorder lanes (U06) — stubs: the logic lands in U06 ------
+    // --- Placement + reorder lanes (U06) — standing re-checked server-side ----
+    //
+    // **Seam shape (design doc §2.3, the U05 write-lane shape mirrored):** each
+    // lane carries <c>actorId</c> + the principal's real role set
+    // (<c>actorRoles</c>, the Web layer's <c>RoleSet(User)</c>) and opens its
+    // **own** write session (no caller <c>IDocumentSession</c> — the
+    // EventService standalone shape), storing the domain write + the
+    // <see cref="AccessAudit"/> row in that one session, committing atomically
+    // (C3 — the write and the audit row commit or roll back together, never
+    // un-audited). Standing is enforced server-side via the **same** pure
+    // helper the write lanes use (<see cref="CheckTodoStanding"/>) — C-M5·6:
+    // **creator ∪ assignee ∪ GlobalAdmin over the *to-do*** (the placement's
+    // board is **not** the standing surface — the to-do is). A
+    // <c>direction</c> that is not one of the lane's two valid values is an
+    // <see cref="ArgumentException"/> (the Web layer's 400).
+    //
+    // **The new M5 pins (design doc §2.3):** the **lane-status auto-update**
+    // (C-M5·4) — a move into a lane whose <see cref="KanbanLane.Status"/> is
+    // non-null sets the to-do's <see cref="TodoItem.Status"/> to that lane's
+    // status **in the same transaction** (C3); a null lane <c>Status</c>
+    // leaves the to-do's status unchanged (the <c>F4</c> / <c>F5</c> FACES).
+    // The **lane-limit refusal** (C-M5·5) — a move / copy into a lane at its
+    // <see cref="KanbanLane.MaxItems"/> limit is **refused** (<see
+    /// cref="InvalidOperationException"/> with the lane's <c>Title</c> in the
+    // message; **nothing is written** — the <c>F6</c> FACES); a reorder within
+    // a lane and a move *out* of a lane never trip the source's limit. The
+    // **move-to / copy-to split** (C-M5·8) — <c>MoveTodoToBoardAsync</c>
+    // **relocates** the placement (the source board's placement rows vanish,
+    // the to-do is untouched), <c>CopyTodoToBoardAsync</c> **duplicates** the
+    // to-do (the actor is the new <c>AuthorId</c>, **no** <c>ParentId</c>, the
+    // original is untouched) — the <c>F10</c> FACES.
 
-    /// <inheritdoc cref="IProjectService.MoveTodoWithinLaneAsync"/>
-    Task<BoardItemPlacement> IProjectService.MoveTodoWithinLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct) =>
-        throw new NotImplementedException("MoveTodoWithinLaneAsync lands in U06 (the M5 placement lane).");
+    /// <summary>
+    /// **Reorder within the lane** (design doc §2.3, <c>F4</c>/<c>F5</c>
+    /// adjacent; the <c>direction</c> string pin): <paramref
+    /// name="direction"/> is <c>"up"</c> or <c>"down"</c> (a string, not an
+    /// enum — the ADR 0031 plain-GET/POST posture). The placement's
+    /// <see cref="BoardItemPlacement.Order"/> is **swapped** with the adjacent
+    /// card — the <see cref="BoardItemPlacement"/> row with the nearest lower
+    /// (<c>"up"</c>) / higher (<c>"down"</c>) <c>Order</c> in the same lane;
+    /// a card at the lane's edge (no adjacent card in that direction) is a
+    /// **no-op** (nothing is written, no audit row). The **lane-limit
+    /// refusal** (C-M5·5) does **not** apply to a reorder within a lane (the
+    /// lane's placement count is unchanged). Standing (server-side, C3
+    /// single-source): **creator ∪ assignee ∪ GlobalAdmin over the
+    /// to-do** (the <see cref="CheckTodoStanding"/> helper — C-M5·6; the
+    /// placement's board is not the standing surface). A missing /
+    /// soft-deleted placement or to-do is <see cref="KeyNotFoundException"/>
+    /// (404); a denied actor is <see cref="UnauthorizedAccessException"/> (403);
+    /// an invalid <paramref name="direction"/> is <see
+    /// cref="ArgumentException"/> (400). One <see cref="AccessAudit"/> row
+    /// (<c>todo.move_within_lane</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    public async Task<BoardItemPlacement> MoveTodoWithinLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(placementId)) throw new KeyNotFoundException("A placement id is required.");
+        if (string.IsNullOrEmpty(direction) || (direction != "up" && direction != "down"))
+            throw new ArgumentException("A direction of \"up\" or \"down\" is required.", nameof(direction));
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to move a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
 
-    /// <inheritdoc cref="IProjectService.MoveTodoToAdjacentLaneAsync"/>
-    Task<BoardItemPlacement> IProjectService.MoveTodoToAdjacentLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct) =>
-        throw new NotImplementedException("MoveTodoToAdjacentLaneAsync lands in U06 (the M5 placement lane).");
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var placement = await session.LoadAsync<BoardItemPlacement>(placementId, ct).ConfigureAwait(false);
+        if (placement is null)
+            throw new KeyNotFoundException($"Placement '{placementId}' was not found in the session; nothing to move.");
 
-    /// <inheritdoc cref="IProjectService.MoveTodoToBoardAsync"/>
-    Task<BoardItemPlacement> IProjectService.MoveTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct) =>
-        throw new NotImplementedException("MoveTodoToBoardAsync lands in U06 (the M5 placement lane).");
+        var todo = await session.LoadAsync<TodoItem>(placement.TodoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{placement.TodoItemId}' was not found in the session; nothing to move.");
 
-    /// <inheritdoc cref="IProjectService.CopyTodoToBoardAsync"/>
-    Task<TodoItem> IProjectService.CopyTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct) =>
-        throw new NotImplementedException("CopyTodoToBoardAsync lands in U06 (the M5 placement lane).");
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{placement.TodoItemId}' was not found in the session; nothing to move.");
+
+        // Standing re-check (server-side, C3 single-source) over the **to-do**
+        // (C-M5·6 — the placement's board is not the standing surface):
+        // creator ∪ assignee ∪ GlobalAdmin.
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // Find the adjacent card: the placement with the nearest lower
+        // (direction "up") / higher (direction "down") Order in the same lane
+        // (BoardId + LaneId). A card at the edge has no adjacent card in that
+        // direction → no-op (the design doc §2.3 pin).
+        IQueryable<BoardItemPlacement> lanePlacements = session.Query<BoardItemPlacement>()
+            .Where(p => p.BoardId == placement.BoardId && p.LaneId == placement.LaneId);
+        var adjacent = direction == "up"
+            ? await lanePlacements.Where(p => p.Order < placement.Order)
+                .OrderByDescending(p => p.Order).Take(1).ToListAsync(ct).ConfigureAwait(false)
+            : await lanePlacements.Where(p => p.Order > placement.Order)
+                .OrderBy(p => p.Order).Take(1).ToListAsync(ct).ConfigureAwait(false);
+
+        if (adjacent.Count == 0)
+            return placement;                               // edge — no-op (nothing written).
+
+        // Swap the two Order values (the C-M5·5 limit is untouched — the
+        // lane's placement count is unchanged).
+        (placement.Order, adjacent[0].Order) = (adjacent[0].Order, placement.Order);
+        placement.Modified = DateTimeOffset.UtcNow;
+        adjacent[0].Modified = DateTimeOffset.UtcNow;
+
+        session.Store(placement);
+        session.Store(adjacent[0]);
+        StoreAuditRow(session, actorId, "todo.move_within_lane", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return placement;
+    }
+
+    /// <summary>
+    /// **Change lane (same board)** (design doc §2.3, the <c>F4</c> / <c>F5</c>
+    /// / <c>F6</c> FACES): <paramref name="direction"/> is <c>"left"</c> or
+    /// <c>"right"</c> (a string, not an enum). The placement's <see
+    /// cref="BoardItemPlacement.LaneId"/> is set to the adjacent lane's id
+    /// (the <see cref="KanbanLane"/> row with the nearest lower
+    /// (<c>"left"</c>) / higher (<c>"right"</c>) <c>Order</c> in the same
+    /// board; a lane at the board's edge is a **no-op** — nothing written);
+    /// <see cref="BoardItemPlacement.Order"/> is reset to the **end** of the
+    /// target lane (the max <c>Order</c> + 1). **The lane-status auto-update
+    /// (C-M5·4):** if the target lane's <see cref="KanbanLane.Status"/> is
+    /// non-null, the to-do's <see cref="TodoItem.Status"/> is set to that
+    /// lane's status **in the same transaction** (C3); a null lane
+    /// <c>Status</c> leaves the to-do's status unchanged. **The lane-limit
+    /// refusal (C-M5·5):** if the target lane's <see
+    /// cref="KanbanLane.MaxItems"/> is non-null and the target lane already
+    /// has that many placements, the move is **refused** (<see
+    /// cref="InvalidOperationException"/> with the lane's <c>Title</c> in the
+    /// message; **nothing is written**). Standing (server-side, C3
+    /// single-source): **creator ∪ assignee ∪ GlobalAdmin over the
+    /// to-do** (the <see cref="CheckTodoStanding"/> helper — C-M5·6). A
+    /// missing / soft-deleted placement / lane / board / to-do is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403); an invalid <paramref
+    /// name="direction"/> is <see cref="ArgumentException"/> (400). One
+    /// <see cref="AccessAudit"/> row (<c>todo.move_to_lane</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task<BoardItemPlacement> MoveTodoToAdjacentLaneAsync(string placementId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(placementId)) throw new KeyNotFoundException("A placement id is required.");
+        if (string.IsNullOrEmpty(direction) || (direction != "left" && direction != "right"))
+            throw new ArgumentException("A direction of \"left\" or \"right\" is required.", nameof(direction));
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to move a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var placement = await session.LoadAsync<BoardItemPlacement>(placementId, ct).ConfigureAwait(false);
+        if (placement is null)
+            throw new KeyNotFoundException($"Placement '{placementId}' was not found in the session; nothing to move.");
+
+        var board = await session.LoadAsync<KanbanBoard>(placement.BoardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{placement.BoardId}' was not found in the session; nothing to move.");
+
+        var todo = await session.LoadAsync<TodoItem>(placement.TodoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{placement.TodoItemId}' was not found in the session; nothing to move.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{placement.TodoItemId}' was not found in the session; nothing to move.");
+
+        // Standing re-check (server-side, C3 single-source) over the **to-do**
+        // (C-M5·6 — the placement's board is not the standing surface):
+        // creator ∪ assignee ∪ GlobalAdmin.
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // The board's lanes (the (BoardId, Order) business key, Order
+        // ascending) + the adjacent lane: the lane with the nearest lower
+        // (direction "left") / higher (direction "right") Order. A lane at the
+        // board's edge has no adjacent lane in that direction → no-op (the
+        // design doc §2.3 pin).
+        var lanes = await session.Query<KanbanLane>()
+            .Where(l => l.BoardId == placement.BoardId)
+            .OrderBy(l => l.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var currentLane = lanes.FirstOrDefault(l => l.Id == placement.LaneId);
+        if (currentLane is null)
+            throw new KeyNotFoundException($"Lane '{placement.LaneId}' was not found in the session; nothing to move.");
+
+        // The adjacent lane: the nearest lower (direction "left") / higher
+        // (direction "right") Order in the same board. A lane at the board's
+        // edge has no adjacent lane in that direction → no-op (the design
+        // doc §2.3 pin).
+        KanbanLane? targetLane = direction == "left"
+            ? lanes.Where(l => l.Order < currentLane.Order).OrderByDescending(l => l.Order).FirstOrDefault()
+            : lanes.Where(l => l.Order > currentLane.Order).OrderBy(l => l.Order).FirstOrDefault();
+        if (targetLane is null)
+            return placement;                               // edge — no-op (nothing written).
+
+        // **The lane-limit refusal (C-M5·5):** the target lane at its MaxItems
+        // limit refuses the move-in — the lane's Title in the message; nothing
+        // is written (the F6 FACES).
+        if (targetLane.MaxItems is not null)
+        {
+            var targetCount = await session.Query<BoardItemPlacement>()
+                .Where(p => p.BoardId == placement.BoardId && p.LaneId == targetLane.Id)
+                .CountAsync(ct)
+                .ConfigureAwait(false);
+            if (targetCount >= targetLane.MaxItems.Value)
+                throw new InvalidOperationException(
+                    $"Lane '{targetLane.Title}' is at its limit of {targetLane.MaxItems} items; the move is refused.");
+        }
+
+        // **The lane-status auto-update (C-M5·4):** the target lane's
+        // non-null Status imparts on the to-do in the same transaction (C3);
+        // a null lane Status leaves the to-do's status unchanged (F4 / F5).
+        if (targetLane.Status is not null)
+            todo.Status = targetLane.Status;
+
+        // Order = the end of the target lane (the max Order + 1 there).
+        var maxTargetOrder = (await session.Query<BoardItemPlacement>()
+            .Where(p => p.BoardId == placement.BoardId && p.LaneId == targetLane.Id)
+            .Select(p => p.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false))
+            .DefaultIfEmpty(-1)
+            .Max();
+
+        placement.LaneId = targetLane.Id;
+        placement.Order = maxTargetOrder + 1;
+        placement.Modified = DateTimeOffset.UtcNow;
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        session.Store(placement);
+        StoreAuditRow(session, actorId, "todo.move_to_lane", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return placement;
+    }
+
+    /// <summary>
+    /// **Relocate the placement** (design doc §2.3, <c>F10_MoveToBoard_RelocatesPlacement</c>
+    /// — C-M5·8): the to-do's <see cref="BoardItemPlacement"/> rows on **other**
+    /// boards (all rows with <c>TodoItemId == todoItemId</c> and
+    /// <c>BoardId != targetBoardId</c>) are **deleted**; a new
+    /// <see cref="BoardItemPlacement"/> row is created on the target board's
+    /// **first lane** (the <see cref="KanbanLane"/> row with the lowest
+    /// <c>Order</c> in the target board), <c>Order</c> = the end of that lane
+    /// (max <c>Order</c> + 1). **The lane-limit refusal (C-M5·5)** and
+    /// **the lane-status auto-update (C-M5·4)** apply to the target's first
+    /// lane (the same rules as <see cref="MoveTodoToAdjacentLaneAsync"/>).
+    /// The to-do itself is untouched except its <see cref="TodoItem.Status"/>
+    /// (the C-M5·4 auto-update). Standing (server-side, C3 single-source):
+    /// **creator ∪ assignee ∪ GlobalAdmin over the to-do** (the <see
+    /// cref="CheckTodoStanding"/> helper — C-M5·6). A missing / soft-deleted
+    /// to-do / board / lane is <see cref="KeyNotFoundException"/> (404); a
+    /// denied actor is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <see cref="AccessAudit"/> row (<c>todo.move_to_board</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the writes (C3).
+    /// </summary>
+    public async Task<BoardItemPlacement> MoveTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(targetBoardId)) throw new KeyNotFoundException("A target board id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to move a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to move.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to move.");
+
+        var board = await session.LoadAsync<KanbanBoard>(targetBoardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' was not found in the session; nothing to move onto.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' was not found in the session; nothing to move onto.");
+
+        // Standing re-check (server-side, C3 single-source) over the **to-do**
+        // (C-M5·6 — the target board is not the standing surface): creator ∪
+        // assignee ∪ GlobalAdmin.
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // The target board's **first lane** (the lowest Order in the board).
+        // A board with no lanes cannot host a card — 404 (the design doc's
+        // "absent lane" pin).
+        var firstLane = await session.Query<KanbanLane>()
+            .Where(l => l.BoardId == targetBoardId)
+            .OrderBy(l => l.Order)
+            .Take(1)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (firstLane is null)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' has no lanes; nothing to move onto.");
+
+        // **The lane-limit refusal (C-M5·5)** on the target's first lane —
+        // refused, the lane's Title in the message, nothing written (F6).
+        await RefuseIfLaneAtLimitAsync(session, firstLane, targetBoardId, ct).ConfigureAwait(false);
+
+        // **The lane-status auto-update (C-M5·4)** on the target's first lane
+        // (F4 / F5 — a null lane Status leaves the to-do's status unchanged).
+        if (firstLane.Status is not null)
+            todo.Status = firstLane.Status;
+
+        // **The relocation (C-M5·8):** delete the to-do's placement rows on
+        // every other board (the to-do's placements on other boards vanish);
+        // keep any placement it already has on the target board, but move it
+        // to the first lane at the end (a to-do appears on a board at most
+        // once — the (TodoItemId, BoardId) business key).
+        var otherPlacements = await session.Query<BoardItemPlacement>()
+            .Where(p => p.TodoItemId == todoItemId && p.BoardId != targetBoardId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        foreach (var p in otherPlacements)
+            session.Delete(p);
+
+        var existingTarget = await session.Query<BoardItemPlacement>()
+            .Where(p => p.TodoItemId == todoItemId && p.BoardId == targetBoardId)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+
+        var maxOrder = (await session.Query<BoardItemPlacement>()
+            .Where(p => p.BoardId == targetBoardId && p.LaneId == firstLane.Id)
+            .Select(p => p.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false))
+            .DefaultIfEmpty(-1)
+            .Max();
+
+        BoardItemPlacement placement;
+        if (existingTarget is not null)
+        {
+            existingTarget.LaneId = firstLane.Id;
+            existingTarget.Order = maxOrder + 1;
+            existingTarget.Modified = DateTimeOffset.UtcNow;
+            session.Store(existingTarget);
+            placement = existingTarget;
+        }
+        else
+        {
+            placement = new BoardItemPlacement
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                TodoItemId = todoItemId,
+                BoardId = targetBoardId,
+                LaneId = firstLane.Id,
+                Order = maxOrder + 1,
+                Created = DateTimeOffset.UtcNow
+            };
+            session.Store(placement);
+        }
+
+        todo.Modified = DateTimeOffset.UtcNow;
+        session.Store(todo);
+        StoreAuditRow(session, actorId, "todo.move_to_board", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return placement;
+    }
+
+    /// <summary>
+    /// **Duplicate the to-do** (design doc §2.3, <c>F10_CopyToBoard_Duplicates_OriginalUntouched</c>
+    /// — C-M5·8): a new <see cref="TodoItem"/> row with the same <c>Title</c> /
+    /// <c>Body</c> / <c>Status</c> / <c>AssigneeId</c> / <c>Audience</c> /
+    /// <c>ComponentId</c> / <c>LanguageCode</c> / <c>TagIds</c> / <c>ImageIds</c>
+    /// / <c>AttachmentIds</c> — the <see cref="TodoItem.AuthorId"/> is the
+    /// **actor** (the copy is a new to-do, not a clone), **no** <see
+    /// cref="TodoItem.ParentId"/> (a copy is always top-level — a subtask is
+    /// not copied as a subtask — C-M5·7); a new
+    /// <see cref="BoardItemPlacement"/> row on the target board's **first
+    /// lane** (the same shape as <see cref="MoveTodoToBoardAsync"/>). **The
+    /// lane-limit refusal (C-M5·5)** and **the lane-status auto-update
+    /// (C-M5·4)** apply to the target's first lane (the copy's status is set
+    /// to the first lane's status, if non-null). The **original to-do is
+    /// untouched** (C-M5·8). Standing (server-side, C3 single-source):
+    /// **creator ∪ assignee ∪ GlobalAdmin over the to-do** (the <see
+    /// cref="CheckTodoStanding"/> helper — C-M5·6, evaluated over the
+    /// **original**). A missing / soft-deleted original to-do / target board
+    /// / lane is <see cref="KeyNotFoundException"/> (404); a denied actor is
+    /// <see cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>todo.copy_to_board</c>,
+    /// <c>TargetKind = "todo"</c>, the **copy's** id as the target — the
+    /// AddSubtaskAsync precedent) commits atomically with the writes (C3).
+    /// </summary>
+    public async Task<TodoItem> CopyTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(targetBoardId)) throw new KeyNotFoundException("A target board id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to copy a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var original = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (original is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to copy.");
+
+        if (original.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to copy.");
+
+        var board = await session.LoadAsync<KanbanBoard>(targetBoardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' was not found in the session; nothing to copy onto.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' was not found in the session; nothing to copy onto.");
+
+        // Standing re-check (server-side, C3 single-source) over the
+        // **original** to-do (C-M5·6): creator ∪ assignee ∪ GlobalAdmin.
+        CheckTodoStanding(actorId, actorRoles, original);
+
+        // The target board's **first lane** (the lowest Order in the board) —
+        // a board with no lanes cannot host a card (404, the same pin).
+        var firstLane = await session.Query<KanbanLane>()
+            .Where(l => l.BoardId == targetBoardId)
+            .OrderBy(l => l.Order)
+            .Take(1)
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+        if (firstLane is null)
+            throw new KeyNotFoundException($"Board '{targetBoardId}' has no lanes; nothing to copy onto.");
+
+        // **The lane-limit refusal (C-M5·5)** on the target's first lane —
+        // refused, the lane's Title in the message, nothing written (F6).
+        await RefuseIfLaneAtLimitAsync(session, firstLane, targetBoardId, ct).ConfigureAwait(false);
+
+        // **The copy (C-M5·8):** a new to-do — same content fields as the
+        // original; the actor is the new standing owner; no ParentId (a copy
+        // is always top-level, C-M5·7); the original is untouched.
+        var now = DateTimeOffset.UtcNow;
+        var copy = new TodoItem
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = original.Title,
+            Body = original.Body,
+            ComponentId = original.ComponentId,
+            AuthorId = actorId,                             // C-M5·8 — the actor is the copy's standing owner.
+            AssigneeId = original.AssigneeId,
+            Status = original.Status,                       // the C-M5·4 auto-update may overwrite below.
+            ParentId = null,                                // C-M5·7 — a copy is always top-level.
+            Audience = original.Audience,                   // ADR 0001-B — copied verbatim; never re-derived.
+            IsDeleted = false,
+            LanguageCode = original.LanguageCode,           // ADR 0018 — already materialized on the original.
+            TagIds = original.TagIds,
+            ImageIds = original.ImageIds,
+            AttachmentIds = original.AttachmentIds,
+            Created = now
+        };
+
+        // **The lane-status auto-update (C-M5·4):** the first lane's
+        // non-null Status imparts on the **copy** in the same transaction
+        // (C3); a null lane Status leaves the copy's status as copied.
+        if (firstLane.Status is not null)
+            copy.Status = firstLane.Status;
+
+        // Order = the end of the first lane (the max Order + 1 there).
+        var maxOrder = (await session.Query<BoardItemPlacement>()
+            .Where(p => p.BoardId == targetBoardId && p.LaneId == firstLane.Id)
+            .Select(p => p.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false))
+            .DefaultIfEmpty(-1)
+            .Max();
+
+        var placement = new BoardItemPlacement
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            TodoItemId = copy.Id,
+            BoardId = targetBoardId,
+            LaneId = firstLane.Id,
+            Order = maxOrder + 1,
+            Created = now
+        };
+
+        session.Store(copy);
+        session.Store(placement);
+        // Design doc §2.3 — the audit row targets the **copy** (the AddSubtaskAsync
+        // precedent: the new to-do's id is the target); the branch the actor
+        // qualified under (creator / assignee / GlobalAdmin over the original).
+        StoreAuditRow(session, actorId, "todo.copy_to_board", copy.Id, TargetKindTodo, TodoAuditViaFor(actorId, original));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return copy;
+    }
+
+    /// <summary>
+    /// **The lane-limit refusal (C-M5·5)** as a shared gate for the move-to
+    /// board / copy-to board lanes: if <paramref name="lane"/>'s
+    /// <see cref="KanbanLane.MaxItems"/> is non-null and the lane already
+    /// has that many <see cref="BoardItemPlacement"/> rows on
+    /// <paramref name="boardId"/>, the move / copy is **refused** (<see
+    /// cref="InvalidOperationException"/> with the lane's <c>Title</c> in the
+    /// message; **nothing is written** — the F6 FACES). A null
+    /// <c>MaxItems</c> (no limit) or a lane below its limit passes.
+    /// </summary>
+    private static async Task RefuseIfLaneAtLimitAsync(IDocumentSession session, KanbanLane lane, string boardId, CancellationToken ct)
+    {
+        if (lane.MaxItems is null)
+            return;
+
+        var count = await session.Query<BoardItemPlacement>()
+            .Where(p => p.BoardId == boardId && p.LaneId == lane.Id)
+            .CountAsync(ct)
+            .ConfigureAwait(false);
+        if (count >= lane.MaxItems.Value)
+            throw new InvalidOperationException(
+                $"Lane '{lane.Title}' is at its limit of {lane.MaxItems} items; the move is refused.");
+    }
 }
