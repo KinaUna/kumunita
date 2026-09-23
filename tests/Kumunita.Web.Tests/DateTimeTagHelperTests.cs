@@ -70,7 +70,12 @@ public class DateTimeTagHelperTests
         return new DateTimeTagHelper(zone, format)
         {
             Dt = dt,
-            TimeOnly = timeOnly,
+            // The time-only mode is selected by the `format` sentinel
+            // ("timeonly") rather than a separate flag property — the
+            // Razor source generator in this environment does not bind
+            // newly-added [HtmlAttributeName] properties on DateTimeTagHelper,
+            // but the existing Format property binds reliably.
+            Format = timeOnly ? "timeonly" : "g",
         };
     }
 

@@ -78,20 +78,26 @@ public sealed class DateTimeTagHelper : TagHelper
     public string Format { get; set; } = "g";
 
     /// <summary>
-    /// When <c>true</c>, render the converted instant as the **time only**
-    /// (<c>HH:mm</c>, 24-hour) instead of the effective <see cref="Format"/> —
-    /// for a list/calendar surface where a time-of-day is what the resident
-    /// needs and a date would be redundant (the calendar grid already supplies
-    /// the day). The effective time zone still applies (the same
+    /// When the <c>format</c> attribute is set to <c>"timeonly"</c>, render
+    /// the converted instant as the **time of day only** (<c>HH:mm</c>,
+    /// 24-hour) instead of the effective date-time format — for a
+    /// list/calendar surface where a time-of-day is what the resident needs
+    /// and a date would be redundant (the calendar grid already supplies the
+    /// day). The effective time zone still applies (the same
     /// <see cref="EffectiveTimezoneResolver"/> conversion as the full form),
     /// and <c>HH:mm</c> matches the platform's 24-hour clock convention (ADR
     /// 0020 — every preset is a 24-hour clock), so the time reads the same on
-    /// every resident's screen. <c>false</c> (the default) renders the
-    /// effective format, exactly as before — every existing <c>kw-dt</c> is
-    /// unchanged.
+    /// every resident's screen. Any other <c>format</c> value (or the
+    /// default <c>"g"</c>) renders the effective format, exactly as before.
     /// </summary>
-    [HtmlAttributeName]
-    public bool TimeOnly { get; set; }
+    /// <remarks>
+    /// Implemented as a special value on the existing <see cref="Format"/>
+    /// property (which Razor's source generator binds reliably) rather than
+    /// a separate flag property — the Razor source generator in this
+    /// environment does not pick up newly-added <c>[HtmlAttributeName]</c>
+    /// properties on an already-compiled TagHelper type, leaving them as raw
+    /// HTML attributes that never reach the TagHelper.
+    /// </remarks>
 
     public override async Task ProcessAsync(TagHelperContext context, TagHelperOutput output)
     {
@@ -123,7 +129,16 @@ public sealed class DateTimeTagHelper : TagHelper
         // not the host's locale, are what the resident sees).
         var utc = Dt.Value.UtcDateTime;
         var wallTime = utc + tz.GetUtcOffset(utc);
-        var rendered = TimeOnly
+        // The `format` sentinel ("timeonly", case-insensitive) selects the
+        // 24-hour `HH:mm` time-of-day render (the ADR 0020 platform convention,
+        // no date). It is a documented special value on the existing `Format`
+        // property — the one binding path Razor's source generator reliably
+        // emits for this TagHelper — rather than a separate flag property (see
+        // the class-level note on why a new [HtmlAttributeName] flag is not
+        // used). Any other `Format` value falls through to the effective
+        // (dated) format resolved per request.
+        var timeOnly = string.Equals(Format, "timeonly", System.StringComparison.OrdinalIgnoreCase);
+        var rendered = timeOnly
             ? wallTime.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture)
             : wallTime.ToString(await _formatResolver.GetAsync(), System.Globalization.CultureInfo.InvariantCulture);
 

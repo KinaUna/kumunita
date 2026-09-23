@@ -206,7 +206,7 @@
                              data-title="@row.Title"
                              data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" TimeOnly="true"></kw-dt></span>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
                         </div>
                     }
                 </div>
@@ -255,7 +255,7 @@
                              data-title="@row.Title"
                              data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
                             <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
-                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" TimeOnly="true"></kw-dt></span>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
                         </div>
                     }
                 </div>
