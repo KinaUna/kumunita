@@ -290,3 +290,12 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <!-- Projects board (M5 — ADR 0067) — client/lib/projects-board.ts,
+         tsc-built; keyboard reorder / move on a focused card (Arrow keys →
+         the card's own move-… POST form, CSRF-aware, server-authoritative —
+         C-M5·9 / D10: no HTML5 drag, no optimistic reordering). The menu
+         channel is the plain POST forms above (the browser handles them). -->
+    <script type="module" src="~/js/lib/projects-board.js"></script>
+}

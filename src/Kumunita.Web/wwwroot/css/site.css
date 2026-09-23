@@ -1409,3 +1409,122 @@ body.kmb-page-fullbleed .navbar {
   }
 }
 
+/* M5 (ADR 0067) — the kanban board (Views/Projects/BoardDetail.cshtml):
+   a flexbox row of lane columns (the .events-calendar-grid /
+   .events-calendar-day shape, reused), each lane a vertical strip of
+   cards (the .event-chip / .event-block shape, reused). Tokens come
+   from the :root blocks above; this file adds no new tokens. The card
+   is the keyboard channel's target (client/lib/projects-board.ts —
+   C-M5·9 / D10: no HTML5 drag, no optimistic reordering, the server is
+   authoritative), so it is focusable and gets a focus ring of its own. */
+
+/* The lanes container — a flexbox row, equal-width columns that keep
+   their min-width and scroll horizontally on a narrow viewport
+   (the .events-calendar-grid / responsive .events-time-grid--week
+   shape, reused). */
+.kanban-board {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+/* A single lane column (the .events-calendar-day shape, reused): a
+   tinted, bordered, rounded strip — head, toolbar, then the cards. */
+.kanban-lane {
+  flex: 1 1 0;
+  min-width: 14rem;
+  max-width: 20rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--kmb-tint-a);
+  border: 1px solid var(--kmb-border-soft);
+  border-radius: var(--kmb-radius);
+  padding: 0.75rem;
+}
+
+/* The lane head (title + the status / max-items badges the view ships
+   as .badge spans). Baseline-aligned, wrapping when long. */
+.kanban-lane-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+.kanban-lane-head h3 {
+  font-weight: 600;
+}
+
+/* The lane toolbar (the inline Title / Status / MaxItems + Save form
+   the view ships). The row gutter comes from the view's .row.g-1; the
+   toolbar itself needs no box of its own (transparent on the tint). */
+.kanban-lane-toolbar {
+  display: block;
+}
+
+/* The cards stack — a column with its own gap (the .event-block-stack
+   vertical rhythm, reused). */
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* A single card (the .event-chip shape, reused): white over the lane's
+   tint, a soft border + shadow, the shared chip radius. The card is a
+   tab stop (the TS module sets tabindex="0") and gets the focus ring
+   on :focus AND :focus-within (the title link / dropdown toggle are
+   inside it, so focus can land on either). */
+.kanban-card {
+  background: #fff;
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius-chip);
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 1px 2px rgba(19, 32, 26, 0.05);
+  transition: box-shadow 120ms ease;
+}
+.kanban-card:hover {
+  box-shadow: 0 1px 6px rgba(19, 32, 26, 0.08);
+  border-color: var(--kmb-hover-border);
+}
+.kanban-card:focus,
+.kanban-card:focus-within {
+  outline: none;
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 2px var(--bs-focus-ring-color);
+}
+.kanban-card a {
+  color: var(--kmb-ink);
+  text-decoration: none;
+}
+.kanban-card a:hover {
+  color: var(--bs-primary);
+}
+
+/* The lane-empty state (the .events-calendar-day empty-cell shape —
+   muted text, centered, no box of its own). */
+.kanban-lane-empty {
+  color: var(--kmb-muted);
+  text-align: center;
+  padding: 0.75rem 0;
+}
+
+/* The board-empty state (no lanes at all — a single centered note in
+   place of the lane row; the view already ships .p-4.border.rounded
+   on it, so this only sets the type). */
+.kanban-board-empty {
+  color: var(--kmb-muted);
+  text-align: center;
+}
+
+@media (max-width: 767.98px) {
+  .kanban-board {
+    min-width: 0;
+  }
+  .kanban-lane {
+    min-width: 12rem;
+  }
+}
+
