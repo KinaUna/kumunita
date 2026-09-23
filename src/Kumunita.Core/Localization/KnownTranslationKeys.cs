@@ -1128,6 +1128,16 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Update",
             ["events.remove_translation_confirm"] = "Remove this translation?",
 
+            // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Calendar",
+            ["events.calendar.prev"] = "Prev",
+            ["events.calendar.next"] = "Next",
+            ["events.calendar.today"] = "Today",
+            ["events.calendar.overlap_hint"] = "Overlaps another event in this window",
+            ["events.calendar.empty"] = "No events in this window.",
+            ["events.calendar.list_view"] = "List",
+            ["events.calendar.from"] = "From",
+
             // ── grant (the shared "Who to grant to" picker — the C#-built "Select all" + count) ──
             ["grant.select_all"] = "Select all",
             ["grant.label_residences"] = "Residences",
@@ -2192,6 +2202,16 @@ public static class KnownTranslationKeys
             ["events.rsvp_responses"] = "Antworten",
             ["events.rsvp_update"] = "Aktualisieren",
             ["events.remove_translation_confirm"] = "Diese Übersetzung entfernen?",
+
+            // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Kalender",
+            ["events.calendar.prev"] = "Zurück",
+            ["events.calendar.next"] = "Weiter",
+            ["events.calendar.today"] = "Heute",
+            ["events.calendar.overlap_hint"] = "Überlappt mit einem anderen Termin in diesem Zeitraum",
+            ["events.calendar.empty"] = "Keine Termine in diesem Zeitraum.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Von",
 
             // ── grant (der gemeinsame „Wem zugewiesen"-Picker — C#-gebaut „Alle auswählen" + Zähler) ──
             ["grant.select_all"] = "Alle auswählen",
@@ -3260,6 +3280,16 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Mettre à jour",
             ["events.remove_translation_confirm"] = "Supprimer cette traduction ?",
 
+            // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Calendrier",
+            ["events.calendar.prev"] = "Précédent",
+            ["events.calendar.next"] = "Suivant",
+            ["events.calendar.today"] = "Aujourd'hui",
+            ["events.calendar.overlap_hint"] = "Chevauche un autre événement dans cette période",
+            ["events.calendar.empty"] = "Aucun événement dans cette période.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Depuis",
+
             // ── grant (le picker « À qui accorder » — C# « Tout sélectionner » + compteur) ──
             ["grant.select_all"] = "Tout sélectionner",
             ["grant.label_residences"] = "Résidents",
@@ -4321,6 +4351,16 @@ public static class KnownTranslationKeys
             ["events.rsvp_responses"] = "Svar",
             ["events.rsvp_update"] = "Opdater",
             ["events.remove_translation_confirm"] = "Fjern denne oversættelse?",
+
+            // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Kalender",
+            ["events.calendar.prev"] = "Forrige",
+            ["events.calendar.next"] = "Næste",
+            ["events.calendar.today"] = "I dag",
+            ["events.calendar.overlap_hint"] = "Overlapper med et andet arrangement i dette område",
+            ["events.calendar.empty"] = "Ingen arrangementer i dette område.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Fra",
 
             // ── grant (den fælles « Hvem du giver adgang til »-picker — C# « Vælg alle » + tæller) ──
             ["grant.select_all"] = "Vælg alle",
