@@ -1008,18 +1008,22 @@ public class EventControllerTests
     // substitutes (no live Postgres — the M4 controller harness shape).
 
     /// <summary>
-    /// No <c>from</c> query ⇒ the anchor is <b>today in the viewer's
-    /// effective zone</b> (C-EV·5): the window start passed to the seam is
-    /// that zone's local midnight of today, converted to UTC (a
-    /// fixed-offset zone's midnight is a distinct UTC instant from the
-    /// UTC-midnight floor), the window end is start + 30d, and the model's
-    /// <see cref="EventCalendarViewModel.FromAnchor"/> is the zone's today
-    /// as <c>yyyy-MM-dd</c>. The zone is driven through the resolver's
-    /// platform-default seam (<c>GetDefaultTimezoneAsync</c> → a real IANA
-    /// zone, <c>Europe/Berlin</c>), so the <c>UTC</c> floor is not what's
-    /// under test here. The expected instant is computed before and after
-    /// the call, so a zone-local midnight rollover during the test can't
-    /// flake the pin.
+    /// No <c>from</c> and no <c>view</c> ⇒ the anchor is <b>today in the
+    /// viewer's effective zone</b> (C-EV·5) and the view resolves to
+    /// <b>month</b> (the backward-compatible default, C-DWM·8): the window
+    /// start passed to the seam is the anchor's month's <b>1st</b>, that
+    /// zone's local midnight converted to UTC (a fixed-offset zone's
+    /// midnight is a distinct UTC instant from the UTC-midnight floor), the
+    /// window end is start + the month's days (the calendar-month span, D4 /
+    /// §6.2 step 3), and the model's <see cref="EventCalendarViewModel
+    /// .View"/> is <c>"month"</c> with a non-empty <see
+    /// cref="EventCalendarViewModel.WindowDays"/> grid. The zone is driven
+    /// through the resolver's platform-default seam (→ a real IANA zone,
+    /// <c>Europe/Berlin</c>), so the <c>UTC</c> floor is not what's under
+    /// test here. The expected instant is computed before and after the
+    /// call, so a zone-local midnight rollover during the test can't flake
+    /// the pin. (Updated for EV-DWM: the month window is the anchor's
+    /// calendar month, not the prior rolling 30-day run — ADR 0064 D4.)
     /// </summary>
     [Fact]
     public async Task Calendar_DefaultFromIsTodayInEffectiveZone()
@@ -1043,24 +1047,27 @@ public class EventControllerTests
 
         var controller = BuildCalendarController(events, zoneId, roles: [Roles.Member], subjectId: subject);
 
-        var expectedBefore = ExpectZoneMidnightUtc(zone, DateTime.UtcNow);
+        var anchorBefore = System.TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone).Date;
         var result = await controller.Calendar(null, null);
-        var expectedAfter = ExpectZoneMidnightUtc(zone, DateTime.UtcNow);
+        var anchorAfter = System.TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone).Date;
 
-        // The seam saw [zone-midnight-today-as-UTC, +30d) (C-EV·5 — the
-        // window is anchored on the viewer's zone, not the UTC floor).
+        // The window is the anchor's calendar month (default view = month,
+        // C-DWM·8): start = the 1st of the anchor's month, that zone's local
+        // midnight as UTC; end = start + the month's day count (D4).
+        var startBefore = ExpectZoneMidnightUtc(zone, new DateTime(anchorBefore.Year, anchorBefore.Month, 1));
+        var startAfter = ExpectZoneMidnightUtc(zone, new DateTime(anchorAfter.Year, anchorAfter.Month, 1));
         Assert.True(
-            capturedStart == expectedBefore || capturedStart == expectedAfter,
-            $"Window start {capturedStart} is neither the zone's midnight-today as UTC ({expectedBefore}) nor one rollover away ({expectedAfter}).");
-        Assert.Equal(capturedStart!.Value.AddDays(30), capturedEnd);
+            capturedStart == startBefore || capturedStart == startAfter,
+            $"Window start {capturedStart} is neither the zone's midnight of the 1st of the anchor's month ({startBefore}) nor one month rollover away ({startAfter}).");
+
+        var anchorFromStart = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone).Date;
+        var daysInMonth = System.DateTime.DaysInMonth(anchorFromStart.Year, anchorFromStart.Month);
+        Assert.Equal(ExpectZoneMidnightUtc(zone, anchorFromStart.AddDays(daysInMonth)), capturedEnd);
 
         var view = Assert.IsType<ViewResult>(result);
         var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
-        // The FromAnchor is the zone-local date of the window start — the
-        // captured windowStart converted back to the zone gives the anchor
-        // date unambiguously (no UTC-date off-by-one).
-        var anchorDate = System.TimeZoneInfo.ConvertTimeFromUtc(capturedStart!.Value.UtcDateTime, zone).Date;
-        Assert.Equal(anchorDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), vm.FromAnchor);
+        Assert.Equal("month", vm.View);
+        Assert.NotEmpty(vm.WindowDays);
         Assert.Equal(zone.Id, vm.TimeZoneId);
 
         await events.Received(1).ListInRangeAsync(
@@ -1068,12 +1075,16 @@ public class EventControllerTests
     }
 
     /// <summary>
-    /// A <c>from</c> anchor of <c>2026-08-15</c> shifts the window: the seam
-    /// receives <c>[2026-08-15 zone-local midnight as UTC, +30d)</c>, and the
-    /// model carries the anchor's ±1-month nav links as <c>yyyy-MM-dd</c>
-    /// (<see cref="EventCalendarViewModel.PrevAnchor"/> =
-    /// <c>2026-07-15</c>, <see cref="EventCalendarViewModel.NextAnchor"/> =
-    /// <c>2026-09-15</c>) — the C-EV·7 pre-rendered plain-GET-link targets.
+    /// A <c>from</c> anchor of <c>2026-08-15</c> (default <c>view</c> = month)
+    /// windows the anchor's <b>calendar month</b>: the seam receives
+    /// <c>[2026-08-01 zone-local midnight as UTC, 2026-09-01 zone-local
+    /// midnight as UTC)</c> — the anchor's month's 1st through its day count
+    /// (D4 / §6.2 step 3, the calendar-month span replacing the prior
+    /// rolling 30-day run), and the model carries the anchor's ±1-month nav
+    /// links as <c>yyyy-MM-dd</c> (<see cref="EventCalendarViewModel
+    /// .PrevAnchor"/> = <c>2026-07-15</c>, <see cref="EventCalendarViewModel
+    /// .NextAnchor"/> = <c>2026-09-15</c>) — the C-DWM·6 pre-rendered
+    /// plain-GET-link targets. (Updated for EV-DWM / ADR 0064 D4.)
     /// </summary>
     [Fact]
     public async Task Calendar_FromShiftsWindow_AndPrevNextLinks()
@@ -1098,22 +1109,23 @@ public class EventControllerTests
 
         var result = await controller.Calendar("2026-08-15", null);
 
-        // The window is anchored on the <c>from</c> date's zone-local
-        // midnight (not the caller's clock) — the §5.2 window-math pin.
-        var expectedStartUtc = new DateTimeOffset(
-            new DateTime(2026, 8, 15, 0, 0, 0, DateTimeKind.Unspecified),
-            zone.GetUtcOffset(new DateTime(2026, 8, 15))).ToUniversalTime();
+        // The window is the anchor's calendar month (default view = month):
+        // start = the 1st, end = the 1st + the month's day count (D4 / §6.2
+        // step 3), both as zone-local midnights converted to UTC.
+        var expectedStartUtc = ExpectZoneMidnightUtc(zone, new DateTime(2026, 8, 1));
+        var expectedEndUtc = ExpectZoneMidnightUtc(zone, new DateTime(2026, 9, 1));
         Assert.Equal(expectedStartUtc, capturedStart);
-        Assert.Equal(expectedStartUtc.AddDays(30), capturedEnd);
+        Assert.Equal(expectedEndUtc, capturedEnd);
 
         var view = Assert.IsType<ViewResult>(result);
         var vm = Assert.IsType<EventCalendarViewModel>(view.ViewData.Model);
         Assert.Equal("2026-08-15", vm.FromAnchor);
+        Assert.Equal("month", vm.View);
         Assert.Equal("2026-07-15", vm.PrevAnchor);
         Assert.Equal("2026-09-15", vm.NextAnchor);
 
         await events.Received(1).ListInRangeAsync(
-            expectedStartUtc, expectedStartUtc.AddDays(30), null, subject, Arg.Any<CancellationToken>());
+            expectedStartUtc, expectedEndUtc, null, subject, Arg.Any<CancellationToken>());
     }
 
     /// <summary>

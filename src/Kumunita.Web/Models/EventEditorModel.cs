@@ -332,17 +332,33 @@ public sealed record EventIndexViewModel(
 
 /// <summary>
 /// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read
-/// surface — ADR 0063; the <see cref="Kumunita.Core.Events.IEventService
-/// .ListInRangeAsync"/> window, a rolling 30-day anchor in the viewer's
-/// effective zone).
+/// surface — ADR 0063; ADR 0064 <c>EV-DWM</c> adds the Day/Week/Month
+/// views over the same window-agnostic
+/// <see cref="Kumunita.Core.Events.IEventService
+/// .ListInRangeAsync"/> seam).
 /// <para>
 /// **<see cref="FromAnchor"/> / <see cref="PrevAnchor"/> /
-/// <see cref="NextAnchor"/>** are the month anchor and its ±1-month
-/// neighbors, each <c>yyyy-MM-dd</c> in the viewer's effective zone —
-/// pre-rendered plain-GET-link targets (C-EV·7: nav is plain GET links;
+/// <see cref="NextAnchor"/>** are the anchor date and its nav neighbors
+/// (shifted by the <b>view's unit</b> — ±1 day / ±1 week / ±1 month),
+/// each <c>yyyy-MM-dd</c> in the viewer's effective zone —
+/// pre-rendered plain-GET-link targets (C-DWM·6: nav is plain GET links;
 /// the server re-renders, the authorization re-runs per request).
-/// <see cref="MonthLabel"/> is the anchor's month name + year in the UI
-/// culture (a display string, not a zone-driven calculation).
+/// <see cref="Label"/> is the view-appropriate display string in the UI
+/// culture — a full date for Day, a date range for Week, a month name +
+/// year for Month (a display string, not a zone-driven calculation, not a
+/// registry key — C-DWM·9).
+/// </para>
+/// <para>
+/// **<see cref="View"/>** (default <c>"month"</c> — the backward-
+/// compatible EV-CAL default, C-DWM·8) echoes the resolved
+/// <c>?view=</c> selector back to the view so the toggle can render the
+/// active button pressed. **<see cref="WindowDays"/>** is the ordered
+/// list of the view's grid day-columns (date-only
+/// <see cref="DateTime"/>): Day → 1 entry (the anchor); Week → 7 entries,
+/// Monday-first (C-DWM·5); Month → the 5–6 full weeks covering the
+/// calendar month, starting on the Monday on or before the 1st (D4). The
+/// per-chip instants remain <see cref="EventRow.StartUtc"/> /
+/// <see cref="EventRow.EndUtc"/> (ADR 0063, unchanged).
 /// </para>
 /// <para>
 /// **<see cref="Components"/>** (the filter picker's options) is the
@@ -361,10 +377,12 @@ public sealed record EventCalendarViewModel(
     string FromAnchor,
     string? PrevAnchor,
     string? NextAnchor,
-    string MonthLabel,
+    string Label,
     string? CurrentComponentId,
     IReadOnlyList<(string Id, string Name)> Components,
-    string TimeZoneId);
+    string TimeZoneId,
+    string View = "month",
+    IReadOnlyList<DateTime> WindowDays = null!);
 
 /// <summary>
 /// The <b>detail</b> view model (the <c>GET /events/{id}</c> read

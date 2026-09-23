@@ -57,3 +57,46 @@ section + its own entry-read list.
 - Next: **U02** — the `EventCalendarViewModel` additive fields + the
   `Calendar` action's `?view=` engine (per-view window + nav-by-view-unit +
   label). Zero Core change.
+
+## U02 — view-model + ?view= engine
+
+- **Sealed shape** (§6.1): `EventCalendarViewModel` is now
+  `(Events, FromAnchor, PrevAnchor, NextAnchor, Label, CurrentComponentId, Components, TimeZoneId, View = "month", WindowDays = null!)`
+  — `MonthLabel`→`Label`, + `View` (additive, default `"month"`), + `WindowDays`
+  (additive, `IReadOnlyList<DateTime>`, the ordered grid day-columns).
+  `Calendar` action signature is now `Calendar(string? from, string? componentId, string? view = null)`.
+- **Per-view window** (each bound = that day's zone-local midnight → UTC, via
+  `LocalMidnightUtc`): **day** = `[anchor, anchor+1d)`, `WindowDays=[anchor]`;
+  **week** = `[monday, monday+7d)` where `monday = anchor - ((int)anchor.DayOfWeek+6)%7`
+  (C-DWM·5 ISO Monday-start), `WindowDays = monday..monday+6`;
+  **month** = `[1st, 1st+DaysInMonth)`, `WindowDays = Monday-on-or-before-1st …
+  Sunday-on-or-after-last-day` (the 5–6 full weeks, D4).
+- **Nav** = the anchor shifted by the view's unit — day: ±1 day; week: ±7 days
+  (preserves Monday alignment); month: ±1 month (C-DWM·6). **Label** = Day →
+  full date, Week → `Mon d – Mon d`, Month → month name + year (UI culture,
+  not a registry key — C-DWM·9). **Seam untouched** (C-DWM·1 / D1):
+  `ListInRangeAsync(windowStartUtc, windowEndUtc, componentId, actorId, ct)`
+  called unchanged; `git status` shows only the 2 C# files + the one allowed
+  `Calendar.cshtml` `MonthLabel`→`Label` rename (no Core file touched).
+- **Conformed 2 stale EV-CAL pins (resolved, NOT a drift pause):** the
+  month-window reframe (D4 / §6.2 step 3 / F3) breaks two **pre-existing EV-CAL
+  (ADR 0063) pins** that hardcoded the *old* rolling 30-day window —
+  `Calendar_DefaultFromIsTodayInEffectiveZone` and
+  `Calendar_FromShiftsWindow_AndPrevNextLinks` both asserted
+  `capturedStart.AddDays(30)` / a window starting at the anchor's own midnight.
+  Under the **frozen** design the default month view windows the **calendar
+  month** (`[1st, 1st+DaysInMonth)`). I did **not** revert the code to `+30d`
+  to appease them (that would violate the §6.5 frozen pin); I updated the two
+  pins' assertions to the calendar-month window + the resolved
+  `View = "month"` / non-empty `WindowDays`, and added the `view` param to the
+  `BuildCalendarController` calls. The sibling
+  `Calendar_PassesComponentFilter_ToSeam` needed no change. This keeps the
+  "Web.Tests still green" exit honest; **U06** still adds the 7 *new* EV-DWM
+  Web pins (day/week/invalid/label) on top — those are additive, unaffected.
+- **Exit:** `dotnet build Kumunita.slnx -c Debug` → **0 errors / 0 warnings**.
+  Web.Tests → **368 run, 0 failed, 0 errors** (green). No regression.
+- Files: `src/Kumunita.Web/Models/EventEditorModel.cs`,
+  `src/Kumunita.Web/Controllers/EventController.cs` (+ `Views/Event/Calendar.cshtml`
+  one-line `@Model.Label` rename).
+- Next: **U03** — Month view (chip grid reframed to a true calendar month) +
+  the Day/Week/Month toggle in the header.

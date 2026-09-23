@@ -295,29 +295,51 @@ public sealed class EventController : Controller
     }
 
     /// <summary>
-    /// <c>GET /events/calendar</c> — the EV-CAL calendar (ADR 0063): a
-    /// month-anchored, display-only overview of the caller's visible events
-    /// over a rolling 30-day window. The <paramref name="from"/> query is the
-    /// anchor **date in the viewer's effective zone** (C-EV·5; default: the
-    /// zone's today) — window = [zone-local midnight of the anchor as UTC,
-    /// + 30d); the 30-day *span* is this controller's policy, the seam's
-    /// <c>Take(WindowCap)</c> is only a backstop (design §5.1). The
-    /// visibility split is the seam's — the single
-    /// <see cref="IEventService.ListInRangeAsync"/> <c>CanSeeAsync(Read)</c>
-    /// gate (C-EV·1 non-leak pin); the controller is thin (ADR 0006-D). The
+    /// <c>GET /events/calendar</c> — the EV-CAL calendar (ADR 0063) with the
+    /// EV-DWM Day/Week/Month views (ADR 0064): a display-only overview of the
+    /// caller's visible events over a **view-appropriate window**. The
+    /// <paramref name="view"/> query is a **display selector, never an
+    /// access input** (C-DWM·3): <c>day</c> (the anchor day), <c>week</c>
+    /// (the anchor's **Monday-start** week, C-DWM·5), or <c>month</c> (the
+    /// anchor's calendar month) — missing / invalid / out-of-set values fall
+    /// back to <c>month</c> (the backward-compatible EV-CAL default,
+    /// C-DWM·8; a display fallback, not an error). The <paramref name="from"/>
+    /// query is the anchor **date in the viewer's effective zone** (C-EV·5;
+    /// default: the zone's today) — each window bound is that date's
+    /// zone-local midnight as a UTC instant; the *span* (1d / 7d /
+    /// days-in-month) is this controller's policy, the seam's
+    /// <c>Take(WindowCap)</c> is only a backstop. The window is **window-
+    /// agnostic on the seam** (C-DWM·1 / D1) — <see cref="IEventService
+    /// .ListInRangeAsync"/> is called unchanged. The visibility split is the
+    /// seam's — the single <c>CanSeeAsync(Read)</c> gate (C-EV·1 non-leak
+    /// pin); the controller is thin (ADR 0006-D). The
     /// <paramref name="componentId"/> query is a filter, never a gate
     /// (C-M3·2 / C-EV·3). <see cref="EventCalendarViewModel.PrevAnchor"/> /
     /// <see cref="EventCalendarViewModel.NextAnchor"/> are the anchor shifted
-    /// ±1 month, <c>yyyy-MM-dd</c> — pre-rendered plain-GET-link targets
-    /// (C-EV·7); <see cref="EventCalendarViewModel.TimeZoneId"/> is the
-    /// effective zone id shipped to the view as a **display** input only
-    /// (C-EV·5 — never an authorization input).
+    /// by the **view's unit** (±1 day / ±1 week / ±1 month), <c>yyyy-MM-dd</c>
+    /// — pre-rendered plain-GET-link targets (C-DWM·6); <see
+    /// cref="EventCalendarViewModel.TimeZoneId"/> is the effective zone id
+    /// shipped to the view as a **display** input only (C-EV·5 — never an
+    /// authorization input).
     /// </summary>
     [HttpGet("/events/calendar")]
-    public async Task<IActionResult> Calendar(string? from, string? componentId)
+    public async Task<IActionResult> Calendar(string? from, string? componentId, string? view = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
         var zone = await this.timezone.GetAsync();
+
+        // `view` = the EV-DWM display selector (ADR 0064 §6.2 step 1):
+        // exactly {"day","week","month"} (case-insensitive); missing /
+        // invalid / out-of-set falls back to "month" (the backward-compatible
+        // EV-CAL default — C-DWM·3 / C-DWM·8; a display fallback, not an
+        // error). Never an access input (C-DWM·3).
+        var resolvedView = view?.Trim()?.ToLowerInvariant() switch
+        {
+            "day" => "day",
+            "week" => "week",
+            "month" => "month",
+            _ => "month",
+        };
 
         // Anchor = the `from` query parsed as a date in the viewer's effective
         // zone (default: the zone's today). Invalid/missing values fall back
@@ -328,14 +350,64 @@ public sealed class EventController : Controller
             ? parsed.Date
             : nowInZone.Date;
 
-        // Window math (design §5.2): anchor → zone-local midnight → UTC
-        // instant; window = [windowStartUtc, windowStartUtc + 30d). The
-        // anchor's local midnight is a display anchor, not a stored value —
-        // a DST-ambiguous midnight is still a well-defined zone-local time.
-        var windowStartUtc = new DateTimeOffset(
-            new DateTime(anchorDate.Year, anchorDate.Month, anchorDate.Day, 0, 0, 0, DateTimeKind.Unspecified),
-            zone.GetUtcOffset(anchorDate.Date)).ToUniversalTime();
-        var windowEndUtc = windowStartUtc.AddDays(30);
+        // Per-view window (ADR 0064 §6.2 step 3): each bound = the window's
+        // first/last day's zone-local midnight → UTC instant (the anchor's
+        // local midnight is a display anchor, not a stored value — a
+        // DST-ambiguous midnight is still a well-defined zone-local time).
+        // The span is this controller's policy; the seam's Take(WindowCap)
+        // is only a backstop.
+        static DateTimeOffset LocalMidnightUtc(DateTime date, TimeZoneInfo z) =>
+            new DateTimeOffset(
+                new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Unspecified),
+                z.GetUtcOffset(date)).ToUniversalTime();
+
+        DateTime windowStartLocal, windowEndLocalExclusive;
+        List<DateTime> windowDays;
+        switch (resolvedView)
+        {
+            case "day":
+            {
+                // Day (F1): [anchorLocalStartUtc, anchorLocalStartUtc + 1d);
+                // WindowDays = [anchorDate].
+                windowStartLocal = anchorDate;
+                windowEndLocalExclusive = anchorDate.AddDays(1);
+                windowDays = [anchorDate];
+                break;
+            }
+            case "week":
+            {
+                // Week (F2, C-DWM·5): the anchor's ISO **Monday-start** week —
+                // Monday = anchor minus ((int)DayOfWeek + 6) % 7 days;
+                // [mondayLocalStartUtc, mondayLocalStartUtc + 7d); WindowDays
+                // = the 7 days monday .. monday+6 (Monday-first).
+                var monday = anchorDate.AddDays(-(((int)anchorDate.DayOfWeek + 6) % 7));
+                windowStartLocal = monday;
+                windowEndLocalExclusive = monday.AddDays(7);
+                windowDays = Enumerable.Range(0, 7).Select(n => monday.AddDays(n)).ToList();
+                break;
+            }
+            default:
+            {
+                // Month (F3): the anchor's calendar month —
+                // [1stLocalStartUtc, 1stLocalStartUtc + DaysInMonth);
+                // WindowDays = the 5–6 full weeks covering the month,
+                // starting on the Monday on or before the 1st (D4).
+                var monthStart = new DateTime(anchorDate.Year, anchorDate.Month, 1);
+                var daysInMonth = DateTime.DaysInMonth(anchorDate.Year, anchorDate.Month);
+                var gridMonday = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
+                var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                var gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                windowStartLocal = monthStart;
+                windowEndLocalExclusive = monthStart.AddDays(daysInMonth);
+                windowDays = new List<DateTime>();
+                for (var d = gridMonday; d < gridEndExclusive; d = d.AddDays(1))
+                    windowDays.Add(d);
+                break;
+            }
+        }
+
+        var windowStartUtc = LocalMidnightUtc(windowStartLocal, zone);
+        var windowEndUtc = LocalMidnightUtc(windowEndLocalExclusive, zone);
 
         IReadOnlyList<Event> events;
         try
@@ -388,23 +460,54 @@ public sealed class EventController : Controller
                 EndUtc: e.End))
             .ToList();
 
-        // Nav anchors (C-EV·7 — plain pre-rendered GET links): ±1 month on
-        // the anchor date, yyyy-MM-dd.
+        // Nav anchors (C-DWM·6 — plain pre-rendered GET links): the anchor
+        // shifted by the **view's unit** (day: ±1 day; week: ±7 days —
+        // preserving the Monday-start alignment; month: ±1 month),
+        // yyyy-MM-dd. The view + component filter ride along in the view's
+        // NavHref (C-DWM·6 / C-EV·3).
+        var prevDate = resolvedView switch
+        {
+            "day" => anchorDate.AddDays(-1),
+            "week" => anchorDate.AddDays(-7),
+            _ => anchorDate.AddMonths(-1),
+        };
+        var nextDate = resolvedView switch
+        {
+            "day" => anchorDate.AddDays(1),
+            "week" => anchorDate.AddDays(7),
+            _ => anchorDate.AddMonths(1),
+        };
         var fromAnchor = anchorDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var prevAnchor = anchorDate.AddMonths(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        var nextAnchor = anchorDate.AddMonths(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var prevAnchor = prevDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var nextAnchor = nextDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        // MonthLabel — the anchor's month name + year in the UI culture (a
-        // display string, not a zone-driven calculation — design §5.2).
-        var monthLabel = CultureInfo.CurrentCulture
-            .DateTimeFormat.GetMonthName(anchorDate.Month) + " " + anchorDate.Year;
+        // Label — the view-appropriate display string in the UI culture
+        // (ADR 0064 §6.2 step 6; a computed display string, **not** a
+        // registry key — C-DWM·9): Day → full date; Week → "Mon d – Mon d"
+        // range; Month → month name + year (the EV-CAL shape).
+        var fmt = CultureInfo.CurrentCulture.DateTimeFormat;
+        string label;
+        if (resolvedView == "day")
+        {
+            label = $"{fmt.GetDayName(anchorDate.DayOfWeek)} {anchorDate.Day} {fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
+        }
+        else if (resolvedView == "week")
+        {
+            var monday = windowDays[0];
+            var sunday = windowDays[^1];
+            label = $"{fmt.GetAbbreviatedDayName(monday.DayOfWeek)} {monday:d} – {fmt.GetAbbreviatedDayName(sunday.DayOfWeek)} {sunday:d}";
+        }
+        else
+        {
+            label = $"{fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
+        }
 
         var vm = new EventCalendarViewModel(
             Events: rows,
             FromAnchor: fromAnchor,
             PrevAnchor: prevAnchor,
             NextAnchor: nextAnchor,
-            MonthLabel: monthLabel,
+            Label: label,
             CurrentComponentId: componentId,
             Components: allComponents
                 .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
@@ -413,7 +516,12 @@ public sealed class EventController : Controller
             // C-EV·5 — the effective zone id: a DISPLAY input for the view's
             // TS day-distribution (Intl via zone id) only; never an
             // authorization input.
-            TimeZoneId: zone.Id);
+            TimeZoneId: zone.Id,
+            // EV-DWM (ADR 0064 §6.1) — the resolved view echoed back to the
+            // view (the toggle's active button) + the ordered grid
+            // day-columns (the view's columns, C-DWM·3 / D4).
+            View: resolvedView,
+            WindowDays: windowDays);
 
         return View(vm);
     }
