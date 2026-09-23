@@ -40,7 +40,7 @@ The guide set is a **closed registry**, in the seeder's `GuidePages()` array
 2026-09-21) — the ADR 0042 D1 "the registry is the single source both the
 seeder and these tests read" shape, applied to the guides. A new guide is a
 new row in **all four** arrays (one per language), not a silent addition —
-the ADR 0040 `PageKind` closed-set rule applied to the guide set. The ten
+the ADR 0040 `PageKind` closed-set rule applied to the guide set. The twelve
 seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
 `RE`/`TG`/`PG`/`GU`/`GA`/`TR`/`TZ`/`DF` lanes):
 
@@ -56,6 +56,8 @@ seeded guides (the current shipped surface, M0–M4 + the `ML`/`LS`/`SP`/`RC`/
 | `translator` | what the `Translator` role may and may not do, in plain language | ADR 0021 |
 | `child-accounts` | the guardian's child accounts: what a guardian may and may not do (suspend, memberships, invitation approval, assign a second guardian, hand-over), and the privacy boundary (no reading the child's content) | ADR 0028 / 0038 |
 | `being-a-child` | the child's own view of a child account: what stays theirs (posts/replies/profile the guardian can't read), what the guardian handles (memberships, suspend), group invitations (decline always open, accept needs guardian approval), and hand-over restoring the child's own controls | ADR 0028 / 0038 |
+| `admins` | what a global admin does (accounts, communities, the platform pages incl. reset-to-seeded, the sign-up gate, the platform defaults) and what keeps the role in check (audit trail; no reading of residents' content) | ADR 0062 / 0050 / 0019 / 0020 / 0040 / 0058 |
+| `moderators` | what a standing moderator may do (see their scoped report queue) and may not (act on a report — assign/unlock/resolve stay with an admin; see outside their part; read anyone's content) | ADR 0003 / 0030 |
 
 A guide that documents a feature **not yet shipped** (M5 Projects, M6
 Portability / iCal / notifications / search, the deferred items in SECURITY.md
