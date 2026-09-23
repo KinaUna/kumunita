@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using Kumunita.Core.Events;
@@ -289,6 +290,130 @@ public sealed class EventController : Controller
                 .ToList(),
             CurrentComponentId: componentId,
             CurrentPage: page);
+
+        return View(vm);
+    }
+
+    /// <summary>
+    /// <c>GET /events/calendar</c> — the EV-CAL calendar (ADR 0063): a
+    /// month-anchored, display-only overview of the caller's visible events
+    /// over a rolling 30-day window. The <paramref name="from"/> query is the
+    /// anchor **date in the viewer's effective zone** (C-EV·5; default: the
+    /// zone's today) — window = [zone-local midnight of the anchor as UTC,
+    /// + 30d); the 30-day *span* is this controller's policy, the seam's
+    /// <c>Take(WindowCap)</c> is only a backstop (design §5.1). The
+    /// visibility split is the seam's — the single
+    /// <see cref="IEventService.ListInRangeAsync"/> <c>CanSeeAsync(Read)</c>
+    /// gate (C-EV·1 non-leak pin); the controller is thin (ADR 0006-D). The
+    /// <paramref name="componentId"/> query is a filter, never a gate
+    /// (C-M3·2 / C-EV·3). <see cref="EventCalendarViewModel.PrevAnchor"/> /
+    /// <see cref="EventCalendarViewModel.NextAnchor"/> are the anchor shifted
+    /// ±1 month, <c>yyyy-MM-dd</c> — pre-rendered plain-GET-link targets
+    /// (C-EV·7); <see cref="EventCalendarViewModel.TimeZoneId"/> is the
+    /// effective zone id shipped to the view as a **display** input only
+    /// (C-EV·5 — never an authorization input).
+    /// </summary>
+    [HttpGet("/events/calendar")]
+    public async Task<IActionResult> Calendar(string? from, string? componentId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        var zone = await this.timezone.GetAsync();
+
+        // Anchor = the `from` query parsed as a date in the viewer's effective
+        // zone (default: the zone's today). Invalid/missing values fall back
+        // to today — a display anchor, never an access decision.
+        var nowInZone = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        var anchorDate = DateTime.TryParse(from, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var parsed)
+            ? parsed.Date
+            : nowInZone.Date;
+
+        // Window math (design §5.2): anchor → zone-local midnight → UTC
+        // instant; window = [windowStartUtc, windowStartUtc + 30d). The
+        // anchor's local midnight is a display anchor, not a stored value —
+        // a DST-ambiguous midnight is still a well-defined zone-local time.
+        var windowStartUtc = new DateTimeOffset(
+            new DateTime(anchorDate.Year, anchorDate.Month, anchorDate.Day, 0, 0, 0, DateTimeKind.Unspecified),
+            zone.GetUtcOffset(anchorDate.Date)).ToUniversalTime();
+        var windowEndUtc = windowStartUtc.AddDays(30);
+
+        IReadOnlyList<Event> events;
+        try
+        {
+            events = await this.events.ListInRangeAsync(windowStartUtc, windowEndUtc, componentId, actorId, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // Author display names (a *read* lookup, never an access decision —
+        // the audience gate already ran in ListInRangeAsync). Missing profile
+        // → the raw subject id (the feed action's idiom).
+        var authorIds = events.Select(e => e.AuthorId).Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
+        var authorName = new Dictionary<string, string>();
+        foreach (var authorId in authorIds)
+        {
+            var profile = await userInfo.GetProfileAsync(authorId);
+            authorName[authorId] =
+                profile?.DisplayName is not null && profile.DisplayName.Length > 0
+                    ? profile.DisplayName : authorId;
+        }
+
+        // Component display names (a *read* lookup, never a gate — C-M3·2).
+        var componentIds = events.Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var componentById = allComponents
+            .Where(c => componentIds.Contains(c.Id))
+            .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
+
+        // The U03 additive fields (StartUtc / EndUtc) are set **explicitly
+        // here** — the calendar path is the only call site that sets them
+        // (design §5.2); the feed action's call site keeps them defaulted.
+        var rows = events
+            .Select(e => new EventRow(
+                Id: e.Id,
+                Title: e.Title,
+                Body: e.Body,
+                Start: e.Start,
+                End: e.End,
+                Location: e.Location,
+                AuthorId: e.AuthorId,
+                AuthorDisplayName: authorName.TryGetValue(e.AuthorId, out var an) ? an : e.AuthorId,
+                ComponentId: e.ComponentId,
+                ComponentDisplayName: e.ComponentId is not null && componentById.TryGetValue(e.ComponentId, out var cn) ? cn : null,
+                IsDraft: e.IsDraft,
+                IsDeleted: e.IsDeleted,
+                StartUtc: e.Start,
+                EndUtc: e.End))
+            .ToList();
+
+        // Nav anchors (C-EV·7 — plain pre-rendered GET links): ±1 month on
+        // the anchor date, yyyy-MM-dd.
+        var fromAnchor = anchorDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var prevAnchor = anchorDate.AddMonths(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var nextAnchor = anchorDate.AddMonths(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        // MonthLabel — the anchor's month name + year in the UI culture (a
+        // display string, not a zone-driven calculation — design §5.2).
+        var monthLabel = CultureInfo.CurrentCulture
+            .DateTimeFormat.GetMonthName(anchorDate.Month) + " " + anchorDate.Year;
+
+        var vm = new EventCalendarViewModel(
+            Events: rows,
+            FromAnchor: fromAnchor,
+            PrevAnchor: prevAnchor,
+            NextAnchor: nextAnchor,
+            MonthLabel: monthLabel,
+            CurrentComponentId: componentId,
+            Components: allComponents
+                .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
+                .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            // C-EV·5 — the effective zone id: a DISPLAY input for the view's
+            // TS day-distribution (Intl via zone id) only; never an
+            // authorization input.
+            TimeZoneId: zone.Id);
 
         return View(vm);
     }
