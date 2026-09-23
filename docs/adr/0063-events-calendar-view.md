@@ -116,7 +116,14 @@ Two events overlap iff their `[startUtc, endUtc)` half-open intervals
 intersect. Computed in the TS module **over the already-authorized row list**
 the view ships (each chip carries `data-start-utc` / `data-end-utc`); the flag
 drives a CSS class (a ring / highlight) + the `kw-l` "overlaps" hint (`title`
-attribute). It writes **no** row, calls **no** seam, is **never persisted**,
+attribute) — the hint is **registry-localized**: `Calendar.cshtml` resolves the
+existing `events.calendar.overlap_hint` key server-side (the `kw-l` provider
+path) and ships it as `data-overlap-hint` on `#events-calendar` (the
+`_RichEditorToggle` display-value channel); the TS module reads it and falls
+back to the key's en source text when the attribute is absent (the
+2026-09-23 follow-up replaced the U06 hardcoded-English-only hint — still a
+client-side display concern, never an input to any seam or access decision).
+It writes **no** row, calls **no** seam, is **never persisted**,
 and is **never an access decision** (C-EV·4 — keeping it out of the service
 keeps it from accreting).
 

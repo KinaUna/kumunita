@@ -21,9 +21,13 @@
  *     server already decided to show; writes no row, calls no seam, never an
  *     access decision): two events overlap iff their `[startUtc, endUtc)`
  *     half-open intervals intersect. Every instance of an overlapping event
- *     gets the `event-chip-overlap` ring (site.css) + the English hint as
- *     `title` (the `events.calendar.overlap_hint` key is U07's to seed, so
- *     the hint is a hardcoded English string here, not a `kw-l` lookup).
+ *     gets the `event-chip-overlap` ring (site.css) + the hint as `title` —
+ *     the registry-localized `events.calendar.overlap_hint` text the view
+ *     ships as `data-overlap-hint` on the root (resolved server-side
+ *     through ITranslationProvider, the _RichEditorToggle display-value
+ *     pattern), with the hardcoded English string below as the floor
+ *     fallback when the attribute is absent (the module stays
+ *     self-contained).
  *
  * No nav code (C-EV·7 — prev/next/today are plain pre-rendered GET links
  * the server ships), no network calls, no globals, no `any`.
@@ -31,11 +35,18 @@
 (() => {
   'use strict';
 
+  // Floor fallback — the key's en source text (events.calendar.overlap_hint);
+  // used only when the view's data-overlap-hint is absent.
   const OVERLAP_HINT = 'Overlaps another event in this window';
 
   function bindEventsCalendar(root: HTMLElement): void {
     const zoneId = root.dataset.timeZone;
     if (!zoneId) return;
+
+    // (b) hint source — the view's server-resolved display value, falling
+    // back to the English floor (the attribute is a display channel only;
+    // its absence never changes behavior beyond the hint text).
+    const hint = root.dataset.overlapHint || OVERLAP_HINT;
 
     // The zone's local calendar date of a UTC instant, as a yyyy-MM-dd key
     // (en-CA is the IANA-recommended ISO-ordering locale) — the same key the
@@ -66,7 +77,7 @@
         if (starts[i] < ends[j] && starts[j] < ends[i]) {
           for (const c of [chips[i], chips[j]]) {
             c.classList.add('event-chip-overlap');
-            c.title = OVERLAP_HINT;
+            c.title = hint;
           }
         }
       }

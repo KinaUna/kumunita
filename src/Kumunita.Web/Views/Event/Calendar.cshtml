@@ -1,6 +1,28 @@
 @model Kumunita.Web.Models.EventCalendarViewModel
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Events calendar";
+
+    // The overlap tooltip (C-EV·4, client-side display-only) — resolved
+    // server-side through ITranslationProvider (the same path the <kw-l>
+    // TagHelper uses) so the client never carries the resolved registry
+    // text, and shipped as a display value on #events-calendar (the
+    // _RichEditorToggle data-ie-label-* / rich-editor.ts pattern). The TS
+    // module (client/lib/events-calendar.ts) reads data-overlap-hint and
+    // falls back to its own hardcoded English string if the attribute is
+    // absent, so the module stays self-contained.
+    var hintReq = HttpContextAccessor?.HttpContext?.Request;
+    var hintPref = hintReq is null ? null : LocaleCookie.Read(hintReq);
+    if (string.IsNullOrWhiteSpace(hintPref) && hintReq is not null)
+        hintPref = RequestLanguage.Browser(hintReq, await Localization.ListLanguagesAsync());
+    var hintLabels = await Translation.GetManyAsync(
+        new[] { "events.calendar.overlap_hint" }, hintPref);
+    var overlapHint = hintLabels.TryGetValue("events.calendar.overlap_hint", out var oh)
+        ? oh : "Overlaps another event in this window";
 
     // The anchor (Model.FromAnchor, yyyy-MM-dd — a date in the viewer's
     // effective zone, C-EV·5) drives the 30 window-days of the grid.
@@ -69,7 +91,8 @@
         {
             <div id="events-calendar"
                  data-time-zone="@Model.TimeZoneId"
-                 data-from="@Model.FromAnchor">
+                 data-from="@Model.FromAnchor"
+                 data-overlap-hint="@overlapHint">
                 <!-- The 30 day-columns: each shows its date label + an
                      empty chip stack. The TS module (U06,
                      client/lib/events-calendar.ts) moves one chip

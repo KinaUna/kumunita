@@ -118,6 +118,44 @@ the M4 events context (ADR 0054), closed by U10, moved to `done/` by U11:
 - **Roadmap** — the `EV-CAL` row is **Done**; the single in-progress pin
   returned to **M5** (U01's open flipped exactly back by U10).
 
+## Follow-up (2026-09-23) — overlap hint registry-localized (display-string wiring gap)
+
+Defect-fix on the shipped lane (not a new lane, no roadmap touch). The U06
+hardcoded-English overlap `title` hint is now **registry-localized** in the
+viewer's UI language, with the English text as floor fallback, via the
+existing `kw-l` key `events.calendar.overlap_hint` (already seeded ×4
+languages in U07 — **no key change, no new seam, no new tests**). Two files:
+
+- **`Views/Event/Calendar.cshtml`** — resolves the hint server-side through
+  `ITranslationProvider` (the exact `_RichEditorToggle` / ADR 0046 display-value
+  channel: `LocaleCookie.Read` preference first, then
+  `RequestLanguage.Browser` against the enabled catalog, `GetManyAsync`, en
+  source text as the last-resort) and ships it as
+  `data-overlap-hint` on `#events-calendar` (mirroring
+  `data-ie-label-source` / `data-ie-label-preview` — the precedent for
+  `client/lib` modules consuming server-resolved display values; the TS
+  `title` attribute is an *attribute*, so a `<kw-l>` element can't sit there —
+  same reason the toggle partial resolves its labels server-side).
+- **`client/lib/events-calendar.ts`** — reads `root.dataset.overlapHint ||
+  OVERLAP_HINT` and uses it for the `title`; the `OVERLAP_HINT` constant
+  (the key's en source text) is **kept as the floor fallback** so the module
+  stays self-contained if the attribute is ever absent. C-EV·4 unchanged:
+  still a client-side display concern — the attribute is a display channel
+  only, never an input to any seam or access decision; tsc-only / zero
+  deps hold (the ADR 0031 pin).
+
+**Exit green:** `dotnet build Kumunita.slnx` **0 errors** (171 pre-existing
+warnings, same set); `npm --prefix src/Kumunita.Web run build` (tsc) green,
+compiled `wwwroot/js/lib/events-calendar.js` contains the new read
+(`root.dataset.overlapHint || OVERLAP_HINT`);
+`dotnet exec tests\Kumunita.Web.Tests\…dll` = **368 Total / 0 Failed**
+(baseline unchanged — no pin added; the 13 EV-CAL pins stay green).
+
+**Doc parity:** ADR 0063 D4 + `events-calendar-design.md` §3.4 each gained a
+one-line note that the hint is now registry-localized through the existing
+`events.calendar.overlap_hint` key (the U06 "hardcoded English" wording is
+superseded where it appeared).
+
 ## U11 — lane moved to done/
 
 `git mv docs/plans-milestones/in-progress/events-calendar docs/plans-milestones/done/events-calendar` run (history preserved; both files moved together). Header flip: `plan-events-calendar.md` lead-in `> **In progress.**` → `> **Done.**` (everything else as-is). Final `ls`: `done/events-calendar/` = `events-calendar-handoff-notes.md` + `plan-events-calendar.md`; `in-progress/events-calendar` gone.
