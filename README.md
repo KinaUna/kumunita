@@ -47,8 +47,7 @@ four surfaces.
 account (ADR 0028); **PG is done** — the hierarchical, audience-restricted,
 translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
 (ADR 0054); **EV-DWM is done** — events calendar day/week/month views
-(ADR 0064); **next is M5** — projects (per the roadmap table in
-`docs/ARCHITECTURE.md`).
+(ADR 0064); **M5 is done** — projects (ADR 0067); **next is M6** — portability, iCal, notifications, search (see the "Roadmap" below).
 
 ## Principles
 
@@ -66,7 +65,7 @@ translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
 - Resident directory (profiles, opt-in contact details)
 - Announcements & discussions, organized by **functional components** (Safety, Maintenance, Social, Governance, …)
 - Events with RSVP and reminders *(M4 — done, ADR 0054; see the "Roadmap" below)*
-- Collaborative projects (goals, tasks, contributors) *(next — M5, see the "Roadmap" below)*
+- Collaborative projects (goals, tasks, contributors) *(M5 — done, ADR 0067; see the "Roadmap" below)*
 - **Groups** — public groups power reusable access lists; **private groups**
   (ADR 0010) are a membership/organizing unit for a family or circle, and stay
   out of the audience pickers
@@ -230,8 +229,8 @@ stays trivial and the authorization rules can grow freely.
 - **Event translations** (`ET`, ADR 0059) — the **user-added translation lane** (ADR 0022 / 0029 / 0048) carried to the events surface: an `EventTranslation` doc (title + body) on the `M4DocTypes` surface with a `(EventId, LanguageCode)` unique index, four `IEventService` seams (read / add / **update** / **remove** — the full lane, the ADR 0048 shape), the standing **author ∪ `Translator` ∪ `GlobalAdmin`** (ADR 0021 / 0030; **no** component-moderator branch — events have none, ADR 0054 §5), one `eventtranslation.*` audit row per write, the ADR 0027 chip-swap + ADR 0049 default-visible variant on the detail page, and the ADR 0051 viewer-language selection on the `/events` feed. **Done.** A `SampleData__Enabled` instance whose first boot predates this lane gets the sample events' `de`/`fr`/`da` rows backfilled on the next warm boot — create-if-missing, idempotent, never overwriting a Translator's edit (ADR 0060).
 - **Events calendar** (`EV-CAL`, ADR 0063) — a month-anchored, display-only overview of the caller's visible events over a rolling 30-day window: overlap pairs highlighted client-side, prev/next/today navigation to go back in time; one additive read seam (`IEventService.ListInRangeAsync`) + one view + one `client/lib` TS module (tsc-only, no dependency); zero document / schema / seeding changes; M5 stays Projects; M6 stays Portability. **Done.**
 - **Events calendar day/week/month views** (`EV-DWM`, ADR 0064) — the same `GET /events/calendar` surface turned into the **three named views** residents expect (Day / Week / Month): one additive `?view=` selector on the existing route + a view-appropriate anchor window computed in the controller (1 day / the anchor's Monday-start week / the anchor's calendar month); Day + Week as time-ruler grids (a new `client/lib/events-calendar-time.ts`, tsc-only, zero dependencies) and Month reframed to a true calendar month (the existing `events-calendar.ts` reused untouched); **zero Core change** — the `ListInRangeAsync` seam is reused unchanged, already window-agnostic; M5 stays Projects; M6 stays Portability. **Done.**
-- **M5** — Projects (goals, tasks, contributors). **In progress.**
-- **M6** — Portability (export/import), iCal, notifications, search, responsive pass.
+- **M5** — Projects (goals, tasks, contributors). **Done.**
+- **M6** — Portability (export/import), iCal, notifications, search, responsive pass. **In progress.**
 
 ## Deferred (future, by design)
 

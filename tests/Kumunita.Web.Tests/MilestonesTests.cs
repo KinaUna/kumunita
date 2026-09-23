@@ -23,7 +23,7 @@ public class MilestonesTests
     [Fact]
     public void Shipped_Milestones_Are_Marked_Done()
     {
-        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM" })
+        foreach (string id in new[] { "M0", "M1", "M2", "M3", "GP", "ML", "ML-UI", "LS", "SP", "TZ", "DF", "TR", "RC", "GU", "GA", "RE", "TG", "PG", "UG", "M4", "EV-CAL", "EV-DWM", "M5" })
         {
             var m = Milestones.All.Single(x => x.Id == id);
             Assert.Equal(Milestones.StatusDone, m.Status);
@@ -31,11 +31,11 @@ public class MilestonesTests
     }
 
     [Fact]
-    public void M5_Is_The_Single_InProgress_Milestone()
+    public void M6_Is_The_Single_InProgress_Milestone()
     {
         var next = Milestones.All.Where(m => m.Status == Milestones.StatusNext).ToList();
         Assert.Single(next);
-        Assert.Equal("M5", next[0].Id);
+        Assert.Equal("M6", next[0].Id);
     }
 
     [Fact]
