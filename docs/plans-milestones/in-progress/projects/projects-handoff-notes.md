@@ -68,3 +68,14 @@ overloads are `Index(expr)` and `Index(expr, Action<ComputedIndex>)`, and
 `M5DocTypes.cs` therefore uses the unnamed `.Index(expr)` form (the exact
 `M4DocTypes` precedent) for `TodoItem` (×2) and `KanbanBoard` (×1); all
 unique indexes are unaffected.
+
+## U03 — adapters
+
+Two new files, `src/Kumunita.Core/Projects/` —
+`TodoItemToAuditableResource.cs` (`TargetKind => "todo"`) and
+`KanbanBoardToAuditableResource.cs` (`TargetKind => "board"`), each a
+`sealed class` over the frozen `IAuditableResource` 6-member surface,
+mirroring `EventToAuditableResource`. `Name` is the 60-char
+title-then-body/description pin (57 + "..."), null-safe via a small
+private `Truncate` helper (the body/description is optional — degenerate
+case = empty `Name`). **`dotnet build Kumunita.slnx -c Debug` is green.**
