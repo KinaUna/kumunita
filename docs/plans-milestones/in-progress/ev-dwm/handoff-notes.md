@@ -126,3 +126,28 @@ section + its own entry-read list.
   intact. No drift.
 - Next: **U04** — Week view (7-column time grid, Monday-start) + the new
   `client/lib/events-calendar-time.ts`.
+
+## U04 — Week + time module
+
+- New module `src/Kumunita.Web/client/lib/events-calendar-time.ts`
+  (self-contained IIFE, tsc-only, zero deps, no globals, no `any`) — three
+  display-only passes over the pool the view ships: **(a)** position each
+  block per touched day-column; **(b)** multi-day repeats (one clone per
+  column, first keeps the rendered time label); **(c)** overlap flag — the
+  same `[start,end)` half-open intersection as `events-calendar.ts`
+  (flagged on the pool originals; clones inherit).
+- **Formulas** (day = local midnight→next midnight, DST-aware):
+  `top% = (clippedStart − dayMidnightUtc) / dayLength × 100`,
+  `height% = (clippedEnd − clippedStart) / dayLength × 100` (1.5% floor).
+- **Self-wire guard**: binds only when `data-view != "month"` — the Month
+  path stays on `events-calendar.js` (C-DWM·7).
+- **Week-branch markup** in `Calendar.cshtml`: hour-ruler gutter (00:00–23:00)
+  + one `.events-time-column` per `WindowDays` (Monday-start) + a hidden
+  `.event-block-pool`; both script includes added to `@section Scripts`.
+- **Exit**: `dotnet build Kumunita.slnx -c Debug` → 0 errors; `tsc` green;
+  `Kumunita.Web.Tests` → 368 run, 0 failed. Browser verified: Week renders a
+  Monday-start 7-column time grid with "Community Cleanup Day" positioned in
+  the Sat 26 column (top 55.87%, height 12.5%); Day renders a single column;
+  Month chip layout + `events-calendar.js` intact. **`events-calendar.ts`
+  untouched** (empty `git diff`). No drift.
+- Next: **U05** — the 3 `events.calendar.view.*` `kw-l` keys × 4 languages.

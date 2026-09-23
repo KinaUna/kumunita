@@ -48,6 +48,19 @@
         Model.View == "month" &&
         (day.Month != anchor.Month || day.Year != anchor.Year);
 
+    // U04 — the Day/Week time grid's day-label (D3): the column's weekday
+    // + day-of-month, in the UI culture (a computed display string — the
+    // same "dates are not registry keys" rule as the Label, C-DWM·9 / D6).
+    string DayLabel(DateTime day) => day.ToString("ddd d", System.Globalization.CultureInfo.CurrentCulture);
+
+    // U04 — the Day/Week time grid's hour rows (D3): 0–23, each an hh:00
+    // local time label. Rendered server-side as the grid skeleton (plain
+    // numerals — a 24h ruler's hour marks are zone-independent numbers;
+    // a block's *position* within a day is the TS module's job, via Intl
+    // + data-time-zone, C-DWM·5 / C-DWM·4 display-only). 24 rows give the
+    // 00:00–24:00 span the design doc's §3.3 pins.
+    int[] Hours = Enumerable.Range(0, 24).ToArray();
+
     // C-EV·7 — nav is plain pre-rendered GET links; the server re-renders,
     // the authorization re-runs per request. The component filter rides
     // along so a filtered calendar stays filtered across nav (C-EV·3:
@@ -138,11 +151,65 @@
         {
             <div class="p-4 text-muted"><kw-l key="events.calendar.empty">No events in this window.</kw-l></div>
         }
+        else if (Model.View == "day" || Model.View == "week")
+        {
+            <!-- U04 / D3 — the Day/Week time-ruler grid: an hour-ruler
+                 column (00:00–24:00, server-rendered skeleton) + one
+                 day-column per WindowDays entry (Day = 1, Week = 7,
+                 Monday-first, C-DWM·5). Each day-column carries an
+                 absolutely-positioned .event-block-stack; the hidden
+                 .event-block-pool (one block per event, data-start-utc /
+                 data-end-utc / data-title / data-href) is the single
+                 source of truth — events-calendar-time.ts (C-DWM·4) moves
+                 one instance per touched day-column into the stack,
+                 positioned by top%/height% of that day, and flags overlap
+                 (the same [startUtc, endUtc) intersection rule as Month —
+                 all client-side display, never an access decision). -->
+            <div id="events-calendar"
+                 data-time-zone="@Model.TimeZoneId"
+                 data-from="@Model.FromAnchor"
+                 data-view="@Model.View"
+                 data-overlap-hint="@overlapHint">
+                <div class="events-time-grid @((Model.View == "day") ? "events-time-grid--day" : "events-time-grid--week")">
+                    <div class="events-time-ruler" aria-hidden="true">
+                        @foreach (var h in Hours)
+                        {
+                            <div class="events-time-ruler-label">@h.ToString("00"):00</div>
+                        }
+                    </div>
+                    <div class="events-time-day-area">
+                        @foreach (var day in days)
+                        {
+                            <div class="events-time-column" data-date="@day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)">
+                                <div class="events-time-column-label">@DayLabel(day)</div>
+                                <div class="events-time-body">
+                                    <div class="event-block-stack"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="event-block-pool" hidden>
+                    @foreach (var row in Model.Events)
+                    {
+                        <div class="event-block"
+                             data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-title="@row.Title"
+                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
+                            <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="g"></kw-dt></span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
         else
         {
             <div id="events-calendar"
                  data-time-zone="@Model.TimeZoneId"
                  data-from="@Model.FromAnchor"
+                 data-view="@Model.View"
                  data-overlap-hint="@overlapHint">
                 <!-- The day-columns (Model.WindowDays — U02's per-view
                      window; month = the true calendar month, 5–6 full
@@ -192,6 +259,14 @@
 @section Scripts {
     <!-- Events calendar (EV-CAL, ADR 0063) — client/lib/events-calendar.ts,
          tsc-built; distributes chips into day-columns (Intl + the effective
-         zone id, C-EV·5 display-only) + the overlap flag (C-EV·4). -->
+         zone id, C-EV·5 display-only) + the overlap flag (C-EV·4). Runs on
+         the Month path only (the view ships data-view, the module's guard
+         is data-view != "month" — events-calendar-time.ts takes Day/Week). -->
     <script type="module" src="~/js/lib/events-calendar.js"></script>
+    <!-- EV-DWM (ADR 0064, U04) — the Day/Week time-ruler grid module:
+         positions each .event-block by top%/height% within its touched
+         day-column(s) (Intl + data-time-zone, display-only) + the overlap
+         flag (C-DWM·4, mirrored from events-calendar.ts so the EV-CAL
+         module stays untouched — C-DWM·7). -->
+    <script type="module" src="~/js/lib/events-calendar-time.js"></script>
 }
