@@ -533,6 +533,7 @@ public sealed class EventService : IEventService
             End = request.End,
             Location = request.Location,
             Capacity = request.Capacity,
+            Color = request.Color,                    // display metadata (the Location shape) — written verbatim.
             Audience = request.Audience,              // ADR 0001-B — written verbatim; never mutated here.
             ReminderEnabled = request.ReminderEnabled,
             IsDraft = request.IsDraft,                // ADR 0037 — a newly created event is a draft by default.
@@ -620,6 +621,7 @@ public sealed class EventService : IEventService
             || existing.End != request.End
             || !string.Equals(existing.Location, request.Location, StringComparison.Ordinal)
             || existing.Capacity != request.Capacity
+            || !string.Equals(existing.Color, request.Color, StringComparison.Ordinal)
             || !AudiencesEqual(existing.Audience, request.Audience)
             || existing.ReminderEnabled != request.ReminderEnabled
             || existingLanguageCode != updatedLanguageCode
@@ -637,6 +639,7 @@ public sealed class EventService : IEventService
         existing.Start = request.Start;
         existing.End = request.End;
         existing.Location = request.Location;
+        existing.Color = request.Color;                 // display metadata (the Location shape) — written verbatim.
         existing.Capacity = request.Capacity;
         existing.Audience = request.Audience;           // ADR 0001-B — written verbatim; never mutated.
         existing.ReminderEnabled = request.ReminderEnabled;

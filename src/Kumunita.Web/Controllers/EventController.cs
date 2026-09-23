@@ -321,7 +321,8 @@ public sealed class EventController : Controller
                 ComponentId: e.ComponentId,
                 ComponentDisplayName: e.ComponentId is not null && componentById.TryGetValue(e.ComponentId, out var cn) ? cn : null,
                 IsDraft: e.IsDraft,
-                IsDeleted: e.IsDeleted);
+                IsDeleted: e.IsDeleted,
+                Color: e.Color);
 
         var rows = events.Select(e => ProjectRow(e, authorName, componentById)).ToList();
         var myRows = myEvents.Select(e => ProjectRow(e, authorName, componentById)).ToList();
@@ -520,7 +521,8 @@ public sealed class EventController : Controller
                 IsDraft: e.IsDraft,
                 IsDeleted: e.IsDeleted,
                 StartUtc: e.Start,
-                EndUtc: e.End))
+                EndUtc: e.End,
+                Color: e.Color))
             .ToList();
 
         // Nav anchors (C-DWM·6 — plain pre-rendered GET links): the anchor
@@ -822,6 +824,7 @@ public sealed class EventController : Controller
             Start = model.Start,
             End = model.End,
             Location = model.Location,
+            Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             ReminderEnabled = model.ReminderEnabled,
@@ -905,6 +908,7 @@ public sealed class EventController : Controller
             Start = ev.Start,
             End = ev.End,
             Location = ev.Location,
+            Color = ev.Color,
             Capacity = ev.Capacity,
             Audience = AudienceEditorModel.FromAudience(ev.Audience),
             ReminderEnabled = ev.ReminderEnabled,
@@ -983,6 +987,7 @@ public sealed class EventController : Controller
             Start = model.Start,
             End = model.End,
             Location = model.Location,
+            Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,
             Audience = model.Audience.BuildAudience(),
             ReminderEnabled = model.ReminderEnabled,

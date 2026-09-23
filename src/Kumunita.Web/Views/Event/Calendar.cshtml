@@ -201,6 +201,7 @@
                     @foreach (var row in Model.Events)
                     {
                         <div class="event-block"
+                             style="@(row.Color is { Length: > 0 } c ? $"--event-color:{c}" : null)"
                              data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-title="@row.Title"
@@ -250,6 +251,7 @@
                     @foreach (var row in Model.Events)
                     {
                         <div class="event-chip"
+                             style="@(row.Color is { Length: > 0 } c ? $"--event-color:{c}" : null)"
                              data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
                              data-title="@row.Title"

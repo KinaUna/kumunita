@@ -66,8 +66,8 @@
 
             <div class="card mb-4">
                 <div class="card-body">
-                    <div class="row g-2">
-                        <div class="col">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-5">
                             <label class="form-label" for="location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
                             <input class="form-control" type="text" id="location" name="Location"
                                    placeholder="@optionalPlaceholder" value="@Model.Location" />
@@ -77,9 +77,13 @@
                             <input class="form-control" type="number" min="1" id="capacity" name="Capacity"
                                    placeholder="@optionalPlaceholder" value="@Model.Capacity" />
                         </div>
+                        <div class="col-sm-3">
+                            <label class="form-label" for="color" style="font-weight:600;"><kw-l key="events.color">Color</kw-l></label>
+                            <input class="form-control form-control-color" type="color" id="color" name="Color"
+                                   value="@(Model.Color ?? "#4f8f84")" />                        </div>
                     </div>
                     <div class="text-muted small mt-2">
-                        <kw-l key="events.location_hint">Location and capacity are display details only — they do not limit who can RSVP.</kw-l>
+                        <kw-l key="events.location_hint">Location, capacity, and color are display details only — they do not limit who can RSVP.</kw-l>
                     </div>
                 </div>
             </div>

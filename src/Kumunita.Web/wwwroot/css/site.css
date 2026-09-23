@@ -1142,6 +1142,20 @@ body.kmb-page-fullbleed .navbar {
   .airy-page-list li { padding: 0.75rem 1rem; }
 }
 
+/* The shared base for the Month chip (.event-chip) and the Day/Week block
+   (.event-block): the author's picked calendar color (the pool item's
+   --event-color inline custom property — set in Calendar.cshtml from
+   Event.Color, a CSS color) as a soft tint over white, or the same faint
+   default when no color is set. The overlap ring below is declared after
+   this and overrides the background/border for a clash. Placed before the
+   overlap rule so the ring wins the cascade (equal specificity, later wins). */
+.event-chip,
+.event-block {
+  background: color-mix(in srgb, var(--event-color, color-mix(in srgb, var(--kmb-ink) 8%, #fff)) 18%, #fff);
+  border: 1px solid var(--kmb-border);
+  border-radius: var(--kmb-radius-chip);
+}
+
 /* EV-CAL (ADR 0063) — the overlap ring. `client/lib/events-calendar.ts`
    adds this class to every chip whose [startUtc, endUtc) half-open interval
    intersects another's (C-EV·4 — a display flag, never an access decision);
@@ -1331,7 +1345,8 @@ body.kmb-page-fullbleed .navbar {
   left: 0.25rem;
   right: 0.25rem;
   min-height: 1.25rem;
-  background: color-mix(in srgb, var(--kmb-ink) 4%, #fff);
+  /* background comes from the shared .event-chip/.event-block rule above (the
+     author's picked --event-color tint, or the faint default). */
   border: 1px solid var(--kmb-border);
   border-radius: var(--kmb-radius-chip);
   padding: 0.125rem 0.375rem;

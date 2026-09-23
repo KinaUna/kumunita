@@ -1096,8 +1096,9 @@ public static class KnownTranslationKeys
                 "The time the event runs. Shown to viewers in their own timezone.",
             ["events.location"] = "Location",
             ["events.capacity"] = "Capacity",
+            ["events.color"] = "Color",
             ["events.location_hint"] =
-                "Location and capacity are display details only — they do not limit who can RSVP.",
+                "Location, capacity, and color are display details only — they do not limit who can RSVP.",
             ["events.all_communities"] = "All communities",
             ["events.community_hint"] =
                 "The community this event appears under — a filter, not an access limit.",
@@ -2180,8 +2181,9 @@ public static class KnownTranslationKeys
                 "Die Zeit, in der die Veranstaltung stattfindet. Besucher sehen sie in ihrer eigenen Zeitzone.",
             ["events.location"] = "Ort",
             ["events.capacity"] = "Kapazität",
+            ["events.color"] = "Farbe",
             ["events.location_hint"] =
-                "Ort und Kapazität sind nur Anzeigedetails — sie beschränken nicht, wer eine Teilnahme angeben kann.",
+                "Ort, Kapazität und Farbe sind nur Anzeigedetails — sie beschränken nicht, wer eine Teilnahme angeben kann.",
             ["events.all_communities"] = "Alle Gemeinden",
             ["events.community_hint"] =
                 "Die Gemeinde, unter der diese Veranstaltung erscheint — ein Filter, keine Zugangsgrenze.",
@@ -3265,8 +3267,9 @@ public static class KnownTranslationKeys
                 "Le moment où l'événement a lieu. Les visiteurs le voient dans leur propre fuseau horaire.",
             ["events.location"] = "Lieu",
             ["events.capacity"] = "Capacité",
+            ["events.color"] = "Couleur",
             ["events.location_hint"] =
-                "Le lieu et la capacité sont des détails d'affichage seulement — ils ne limitent pas qui peut indiquer sa présence.",
+                "Le lieu, la capacité et la couleur sont des détails d'affichage seulement — ils ne limitent pas qui peut indiquer sa présence.",
             ["events.all_communities"] = "Toutes les communautés",
             ["events.community_hint"] =
                 "La communauté sous laquelle cet événement apparaît — un filtre, pas une limite d'accès.",
@@ -4345,8 +4348,9 @@ public static class KnownTranslationKeys
                 "Den tid, arrangementet foregår. Seere ser det i deres egen tidszone.",
             ["events.location"] = "Sted",
             ["events.capacity"] = "Kapacitet",
+            ["events.color"] = "Farve",
             ["events.location_hint"] =
-                "Sted og kapacitet er kun visningsdetaljer — de begrænser ikke, hvem der kan tilmelde sig.",
+                "Sted, kapacitet og farve er kun visningsdetaljer — de begrænser ikke, hvem der kan tilmelde sig.",
             ["events.all_communities"] = "Alle fællesskaber",
             ["events.community_hint"] =
                 "Det fællesskab, dette arrangement optræder under — et filter, ikke en adgangsgrænse.",

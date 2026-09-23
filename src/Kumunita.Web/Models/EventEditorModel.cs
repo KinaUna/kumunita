@@ -28,6 +28,9 @@ namespace Kumunita.Web.Models;
 /// <item><see cref="Location"/> / <see cref="Capacity"/> — display
 /// metadata; <see cref="Capacity"/> is **not** a gate (no admission
 /// queue; the <c>Going</c> RSVP set is the truth).</item>
+/// <item><see cref="Color"/> — the author's picked calendar color (the
+/// <see cref="Location"/> / <see cref="Capacity"/> shape — display
+/// metadata, never a gate; ADR 0066).</item>
 /// <item><see cref="Audience"/> — the M2 reusable
 /// <see cref="AudienceEditorModel"/> (the single-source pin — the one
 /// form-bound audience editor; <see cref="AudienceEditorModel
@@ -122,6 +125,14 @@ public sealed class EventEditorModel
     /// there is no admission queue in M4; the <c>Going</c> RSVP set is
     /// the truth.</summary>
     public int? Capacity { get; set; }
+
+    /// <summary>An optional display color (a CSS color, typically a
+    /// normalized <c>#RRGGBB</c> hex value) the author picked in the
+    /// composer (the <see cref="Location"/> / <see cref="Capacity"/>
+    /// shape — display metadata, never a gate). The calendar renders it
+    /// as the event chip/block background; null / empty = the theme
+    /// default.</summary>
+    public string? Color { get; set; }
 
     /// <summary>The event's <b>audience</b> editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the single-source pin — the
@@ -285,6 +296,9 @@ public sealed class EventEditorModel
 /// 0024) — the feed excludes deleted events unconditionally; this is
 /// present for the shape's completeness (the service filters it out,
 /// so it is false in every feed row).</param>
+/// <param name="Color">The author's picked display color for the
+/// calendar (the <c>Location</c> shape — display metadata, never a
+/// gate); null = the theme default.</param>
 public sealed record EventRow(
     string Id,
     string Title,
@@ -299,7 +313,8 @@ public sealed record EventRow(
     bool IsDraft,
     bool IsDeleted,
     DateTimeOffset StartUtc = default,
-    DateTimeOffset EndUtc = default);
+    DateTimeOffset EndUtc = default,
+    string? Color = null);
 
 /// <summary>
 /// The <b>feed</b> view model (the <c>GET /events</c> read surface —

@@ -23,6 +23,9 @@ namespace Kumunita.Core.Events;
 /// <item><see cref="Location"/> / <see cref="Capacity"/> — *new, this milestone*:
 /// display metadata — <see cref="Capacity"/> is **not** a gate (no admission queue in
 /// M4; <c>Going</c> RSVPs are the truth, §5).</item>
+/// <item><see cref="Color"/> — display metadata (the <see cref="Location"/> /
+/// <see cref="Capacity"/> shape): the author's picked chip color for the calendar;
+/// <c>null</c> = the theme default. Never a gate.</item>
 /// <item><see cref="Audience"/> — <c>Post.Audience</c> (ADR 0001-B / 0036): <c>null</c>
 /// = public (the frozen <c>Decide()</c> branch 5); the <c>AudienceEditorModel</c> form
 /// surface verbatim. **No new audience mechanism.**</item>
@@ -86,6 +89,14 @@ public sealed class Event
     /// admission queue / waitlist in M4 (the design doc §5 non-decision); <c>Going</c>
     /// RSVPs are the truth.</summary>
     public int? Capacity { get; set; }
+
+    /// <summary>
+    /// An optional display color (a CSS color, typically a normalized <c>#RRGGBB</c> hex
+    /// value) the author picked in the composer — a pure **display** choice, not a gate
+    /// (the <see cref="Location"/> / <see cref="Capacity"/> shape). The calendar renders
+    /// it as the event chip/block background; <c>null</c> = the theme default.
+    /// </summary>
+    public string? Color { get; set; }
 
     /// <summary>
     /// The **exact** <c>Post</c> <see cref="Kumunita.Core.Authorization.Audience"/>
