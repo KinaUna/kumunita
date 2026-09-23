@@ -1154,3 +1154,32 @@ body.kmb-page-fullbleed .navbar {
   background: color-mix(in srgb, var(--kmb-amber-soft) 14%, #fff);
 }
 
+/* EV-DWM (ADR 0064, U03) — the Day/Week/Month toggle in the calendar
+   header (D5). Three plain-GET links in a btn-group; the active view is
+   rendered pressed (Bootstrap's .btn-group .btn.active styling applies,
+   so only the pressed fill is reinforced here — a calm solid state that
+   reads as "current view" against the outline siblings). */
+.events-view-toggle .btn.active {
+  background: var(--kmb-tint-a);
+  border-color: var(--kmb-hover-border);
+  color: var(--bs-primary);
+  font-weight: 600;
+}
+.events-view-toggle .btn:not(.active):hover {
+  background: var(--kmb-tint-a);
+  color: var(--bs-primary);
+}
+
+/* EV-DWM (ADR 0064, U03) — Month as a true calendar month (D4): the
+   5–6-week grid's leading/trailing columns belong to the adjacent
+   months; dim them so the month's shape reads at a glance. A display
+   nicety only — the columns still distribute chips (the TS module is
+   untouched, C-DWM·7); events landing on those days are the anchor
+   month's multi-day overflows, dimmed by their column. */
+.events-calendar-day-outside {
+  opacity: 0.55;
+}
+.events-calendar-day-outside .events-calendar-day-label {
+  color: var(--kmb-muted);
+}
+

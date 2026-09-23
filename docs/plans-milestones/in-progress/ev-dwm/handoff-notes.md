@@ -100,3 +100,29 @@ section + its own entry-read list.
   one-line `@Model.Label` rename).
 - Next: **U03** — Month view (chip grid reframed to a true calendar month) +
   the Day/Week/Month toggle in the header.
+
+## U03 — Month + toggle
+
+- **`WindowDays`-driven grid**: `Calendar.cshtml` now iterates `Model.WindowDays`
+  (U02's 5–6 week × 7 day columns) instead of the hardcoded `Enumerable.Range(0,30)`;
+  each outside-month column gets `.events-calendar-day-outside` (CSS opacity dim, D4).
+- **Toggle**: `Day / Week / Month` in the header as a `btn-group btn-group-sm`
+  (three plain-GET links: `/events/calendar?view=…&from=…[&componentId=…]`),
+  active view marked via `Model.View` (`.active` class + `aria-pressed`); the
+  component-filter form also gets a hidden `view` input so a filtered view
+  stays filtered. Toggle labels are plain English (the 3 `kw-l` keys are
+  **U05**'s deliverable — adding them now would fail the `KwLRegistryConsistencyTests`).
+- **`events-calendar.ts` untouched** (C-DWM·7) — the module iterates whatever
+  `.events-calendar-day` columns exist and worked on the 34-column month grid
+  without any change (verified in the browser: 2 chips distributed correctly).
+- **`NavHref`** now appends `view=` so prev/next/today preserve the current
+  view (C-DWM·6 / F6).
+- **Files**: `src/Kumunita.Web/Views/Event/Calendar.cshtml` +
+  `src/Kumunita.Web/wwwroot/css/site.css` (toggle active/hover states +
+  `.events-calendar-day-outside` dim).
+- **Exit**: `dotnet build Kumunita.slnx -c Debug` → 0 errors; `Kumunita.Web.Tests`
+  → 368 run, 0 failed. Browser verified: 34 day-columns (Aug 31 – Oct 3),
+  4 outside-month columns dimmed, Month toggle active, chip distribution
+  intact. No drift.
+- Next: **U04** — Week view (7-column time grid, Monday-start) + the new
+  `client/lib/events-calendar-time.ts`.
