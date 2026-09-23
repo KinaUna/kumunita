@@ -72,6 +72,16 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" href="/events"><kw-l key="nav.events">Events</kw-l></a>
                             </li>
+                            @* M5 (ADR 0067) — the to-do / board surface (the
+                               "outcome" arrow): shared to-dos + Kanban boards.
+                               [Authorize] on the ProjectsController ⇒
+                               resident-only, so it lives in this signed-in
+                               block (one entry, not three — the to-do feed /
+                               detail / composer are one surface; the board
+                               surface is the same controller). *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/projects/todos"><kw-l key="nav.projects">Projects</kw-l></a>
+                            </li>
                             @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
                                view). Display, not access — the tree is CanSeeAsync(Read)
                                -filtered and the composer button is standing-gated. The

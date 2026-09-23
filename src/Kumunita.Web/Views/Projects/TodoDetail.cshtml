@@ -1,0 +1,196 @@
+@model Kumunita.Web.Models.TodoDetailViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Todo.Title) ? "To-do" : Model.Todo.Title;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/projects/todos" class="btn btn-link p-0"><kw-l key="projects.todo.back">← Back to to-dos</kw-l></a>
+        </p>
+
+        @* The action dropdown (the _AccountNav.cshtml Bootstrap dropdown shape,
+           the M2/M3/M4 shared nav-dropdown idiom): assign / add-subtask /
+           delete — plain POST forms to the U07 routes, CSRF-tokenized,
+           redirect-after-POST. Standing + cascade are the service's (F7/F8/
+           F9); the view only renders what the service returns (C3). The
+           assign-to-user picker draws on the seeded grant-picker option lists
+           (the _GrantPickers partial's option source, the M2/M3/M4 shared
+           shape); "Unassign" clears the assignee. *@
+        <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+            @if (!string.IsNullOrWhiteSpace(Model.Todo.Status))
+            {
+                <span class="badge text-bg-light border">@Model.Todo.Status</span>
+            }
+            @if (Model.Todo.ComponentDisplayName is not null)
+            {
+                <span class="badge text-bg-light border">@Model.Todo.ComponentDisplayName</span>
+            }
+            <div class="dropdown ms-auto">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        aria-label="Actions for @Model.Todo.Title">⋮</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item text-dark" href="@($"/projects/todos/@Model.Todo.Id/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                    </li>
+                    <li>
+                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/assign")"
+                              data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/subtasks")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <div class="px-3 py-2">
+                                <input class="form-control form-control-sm mb-2" type="text" name="Title"
+                                       maxlength="120" required
+                                       placeholder="@("Subtask title")" />
+                            </div>
+                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.add_subtask">Add subtask</kw-l></button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/delete")"
+                              data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h1 class="mb-1">
+                    @if (string.IsNullOrWhiteSpace(Model.Todo.Title))
+                    {
+                        <span class="text-body-tertiary"><kw-l key="projects.todo.untitled">Untitled to-do</kw-l></span>
+                    }
+                    else
+                    {
+                        @Model.Todo.Title
+                    }
+                </h1>
+
+                <div class="text-muted small mt-2 mb-3">
+                    @Model.Todo.AuthorDisplayName
+                    @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))
+                    {
+                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
+                    }
+                    <span> · <kw-l key="projects.todo.created">Created</kw-l>
+                    <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
+                    @if (Model.Todo.Modified is not null)
+                    {
+                        <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                        <kw-dt dt="@Model.Todo.Modified" format="g"></kw-dt></span>
+                    }
+                </div>
+
+                @* F9 — the parent link (a subtask is a full to-do shown under
+                   its parent; the service's read surface, the view renders it). *@
+                @if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))
+                {
+                    <div class="mb-3">
+                        <span class="text-muted small"><kw-l key="projects.todo.parent">Parent</kw-l> · </span>
+                        <a href="@($"/projects/todos/@Model.Todo.ParentId")">@Model.Todo.ParentTitle</a>
+                    </div>
+                }
+
+                @* The body (the U09 spec's rich-editor shape — the
+                   rc-editor-toolbar / data-rich-editor /
+                   data-rich-editor-preview pattern, the ADR 0031 pin, the
+                   M3/M4 precedent): shown + editable in place. *@
+                @if (!string.IsNullOrWhiteSpace(Model.Todo.Body))
+                {
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control" id="body" name="Body" rows="6" data-rich-editor>@Model.Todo.Body</textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-body-tertiary mb-0"><kw-l key="projects.todo.no_body">No body — this to-do is title-only.</kw-l></p>
+                }
+            </div>
+        </div>
+
+        @* F9 — the subtasks (each a full to-do — its own status / assignee /
+           audience; the service's per-subtask Read gate already ran). *@
+        @if (Model.Subtasks.Count > 0)
+        {
+            <section class="mb-4">
+                <h2 class="h5 mb-3"><kw-l key="projects.todo.subtasks">Subtasks</kw-l></h2>
+                <div class="airy-ann-list">
+                    @foreach (var sub in Model.Subtasks)
+                    {
+                        <div class="airy-ann-row">
+                            <div>
+                                <h3 class="airy-ann-title">
+                                    <a href="@($"/projects/todos/@sub.Id")">@sub.Title</a>
+                                </h3>
+                                <div class="text-muted small mb-1">
+                                    @sub.AuthorDisplayName
+                                    @if (!string.IsNullOrWhiteSpace(sub.AssigneeDisplayName))
+                                    {
+                                        <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @sub.AssigneeDisplayName</span>
+                                    }
+                                    <span> · <kw-dt dt="@sub.Created" format="g"></kw-dt></span>
+                                    @if (!string.IsNullOrWhiteSpace(sub.Status))
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@sub.Status</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        @* F2 — the board placements (a to-do appears on each board it is
+           placed on; the service's read surface, the view renders it). *@
+        @if (Model.Placements.Count > 0)
+        {
+            <section class="mb-4">
+                <h2 class="h5 mb-3"><kw-l key="projects.todo.boards">Boards</kw-l></h2>
+                <div class="list-group">
+                    @foreach (var placement in Model.Placements)
+                    {
+                        <div class="list-group-item">
+                            <a href="@($"/projects/boards/@placement.BoardId")">
+                                @placement.BoardTitle
+                                @if (string.IsNullOrWhiteSpace(placement.BoardTitle))
+                                {
+                                    @placement.BoardId
+                                }
+                            </a>
+                            @if (!string.IsNullOrWhiteSpace(placement.LaneTitle))
+                            {
+                                <span class="text-muted small ms-2">· @placement.LaneTitle</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

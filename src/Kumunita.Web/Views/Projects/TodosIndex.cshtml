@@ -1,0 +1,119 @@
+@model Kumunita.Web.Models.TodoIndexViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "To-dos";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="projects.todo.title">To-dos</kw-l></h1>
+                    <p class="lede">
+                        <kw-l key="projects.todo.lede">The neighborhood's shared to-dos — assign work to a neighbor, break it into subtasks, and put it on a board.</kw-l>
+                    </p>
+                </div>
+                <a class="btn btn-outline-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
+            </div>
+        </header>
+
+        @if (Model.Components.Count > 0)
+        {
+            <form method="get" action="/projects/todos" class="mb-4">
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value=""><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+                </div>
+            </form>
+        }
+
+        <div class="airy-ann-list">
+            @if (Model.Todos.Count == 0)
+            {
+                <div class="p-4 text-muted"><kw-l key="projects.todo.empty">No to-dos yet — create one to get the shared work started.</kw-l></div>
+            }
+            @foreach (var row in Model.Todos)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@($"/projects/todos/@row.Id")">@row.Title</a>
+                        </h3>
+                        <div class="text-muted small mb-1">
+                            @row.AuthorDisplayName
+                            @if (!string.IsNullOrWhiteSpace(row.AssigneeDisplayName))
+                            {
+                                <span>· <kw-l key="projects.todo.assignee">Assignee</kw-l>: @row.AssigneeDisplayName</span>
+                            }
+                            <span>· <kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                            @if (!string.IsNullOrWhiteSpace(row.Status))
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.Status</span>
+                            }
+                            @if (row.ComponentDisplayName is not null)
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(row.Body))
+                        {
+                            <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
+                        }
+                    </div>
+                    @* The to-do action dropdown (the _AccountNav.cshtml Bootstrap
+                       dropdown shape, the M2/M3/M4 shared nav-dropdown idiom):
+                       assign / add-subtask / delete — each a plain POST form to
+                       the U07 routes, CSRF-tokenized, redirect-after-POST. The
+                       standing + cascade decisions are the service's (F7/F8/F9);
+                       this surface only renders what the service returns (C3).
+                       The assign item here clears the assignee (unassigns); the
+                       assign-to-user picker lives in the edit lane, which seeds
+                       the user option lists. *@
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Actions for @row.Title">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <div class="dropdown-item text-dark"><kw-l key="projects.todo.assign">Assign</kw-l></div>
+                                <form method="post" action="@($"/projects/todos/@row.Id/assign")"
+                                      data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                </form>
+                            </li>
+                            <li>
+                                <form method="post" action="@($"/projects/todos/@row.Id/subtasks")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <div class="px-3 py-2">
+                                        <input class="form-control form-control-sm mb-2" type="text" name="Title"
+                                               maxlength="120" required
+                                               placeholder="@("Subtask title")" />
+                                    </div>
+                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.add_subtask">Add subtask</kw-l></button>
+                                </form>
+                            </li>
+                            <li>
+                                <form method="post" action="@($"/projects/todos/@row.Id/delete")"
+                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
