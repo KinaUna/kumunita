@@ -187,6 +187,19 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<IUserInfoService>()));
+
+        // M5 (ADR 0067, plan U04): the Projects bounded context's service seam
+        // (bounded context Kumunita.Core.Projects — the "outcome" arrow: the
+        // TodoItem + KanbanBoard/KanbanLane/BoardItemPlacement documents, the
+        // IProjectService read/write/placement surface). Same
+        // "AddTransient with the store injected" shape as IEventService above;
+        // U04 lands the read lanes + the stubs, U05 / U06 land the write +
+        // placement lanes (the seam is the frozen surface — the design doc §2.3
+        // pin; the same "logic lands later" posture as the M4 U01 pin).
+        services.AddTransient<Projects.IProjectService>(sp => new Projects.ProjectService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
         return services;
     }
 }

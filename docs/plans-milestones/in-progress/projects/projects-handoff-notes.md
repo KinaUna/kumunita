@@ -79,3 +79,34 @@ mirroring `EventToAuditableResource`. `Name` is the 60-char
 title-then-body/description pin (57 + "..."), null-safe via a small
 private `Truncate` helper (the body/description is optional — degenerate
 case = empty `Name`). **`dotnet build Kumunita.slnx -c Debug` is green.**
+
+## U04 — service seam + read lanes
+
+**Four new files, one edit:** (a) `src/Kumunita.Core/Projects/IProjectService.cs`
+(the **full** frozen seam — read + write + placement, verbatim design doc §2.3:
+4 read, 8 write, 4 placement); (b) `src/Kumunita.Core/Projects/ProjectService.cs`
+(`sealed class`, constructor `(IDocumentStore, IAuthorizationService,
+IUserInfoService)`, `PageSize = 30`); (c) `src/Kumunita.Core/Projects/
+ProjectRequests.cs` (the 8 DTO records, verbatim §2.3); (d) **`IProjectService`
+DI registration** in `src/Kumunita.Core/DependencyInjection.cs` (the
+`AddTransient<Projects.IProjectService>` shape, placed immediately after the
+`IEventService` registration). **Read lanes landed (4):**
+`ListTodosAsync` (feed: `!IsDeleted` + optional `ComponentId` / `AssigneeId`
+filter, `Created` descending, paged, one standalone `CanSeeAsync(Read)` over
+`TodoItemToAuditableResource`); `GetTodoAsync` (detail: load → `IsDeleted`
+404 → `CanAsync(Read)` 403 split → subtasks each individually
+`CanAsync(Read)`-gated, ordered `Created` ascending, returned in a
+`TodoDetailResult`); `ListBoardsAsync` (feed: `!IsDeleted` + optional
+`ComponentId`, `Created` descending, paged, one `CanSeeAsync(Read)` over
+`KanbanBoardToAuditableResource`); `GetBoardAsync` (detail: load → `IsDeleted`
+404 → board `CanAsync(Read)` 403 split → lanes ordered `Order` ascending →
+each lane's placements resolved to their `TodoItem` → each card individually
+`CanAsync(Read)`-gated, soft-deleted cards excluded, denied cards **not
+returned** — C-M5·3 two-level pin, returned in `BoardDetailResult` with
+`LaneDetail` per lane). **Stubs landed (12):** all 8 write methods (U05) +
+all 4 placement / reorder methods (U06) throw
+`NotImplementedException` with the unit they land in named in the message
+(the M4 U01 interface-first pin). **`IAuthorizationService` used with
+**no** signature change, **no** new `AccessAction`, **no** new `AccessVia`,
+**no** new branch in `Decide()` (C-M5·11). **`dotnet build Kumunita.slnx -c
+Debug` is green** (4.8 s, 0 errors, 0 warnings).
