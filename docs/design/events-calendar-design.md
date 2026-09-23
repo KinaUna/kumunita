@@ -1,16 +1,16 @@
 # Events calendar (`EV-CAL`) — a month-anchored overview of visible events — design
 
-> **Part 1 of 2** (U00). Part 2 (U01) will append "The seams (exact C# —
-> Part 2)" with the exact seam signature every unit codes against, the
-> **pinned seam-test names**, the **three-test acceptance gate**, and the
-> drift-guard — mirroring `m4-events-design.md` Part 2 and the `tags-design.md`
-> two-part shape.
+> **Two parts.** Part 1 (U00) is "What this lane is / the existing surface /
+> the design decisions / the invariants"; Part 2 (U01, §5 below) is "The seams
+> (exact C#)" — the exact seam signature every unit codes against, the **13
+> pinned test names**, the **three-test acceptance gate**, and the drift-guard
+> — mirroring `m4-events-design.md` Part 2 and the `tags-design.md` two-part
+> shape.
 >
 > **Status.** **In progress** (lane opened 2026-09-23). Decisions **D1–D7**
-> are marked **[PROPOSED]** in this part — U01 locks them by flipping every
-> marker to **[DECIDED — ADR 0063]** and authoring ADR 0063 (Accepted). The
-> ADR is the sign-off gate; this doc is the primary reference tier for
-> implementation. The lane plan is
+> are **locked — [DECIDED — ADR 0063]** (U01 authored ADR 0063, Accepted, and
+> flipped every marker to this). The ADR is the sign-off gate; this doc is
+> the primary reference tier for implementation. The lane plan is
 > `plans-milestones/in-progress/events-calendar/plan-events-calendar.md`
 > (the sealed-unit register, U00–U11); the scratch log is
 > `events-calendar-handoff-notes.md` alongside it.
@@ -126,11 +126,11 @@ Read directly, not assumed:
 
 ## 3. The design decisions
 
-Each decision below is **[PROPOSED]** — U01 locks them all by authoring
-**ADR 0063** (Accepted) and flipping every marker to **[DECIDED — ADR
-0063]**. U02–U08 code against the *locked* text.
+Each decision below is **locked — [DECIDED — ADR 0063]** (U01 authored ADR
+0063, Accepted, and flipped every marker to this). U02–U08 code against this
+locked text.
 
-### 3.1 Zero document changes (D1) [PROPOSED]
+### 3.1 Zero document changes (D1) **[DECIDED — ADR 0063]**
 
 No field is added to `Event`, `EventRsvp`, or `EventTranslation`;
 `M4DocTypes` is untouched; no `FeatureSchemaBase` migration; the boot
@@ -141,13 +141,15 @@ in the whole lane is: one seam (`ListInRangeAsync`) + its implementation,
 one `Calendar` action, one view, one TS file, one CSS rule, and the key
 block (the C-EV·6 pin).
 
-### 3.2 The one seam: `ListInRangeAsync` (D2) [PROPOSED]
+### 3.2 The one seam: `ListInRangeAsync` (D2) **[DECIDED — ADR 0063]**
 
-`IEventService.ListInRangeAsync(string actorId, DateTime windowStartUtc,
-DateTime windowEndUtc, string? componentId, CancellationToken ct)` —
-declared directly after `ListUpcomingAsync`, implemented in `EventService`
-by **mirroring `ListUpcomingAsync` verbatim**: the same candidate filter
-(`!IsDeleted && !IsDraft`, optional `ComponentId` filter — C-M3·2), the
+`IEventService.ListInRangeAsync(DateTimeOffset windowStartUtc,
+DateTimeOffset windowEndUtc, string? componentId, string actorId,
+CancellationToken ct = default)` — the exact signature is pinned in
+§5.1; declared directly after `ListUpcomingAsync`, implemented in
+`EventService` by **mirroring `ListUpcomingAsync` verbatim**: the same
+candidate filter (`!IsDeleted && !IsDraft`, optional `ComponentId` filter
+— C-M3·2), the
 same single `CanSeeAsync(Read)` call over `EventToAuditableResource`
 (standalone form, the C3 one-aggregate-`AccessAudit`-row shape with
 `TargetKind = "event"`), restricted to the window predicate
@@ -161,7 +163,7 @@ seam itself is unbounded in `ct` semantics; the *bound* is a caller
 policy the Web enforces: `windowEndUtc = windowStartUtc + 30d`). No other
 method in `IEventService` or `EventService` changes.
 
-### 3.3 The route + anchor + window (D3) [PROPOSED]
+### 3.3 The route + anchor + window (D3) **[DECIDED — ADR 0063]**
 
 `GET /events/calendar` with query `?from=YYYY-MM-DD` — the month anchor
 **in the viewer's effective timezone** (the
@@ -176,7 +178,7 @@ as plain GET links by the server (C-EV·7 — no client nav code).
 Unparseable/missing `from` falls back to the zone's today (a display
 fallback, not an error).
 
-### 3.4 Overlap is client-side display-only (D4) [PROPOSED]
+### 3.4 Overlap is client-side display-only (D4) **[DECIDED — ADR 0063]**
 
 Two events overlap iff their `[startUtc, endUtc)` half-open intervals
 intersect. Computed in the TS module **over the already-authorized row
@@ -187,7 +189,7 @@ list** the view ships (each chip carries `data-start-utc` /
 (the C-EV·4 pin — the overlap is computed on the client over data the
 server already decided to show; the server neither sees nor cares).
 
-### 3.5 The view shape (D5) [PROPOSED]
+### 3.5 The view shape (D5) **[DECIDED — ADR 0063]**
 
 `Views/Event/Calendar.cshtml` over `EventCalendarViewModel`: a **7-column
 day grid** of the 30 window-days (Bootstrap shape, mirroring
@@ -200,7 +202,7 @@ label, the prev/next/today nav links, the `componentId` filter form
 (reused from the feed), the "List" cross-link (C-EV·8), and an empty
 state when the window has no visible events.
 
-### 3.6 The `kw-l` keys (D6) [PROPOSED]
+### 3.6 The `kw-l` keys (D6) **[DECIDED — ADR 0063]**
 
 ~8 new keys under `events.calendar.*` in **all four** seeded languages
 (en/de/fr/da) in `KnownTranslationKeys.cs`: `events.calendar.title`,
@@ -210,7 +212,7 @@ en floor text is authoritative, the de/fr/da texts are U07's
 translations). The `events.*` block is the host; the `tags.*` block is
 the precedent.
 
-### 3.7 Out of scope (future lanes) (D7) [PROPOSED]
+### 3.7 Out of scope (future lanes) (D7) **[DECIDED — ADR 0063]**
 
 No year view; no event creation from the calendar; no RSVP from the
 calendar (the detail page owns it); no drag-to-reschedule; no iCal export
@@ -263,3 +265,188 @@ and the ADR 0063 will carry them verbatim.
 - **C-EV·8** — the list view is unchanged in behavior; the calendar is a
   **second view** of the same data — the list⇄calendar cross-links are
   the *only* `Index.cshtml` touch in the lane (one "Calendar" link).
+
+## 5. The seams (exact C# — Part 2)
+
+**Part 2 of 2** (U01). This part pins the exact C# every implementation unit
+(U02–U08) codes against: the one seam's signature (§5.1), the Web shape
+(§5.2), the **13 pinned test names** (§5.3 / §5.4), the three-test acceptance
+gate (§5.5), and the drift-guard (§5.6). U02–U08 code against *this* text;
+any mismatch is a `## U<m> — Drift pause` (unit-series rule 7).
+
+### 5.1 The one seam (exact C#)
+
+On `IEventService`, declared **directly after `ListUpcomingAsync`** (the
+exact placement — a rename, re-order, or re-type after U02 is a drift event):
+
+```csharp
+/// <summary>
+/// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — the feed's candidate set
+/// restricted to <c>[windowStartUtc, windowEndUtc)</c>: an event is in the
+/// window on the day it <b>starts</b> (<c>Start &gt;= windowStartUtc &amp;&amp;
+/// Start &lt; windowEndUtc</c>, inclusive start / exclusive end). Same candidate
+/// filter as <see cref="ListUpcomingAsync"/> (<c>!IsDeleted &amp;&amp; !IsDraft</c>,
+/// optional <c>ComponentId</c> filter — C-M3·2, a filter never a gate), the
+/// same single <c>CanSeeAsync(Read)</c> gate over
+/// <see cref="EventToAuditableResource"/> (C-EV·2, one aggregate
+/// <c>AccessAudit</c> row, <c>TargetKind = "event"</c>), the same standalone
+/// form (no in-flight caller transaction). <b>C-EV·1</b>: shows exactly what
+/// <see cref="ListUpcomingAsync"/> would for this window.
+/// </summary>
+Task<IReadOnlyList<Event>> ListInRangeAsync(
+    DateTimeOffset windowStartUtc,
+    DateTimeOffset windowEndUtc,
+    string? componentId,
+    string actorId,
+    CancellationToken ct = default);
+```
+
+**Parameter order + types — locked** (resolves U00's open question (a)): the
+order is `(windowStartUtc, windowEndUtc, componentId, actorId, ct)` and the
+bounds are **`DateTimeOffset`** (matching `Event.Start` / `Event.End`, both
+`DateTimeOffset` UTC instants — Part 1's tentative `DateTime` +
+`actorId`-first form is superseded by this pin). The window bounds lead (the
+query's primary predicate), with the feed's own two args (`componentId`,
+`actorId`) trailing — the `ListUpcomingAsync(componentId, actorId, page)`
+shape with the window replacing `page`.
+
+**Window semantics (the §5.1 pin):**
+
+- **Predicate** — `Start >= windowStartUtc && Start < windowEndUtc` (the
+  event is in the window on the day it *starts*; a multi-day event's chip
+  repetition across columns is a *display* concern — the U06 TS module
+  distributes it, D5).
+- **Ordering** — `OrderBy(Start)` (the feed's ordering, verbatim).
+- **Cap** — `Take(30)` via a private `const int WindowCap = 30;` on
+  `EventService` next to `PageSize` (re-purposing the `PageSize = 30`
+  precedent as a *window bound*). Resolves U00's open question (b): the
+  const is named **`WindowCap`** (not `WindowDays`) because it caps the
+  *count* returned; the 30-day *span* is the controller's policy
+  (`windowEndUtc = windowStartUtc.AddDays(30)`), not the service's.
+- **Gate** — the single `CanSeeAsync(Read, …)` over
+  `EventToAuditableResource` (standalone form), then the `visibleIds`
+  filter — verbatim the `ListUpcomingAsync` body (C-EV·1 / C-EV·2).
+- **No** `page` parameter — the window replaces paging (the calendar is one
+  window, not a paged feed).
+
+**The 30-day span lives in the *controller*** (U04), not the service: the
+window is always `[anchorLocalStartUtc, anchorLocalStartUtc + 30d)`; the
+service's `Take(30)` cap is a **backstop**, not a policy. This keeps the
+service window-span-agnostic (a future year view could call the same seam
+with a wider span — a future lane, D7).
+
+### 5.2 The Web shape (exact C#)
+
+**`EventRow` gains exactly two additive, defaulted fields** (U03; the C-EV·6
+pin — additive, so the feed action's existing construction call site compiles
+unchanged):
+
+```csharp
+// in Models/EventEditorModel.cs — appended to the existing EventRow record
+// (after IsDeleted), both defaulted:
+    DateTimeOffset StartUtc = default,
+    DateTimeOffset EndUtc   = default;
+```
+
+**Note (resolves U03's open question):** `EventRow.Start` / `EventRow.End`
+are *already* `DateTimeOffset` UTC instants, so `StartUtc` / `EndUtc` are
+display-convenience mirrors of them. The U04 calendar action sets them
+explicitly (`StartUtc: e.Start, EndUtc: e.End`) on the calendar path; the
+feed action is **untouched** (the fields default). This keeps the U06 TS
+contract (`data-start-utc` / `data-end-utc`) reading unambiguous fields
+rather than re-deriving them. **No other `EventRow` field changes.**
+
+**`EventCalendarViewModel`** — added directly after `EventIndexViewModel` in
+`Models/EventEditorModel.cs` (U03; the `@model` in
+`Views/Event/Calendar.cshtml` must match this shape):
+
+```csharp
+public sealed record EventCalendarViewModel(
+    IReadOnlyList<EventRow> Events,                            // the window's visible events (the seam's survivors)
+    string FromAnchor,                                          // the current anchor, "yyyy-MM-dd" (the viewer's effective zone)
+    string? PrevAnchor,                                         // anchor − 1 month, "yyyy-MM-dd" (the prev nav link target)
+    string? NextAnchor,                                         // anchor + 1 month, "yyyy-MM-dd" (the next nav link target)
+    string MonthLabel,                                          // the anchor's month name + year (a display string, UI-culture driven)
+    string? CurrentComponentId,                                 // the selected filter (null ⇒ unfiltered) — C-M3·2
+    IReadOnlyList<(string Id, string Name)> Components,         // the filter picker options (a GetComponentsAsync read — a filter, never a gate)
+    string TimeZoneId);                                         // the effective zone id — C-EV·5: a DISPLAY input only, never an authorization input
+```
+
+**The `Calendar` action's window math** (U04, in `EventController`): parse
+`from` as a date **in the viewer's effective zone** (default: the zone's
+today) → convert the anchor's **local midnight** to a UTC instant (the
+`EffectiveTimezoneResolver`'s zone, ADR 0019) →
+`windowEndUtc = windowStartUtc.AddDays(30)`. `PrevAnchor` / `NextAnchor` are
+the anchor shifted **±1 month**, formatted `yyyy-MM-dd` (pre-rendered
+plain-GET-link targets — C-EV·7). `MonthLabel` is the anchor date's month
+short-name + year in `CultureInfo.CurrentCulture` (a *display* string, not a
+zone-driven calculation). The action is `[HttpGet("/events/calendar")]` under
+the controller's `[Authorize]`, thin — the visibility split is the seam's
+(C-EV·1). **No other `EventController` action changes.**
+
+### 5.3 The pinned seam tests (exact names) — 10
+
+`tests/Kumunita.Core.Tests/EventCalendarSeamTests.cs` (the
+`EventServiceTests` shape: `PostgresFixture`, seed-and-assert, the
+audience / draft / deleted matrix). **Exactly these 10 names** — a test
+whose name is not here is a drift event (unit-series rule 3):
+
+1. `EV_Range_IncludesEventStartingInWindow`
+2. `EV_Range_ExcludesEventStartingBeforeWindow`
+3. `EV_Range_ExcludesEventStartingOnWindowEnd_Exclusive`
+4. `EV_Range_DraftInvisibleToNonAuthor`
+5. `EV_Range_DraftVisibleToAuthor`
+6. `EV_Range_DeletedExcludedForEveryone`
+7. `EV_Range_AudienceMemberSeesEvent`
+8. `EV_Range_NonMemberDenied_NoLeak`
+9. `EV_Range_AggregateAuditRowShape_TargetKindEvent`
+10. `EV_Range_ComponentFilterIsFilterNotGate`
+
+### 5.4 The Web pin tests (exact names) — 3
+
+Appended to `tests/Kumunita.Web.Tests/EventControllerTests.cs` (NSubstitute —
+the seam + the `EffectiveTimezoneResolver` stubbed):
+
+11. `Calendar_DefaultFromIsTodayInEffectiveZone`
+12. `Calendar_FromShiftsWindow_AndPrevNextLinks`
+13. `Calendar_PassesComponentFilter_ToSeam`
+
+**13 pinned tests total** (10 seam + 3 Web).
+
+### 5.5 The acceptance gate (U09 records)
+
+The three-test gate (the M4 U11 precedent), recorded by U09 as a
+`### Run result (EV-CAL acceptance gate — <date>)` section in this doc:
+
+- **Closed loop** — an author's *published* event in the window appears in
+  the author's calendar with the right chip, and exactly one aggregate
+  `AccessAudit` row (`TargetKind = "event"`) is written for the render.
+- **Handoff** — a group member added to the event's audience sees the event
+  in their calendar on the *next* render (the C4 strong-consistency shape —
+  the decision re-runs per request); a non-member's calendar still excludes
+  it (the C-EV·1 non-leak).
+- **Part-vs-whole** — the 10 seam tests (§5.3) + the 3 Web pins (§5.4) pass
+  together **with the full M4 `EventServiceTests` suite still green** — the
+  lane is additive; nothing in M4 regressed (C-EV·6).
+
+### 5.6 The drift-guard (frozen once written)
+
+The following are **frozen pins** for `EV-CAL`; a unit that finds one out of
+date pauses and records `## U<m> — Drift pause` in the handoff note
+(unit-series rule 7) rather than improvising:
+
+- **D1–D7** (§3.1–§3.7) — locked [DECIDED — ADR 0063]; the ADR 0063 Decision
+  section is the source of truth.
+- **The seam signature** (§5.1) — `ListInRangeAsync(DateTimeOffset
+  windowStartUtc, DateTimeOffset windowEndUtc, string? componentId, string
+  actorId, CancellationToken ct = default)`, placed directly after
+  `ListUpcomingAsync`; the predicate `Start >= windowStartUtc && Start <
+  windowEndUtc`; the `WindowCap = 30` const.
+- **The `EventRow` 2-field pin** (§5.2) — exactly `StartUtc` + `EndUtc`, both
+  `DateTimeOffset`, both defaulted; no other field.
+- **The `EventCalendarViewModel` shape** (§5.2) — the 8 positional fields,
+  in this order.
+- **The 13 test names** (§5.3 / §5.4) — verbatim.
+- **The 8 invariants** (C-EV·1 … C-EV·8, §4) — verbatim.
+- **The 8 `kw-l` key names** (§3.6) — `events.calendar.title`, `.prev`,
+  `.next`, `.today`, `.overlap_hint`, `.empty`, `.list_view`, `.from`.
