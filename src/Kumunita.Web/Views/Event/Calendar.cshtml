@@ -148,11 +148,12 @@
             }
         </div>
 
-        @if (Model.Events.Count == 0)
-        {
-            <div class="p-4 text-muted"><kw-l key="events.calendar.empty">No events in this window.</kw-l></div>
-        }
-        else if (Model.View == "day" || Model.View == "week")
+        @* The grid renders even when the window is empty (C-DWM: the day/week
+             time-ruler and the month chip grid are the empty state — the
+             structure shows even with no events, so a resident sees the
+             hours/days at a glance and knows where to look. The pool/stacks
+             are simply empty; the TS modules no-op over zero rows. *@
+        @if (Model.View == "day" || Model.View == "week")
         {
             <!-- U04 / D3 — the Day/Week time-ruler grid: an hour-ruler
                  column (00:00–24:00, server-rendered skeleton) + one
@@ -173,6 +174,12 @@
                  data-overlap-hint="@overlapHint">
                 <div class="events-time-grid @((Model.View == "day") ? "events-time-grid--day" : "events-time-grid--week")">
                     <div class="events-time-ruler" aria-hidden="true">
+                        @* The 2rem head band mirrors each day-column's day-label
+                             header (".events-time-column-label"), so the ruler's
+                             hour rows start at the same y as the day-body's hour
+                             rows — the two stay pixel-aligned (the hour rows are
+                             24 × 3rem in both; only the head offsets them). *@
+                        <div class="events-time-ruler-head"></div>
                         @foreach (var h in Hours)
                         {
                             <div class="events-time-ruler-label">@h.ToString("00"):00</div>
