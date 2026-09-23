@@ -72,6 +72,47 @@ public interface IEventService
     /// </summary>
     Task<EventRsvp?> GetMyRsvpAsync(string eventId, string actorId, CancellationToken ct = default);
 
+    /// <summary>
+    /// The actor's **own upcoming events** (ADR 0065, the <c>EV-MINE</c> lane) —
+    /// the <c>/events</c> feed's "your events" section. The set is the **union**
+    /// of:
+    /// <list type="bullet">
+    /// <item>the actor's <b>RSVPs</b> — every <see cref="EventRsvp"/> row keyed
+    /// to <paramref name="actorId"/>'s <c>SubjectId</c>, resolved to its
+    /// <see cref="Event"/>, regardless of <see cref="RsvpStatus"/> (the resident
+    /// has *signed up* — the row exists — whether <c>Going</c> /
+    /// <c>Maybe</c> / <c>No</c>; the status is surfaced by the caller, not
+    /// filtered here); and</item>
+    /// <item>the actor's **authored** events (<see cref="Event.AuthorId"/> =
+    /// <paramref name="actorId"/>) — a resident's own events are always on their
+    /// "my events" list, whether or not they also RSVPed.</item>
+    /// </list>
+    /// restricted to **upcoming** — <see cref="Event.Start"/> strictly in the
+    /// future (a past event is no longer "upcoming" — it leaves the section
+    /// rather than being re-rendered) — and to **live** events
+    /// (<c>!IsDeleted</c>; a soft-deleted event is invisible to its author here
+    /// too, the ADR 0024 read-lane shape). **Draft** events are *included*
+    /// (ADR 0037 author-only visibility — the author's own draft is on their
+    /// list; no other actor can see it, so the union is inherently non-leaky:
+    /// every event in the result is either authored by the actor or has an
+    /// <see cref="EventRsvp"/> row keyed to them, and <see cref="RsvpAsync"/>
+    /// requires the event to be visible to the actor — a denied actor never
+    /// gets an RSVP row they could later read back). Ordered by
+    /// <see cref="Event.Start"/> ascending; capped at <c>50</c> (a backstop,
+    /// not a page — the per-actor set is small at one-neighborhood scale, and
+    /// a single section should not page).
+    /// <para>
+    /// **No <c>AccessAudit</c> row** (the ADR 0054 §3.2 / §3.4 posture for
+    /// RSVP-shaped reads): this read inherits the visibility decision of the
+    /// write that created each row — the RSVP write lane and the
+    /// <see cref="CreateAsync"/> / <see cref="UpdateAsync"/> write lanes each
+    /// commit their own audit row — so this surface does not re-commit a
+    /// decision. The same posture as <see cref="GetMyRsvpAsync"/>'s read of a
+    /// single row; no <c>IAuthorizationService</c> call here.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<Event>> ListMineAsync(string actorId, CancellationToken ct = default);
+
     // --- Write lanes (U04) — standing re-checked server-side (§3.4, C3) --------
 
     /// <summary>

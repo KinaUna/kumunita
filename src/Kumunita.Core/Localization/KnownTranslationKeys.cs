@@ -1128,6 +1128,10 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Update",
             ["events.remove_translation_confirm"] = "Remove this translation?",
 
+            // ── events.mine (the EV-MINE "your upcoming events" section on /events — ADR 0065) ──
+            ["events.mine.title"] = "Your upcoming events",
+            ["events.mine.hint"] = "Events you've RSVPed to or organized.",
+
             // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendar",
             ["events.calendar.prev"] = "Prev",
@@ -2207,6 +2211,10 @@ public static class KnownTranslationKeys
             ["events.rsvp_responses"] = "Antworten",
             ["events.rsvp_update"] = "Aktualisieren",
             ["events.remove_translation_confirm"] = "Diese Übersetzung entfernen?",
+
+            // ── events.mine (der EV-MINE-Bereich „Deine Veranstaltungen“ auf /events — ADR 0065) ──
+            ["events.mine.title"] = "Deine kommenden Veranstaltungen",
+            ["events.mine.hint"] = "Veranstaltungen, die du bestätigt hast oder organisiert.",
 
             // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",
@@ -3289,6 +3297,10 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Mettre à jour",
             ["events.remove_translation_confirm"] = "Supprimer cette traduction ?",
 
+            // ── events.mine (la section « Tes prochains événements » sur /events — ADR 0065) ──
+            ["events.mine.title"] = "Tes prochains événements",
+            ["events.mine.hint"] = "Événements auxquels tu as répondu ou que tu as organisés.",
+
             // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Calendrier",
             ["events.calendar.prev"] = "Précédent",
@@ -4364,6 +4376,10 @@ public static class KnownTranslationKeys
             ["events.rsvp_responses"] = "Svar",
             ["events.rsvp_update"] = "Opdater",
             ["events.remove_translation_confirm"] = "Fjern denne oversættelse?",
+
+            // ── events.mine (sektionen „Dine kommende arrangementer“ på /events — ADR 0065) ──
+            ["events.mine.title"] = "Dine kommende arrangementer",
+            ["events.mine.hint"] = "Arrangementer, du har svaret på eller arrangerer.",
 
             // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
             ["events.calendar.title"] = "Kalender",

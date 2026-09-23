@@ -41,6 +41,12 @@ public sealed class EventService : IEventService
     // *span* is the controller's policy, not the service's).
     private const int WindowCap = 30;
 
+    // EV-MINE (ADR 0065) — the "your upcoming events" section's result-count
+    // backstop: the per-actor RSVP/authorship set is small at one-neighborhood
+    // scale, and the section does not page — the cap guards against a
+    // misconfigured or abusive RSVP history, it is not a page size.
+    private const int MineCap = 50;
+
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
@@ -267,6 +273,61 @@ public sealed class EventService : IEventService
         return await session.Query<EventRsvp>()
             .Where(r => r.EventId == eventId && r.UserId == actorId)
             .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The actor's **own upcoming events** (ADR 0065, the <c>EV-MINE</c> lane) —
+    /// the <c>/events</c> feed's "your events" section. The candidate set is
+    /// the **union** of the actor's RSVP rows (any
+    /// <see cref="RsvpStatus"/> — a <c>No</c> / <c>Maybe</c> RSVP is still a
+    /// sign-up, the row exists) and the events they authored, restricted to
+    /// **upcoming** (<c>Start &gt; now</c>) and **live** (<c>!IsDeleted</c> —
+    /// the ADR 0024 read-lane shape). **Drafts are included**: ADR 0037's
+    /// author-only draft gate makes the union inherently non-leaky — every
+    /// result row is authored by the actor or has an
+    /// <see cref="EventRsvp"/> row keyed to them (an RSVP row can only exist
+    /// on an event the actor may already read — <see cref="RsvpAsync"/>
+    /// verifies standing first), so no other actor can ever see an event
+    /// through this seam. <b>No <c>AccessAudit</c> row</b> (the
+    /// <see cref="GetMyRsvpAsync"/> posture): the row's own write lane already
+    /// committed its decision; no <see cref="IAuthorizationService"/> call
+    /// here. Ordered by <see cref="Event.Start"/> ascending, capped at
+    /// <see cref="MineCap"/> (a backstop, not a page).
+    /// </summary>
+    public async Task<IReadOnlyList<Event>> ListMineAsync(string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An actor is required to read their events.");
+
+        await using var session = _store.QuerySession();
+        var now = DateTimeOffset.UtcNow;
+
+        var mineIds = await (
+            from r in session.Query<EventRsvp>()
+            where r.UserId == actorId
+            select r.EventId
+        ).Distinct().ToListAsync(ct).ConfigureAwait(false);
+
+        var authoredIds = await (
+            from e in session.Query<Event>()
+            where e.AuthorId == actorId
+            select e.Id
+        ).ToListAsync(ct).ConfigureAwait(false);
+
+        if (mineIds.Count == 0 && authoredIds.Count == 0)
+            return Array.Empty<Event>();
+
+        var idSet = new HashSet<string>(mineIds);
+        foreach (var id in authoredIds)
+            idSet.Add(id);
+
+        var nowLocal = now;
+        return await session.Query<Event>()
+            .Where(e => !e.IsDeleted && e.Start > nowLocal && idSet.Contains(e.Id))
+            .OrderBy(e => e.Start)
+            .Take(MineCap)
+            .ToListAsync(ct)
             .ConfigureAwait(false);
     }
 

@@ -323,12 +323,28 @@ public sealed record EventRow(
 /// currently-selected filter (null ⇒ unfiltered). <see
 /// cref="CurrentPage"/> is the current page number (1-based).
 /// </para>
+/// <para>
+/// **<see cref="MyEvents"/>** (ADR 0065, the <c>EV-MINE</c> lane) is the
+/// viewer's **own upcoming events** — the union of their RSVPed events (any
+/// <see cref="Kumunita.Core.Events.RsvpStatus"/> — the row exists, the
+/// resident signed up) and their authored events, restricted to upcoming
+/// (<c>Start</c> in the future) and live (<c>!IsDeleted</c>) — from
+/// <see cref="Kumunita.Core.Events.IEventService.ListMineAsync"/> (no
+/// <c>AccessAudit</c> row — the per-row write lane already committed its
+/// decision, the <c>GetMyRsvpAsync</c> posture). The view renders this
+/// section first, before the full feed, and **only** when non-empty.
+/// </para>
 /// </summary>
 public sealed record EventIndexViewModel(
     IReadOnlyList<EventRow> Events,
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0065 (EV-MINE) — default `null!` (a valid compile-time constant;
+    // a collection expression `[]` is not a constant and is illegal here):
+    // callers that omit the argument treat it as the empty "no section"
+    // case — the view's `Count > 0` guard is null-safe against it.
+    IReadOnlyList<EventRow> MyEvents = null!);
 
 /// <summary>
 /// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read

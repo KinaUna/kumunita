@@ -314,6 +314,101 @@ public class EventControllerTests
         Assert.Equal("subj-ghost-001", model.Events[0].AuthorDisplayName);
     }
 
+    /// <summary>
+    /// ADR 0065 (the <c>EV-MINE</c> lane): <c>GET /events</c> also resolves the
+    /// viewer's **own upcoming events** — <see cref="IEventService
+    /// .ListMineAsync"/> (their RSVPed events, any status, ∪ their authored
+    /// events, upcoming + live only) — and hands them to the view as
+    /// <see cref="EventIndexViewModel.MyEvents"/> with the same
+    /// author/component display-name read shape as the feed rows. The section
+    /// renders first, before the feed, and only when non-empty (the view's
+    /// <c>Count &gt; 0</c> guard).
+    /// </summary>
+    [Fact]
+    public async Task Index_SurfacesMyEvents_WithDisplayNames()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(new List<Event> { SampleEvent("ev-feed", authorId: "subj-author-001") });
+        events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
+            .Returns(new List<Event> { SampleEvent("ev-mine", authorId: "subj-resident-001", componentId: "component-A") });
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
+        userInfo.GetProfileAsync("subj-resident-001").Returns((Profile?)new Profile { SubjectId = "subj-resident-001", DisplayName = "Me" });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component> { new() { Id = "component-A", Name = "Community A" } });
+
+        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+
+        var result = (await controller.Index(componentId: null, page: 1)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
+        Assert.Single(model.Events);          // the feed is untouched.
+        var mine = Assert.Single(model.MyEvents);
+        Assert.Equal("ev-mine", mine.Id);
+        Assert.Equal("Me", mine.AuthorDisplayName);           // the viewer is the author.
+        Assert.Equal("Community A", mine.ComponentDisplayName);
+        await events.Received(1).ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0065 — the empty case: a viewer with no RSVP rows and no authored
+    /// events (an un-stubbed <see cref="IEventService.ListMineAsync"/>
+    /// substitute returns an empty set) leaves <see
+    /// cref="EventIndexViewModel.MyEvents"/> empty — the view's
+    /// <c>Count &gt; 0</c> guard hides the section, and the feed renders
+    /// exactly as before the lane existed.
+    /// </summary>
+    [Fact]
+    public async Task Index_When_MyEventsEmpty_FeedUnchanged_And_MyEventsEmpty()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001") });
+        // ListMineAsync left un-stubbed — NSubstitute auto-returns an empty
+        // IReadOnlyList<Event> (the "no section" case).
+
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
+        userInfo.GetComponentsAsync(true).Returns(new List<Component>());
+
+        var controller = Build(events, userInfo: userInfo, subjectId: "subj-resident-001");
+
+        var result = (await controller.Index(componentId: null, page: 1)) as ViewResult;
+
+        Assert.NotNull(result);
+        var model = Assert.IsType<EventIndexViewModel>(result!.ViewData.Model);
+        Assert.Empty(model.MyEvents);
+        Assert.Single(model.Events);
+        Assert.Equal("Ada", model.Events[0].AuthorDisplayName);
+        await events.Received(1).ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0065 — the 403 split on the own-events read: the service's
+    /// <see cref="IEventService.ListMineAsync"/> denies (a Core-layer re-check
+    /// of the actor's standing). The Web layer maps that to a clean
+    /// <see cref="ForbidResult"/> (403, never a 500) and renders nothing — the
+    /// same 404-vs-403 split convention the feed and the write lanes use.
+    /// </summary>
+    [Fact]
+    public async Task Index_When_ListMineDenies_Returns_403()
+    {
+        var events = Substitute.For<IEventService>();
+        events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
+            .Returns(new List<Event>());
+        events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<Event>>(new UnauthorizedAccessException("An actor is required to read their events.")));
+
+        var controller = Build(events, subjectId: "subj-resident-001");
+
+        var result = await controller.Index(componentId: null, page: 1);
+
+        Assert.IsType<ForbidResult>(result);
+        await events.Received(1).ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>());
+    }
+
     // ── Composer (GET/POST /events/new) ────────────────────────────────────────
 
     /// <summary>

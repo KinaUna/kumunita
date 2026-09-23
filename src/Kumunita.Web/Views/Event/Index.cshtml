@@ -38,6 +38,38 @@
             </form>
         }
 
+        @if (Model.MyEvents.Count > 0)
+        {
+            <section class="mb-4">
+                <h2 class="h5 mb-1"><kw-l key="events.mine.title">Your upcoming events</kw-l></h2>
+                <p class="text-muted small mb-3"><kw-l key="events.mine.hint">Events you've RSVPed to or organized.</kw-l></p>
+                <div class="airy-ann-list">
+                    @foreach (var row in Model.MyEvents)
+                    {
+                        <div class="airy-ann-row">
+                            <div>
+                                <h3 class="airy-ann-title">
+                                    <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+                                </h3>
+                                <div class="text-muted small mb-1">
+                                    @row.AuthorDisplayName — <kw-dt dt="@row.Start" format="g"></kw-dt>
+                                    @if (row.ComponentDisplayName is not null)
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(row.Location))
+                                {
+                                    <div class="mb-1">@row.Location</div>
+                                }
+                                <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
         <div class="airy-ann-list">
             @if (Model.Events.Count == 0)
             {

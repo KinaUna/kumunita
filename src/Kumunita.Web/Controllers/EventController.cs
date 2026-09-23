@@ -217,6 +217,18 @@ public sealed class EventController : Controller
     /// <paramref name="componentId"/> query is a filter (C-M3·2), never a gate.
     /// Author + component display names are *read* lookups (never access
     /// decisions).
+    /// <para>
+    /// **ADR 0065 (the <c>EV-MINE</c> lane):** the same read also resolves the
+    /// viewer's **own upcoming events** (<see cref="IEventService
+    /// .ListMineAsync"/> — their RSVPed events, any status, ∪ their authored
+    /// events, upcoming + live only) and hands them to the view as
+    /// <see cref="EventIndexViewModel.MyEvents"/>. The section is rendered
+    /// first, before the feed, and only when non-empty. No
+    /// <c>AccessAudit</c> row (the per-row write lane already committed its
+    /// decision — the <see cref="IEventService.GetMyRsvpAsync"/> posture); the
+    /// union is inherently non-leaky (a non-author can only hold an RSVP row on
+    /// an event they may already read — <c>RsvpAsync</c> gates standing first).
+    /// </para>
     /// </summary>
     [HttpGet("/events")]
     public async Task<IActionResult> Index(string? componentId, int page = 1)
@@ -233,23 +245,50 @@ public sealed class EventController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0065 (the EV-MINE lane) — the viewer's own upcoming events: the
+        // union of their RSVPed events (any status — the row is the sign-up)
+        // and their authored events, upcoming + live only. No AccessAudit row
+        // (the GetMyRsvpAsync posture — each row's write lane already committed
+        // its decision); the union is inherently non-leaky (a non-author can
+        // only see an event they hold an RSVP row on — and RsvpAsync gates
+        // standing first, so a denied actor never holds such a row). Empty for
+        // a viewer with no sign-ups — the view hides the whole section then.
+        IReadOnlyList<Event> myEvents = Array.Empty<Event>();
+        if (actorId.Length > 0)
+        {
+            try
+            {
+                myEvents = await this.events.ListMineAsync(actorId, HttpContext.RequestAborted);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ForbidResult();
+            }
+        }
+
         // ADR 0051 — extend ADR 0049's default-visible-variant rule to the feed
         // surface: each row shows the event's title/body in the viewer's current
         // language when a translation exists (else the authored-in text — the
         // ADR 0022 floor). One read of the shared per-request chain; a "a read,
         // not a decision" surface (the feed's CanSeeAsync already ran). No Core /
-        // schema change (the posts feed's ADR 0051 idiom).
+        // schema change (the posts feed's ADR 0051 idiom). The EV-MINE rows get
+        // the same treatment — the viewer's own events are a list surface.
         if (translationProvider is not null)
         {
             var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
             foreach (var e in events)
                 await ApplyEventTranslationAsync(e, effLang);
+            foreach (var e in myEvents)
+                await ApplyEventTranslationAsync(e, effLang);
         }
 
         // Author display names (a *read* lookup, never an access decision — the
-        // audience gate already ran in ListUpcomingAsync). Missing profile →
-        // the raw subject id.
-        var authorIds = events.Select(e => e.AuthorId).Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
+        // audience gate already ran in ListUpcomingAsync; the EV-MINE union is
+        // inherently the viewer's own rows). Missing profile → the raw subject
+        // id.
+        var authorIds = events
+            .Concat(myEvents)
+            .Select(e => e.AuthorId).Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
         var authorName = new Dictionary<string, string>();
         foreach (var authorId in authorIds)
         {
@@ -260,14 +299,17 @@ public sealed class EventController : Controller
         }
 
         // Component display names (a *read* lookup, never a gate — C-M3·2).
-        var componentIds = events.Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+        var componentIds = events
+            .Concat(myEvents)
+            .Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
         var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
         var componentById = allComponents
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
 
-        var rows = events
-            .Select(e => new EventRow(
+        static EventRow ProjectRow(Event e, IReadOnlyDictionary<string, string> authorName,
+                                   IReadOnlyDictionary<string, string> componentById)
+            => new EventRow(
                 Id: e.Id,
                 Title: e.Title,
                 Body: e.Body,
@@ -279,8 +321,10 @@ public sealed class EventController : Controller
                 ComponentId: e.ComponentId,
                 ComponentDisplayName: e.ComponentId is not null && componentById.TryGetValue(e.ComponentId, out var cn) ? cn : null,
                 IsDraft: e.IsDraft,
-                IsDeleted: e.IsDeleted))
-            .ToList();
+                IsDeleted: e.IsDeleted);
+
+        var rows = events.Select(e => ProjectRow(e, authorName, componentById)).ToList();
+        var myRows = myEvents.Select(e => ProjectRow(e, authorName, componentById)).ToList();
 
         var vm = new EventIndexViewModel(
             Events: rows,
@@ -289,7 +333,8 @@ public sealed class EventController : Controller
                 .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             CurrentComponentId: componentId,
-            CurrentPage: page);
+            CurrentPage: page,
+            MyEvents: myRows);
 
         return View(vm);
     }
