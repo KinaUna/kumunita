@@ -7,10 +7,6 @@
     <div class="col-md-6 col-lg-5">
         <h1><kw-l key="account.login_title">Sign in</kw-l></h1>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success">@info</div>
-        }
 
         @if (!string.IsNullOrEmpty(Model.Error))
         {

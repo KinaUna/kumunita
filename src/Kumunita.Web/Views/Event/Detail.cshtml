@@ -32,21 +32,6 @@
             <a href="/events" class="btn btn-link p-0"><kw-l key="events.back">← Back to events</kw-l></a>
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @if (Model.ComponentDisplayName is not null)
             {

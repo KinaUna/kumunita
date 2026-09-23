@@ -17,21 +17,6 @@
             <kw-l key="events.edit_lead">Update this event's details. Your audience choice is the sole access boundary — the community pick is only a filter.</kw-l>
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-
         @if (ViewData.ModelState.ErrorCount > 0)
         {
             <div class="alert alert-danger alert-dismissible fade show" role="alert">

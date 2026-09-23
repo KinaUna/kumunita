@@ -17,21 +17,6 @@
             <kw-l key="posts.new_intro">By default everyone in the community you pick below can see your post. Turn that off in the audience section only if you want to narrow who can see it to specific people or groups.</kw-l>
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-
         @if (Model.Components.Count == 0)
         {
             <div class="alert alert-warning">

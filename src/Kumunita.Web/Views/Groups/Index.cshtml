@@ -14,15 +14,6 @@
             </div>
         </header>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @*
             m2b — "Your invitations" card: the actor's OWN pending group
             invitations (GroupListViewModel.Invitations). The invitee cannot

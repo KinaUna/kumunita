@@ -28,6 +28,12 @@
 }
 
 <body class="@(fullBleed ? "kmb-page-fullbleed" : null)">
+    @* Flash toast — the one, uniform flash-message surface (TempData["info"]
+       / ["error"]). Renders a fixed top-right Bootstrap toast when the
+       controller left a flash value on the last redirect. Replaces the
+       per-view .alert blocks that used to land inline wherever each view
+       author placed them. *@
+    @await Html.PartialAsync("_FlashToast")
     @await Html.PartialAsync("_PinnedAnnouncement")
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
@@ -193,6 +199,12 @@
     <script type="module" src="~/js/lib/page-form-visibility.js"></script>
     <!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
     <script type="module" src="~/js/lib/grant-picker-sync.js"></script>
+    <!-- Flash toast (SECURITY.md §6; the one uniform flash surface — see
+         _FlashToast.cshtml). Wires Bootstrap 5.3's Toast to the .toast
+         element(s) the partial renders, so the close button + the
+         data-bs-autohide / data-bs-delay attributes drive the 5 s
+         auto-dismiss + fade-out. -->
+    <script type="module" src="~/js/lib/flash-toast.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

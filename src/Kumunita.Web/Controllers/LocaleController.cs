@@ -37,10 +37,36 @@ namespace Kumunita.Web.Controllers;
 public sealed class LocaleController(
     ILocalizationService localization,
     IUserInfoService userInfo,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // The per-request translation read seam — used to render the
+    // language-change flash message in the resident's current language
+    // (the locale.flash_set / locale.flash_reset keys). Optional (default
+    // null) so any test-construction site that builds this controller
+    // without the seam keeps compiling and renders the provider floor's
+    // English; DI always supplies the live ITranslationProvider in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
     private static string? SubjectId(System.Security.Claims.ClaimsPrincipal user) =>
         KumunitaPrincipal.SubjectId(user);
+
+    /// <summary>
+    /// Resolve a settings flash-message template (locale.flash_*,
+    /// settings.timezone_flash_*, settings.dateformat_flash_*,
+    /// settings.email_flash_*) in the resident's current effective language
+    /// and apply its {0} placeholder(s). Falls back to the English source text
+    /// (the provider floor — code is the floor, ADR 0015 D1) when the seam is
+    /// absent or the key is unregistered, so a resident never sees a raw key.
+    /// </summary>
+    private async Task<string> FlashAsync(string key, params object?[] args)
+    {
+        var template = translationProvider is null
+            ? KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key
+            : await translationProvider.GetAsync(key,
+                await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider));
+        return args.Length > 0
+            ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
+            : template;
+    }
 
     /// <summary>
     /// <c>GET /settings/language</c> — the resident's settings page: the
@@ -185,18 +211,25 @@ public sealed class LocaleController(
     /// </summary>
     [HttpPost("/settings/language")]
     [ValidateAntiForgeryToken]
-    public IActionResult Save(string? code, string? clear)
+    public async Task<IActionResult> Save(string? code, string? clear)
     {
+        // Resolve the flash text in the resident's **current** language
+        // (before the write) — the message explains that the change takes
+        // effect on the *next* request, so the language they're reading right
+        // now is the language it belongs in. (ResolveAsync reads the request
+        // cookie, not the response we're about to set, so this is correct even
+        // though the write follows.)
+        string? info = clear == "1"
+            ? await FlashAsync("locale.flash_reset")
+            : (!string.IsNullOrWhiteSpace(code) ? await FlashAsync("locale.flash_set", code) : null);
+
         if (clear == "1")
-        {
             LocaleCookie.Clear(Response);
-            TempData["info"] = "Language preference reset — the instance default will be used.";
-        }
         else if (!string.IsNullOrWhiteSpace(code))
-        {
             LocaleCookie.Write(Response, code);
-            TempData["info"] = $"Language preference set to \"{code}\" — it takes effect on the next request.";
-        }
+
+        if (info is not null)
+            TempData["info"] = info;
 
         return RedirectToAction(nameof(Index));
     }
@@ -229,12 +262,12 @@ public sealed class LocaleController(
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next request resolves to the instance default).
                 await userInfo.SetProfileTimezoneAsync(subject, null, subject);
-                TempData["info"] = "Time zone reset — the platform default will be used.";
+                TempData["info"] = await FlashAsync("settings.timezone_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(timezone))
             {
                 await userInfo.SetProfileTimezoneAsync(subject, timezone, subject);
-                TempData["info"] = $"Time zone set to \"{timezone}\" — it takes effect on the next request.";
+                TempData["info"] = await FlashAsync("settings.timezone_flash_set", timezone);
             }
         }
         catch (KeyNotFoundException)
@@ -285,12 +318,12 @@ public sealed class LocaleController(
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next request resolves to the instance default).
                 await userInfo.SetProfileDateFormatAsync(subject, null, subject);
-                TempData["info"] = "Date & time format reset — the platform default will be used.";
+                TempData["info"] = await FlashAsync("settings.dateformat_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(chosen))
             {
                 await userInfo.SetProfileDateFormatAsync(subject, chosen, subject);
-                TempData["info"] = "Date & time format set — it takes effect on the next request.";
+                TempData["info"] = await FlashAsync("settings.dateformat_flash_set");
             }
         }
         catch (KeyNotFoundException)
@@ -331,12 +364,12 @@ public sealed class LocaleController(
                 // null ⇒ clear (the lane stores + saves, so the clear persists
                 // — the next outbound email resolves to the instance default).
                 await userInfo.SetProfileEmailLanguageAsync(subject, null, subject);
-                TempData["info"] = "Email & notification language reset — the instance default will be used.";
+                TempData["info"] = await FlashAsync("settings.email_flash_reset");
             }
             else if (!string.IsNullOrWhiteSpace(code))
             {
                 await userInfo.SetProfileEmailLanguageAsync(subject, code, subject);
-                TempData["info"] = "Email & notification language set — your next email will use it.";
+                TempData["info"] = await FlashAsync("settings.email_flash_set");
             }
         }
         catch (KeyNotFoundException)

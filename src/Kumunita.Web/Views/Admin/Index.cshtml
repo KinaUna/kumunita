@@ -11,15 +11,6 @@
 
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 @* Overview cards — the counts at a glance. The numbers are the dashboard's job:
    a quick status read before drilling into a section. *@
 <div class="row g-3 mb-4">

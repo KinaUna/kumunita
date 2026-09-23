@@ -66,15 +66,6 @@
             }
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @*
             ADR 0009 — the group's description (the M1 Group.Description field,
             resident-facing since ADR 0009): rendered for everyone who reaches

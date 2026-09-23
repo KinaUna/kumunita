@@ -12,15 +12,6 @@
 
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 @* Each surface is a list-group item with a title + one-line description, so an
    admin can tell what each one does without clicking. The copy is plain English —
    this view's local convention (the admin shell is mostly non-kw-l English). *@

@@ -45,15 +45,6 @@
             &larr; <kw-l key="posts.back_to">back to</kw-l> @Model.CommunityDisplayName
         </a>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success mt-2" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger mt-2" role="alert">@err</div>
-        }
-
         <div class="card mt-2 mb-4">
             <div class="card-body">
                 @* Author-only edit + delete entry points (both lanes are

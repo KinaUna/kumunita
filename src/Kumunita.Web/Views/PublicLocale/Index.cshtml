@@ -9,15 +9,6 @@
     <kw-l key="locale.lede">Pick the language the platform shows you. Your choice is saved in a browser cookie — it takes effect on the next request, and never affects other residents.</kw-l>
 </p>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success" role="alert">@info</div>
-}
-@if (TempData["error"] is string error)
-{
-    <div class="alert alert-danger" role="alert">@error</div>
-}
-
 <form method="post" action="/language">
     @Html.AntiForgeryToken()
     <div class="row g-2 align-items-end">

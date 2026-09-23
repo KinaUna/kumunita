@@ -13,15 +13,6 @@
     its expiry time.
 </p>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 @if (!Model.HasOverride)
 {
     <div class="alert alert-secondary">

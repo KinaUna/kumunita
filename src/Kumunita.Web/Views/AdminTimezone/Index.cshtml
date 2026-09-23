@@ -7,15 +7,6 @@
 
 <h1 class="mt-2"><kw-l key="admin.timezone_title">Platform default time zone</kw-l></h1>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success" role="alert">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger" role="alert">@err</div>
-}
-
 <p class="text-muted">
     <kw-l key="admin.timezone_lede">The time zone residents' timestamps fall back to when they have set no personal preference of their own.</kw-l>
 </p>

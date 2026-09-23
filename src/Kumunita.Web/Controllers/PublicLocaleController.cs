@@ -4,7 +4,6 @@ using Marten;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Kumunita.Web.Controllers;
-
 /// <summary>
 /// The <strong>public</strong> language picker (ADR 0005 B; M·11; ML-UI U7, D7-1).
 /// A signed-out resident can choose a language without signing in: the write is
@@ -23,8 +22,32 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 public sealed class PublicLocaleController(
     ILocalizationService localization,
-    IDocumentStore store) : Controller
+    IDocumentStore store,
+    // The per-request translation read seam — renders the language-change
+    // flash message in the visitor's current language (locale.flash_set /
+    // locale.flash_reset). Optional (default null) so any test-construction
+    // site that builds this controller without the seam keeps compiling and
+    // renders the provider floor's English; DI always supplies the live
+    // ITranslationProvider in the app.
+    ITranslationProvider? translationProvider = null) : Controller
 {
+    /// <summary>
+    /// Resolve a locale flash-message template (locale.flash_set /
+    /// locale.flash_reset) in the visitor's current effective language and
+    /// apply its {0} placeholder(s). Falls back to the English source text
+    /// (the provider floor — code is the floor, ADR 0015 D1) when the seam is
+    /// absent or the key is unregistered, so a resident never sees a raw key.
+    /// </summary>
+    private async Task<string> FlashAsync(string key, params object?[] args)
+    {
+        var template = translationProvider is null
+            ? KnownTranslationKeys.EnValues.GetValueOrDefault(key) ?? key
+            : await translationProvider.GetAsync(key,
+                await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider));
+        return args.Length > 0
+            ? System.String.Format(System.Globalization.CultureInfo.InvariantCulture, template, args)
+            : template;
+    }
     /// <summary>
     /// <c>GET /language</c> — the compact picker. Builds the <em>same</em> model
     /// shape as <see cref="LocaleController.Index"/> (the enabled catalog in
@@ -53,16 +76,9 @@ public sealed class PublicLocaleController(
                 .OrderBy(l => l.SortOrder)
                 .Select(l => new LocaleController.LocaleOption(l.Id, l.NativeName))
                 .ToList(),
-            CurrentCode = LocaleCookie.Read(Request),
-            // ADR 0046: no saved preference → pre-select the browser's
-            // Accept-Language match (suggested, never persisted).
-            BrowserCode = string.IsNullOrWhiteSpace(LocaleCookie.Read(Request))
-                ? RequestLanguage.Browser(Request, catalog)
-                : null,
             DefaultCode = defaultCode,
+            CurrentCode = LocaleCookie.Read(Request) ?? defaultCode,
         };
-
-        // "Index" is resolved under this controller's folder → Views/PublicLocale/Index.cshtml.
         return View("Index", model);
     }
 
@@ -76,18 +92,25 @@ public sealed class PublicLocaleController(
     /// </summary>
     [HttpPost("/language")]
     [ValidateAntiForgeryToken]
-    public IActionResult Save(string? code, string? clear, string? returnUrl = null)
+    public async Task<IActionResult> Save(string? code, string? clear, string? returnUrl = null)
     {
+        // Resolve the flash text in the visitor's **current** language
+        // (before the write) — the message explains that the change takes
+        // effect on the *next* request, so the language they're reading right
+        // now is the language it belongs in. (ResolveAsync reads the request
+        // cookie, not the response we're about to set, so this is correct even
+        // though the write follows.)
+        string? info = clear == "1"
+            ? await FlashAsync("locale.flash_reset")
+            : (!string.IsNullOrWhiteSpace(code) ? await FlashAsync("locale.flash_set", code) : null);
+
         if (clear == "1")
-        {
             LocaleCookie.Clear(Response);
-            TempData["info"] = "Language preference reset — the instance default will be used.";
-        }
         else if (!string.IsNullOrWhiteSpace(code))
-        {
             LocaleCookie.Write(Response, code);
-            TempData["info"] = $"Language preference set to \"{code}\" — it takes effect on the next request.";
-        }
+
+        if (info is not null)
+            TempData["info"] = info;
 
         // The nav switcher carries the page it came from; the compact picker does
         // not — fall back to the picker's Index view. A relative URL only (no

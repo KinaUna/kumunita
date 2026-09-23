@@ -199,12 +199,14 @@ async function expandReportForm(page: Page): Promise<void> {
   await expect(page.locator('#report-reason')).toBeVisible();
 }
 
-// Wait for the `.alert` (Bootstrap's alert — M3b's views use
-// `alert-success` / `alert-danger` on both Detail.cshtml and
-// Index.cshtml) to appear. Same as M3's U8 precedent (the "lands
-// back on /posts/{id} with the `TempData["info"]`" pin).
+// Wait for the flash toast (_FlashToast.cshtml → #flash-toast-container
+// .toast-body) to appear. The per-view `.alert` blocks are gone; the
+// controller's TempData["info"]/["error"] is now rendered centrally as a
+// Bootstrap 5.3 toast in the layout. Same as M3's U8 precedent (the
+// "lands back on /posts/{id} with the TempData["info"]" pin), but on
+// the toast surface.
 async function expectAlert(page: Page, text: RegExp): Promise<void> {
-  await expect(page.locator('.alert', { hasText: text })).toBeVisible();
+  await expect(page.locator('#flash-toast-container .toast-body', { hasText: text })).toBeVisible();
 }
 
 test.describe('M3b e2e', () => {

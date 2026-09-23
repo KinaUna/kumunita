@@ -184,11 +184,13 @@ async function submitForm(page: Page, scope?: string): Promise<void> {
     .first().click();
 }
 
-// Wait for a `.alert` (Bootstrap's alert — M4's views use
-// `alert-success` / `alert-danger` on both Index.cshtml and Detail.cshtml)
-// to appear. Same as M3b U10's `expectAlert` helper.
+// Wait for the flash toast (_FlashToast.cshtml → #flash-toast-container
+// .toast-body) to appear. The per-view `.alert` blocks are gone; the
+// controller's TempData["info"]/["error"] is now rendered centrally as a
+// Bootstrap 5.3 toast in the layout. Same as M3b U10's `expectAlert`
+// helper, but on the toast surface.
 async function expectAlert(page: Page, text: RegExp): Promise<void> {
-  await expect(page.locator('.alert', { hasText: text })).toBeVisible();
+  await expect(page.locator('#flash-toast-container .toast-body', { hasText: text })).toBeVisible();
 }
 
 test.describe('M4 e2e', () => {

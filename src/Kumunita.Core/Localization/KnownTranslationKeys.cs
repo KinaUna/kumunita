@@ -260,6 +260,8 @@ public static class KnownTranslationKeys
                 ". If you reset your preference, the platform default is used.",
             ["settings.timezone_reset"]        = "Reset to platform default",
             ["settings.timezone_save"]         = "Save",
+            ["settings.timezone_flash_set"]    = "Time zone set to \"{0}\" — it takes effect on the next request.",
+            ["settings.timezone_flash_reset"]  = "Time zone reset — the platform default will be used.",
             ["settings.timezone_unknown"]      = "Unknown time zone",
 
             // ── settings — date format (ADR 0020: the user-override section +
@@ -278,6 +280,8 @@ public static class KnownTranslationKeys
                 "A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.",
             ["settings.dateformat_reset"]        = "Reset to platform default",
             ["settings.dateformat_save"]         = "Save",
+            ["settings.dateformat_flash_set"]    = "Date & time format set — it takes effect on the next request.",
+            ["settings.dateformat_flash_reset"]  = "Date & time format reset — the platform default will be used.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -867,6 +871,12 @@ public static class KnownTranslationKeys
             ["locale.browser_note_tail"] =
                 " from your browser settings. Saving makes it your preferred " +
                 "language — it stays until you change it.",
+            // Flash messages (the toast surface — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = the language code).
+            ["locale.flash_set"] =
+                "Language preference set to \"{0}\" — it takes effect on the next request.",
+            ["locale.flash_reset"] =
+                "Language preference reset — the instance default will be used.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Who sees this?",
@@ -1143,6 +1153,8 @@ public static class KnownTranslationKeys
                 "If you reset it, the instance default is used.",
             ["settings.email_save"] = "Save",
             ["settings.email_reset"] = "Reset to instance default",
+            ["settings.email_flash_set"] = "Email & notification language set — your next email will use it.",
+            ["settings.email_flash_reset"] = "Email & notification language reset — the instance default will be used.",
             ["settings.email_reset_confirm"] =
                 "Reset your email & notification language to the instance default?",
 
@@ -1362,6 +1374,8 @@ public static class KnownTranslationKeys
                 ". Wenn du deine Einstellung zurücksetzt, wird die Plattform-Voreinstellung verwendet.",
             ["settings.timezone_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
             ["settings.timezone_save"]         = "Speichern",
+            ["settings.timezone_flash_set"]    = "Zeitzone auf \"{0}\" gesetzt — sie wirkt ab der nächsten Anfrage.",
+            ["settings.timezone_flash_reset"]  = "Zeitzone zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
             ["settings.timezone_unknown"]      = "Unbekannte Zeitzone",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -1379,6 +1393,8 @@ public static class KnownTranslationKeys
                 "Eine .NET-Zeitreihenformatzeichenfolge (z. B. yyyy-MM-dd HH:mm). Leer lassen, um eine Voreinstellung zu verwenden.",
             ["settings.dateformat_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
             ["settings.dateformat_save"]         = "Speichern",
+            ["settings.dateformat_flash_set"]    = "Datum- und Zeitformat gesetzt — es wirkt ab der nächsten Anfrage.",
+            ["settings.dateformat_flash_reset"]  = "Datum- und Zeitformat zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -1941,6 +1957,12 @@ public static class KnownTranslationKeys
                 " anhand deiner Browser-Einstellungen ausgewählt. " +
                 "Speichern macht es zu deiner Wunschsprache — sie bleibt " +
                 "bestehen, bis du sie änderst.",
+            // Flash-Meldungen (Toast-Oberfläche — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = Sprachcode).
+            ["locale.flash_set"] =
+                "Sprache auf \"{0}\" gesetzt — sie wirkt ab der nächsten Anfrage.",
+            ["locale.flash_reset"] =
+                "Spracheinstellung zurückgesetzt — die Instanz-Voreinstellung wird verwendet.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Wer sieht dies?",
@@ -2196,6 +2218,8 @@ public static class KnownTranslationKeys
                 "Setzt du sie zurück, wird die Instanzstandardsprache verwendet.",
             ["settings.email_save"] = "Speichern",
             ["settings.email_reset"] = "Auf Instanzstandard zurücksetzen",
+            ["settings.email_flash_set"] = "E-Mail- und Benachrichtigungssprache gesetzt — deine nächste E-Mail wird sie verwenden.",
+            ["settings.email_flash_reset"] = "E-Mail- und Benachrichtigungssprache zurückgesetzt — die Instanz-Voreinstellung wird verwendet.",
             ["settings.email_reset_confirm"] =
                 "E-Mail- und Benachrichtigungssprache auf den Instanzstandard zurücksetzen?",
 
@@ -2415,6 +2439,8 @@ public static class KnownTranslationKeys
                 ". Si tu réinitialises ta préférence, le défaut de la plateforme est utilisé.",
             ["settings.timezone_reset"]        = "Réinitialiser au défaut de la plateforme",
             ["settings.timezone_save"]         = "Enregistrer",
+            ["settings.timezone_flash_set"]    = "Fuseau horaire réglé sur \"{0}\" — il prend effet à la prochaine requête.",
+            ["settings.timezone_flash_reset"]  = "Fuseau horaire réinitialisé — le défaut de la plateforme sera utilisé.",
             ["settings.timezone_unknown"]      = "Fuseau horaire inconnu",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -2432,6 +2458,8 @@ public static class KnownTranslationKeys
                 "Une chaîne de format de date/heure personnalisée .NET (p. ex. yyyy-MM-dd HH:mm). Laisser vide pour utiliser un préréglage.",
             ["settings.dateformat_reset"]        = "Réinitialiser au défaut de la plateforme",
             ["settings.dateformat_save"]         = "Enregistrer",
+            ["settings.dateformat_flash_set"]    = "Format de date et d'heure réglé — il prend effet à la prochaine requête.",
+            ["settings.dateformat_flash_reset"]  = "Format de date et d'heure réinitialisé — le défaut de la plateforme sera utilisé.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -2994,6 +3022,12 @@ public static class KnownTranslationKeys
                 " d'après les réglages de ton navigateur. L'enregistrer en " +
                 "fait ta langue préférée — elle reste telle quelle jusqu'à " +
                 "ce que tu la changes.",
+            // Messages flash (surface toast — LocaleController.Save /
+            // PublicLocaleController.Save ; {0} = code de langue).
+            ["locale.flash_set"] =
+                "Langue réglée sur \"{0}\" — elle prend effet à la prochaine requête.",
+            ["locale.flash_reset"] =
+                "Préférence de langue réinitialisée — le défaut de l'instance sera utilisé.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Qui voit cela ?",
@@ -3251,6 +3285,8 @@ public static class KnownTranslationKeys
                 "Si tu réinitialises, la langue par défaut de l'instance est utilisée.",
             ["settings.email_save"] = "Enregistrer",
             ["settings.email_reset"] = "Réinitialiser à la valeur par défaut",
+            ["settings.email_flash_set"] = "Langue des e-mails et des notifications réglée — ton prochain e-mail l'utilisera.",
+            ["settings.email_flash_reset"] = "Langue des e-mails et des notifications réinitialisée — le défaut de l'instance sera utilisé.",
             ["settings.email_reset_confirm"] =
                 "Réinitialiser la langue des e-mails et des notifications à la valeur par défaut ?",
 
@@ -3470,6 +3506,8 @@ public static class KnownTranslationKeys
                 ". Hvis du nulstiller dit valg, bruges platformstandarden.",
             ["settings.timezone_reset"]        = "Nulstil til platformstandard",
             ["settings.timezone_save"]         = "Gem",
+            ["settings.timezone_flash_set"]    = "Tidszone indstillet til \"{0}\" — den træder i kraft ved næste anmodning.",
+            ["settings.timezone_flash_reset"]  = "Tidszone nulstillet — platformstandarden bruges.",
             ["settings.timezone_unknown"]      = "Ukendt tidszone",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -3487,6 +3525,8 @@ public static class KnownTranslationKeys
                 "En tilpasset .NET-dato-/tidsformatstreng (f.eks. yyyy-MM-dd HH:mm). Lad stå tom for at bruge et standardformat.",
             ["settings.dateformat_reset"]        = "Nulstil til platformstandard",
             ["settings.dateformat_save"]         = "Gem",
+            ["settings.dateformat_flash_set"]    = "Dato- og tidsformat indstillet — det træder i kraft ved næste anmodning.",
+            ["settings.dateformat_flash_reset"]  = "Dato- og tidsformat nulstillet — platformstandarden bruges.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -4046,6 +4086,12 @@ public static class KnownTranslationKeys
             ["locale.browser_note_tail"] =
                 " ud fra dine browserindstillinger. Gemmer du det, bliver det " +
                 "dit foretrukne sprog — det bliver ved, indtil du ændrer det.",
+            // Flash-meddelelser (toast-overflade — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = sprogkode).
+            ["locale.flash_set"] =
+                "Sprog indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
+            ["locale.flash_reset"] =
+                "Sprogindstilling nulstillet — instansstandarden bruges.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Hvem ser dette?",
@@ -4301,6 +4347,8 @@ public static class KnownTranslationKeys
                 "Nulstiller du det, bruges instancens standardsprog.",
             ["settings.email_save"] = "Gem",
             ["settings.email_reset"] = "Nulstil til standardsprog",
+            ["settings.email_flash_set"] = "E-mail- og notifikationssprog indstillet — din næste e-mail bruger det.",
+            ["settings.email_flash_reset"] = "E-mail- og notifikationssprog nulstillet — instansstandarden bruges.",
             ["settings.email_reset_confirm"] =
                 "Nulstil sprog til e-mail og beskeder til standardsproget?",
 
