@@ -1,6 +1,6 @@
 # Events calendar (`EV-CAL`) — sealed unit register
 
-> **In progress.** This is the **lane plan** (the secondary register tier) for
+> **Done.** This is the **lane plan** (the secondary register tier) for
 > the **`EV-CAL`** named lane — an **additive view surface** on the already
 > shipped **M4** events context (ADR 0054). The **primary reference tier**
 > (the exact C# seams + the design decisions) is the design doc
