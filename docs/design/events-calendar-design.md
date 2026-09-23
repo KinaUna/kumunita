@@ -450,3 +450,44 @@ date pauses and records `## U<m> — Drift pause` in the handoff note
 - **The 8 invariants** (C-EV·1 … C-EV·8, §4) — verbatim.
 - **The 8 `kw-l` key names** (§3.6) — `events.calendar.title`, `.prev`,
   `.next`, `.today`, `.overlap_hint`, `.empty`, `.list_view`, `.from`.
+
+### Run result (EV-CAL acceptance gate — 2026-09-23)
+
+Recorded by **U09** (2026-09-23). The three-test gate is **satisfied and
+recorded** below using **U08's 13 pinned tests** (executed 2026-09-23 per
+AGENTS.md's `dotnet exec` path — not re-run by U09; U08's run is the
+evidence) as the part-vs-whole input, with the full M4 `EventServiceTests`
+suite green in the same `Kumunita.Core.Tests` run as the non-regression
+proof (C-EV·6). **All three gate tests PASS.**
+
+**(a) The three gate tests + pass status (the §5.5 pin).**
+
+| # | Gate test (shape, §5.5) | EV-CAL evidence (U08 §5.3/§5.4 names) | Result |
+|---|---|---|---|
+| 1 | **closed loop** — an author's *published* event in the window appears in the author's calendar (right chip), and exactly one aggregate `AccessAudit` row (`TargetKind = "event"`) is written for the render | `EV_Range_IncludesEventStartingInWindow` (published event in window, author's own), `EV_Range_AggregateAuditRowShape_TargetKindEvent` (one aggregate row, `TargetKind = "event"`) | **PASS (2/2)** |
+| 2 | **handoff** — a group member added to the event's audience sees the event in their calendar on the *next* render (C4 strong-consistency — the `CanSeeAsync(Read)` gate re-runs per request, no cache); a non-member's calendar still excludes it (the C-EV·1 non-leak) | `EV_Range_AudienceMemberSeesEvent` (grantee sees on render), `EV_Range_NonMemberDenied_NoLeak` (non-member's result empty — zero-leak assertion) | **PASS (2/2)** |
+| 3 | **part-vs-whole** — the 10 seam tests (§5.3) + the 3 Web pins (§5.4) pass together **with the full M4 `EventServiceTests` suite still green** — the lane is additive; nothing in M4 regressed (C-EV·6) | all 10 of §5.3 + all 3 of §5.4 executed in one session, the 10 seam tests in the **same** `Kumunita.Core.Tests` run as the full 64-test M4 `EventServiceTests` suite (no per-name isolation) | **PASS (13/13)** |
+
+**(b) The counts (U08's run — the evidence).**
+
+- `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll`
+  → **Total: 714, Failed: 0**. That run contains the 10 EV-CAL seam tests
+  (§5.3) **and** the full M4 `EventServiceTests` suite — **64 tests, green**
+  (the part-vs-whole's "whole"; the non-regression proof that the additive
+  seam changed nothing in M4).
+- `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+  → **Total: 368, Failed: 0** (baseline 365 → +3: the §5.4 Web pins).
+
+**(c) Drift (the one line).**
+
+- `EV_Range_DraftVisibleToAuthor` — **name-vs-code discrepancy, resolved,
+  not a code defect**: the §5.3 *name* reads aspirational (author sees their
+  draft), but the frozen behavior (C-EV·1 + the §5.1 candidate filter
+  `!IsDeleted && !IsDraft` + the U02 implementation + the M4
+  `M4_DraftInvisibleToNonAuthor` precedent) pins that **drafts are excluded
+  from the list surface for everyone, author included** (the author reaches
+  a draft only via the detail `GetAsync` draft gate). U08 kept the pinned
+  name (unit-series rule 3) and asserted the actual pinned behavior
+  (`Assert.Empty` for the author). No other drift pause is open; §5.6's
+  frozen pins were matched by every unit U02–U08 (each recorded **No
+  drift** in the handoff note).
