@@ -1323,6 +1323,20 @@ body.kmb-page-fullbleed .navbar {
   border-color: var(--kmb-amber-soft);
 }
 
+/* EV-DWM (ADR 0064, U05) — Day single-column polish (D3): the one column
+   is full width (the .events-time-day-area's default 1fr template) and the
+   hour ruler already spans the grid's 24 × 3rem height, so the polish is
+   purely readability — with the whole row to itself, an event block has
+   room for a slightly larger label and padding than the tight 7-col Week
+   (the blocks share the .event-block rules; only the size steps up). */
+.events-time-grid--day .event-block {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+}
+.events-time-grid--day .event-block a {
+  white-space: normal; /* full width — a long title can wrap instead of clipping */
+}
+
 /* Responsive: on a narrow phone the 7-col Week is too tight — let the
    grid scroll horizontally instead of crushing the columns (the ruler
    gutter stays pinned). The Day view (1-col) is unaffected. */

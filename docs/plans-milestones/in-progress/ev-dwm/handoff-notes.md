@@ -151,3 +151,27 @@ section + its own entry-read list.
   Month chip layout + `events-calendar.js` intact. **`events-calendar.ts`
   untouched** (empty `git diff`). No drift.
 - Next: **U05** — the 3 `events.calendar.view.*` `kw-l` keys × 4 languages.
+
+## U05 — Day + keys + CSS
+
+- **Day branch**: `Calendar.cshtml`'s U04 Day/Week branch is column-count-
+  agnostic — Day = the same time-ruler markup with `WindowDays.Count == 1`
+  (the U02 engine ships that); no markup change needed, **no new TS**
+  (`events-calendar-time.ts` already self-wires on `data-view != "month"`).
+  Only addition: the 3 toggle labels now go through the new `kw-l` keys
+  (English fallback inline, C-DWM·9).
+- **3 keys × 4 langs** (`src/Kumunita.Core/Localization/KnownTranslationKeys.cs`):
+  `events.calendar.view.day/.week/.month` added to all four blocks — en
+  "Day/Week/Month", de "Tag/Woche/Monat", fr "Jour/Semaine/Mois", da
+  "Dag/Uge/Måned" (en ~L1142, de ~L2221, fr ~L3302, da ~L4378, grep-verified).
+- **CSS polish** (`src/Kumunita.Web/wwwroot/css/site.css`): Day single-column
+  step-up (`.events-time-grid--day .event-block` larger font/padding + the
+  title may wrap — full width to itself).
+- **Files**: `Views/Event/Calendar.cshtml`, `Core/.../KnownTranslationKeys.cs`,
+  `wwwroot/css/site.css`. `events-calendar.ts` untouched (empty diff).
+- **Exit**: `dotnet build Kumunita.slnx -c Debug` 0 errors; Web.Tests 368/0
+  (incl. `KwLRegistryConsistencyTests`). Browser: Day 1 col (Sat 26 block
+  top 55.87%), Week 7 Mon-start, Month 34 cols / 4 outside / 4 chips; toggle
+  labels en Day/Week/Month · de Tag/Woche/Monat · fr Jour/Semaine/Mois ·
+  da Dag/Uge/Måned. No drift.
+- Next: **U06** — the 9 pinned tests (2 Core window pins + 7 Web pins).

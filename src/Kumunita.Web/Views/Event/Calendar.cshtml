@@ -80,9 +80,9 @@
 
     // D5 / C-DWM·6 — the Day/Week/Month toggle: plain GET links to the same
     // route, the current anchor (?from=) + the component filter riding
-    // along, only ?view= changing. (The label is plain English here — the
-    // 3 events.calendar.view.* kw-l keys are U05's deliverable, and an
-    // unregistered kw-l key would render the raw key, so no kw-l yet.)
+    // along, only ?view= changing. (U05 — the 3 events.calendar.view.*
+    // kw-l keys are registered in all four languages, so the labels
+    // resolve through the normal per-string chain, en floor inline.)
     string ViewHref(string view)
     {
         var qs = new List<string>
@@ -108,12 +108,13 @@
                     <!-- D5 — the Day/Week/Month toggle: three plain GET links
                          (?view= + ?from= + ?componentId= riding along,
                          C-DWM·6); the active view is rendered pressed.
-                         Labels are plain English — the 3 kw-l view keys are
-                         U05's deliverable. -->
+                         Labels through the 3 events.calendar.view.* kw-l
+                         keys (U05 — registered in all four languages, the
+                         inline text is the en floor, C-DWM·9). -->
                     <div class="btn-group btn-group-sm events-view-toggle" role="group" aria-label="Calendar view">
-                        <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")">Day</a>
-                        <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")">Week</a>
-                        <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")">Month</a>
+                        <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")"><kw-l key="events.calendar.view.day">Day</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>
                     </div>
                     <a class="btn btn-outline-secondary" href="/events"><kw-l key="events.calendar.list_view">List</kw-l></a>
                 </div>

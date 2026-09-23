@@ -1137,6 +1137,11 @@ public static class KnownTranslationKeys
             ["events.calendar.empty"] = "No events in this window.",
             ["events.calendar.list_view"] = "List",
             ["events.calendar.from"] = "From",
+            // EV-DWM (ADR 0064, U05) — the Day/Week/Month toggle labels (the Calendar.cshtml
+            // view switch; en is authoritative, de/fr/da below are translations — C-DWM·9).
+            ["events.calendar.view.day"] = "Day",
+            ["events.calendar.view.week"] = "Week",
+            ["events.calendar.view.month"] = "Month",
 
             // ── grant (the shared "Who to grant to" picker — the C#-built "Select all" + count) ──
             ["grant.select_all"] = "Select all",
@@ -2212,6 +2217,10 @@ public static class KnownTranslationKeys
             ["events.calendar.empty"] = "Keine Termine in diesem Zeitraum.",
             ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Von",
+            // EV-DWM (ADR 0064, U05) — die Tag/Woche/Monat-Umschalter-Labels (C-DWM·9).
+            ["events.calendar.view.day"] = "Tag",
+            ["events.calendar.view.week"] = "Woche",
+            ["events.calendar.view.month"] = "Monat",
 
             // ── grant (der gemeinsame „Wem zugewiesen"-Picker — C#-gebaut „Alle auswählen" + Zähler) ──
             ["grant.select_all"] = "Alle auswählen",
@@ -3289,6 +3298,10 @@ public static class KnownTranslationKeys
             ["events.calendar.empty"] = "Aucun événement dans cette période.",
             ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Depuis",
+            // EV-DWM (ADR 0064, U05) — les libellés du commutateur Jour/Semaine/Mois (C-DWM·9).
+            ["events.calendar.view.day"] = "Jour",
+            ["events.calendar.view.week"] = "Semaine",
+            ["events.calendar.view.month"] = "Mois",
 
             // ── grant (le picker « À qui accorder » — C# « Tout sélectionner » + compteur) ──
             ["grant.select_all"] = "Tout sélectionner",
@@ -4361,6 +4374,10 @@ public static class KnownTranslationKeys
             ["events.calendar.empty"] = "Ingen arrangementer i dette område.",
             ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Fra",
+            // EV-DWM (ADR 0064, U05) — Day/Week/Month-omskifterens labels (C-DWM·9).
+            ["events.calendar.view.day"] = "Dag",
+            ["events.calendar.view.week"] = "Uge",
+            ["events.calendar.view.month"] = "Måned",
 
             // ── grant (den fælles « Hvem du giver adgang til »-picker — C# « Vælg alle » + tæller) ──
             ["grant.select_all"] = "Vælg alle",
