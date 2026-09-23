@@ -1,0 +1,292 @@
+@model Kumunita.Web.Models.BoardDetailViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@using Marten
+@inject Marten.IDocumentStore Store
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Board.Title) ? "Board" : Model.Board.Title;
+    // The copy-to / move-to pickers need the *other* boards (the target
+    // board option list). The frozen view model carries no such list
+    // (C-M5·3: a board detail is board-scoped), so this is a read-only
+    // display convenience — never a gate (the audience decision already ran
+    // in the service's GetBoardAsync). The M4 / U07 board-placement idiom.
+    var otherBoards = await Store.QuerySession().Query<KanbanBoard>()
+        .Where(b => !b.IsDeleted && b.Id != Model.Board.Id)
+        .ToListAsync(CancellationToken.None);
+    otherBoards = otherBoards
+        .OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/projects/boards" class="btn btn-link p-0"><kw-l key="projects.board.back">← Back to boards</kw-l></a>
+        </p>
+
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>
+                        @if (string.IsNullOrWhiteSpace(Model.Board.Title))
+                        {
+                            <span class="text-body-tertiary"><kw-l key="projects.board.untitled">Untitled board</kw-l></span>
+                        }
+                        else
+                        {
+                            @Model.Board.Title
+                        }
+                    </h1>
+                    <div class="text-muted small mt-1">
+                        @Model.Board.AuthorDisplayName
+                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                        <kw-dt dt="@Model.Board.Created" format="g"></kw-dt></span>
+                        @if (Model.Board.Modified is not null)
+                        {
+                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                            <kw-dt dt="@Model.Board.Modified" format="g"></kw-dt></span>
+                        }
+                        @if (Model.Board.ComponentDisplayName is not null)
+                        {
+                            <span class="badge text-bg-light border ms-2">@Model.Board.ComponentDisplayName</span>
+                        }
+                    </div>
+                </div>
+                @* The board action dropdown (the _AccountNav.cshtml Bootstrap
+                   dropdown shape): delete board — a plain POST form to the
+                   U08 route, CSRF-tokenized, redirect-after-POST. The cascade
+                   is the service's (F2 / F8); the view renders what the
+                   service returns (C3). *@
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-label="Board actions">⋮</button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <form method="post" action="@($"/projects/boards/@Model.Board.Id/delete")"
+                                  data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Board.Description))
+        {
+            <div class="card mb-4">
+                <div class="card-body rc-body">
+                    @Html.Raw(MarkdownRenderer.RenderHtml(Model.Board.Description))
+                </div>
+            </div>
+        }
+
+        @if (Model.Lanes.Count == 0)
+        {
+            <p class="kanban-board-empty p-4 text-muted border rounded">
+                <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+            </p>
+        }
+
+        <div class="kanban-board">
+            @foreach (var lane in Model.Lanes)
+            {
+                <div class="kanban-lane">
+                    <div class="kanban-lane-head">
+                        <h3 class="h5 mb-0">
+                            @lane.Title
+                            @if (!string.IsNullOrWhiteSpace(lane.Status))
+                            {
+                                <span class="badge text-bg-light border ms-2">@lane.Status</span>
+                            }
+                            @if (lane.MaxItems is not null)
+                            {
+                                <span class="badge text-bg-light border ms-2">
+                                    <kw-l key="projects.board.lane.max_items">Max items</kw-l>: @lane.MaxItems
+                                </span>
+                            }
+                        </h3>
+                    </div>
+
+                    @* The lane toolbar — an inline update form posting to the
+                       U08 lane-update route (POST
+                       /projects/boards/{id}/lanes/{laneId}, the
+                       LaneEditorModel shape: Title / Status / MaxItems /
+                       Order). Title + status + limit are the input to the
+                       F4 / F5 / F6 FACES the service's reorder + move lanes
+                       read — the service's pins (the §2.3 pin); the view
+                       only submits the shape. *@
+                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId")" class="kanban-lane-toolbar mb-3">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-1">
+                            <div class="col-sm-4">
+                                <input class="form-control form-control-sm" type="text" name="Title"
+                                       required maxlength="120" value="@lane.Title"
+                                       aria-label="@("Lane title")" />
+                            </div>
+                            <div class="col-sm-3">
+                                <input class="form-control form-control-sm" type="text" name="Status"
+                                       value="@lane.Status" aria-label="@("Lane status")" />
+                            </div>
+                            <div class="col-sm-3">
+                                <input class="form-control form-control-sm" type="number" name="MaxItems"
+                                       min="1" value="@lane.MaxItems" aria-label="@("Max items")" />
+                            </div>
+                            <div class="col-sm-2">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.save">Save</kw-l></button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <div class="kanban-cards">
+                        @if (lane.Cards.Count == 0)
+                        {
+                            <p class="kanban-lane-empty text-body-tertiary small mb-2">
+                                <kw-l key="projects.board.lane.empty">No cards in this lane.</kw-l>
+                            </p>
+                        }
+                        @foreach (var card in lane.Cards)
+                        {
+                            <div class="kanban-card mb-2">
+                                <div class="d-flex align-items-start gap-2">
+                                    <div class="flex-grow-1">
+                                        <h4 class="h6 mb-1">
+                                            <a href="@($"/projects/todos/@card.TodoId")">@card.Title</a>
+                                        </h4>
+                                        <div class="text-muted small">
+                                            @if (!string.IsNullOrWhiteSpace(card.Status))
+                                            {
+                                                <span class="badge text-bg-light border">@card.Status</span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.assignee">Assignee</kw-l>: @card.AssigneeDisplayName</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    @* The card action dropdown (the
+                                       _AccountNav.cshtml Bootstrap dropdown
+                                       shape, the U09 to-do dropdown idiom):
+                                       unassign / add-subtask / delete — thin
+                                       POST forms to the U07 to-do routes;
+                                       copy-to / move-to — POST forms to the
+                                       U08 board routes with the target-board
+                                       picker; move up / down / left / right
+                                       — POST forms to the U08 reorder
+                                       routes (the placement's id is the
+                                       service's first arg, §2.3). The
+                                       standing + cascade + limit decisions
+                                       are the service's (F7 / F8 / F6); the
+                                       view renders what the service returns
+                                       (C3). *@
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                aria-label="Actions for @card.Title">⋮</button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item text-dark" href="@($"/projects/todos/@card.TodoId")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                                            </li>
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/@card.TodoId/assign")"
+                                                          data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li>
+                                                <form method="post" action="@($"/projects/todos/@card.TodoId/subtasks")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <div class="px-3 py-2">
+                                                        <input class="form-control form-control-sm mb-2" type="text" name="Title"
+                                                               maxlength="120" required
+                                                               placeholder="@("Subtask title")" />
+                                                    </div>
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.add_subtask">Add subtask</kw-l></button>
+                                                </form>
+                                            </li>
+                                            @if (otherBoards.Count > 0)
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/@card.TodoId/copy-to")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="copy-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.copy_to">Copy to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="copy-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.copy_to">Copy to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/@card.TodoId/move-to")"
+                                                          data-confirm="@("Move this to-do to another board? It will no longer be on this board.")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="move-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.move_to">Move to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="move-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_to">Move to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/cards/@card.PlacementId/move-up")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_up">Move up</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/cards/@card.PlacementId/move-down")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_down">Move down</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/cards/@card.PlacementId/move-left")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_left">Move left</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/cards/@card.PlacementId/move-right")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_right">Move right</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/todos/@card.TodoId/delete")"
+                                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

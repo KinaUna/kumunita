@@ -1,0 +1,90 @@
+@model Kumunita.Web.Models.BoardIndexViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Boards";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="projects.board.title">Boards</kw-l></h1>
+                    <p class="lede">
+                        <kw-l key="projects.board.lede">The neighborhood's shared boards — arrange to-dos in lanes, move them through statuses, and keep the work visible.</kw-l>
+                    </p>
+                </div>
+                <a class="btn btn-outline-primary" href="/projects/boards/new"><kw-l key="projects.board.new">New board</kw-l></a>
+            </div>
+        </header>
+
+        @if (Model.Components.Count > 0)
+        {
+            <form method="get" action="/projects/boards" class="mb-4">
+                <div class="d-flex gap-2 align-items-end">
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value=""><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+                </div>
+            </form>
+        }
+
+        <div class="airy-ann-list">
+            @if (Model.Boards.Count == 0)
+            {
+                <div class="p-4 text-muted"><kw-l key="projects.board.empty">No boards yet — create one to start arranging the shared work.</kw-l></div>
+            }
+            @foreach (var row in Model.Boards)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@($"/projects/boards/@row.Id")">@row.Title</a>
+                        </h3>
+                        <div class="text-muted small mb-1">
+                            @row.AuthorDisplayName
+                            <span>· <kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                            @if (row.ComponentDisplayName is not null)
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(row.Description))
+                        {
+                            <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Description, 250)</p>
+                        }
+                    </div>
+                    @* The row action (the _AccountNav.cshtml Bootstrap dropdown
+                       shape, the M2/M3/M4 shared nav-dropdown idiom): delete
+                       board — a plain POST form to the U08 route,
+                       CSRF-tokenized, redirect-after-POST. The cascade
+                       (lanes + placements deleted, to-dos kept) is the
+                       service's (F2 / F8); this surface only renders what the
+                       service returns (C3). *@
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Actions for @row.Title">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post" action="@($"/projects/boards/@row.Id/delete")"
+                                      data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
