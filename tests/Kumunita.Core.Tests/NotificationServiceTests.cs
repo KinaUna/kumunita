@@ -144,12 +144,14 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
     // ── F4 — Emit_EventReminder_Stores_InboxRow_Email_Is_M4s ────────────────
     //
     // C-M6·2 (the <c>event.reminder</c> constant) + C-M6·5 (the inbox row is
-    // M6's addition; the *email* is M4's — the M4 §6.4 reminder email key
-    // <c>remind:{eventId}:{userId}</c> is a **different** key, so the two
-    // coexist). M6 stores the inbox row keyed
-    // <c>notification:event.reminder:{eventId}:{date}</c>; a *re-emission* of
-    // the M4-style email key is an unrelated logical event (a distinct key →
-    // a distinct row, not a dedup collision).
+    // M6's; the *email* is **M4's**). The M4 reminder email is staged directly
+    // by <c>EventReminderService</c> with the frozen
+    // <c>remind:{eventId}:{userId}</c> key (ADR 0054) — it does **not** flow
+    // through <c>EmitAsync</c>. If M6 staged an email here too, a reminder
+    // recipient would get two (the keys differ, so the outbox dedup can't
+    // catch the second — F10), and a resident who disabled the kind (F9)
+    // would still get the M4 email. So this M6 emit stores the inbox row and
+    // stages **no** email.
 
     [Fact]
     public async Task Emit_EventReminder_Stores_InboxRow_Email_Is_M4s()
@@ -166,24 +168,14 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.EventReminder,
             "notification:event.reminder:ev-f4:2026-09-24", "Event morgen");
 
+        // The inbox row is M6's durable record (C-M6·5 / F4) …
         Assert.Equal(NotificationKinds.EventReminder, m6Row.Kind);
         Assert.Equal("ev-f4:2026-09-24", m6Row.SourceId);
+        Assert.Null(m6Row.ReadAt);
         Assert.Equal(1, await CountNotifications(store, recipient));
-        Assert.Single(staged, s => s.Key == "notification:event.reminder:ev-f4:2026-09-24");
-
-        // The M4 email is a *separate* logical event — its own key, its own
-        // row (the two keys coexist; no cross-key dedup).
-        var m4Row = await Emit(svc, session, recipient,
-            NotificationKinds.EventReminder,
-            "remind:ev-f4:" + recipient, "M4 reminder email");
-
-        // A distinct idempotency key → a distinct row (no cross-key dedup);
-        // the M4 email's SourceId is not derivable (non-<c>notification:</c>
-        // prefix — the emitter's responsibility, D4), which is fine: the two
-        // keys coexist as the pin requires.
-        Assert.Null(m4Row.SourceId);
-        Assert.Equal(2, await CountNotifications(store, recipient));
-        Assert.Contains(staged, s => s.Key == "remind:ev-f4:" + recipient);
+        // … and this M6 emit stages **no** email (the email is M4's — see
+        // the F4 header; double-staging here would send it twice).
+        Assert.Empty(staged);
     }
 
     // ── F5 — Emit_ReportFiled_Stores_InboxRow_And_Stages_Email_For_Author ───

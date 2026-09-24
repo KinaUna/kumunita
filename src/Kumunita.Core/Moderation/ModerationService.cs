@@ -321,6 +321,26 @@ public sealed class ModerationService
 
         session.Store(audit);
 
+        // M6 (U04, F5) — report-filed emitter (design doc §6.3), the
+        // reply-report twin of the post-report emitter above: the
+        // content's author (the reply's author) is notified that their
+        // reply was reported. Skip the self-report case (reporter ==
+        // author — no point notifying someone of their own filing). Staged
+        // into the caller's session and committed by the single
+        // SaveChangesAsync below (C3).
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(reply.AuthorId)
+            && !string.Equals(reply.AuthorId, actorId, StringComparison.Ordinal))
+        {
+            await _notifications.EmitAsync(
+                session,
+                recipientId: reply.AuthorId,
+                kind: NotificationKinds.ReportFiled,
+                idempotencyKey: $"notification:report.filed:{report.Id}",
+                body: Truncate(reason),
+                ct: default).ConfigureAwait(false);
+        }
+
         // C3 — one SaveChangesAsync (ADR 0006-C; §2.3 item 4).
         await session.SaveChangesAsync().ConfigureAwait(false);
 

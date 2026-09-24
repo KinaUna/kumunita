@@ -129,6 +129,16 @@ public sealed class NotificationService
         if (!await EmailEnabledForAsync(session, recipientId, kind, ct).ConfigureAwait(false))
             return notification;
 
+        // (4a) The <c>event.reminder</c> kind's email is **M4's** — staged
+        //      directly by <c>EventReminderService</c> with the frozen
+        //      <c>remind:{eventId}:{userId}</c> key (ADR 0054, the M4 surface).
+        //      M6's role for this kind is the inbox row only — the F4 pin:
+        //      "the email is M4's; the inbox row is M6's". Staging here too
+        //      would double-send: the two keys differ, so the outbox dedup
+        //      can't catch the second (F10 — the idempotency-key contract).
+        if (kind == NotificationKinds.EventReminder)
+            return notification;
+
         // (5) The email nudge — the <see cref="IMailerStage"/> idempotency
         //     guarantee is the **sole** email-side dedup (D4). Staged on the
         //     caller's session — one caller <c>SaveChangesAsync</c> = the row

@@ -1290,7 +1290,13 @@ public sealed class PostService
         // `SaveChangesAsync` below is the single commit (C3). The members are
         // read from the caller's session (the same-transaction lane; strong
         // consistency, invariant C4).
-        if (_notifications is not null)
+        //
+        // A draft (ADR 0037 — invisible to all but the author) must **not**
+        // notify members: they could not yet see the content, so an inbox
+        // row + email for it would leak intake they did not consent to
+        // reading (intake honesty). Notification is deferred to the publish
+        // lane (the moment the post becomes visible to members).
+        if (_notifications is not null && !(draft.IsDraft ?? false))
         {
             var members = await session.Query<GroupMembership>()
                 .Where(m => m.GroupId == draft.GroupId)
