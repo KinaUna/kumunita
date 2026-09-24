@@ -171,6 +171,24 @@
                     }
                 </h1>
 
+                @* The assignee avatar (the BoardDetail card pattern, the same
+                   fail-closed contract every other avatar <img> uses: the
+                   <img> links the audited serving lane (GET
+                   /profile/avatar/{subjectId}) and avatar.ts hides it on
+                   the 404 it fails closed to, showing the monogram sibling). *@
+                @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeId))
+                {
+                    string assigneeInitial = !string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName)
+                        ? char.ToUpperInvariant(Model.Todo.AssigneeDisplayName.TrimStart()[0]).ToString()
+                        : string.Empty;
+                    <div class="mb-2">
+                        <span class="d-inline-flex align-items-center">
+                            <img class="avatar avatar-sm" src="/profile/avatar/@Model.Todo.AssigneeId" alt=""
+                                 data-avatar-fallback>
+                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                        </span>
+                    </div>
+                }
                 <div class="text-muted small mt-2 mb-3">
                     @Model.Todo.AuthorDisplayName
                     @if (!string.IsNullOrWhiteSpace(Model.Todo.AssigneeDisplayName))

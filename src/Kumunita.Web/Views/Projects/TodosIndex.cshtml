@@ -89,6 +89,26 @@
                         <h3 class="airy-ann-title">
                             <a href="@($"/projects/todos/{row.Id}")">@row.Title</a>
                         </h3>
+                        @* The assignee avatar (the BoardDetail card pattern): the
+                           <img> links the audited serving lane (GET
+                           /profile/avatar/{subjectId}) and avatar.ts hides it
+                           on the 404 it fails closed to (no avatar set),
+                           showing the monogram sibling — the assignee's
+                           initial. The board already carries one on each
+                           card; this row is the todo-list parity. *@
+                        @if (!string.IsNullOrWhiteSpace(row.AssigneeId))
+                        {
+                            string assigneeInitial = !string.IsNullOrWhiteSpace(row.AssigneeDisplayName)
+                                ? char.ToUpperInvariant(row.AssigneeDisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <div class="mb-1">
+                                <span class="d-inline-flex align-items-center">
+                                    <img class="avatar avatar-sm" src="/profile/avatar/@row.AssigneeId" alt=""
+                                         data-avatar-fallback>
+                                    <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                </span>
+                            </div>
+                        }
                         <div class="text-muted small mb-1">
                             @row.AuthorDisplayName
                             @if (!string.IsNullOrWhiteSpace(row.AssigneeDisplayName))
