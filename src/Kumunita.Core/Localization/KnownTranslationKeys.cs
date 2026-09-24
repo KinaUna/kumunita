@@ -1290,6 +1290,71 @@ public static class KnownTranslationKeys
                 "If you didn't create this account, you can ignore this message.",
             ["email.reminder_subject"] = "Reminder: {0}",
             ["email.reminder_body"] = "**{0}** is coming up: {1}{2}.",
+
+            // ── notifications (M6 — ADR 0076: the /notifications surface —
+            // the inbox (U06), the layout bell, the preferences editor (U07),
+            // and the per-kind email subject/body templates the
+            // NotificationService resolves at emit time (the frozen
+            // `notification.{kind}.subject` / `notification.{kind}.body`
+            // shape — NotificationService.cs; the kind is the stored dotted
+            // constant, e.g. `post.reply`). A UGC snippet (the sender's
+            // authored content, ADR 0018) is **appended after a single
+            // space** to the body template — `template + " " + snippet` —
+            // so the templates end in a trailing sentence break and read
+            // naturally with the snippet attached; no placeholder is
+            // substituted. `post.mention` is reserved, not wired (D2): the
+            // badge + preference-label keys exist; no email templates (no
+            // emitter). All four languages below, en fallback. ──────────────
+            ["notifications.inbox"] = "Notifications",
+            ["notifications.preferences"] = "Preferences",
+            ["notifications.mark_all_read"] = "Mark all as read",
+            ["notifications.empty"] = "Nothing yet — things that happen to you will show up here.",
+            ["notifications.bell"] = "Notifications",
+            ["notifications.preferences.title"] = "Notification preferences",
+            ["notifications.preferences.intro"] = "Choose which notifications you also get by email. The inbox always records every notification.",
+            ["notifications.preferences.save"] = "Save preferences",
+            ["notifications.preferences.coming_soon"] = "coming soon",
+            // per-kind inbox badges (the eight wired kinds + the reserved post.mention)
+            ["notifications.kind.post.reply"] = "Reply",
+            ["notifications.kind.post.mention"] = "Mention",
+            ["notifications.kind.group.post"] = "Group post",
+            ["notifications.kind.event.rsvp"] = "RSVP",
+            ["notifications.kind.event.reminder"] = "Reminder",
+            ["notifications.kind.report.filed"] = "Report",
+            ["notifications.kind.report.assigned"] = "Report assigned",
+            ["notifications.kind.report.resolved"] = "Report resolved",
+            ["notifications.kind.todo.assign"] = "To-do assigned",
+            // per-kind preference labels (the nine — post.mention included, reserved)
+            ["notifications.preference.post.reply.label"] = "Replies to my posts",
+            ["notifications.preference.post.mention.label"] = "Mentions of me",
+            ["notifications.preference.group.post.label"] = "New posts in my groups",
+            ["notifications.preference.event.rsvp.label"] = "RSVPs on my events",
+            ["notifications.preference.event.reminder.label"] = "Event reminders",
+            ["notifications.preference.report.filed.label"] = "Reports filed against my content",
+            ["notifications.preference.report.assigned.label"] = "Reports assigned to me",
+            ["notifications.preference.report.resolved.label"] = "Resolutions of reports I'm involved in",
+            ["notifications.preference.todo.assign.label"] = "To-dos assigned to me",
+            // per-kind email subjects (the eight wired kinds — the ADR 0061
+            // recipient-language template)
+            ["notification.post.reply.subject"] = "A reply was added to your post",
+            ["notification.group.post.subject"] = "A new post in your group",
+            ["notification.event.rsvp.subject"] = "An RSVP on your event",
+            ["notification.event.reminder.subject"] = "Event reminder",
+            ["notification.report.filed.subject"] = "A report was filed on your post",
+            ["notification.report.assigned.subject"] = "A report was assigned to you",
+            ["notification.report.resolved.subject"] = "A report was resolved",
+            ["notification.todo.assign.subject"] = "A to-do was assigned to you",
+            // per-kind email bodies (the eight wired kinds — the UGC snippet
+            // is appended after one space at emit time; the trailing period
+            // keeps the combined line clean)
+            ["notification.post.reply.body"] = "Someone replied to one of your posts: ",
+            ["notification.group.post.body"] = "A new post in one of your groups: ",
+            ["notification.event.rsvp.body"] = "Someone RSVP'd on one of your events. ",
+            ["notification.event.reminder.body"] = "Here is your upcoming event: ",
+            ["notification.report.filed.body"] = "A resident filed a report on one of your posts. ",
+            ["notification.report.assigned.body"] = "A report was assigned to you as a moderator. ",
+            ["notification.report.resolved.body"] = "A report you were involved in was resolved. ",
+            ["notification.todo.assign.body"] = "A to-do was assigned to you: ",
         };
 
     /// <summary>
@@ -2471,6 +2536,54 @@ public static class KnownTranslationKeys
                 "Falls du dieses Konto nicht erstellt hast, kannst du diese Nachricht ignorieren.",
             ["email.reminder_subject"] = "Erinnerung: {0}",
             ["email.reminder_body"] = "**{0}** steht bevor: {1}{2}.",
+
+            // ── notifications (M6 — ADR 0076: the /notifications surface;
+            // translations of the en floor above — same key set, same
+            // dotted shape, no email templates for the reserved
+            // post.mention kind) ──────────────────────────────────────────
+            ["notifications.inbox"] = "Benachrichtigungen",
+            ["notifications.preferences"] = "Einstellungen",
+            ["notifications.mark_all_read"] = "Alle als gelesen markieren",
+            ["notifications.empty"] = "Noch nichts — Dinge, die dir passieren, erscheinen hier.",
+            ["notifications.bell"] = "Benachrichtigungen",
+            ["notifications.preferences.title"] = "Benachrichtigungseinstellungen",
+            ["notifications.preferences.intro"] = "Wähle, welche Benachrichtigungen du zusätzlich per E-Mail bekommst. Der Posteingang erfasst jede Benachrichtigung.",
+            ["notifications.preferences.save"] = "Einstellungen speichern",
+            ["notifications.preferences.coming_soon"] = "bald verfügbar",
+            ["notifications.kind.post.reply"] = "Antwort",
+            ["notifications.kind.post.mention"] = "Erwähnung",
+            ["notifications.kind.group.post"] = "Gruppenbeitrag",
+            ["notifications.kind.event.rsvp"] = "RSVP",
+            ["notifications.kind.event.reminder"] = "Erinnerung",
+            ["notifications.kind.report.filed"] = "Meldung",
+            ["notifications.kind.report.assigned"] = "Meldung zugewiesen",
+            ["notifications.kind.report.resolved"] = "Meldung aufgelöst",
+            ["notifications.kind.todo.assign"] = "Aufgabe zugewiesen",
+            ["notifications.preference.post.reply.label"] = "Antworten auf meine Beiträge",
+            ["notifications.preference.post.mention.label"] = "Erwähnungen von mir",
+            ["notifications.preference.group.post.label"] = "Neue Beiträge in meinen Gruppen",
+            ["notifications.preference.event.rsvp.label"] = "RSVPs auf meinen Veranstaltungen",
+            ["notifications.preference.event.reminder.label"] = "Veranstaltungserinnerungen",
+            ["notifications.preference.report.filed.label"] = "Meldungen über meine Inhalte",
+            ["notifications.preference.report.assigned.label"] = "Mir zugewiesene Meldungen",
+            ["notifications.preference.report.resolved.label"] = "Auflösung von Meldungen, an denen ich beteiligt bin",
+            ["notifications.preference.todo.assign.label"] = "Mir zugewiesene Aufgaben",
+            ["notification.post.reply.subject"] = "Es gibt eine Antwort auf deinen Beitrag",
+            ["notification.group.post.subject"] = "Neuer Beitrag in deiner Gruppe",
+            ["notification.event.rsvp.subject"] = "Ein RSVP auf deiner Veranstaltung",
+            ["notification.event.reminder.subject"] = "Veranstaltungserinnerung",
+            ["notification.report.filed.subject"] = "Eine Meldung zu deinem Beitrag",
+            ["notification.report.assigned.subject"] = "Eine Meldung wurde dir zugewiesen",
+            ["notification.report.resolved.subject"] = "Eine Meldung wurde aufgelöst",
+            ["notification.todo.assign.subject"] = "Eine Aufgabe wurde dir zugewiesen",
+            ["notification.post.reply.body"] = "Jemand hat auf einen deiner Beiträge geantwortet: ",
+            ["notification.group.post.body"] = "Neuer Beitrag in einer deiner Gruppen: ",
+            ["notification.event.rsvp.body"] = "Jemand hat auf einer deiner Veranstaltungen RSVP'd. ",
+            ["notification.event.reminder.body"] = "Deine anstehende Veranstaltung: ",
+            ["notification.report.filed.body"] = "Ein Bewohner hat eine Meldung über einen deiner Beiträge eingereicht. ",
+            ["notification.report.assigned.body"] = "Eine Meldung wurde dir als Moderator zugewiesen. ",
+            ["notification.report.resolved.body"] = "Eine Meldung, an der du beteiligt warst, wurde aufgelöst. ",
+            ["notification.todo.assign.body"] = "Eine Aufgabe wurde dir zugewiesen: ",
         };
 
     /// <summary>
@@ -3654,6 +3767,54 @@ public static class KnownTranslationKeys
                 "Si tu n'as pas créé ce compte, tu peux ignorer ce message.",
             ["email.reminder_subject"] = "Rappel : {0}",
             ["email.reminder_body"] = "**{0}** arrive : {1}{2}.",
+
+            // ── notifications (M6 — ADR 0076: the /notifications surface;
+            // translations of the en floor above — same key set, same
+            // dotted shape, no email templates for the reserved
+            // post.mention kind) ──────────────────────────────────────────
+            ["notifications.inbox"] = "Notifications",
+            ["notifications.preferences"] = "Préférences",
+            ["notifications.mark_all_read"] = "Tout marquer comme lu",
+            ["notifications.empty"] = "Rien pour l'instant — les choses qui t'arrivent apparaîtront ici.",
+            ["notifications.bell"] = "Notifications",
+            ["notifications.preferences.title"] = "Préférences de notification",
+            ["notifications.preferences.intro"] = "Choisis quelles notifications tu reçois aussi par courriel. La boîte d'arrivée enregistre toujours chaque notification.",
+            ["notifications.preferences.save"] = "Enregistrer les préférences",
+            ["notifications.preferences.coming_soon"] = "bientôt",
+            ["notifications.kind.post.reply"] = "Réponse",
+            ["notifications.kind.post.mention"] = "Mention",
+            ["notifications.kind.group.post"] = "Publication de groupe",
+            ["notifications.kind.event.rsvp"] = "RSVP",
+            ["notifications.kind.event.reminder"] = "Rappel",
+            ["notifications.kind.report.filed"] = "Signalement",
+            ["notifications.kind.report.assigned"] = "Signalement assigné",
+            ["notifications.kind.report.resolved"] = "Signalement résolu",
+            ["notifications.kind.todo.assign"] = "Tâche assignée",
+            ["notifications.preference.post.reply.label"] = "Les réponses à mes publications",
+            ["notifications.preference.post.mention.label"] = "Les mentions de moi",
+            ["notifications.preference.group.post.label"] = "Les nouvelles publications de mes groupes",
+            ["notifications.preference.event.rsvp.label"] = "Les RSVP à mes événements",
+            ["notifications.preference.event.reminder.label"] = "Les rappels d'événements",
+            ["notifications.preference.report.filed.label"] = "Les signalements sur mes contenus",
+            ["notifications.preference.report.assigned.label"] = "Les signalements qui m'ont été assignés",
+            ["notifications.preference.report.resolved.label"] = "La résolution des signalements auxquels je participe",
+            ["notifications.preference.todo.assign.label"] = "Les tâches qui m'ont été assignées",
+            ["notification.post.reply.subject"] = "Une réponse a été ajoutée à ta publication",
+            ["notification.group.post.subject"] = "Une nouvelle publication dans ton groupe",
+            ["notification.event.rsvp.subject"] = "Un RSVP à ton événement",
+            ["notification.event.reminder.subject"] = "Rappel d'événement",
+            ["notification.report.filed.subject"] = "Un signalement a été déposé sur ta publication",
+            ["notification.report.assigned.subject"] = "Un signalement t'a été assigné",
+            ["notification.report.resolved.subject"] = "Un signalement a été résolu",
+            ["notification.todo.assign.subject"] = "Une tâche t'a été assignée",
+            ["notification.post.reply.body"] = "Quelqu'un a répondu à l'une de tes publications : ",
+            ["notification.group.post.body"] = "Nouvelle publication dans l'un de tes groupes : ",
+            ["notification.event.rsvp.body"] = "Quelqu'un a répondu à l'un de tes événements. ",
+            ["notification.event.reminder.body"] = "Voici ton événement à venir : ",
+            ["notification.report.filed.body"] = "Un résident a déposé un signalement sur l'une de tes publications. ",
+            ["notification.report.assigned.body"] = "Un signalement t'a été assigné en tant que modérateur. ",
+            ["notification.report.resolved.body"] = "Un signalement auquel tu étais impliqué a été résolu. ",
+            ["notification.todo.assign.body"] = "Une tâche t'a été assignée : ",
         };
 
     /// <summary>
@@ -4832,10 +4993,55 @@ public static class KnownTranslationKeys
                 "Hvis du ikke har oprettet denne konto, kan du ignorere denne besked.",
             ["email.reminder_subject"] = "Påmindelse: {0}",
             ["email.reminder_body"] = "**{0}** er på vej: {1}{2}.",
-        };
 
-    /// <summary>
-    /// The closed key set (the admin editor's list, the seeder's loop bound, and
+            // ── notifications (M6 — ADR 0076: the /notifications surface;
+            // translations of the en floor above — same key set, same
+            // dotted shape, no email templates for the reserved
+            // post.mention kind) ──────────────────────────────────────────
+            ["notifications.inbox"] = "Notifikationer",
+            ["notifications.preferences"] = "Indstillinger",
+            ["notifications.mark_all_read"] = "Markér alle som læst",
+            ["notifications.empty"] = "Ingenting endnu — ting, der hænder dig, vises her.",
+            ["notifications.bell"] = "Notifikationer",
+            ["notifications.preferences.title"] = "Notifikationsindstillinger",
+            ["notifications.preferences.intro"] = "Vælg, hvilke notifikationer du også får på e-mail. Indbakken noterer altid hver notifikation.",
+            ["notifications.preferences.save"] = "Gem indstillinger",
+            ["notifications.preferences.coming_soon"] = "kommer snart",
+            ["notifications.kind.post.reply"] = "Svar",
+            ["notifications.kind.post.mention"] = "Nævnelse",
+            ["notifications.kind.group.post"] = "Gruppeindlæg",
+            ["notifications.kind.event.rsvp"] = "RSVP",
+            ["notifications.kind.event.reminder"] = "Påmindelse",
+            ["notifications.kind.report.filed"] = "Anmeldelse",
+            ["notifications.kind.report.assigned"] = "Anmeldelse tilknyttet",
+            ["notifications.kind.report.resolved"] = "Anmeldelse behandlet",
+            ["notifications.kind.todo.assign"] = "Opgave tilknyttet",
+            ["notifications.preference.post.reply.label"] = "Svar på mine indlæg",
+            ["notifications.preference.post.mention.label"] = "Nævnelser af mig",
+            ["notifications.preference.group.post.label"] = "Nye indlæg i mine grupper",
+            ["notifications.preference.event.rsvp.label"] = "RSVP'er på mine arrangementer",
+            ["notifications.preference.event.reminder.label"] = "Påmindelser om arrangementer",
+            ["notifications.preference.report.filed.label"] = "Anmeldelser af mit indhold",
+            ["notifications.preference.report.assigned.label"] = "Anmeldelser, der er tilknyttet mig",
+            ["notifications.preference.report.resolved.label"] = "Behandling af anmeldelser, jeg er involveret i",
+            ["notifications.preference.todo.assign.label"] = "Opgaver, der er tilknyttet mig",
+            ["notification.post.reply.subject"] = "Der er kommet et svar på dit indlæg",
+            ["notification.group.post.subject"] = "Nyt indlæg i din gruppe",
+            ["notification.event.rsvp.subject"] = "En RSVP på dit arrangement",
+            ["notification.event.reminder.subject"] = "Påmindelse om arrangement",
+            ["notification.report.filed.subject"] = "En anmeldelse er rejst mod dit indlæg",
+            ["notification.report.assigned.subject"] = "En anmeldelse er tilknyttet dig",
+            ["notification.report.resolved.subject"] = "En anmeldelse er behandlet",
+            ["notification.todo.assign.subject"] = "En opgave er tilknyttet dig",
+            ["notification.post.reply.body"] = "Nogen har svaret på ét af dine indlæg: ",
+            ["notification.group.post.body"] = "Nyt indlæg i én af dine grupper: ",
+            ["notification.event.rsvp.body"] = "Nogen har RSVP'et på ét af dine arrangementer. ",
+            ["notification.event.reminder.body"] = "Dit kommende arrangement: ",
+            ["notification.report.filed.body"] = "En beboer har rejst en anmeldelse mod ét af dine indlæg. ",
+            ["notification.report.assigned.body"] = "En anmeldelse er tilknyttet dig som moderator. ",
+            ["notification.report.resolved.body"] = "En anmeldelse, du var involveret i, er behandlet. ",
+            ["notification.todo.assign.body"] = "En opgave er tilknyttet dig: ",
+        };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
     /// </summary>
