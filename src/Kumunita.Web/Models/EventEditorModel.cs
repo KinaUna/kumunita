@@ -28,6 +28,9 @@ namespace Kumunita.Web.Models;
 /// <item><see cref="Location"/> / <see cref="Capacity"/> — display
 /// metadata; <see cref="Capacity"/> is **not** a gate (no admission
 /// queue; the <c>Going</c> RSVP set is the truth).</item>
+/// <item><see cref="Color"/> — the author's picked calendar color (the
+/// <see cref="Location"/> / <see cref="Capacity"/> shape — display
+/// metadata, never a gate; ADR 0066).</item>
 /// <item><see cref="Audience"/> — the M2 reusable
 /// <see cref="AudienceEditorModel"/> (the single-source pin — the one
 /// form-bound audience editor; <see cref="AudienceEditorModel
@@ -122,6 +125,14 @@ public sealed class EventEditorModel
     /// there is no admission queue in M4; the <c>Going</c> RSVP set is
     /// the truth.</summary>
     public int? Capacity { get; set; }
+
+    /// <summary>An optional display color (a CSS color, typically a
+    /// normalized <c>#RRGGBB</c> hex value) the author picked in the
+    /// composer (the <see cref="Location"/> / <see cref="Capacity"/>
+    /// shape — display metadata, never a gate). The calendar renders it
+    /// as the event chip/block background; null / empty = the theme
+    /// default.</summary>
+    public string? Color { get; set; }
 
     /// <summary>The event's <b>audience</b> editor — the M2 reusable
     /// <see cref="AudienceEditorModel"/> (the single-source pin — the
@@ -285,6 +296,9 @@ public sealed class EventEditorModel
 /// 0024) — the feed excludes deleted events unconditionally; this is
 /// present for the shape's completeness (the service filters it out,
 /// so it is false in every feed row).</param>
+/// <param name="Color">The author's picked display color for the
+/// calendar (the <c>Location</c> shape — display metadata, never a
+/// gate); null = the theme default.</param>
 public sealed record EventRow(
     string Id,
     string Title,
@@ -297,7 +311,10 @@ public sealed record EventRow(
     string? ComponentId,
     string? ComponentDisplayName,
     bool IsDraft,
-    bool IsDeleted);
+    bool IsDeleted,
+    DateTimeOffset StartUtc = default,
+    DateTimeOffset EndUtc = default,
+    string? Color = null);
 
 /// <summary>
 /// The <b>feed</b> view model (the <c>GET /events</c> read surface —
@@ -321,12 +338,82 @@ public sealed record EventRow(
 /// currently-selected filter (null ⇒ unfiltered). <see
 /// cref="CurrentPage"/> is the current page number (1-based).
 /// </para>
+/// <para>
+/// **<see cref="MyEvents"/>** (ADR 0065, the <c>EV-MINE</c> lane) is the
+/// viewer's **own upcoming events** — the union of their RSVPed events (any
+/// <see cref="Kumunita.Core.Events.RsvpStatus"/> — the row exists, the
+/// resident signed up) and their authored events, restricted to upcoming
+/// (<c>Start</c> in the future) and live (<c>!IsDeleted</c>) — from
+/// <see cref="Kumunita.Core.Events.IEventService.ListMineAsync"/> (no
+/// <c>AccessAudit</c> row — the per-row write lane already committed its
+/// decision, the <c>GetMyRsvpAsync</c> posture). The view renders this
+/// section first, before the full feed, and **only** when non-empty.
+/// </para>
 /// </summary>
 public sealed record EventIndexViewModel(
     IReadOnlyList<EventRow> Events,
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0065 (EV-MINE) — default `null!` (a valid compile-time constant;
+    // a collection expression `[]` is not a constant and is illegal here):
+    // callers that omit the argument treat it as the empty "no section"
+    // case — the view's `Count > 0` guard is null-safe against it.
+    IReadOnlyList<EventRow> MyEvents = null!);
+
+/// <summary>
+/// The <b>calendar</b> view model (the <c>GET /events/calendar</c> read
+/// surface — ADR 0063; ADR 0064 <c>EV-DWM</c> adds the Day/Week/Month
+/// views over the same window-agnostic
+/// <see cref="Kumunita.Core.Events.IEventService
+/// .ListInRangeAsync"/> seam).
+/// <para>
+/// **<see cref="FromAnchor"/> / <see cref="PrevAnchor"/> /
+/// <see cref="NextAnchor"/>** are the anchor date and its nav neighbors
+/// (shifted by the <b>view's unit</b> — ±1 day / ±1 week / ±1 month),
+/// each <c>yyyy-MM-dd</c> in the viewer's effective zone —
+/// pre-rendered plain-GET-link targets (C-DWM·6: nav is plain GET links;
+/// the server re-renders, the authorization re-runs per request).
+/// <see cref="Label"/> is the view-appropriate display string in the UI
+/// culture — a full date for Day, a date range for Week, a month name +
+/// year for Month (a display string, not a zone-driven calculation, not a
+/// registry key — C-DWM·9).
+/// </para>
+/// <para>
+/// **<see cref="View"/>** (default <c>"month"</c> — the backward-
+/// compatible EV-CAL default, C-DWM·8) echoes the resolved
+/// <c>?view=</c> selector back to the view so the toggle can render the
+/// active button pressed. **<see cref="WindowDays"/>** is the ordered
+/// list of the view's grid day-columns (date-only
+/// <see cref="DateTime"/>): Day → 1 entry (the anchor); Week → 7 entries,
+/// Monday-first (C-DWM·5); Month → the 5–6 full weeks covering the
+/// calendar month, starting on the Monday on or before the 1st (D4). The
+/// per-chip instants remain <see cref="EventRow.StartUtc"/> /
+/// <see cref="EventRow.EndUtc"/> (ADR 0063, unchanged).
+/// </para>
+/// <para>
+/// **<see cref="Components"/>** (the filter picker's options) is the
+/// enabled <c>Component</c> set — a *filter* (C-M3·2), never a gate;
+/// <see cref="CurrentComponentId"/> is the selected filter (null ⇒
+/// unfiltered).
+/// </para>
+/// <para>
+/// **<see cref="TimeZoneId"/>** is the effective zone id (ADR 0019) —
+/// C-EV·5: a **display** input only (the client distributes chips into
+/// day-columns via <c>Intl</c>), **never** an authorization input.
+/// </para>
+/// </summary>
+public sealed record EventCalendarViewModel(
+    IReadOnlyList<EventRow> Events,
+    string FromAnchor,
+    string? PrevAnchor,
+    string? NextAnchor,
+    string Label,
+    string? CurrentComponentId,
+    IReadOnlyList<(string Id, string Name)> Components,
+    string TimeZoneId,
+    string View = "month",
+    IReadOnlyList<DateTime> WindowDays = null!);
 
 /// <summary>
 /// The <b>detail</b> view model (the <c>GET /events/{id}</c> read

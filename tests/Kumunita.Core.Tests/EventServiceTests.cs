@@ -524,7 +524,10 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var @event = new Event { Id = "s2-ev", AuthorId = "u-s2", IsDraft = true };
 
         await_ThrowsUnauthorized(() => EventService.CheckCreateStanding("", new HashSet<string> { Roles.Member }, @event));
-        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding(null, new HashSet<string> { Roles.Member }, @event));
+        // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
+        // these; the Core layer re-checks). `null!` documents the intentional null
+        // instead of tripping CS8625 (null → non-nullable `string actorId`).
+        await_ThrowsUnauthorized(() => EventService.CheckCreateStanding(null!, new HashSet<string> { Roles.Member }, @event));
     }
 
     // ── 13 — M4_CheckCreateStanding_NullEvent_404 ────────────────────────────
@@ -628,7 +631,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal("Bring gloves", ev.Body);
         Assert.True(ev.IsDraft);
         Assert.Equal("en", ev.LanguageCode);          // ADR 0018 — the instance-default floor ("" → en).
-        Assert.NotNull(ev.Created);
+        // (ev.Created is a non-nullable DateTimeOffset — Assert.NotNull on a value
+        // type is meaningless, xUnit2002 — so there is no Created assert here.)
 
         var rows = await EventAuditRows(store);
         var create = Assert.Single(rows);
@@ -665,7 +669,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // The stored row carries the audience verbatim (bit-identical to the input).
         Assert.NotNull(ev.Audience);
-        Assert.Equal(1, ev.Audience!.Grants.Count);
+        Assert.Single(ev.Audience!.Grants);
         Assert.Equal(GrantKind.User, ev.Audience.Grants[0].Kind);
         Assert.Equal(grantee, ev.Audience.Grants[0].Id);
 
@@ -1002,7 +1006,7 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         // Exactly one RSVP row for this resident on this event.
         var all = await svc.GetRsvpsAsync(ev.Id);
-        Assert.Single(all.Where(r => r.UserId == rsvp1));
+        Assert.Single(all, r => r.UserId == rsvp1);
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == rsvp1).Status);
     }
 
@@ -1068,14 +1072,14 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         });
         // The create lane wrote exactly one row (event.create).
         var before = await EventAuditRows(store);
-        Assert.Equal(1, before.Count);
+        Assert.Single(before);
         Assert.Equal("event.create", before.Single().Action);
 
         // The RSVP lane must add **no** audit row.
         await svc.RsvpAsync(ev.Id, rsvp1, RsvpStatus.Going);
 
         var after = await EventAuditRows(store);
-        Assert.Equal(1, after.Count);                          // still exactly one (the create).
+        Assert.Single(after);                                  // still exactly one (the create).
         Assert.DoesNotContain(after, r => r.Action == "event.rsvp");   // no such action exists.
     }
 
@@ -1372,9 +1376,9 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
 
         var all = await svc.GetRsvpsAsync(ev.Id);
         Assert.Equal(2, all.Count);                                            // exactly 2 rows.
-        Assert.Single(all.Where(r => r.UserId == r1));                         // r1: one row.
+        Assert.Single(all, r => r.UserId == r1);                               // r1: one row.
         Assert.Equal(RsvpStatus.No, all.Single(r => r.UserId == r1).Status);  // last write won.
-        Assert.Single(all.Where(r => r.UserId == r2));                         // r2: one row.
+        Assert.Single(all, r => r.UserId == r2);                               // r2: one row.
         Assert.Equal(RsvpStatus.Going, all.Single(r => r.UserId == r2).Status);
     }
 
@@ -1778,7 +1782,8 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         Assert.Equal("Aufräumtag", row.Title);
         Assert.Equal("Kommunikationstest", row.Body);
         Assert.Equal(author, row.AuthorId);
-        Assert.NotNull(row.Created);
+        // (row.Created is a non-nullable DateTimeOffset — Assert.NotNull on a value
+        // type is meaningless, xUnit2002 — so there is no Created assert here.)
 
         // The row is readable back through the read seam.
         var read = await svc.GetEventTranslationsAsync(evId);
@@ -2170,6 +2175,193 @@ public class EventServiceTests(PostgresFixture fixture) : IClassFixture<Postgres
         var b = await svc.GetEventTranslationsAsync(evB);
         Assert.Single(b);
         Assert.Equal("de", b[0].LanguageCode);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ADR 0065 — EV-MINE (the "your upcoming events" section on /events).
+    // ListMineAsync: the actor's RSVPed events (any RsvpStatus — the row's
+    // existence is the sign-up) ∪ their authored events; upcoming (Start
+    // strictly in the future) + live (!IsDeleted); drafts included (the union
+    // is inherently non-leaky); Start-ascending; capped at 50; no AccessAudit
+    // row (the GetMyRsvpAsync posture — the write lanes committed decisions).
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ── ADR 0065·1 — M4_ListMine_RsvpAnyStatusAndAuthored_Included ──────────
+    // A Going, a Maybe, and a No RSVP row each put their event in the
+    // actor's list (row existence = sign-up, the status is not filtered);
+    // an authored event the actor never RSVPed to is in the list too;
+    // a draft authored event is included (non-leaky: only the actor's own
+    // rows). Ordered by Start ascending.
+
+    [Fact]
+    public async Task M4_ListMine_RsvpAnyStatusAndAuthored_Included()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string me = "u-a065-1-me";
+        const string otherAuthor = "u-a065-1-otherAuthor";
+
+        var past = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
+        var future = DateTimeOffset.UtcNow.AddHours(2);
+
+        // An upcoming event I RSVPed "Maybe" to (another resident's).
+        await Plant(store, new Event
+        {
+            Id = "a065-1-maybe", AuthorId = otherAuthor, Title = "Walk", Body = "b",
+            Start = future, End = future.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "a065-1-r1", EventId = "a065-1-maybe", UserId = me,
+            Status = RsvpStatus.Maybe, At = past,
+        });
+
+        // An upcoming event I RSVPed "No" to (still in my list — the row's
+        // existence is the sign-up, the status is surfaced by the caller).
+        await Plant(store, new Event
+        {
+            Id = "a065-1-no", AuthorId = otherAuthor, Title = "Party", Body = "b",
+            Start = future.AddDays(1), End = future.AddDays(1).AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "a065-1-r2", EventId = "a065-1-no", UserId = me,
+            Status = RsvpStatus.No, At = past,
+        });
+
+        // An upcoming event I authored (no RSVP row at all).
+        await Plant(store, new Event
+        {
+            Id = "a065-1-mine", AuthorId = me, Title = "My cleanup", Body = "b",
+            Start = future.AddDays(2), End = future.AddDays(2).AddHours(3),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        // A draft I authored — included for the author (non-leaky union).
+        await Plant(store, new Event
+        {
+            Id = "a065-1-draft", AuthorId = me, Title = "Draft thing", Body = "b",
+            Start = future.AddDays(3), End = future.AddDays(3).AddHours(1),
+            IsDraft = true, IsDeleted = false, Audience = null,
+        });
+
+        var mine = await svc.ListMineAsync(me);
+
+        var ids = mine.Select(e => e.Id).ToArray();
+        Assert.Contains("a065-1-maybe", ids);
+        Assert.Contains("a065-1-no", ids);
+        Assert.Contains("a065-1-mine", ids);
+        Assert.Contains("a065-1-draft", ids);
+
+        // Start-ascending: maybe < no < mine < draft (the planted order).
+        Assert.Equal(new[] { "a065-1-maybe", "a065-1-no", "a065-1-mine", "a065-1-draft" }, ids);
+
+        // A stranger's RSVP row on my events does not change my list.
+        await Plant(store, new EventRsvp
+        {
+            Id = "a065-1-r3", EventId = "a065-1-mine", UserId = otherAuthor,
+            Status = RsvpStatus.Going, At = past,
+        });
+        var again = await svc.ListMineAsync(me);
+        Assert.Equal(ids, again.Select(e => e.Id).ToArray());
+    }
+
+    // ── ADR 0065·2 — M4_ListMine_PastAndDeleted_Excluded ────────────────────
+    // Past events (Start not strictly in the future) and soft-deleted events
+    // are out of the list, whether RSVPed or authored; the list is live-only
+    // + upcoming-only (the caller never renders a finished event).
+
+    [Fact]
+    public async Task M4_ListMine_PastAndDeleted_Excluded()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string me = "u-a065-2-me";
+        var past = DateTimeOffset.UtcNow.AddDays(-3);
+
+        // A past event I RSVPed to.
+        await Plant(store, new Event
+        {
+            Id = "a065-2-past", AuthorId = "u-a065-2-author", Title = "Past", Body = "b",
+            Start = past, End = past.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+        await Plant(store, new EventRsvp
+        {
+            Id = "a065-2-r1", EventId = "a065-2-past", UserId = me,
+            Status = RsvpStatus.Going, At = past,
+        });
+
+        // A deleted event I authored (soft-deleted — out of the union's filter).
+        await Plant(store, new Event
+        {
+            Id = "a065-2-deleted", AuthorId = me, Title = "Deleted", Body = "b",
+            Start = DateTimeOffset.UtcNow.AddHours(5), End = DateTimeOffset.UtcNow.AddDays(1),
+            IsDraft = false, IsDeleted = true, Audience = null,
+        });
+
+        // The only survivor: an upcoming live event I authored.
+        var live = DateTimeOffset.UtcNow.AddHours(2);
+        await Plant(store, new Event
+        {
+            Id = "a065-2-live", AuthorId = me, Title = "Live", Body = "b",
+            Start = live, End = live.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var mine = await svc.ListMineAsync(me);
+        var ids = mine.Select(e => e.Id).ToArray();
+        Assert.DoesNotContain("a065-2-past", ids);
+        Assert.DoesNotContain("a065-2-deleted", ids);
+        Assert.Equal(new[] { "a065-2-live" }, ids);
+    }
+
+    // ── ADR 0065·3 — M4_ListMine_Nothing_Planted_Empty ──────────────────────
+    // An actor with no RSVP rows and no authored events gets an empty list
+    // (not an error) — the /events section is hidden by the caller when
+    // empty, so this is the "no section" case.
+
+    [Fact]
+    public async Task M4_ListMine_Nothing_Planted_Empty()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        // An upcoming event by a stranger (I have no RSVP, no authorship).
+        var live = DateTimeOffset.UtcNow.AddHours(2);
+        await Plant(store, new Event
+        {
+            Id = "a065-3-strangers", AuthorId = "u-a065-3-author", Title = "Theirs", Body = "b",
+            Start = live, End = live.AddHours(2),
+            IsDraft = false, IsDeleted = false, Audience = null,
+        });
+
+        var mine = await svc.ListMineAsync("u-a065-3-me");
+        Assert.Empty(mine);
+    }
+
+    // ── ADR 0065·4 — M4_ListMine_NoActor_Denies ─────────────────────────────
+    // An empty actor is a 403 (the Web [Authorize] would have stopped them;
+    // this re-checks at the Core layer) — thrown before any store access, so
+    // no AccessAudit row lands (the posture: the write lanes committed their
+    // decisions; this read does not re-decide per row).
+
+    [Fact]
+    public async Task M4_ListMine_NoActor_Denies()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(""));
+        // null! — the null-actor deny path is deliberate (the Web [Authorize] stops
+        // these; the Core layer re-checks). `null!` documents the intentional null
+        // instead of tripping CS8625 (null → non-nullable `string actorId`).
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => svc.ListMineAsync(null!));
+
+        // No audit row from the denied read (the GetMyRsvpAsync posture).
+        Assert.Empty(await EventAuditRows(store));
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -28,6 +28,12 @@
 }
 
 <body class="@(fullBleed ? "kmb-page-fullbleed" : null)">
+    @* Flash toast — the one, uniform flash-message surface (TempData["info"]
+       / ["error"]). Renders a fixed top-right Bootstrap toast when the
+       controller left a flash value on the last redirect. Replaces the
+       per-view .alert blocks that used to land inline wherever each view
+       author placed them. *@
+    @await Html.PartialAsync("_FlashToast")
     @await Html.PartialAsync("_PinnedAnnouncement")
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
@@ -65,6 +71,16 @@
                                three — the feed / detail / composer are one surface). *@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" href="/events"><kw-l key="nav.events">Events</kw-l></a>
+                            </li>
+                            @* M5 (ADR 0067) — the to-do / board surface (the
+                               "outcome" arrow): shared to-dos + Kanban boards.
+                               [Authorize] on the ProjectsController ⇒
+                               resident-only, so it lives in this signed-in
+                               block (one entry, not three — the to-do feed /
+                               detail / composer are one surface; the board
+                               surface is the same controller). *@
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" href="/projects/todos"><kw-l key="nav.projects">Projects</kw-l></a>
                             </li>
                             @* ADR 0039 §3.8 — the pages tree browse (the "folder/file"
                                view). Display, not access — the tree is CanSeeAsync(Read)
@@ -144,12 +160,12 @@
                     </ul>
                 </div>
                 <div class="col-6 col-md-4 col-lg-3">
-                    <h3>The project</h3>
+                    <h3><kw-l key="footer.project.heading">The project</kw-l></h3>
                     <ul class="list-unstyled d-grid gap-2">
                         @foreach (var link in RepositoryInfo.Links)
                         {
                             <li>
-                                <a href="@link.Url" target="_blank" rel="noopener noreferrer">@link.Label</a>
+                                <a href="@link.Url" target="_blank" rel="noopener noreferrer"><kw-l key="@link.Key">@link.Label</kw-l></a>
                             </li>
                         }
                     </ul>
@@ -179,6 +195,12 @@
     <!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
          onclick="this.form.reset()" pattern) -->
     <script type="module" src="~/js/lib/reset-form.js"></script>
+    <!-- Detach menu (SECURITY.md §6 no-inline-script): while an opted-in
+         dropdown (data-detach) is open, re-home its .dropdown-menu onto <body>
+         so it escapes overflow-clipping ancestors (Kanban board / to-do feed)
+         and always renders fully on top. Loaded after bootstrap.bundle so
+         window.bootstrap is available. -->
+    <script type="module" src="~/js/lib/detach-menu.js"></script>
     <!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
     <script type="module" src="~/js/lib/audience-toggle.js"></script>
     <!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->
@@ -193,6 +215,12 @@
     <script type="module" src="~/js/lib/page-form-visibility.js"></script>
     <!-- Grant-picker sync (SECURITY.md §6; hidden textarea ↔ checkbox pickers) -->
     <script type="module" src="~/js/lib/grant-picker-sync.js"></script>
+    <!-- Flash toast (SECURITY.md §6; the one uniform flash surface — see
+         _FlashToast.cshtml). Wires Bootstrap 5.3's Toast to the .toast
+         element(s) the partial renders, so the close button + the
+         data-bs-autohide / data-bs-delay attributes drive the 5 s
+         auto-dismiss + fade-out. -->
+    <script type="module" src="~/js/lib/flash-toast.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

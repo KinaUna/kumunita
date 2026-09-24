@@ -93,7 +93,7 @@ public class MLUI_FacesTests
     }
 
     [Fact(DisplayName = "L3 a signed-out visitor saves a pl preference → the Set-Cookie header is written (next request renders pl)")]
-    public void MLUI_U8_L3_SavePreference_WritesLocaleCookie()
+    public async Task MLUI_U8_L3_SavePreference_WritesLocaleCookie()
     {
         var controller = BuildPicker(
             new[]
@@ -104,7 +104,7 @@ public class MLUI_FacesTests
             settings: new LocaleSettings { DefaultLanguageCode = "en" });
 
         // POST /language — a signed-out visitor (no authz; the action is public).
-        var result = controller.Save(code: "pl", clear: null);
+        var result = await controller.Save(code: "pl", clear: null);
         Assert.IsType<RedirectToActionResult>(result);
 
         // The frozen LocaleCookie.Write shape: kumunita.locale=pl, HttpOnly,
@@ -121,7 +121,7 @@ public class MLUI_FacesTests
     // ── L3 branch: clear=1 deletes the preference ──────────────────────────
 
     [Fact(DisplayName = "L3 clear=1 branch — the locale cookie is deleted (reset to default)")]
-    public void MLUI_U8_L3_ClearPreference_DeletesCookie()
+    public async Task MLUI_U8_L3_ClearPreference_DeletesCookie()
     {
         var controller = BuildPicker(
             new[]
@@ -130,7 +130,7 @@ public class MLUI_FacesTests
             },
             settings: new LocaleSettings { DefaultLanguageCode = "en" });
 
-        var result = controller.Save(code: null, clear: "1");
+        var result = await controller.Save(code: null, clear: "1");
         Assert.IsType<RedirectToActionResult>(result);
 
         // LocaleCookie.Clear deletes the cookie. The frozen shape signals the

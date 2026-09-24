@@ -1,7 +1,12 @@
 @model Kumunita.Web.Models.AnnouncementComposeViewModel
 @using Kumunita.Core.Announcements
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Edit announcement";
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -10,21 +15,6 @@
         <p class="text-muted">
             <kw-l key="announcements.edit_lede">Update this announcement's title, body, and visibility. A public announcement is visible to everyone, including people who are not signed in (e.g. a maintenance window). A resident announcement is only visible to signed-in residents (e.g. a "help us with X" call).</kw-l>
         </p>
-
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
         @if (ViewData.ModelState.ErrorCount > 0)
         {
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -93,7 +83,7 @@
                         <kw-l key="announcements.title_label">Title</kw-l>
                     </label>
                     <input class="form-control" type="text" id="title" name="Title"
-                           maxlength="120" placeholder="optional"
+                           maxlength="120" placeholder="@optionalPlaceholder"
                            value="@Model.Title" />
                     <div class="text-muted small mt-1">
                         <kw-l key="announcements.title_hint">A short headline (up to 120 characters).</kw-l>

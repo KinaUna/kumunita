@@ -44,11 +44,18 @@ namespace Kumunita.Core.Localization;
 /// keys are registered below (ADR 0042 D5, 2026-09-18 — the exclusion is
 /// superseded for <c>about</c>, held for the FAQ placeholder).</li>
 /// <li><b>Not HTML attributes, JS strings, or C#-built markup</b>:
-/// <c>placeholder</c>/<c>aria-label</c>/<c>title</c> attributes,
+/// <c>aria-label</c>/<c>title</c> attributes that embed an inlined value,
 /// <c>confirm()</c> dialogs, and strings embedding inline <c>&lt;code&gt;</c>
 /// API identifiers or inlined data values are out of the TagHelper's reach and
 /// stay hardcoded — registering a key that could drift from the rendered
-/// output would make this registry a lie.</li>
+/// output would make this registry a lie.
+/// <b>Exception (ADR 0072):</b> a small set of *simple, value-free*
+/// <c>placeholder</c> attributes that are fixed UI copy (e.g.
+/// <c>common.optional</c>, the three <c>projects.board.lane.*_placeholder</c>
+/// keys) are registered and resolved through the provider
+/// (<c>Translation.GetAsync</c>) in-scope — not via the TagHelper, which
+/// cannot wrap an attribute. The drift guard still applies to any attribute
+/// that interpolates data.</li>
 /// </ul>
 /// <para>
 /// <b>Upgrade-safe.</b> The <b>provider floor</b> (ADR 0015 D1) resolves any
@@ -78,6 +85,103 @@ public static class KnownTranslationKeys
             ["events.created"]    = "Created",
             ["events.edited"]     = "edited",
 
+            // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
+            ["nav.projects"]                 = "Projects",
+            ["projects.todo.title"]          = "To-dos",
+            ["projects.todo.lede"]           = "The neighborhood's shared to-dos — assign work to a neighbor, break it into subtasks, and put it on a board.",
+            ["projects.todo.new"]            = "New to-do",
+            ["projects.todo.new_lead"]       = "Write a to-do, optionally assign it to a neighbor, and — if needed — break it into subtasks or put it on a board. By default it is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.",
+            ["projects.todo.title_hint"]     = "A short label for the to-do — the card label.",
+            ["projects.todo.status"]         = "Status",
+            ["projects.todo.status_assignee_hint"] = "Status is a free-text label (a string, not a fixed list). Assigning a to-do gives that resident standing over it — display + standing, never an access limit.",
+            ["projects.todo.assignee"]       = "Assignee",
+            ["projects.todo.unassigned"]     = "Unassigned",
+            ["projects.todo.assign"]         = "Assign",
+            ["projects.todo.unassign"]       = "Unassign",
+            ["projects.todo.assign_to"]      = "Assign to…",
+            ["projects.todo.assign_people"]  = "People",
+            ["projects.todo.assign_groups"]  = "Groups",
+            ["projects.todo.assign_communities"] = "Communities",
+            ["projects.todo.claim"]          = "Claim",
+            ["projects.todo.addressed_to"]   = "Addressed to",
+            ["projects.todo.filter_unassigned"] = "Unassigned only",
+            ["projects.todo.add_subtask"]    = "Add subtask",
+            ["projects.todo.delete"]         = "Delete",
+            ["projects.todo.parent"]         = "Parent",
+            ["projects.todo.top_level"]      = "Top-level to-do",
+            ["projects.todo.parent_hint"]    = "Pick a parent to create this to-do as a subtask of it — a subtask is a full to-do with its own status, assignee, and board placement.",
+            ["projects.todo.no_parent"]      = "No parent (top-level)",
+            ["projects.todo.clear_parent"]   = "Clear parent (make top-level)",
+            ["projects.todo.reparent_hint"]  = "A subtask is a full to-do with its own status, assignee, and board placement. Reparenting to a descendant is refused (cycle guard).",
+            ["projects.todo.created"]        = "Created",
+            ["projects.todo.modified"]       = "Modified",
+            ["projects.todo.no_body"]        = "No body — this to-do is title-only.",
+            ["projects.todo.subtasks"]       = "Subtasks",
+            ["projects.todo.boards"]         = "Boards",
+            ["projects.todo.back"]           = "← Back to to-dos",
+            ["projects.todo.untitled"]       = "Untitled to-do",
+            ["projects.todo.edit"]           = "Edit",
+            ["projects.todo.edit_heading"]   = "Edit to-do",
+            ["projects.todo.edit_lead"]      = "Update this to-do's details. Your audience choice is the sole access boundary — the community pick is only a filter.",
+            ["projects.todo.all_communities"] = "All communities",
+            ["projects.todo.audience_heading"] = "Audience — who can see this to-do",
+            ["projects.todo.audience_default"] = "The default — everyone can see this to-do. Turn it off only if you want to narrow who can see it.",
+            ["projects.todo.save"]           = "Save changes",
+            ["projects.todo.create"]         = "Create to-do",
+            ["projects.todo.empty"]          = "No to-dos yet — create one to get the shared work started.",
+
+            // ── projects (M5 — ADR 0067: the board surface (U10) + card actions) ──
+            ["projects.todo.copy_to"]        = "Copy to board",
+            ["projects.todo.move_to"]        = "Move to board",
+            ["projects.todo.move_up"]        = "Move up",
+            ["projects.todo.move_down"]      = "Move down",
+            ["projects.todo.move_left"]      = "Move left",
+            ["projects.todo.move_right"]     = "Move right",
+            ["projects.board.title"]         = "Boards",
+            ["projects.board.lede"]          = "The neighborhood's shared boards — arrange to-dos in lanes, move them through statuses, and keep the work visible.",
+            ["projects.board.new"]           = "New board",
+            ["projects.board.new_lead"]      = "Create a board to arrange to-dos in lanes. A lane can carry a status (a to-do moved into it picks that status up) and an optional limit on how many cards it holds. By default the board is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.",
+            ["projects.board.title_hint"]    = "A short name for the board — the feed label.",
+            ["projects.board.description_hint"] = "An optional description of what this board tracks. A board is usable title-only.",
+            ["projects.board.back"]          = "← Back to boards",
+            ["projects.board.untitled"]      = "Untitled board",
+            ["projects.board.delete"]        = "Delete board",
+            ["projects.board.edit"]          = "Edit board",
+            ["projects.board.edit_heading"]  = "Edit board",
+            ["projects.board.edit_lead"]     = "Update this board's title and description. Its audience, community, and language are fixed when the board is created.",
+            ["projects.board.save"]          = "Save changes",
+            ["projects.board.create"]        = "Create board",
+            ["projects.board.empty"]         = "No boards yet — create one to start arranging the shared work.",
+            ["projects.board.no_lanes"]      = "This board has no lanes yet.",
+            ["projects.board.lanes"]         = "Lanes",
+            ["projects.board.lanes_hint"]    = "Columns across the board — for example \"Planned / Doing / Done\". A lane's status, when set, is applied to a to-do moved into that lane; its max items cap how many cards the lane holds.",
+            ["projects.board.single_lane_hint"] = "The board starts with one lane — add more lanes and statuses on the board page after creating it.",
+            ["projects.board.lane.title"]    = "Lane title",
+            ["projects.board.lane.status"]   = "Status",
+            ["projects.board.lane.max_items"] = "Max items",
+            ["projects.board.lane.order"]    = "Order",
+            ["projects.board.lane.empty"]    = "No cards in this lane.",
+            ["projects.board.lane.save"]     = "Save",
+            ["projects.board.lane.rename"]   = "Rename",
+            ["projects.board.lane.set_limit"] = "Set limit",
+            ["projects.board.lane.set_status"] = "Set status",
+            ["projects.board.lane.move_left"] = "Move left",
+            ["projects.board.lane.move_right"] = "Move right",
+            ["projects.board.lane.add_todo"] = "Add to-do",
+            ["projects.board.lane.add_lane"] = "Add lane",
+            ["projects.board.lane.add_todo_placeholder"] = "To-do title",
+            ["projects.board.lane.add_lane_placeholder"] = "New lane title",
+            ["projects.board.lane.first_title_placeholder"] = "Planned",
+            ["projects.board.status.none"] = "None",
+            ["projects.board.status.not_started"] = "Not started",
+            ["projects.board.status.in_progress"] = "In progress",
+            ["projects.board.status.done"] = "Done",
+            ["projects.board.status.cancelled"] = "Cancelled",
+            ["projects.board.fullscreen"]    = "Full screen",
+            ["projects.board.exit_fullscreen"] = "Exit full screen",
+            ["projects.board.audience_heading"] = "Audience — who can see this board",
+            ["projects.board.audience_default"] = "The default — everyone can see this board. Turn it off only if you want to narrow who can see it.",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Cancel",
             ["common.save"]     = "Save",
@@ -88,6 +192,24 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Add",
             ["common.remove"]   = "Remove",
             ["common.filter"]   = "Filter",
+            ["common.name"]         = "Name",
+            ["common.display_name"] = "Display name",
+            ["common.email"]        = "Email",
+            ["common.password"]     = "Password",
+            ["common.filter_name"]  = "Filter by name…",
+            ["account.confirm_password"] = "Confirm password",
+            ["groups.name_label"]     = "Group name",
+            ["groups.desc_placeholder"] = "What is this group about? (visible to everyone who can reach this page)",
+            ["posts.report_reason_placeholder"] = "Optionally add a reason for a moderator…",
+            ["tags.events_example"] = "e.g. cleanup, social, garden",
+            ["tags.pages_example"]  = "e.g. sanitation, budget, maple-street",
+            ["admin.community_description"] = "Description (optional)",
+            ["admin.community_mandatory"]   = "Mandatory",
+            ["admin.add_community"]         = "Add community",
+            ["admin.roles_heading"]         = "Roles",
+            ["admin.roles_independent_hint"] = "Independent — a resident may hold any combination (ADR 0030). Nothing checked = a plain Member.",
+            ["admin.moderator_scope"]       = "Moderator scope",
+            ["admin.moderator_scope_hint"]  = "The communities this account may moderate. Meaningful only when the Moderator role is checked — the Core lane clears scope rows when the Moderator role is off.",
             ["nav.announcements"] = "Announcements",
             ["nav.community"]     = "Community",
             ["nav.groups"]        = "Groups",
@@ -210,6 +332,14 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Help",
             ["footer.platform.privacy"] = "Privacy",
             ["footer.platform.conduct"] = "Code of conduct",
+            // The "The project" column (home / about / footer): the heading plus
+            // the three RepositoryInfo.Links labels (repo.source_code /
+            // repo.documentation / repo.non_technical) — emitted via a dynamic
+            // kw-l key from the link list, so the labels resolve per-language.
+            ["footer.project.heading"] = "The project",
+            ["repo.source_code"]      = "Source code",
+            ["repo.documentation"]    = "Documentation",
+            ["repo.non_technical"]    = "For non-technical residents",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Settings",
@@ -234,6 +364,8 @@ public static class KnownTranslationKeys
                 ". If you reset your preference, the platform default is used.",
             ["settings.timezone_reset"]        = "Reset to platform default",
             ["settings.timezone_save"]         = "Save",
+            ["settings.timezone_flash_set"]    = "Time zone set to \"{0}\" — it takes effect on the next request.",
+            ["settings.timezone_flash_reset"]  = "Time zone reset — the platform default will be used.",
             ["settings.timezone_unknown"]      = "Unknown time zone",
 
             // ── settings — date format (ADR 0020: the user-override section +
@@ -252,6 +384,8 @@ public static class KnownTranslationKeys
                 "A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.",
             ["settings.dateformat_reset"]        = "Reset to platform default",
             ["settings.dateformat_save"]         = "Save",
+            ["settings.dateformat_flash_set"]    = "Date & time format set — it takes effect on the next request.",
+            ["settings.dateformat_flash_reset"]  = "Date & time format reset — the platform default will be used.",
 
             // ── admin — the platform-default timezone (the /admin/timezone
             // surface, the global-admin control plane) ─────────────────────
@@ -498,6 +632,17 @@ public static class KnownTranslationKeys
                 "it in the box below.",
             ["profile.save"] = "Save",
             ["profile.preview_link"] = "Preview — how I appear",
+
+            // ── profile (Edit page — field labels + input placeholders) ──────
+            ["profile.display_name_label"] = "Display name",
+            ["profile.address_label"] = "Address (the street you live at)",
+            ["profile.address_placeholder"] =
+                "Street — shown to neighbors when you opt in below",
+            ["profile.phone_label"] = "Phone number",
+            ["profile.phone_placeholder"] =
+                "Phone — shown to neighbors when you opt in below",
+            ["profile.audience_mode_any_word"] = "Any",
+            ["profile.audience_mode_all_word"] = "All",
 
             // ── profile (Preview page) ───────────────────────────────────────
             ["profile.preview_back"] = "← Back to the editor",
@@ -830,6 +975,12 @@ public static class KnownTranslationKeys
             ["locale.browser_note_tail"] =
                 " from your browser settings. Saving makes it your preferred " +
                 "language — it stays until you change it.",
+            // Flash messages (the toast surface — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = the language code).
+            ["locale.flash_set"] =
+                "Language preference set to \"{0}\" — it takes effect on the next request.",
+            ["locale.flash_reset"] =
+                "Language preference reset — the instance default will be used.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Who sees this?",
@@ -1049,8 +1200,9 @@ public static class KnownTranslationKeys
                 "The time the event runs. Shown to viewers in their own timezone.",
             ["events.location"] = "Location",
             ["events.capacity"] = "Capacity",
+            ["events.color"] = "Color",
             ["events.location_hint"] =
-                "Location and capacity are display details only — they do not limit who can RSVP.",
+                "Location, capacity, and color are display details only — they do not limit who can RSVP.",
             ["events.all_communities"] = "All communities",
             ["events.community_hint"] =
                 "The community this event appears under — a filter, not an access limit.",
@@ -1081,6 +1233,25 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Update",
             ["events.remove_translation_confirm"] = "Remove this translation?",
 
+            // ── events.mine (the EV-MINE "your upcoming events" section on /events — ADR 0065) ──
+            ["events.mine.title"] = "Your upcoming events",
+            ["events.mine.hint"] = "Events you've RSVPed to or organized.",
+
+            // ── events.calendar (the EV-CAL month-anchored calendar view — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Calendar",
+            ["events.calendar.prev"] = "Prev",
+            ["events.calendar.next"] = "Next",
+            ["events.calendar.today"] = "Today",
+            ["events.calendar.overlap_hint"] = "Overlaps another event in this window",
+            ["events.calendar.empty"] = "No events in this window.",
+            ["events.calendar.list_view"] = "List",
+            ["events.calendar.from"] = "From",
+            // EV-DWM (ADR 0064, U05) — the Day/Week/Month toggle labels (the Calendar.cshtml
+            // view switch; en is authoritative, de/fr/da below are translations — C-DWM·9).
+            ["events.calendar.view.day"] = "Day",
+            ["events.calendar.view.week"] = "Week",
+            ["events.calendar.view.month"] = "Month",
+
             // ── grant (the shared "Who to grant to" picker — the C#-built "Select all" + count) ──
             ["grant.select_all"] = "Select all",
             ["grant.label_residences"] = "Residences",
@@ -1106,6 +1277,8 @@ public static class KnownTranslationKeys
                 "If you reset it, the instance default is used.",
             ["settings.email_save"] = "Save",
             ["settings.email_reset"] = "Reset to instance default",
+            ["settings.email_flash_set"] = "Email & notification language set — your next email will use it.",
+            ["settings.email_flash_reset"] = "Email & notification language reset — the instance default will be used.",
             ["settings.email_reset_confirm"] =
                 "Reset your email & notification language to the instance default?",
 
@@ -1143,6 +1316,103 @@ public static class KnownTranslationKeys
             ["events.created"]    = "Erstellt",
             ["events.edited"]     = "bearbeitet",
 
+            // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
+            ["nav.projects"]                 = "Projekte",
+            ["projects.todo.title"]          = "Aufgaben",
+            ["projects.todo.lede"]           = "Die gemeinsamen Aufgaben der Nachbarschaft — Arbeit einem Nachbarn zuweisen, in Unteraufgaben aufteilen und auf einem Board ablegen.",
+            ["projects.todo.new"]            = "Neue Aufgabe",
+            ["projects.todo.new_lead"]       = "Erstelle eine Aufgabe, weise sie optional einem Nachbarn zu und — falls nötig — teile sie in Unteraufgaben auf oder lege sie auf ein Board. Standardmäßig ist sie für alle sichtbar; deaktiviere das im Abschnitt „Zielgruppe“, wenn du einschränken willst.",
+            ["projects.todo.title_hint"]     = "Ein kurzer Name für die Aufgabe — die Kartenbeschriftung.",
+            ["projects.todo.status"]         = "Status",
+            ["projects.todo.status_assignee_hint"] = "Der Status ist ein freier Text (eine Zeichenkette, keine feste Liste). Eine Aufgabe zuzuweisen gibt diesem Bewohner Handhabung darüber — Anzeige + Handhabung, nie eine Zugangsgrenze.",
+            ["projects.todo.assignee"]       = "Zugewiesen an",
+            ["projects.todo.unassigned"]     = "Nicht zugewiesen",
+            ["projects.todo.assign"]         = "Zuweisen",
+            ["projects.todo.unassign"]       = "Zuweisung aufheben",
+            ["projects.todo.assign_to"]      = "Zuweisen an…",
+            ["projects.todo.assign_people"]  = "Personen",
+            ["projects.todo.assign_groups"]  = "Gruppen",
+            ["projects.todo.assign_communities"] = "Gemeinschaften",
+            ["projects.todo.claim"]          = "Übernehmen",
+            ["projects.todo.addressed_to"]   = "Adressiert an",
+            ["projects.todo.filter_unassigned"] = "Nur nicht zugewiesene",
+            ["projects.todo.add_subtask"]    = "Unteraufgabe hinzufügen",
+            ["projects.todo.delete"]         = "Löschen",
+            ["projects.todo.parent"]         = "Elternaufgabe",
+            ["projects.todo.top_level"]      = "Top-Level-Aufgabe",
+            ["projects.todo.parent_hint"]    = "Wähle eine Elternaufgabe, um diese Aufgabe als Unteraufgabe zu erstellen — eine Unteraufgabe ist eine vollständige Aufgabe mit eigenem Status, Zuweisung und Board-Platzierung.",
+            ["projects.todo.no_parent"]      = "Keine Elternaufgabe (Top-Level)",
+            ["projects.todo.clear_parent"]   = "Elternaufgabe löschen (zur Top-Level machen)",
+            ["projects.todo.reparent_hint"]  = "Eine Unteraufgabe ist eine vollständige Aufgabe mit eigenem Status, Zuweisung und Board-Platzierung. Das Umhängen an einen Nachkommen wird abgelehnt (Zyklusschutz).",
+            ["projects.todo.created"]        = "Erstellt",
+            ["projects.todo.modified"]       = "Geändert",
+            ["projects.todo.no_body"]        = "Kein Text — diese Aufgabe hat nur einen Titel.",
+            ["projects.todo.subtasks"]       = "Unteraufgaben",
+            ["projects.todo.boards"]         = "Boards",
+            ["projects.todo.back"]           = "← Zurück zu den Aufgaben",
+            ["projects.todo.untitled"]       = "Aufgabe ohne Titel",
+            ["projects.todo.edit"]           = "Bearbeiten",
+            ["projects.todo.edit_heading"]   = "Aufgabe bearbeiten",
+            ["projects.todo.edit_lead"]      = "Aktualisiere die Details dieser Aufgabe. Deine Zielgruppenwahl ist die einzige Zugangsgrenze — die Gemeinschaftswahl ist nur ein Filter.",
+            ["projects.todo.all_communities"] = "Alle Gemeinschaften",
+            ["projects.todo.audience_heading"] = "Zielgruppe — wer diese Aufgabe sehen kann",
+            ["projects.todo.audience_default"] = "Standard — jeder kann diese Aufgabe sehen. Deaktiviere es nur, wenn du einschränken willst.",
+            ["projects.todo.save"]           = "Änderungen speichern",
+            ["projects.todo.create"]         = "Aufgabe erstellen",
+            ["projects.todo.empty"]          = "Noch keine Aufgaben — erstelle eine, um die gemeinsame Arbeit zu starten.",
+
+            // ── projects (M5 — ADR 0067: die Board-Oberfläche (U10) + Kartenaktionen) ──
+            ["projects.todo.copy_to"]        = "Auf Board kopieren",
+            ["projects.todo.move_to"]        = "Auf Board verschieben",
+            ["projects.todo.move_up"]        = "Nach oben",
+            ["projects.todo.move_down"]      = "Nach unten",
+            ["projects.todo.move_left"]      = "Nach links",
+            ["projects.todo.move_right"]     = "Nach rechts",
+            ["projects.board.title"]         = "Boards",
+            ["projects.board.lede"]          = "Die gemeinsamen Boards der Nachbarschaft — Aufgaben in Lanes ordnen, durch Status hindurchschieben und die Arbeit sichtbar halten.",
+            ["projects.board.new"]           = "Neues Board",
+            ["projects.board.new_lead"]      = "Erstelle ein Board, um Aufgaben in Lanes anzuordnen. Eine Lane kann einen Status tragen (eine Aufgabe, die dorthin verschoben wird, übernimmt diesen Status) und ein optionales Limit für die Anzahl der Karten. Standardmäßig ist das Board für alle sichtbar; deaktiviere das im Abschnitt „Zielgruppe“, wenn du einschränken willst.",
+            ["projects.board.title_hint"]    = "Ein kurzer Name für das Board — die Feed-Beschriftung.",
+            ["projects.board.description_hint"] = "Eine optionale Beschreibung, was dieses Board nachverfolgt. Ein Board ist allein mit Titel nutzbar.",
+            ["projects.board.back"]          = "← Zurück zu den Boards",
+            ["projects.board.untitled"]      = "Board ohne Titel",
+            ["projects.board.delete"]        = "Board löschen",
+            ["projects.board.edit"]          = "Board bearbeiten",
+            ["projects.board.edit_heading"]  = "Board bearbeiten",
+            ["projects.board.edit_lead"]     = "Aktualisiere Titel und Beschreibung dieses Boards. Zielgruppe, Gemeinschaft und Sprache sind bei der Erstellung festgelegt.",
+            ["projects.board.save"]          = "Änderungen speichern",
+            ["projects.board.create"]        = "Board erstellen",
+            ["projects.board.empty"]         = "Noch keine Boards — erstelle eines, um die gemeinsame Arbeit anzuordnen.",
+            ["projects.board.no_lanes"]      = "Dieses Board hat noch keine Lanes.",
+            ["projects.board.lanes"]         = "Lanes",
+            ["projects.board.lanes_hint"]    = "Spalten über das Board — zum Beispiel „Geplant / In Arbeit / Erledigt“. Der Status einer Lane wird, wenn gesetzt, einer Aufgabe beim Verschieben dorthin zugewiesen; ihr Max-items-Limit begrenzt die Anzahl der Karten.",
+            ["projects.board.single_lane_hint"] = "Das Board startet mit einer Lane — weitere Lanes und Status fügst du auf der Board-Seite hinzu.",
+            ["projects.board.lane.title"]    = "Lane-Titel",
+            ["projects.board.lane.status"]   = "Status",
+            ["projects.board.lane.max_items"] = "Max. Elemente",
+            ["projects.board.lane.order"]    = "Reihenfolge",
+            ["projects.board.lane.empty"]    = "Keine Karten in dieser Lane.",
+            ["projects.board.lane.save"]     = "Speichern",
+            ["projects.board.lane.rename"]   = "Umbenennen",
+            ["projects.board.lane.set_limit"] = "Limit setzen",
+            ["projects.board.lane.set_status"] = "Status setzen",
+            ["projects.board.lane.move_left"] = "Nach links verschieben",
+            ["projects.board.lane.move_right"] = "Nach rechts verschieben",
+            ["projects.board.lane.add_todo"] = "To-do hinzufügen",
+            ["projects.board.lane.add_lane"] = "Lane hinzufügen",
+            ["projects.board.lane.add_todo_placeholder"] = "Aufgabentitel",
+            ["projects.board.lane.add_lane_placeholder"] = "Neuer Lane-Titel",
+            ["projects.board.lane.first_title_placeholder"] = "Geplant",
+            ["projects.board.status.none"] = "Keine",
+            ["projects.board.status.not_started"] = "Nicht begonnen",
+            ["projects.board.status.in_progress"] = "In Arbeit",
+            ["projects.board.status.done"] = "Erledigt",
+            ["projects.board.status.cancelled"] = "Abgebrochen",
+            ["projects.board.fullscreen"]    = "Vollbild",
+            ["projects.board.exit_fullscreen"] = "Vollbild beenden",
+            ["projects.board.audience_heading"] = "Zielgruppe — wer dieses Board sehen kann",
+            ["projects.board.audience_default"] = "Standard — jeder kann dieses Board sehen. Deaktiviere es nur, wenn du einschränken willst.",
+
             // ── common (shared action/field labels reused across resident-facing views) ──
             ["common.cancel"]   = "Abbrechen",
             ["common.save"]     = "Speichern",
@@ -1153,6 +1423,24 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Hinzufügen",
             ["common.remove"]   = "Entfernen",
             ["common.filter"]   = "Filter",
+            ["common.name"]         = "Name",
+            ["common.display_name"] = "Anzeigename",
+            ["common.email"]        = "E-Mail",
+            ["common.password"]     = "Passwort",
+            ["common.filter_name"]  = "Nach Namen filtern…",
+            ["account.confirm_password"] = "Passwort bestätigen",
+            ["groups.name_label"]     = "Gruppenname",
+            ["groups.desc_placeholder"] = "Worum geht es in dieser Gruppe? (sichtbar für alle, die diese Seite erreichen)",
+            ["posts.report_reason_placeholder"] = "Optional einen Grund für den Moderator hinzufügen…",
+            ["tags.events_example"] = "z. B. Aufräumen, Gesellig, Garten",
+            ["tags.pages_example"]  = "z. B. Hygiene, Budget, maple-street",
+            ["admin.community_description"] = "Beschreibung (optional)",
+            ["admin.community_mandatory"]   = "Pflicht",
+            ["admin.add_community"]         = "Gemeinschaft hinzufügen",
+            ["admin.roles_heading"]         = "Rollen",
+            ["admin.roles_independent_hint"] = "Unabhängig — ein Bewohner kann beliebig viele Rollen kombinieren (ADR 0030). Nichts angekreuzt = ein einfacher Member.",
+            ["admin.moderator_scope"]       = "Moderator-Bereich",
+            ["admin.moderator_scope_hint"]  = "Die Gemeinschaften, die dieses Konto moderieren darf. Nur relevant, wenn die Moderator-Rolle angehakt ist — die Core-Lane löscht Scope-Zeilen, wenn die Moderator-Rolle aus ist.",
             ["nav.announcements"] = "Ankündigungen",
             ["nav.community"]     = "Gemeinschaft",
             ["nav.groups"]        = "Gruppen",
@@ -1277,6 +1565,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Hilfe",
             ["footer.platform.privacy"] = "Datenschutz",
             ["footer.platform.conduct"] = "Verhaltenskodex",
+            // Die Spalte "Das Projekt" (home / about / footer): Überschriften
+            // + die drei RepositoryInfo.Links-Labels (über dynamische kw-l-Keys
+            // aus der Linkliste, damit sie pro Sprache aufgelöst werden).
+            ["footer.project.heading"] = "Das Projekt",
+            ["repo.source_code"]      = "Quellcode",
+            ["repo.documentation"]    = "Dokumentation",
+            ["repo.non_technical"]    = "Für nicht-technische Anwohnende",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Einstellungen",
@@ -1300,6 +1595,8 @@ public static class KnownTranslationKeys
                 ". Wenn du deine Einstellung zurücksetzt, wird die Plattform-Voreinstellung verwendet.",
             ["settings.timezone_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
             ["settings.timezone_save"]         = "Speichern",
+            ["settings.timezone_flash_set"]    = "Zeitzone auf \"{0}\" gesetzt — sie wirkt ab der nächsten Anfrage.",
+            ["settings.timezone_flash_reset"]  = "Zeitzone zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
             ["settings.timezone_unknown"]      = "Unbekannte Zeitzone",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -1317,6 +1614,8 @@ public static class KnownTranslationKeys
                 "Eine .NET-Zeitreihenformatzeichenfolge (z. B. yyyy-MM-dd HH:mm). Leer lassen, um eine Voreinstellung zu verwenden.",
             ["settings.dateformat_reset"]        = "Auf die Plattform-Voreinstellung zurücksetzen",
             ["settings.dateformat_save"]         = "Speichern",
+            ["settings.dateformat_flash_set"]    = "Datum- und Zeitformat gesetzt — es wirkt ab der nächsten Anfrage.",
+            ["settings.dateformat_flash_reset"]  = "Datum- und Zeitformat zurückgesetzt — die Plattform-Voreinstellung wird verwendet.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Plattform-Vorgabe: Zeitzone",
@@ -1547,6 +1846,17 @@ public static class KnownTranslationKeys
                 "unten aus, wer es sehen darf.",
             ["profile.save"] = "Speichern",
             ["profile.preview_link"] = "Vorschau — so erscheine ich",
+
+            // ── profile (Edit page — field labels + input placeholders) ──────
+            ["profile.display_name_label"] = "Anzeigename",
+            ["profile.address_label"] = "Adresse (die Straße, an der du wohnst)",
+            ["profile.address_placeholder"] =
+                "Straße — wird Nachbarn angezeigt, wenn du unten zustimmst",
+            ["profile.phone_label"] = "Telefonnummer",
+            ["profile.phone_placeholder"] =
+                "Telefon — wird Nachbarn angezeigt, wenn du unten zustimmst",
+            ["profile.audience_mode_any_word"] = "Beliebig",
+            ["profile.audience_mode_all_word"] = "Alle",
 
             // ── profile (Preview page) ───────────────────────────────────────
             ["profile.preview_back"] = "← Zurück zum Editor",
@@ -1868,6 +2178,12 @@ public static class KnownTranslationKeys
                 " anhand deiner Browser-Einstellungen ausgewählt. " +
                 "Speichern macht es zu deiner Wunschsprache — sie bleibt " +
                 "bestehen, bis du sie änderst.",
+            // Flash-Meldungen (Toast-Oberfläche — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = Sprachcode).
+            ["locale.flash_set"] =
+                "Sprache auf \"{0}\" gesetzt — sie wirkt ab der nächsten Anfrage.",
+            ["locale.flash_reset"] =
+                "Spracheinstellung zurückgesetzt — die Instanz-Voreinstellung wird verwendet.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Wer sieht dies?",
@@ -2066,8 +2382,9 @@ public static class KnownTranslationKeys
                 "Die Zeit, in der die Veranstaltung stattfindet. Besucher sehen sie in ihrer eigenen Zeitzone.",
             ["events.location"] = "Ort",
             ["events.capacity"] = "Kapazität",
+            ["events.color"] = "Farbe",
             ["events.location_hint"] =
-                "Ort und Kapazität sind nur Anzeigedetails — sie beschränken nicht, wer eine Teilnahme angeben kann.",
+                "Ort, Kapazität und Farbe sind nur Anzeigedetails — sie beschränken nicht, wer eine Teilnahme angeben kann.",
             ["events.all_communities"] = "Alle Gemeinden",
             ["events.community_hint"] =
                 "Die Gemeinde, unter der diese Veranstaltung erscheint — ein Filter, keine Zugangsgrenze.",
@@ -2098,6 +2415,24 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Aktualisieren",
             ["events.remove_translation_confirm"] = "Diese Übersetzung entfernen?",
 
+            // ── events.mine (der EV-MINE-Bereich „Deine Veranstaltungen“ auf /events — ADR 0065) ──
+            ["events.mine.title"] = "Deine kommenden Veranstaltungen",
+            ["events.mine.hint"] = "Veranstaltungen, die du bestätigt hast oder organisiert.",
+
+            // ── events.calendar (die EV-CAL-Monatsansicht — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Kalender",
+            ["events.calendar.prev"] = "Zurück",
+            ["events.calendar.next"] = "Weiter",
+            ["events.calendar.today"] = "Heute",
+            ["events.calendar.overlap_hint"] = "Überlappt mit einem anderen Termin in diesem Zeitraum",
+            ["events.calendar.empty"] = "Keine Termine in diesem Zeitraum.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Von",
+            // EV-DWM (ADR 0064, U05) — die Tag/Woche/Monat-Umschalter-Labels (C-DWM·9).
+            ["events.calendar.view.day"] = "Tag",
+            ["events.calendar.view.week"] = "Woche",
+            ["events.calendar.view.month"] = "Monat",
+
             // ── grant (der gemeinsame „Wem zugewiesen"-Picker — C#-gebaut „Alle auswählen" + Zähler) ──
             ["grant.select_all"] = "Alle auswählen",
             ["grant.label_residences"] = "Anwohner",
@@ -2123,6 +2458,8 @@ public static class KnownTranslationKeys
                 "Setzt du sie zurück, wird die Instanzstandardsprache verwendet.",
             ["settings.email_save"] = "Speichern",
             ["settings.email_reset"] = "Auf Instanzstandard zurücksetzen",
+            ["settings.email_flash_set"] = "E-Mail- und Benachrichtigungssprache gesetzt — deine nächste E-Mail wird sie verwenden.",
+            ["settings.email_flash_reset"] = "E-Mail- und Benachrichtigungssprache zurückgesetzt — die Instanz-Voreinstellung wird verwendet.",
             ["settings.email_reset_confirm"] =
                 "E-Mail- und Benachrichtigungssprache auf den Instanzstandard zurücksetzen?",
 
@@ -2167,6 +2504,24 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Ajouter",
             ["common.remove"]   = "Retirer",
             ["common.filter"]   = "Filtrer",
+            ["common.name"]         = "Nom",
+            ["common.display_name"] = "Nom affiché",
+            ["common.email"]        = "E-mail",
+            ["common.password"]     = "Mot de passe",
+            ["common.filter_name"]  = "Filtrer par nom…",
+            ["account.confirm_password"] = "Confirmer le mot de passe",
+            ["groups.name_label"]     = "Nom du groupe",
+            ["groups.desc_placeholder"] = "De quoi s'agit-il ? (visible par tous ceux qui peuvent accéder à cette page)",
+            ["posts.report_reason_placeholder"] = "Ajoutez éventuellement une raison pour un modérateur…",
+            ["tags.events_example"] = "ex. nettoyage, convivial, jardin",
+            ["tags.pages_example"]  = "ex. salubrité, budget, maple-street",
+            ["admin.community_description"] = "Description (optionnelle)",
+            ["admin.community_mandatory"]   = "Obligatoire",
+            ["admin.add_community"]         = "Ajouter une communauté",
+            ["admin.roles_heading"]         = "Rôles",
+            ["admin.roles_independent_hint"] = "Indépendants — un résident peut cumuler librement les rôles (ADR 0030). Aucune case cochée = un simple Membre.",
+            ["admin.moderator_scope"]       = "Portée du modérateur",
+            ["admin.moderator_scope_hint"]  = "Les communautés que ce compte peut modérer. N'a de sens que si le rôle Modérateur est coché — la voie Core efface les lignes de portée quand le rôle Modérateur est désactivé.",
             ["nav.announcements"] = "Annonces",
             ["nav.community"]     = "Communauté",
             ["nav.groups"]        = "Groupes",
@@ -2187,6 +2542,103 @@ public static class KnownTranslationKeys
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["events.created"]    = "Créé le",
             ["events.edited"]     = "modifié le",
+
+            // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
+            ["nav.projects"]                 = "Projets",
+            ["projects.todo.title"]          = "Tâches",
+            ["projects.todo.lede"]           = "Les tâches partagées du quartier — assignez du travail à un voisin, décomposez-le en sous-tâches et placez-le sur un tableau.",
+            ["projects.todo.new"]            = "Nouvelle tâche",
+            ["projects.todo.new_lead"]       = "Rédigez une tâche, assignez-la éventuellement à un voisin, et — si besoin — décomposez-la en sous-tâches ou placez-la sur un tableau. Par défaut, elle est visible par tous ; désactivez cela dans la section public pour restreindre l'accès.",
+            ["projects.todo.title_hint"]     = "Un libellé court pour la tâche — l'étiquette de la carte.",
+            ["projects.todo.status"]         = "Statut",
+            ["projects.todo.status_assignee_hint"] = "Le statut est un libellé libre (une chaîne, pas une liste fixe). Assigner une tâche donne à ce résident un droit d'intervention sur elle — affichage + intervention, jamais une limite d'accès.",
+            ["projects.todo.assignee"]       = "Assignée à",
+            ["projects.todo.unassigned"]     = "Non assignée",
+            ["projects.todo.assign"]         = "Assigner",
+            ["projects.todo.unassign"]       = "Retirer l'assignation",
+            ["projects.todo.assign_to"]      = "Assigner à…",
+            ["projects.todo.assign_people"]  = "Personnes",
+            ["projects.todo.assign_groups"]  = "Groupes",
+            ["projects.todo.assign_communities"] = "Communautés",
+            ["projects.todo.claim"]          = "Prendre en charge",
+            ["projects.todo.addressed_to"]   = "Adressée à",
+            ["projects.todo.filter_unassigned"] = "Non assignées uniquement",
+            ["projects.todo.add_subtask"]    = "Ajouter une sous-tâche",
+            ["projects.todo.delete"]         = "Supprimer",
+            ["projects.todo.parent"]         = "Tâche parente",
+            ["projects.todo.top_level"]      = "Tâche de niveau supérieur",
+            ["projects.todo.parent_hint"]    = "Choisissez une tâche parente pour créer cette tâche comme sous-tâche — une sous-tâche est une tâche complète avec son propre statut, son assignation et sa position sur un tableau.",
+            ["projects.todo.no_parent"]      = "Pas de tâche parente (niveau supérieur)",
+            ["projects.todo.clear_parent"]   = "Retirer la tâche parente (rendre de niveau supérieur)",
+            ["projects.todo.reparent_hint"]  = "Une sous-tâche est une tâche complète avec son propre statut, son assignation et sa position sur un tableau. Replacer sous un descendant est refusé (garde anti-cycle).",
+            ["projects.todo.created"]        = "Créé le",
+            ["projects.todo.modified"]       = "Modifié le",
+            ["projects.todo.no_body"]        = "Pas de texte — cette tâche n'a qu'un titre.",
+            ["projects.todo.subtasks"]       = "Sous-tâches",
+            ["projects.todo.boards"]         = "Tableaux",
+            ["projects.todo.back"]           = "← Retour aux tâches",
+            ["projects.todo.untitled"]       = "Tâche sans titre",
+            ["projects.todo.edit"]           = "Modifier",
+            ["projects.todo.edit_heading"]   = "Modifier la tâche",
+            ["projects.todo.edit_lead"]      = "Mettez à jour les détails de cette tâche. Votre choix de public est la seule limite d'accès — le choix de la communauté n'est qu'un filtre.",
+            ["projects.todo.all_communities"] = "Toutes les communautés",
+            ["projects.todo.audience_heading"] = "Public — qui peut voir cette tâche",
+            ["projects.todo.audience_default"] = "Par défaut — tout le monde peut voir cette tâche. Désactivez cela uniquement si vous voulez restreindre l'accès.",
+            ["projects.todo.save"]           = "Enregistrer les modifications",
+            ["projects.todo.create"]         = "Créer la tâche",
+            ["projects.todo.empty"]          = "Aucune tâche pour l'instant — créez-en une pour lancer le travail partagé.",
+
+            // ── projects (M5 — ADR 0067 : la surface tableaux (U10) + actions de carte) ──
+            ["projects.todo.copy_to"]        = "Copier sur un tableau",
+            ["projects.todo.move_to"]        = "Déplacer sur un tableau",
+            ["projects.todo.move_up"]        = "Monter",
+            ["projects.todo.move_down"]      = "Descendre",
+            ["projects.todo.move_left"]      = "Aller à gauche",
+            ["projects.todo.move_right"]     = "Aller à droite",
+            ["projects.board.title"]         = "Tableaux",
+            ["projects.board.lede"]          = "Les tableaux partagés du quartier — organisez les tâches dans des colonnes, faites-les avancer dans les statuts et gardez le travail visible.",
+            ["projects.board.new"]           = "Nouveau tableau",
+            ["projects.board.new_lead"]      = "Créez un tableau pour organiser les tâches dans des colonnes. Une colonne peut porter un statut (une tâche déplacée dedans en hérite) et une limite optionnelle du nombre de cartes. Par défaut, le tableau est visible par tous ; désactivez cela dans la section public pour restreindre l'accès.",
+            ["projects.board.title_hint"]    = "Un libellé court pour le tableau — l'étiquette du flux.",
+            ["projects.board.edit"]          = "Modifier le tableau",
+            ["projects.board.edit_heading"]  = "Modifier le tableau",
+            ["projects.board.edit_lead"]     = "Mettez à jour le titre et la description de ce tableau. Son public, sa communauté et sa langue sont fixés à la création.",
+            ["projects.board.save"]          = "Enregistrer les modifications",
+            ["projects.board.description_hint"] = "Une description optionnelle de ce que ce tableau suit. Un tableau est utilisable avec un titre seul.",
+            ["projects.board.back"]          = "← Retour aux tableaux",
+            ["projects.board.untitled"]      = "Tableau sans titre",
+            ["projects.board.delete"]        = "Supprimer le tableau",
+            ["projects.board.create"]        = "Créer le tableau",
+            ["projects.board.empty"]         = "Aucun tableau pour l'instant — créez-en un pour commencer à organiser le travail partagé.",
+            ["projects.board.no_lanes"]      = "Ce tableau n'a pas encore de colonnes.",
+            ["projects.board.lanes"]         = "Colonnes",
+            ["projects.board.lanes_hint"]    = "Des colonnes à travers le tableau — par exemple « Planifié / En cours / Fait ». Le statut d'une colonne, s'il est défini, est appliqué à une tâche déplacée dedans ; sa limite de cartes borne le nombre de cartes.",
+            ["projects.board.single_lane_hint"] = "Le tableau démarre avec une colonne — ajoutez d'autres colonnes et statuts sur la page du tableau.",
+            ["projects.board.lane.title"]    = "Titre de la colonne",
+            ["projects.board.lane.status"]   = "Statut",
+            ["projects.board.lane.max_items"] = "Max. d'articles",
+            ["projects.board.lane.order"]    = "Ordre",
+            ["projects.board.lane.empty"]    = "Aucune carte dans cette colonne.",
+            ["projects.board.lane.save"]     = "Enregistrer",
+            ["projects.board.lane.rename"]   = "Renommer",
+            ["projects.board.lane.set_limit"] = "Définir la limite",
+            ["projects.board.lane.set_status"] = "Définir le statut",
+            ["projects.board.lane.move_left"] = "Déplacer à gauche",
+            ["projects.board.lane.move_right"] = "Déplacer à droite",
+            ["projects.board.lane.add_todo"] = "Ajouter une tâche",
+            ["projects.board.lane.add_lane"] = "Ajouter une colonne",
+            ["projects.board.lane.add_todo_placeholder"] = "Titre de la tâche",
+            ["projects.board.lane.add_lane_placeholder"] = "Titre de la nouvelle colonne",
+            ["projects.board.lane.first_title_placeholder"] = "Prévu",
+            ["projects.board.status.none"] = "Aucun",
+            ["projects.board.status.not_started"] = "Non commencé",
+            ["projects.board.status.in_progress"] = "En cours",
+            ["projects.board.status.done"] = "Fait",
+            ["projects.board.status.cancelled"] = "Annulé",
+            ["projects.board.fullscreen"]    = "Plein écran",
+            ["projects.board.exit_fullscreen"] = "Quitter le plein écran",
+            ["projects.board.audience_heading"] = "Public — qui peut voir ce tableau",
+            ["projects.board.audience_default"] = "Par défaut — tout le monde peut voir ce tableau. Désactivez cela uniquement si vous voulez restreindre l'accès.",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Tes enfants",
@@ -2294,6 +2746,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Aide",
             ["footer.platform.privacy"] = "Confidentialité",
             ["footer.platform.conduct"] = "Règles de conduite",
+            // La colonne « Le projet » (home / about / footer) : le titre + les
+            // trois libellés RepositoryInfo.Links (émis via une clé kw-l dynamique
+            // depuis la liste de liens, résolue selon la langue).
+            ["footer.project.heading"] = "Le projet",
+            ["repo.source_code"]      = "Code source",
+            ["repo.documentation"]    = "Documentation",
+            ["repo.non_technical"]    = "Pour les habitants non techniques",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Paramètres",
@@ -2317,6 +2776,8 @@ public static class KnownTranslationKeys
                 ". Si tu réinitialises ta préférence, le défaut de la plateforme est utilisé.",
             ["settings.timezone_reset"]        = "Réinitialiser au défaut de la plateforme",
             ["settings.timezone_save"]         = "Enregistrer",
+            ["settings.timezone_flash_set"]    = "Fuseau horaire réglé sur \"{0}\" — il prend effet à la prochaine requête.",
+            ["settings.timezone_flash_reset"]  = "Fuseau horaire réinitialisé — le défaut de la plateforme sera utilisé.",
             ["settings.timezone_unknown"]      = "Fuseau horaire inconnu",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -2334,6 +2795,8 @@ public static class KnownTranslationKeys
                 "Une chaîne de format de date/heure personnalisée .NET (p. ex. yyyy-MM-dd HH:mm). Laisser vide pour utiliser un préréglage.",
             ["settings.dateformat_reset"]        = "Réinitialiser au défaut de la plateforme",
             ["settings.dateformat_save"]         = "Enregistrer",
+            ["settings.dateformat_flash_set"]    = "Format de date et d'heure réglé — il prend effet à la prochaine requête.",
+            ["settings.dateformat_flash_reset"]  = "Format de date et d'heure réinitialisé — le défaut de la plateforme sera utilisé.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Fuseau horaire par défaut de la plateforme",
@@ -2564,6 +3027,17 @@ public static class KnownTranslationKeys
                 "qui peut les voir dans le bloc ci-dessous.",
             ["profile.save"] = "Enregistrer",
             ["profile.preview_link"] = "Aperçu — comment je me présente",
+
+            // ── profile (Edit page — field labels + input placeholders) ──────
+            ["profile.display_name_label"] = "Nom affiché",
+            ["profile.address_label"] = "Adresse (la rue où tu vis)",
+            ["profile.address_placeholder"] =
+                "Rue — affichée aux voisins si tu actives le partage ci-dessous",
+            ["profile.phone_label"] = "Numéro de téléphone",
+            ["profile.phone_placeholder"] =
+                "Téléphone — affiché aux voisins si tu actives le partage ci-dessous",
+            ["profile.audience_mode_any_word"] = "N'importe lequel",
+            ["profile.audience_mode_all_word"] = "Tous",
 
             // ── profile (Preview page) ───────────────────────────────────────
             ["profile.preview_back"] = "← Retour à l'éditeur",
@@ -2885,6 +3359,12 @@ public static class KnownTranslationKeys
                 " d'après les réglages de ton navigateur. L'enregistrer en " +
                 "fait ta langue préférée — elle reste telle quelle jusqu'à " +
                 "ce que tu la changes.",
+            // Messages flash (surface toast — LocaleController.Save /
+            // PublicLocaleController.Save ; {0} = code de langue).
+            ["locale.flash_set"] =
+                "Langue réglée sur \"{0}\" — elle prend effet à la prochaine requête.",
+            ["locale.flash_reset"] =
+                "Préférence de langue réinitialisée — le défaut de l'instance sera utilisé.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Qui voit cela ?",
@@ -3085,8 +3565,9 @@ public static class KnownTranslationKeys
                 "Le moment où l'événement a lieu. Les visiteurs le voient dans leur propre fuseau horaire.",
             ["events.location"] = "Lieu",
             ["events.capacity"] = "Capacité",
+            ["events.color"] = "Couleur",
             ["events.location_hint"] =
-                "Le lieu et la capacité sont des détails d'affichage seulement — ils ne limitent pas qui peut indiquer sa présence.",
+                "Le lieu, la capacité et la couleur sont des détails d'affichage seulement — ils ne limitent pas qui peut indiquer sa présence.",
             ["events.all_communities"] = "Toutes les communautés",
             ["events.community_hint"] =
                 "La communauté sous laquelle cet événement apparaît — un filtre, pas une limite d'accès.",
@@ -3117,6 +3598,24 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Mettre à jour",
             ["events.remove_translation_confirm"] = "Supprimer cette traduction ?",
 
+            // ── events.mine (la section « Tes prochains événements » sur /events — ADR 0065) ──
+            ["events.mine.title"] = "Tes prochains événements",
+            ["events.mine.hint"] = "Événements auxquels tu as répondu ou que tu as organisés.",
+
+            // ── events.calendar (la vue calendrier EV-CAL — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Calendrier",
+            ["events.calendar.prev"] = "Précédent",
+            ["events.calendar.next"] = "Suivant",
+            ["events.calendar.today"] = "Aujourd'hui",
+            ["events.calendar.overlap_hint"] = "Chevauche un autre événement dans cette période",
+            ["events.calendar.empty"] = "Aucun événement dans cette période.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Depuis",
+            // EV-DWM (ADR 0064, U05) — les libellés du commutateur Jour/Semaine/Mois (C-DWM·9).
+            ["events.calendar.view.day"] = "Jour",
+            ["events.calendar.view.week"] = "Semaine",
+            ["events.calendar.view.month"] = "Mois",
+
             // ── grant (le picker « À qui accorder » — C# « Tout sélectionner » + compteur) ──
             ["grant.select_all"] = "Tout sélectionner",
             ["grant.label_residences"] = "Résidents",
@@ -3142,6 +3641,8 @@ public static class KnownTranslationKeys
                 "Si tu réinitialises, la langue par défaut de l'instance est utilisée.",
             ["settings.email_save"] = "Enregistrer",
             ["settings.email_reset"] = "Réinitialiser à la valeur par défaut",
+            ["settings.email_flash_set"] = "Langue des e-mails et des notifications réglée — ton prochain e-mail l'utilisera.",
+            ["settings.email_flash_reset"] = "Langue des e-mails et des notifications réinitialisée — le défaut de l'instance sera utilisé.",
             ["settings.email_reset_confirm"] =
                 "Réinitialiser la langue des e-mails et des notifications à la valeur par défaut ?",
 
@@ -3187,6 +3688,24 @@ public static class KnownTranslationKeys
             ["common.add"]      = "Tilføj",
             ["common.remove"]   = "Fjern",
             ["common.filter"]   = "Filtrér",
+            ["common.name"]         = "Navn",
+            ["common.display_name"] = "Vistnavn",
+            ["common.email"]        = "E-mail",
+            ["common.password"]     = "Adgangskode",
+            ["common.filter_name"]  = "Filtrér efter navn…",
+            ["account.confirm_password"] = "Bekræft adgangskode",
+            ["groups.name_label"]     = "Gruppens navn",
+            ["groups.desc_placeholder"] = "Hvad handler gruppen om? (synlig for alle, der kan nå denne side)",
+            ["posts.report_reason_placeholder"] = "Tilføj evt. en årsag for en moderator…",
+            ["tags.events_example"] = "f.eks. oprydning, socialt, have",
+            ["tags.pages_example"]  = "f.eks. sanitet, budget, maple-street",
+            ["admin.community_description"] = "Beskrivelse (valgfri)",
+            ["admin.community_mandatory"]   = "Påkrævet",
+            ["admin.add_community"]         = "Tilføj fællesskab",
+            ["admin.roles_heading"]         = "Roller",
+            ["admin.roles_independent_hint"] = "Uafhængige — en beboer kan frit kombinere roller (ADR 0030). Intet markeret = almindeligt Medlem.",
+            ["admin.moderator_scope"]       = "Moderatørens område",
+            ["admin.moderator_scope_hint"]  = "De fællesskaber, dette konto kan moderere. Kun meningsfuldt når Moderator-rollen er markeret — Core-lanet rydder scope-rækker, når Moderator-rollen er fra.",
             ["nav.announcements"] = "Meddelelser",
             ["nav.community"]     = "Fællesskab",
             ["nav.groups"]        = "Grupper",
@@ -3207,6 +3726,103 @@ public static class KnownTranslationKeys
             // ── events (M4 — ADR 0054: the events nav entry + the Detail footer) ──
             ["events.created"]    = "Oprettet",
             ["events.edited"]     = "redigeret",
+
+            // ── projects (M5 — ADR 0067: the to-do surface nav entry + labels) ──
+            ["nav.projects"]                 = "Projekter",
+            ["projects.todo.title"]          = "Opgaver",
+            ["projects.todo.lede"]           = "Nabolagets fælles opgaver — tildel arbejde til en nabo, opdel det i delopgaver og læg det på et board.",
+            ["projects.todo.new"]            = "Ny opgave",
+            ["projects.todo.new_lead"]       = "Skriv en opgave, tildel den evt. til en nabo, og — hvis nødvendigt — opdel den i delopgaver eller læg den på et board. Som udgangspunkt kan alle se den; slå den fra i publikumsafsnittet, hvis du vil begrænse adgang.",
+            ["projects.todo.title_hint"]     = "Et kort navn til opgaven — kortets label.",
+            ["projects.todo.status"]         = "Status",
+            ["projects.todo.status_assignee_hint"] = "Status er en fritextlabel (en streng, ikke en fast liste). Tildeling af en opgave giver denne beboer håndtering af den — visning + håndtering, aldrig en adgangsbegrænsning.",
+            ["projects.todo.assignee"]       = "Tildelt til",
+            ["projects.todo.unassigned"]     = "Ikke tildelt",
+            ["projects.todo.assign"]         = "Tildel",
+            ["projects.todo.unassign"]       = "Fjern tildeling",
+            ["projects.todo.assign_to"]      = "Tildel til…",
+            ["projects.todo.assign_people"]  = "Personer",
+            ["projects.todo.assign_groups"]  = "Grupper",
+            ["projects.todo.assign_communities"] = "Fællesskaber",
+            ["projects.todo.claim"]          = "Tag på dig",
+            ["projects.todo.addressed_to"]   = "Rettet til",
+            ["projects.todo.filter_unassigned"] = "Kun ikke tildelte",
+            ["projects.todo.add_subtask"]    = "Tilføj delopgave",
+            ["projects.todo.delete"]         = "Slet",
+            ["projects.todo.parent"]         = "Forældreopgave",
+            ["projects.todo.top_level"]      = "Tophangende opgave",
+            ["projects.todo.parent_hint"]    = "Vælg en forældreopgave for at oprette denne opgave som en delopgave — en delopgave er en fuldstændig opgave med egen status, tildeling og boardplacering.",
+            ["projects.todo.no_parent"]      = "Ingen forældreopgave (tophængende)",
+            ["projects.todo.clear_parent"]   = "Fjern forældreopgave (gør top-hængende)",
+            ["projects.todo.reparent_hint"]  = "En delopgave er en fuldstændig opgave med egen status, tildeling og boardplacering. Omhængning til en efterkommer nægtes (cyklusvagt).",
+            ["projects.todo.created"]        = "Oprettet",
+            ["projects.todo.modified"]       = "Ændret",
+            ["projects.todo.no_body"]        = "Ingen tekst — denne opgave har kun et navn.",
+            ["projects.todo.subtasks"]       = "Delopgaver",
+            ["projects.todo.boards"]         = "Boards",
+            ["projects.todo.back"]           = "← Tilbage til opgaverne",
+            ["projects.todo.untitled"]       = "Opgave uden navn",
+            ["projects.todo.edit"]           = "Rediger",
+            ["projects.todo.edit_heading"]   = "Rediger opgave",
+            ["projects.todo.edit_lead"]      = "Opdater detaljerne for denne opgave. Dit publikumsvalg er den eneste adgangsbegrænsning — fællesskabsvalget er kun en filter.",
+            ["projects.todo.all_communities"] = "Alle fællesskaber",
+            ["projects.todo.audience_heading"] = "Publikum — hvem der kan se denne opgave",
+            ["projects.todo.audience_default"] = "Som udgangspunkt kan alle se denne opgave. Slå den fra kun, hvis du vil begrænse adgang.",
+            ["projects.todo.save"]           = "Gem ændringer",
+            ["projects.todo.create"]         = "Opret opgave",
+            ["projects.todo.empty"]          = "Ingen opgaver endnu — opret en for at komme i gang med det fælles arbejde.",
+
+            // ── projects (M5 — ADR 0067: brætfladen (U10) + kort-handlinger) ──
+            ["projects.todo.copy_to"]        = "Kopiér til bræt",
+            ["projects.todo.move_to"]        = "Flyt til bræt",
+            ["projects.todo.move_up"]        = "Flyt op",
+            ["projects.todo.move_down"]      = "Flyt ned",
+            ["projects.todo.move_left"]      = "Flyt venstre",
+            ["projects.todo.move_right"]     = "Flyt højre",
+            ["projects.board.title"]         = "Brætter",
+            ["projects.board.lede"]          = "Nabolagets fælles brætter — arranger opgaver i laner, flyt dem igennem statusser og hold arbejdet synligt.",
+            ["projects.board.new"]           = "Nyt bræt",
+            ["projects.board.new_lead"]      = "Opret et bræt for at arrangerer opgaver i laner. En lane kan bære en status (en opgave flyttet dertil overtarver den) og en valgfri grænse for antal kort. Som udgangspunkt kan alle se brættet; slå det fra i publikumsafsnittet, hvis du vil begrænse adgang.",
+            ["projects.board.title_hint"]    = "Et kort navn til brættet — feed-labelen.",
+            ["projects.board.edit"]          = "Redigér bræt",
+            ["projects.board.edit_heading"]  = "Redigér bræt",
+            ["projects.board.edit_lead"]     = "Opdater brættets navn og beskrivelse. Publikum, fællesskab og sprog er fastlagt ved oprettelsen.",
+            ["projects.board.save"]          = "Gem ændringer",
+            ["projects.board.description_hint"] = "En valgfri beskrivelse af, hvad brættet følger. Et bræt kan bruges kun med et navn.",
+            ["projects.board.back"]          = "← Tilbage til brætter",
+            ["projects.board.untitled"]      = "Bræt uden navn",
+            ["projects.board.delete"]        = "Slet bræt",
+            ["projects.board.create"]        = "Opret bræt",
+            ["projects.board.empty"]         = "Ingen brætter endnu — opret et for at begynde at arrangere det fælles arbejde.",
+            ["projects.board.no_lanes"]      = "Dette bræt har endnu ikke laner.",
+            ["projects.board.lanes"]         = "Laner",
+            ["projects.board.lanes_hint"]    = "Kolonner tværs over brættet — for eksempel »Planlagt / I gang / Færdig«. En lanes status anvendes, hvis den er angivet, på en opgave flyttet dertil; dens max-items-grænse begrænser antallet af kort.",
+            ["projects.board.single_lane_hint"] = "Brættet starter med én lane — tilføj flere laner og statusser på bræt-siden efter oprettelsen.",
+            ["projects.board.lane.title"]    = "Lane-titel",
+            ["projects.board.lane.status"]   = "Status",
+            ["projects.board.lane.max_items"] = "Max. elementer",
+            ["projects.board.lane.order"]    = "Rækkefølge",
+            ["projects.board.lane.empty"]    = "Ingen kort i denne lane.",
+            ["projects.board.lane.save"]     = "Gem",
+            ["projects.board.lane.rename"]   = "Omdøb",
+            ["projects.board.lane.set_limit"] = "Sæt grænse",
+            ["projects.board.lane.set_status"] = "Sæt status",
+            ["projects.board.lane.move_left"] = "Flyt venstre",
+            ["projects.board.lane.move_right"] = "Flyt højre",
+            ["projects.board.lane.add_todo"] = "Tilføj to-do",
+            ["projects.board.lane.add_lane"] = "Tilføj lane",
+            ["projects.board.lane.add_todo_placeholder"] = "To-do titel",
+            ["projects.board.lane.add_lane_placeholder"] = "Ny lane titel",
+            ["projects.board.lane.first_title_placeholder"] = "Planlagt",
+            ["projects.board.status.none"] = "Ingen",
+            ["projects.board.status.not_started"] = "Ikke startet",
+            ["projects.board.status.in_progress"] = "I gang",
+            ["projects.board.status.done"] = "Færdig",
+            ["projects.board.status.cancelled"] = "Annulleret",
+            ["projects.board.fullscreen"]    = "Fuldskærm",
+            ["projects.board.exit_fullscreen"] = "Afslut fuldskærm",
+            ["projects.board.audience_heading"] = "Publikum — hvem der kan se dette bræt",
+            ["projects.board.audience_default"] = "Som udgangspunkt kan alle se dette bræt. Slå det fra kun, hvis du vil begrænse adgang.",
 
             // ── guardian (the /me/children child-accounts surface) ─────────
             ["guardian.title"]        = "Dine børn",
@@ -3313,6 +3929,13 @@ public static class KnownTranslationKeys
             ["footer.platform.help"]    = "Hjælp",
             ["footer.platform.privacy"] = "Privatliv",
             ["footer.platform.conduct"] = "Adfærdskodeks",
+            // Søjlen "Projektet" (home / about / footer): overskriften + de tre
+            // RepositoryInfo.Links-labels (udgivet via et dynamisk kw-l-nøgle fra
+            // linklisten, løst op efter sprog).
+            ["footer.project.heading"] = "Projektet",
+            ["repo.source_code"]      = "Kildekode",
+            ["repo.documentation"]    = "Dokumentation",
+            ["repo.non_technical"]    = "For ikke-tekniske naboer",
 
             // ── settings (the language-picker labels) ───────────────────────
             ["settings.settings"]       = "Indstillinger",
@@ -3336,6 +3959,8 @@ public static class KnownTranslationKeys
                 ". Hvis du nulstiller dit valg, bruges platformstandarden.",
             ["settings.timezone_reset"]        = "Nulstil til platformstandard",
             ["settings.timezone_save"]         = "Gem",
+            ["settings.timezone_flash_set"]    = "Tidszone indstillet til \"{0}\" — den træder i kraft ved næste anmodning.",
+            ["settings.timezone_flash_reset"]  = "Tidszone nulstillet — platformstandarden bruges.",
             ["settings.timezone_unknown"]      = "Ukendt tidszone",
 
             // ── settings — date format (ADR 0020) ───────────────────────────
@@ -3353,6 +3978,8 @@ public static class KnownTranslationKeys
                 "En tilpasset .NET-dato-/tidsformatstreng (f.eks. yyyy-MM-dd HH:mm). Lad stå tom for at bruge et standardformat.",
             ["settings.dateformat_reset"]        = "Nulstil til platformstandard",
             ["settings.dateformat_save"]         = "Gem",
+            ["settings.dateformat_flash_set"]    = "Dato- og tidsformat indstillet — det træder i kraft ved næste anmodning.",
+            ["settings.dateformat_flash_reset"]  = "Dato- og tidsformat nulstillet — platformstandarden bruges.",
 
             // ── admin — the platform-default timezone ───────────────────────
             ["admin.timezone_title"]    = "Platformstandard: tidszone",
@@ -3582,6 +4209,17 @@ public static class KnownTranslationKeys
                 "nedenfor, hvem der kan se den.",
             ["profile.save"] = "Gem",
             ["profile.preview_link"] = "Forhåndsvisning — sådan ser jeg ud",
+
+            // ── profile (Edit page — field labels + input placeholders) ──────
+            ["profile.display_name_label"] = "Vistnavn",
+            ["profile.address_label"] = "Adresse (gaden, du bor på)",
+            ["profile.address_placeholder"] =
+                "Gade — vises for naboer, når du slår til nedenfor",
+            ["profile.phone_label"] = "Telefonnummer",
+            ["profile.phone_placeholder"] =
+                "Telefon — vises for naboer, når du slår til nedenfor",
+            ["profile.audience_mode_any_word"] = "En som helst",
+            ["profile.audience_mode_all_word"] = "Alle",
 
             // ── profile (Preview page) ───────────────────────────────────────
             ["profile.preview_back"] = "← Tilbage til editoren",
@@ -3901,6 +4539,12 @@ public static class KnownTranslationKeys
             ["locale.browser_note_tail"] =
                 " ud fra dine browserindstillinger. Gemmer du det, bliver det " +
                 "dit foretrukne sprog — det bliver ved, indtil du ændrer det.",
+            // Flash-meddelelser (toast-overflade — LocaleController.Save /
+            // PublicLocaleController.Save; {0} = sprogkode).
+            ["locale.flash_set"] =
+                "Sprog indstillet til \"{0}\" — det træder i kraft ved næste anmodning.",
+            ["locale.flash_reset"] =
+                "Sprogindstilling nulstillet — instansstandarden bruges.",
 
             // ── announcements (shared labels + New/Edit compose) ─────────────
             ["announcements.scope_label"] = "Hvem ser dette?",
@@ -4099,8 +4743,9 @@ public static class KnownTranslationKeys
                 "Den tid, arrangementet foregår. Seere ser det i deres egen tidszone.",
             ["events.location"] = "Sted",
             ["events.capacity"] = "Kapacitet",
+            ["events.color"] = "Farve",
             ["events.location_hint"] =
-                "Sted og kapacitet er kun visningsdetaljer — de begrænser ikke, hvem der kan tilmelde sig.",
+                "Sted, kapacitet og farve er kun visningsdetaljer — de begrænser ikke, hvem der kan tilmelde sig.",
             ["events.all_communities"] = "Alle fællesskaber",
             ["events.community_hint"] =
                 "Det fællesskab, dette arrangement optræder under — et filter, ikke en adgangsgrænse.",
@@ -4131,6 +4776,24 @@ public static class KnownTranslationKeys
             ["events.rsvp_update"] = "Opdater",
             ["events.remove_translation_confirm"] = "Fjern denne oversættelse?",
 
+            // ── events.mine (sektionen „Dine kommende arrangementer“ på /events — ADR 0065) ──
+            ["events.mine.title"] = "Dine kommende arrangementer",
+            ["events.mine.hint"] = "Arrangementer, du har svaret på eller arrangerer.",
+
+            // ── events.calendar (EV-CAL-månedskalenderen — /events/calendar, ADR 0063) ──
+            ["events.calendar.title"] = "Kalender",
+            ["events.calendar.prev"] = "Forrige",
+            ["events.calendar.next"] = "Næste",
+            ["events.calendar.today"] = "I dag",
+            ["events.calendar.overlap_hint"] = "Overlapper med et andet arrangement i dette område",
+            ["events.calendar.empty"] = "Ingen arrangementer i dette område.",
+            ["events.calendar.list_view"] = "Liste",
+            ["events.calendar.from"] = "Fra",
+            // EV-DWM (ADR 0064, U05) — Day/Week/Month-omskifterens labels (C-DWM·9).
+            ["events.calendar.view.day"] = "Dag",
+            ["events.calendar.view.week"] = "Uge",
+            ["events.calendar.view.month"] = "Måned",
+
             // ── grant (den fælles « Hvem du giver adgang til »-picker — C# « Vælg alle » + tæller) ──
             ["grant.select_all"] = "Vælg alle",
             ["grant.label_residences"] = "Beboere",
@@ -4156,6 +4819,8 @@ public static class KnownTranslationKeys
                 "Nulstiller du det, bruges instancens standardsprog.",
             ["settings.email_save"] = "Gem",
             ["settings.email_reset"] = "Nulstil til standardsprog",
+            ["settings.email_flash_set"] = "E-mail- og notifikationssprog indstillet — din næste e-mail bruger det.",
+            ["settings.email_flash_reset"] = "E-mail- og notifikationssprog nulstillet — instansstandarden bruges.",
             ["settings.email_reset_confirm"] =
                 "Nulstil sprog til e-mail og beskeder til standardsproget?",
 

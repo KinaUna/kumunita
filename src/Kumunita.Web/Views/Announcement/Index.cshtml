@@ -27,21 +27,6 @@
             </div>
         </header>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-
         <div class="airy-ann-list">
             @if (Model.Announcements.Count == 0)
             {
@@ -125,7 +110,7 @@
                             @if (isGlobalAdmin)
                             {
                                 <form method="post" action="/announcements/@a.Id/delete"
-                                      data-confirm="Delete this announcement? This cannot be undone.""
+                                      data-confirm="Delete this announcement? This cannot be undone."
                                       style="margin:0; display:inline;">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="link-quiet small text-danger text-decoration-none border-0 bg-transparent p-0">

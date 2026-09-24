@@ -115,6 +115,15 @@ var marten = builder.Services.AddMarten(opts =>
     // invisible to Marten (the M3/Media/Page/Tag precedent). The Event/EventRsvp
     // POCOs are new; the existing Post/Announcement/Page surfaces are untouched.
     M4DocTypes.Configure(opts);
+
+    // M5 (ADR 0067, plan U02): the Projects bounded context's documents
+    // (TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement, ADR 0004 §B.1
+    // — the three business-key unique indexes: (BoardId, Order) on KanbanLane,
+    // (BoardId, LaneId, Order) + (TodoItemId, BoardId) on BoardItemPlacement).
+    // Without this call the docs are invisible to Marten (the M3/Media/Page/Tag/M4
+    // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
+    // SchemaBootstrap versioned boot both pick the surface up automatically.
+    M5DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the

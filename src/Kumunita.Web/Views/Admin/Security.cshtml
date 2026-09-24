@@ -10,15 +10,6 @@
 
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 <div class="list-group">
     <a asp-action="Audit" class="list-group-item list-group-item-action">
         <div class="fw-semibold">Access audit log</div>

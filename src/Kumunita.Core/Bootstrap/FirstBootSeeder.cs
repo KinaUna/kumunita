@@ -1215,6 +1215,104 @@ public static class FirstBootSeeder
              "A Translator's work is visible: the interface shows, next to a " +
              "translated thing, the one who added that translation, and the " +
              "original is always one click away.\n"),
+            ("child-accounts", "Child accounts",
+             "## Child accounts\n\n" +
+             "A child account is an account you set up for a child, and you keep " +
+             "the controls over it. You set it up because you created the account " +
+             "— that standing is what gives you the controls, and it does not let " +
+             "you read what the child writes.\n\n" +
+             "**What you can do.** You can suspend and un-suspend the account, " +
+             "decide which groups and communities the child belongs to, approve a " +
+             "group invitation the child received, and assign another guardian to " +
+             "share the controls. You can also hand the account over when the child " +
+             "is ready to run it on their own.\n\n" +
+             "**What you can't do.** You can't read the child's posts, replies, or " +
+             "profile. Those are the child's, and they stay the child's.\n\n" +
+             "**To add one.** Open **Account → Children**, fill in the child's " +
+             "display name, email, and a password, and click **Add a child " +
+             "account**. The child verifies their own email to sign in — the usual " +
+             "sign-up flow.\n\n" +
+             "**To suspend or un-suspend.** On the **Children** page, find the " +
+             "child and click **Suspend** or **Un-suspend**. A suspended child " +
+             "can't sign in until you un-suspend them.\n\n" +
+             "**To manage memberships.** On the child's page, add or remove group " +
+             "and community memberships under **Group memberships** and " +
+             "**Community memberships**.\n\n" +
+             "**To approve a group invitation.** On the child's page, find the " +
+             "invitation under **Pending group invitations** and click " +
+             "**Approve**.\n\n" +
+             "**To assign another guardian.** On the child's page, open " +
+             "**Assign a guardian**, enter their email, and click **Assign**. " +
+             "They then hold the same controls you do.\n\n" +
+             "**To hand over the account.** When the child is ready, open their " +
+             "page and click **Dissolve guardianship**. Their memberships are " +
+             "kept, and their own controls come back on the next read.\n"),
+            ("being-a-child", "Being a child on Kumunita",
+             "## Being a child on Kumunita\n\n" +
+             "A child account is one your parent set up for you. It works like a " +
+             "normal account — you read the feed, write posts, and reply — with a " +
+             "few things your parent handles for you.\n\n" +
+             "**What stays yours.** Your posts, replies, and profile are yours. " +
+             "Your parent can't read them, even though they set up the account.\n\n" +
+             "**What your parent handles.** Your parent decides which groups and " +
+             "communities you're in, and can suspend or un-suspend your account.\n\n" +
+             "**Group invitations.** You'll see an invitation under **Invitations**. " +
+             "You can always **Decline**. To **Accept**, your parent has to approve " +
+             "it first — ask them to approve it for you.\n\n" +
+             "**When you're ready to take over.** When your parent hands the " +
+             "account over, your own controls come back: you can accept group " +
+             "invitations yourself and manage your own groups and communities.\n"),
+            ("admins", "Admins",
+             "## Admins\n\n" +
+             "An **admin** (the platform's global admin) is the resident who keeps " +
+             "the instance running for the whole neighborhood. Most days you'll " +
+             "never meet one — you can do almost everything without them — but " +
+             "here is what the role covers.\n\n" +
+             "**What an admin does.**\n" +
+             "- **Accounts.** Verify a new account, block or unblock a resident, " +
+             "and decide who holds which elevated role.\n" +
+             "- **Communities.** Add and edit the communities, and decide which " +
+             "of them every resident belongs to.\n" +
+             "- **The platform pages.** Edit the terms, the help guides, the " +
+             "privacy note, and the code of conduct — and reset a page back to " +
+             "its shipped text when you want the latest wording.\n" +
+             "- **Sign-up.** Choose whether new residents can sign up on their " +
+             "own, or only when you invite them.\n" +
+             "- **The platform defaults.** Set the default language, time zone, " +
+             "and date format for the instance. Every resident can still " +
+             "override any of these on their own account.\n" +
+             "- **Moderation.** See every report, and act on one — the standing " +
+             "to assign, unlock, and resolve a report stays with an admin, even " +
+             "when a moderator can see it.\n\n" +
+             "**What keeps it in check.** Every admin action is written to an " +
+             "audit trail you can review, and the standing is narrow by design: " +
+             "an admin keeps the instance running, but they do not read your " +
+             "posts, replies, or profile — audience still decides what is " +
+             "visible, and a report is never a back-door into someone's " +
+             "content.\n"),
+            ("moderators", "Moderators",
+             "## Moderators\n\n" +
+             "A **moderator** is a resident you've granted the standing to look " +
+             "after one part of the neighborhood — a community or a group — and " +
+             "to keep it a safe place.\n\n" +
+             "**What a moderator may do.**\n" +
+             "- **See the reports** that concern the part of the neighborhood " +
+             "they moderate. The report queue shows only those.\n" +
+             "- **Read a report** in detail, including who filed it and what " +
+             "they're asking for.\n\n" +
+             "**What a moderator may not do.**\n" +
+             "- **Act on a report.** Assigning, unlocking, and resolving a " +
+             "report are an admin's standing — a moderator can see a report, " +
+             "but the platform won't let them take an action on it.\n" +
+             "- **See outside their part.** A moderator only sees the reports " +
+             "that concern the part they were granted. Reports elsewhere are " +
+             "not in their queue.\n" +
+             "- **Read anyone's content.** Seeing a report is not a back-door " +
+             "into a resident's posts, replies, or profile — audience still " +
+             "decides what is visible, and a report doesn't change that.\n\n" +
+             "A moderator is a neighbor helping keep their part of the " +
+             "neighborhood in good order — not an admin, and not a reader of " +
+             "other people's content.\n"),
         ];
     }
 
@@ -1413,6 +1511,120 @@ public static class FirstBootSeeder
              "Die Arbeit eines Übersetzers ist sichtbar: die Oberfläche zeigt neben " +
              "einem übersetzten Ding die Person, die diese Übersetzung " +
              "hinzugefügt hat, und das Original ist immer einen Klick entfernt.\n"),
+            ("child-accounts", "Kinderkonten",
+             "## Kinderkonten\n\n" +
+             "Ein Kinderkonto ist ein Konto, das du für ein Kind einrichtest, und " +
+             "die Kontrollen darüber behältst du. Du hast das Konto eingerichtet — " +
+             "genau das gibt dir die Kontrollen, aber es lässt dich nicht lesen, " +
+             "was das Kind schreibt.\n\n" +
+             "**Was du kannst.** Du kannst das Konto sperren und wieder aktivieren, " +
+             "entscheiden, in welchen Gruppen und Gemeinschaften das Kind ist, " +
+             "eine Gruppeneinladung genehmigen, die das Kind erhalten hat, und " +
+             "einen weiteren Vormund zuweisen, mit dem du die Kontrollen teilst. " +
+             "Und du kannst das Konto übergeben, wenn das Kind bereit ist, es " +
+             "selbst zu führen.\n\n" +
+             "**Was du nicht kannst.** Du kannst die Beiträge, Antworten und das " +
+             "Profil des Kindes nicht lesen. Das sind des Kindes, und es bleibt " +
+             "des Kindes.\n\n" +
+             "**Zum Hinzufügen.** Öffne **Konto → Kinder**, gib den Anzeigenamen, " +
+             "die E-Mail-Adresse und ein Passwort des Kindes ein und klicke auf " +
+             "**Kinderkonto hinzufügen**. Das Kind bestätigt seine eigene E-Mail " +
+             "zur Anmeldung — der gewöhnliche Anmeldevorgang.\n\n" +
+             "**Zum Sperren oder Wieder aktivieren.** Auf der Seite **Kinder** " +
+             "findest du das Kind und klickst auf **Sperren** oder " +
+             "**Wieder aktivieren**. Ein gesperrtes Kind kann sich nicht " +
+             "anmelden, bis du es wieder aktivierst.\n\n" +
+             "**Mitgliedschaften verwalten.** Auf der Seite des Kindes fügst du " +
+             "Gruppen- und Gemeinschaftsmitgliedschaften unter " +
+             "**Gruppenmitgliedschaften** und **Gemeinschaftsmitgliedschaften** " +
+             "hinzu oder entfernst sie.\n\n" +
+             "**Eine Gruppeneinladung genehmigen.** Auf der Seite des Kindes " +
+             "findest du die Einladung unter **Ausstehende Gruppeneinladungen** " +
+             "und klickst auf **Genehmigen**.\n\n" +
+             "**Einen weiteren Vormund zuweisen.** Auf der Seite des Kindes " +
+             "öffnest du **Vormund zuweisen**, gibst dessen E-Mail ein und klickst " +
+             "auf **Zuweisen**. Dann hat er dieselben Kontrollen wie du.\n\n" +
+             "**Das Konto übergeben.** Wenn das Kind bereit ist, öffne seine Seite " +
+             "und klicke auf **Vormundschaft auflösen**. Die Mitgliedschaften " +
+             "bleiben erhalten, und die eigenen Kontrollen kommen beim nächsten " +
+             "Lesen zurück.\n"),
+            ("being-a-child", "Ein Kinderkonto nutzen",
+             "## Ein Kinderkonto nutzen\n\n" +
+             "Ein Kinderkonto ist eines, das deine Eltern für dich eingerichtet " +
+             "haben. Es funktioniert wie ein normales Konto — du liest den Feed, " +
+             "schreibst Beiträge und antwortest — nur ein paar Dinge übernehmen " +
+             "deine Eltern für dich.\n\n" +
+             "**Was dir gehört.** Deine Beiträge, Antworten und dein Profil gehören " +
+             "dir. Deine Eltern können sie nicht lesen, auch wenn sie das Konto " +
+             "eingerichtet haben.\n\n" +
+             "**Was deine Eltern übernehmen.** Deine Eltern entscheiden, in welchen " +
+             "Gruppen und Gemeinschaften du bist, und können dein Konto sperren " +
+             "oder wieder aktivieren.\n\n" +
+             "**Gruppeneinladungen.** Eine Einladung findest du unter " +
+             "**Einladungen**. Du kannst sie immer **Ablehnen**. Um sie " +
+             "**Anzunehmen**, müssen deine Eltern sie erst genehmigen — bitte sie, " +
+             "sie für dich zu genehmigen.\n\n" +
+             "**Wenn du bereit bist, es selbst zu übernehmen.** Wenn deine Eltern " +
+             "dir das Konto übergeben, kommen deine eigenen Kontrollen zurück: Du " +
+             "kannst Gruppeneinladungen selbst annehmen und deine eigenen Gruppen " +
+             "und Gemeinschaften verwalten.\n"),
+            ("admins", "Administratoren",
+             "## Administratoren\n\n" +
+             "Ein **Administrator** (der globale Admin der Plattform) ist die " +
+             "Person, die die Instanz für das ganze Viertel in Betrieb hält. Den " +
+             "Alltag über wirst du sie kaum bemerken — die meisten Dinge kannst " +
+             "du ganz ohne sie erledigen. Hier ist, wofür die Rolle zuständig " +
+             "ist.\n\n" +
+             "**Was ein Administrator macht.**\n" +
+             "- **Konten.** Ein neues Konto bestätigen, eine Person blockieren " +
+             "oder wieder freigeben und entscheiden, wer welche erhöhte Rolle " +
+             "trägt.\n" +
+             "- **Gemeinschaften.** Gemeinschaften anlegen und bearbeiten und " +
+             "festlegen, welchen davon jede Person angehört.\n" +
+             "- **Die Plattformseiten.** Die Nutzungsbedingungen, die Hilfeseiten, " +
+             "den Datenschutzhinweis und die Nutzungsordnung bearbeiten — und " +
+             "eine Seite auf ihre ausgelieferte Fassung zurücksetzen, wenn du " +
+             "den neuesten Text möchtest.\n" +
+             "- **Registrierung.** Festlegen, ob sich neue Personen von allein " +
+             "registrieren dürfen oder nur, wenn du sie einlädst.\n" +
+             "- **Die Plattform-Voreinstellungen.** Die Standardsprache, die " +
+             "Zeitzone und das Datumsformat der Instanz setzen. Jede Person " +
+             "kann all das auf ihrem eigenen Konto individuell überschreiben.\n" +
+             "- **Moderation.** Jeden Bericht sehen und einen abschließen — die " +
+             "Befugnis, über einen Bericht zu entscheiden, bleibt beim " +
+             "Administrator, auch wenn ein Moderator ihn einsehen kann.\n\n" +
+             "**Was die Rolle bremst.** Jede Administratoraktion wird in einem " +
+             "Prüfprotokoll festgehalten, das du einsehen kannst, und die Rolle " +
+             "ist bewusst schmal gehalten: Ein Administrator hält die Instanz in " +
+             "Gang, liest aber weder deine Beiträge noch deine Antworten noch " +
+             "dein Profil — wer etwas sehen darf, bestimmt weiterhin die " +
+             "Zielgruppe, und ein Bericht ist nie eine Hintertür zu den " +
+             "Inhalten einer Person.\n"),
+            ("moderators", "Moderatoren",
+             "## Moderatoren\n\n" +
+             "Ein **Moderator** ist eine Person, der du die Befugnis gegeben " +
+             "hast, auf einen Teil deines Viertels zu achten — eine Gemeinschaft " +
+             "oder eine Gruppe — und diesen Ort sicher zu halten.\n\n" +
+             "**Was ein Moderator darf.**\n" +
+             "- **Die Berichte sehen**, die seinen Bereich betreffen. Die " +
+             "Berichtsanzeige zeigt genau diese Berichte.\n" +
+             "- **Einen Bericht** im Detail lesen, einschließlich wer ihn " +
+             "eingereicht hat und um was es geht.\n\n" +
+             "**Was ein Moderator nicht darf.**\n" +
+             "- **Über einen Bericht entscheiden.** Zuweisen, Freischalten und " +
+             "Abschließen sind die Befugnis eines Administrators — ein " +
+             "Moderator kann einen Bericht sehen, aber die Plattform lässt ihn " +
+             "keine Handlung darüber ausführen.\n" +
+             "- **Hinausgucken.** Ein Moderator sieht nur die Berichte, die den " +
+             "Bereich betreffen, für den er zuständig ist. Berichte von woanders " +
+             "stehen nicht in seiner Anzeige.\n" +
+             "- **Die Inhalte beliebiger Person lesen.** Einen Bericht zu sehen " +
+             "ist keine Hintertür zu den Beiträgen, Antworten oder dem Profil " +
+             "einer Person — wer etwas sehen darf, bestimmt weiterhin die " +
+             "Zielgruppe, und ein Bericht ändert das nicht.\n\n" +
+             "Ein Moderator ist eine Nachbarin, die ihren Teil des Viertels " +
+             "ordentlich hält — kein Administrator und kein Leser fremder " +
+             "Inhalte.\n"),
         ];
     }
 
@@ -1606,6 +1818,113 @@ public static class FirstBootSeeder
              "Le travail d'un traducteur est visible : l'interface montre, à côté " +
              "d'une chose traduite, la personne qui a ajouté cette traduction, et " +
              "l'original est toujours à un clic.\n"),
+            ("child-accounts", "Comptes enfants",
+             "## Comptes enfants\n\n" +
+             "Un compte enfant est un compte que tu crées pour un enfant, et tu en " +
+             "gardes les contrôles. Tu l'as créé — c'est cela qui te donne les " +
+             "contrôles, mais cela ne te laisse pas lire ce que l'enfant " +
+             "écrit.\n\n" +
+             "**Ce que tu peux faire.** Tu peux suspendre et réactiver le compte, " +
+             "décider de quels groupes et communautés l'enfant fait partie, " +
+             "approuver une invitation de groupe que l'enfant a reçue, et assigner " +
+             "un autre tuteur pour partager les contrôles. Et tu peux transférer " +
+             "le compte quand l'enfant est prêt à le conduire seul.\n\n" +
+             "**Ce que tu ne peux pas faire.** Tu ne peux pas lire les " +
+             "publications, les réponses ou le profil de l'enfant. Ce sont ceux de " +
+             "l'enfant, et ils restent ceux de l'enfant.\n\n" +
+             "**Pour en ajouter un.** Ouvre **Compte → Enfants**, entre le nom " +
+             "affiché, l'adresse e-mail et un mot de passe de l'enfant, et clique " +
+             "sur **Ajouter un compte enfant**. L'enfant vérifie son propre e-mail " +
+             "pour se connecter — le flux d'inscription habituel.\n\n" +
+             "**Pour suspendre ou réactiver.** Sur la page **Enfants**, trouve " +
+             "l'enfant et clique sur **Suspendre** ou **Réactiver**. Un enfant " +
+             "suspendu ne peut pas se connecter jusqu'à ce que tu le " +
+             "réactives.\n\n" +
+             "**Gérer les adhésions.** Sur la page de l'enfant, ajoute ou retire " +
+             "des adhésions aux groupes et aux communautés sous **Adhésions aux " +
+             "groupes** et **Adhésions aux communautés**.\n\n" +
+             "**Approuver une invitation de groupe.** Sur la page de l'enfant, " +
+             "trouve l'invitation sous **Invitations de groupe en attente** et " +
+             "clique sur **Approuver**.\n\n" +
+             "**Assigner un autre tuteur.** Sur la page de l'enfant, ouvre " +
+             "**Assigner un tuteur**, entre son e-mail et clique sur **Assigner**. " +
+             "Il a alors les mêmes contrôles que toi.\n\n" +
+             "**Transférer le compte.** Quand l'enfant est prêt, ouvre sa page et " +
+             "clique sur **Dissoudre la tutelle**. Ses adhésions sont " +
+             "conservées, et ses propres contrôles reviennent à la prochaine " +
+             "lecture.\n"),
+            ("being-a-child", "Utiliser un compte enfant",
+             "## Utiliser un compte enfant\n\n" +
+             "Un compte enfant est celui que ton parent a créé pour toi. Il " +
+             "fonctionne comme un compte normal — tu lis le fil, tu écris des " +
+             "publications et tu réponds — à quelques près que ton parent gère " +
+             "pour toi.\n\n" +
+             "**Ce qui te reste.** Tes publications, tes réponses et ton profil te " +
+             "restent. Ton parent ne peut pas les lire, même s'il a créé le compte.\n\n" +
+             "**Ce que ton parent gère.** Ton parent décide de quels groupes et " +
+             "communautés tu fais partie, et peut suspendre ou réactiver ton compte.\n\n" +
+             "**Invitations de groupe.** Tu verras une invitation sous " +
+             "**Invitations**. Tu peux toujours **Refuser**. Pour l'**Accepter**, " +
+             "ton parent doit d'abord l'approuver — demande-lui de l'approuver " +
+             "pour toi.\n\n" +
+             "**Quand tu es prêt à prendre la main.** Quand ton parent te transfère " +
+             "le compte, tes propres contrôles reviennent : tu peux accepter les " +
+             "invitations de groupe toi-même et gérer tes propres groupes et " +
+             "communautés.\n"),
+            ("admins", "Administrateurs",
+             "## Administrateurs\n\n" +
+             "Un **administrateur** (l'administrateur global de la plateforme) " +
+             "est la personne qui fait tourner l'instance pour tout le quartier. " +
+             "Tu ne la rencontreras presque jamais au quotidien — la plupart des " +
+             "choses se font sans elle. Voici ce que couvre ce rôle.\n\n" +
+             "**Ce que fait un administrateur.**\n" +
+             "- **Les comptes.** Valider un nouveau compte, bloquer ou débloquer " +
+             "un habitant, et décider qui détient quel rôle élevé.\n" +
+             "- **Les communautés.** Ajouter et modifier les communautés, et " +
+             "décider desquelles chaque habitant fait partie.\n" +
+             "- **Les pages de la plateforme.** Modifier les conditions " +
+             "d'utilisation, les guides d'aide, la note de confidentialité et " +
+             "la charte — et réinitialiser une page à son texte livré quand tu " +
+             "veux la dernière formulation.\n" +
+             "- **L'inscription.** Choisir si de nouveaux habitants peuvent " +
+             "s'inscrire tout seuls, ou seulement si tu les invites.\n" +
+             "- **Les réglages de la plateforme.** Fixer la langue par défaut, " +
+             "le fuseau horaire et le format de date de l'instance. Chaque " +
+             "habitant peut encore tous les outrepasser sur son propre " +
+             "compte.\n" +
+             "- **La modération.** Examiner chaque signalement et en résoudre " +
+             "un — la qualité d'agir sur un signalement reste celle d'un " +
+             "administrateur, même quand un modérateur peut le voir.\n\n" +
+             "**Ce qui freine le rôle.** Chaque action d'administrateur est " +
+             "inscrite dans un journal d'audit que tu peux consulter, et la " +
+             "qualité est volontairement étroite : un administrateur fait " +
+             "tourner l'instance, mais il ne lit ni tes messages ni tes " +
+             "réponses ni ton profil — l'audience continue de décider ce qui " +
+             "est visible, et un signalement n'est jamais une porte dérobée " +
+             "vers le contenu d'une personne.\n"),
+            ("moderators", "Modérateurs",
+             "## Modérateurs\n\n" +
+             "Un **modérateur** est une personne à qui tu as donné la qualité de " +
+             "veiller sur une partie du quartier — une communauté ou un groupe — " +
+             "et d'en faire un lieu sûr.\n\n" +
+             "**Ce qu'un modérateur peut faire.**\n" +
+             "- **Voir les signalements** qui concernent la partie du quartier " +
+             "dont il s'occupe. La file de signalement n'affiche que ceux-là.\n" +
+             "- **Lire un signalement** en détail, y compris qui l'a déposé et " +
+             "ce qu'il demande.\n\n" +
+             "**Ce qu'un modérateur ne peut pas faire.**\n" +
+             "- **Agir sur un signalement.** Affecter, débloquer et résoudre " +
+             "sont la qualité d'un administrateur — un modérateur peut voir un " +
+             "signalement, mais la plateforme ne lui permet pas d'agir dessus.\n" +
+             "- **Voir au-delà de sa partie.** Un modérateur ne voit que les " +
+             "signalements qui concernent la partie qu'on lui a donnée. Les " +
+             "signalements d'ailleurs ne figurent pas dans sa file.\n" +
+             "- **Lire le contenu de quiconque.** Voir un signalement n'est pas " +
+             "une porte dérobée vers les messages, les réponses ou le profil " +
+             "d'une personne — l'audience continue de décider ce qui est " +
+             "visible, et un signalement ne change pas cela.\n\n" +
+             "Un modérateur est un voisin qui veille sur sa part du quartier — " +
+             "ni administrateur, ni lecteur du contenu des autres.\n"),
         ];
     }
 
@@ -1785,6 +2104,108 @@ public static class FirstBootSeeder
              "En oversætters arbejde er synligt: grænsefladen viser, ved siden " +
              "af en oversat ting, den person, der har tilføjet denne oversættelse, " +
              "og originalen er altid ét klik væk.\n"),
+            ("child-accounts", "Barnkonti",
+             "## Barnkonti\n\n" +
+             "En barnkonto er en konto, du opretter til et barn, og kontrollerne " +
+             "over den holder du. Du har oprettet kontoen — det er det, der giver " +
+             "dig kontrollerne, men det lader dig ikke læse, hvad barnet " +
+             "skriver.\n\n" +
+             "**Hvad du kan.** Du kan suspendere og genoprette kontoen, bestemme, " +
+             "hvilke grupper og fællesskaber barnet tilhører, godkende en " +
+             "gruppeinvitation, barnet har modtaget, og tildele en anden " +
+             "værgemand, så I deler kontrollerne. Og du kan give kontoen videre, " +
+             "når barnet er klar til at drive den selv.\n\n" +
+             "**Hvad du ikke kan.** Du kan ikke læse barnets indlæg, svar eller " +
+             "profil. De er barnets, og de forbliver barnets.\n\n" +
+             "**For at tilføje en.** Åbn **Konto → Børn**, udfyld barnets " +
+             "vistnavn, e-mailadresse og en adgangskode, og klik på **Tilføj en " +
+             "barnkonto**. Barnet bekræfter sin egen e-mail for at logge ind — " +
+             "den sædvanlige tilmeldingsproces.\n\n" +
+             "**For at suspendere eller genoprette.** På siden **Børn** finder du " +
+             "barnet og klikker på **Suspendér** eller **Genopret**. Et suspendet " +
+             "barn kan ikke logge ind, indtil du genopretter det.\n\n" +
+             "**Styr på medlemskaber.** På barnets side tilføjer eller fjerner du " +
+             "gruppemedlemskaber og fællesskabsmedlemskaber under " +
+             "**Gruppemedlemskaber** og **Fællesskabsmedlemskaber**.\n\n" +
+             "**Godkend en gruppeinvitation.** På barnets side finder du " +
+             "invitationen under **Afventende gruppeinvitationer** og klikker " +
+             "på **Godkend**.\n\n" +
+             "**Tildel en anden værgemand.** På barnets side åbner du **Tildel " +
+             "en værgemand**, indtaster e-mailen og klikker på **Tildel**. Så har " +
+             "personen de samme kontroller som dig.\n\n" +
+             "**Giv kontoen videre.** Når barnet er klar, åbner du dets side og " +
+             "klikker på **Afløs værgemodet**. Medlemskaberne bevares, og " +
+             "barnets egne kontroller kommer tilbage ved næste læsning.\n"),
+            ("being-a-child", "At bruge en barnkonto",
+             "## At bruge en barnkonto\n\n" +
+             "En barnkonto er en, dine forældre har oprettet til dig. Den virker " +
+             "som en normal konto — du læser feedet, skriver indlæg og svarer — " +
+             "bortset fra, at dine forældre klarer et par ting for dig.\n\n" +
+             "**Hvad der er dit.** Dine indlæg, svar og profil er dine. Dine " +
+             "forældre kan ikke læse dem, selvom de har oprettet kontoen.\n\n" +
+             "**Hvad dine forældre klarer.** Dine forældre beslutter, hvilke " +
+             "grupper og fællesskaber, du tilhører, og de kan suspendere eller " +
+             "genoprette din konto.\n\n" +
+             "**Gruppeinvitationer.** Du finder invitationen under " +
+             "**Indladelser**. Du kan altid klikke på **Afvis**. For at " +
+             "klikke på **Acceptér**, skal dine forældre først godkende den — " +
+             "bed dem godkende den for dig.\n\n" +
+             "**Når du er klar til at overtage.** Når dine forældre giver kontoen " +
+             "videre til dig, kommer dine egne kontroller tilbage: Du kan selv " +
+             "acceptere gruppeinvitationer og styre dine egne grupper og " +
+             "fællesskaber.\n"),
+            ("admins", "Administrerende",
+             "## Administrerende\n\n" +
+             "En **administrerende** (platformens globale admin) er den person, " +
+             "der holder instansen i gang for hele nabolaget. I dagligdagen " +
+             "møder du dem sjældent — de fleste ting kan du gøre helt uden dem. " +
+             "Her er, hvad rollen dækker.\n\n" +
+             "**Det en administrerende gør.**\n" +
+             "- **Konti.** Bekræfte en ny konto, blokere eller blokfratage en " +
+             "person, og bestemme, hvem der bærer hvilken hævet rolle.\n" +
+             "- **Samfund.** Oprette og redigere samfund og beslutte, hvilke af " +
+             "dem hver person tilhører.\n" +
+             "- **Platformsiderne.** Redigere vilkårne, hjælpeguiderne, " +
+             "personvernshinvisningen og opførselsreglerne — og nulstille en " +
+             "side til dens leverede tekst, når du vil have den nyeste ordlyd.\n" +
+             "- **Tilmelding.** Bestemme, om nye personer må tilmelde sig selv, " +
+             "eller kun når du inviterer dem.\n" +
+             "- **Platformindstillingerne.** Sætte standardsproget, tidszonen " +
+             "og datoformatet for instansen. Hver person kan stadig overskrive " +
+             "dem på den egne konto.\n" +
+             "- **Moderation.** Se alle anmeldelser og afslutte én — den " +
+             "fuldmagt til at handle på en anmeldelse tilhører den " +
+             "administrerende, selvom en moderator kan se den.\n\n" +
+             "**Det, der holder rollen i skak.** Hver admintiltag bliver " +
+             "skrevet i et auditlog, du kan gennemse, og rollen er med vilje " +
+             "snæver: En administrerende holder instansen i gang, men læser " +
+             "hverken dine indlæg eller dine svar eller din profil — " +
+             "målgruppen bestemmer stadig, hvad der er synligt, og en " +
+             "anmeldelse er aldrig en bagdør til en persons indhold.\n"),
+            ("moderators", "Moderatorer",
+             "## Moderatorer\n\n" +
+             "En **moderator** er en person, du har givet fuldmagt til at passe " +
+             "på en del af nabolaget — et samfund eller en gruppe — og holde det " +
+             "til en sikker plads.\n\n" +
+             "**Det en moderator må.**\n" +
+             "- **Se de anmeldelser**, der vedrører den del af nabolaget, " +
+             "personen modererer. Anmeldelseslisten viser kun dem.\n" +
+             "- **Læse en anmeldelse** i detalje, inklusive hvem der har " +
+             "afgivet den, og hvad det drejer sig om.\n\n" +
+             "**Det en moderator ikke må.**\n" +
+             "- **Handle på en anmeldelse.** At tildele, låse op og afslutte " +
+             "er den administrerendes fuldmagt — en moderator kan se en " +
+             "anmeldelse, men platformen lader personen ikke gribe ind over " +
+             "den.\n" +
+             "- **Se ud over sin del.** En moderator ser kun de anmeldelser, " +
+             "der vedrører den del, personen er givet. Anmeldelser fra andre " +
+             "steder står ikke i personens liste.\n" +
+             "- **Læse andres indhold.** At se en anmeldelse er ikke en bagdør " +
+             "til en persons indlæg, svar eller profil — målgruppen bestemmer " +
+             "stadig, hvad der er synligt, og en anmeldelse ændrer ikke på " +
+             "det.\n\n" +
+             "En moderator er en nabo, der holder sin del af nabolaget i orden " +
+             "— hverken en administrerende eller en læser af andres indhold.\n"),
         ];
     }
 
@@ -1844,7 +2265,11 @@ public static class FirstBootSeeder
              "- [Audience](/pages/system/help/audience) — choosing who can see a post\n" +
              "- [Language](/pages/system/help/language) — your language, time zone, and date format\n" +
              "- [Events](/pages/system/help/events) — the feed, RSVP, reminders\n" +
-             "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n\n" +
+             "- [Translators](/pages/system/help/translator) — what a Translator may and may not do\n" +
+             "- [Child accounts](/pages/system/help/child-accounts) — what a guardian may and may not do\n" +
+             "- [Being a child](/pages/system/help/being-a-child) — what a child's account is like, and what stays yours\n" +
+             "- [Admins](/pages/system/help/admins) — what a global admin does, and what keeps it in check\n" +
+             "- [Moderators](/pages/system/help/moderators) — what a moderator may and may not do\n\n" +
              "Need help with the instance itself? That's an operator concern — see the " +
              "self-hosted documentation linked in the footer.\n"),
             ("privacy", "Privacy",
@@ -1936,7 +2361,11 @@ public static class FirstBootSeeder
              "- [Zielgruppe](/pages/system/help/audience) — Wer darf einen Beitrag sehen\n" +
              "- [Sprache](/pages/system/help/language) — Deine Sprache, Zeitzone und das Datumsformat\n" +
              "- [Termine](/pages/system/help/events) — Der Feed, RSVP, Erinnerungen\n" +
-             "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n\n" +
+             "- [Übersetzer](/pages/system/help/translator) — Was ein Übersetzer darf und nicht darf\n" +
+             "- [Kinderkonten](/pages/system/help/child-accounts) — Was ein Vormund darf und nicht darf\n" +
+             "- [Ein Kinderkonto nutzen](/pages/system/help/being-a-child) — Wie sich ein Kinderkonto anfühlt und was dir gehört\n" +
+             "- [Administratoren](/pages/system/help/admins) — Was ein globaler Admin macht, und was die Rolle bremst\n" +
+             "- [Moderatoren](/pages/system/help/moderators) — Was ein Moderator darf und nicht darf\n\n" +
              "Probleme mit der Instanz selbst? Das ist eine Frage für den Betreiber — " +
              "siehe die Dokumentation zum Self-Hosting, verlinkt in der Fußzeile.\n"),
             ("privacy", "Datenschutz",
@@ -2033,7 +2462,11 @@ public static class FirstBootSeeder
              "- [Audience](/pages/system/help/audience) — Qui peut voir un message\n" +
              "- [Langue](/pages/system/help/language) — Ta langue, ton fuseau horaire et ton format de date\n" +
              "- [Événements](/pages/system/help/events) — Le fil, la participation, les rappels\n" +
-             "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n\n" +
+             "- [Traducteurs](/pages/system/help/translator) — Ce qu'un traducteur peut et ne peut pas faire\n" +
+             "- [Comptes enfants](/pages/system/help/child-accounts) — Ce qu'un tuteur peut et ne peut pas faire\n" +
+             "- [Utiliser un compte enfant](/pages/system/help/being-a-child) — À quoi ressemble un compte enfant et ce qui te reste\n" +
+             "- [Administrateurs](/pages/system/help/admins) — Ce qu'un administrateur global fait, et ce qui freine le rôle\n" +
+             "- [Modérateurs](/pages/system/help/moderators) — Ce qu'un modérateur peut et ne peut pas faire\n\n" +
              "Un souci avec l'instance elle-même ? C'est une affaire de porteur — " +
              "consulte la documentation d'auto-hébergement, liée dans le pied de page.\n"),
             ("privacy", "Vie privée",
@@ -2127,7 +2560,11 @@ public static class FirstBootSeeder
              "- [Modtagerkreds](/pages/system/help/audience) — Hvem der kan se et indlæg\n" +
              "- [Sprog](/pages/system/help/language) — Dit sprog, din tidzone og dit datoformat\n" +
              "- [Begivenheder](/pages/system/help/events) — Feeden, deltagelse, påmindelser\n" +
-             "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n\n" +
+             "- [Oversættere](/pages/system/help/translator) — Hvad en oversætter må og ikke må\n" +
+             "- [Barnkonti](/pages/system/help/child-accounts) — Hvad en værgemand må og ikke må\n" +
+             "- [At bruge en barnkonto](/pages/system/help/being-a-child) — Hvordan en barnkonto er, og hvad der er dit\n" +
+             "- [Administrerende](/pages/system/help/admins) — Hvad en global admin gør, og hvad der holder rollen i skak\n" +
+             "- [Moderatorer](/pages/system/help/moderators) — Hvad en moderator må og ikke må\n\n" +
              "Problemer med selve instansen? Det er en sag for operatøren — " +
              "se dokumentationen om selv-hosting, linket i footeren.\n"),
             ("privacy", "Privatliv",

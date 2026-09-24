@@ -1,7 +1,13 @@
 @model Kumunita.Web.Models.PostComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = "Write a post";
     string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    var tagsExample       = await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -10,21 +16,6 @@
         <p class="text-muted">
             <kw-l key="posts.new_intro">By default everyone in the community you pick below can see your post. Turn that off in the audience section only if you want to narrow who can see it to specific people or groups.</kw-l>
         </p>
-
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
 
         @if (Model.Components.Count == 0)
         {
@@ -68,7 +59,7 @@
                             </label>
                             <input class="form-control" type="text" id="title" name="Title"
                                    maxlength="120"
-                                   placeholder="optional" />
+                                   placeholder="@optionalPlaceholder" />
                             <div class="text-muted small mt-1">
                                 <kw-l key="posts.title_hint">A short headline (up to 120 characters). Leave blank for a body-only post — the list will show your first line of the body instead.</kw-l>
                             </div>
@@ -138,7 +129,7 @@
                     <input class="form-control" type="text" id="tags"
                            data-tag-suggest
                            maxlength="64"
-                           placeholder="e.g. sanitation, budget, maple-street" />
+                           placeholder="@tagsExample" />
                     <div class="text-muted small mt-1">
                         <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
                     </div>

@@ -4,15 +4,6 @@
     ViewData["Title"] = $"Admin — {Model.Account.DisplayName ?? Model.Account.Email ?? Model.Account.SubjectId}";
 }
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb small">
         <li class="breadcrumb-item"><a href="/admin">Admin</a></li>
@@ -88,10 +79,9 @@
             <input type="hidden" name="targetSubjectId" value="@Model.Account.SubjectId" />
 
             <fieldset class="mb-3">
-                <legend class="h6">Roles</legend>
+                <legend class="h6"><kw-l key="admin.roles_heading">Roles</kw-l></legend>
                 <p class="text-muted small mb-2">
-                    Independent — a resident may hold any combination (ADR 0030).
-                    Nothing checked = a plain Member.
+                    <kw-l key="admin.roles_independent_hint">Independent — a resident may hold any combination (ADR 0030). Nothing checked = a plain Member.</kw-l>
                 </p>
                 <div class="d-flex gap-3 flex-wrap">
                     <div class="form-check">
@@ -121,11 +111,9 @@
             @if (Model.Components.Count > 0)
             {
                 <fieldset class="mb-3">
-                    <legend class="h6">Moderator scope</legend>
+                    <legend class="h6"><kw-l key="admin.moderator_scope">Moderator scope</kw-l></legend>
                     <p class="text-muted small mb-2">
-                        The communities this account may moderate. Meaningful only
-                        when the Moderator role is checked — the Core lane clears
-                        scope rows when the Moderator role is off.
+                        <kw-l key="admin.moderator_scope_hint">The communities this account may moderate. Meaningful only when the Moderator role is checked — the Core lane clears scope rows when the Moderator role is off.</kw-l>
                     </p>
                     <div class="d-flex gap-3 flex-wrap">
                         @foreach (var c in Model.Components)

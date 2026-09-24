@@ -1,0 +1,410 @@
+@model Kumunita.Web.Models.TodoIndexViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@using Marten
+@inject Marten.IDocumentStore Store
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = "To-dos";
+    // The "Assign to…" modal's optgroup labels are resolved the ADR 0072 way:
+    // provider by the effective language, the en registry the backstop (the
+    // <kw-l> TagHelper renders text nodes, not attributes — the same reason
+    // the board card's assign modal resolves its labels server-side).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    // The row dropdown's "Copy to board" / "Move to board" pickers need the
+    // *other* boards (the target option list) — the same frozen-store read
+    // the board card menu's pickers lean on (BoardDetail's otherBoards).
+    // A read-only display convenience: the audience gate already ran in the
+    // feed's ListTodosAsync (C-M5·3); a row's own boards are excluded per
+    // row below (a board never offers itself as a target).
+    var allBoards = await Store.QuerySession().Query<KanbanBoard>()
+        .Where(b => !b.IsDeleted)
+        .ToListAsync(CancellationToken.None);
+    allBoards = allBoards
+        .OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    // ADR 0069 — the fixed status vocabulary's label keys (the same closed
+    // set the Kanban lane's Set-status select offers: None + the four codes).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="projects.todo.title">To-dos</kw-l></h1>
+                    <p class="lede">
+                        <kw-l key="projects.todo.lede">The neighborhood's shared to-dos — assign work to a neighbor, break it into subtasks, and put it on a board.</kw-l>
+                    </p>
+                </div>
+                <a class="btn btn-outline-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
+            </div>
+        </header>
+
+        @* The To-dos / Boards tab strip (the _AdminNav.cshtml idiom): start from
+           a to-do or from a board — both entry points are first-class. *@
+        <partial name="_ProjectsTabs" />
+
+        <form method="get" action="/projects/todos" class="mb-4">
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                @if (Model.Components.Count > 0)
+                {
+                    <div>
+                        <label class="form-label" for="component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="component-filter" name="componentId">
+                            <option value=""><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="unassigned-filter" name="unassignedOnly" value="true" checked="@(Model.UnassignedOnly ? "checked" : null)" />
+                    <label class="form-check-label" for="unassigned-filter"><kw-l key="projects.todo.filter_unassigned">Unassigned only</kw-l></label>
+                </div>
+                <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+            </div>
+        </form>
+
+        <div class="airy-ann-list">
+            @if (Model.Todos.Count == 0)
+            {
+                <div class="p-4 text-muted"><kw-l key="projects.todo.empty">No to-dos yet — create one to get the shared work started.</kw-l></div>
+            }
+            @foreach (var row in Model.Todos)
+            {
+                <div class="airy-ann-row">
+                    <div>
+                        <h3 class="airy-ann-title">
+                            <a href="@($"/projects/todos/{row.Id}")">@row.Title</a>
+                        </h3>
+                        <div class="text-muted small mb-1">
+                            @row.AuthorDisplayName
+                            @if (!string.IsNullOrWhiteSpace(row.AssigneeDisplayName))
+                            {
+                                <span>· <kw-l key="projects.todo.assignee">Assignee</kw-l>: @row.AssigneeDisplayName</span>
+                            }
+                            else
+                            {
+                                <span>· <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
+                            }
+                            <span>· <kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                            @if (!string.IsNullOrWhiteSpace(row.Status))
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.Status</span>
+                            }
+                            @if (row.ComponentDisplayName is not null)
+                            {
+                                <span class="badge text-bg-light border ms-2">@row.ComponentDisplayName</span>
+                            }
+                            @if (row.GroupNames is { Count: > 0 })
+                            {
+                                <span class="badge text-bg-light border ms-2">
+                                    <kw-l key="projects.todo.addressed_to">Addressed to</kw-l>: @string.Join(", ", row.GroupNames)
+                                </span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(row.Body))
+                        {
+                            <p class="mb-1">@MarkdownRenderer.PlainTextPreview(row.Body, 250)</p>
+                        }
+                    </div>
+                    @* The to-do action dropdown (the _AccountNav.cshtml Bootstrap
+                       dropdown shape, the M2/M3/M4 shared nav-dropdown idiom) —
+                       the same menu the Kanban board card offers (the ADR 0071
+                       divided groups), minus the lane moves (move up / down /
+                       left / right have no board context here): Assign to… (a
+                       modal picking people / groups / communities, the ADR 0074
+                       board-card shape) / Edit / Unassign, then Copy to board /
+                       Move to board (target pickers over this to-do's *other*
+                       boards), then Claim (the ADR 0073 pick-up, unassigned
+                       rows only) and Delete (the destructive action, always
+                       separated). The standing + cascade decisions are the
+                       service's (F7/F8/F9); this surface only renders what the
+                       service returns (C3). *@
+                    @{
+                        var rowOtherBoards = allBoards
+                            .Where(b => !row.PlacementBoardIds.Contains(b.Id))
+                            .ToList();
+                    }
+                    <div class="dropdown" data-detach>
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Actions for @row.Title">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#assign-{row.Id}")">
+                                    <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                </button>
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{row.Id}")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                            </li>
+                            @if (!string.IsNullOrWhiteSpace(row.AssigneeId))
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{row.Id}/assign")"
+                                          data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#subtask-{row.Id}")">
+                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                </button>
+                            </li>
+                            @if (rowOtherBoards.Count > 0)
+                            {
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{row.Id}/copy-to")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="copy-target-@row.Id">
+                                                <kw-l key="projects.todo.copy_to">Copy to board</kw-l>
+                                            </label>
+                                            <select class="form-select form-select-sm mb-2" id="copy-target-@row.Id" name="targetBoardId">
+                                                @foreach (var b in rowOtherBoards)
+                                                {
+                                                    <option value="@b.Id">@b.Title</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.copy_to">Copy to board</kw-l></button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{row.Id}/move-to")"
+                                          data-confirm="@("Move this to-do to another board? It will no longer be on this board.")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="move-target-@row.Id">
+                                                <kw-l key="projects.todo.move_to">Move to board</kw-l>
+                                            </label>
+                                            <select class="form-select form-select-sm mb-2" id="move-target-@row.Id" name="targetBoardId">
+                                                @foreach (var b in rowOtherBoards)
+                                                {
+                                                    <option value="@b.Id">@b.Title</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_to">Move to board</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            <li><hr class="dropdown-divider" /></li>
+                            @if (row.CanClaim)
+                            {
+                                <li>
+                                    <form method="post" action="@($"/projects/todos/{row.Id}/claim")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
+                                    </form>
+                                </li>
+                            }
+                            <li>
+                                <form method="post" action="@($"/projects/todos/{row.Id}/delete")"
+                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+
+                    @* ADR 0071 — the Add-subtask modal (same convention as the
+                       Kanban board card; the inline Title input is replaced). *@
+                    <div class="modal fade" id="@($"subtask-{row.Id}")" tabindex="-1"
+                         aria-labelledby="@($"subtask-label-{row.Id}")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/projects/todos/{row.Id}/subtasks")"
+                                      id="@($"subtask-form-{row.Id}")">
+                                    @Html.AntiForgeryToken()
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"subtask-label-{row.Id}")">
+                                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="@("Close")"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="@($"subtask-title-{row.Id}")">
+                                                <kw-l key="common.title">Title</kw-l>
+                                            </label>
+                                            <input class="form-control" type="text" name="Title"
+                                                   id="@($"subtask-title-{row.Id}")" maxlength="120" required />
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="@($"subtask-status-{row.Id}")">
+                                                <kw-l key="projects.todo.status">Status</kw-l>
+                                            </label>
+                                            @* ADR 0069 — the fixed status
+                                               vocabulary (the same
+                                               <c>KanbanStatuses.Known</c> set the
+                                               Kanban lane's Set-status select
+                                               offers: None + the four codes). A
+                                               new subtask starts with no status,
+                                               so "None" is the selected default. *@
+                                            <select class="form-select" name="Status" id="@($"subtask-status-{row.Id}")">
+                                                <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
+                                                @foreach (var code in KanbanStatuses.Known)
+                                                {
+                                                    <option value="@code">
+                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                    </option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="form-label" for="@($"subtask-assignee-{row.Id}")">
+                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                            </label>
+                                            @{ var _opts = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>(); }
+                                            <select class="form-control" name="AssigneeId" id="@($"subtask-assignee-{row.Id}")">
+                                                <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                                @foreach (var o in _opts)
+                                                {
+                                                    <option value="@o.Id">@o.Label</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"subtask-form-{row.Id}")">
+                                            <kw-l key="common.add">Add</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    @* ADR 0074 — the "Assign to…" modal (the board card's
+                       ⋮-menu shape, ported to the feed): one <select> with
+                       three optgroups — People (the seeded Audience_Users),
+                       Groups (the seeded Audience_Groups), Communities (the
+                       seeded Assign_Communities) — led by the Unassigned
+                       option (an empty value clears the assignee on submit).
+                       The current assignee is preselected when it matches an
+                       option (the id spaces are disjoint). The form posts the
+                       existing assign route (POST /projects/todos/{id}/assign
+                       — the standing gate is the service's, creator ∪ assignee
+                       ∪ GlobalAdmin) with a same-site returnUrl back to this
+                       feed, so the flash toast ("To-do assigned." / "Assignee
+                       removed.") lands here. The options are a display
+                       convenience, never a gate. *@
+                    @{
+                        var _assignPeople = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                        var _assignGroups = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>();
+                        var _assignCommunities = (ViewData["Assign_Communities"] as List<GrantOption>) ?? new List<GrantOption>();
+                        var _assignPeopleLabel = await Translation.GetAsync("projects.todo.assign_people", _kwL);
+                        var _assignGroupsLabel = await Translation.GetAsync("projects.todo.assign_groups", _kwL);
+                        var _assignCommunitiesLabel = await Translation.GetAsync("projects.todo.assign_communities", _kwL);
+                        static bool _IsCurrent(string? currentId, string oId) =>
+                            !string.IsNullOrEmpty(currentId) && currentId == oId;
+                    }
+                    <div class="modal fade" id="@($"assign-{row.Id}")" tabindex="-1"
+                         aria-labelledby="@($"assign-label-{row.Id}")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/projects/todos/{row.Id}/assign")"
+                                      id="@($"assign-form-{row.Id}")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="/projects/todos" />
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"assign-label-{row.Id}")">
+                                            <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                            <span class="text-body-secondary">· @row.Title</span>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="@("Close")"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        @if (!string.IsNullOrWhiteSpace(row.AssigneeId))
+                                        {
+                                            <p class="mb-3">
+                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>: <span>@row.AssigneeDisplayName</span>
+                                            </p>
+                                        }
+                                        <div>
+                                            <label class="form-label" for="@($"assign-select-{row.Id}")">
+                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                            </label>
+                                            <select class="form-control" name="assigneeId"
+                                                    id="@($"assign-select-{row.Id}")">
+                                                <option value=""
+                                                        selected="@(!string.IsNullOrEmpty(row.AssigneeId) ? null : "selected")">
+                                                    <kw-l key="projects.todo.unassigned">Unassigned</kw-l>
+                                                </option>
+                                                @if (_assignPeople.Count > 0)
+                                                {
+                                                    <optgroup label="@_assignPeopleLabel">
+                                                        @foreach (var o in _assignPeople)
+                                                        {
+                                                            <option value="@o.Id"
+                                                                    selected="@(_IsCurrent(row.AssigneeId, o.Id) ? "selected" : null)">@o.Label</option>
+                                                        }
+                                                    </optgroup>
+                                                }
+                                                @if (_assignGroups.Count > 0)
+                                                {
+                                                    <optgroup label="@_assignGroupsLabel">
+                                                        @foreach (var o in _assignGroups)
+                                                        {
+                                                            <option value="@o.Id"
+                                                                    selected="@(_IsCurrent(row.AssigneeId, o.Id) ? "selected" : null)">@o.Label</option>
+                                                        }
+                                                    </optgroup>
+                                                }
+                                                @if (_assignCommunities.Count > 0)
+                                                {
+                                                    <optgroup label="@_assignCommunitiesLabel">
+                                                        @foreach (var o in _assignCommunities)
+                                                        {
+                                                            <option value="@o.Id"
+                                                                    selected="@(_IsCurrent(row.AssigneeId, o.Id) ? "selected" : null)">@o.Label</option>
+                                                        }
+                                                    </optgroup>
+                                                }
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"assign-form-{row.Id}")">
+                                            <kw-l key="projects.todo.assign">Assign</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>

@@ -32,21 +32,6 @@
             <a href="/events" class="btn btn-link p-0"><kw-l key="events.back">← Back to events</kw-l></a>
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-
         <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             @if (Model.ComponentDisplayName is not null)
             {
@@ -180,7 +165,7 @@
                                         <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
                                     </summary>
                                     <div class="ms-2">
-                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/update")">
+                                        <form method="post" action="@($"/events/{Model.Event.Id}/translations/update")">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                             <label class="form-label small">
@@ -197,7 +182,7 @@
                                                 <kw-l key="posts.translation_save">Save translation</kw-l>
                                             </button>
                                         </form>
-                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/remove")"
+                                        <form method="post" action="@($"/events/{Model.Event.Id}/translations/remove")"
                                               class="mt-2" data-confirm="Remove this translation?">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
@@ -216,7 +201,7 @@
                                         <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
                                     </summary>
                                     <form class="ms-2" method="post"
-                                          action="@($"/events/@Model.Event.Id/translations")">
+                                          action="@($"/events/{Model.Event.Id}/translations")">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="languageCode" value="@lang.Code" />
                                         <label class="form-label small" for="event-t-title">

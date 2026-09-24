@@ -1,0 +1,57 @@
+@*
+    _FlashToast.cshtml — the one, uniform flash-message surface.
+
+    Every controller that redirects after an action writes TempData["info"]
+    or TempData["error"]; the view used to render that in an inline .alert
+    wherever the view author chose (inside a card, mid-form, etc.). This
+    partial replaces all of those: it renders a Bootstrap 5.3 toast in a
+    fixed top-right container, driven by client/lib/flash-toast.js
+    (type="module", loaded in _Layout.cshtml).
+
+    The container only appears when there is at least one flash value,
+    so pages with no flash render no extra markup.
+
+    Accessibility:
+      - info  → role="status"  aria-live="polite"     (non-assertive)
+      - error → role="alert"   aria-live="assertive"  (assertive)
+    Both are aria-atomic (the whole toast is announced, not char-by-char).
+
+    Auto-hide: 5 s. The `show` class is in the markup so the message is
+    visible even without JS (and to screen readers immediately);
+    client/lib/flash-toast.js (loaded in _Layout.cshtml) attaches a
+    Bootstrap 5.3 `Toast` instance with `{ autohide: true, delay: 5000 }`
+    — the data API does not read data-bs-autohide / data-bs-delay (a
+    Bootstrap upstream limitation), so the config is passed in JS.
+*@
+@{
+    string? info = TempData["info"]   as string;
+    string? err  = TempData["error"]  as string;
+}
+@if (info is not null || err is not null)
+{
+    <div class="toast-container position-fixed top-0 end-0 p-3 kmb-flash-toast"
+         id="flash-toast-container" aria-label="Notifications">
+        @if (info is not null)
+        {
+            <div class="toast align-items-center text-bg-success border-0 show"
+                 role="status" aria-live="polite" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">@info</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                            data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+        @if (err is not null)
+        {
+            <div class="toast align-items-center text-bg-danger border-0 show"
+                 role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body">@err</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                            data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+        }
+    </div>
+}

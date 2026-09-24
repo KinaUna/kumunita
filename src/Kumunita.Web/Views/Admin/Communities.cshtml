@@ -12,15 +12,6 @@
 
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 @* ── Add community ── *@
 <div class="card mb-4">
     <div class="card-body py-3">
@@ -28,20 +19,20 @@
             @Html.AntiForgeryToken()
             <div class="row g-2 align-items-end">
                 <div class="col-md-3">
-                    <label for="addName" class="form-label small mb-1">Name</label>
+                    <label for="addName" class="form-label small mb-1"><kw-l key="common.name">Name</kw-l></label>
                     <input name="Name" id="addName" type="text" class="form-control form-control-sm" maxlength="100" required autocomplete="off" />
                 </div>
                 <div class="col-md-4">
-                    <label for="addDesc" class="form-label small mb-1">Description (optional)</label>
+                    <label for="addDesc" class="form-label small mb-1"><kw-l key="admin.community_description">Description (optional)</kw-l></label>
                     <input name="Description" id="addDesc" type="text" class="form-control form-control-sm" maxlength="500" autocomplete="off" />
                 </div>
                 <div class="col-md-2 d-flex align-items-center ps-2">
                     <input class="form-check-input" type="checkbox" id="addMandatory" name="Mandatory" value="true" />
                     <label class="form-check-label ms-1 small text-nowrap" for="addMandatory"
-                           title="Everyone in the neighborhood is a member — no one can be removed or leave it.">Mandatory</label>
+                           title="Everyone in the neighborhood is a member — no one can be removed or leave it."><kw-l key="admin.community_mandatory">Mandatory</kw-l></label>
                 </div>
                 <div class="col-md-3 text-end">
-                    <button class="btn btn-primary btn-sm" type="submit">Add community</button>
+                    <button class="btn btn-primary btn-sm" type="submit"><kw-l key="admin.add_community">Add community</kw-l></button>
                 </div>
             </div>
         </form>

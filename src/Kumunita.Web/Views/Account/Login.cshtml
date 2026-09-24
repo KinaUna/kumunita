@@ -7,10 +7,6 @@
     <div class="col-md-6 col-lg-5">
         <h1><kw-l key="account.login_title">Sign in</kw-l></h1>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success">@info</div>
-        }
 
         @if (!string.IsNullOrEmpty(Model.Error))
         {
@@ -22,13 +18,13 @@
             <div asp-validation-summary="All" class="text-danger"></div>
 
             <div class="mb-3">
-                <label asp-for="Email" class="form-label"></label>
+                <label asp-for="Email" class="form-label"><kw-l key="common.email">Email</kw-l></label>
                 <input asp-for="Email" class="form-control" autocomplete="username" />
                 <span asp-validation-for="Email" class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Password" class="form-label"></label>
+                <label asp-for="Password" class="form-label"><kw-l key="common.password">Password</kw-l></label>
                 <input asp-for="Password" class="form-control" autocomplete="current-password" />
                 <span asp-validation-for="Password" class="text-danger"></span>
             </div>

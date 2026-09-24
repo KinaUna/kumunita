@@ -1,7 +1,16 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Models.GroupDetailViewModel
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = Model.Name;
+    // Render-time localization of the description + filter placeholders (the
+    // <kw-l> TagHelper always emits a <kw-l> element, so it can't sit inside a
+    // placeholder="..." attribute — resolve server-side, the _GrantPickers /
+    // Profile/Edit pattern; M·5/M·8, ADR 0049).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var descPlaceholder = await Translation.GetAsync("groups.desc_placeholder", _kwL);
+    var filterNamePlaceholder = await Translation.GetAsync("common.filter_name", _kwL);
 
     // The add / remove member routes each carry the same [FromForm] subjectId —
     // the route distinguishes the two (the plan's U10 line 152 pin). The
@@ -57,15 +66,6 @@
             }
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @*
             ADR 0009 — the group's description (the M1 Group.Description field,
             resident-facing since ADR 0009): rendered for everyone who reaches
@@ -88,7 +88,7 @@
                 @Html.AntiForgeryToken()
                 <label class="form-label" for="description"><kw-l key="groups.about_desc_label">Description (optional)</kw-l></label>
                 <textarea class="form-control" id="description" name="description" rows="3" maxlength="500"
-                          placeholder="What is this group about? (visible to everyone who can reach this page)">@Model.Description</textarea>
+                          placeholder="@descPlaceholder">@Model.Description</textarea>
                 <div class="form-text mt-1"><kw-l key="groups.about_desc_clear_hint">Leave blank to clear the description.</kw-l></div>
                 <button type="submit" class="btn btn-primary mt-2"><kw-l key="groups.about_desc_save">Save description</kw-l></button>
             </form>
@@ -408,7 +408,7 @@
                         <label class="visually-hidden" for="invite-filter">Filter residents</label>
                         <input type="text" class="form-control" id="invite-filter"
                                data-name-filter="invite-subjectId"
-                               placeholder="Filter by name…" autocomplete="off" />
+                               placeholder="@filterNamePlaceholder" autocomplete="off" />
                         <label class="visually-hidden" for="invite-subjectId">Resident</label>
                         <select id="invite-subjectId" name="subjectId" class="form-select mt-2" required>
                             @foreach (var r in Model.ResidentCandidates)
@@ -460,7 +460,7 @@
                     <label class="visually-hidden" for="add-member-filter">Filter residents</label>
                     <input type="text" class="form-control" id="add-member-filter"
                            data-name-filter="add-subjectId"
-                           placeholder="Filter by name…" autocomplete="off" />
+                           placeholder="@filterNamePlaceholder" autocomplete="off" />
                     <label class="visually-hidden" for="add-subjectId">Resident</label>
                     <select id="add-subjectId" name="subjectId" class="form-select mt-2" required>
                         @foreach (var r in Model.ResidentCandidates)

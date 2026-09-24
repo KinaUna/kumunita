@@ -76,13 +76,14 @@
                        name="@modePrefix" id="@($"{modePrefix}-{m}")"
                        value="@m" @checkedMark />
                 <label class="form-check-label" for="@($"{modePrefix}-{m}")">
-                    @m 
                     @if (m == "Any")
                     {
+                        <kw-l key="profile.audience_mode_any_word">Any</kw-l>
                         <text> — <kw-l key="profile.audience_mode_any">a person is allowed if they meet any of the people/groups you picked</kw-l></text>
                     }
                     else
                     {
+                        <kw-l key="profile.audience_mode_all_word">All</kw-l>
                         <text> — <kw-l key="profile.audience_mode_all">a person is allowed only if they meet all of the people/groups you picked</kw-l></text>
                     }
                 </label>

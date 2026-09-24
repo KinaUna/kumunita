@@ -15,15 +15,6 @@
     visible on the next request.
 </p>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success" role="alert">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger" role="alert">@err</div>
-}
-
 <div class="table-responsive">
     <table class="table table-sm align-middle">
         <thead>

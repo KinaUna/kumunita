@@ -8,15 +8,6 @@
         <h1><kw-l key="guardian.title">Your children</kw-l></h1>
         <p class="text-muted"><kw-l key="guardian.lead">The accounts you set up for a child, and the controls you hold over each one.</kw-l></p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @*
             GU (ADR 0028) — the child list: each row is the child's display name
             + the Blocked badge only (G·1 — never the child's posts or profile

@@ -1,0 +1,221 @@
+@model Kumunita.Web.Models.BoardEditorModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = "New board";
+    string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    // ADR 0072 — the initial-lane suggested-title placeholder (was the
+    // hardcoded "Planned"), resolved the same way as optionalPlaceholder.
+    var firstLanePlaceholder = await Translation.GetAsync("projects.board.lane.first_title_placeholder", _kwL);
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="projects.board.new">New board</kw-l></h1>
+        <p class="text-muted">
+            <kw-l key="projects.board.new_lead">Create a board to arrange to-dos in lanes. A lane can carry a status (a to-do moved into it picks that status up) and an optional limit on how many cards it holds. By default the board is visible to everyone; turn that off in the audience section only if you want to narrow who can see it.</kw-l>
+        </p>
+
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form id="new-board-form" method="post" action="/projects/boards">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-label" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></div>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="120" required value="@Model.Title" />
+                    <div class="text-muted small mt-1"><kw-l key="projects.board.title_hint">A short name for the board — the feed label.</kw-l></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="description" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control" id="description" name="Description" rows="5" data-rich-editor>@Model.Description</textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
+                    <div class="text-muted small mt-2"><kw-l key="projects.board.description_hint">An optional description of what this board tracks. A board is usable title-only.</kw-l></div>
+                </div>
+            </div>
+
+            @if (Model.Components.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="component" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-control" id="component" name="ComponentId">
+                            <option value="" selected="@(Model.ComponentId is null ? "selected" : null)"><kw-l key="projects.todo.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.ComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="events.community_hint">The community this board appears under — a filter, not an access limit.</kw-l>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="language" style="font-weight:600;"><kw-l key="common.language">Language</kw-l></label>
+                    <select class="form-control" id="language" name="LanguageCode">
+                        @foreach (var (languageCode, nativeName) in Model.Languages)
+                        {
+                            <option value="@languageCode" selected="@(languageCode == Model.LanguageCode ? "selected" : null)">
+                                @nativeName
+                            </option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="posts.language_hint">The language you're writing this board in. This is only a tag — it is not translated — and it keeps the text findable later.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            @* The lanes editor — the board's initial lanes (the
+               CreateBoardRequest.Lanes shape, the §2.3 pin). Each lane's
+               Title / Status / MaxItems are the input to the F4 / F5 / F6
+               FACES the service's reorder + move lanes read (the lane's
+               Status auto-updates a to-do moved into it — F4 / F5; the
+               MaxItems cap is refused, not dropped — F6). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;"><kw-l key="projects.board.lanes">Lanes</kw-l></h6>
+                    <div class="text-muted small mb-3">
+                        <kw-l key="projects.board.lanes_hint">Columns across the board — for example "Planned / Doing / Done". A lane's status, when set, is applied to a to-do moved into that lane; its max items cap how many cards the lane holds.</kw-l>
+                    </div>
+                    @for (var i = 0; i < Model.Lanes.Count; i++)
+                    {
+                        <div class="row g-2 align-items-end mb-3 lane-editor-row">
+                            <div class="col-sm-5">
+                                <label class="form-label" for="lane-title-@i" style="font-weight:600;"><kw-l key="projects.board.lane.title">Lane title</kw-l></label>
+                                <input class="form-control" type="text" id="lane-title-@i" name="@($"Lanes[{i}].Title")"
+                                       maxlength="120" required value="@(Model.Lanes[i].Title)" />
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label" for="lane-status-@i" style="font-weight:600;"><kw-l key="projects.board.lane.status">Status</kw-l></label>
+                                <input class="form-control" type="text" id="lane-status-@i" name="@($"Lanes[{i}].Status")"
+                                       placeholder="@optionalPlaceholder" value="@(Model.Lanes[i].Status)" />
+                            </div>
+                            <div class="col-sm-2">
+                                <label class="form-label" for="lane-max-@i" style="font-weight:600;"><kw-l key="projects.board.lane.max_items">Max items</kw-l></label>
+                                <input class="form-control" type="number" id="lane-max-@i" name="@($"Lanes[{i}].MaxItems")"
+                                       min="1" value="@(Model.Lanes[i].MaxItems)" />
+                            </div>
+                            <div class="col-sm-2">
+                                <label class="form-label" for="lane-order-@i" style="font-weight:600;"><kw-l key="projects.board.lane.order">Order</kw-l></label>
+                                <input class="form-control" type="number" id="lane-order-@i" name="@($"Lanes[{i}].Order")"
+                                       min="0" value="@(Model.Lanes[i].Order)" />
+                            </div>
+                        </div>
+                    }
+                    @* A single initial lane — enough to create the board; add
+                       more lanes by editing the board after creation. *@
+                    @if (Model.Lanes.Count == 0)
+                    {
+                        <div class="form-label" style="font-weight:600;"><kw-l key="projects.board.lane.title">Lane title</kw-l></div>
+                        <input class="form-control" type="text" name="Lanes[0].Title" maxlength="120" required
+                               placeholder="@firstLanePlaceholder" />
+                        <div class="text-muted small mt-2">
+                            <kw-l key="projects.board.single_lane_hint">The board starts with one lane — add more lanes and statuses on the board page after creating it.</kw-l>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="card-title" style="font-weight:600;"><kw-l key="projects.board.audience_heading">Audience — who can see this board</kw-l></h6>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox"
+                               name="Audience.CommunityVisible"
+                               id="aud-community" data-audience-toggle
+                               value="true"
+                               @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
+                        <label class="form-check-label fw-semibold" for="aud-community">
+                            <kw-l key="posts.audience_all_members">Everyone</kw-l>
+                        </label>
+                        <div class="text-muted small ms-4">
+                            <kw-l key="projects.board.audience_default">The default — everyone can see this board. Turn it off only if you want to narrow who can see it.</kw-l>
+                        </div>
+                        @foreach (var m in modes)
+                        {
+                            var checkedMark =
+                                string.Equals(Model.Audience?.Mode, m, StringComparison.OrdinalIgnoreCase)
+                                    ? "checked"
+                                    : null;
+                            <div class="form-check" style="margin-left:0.5rem;">
+                                <input class="form-check-input" type="radio"
+                                       name="Audience.Mode" id="@($"aud-mode-{m}")"
+                                       value="@m" @checkedMark required />
+                                <label class="form-check-label" for="@($"aud-mode-{m}")">
+                                    @m
+                                    @if (m == "Any")
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_any">a viewer matches if they're on any of the picks</kw-l>
+                                    }
+                                    else
+                                    {
+                                        @(" — ")<kw-l key="events.audience_mode_all">a viewer must be on every pick — an empty list denies everyone</kw-l>
+                                    }
+                                </label>
+                            </div>
+                        }
+
+                        <partial name="_GrantPickers" model="@(new GrantPickersModel
+                        {
+                            EditorName = "Audience",
+                            Editor     = Model.Audience
+                                        ?? new AudienceEditorModel { Mode = "Any", Grants = string.Empty },
+                            Users      = (ViewData["Audience_Users"]  as List<GrantOption>) ?? new List<GrantOption>(),
+                            Groups     = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>(),
+                        })" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="projects.board.create">Create board</kw-l></button>
+                <a href="/projects/boards" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+    <partial name="_GrantPickerScripts" />
+    @* Audience-toggle handled by client/lib/audience-toggle.js (loaded in
+       _Layout.cshtml — SECURITY.md §6). *@
+}

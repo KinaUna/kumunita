@@ -1,4 +1,7 @@
 @model Kumunita.Web.Models.PageComposeViewModel
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     // The composer / edit form body (one form, one editor — the ADR 0039 §3.8
     // "one editor, one renderer" pin). Shared between New.cshtml and
@@ -7,26 +10,13 @@
     bool isEdit   = Model.PageId is not null;
     string action = isEdit ? $"/pages/{Model.PageId}/edit" : "/pages/new";
     string[] modes = { "Any", "All" };
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var tagsExample = await Translation.GetAsync("tags.pages_example", _kwL);
 }
 
 <div class="row justify-content-center">
     <div class="col-md-9 col-lg-8">
         <h1>@(isEdit ? "Edit page" : "New page")</h1>
-
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                @info
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                @err
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        }
 
         @if (!ViewData.ModelState.IsValid)
         {
@@ -150,7 +140,7 @@
                         <input class="form-control" type="text" id="tags"
                                data-tag-suggest
                                maxlength="64"
-                               placeholder="e.g. sanitation, budget, maple-street" />
+                           placeholder="@tagsExample" />
                         <div class="text-muted small mt-1">
                             <kw-l key="tag.input.hint">Type to search existing tags, or start a new one — it attaches to this post.</kw-l>
                         </div>

@@ -17,6 +17,10 @@ public sealed record CreateEventRequest
     public DateTimeOffset End { get; init; }
     public string? Location { get; init; }
     public int? Capacity { get; init; }
+    // An optional display color (a CSS color, typically a normalized #RRGGBB hex
+    // value) the author picked in the composer (the Location / Capacity shape —
+    // display metadata, never a gate). null / empty = the theme default.
+    public string? Color { get; init; }
     public Authorization.Audience? Audience { get; init; }
     public bool ReminderEnabled { get; init; } = true;
     public bool IsDraft { get; init; } = true;
@@ -55,6 +59,10 @@ public sealed record UpdateEventRequest
     public DateTimeOffset End { get; init; }
     public string? Location { get; init; }
     public int? Capacity { get; init; }
+    // An optional display color (a CSS color, typically a normalized #RRGGBB hex
+    // value) the author picked in the composer (the Location / Capacity shape —
+    // display metadata, never a gate). null / empty = the theme default.
+    public string? Color { get; init; }
     public Authorization.Audience? Audience { get; init; }
     public bool ReminderEnabled { get; init; } = true;
     public string LanguageCode { get; init; } = string.Empty;

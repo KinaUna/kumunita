@@ -6,15 +6,6 @@
 
 <h1><kw-l key="moderation.title">Moderation</kw-l></h1>
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 <p class="text-muted">
     @Model.TotalCount report(s) — @Model.ByStatus.GetValueOrDefault("filed", 0) filed,
     @Model.ByStatus.GetValueOrDefault("assigned", 0) assigned,

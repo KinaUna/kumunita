@@ -72,14 +72,6 @@
             <div class="card mt-4">
                 <div class="card-body">
                     <h2><kw-l key="tag.translate.heading">Translations</kw-l></h2>
-                    @if (TempData["info"] is string info)
-                    {
-                        <div class="alert alert-success">@info</div>
-                    }
-                    @if (TempData["error"] is string err)
-                    {
-                        <div class="alert alert-warning">@err</div>
-                    }
                     <form method="post" action="@($"/tags/{Model.Slug}/translate")">
                         @Html.AntiForgeryToken()
                         @* One row per available language (C-TG·5 / D4):

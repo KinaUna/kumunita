@@ -1,0 +1,282 @@
+@model Kumunita.Web.Models.EventCalendarViewModel
+@using Kumunita.Core.Localization
+@using Kumunita.Web.Security
+@inject ITranslationProvider Translation
+@inject ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    ViewData["Title"] = "Events calendar";
+
+    // The overlap tooltip (C-EV·4, client-side display-only) — resolved
+    // server-side through ITranslationProvider (the same path the <kw-l>
+    // TagHelper uses) so the client never carries the resolved registry
+    // text, and shipped as a display value on #events-calendar (the
+    // _RichEditorToggle data-ie-label-* / rich-editor.ts pattern). The TS
+    // module (client/lib/events-calendar.ts) reads data-overlap-hint and
+    // falls back to its own hardcoded English string if the attribute is
+    // absent, so the module stays self-contained.
+    var hintReq = HttpContextAccessor?.HttpContext?.Request;
+    var hintPref = hintReq is null ? null : LocaleCookie.Read(hintReq);
+    if (string.IsNullOrWhiteSpace(hintPref) && hintReq is not null)
+        hintPref = RequestLanguage.Browser(hintReq, await Localization.ListLanguagesAsync());
+    var hintLabels = await Translation.GetManyAsync(
+        new[] { "events.calendar.overlap_hint" }, hintPref);
+    var overlapHint = hintLabels.TryGetValue("events.calendar.overlap_hint", out var oh)
+        ? oh : "Overlaps another event in this window";
+
+    // The anchor (Model.FromAnchor, yyyy-MM-dd — a date in the viewer's
+    // effective zone, C-EV·5). The grid's day columns come from
+    // Model.WindowDays (U02's ?view= engine, ADR 0064 D4): the default
+    // month view is the anchor's calendar month as 5–6 full weeks
+    // (Monday-start), so the columns span the true calendar month with the
+    // adjacent months' leading/trailing days marked outside. The flat
+    // 30-day run survives only as the null-guard fallback — the controller
+    // always supplies columns (U02). The TS module distributes each event
+    // into the day-column(s) it touches via Intl + Model.TimeZoneId
+    // (display-only, C-EV·5).
+    var anchor = DateTime.ParseExact(Model.FromAnchor, "yyyy-MM-dd",
+        System.Globalization.CultureInfo.InvariantCulture,
+        System.Globalization.DateTimeStyles.None);
+    var days = Model.WindowDays is { Count: > 0 }
+        ? Model.WindowDays.ToList()
+        : Enumerable.Range(0, 30).Select(n => anchor.AddDays(n)).ToList();
+
+    // D4 — the month view's edges: a column outside the anchor's calendar
+    // month (previous/next month's days padding the 5–6 full weeks) is
+    // marked, so the month's shape reads at a glance (CSS dims it).
+    bool IsOutsideMonth(DateTime day) =>
+        Model.View == "month" &&
+        (day.Month != anchor.Month || day.Year != anchor.Year);
+
+    // U04 — the Day/Week time grid's day-label (D3): the column's weekday
+    // + day-of-month, in the UI culture (a computed display string — the
+    // same "dates are not registry keys" rule as the Label, C-DWM·9 / D6).
+    string DayLabel(DateTime day) => day.ToString("ddd d", System.Globalization.CultureInfo.CurrentCulture);
+
+    // U04 — the Day/Week time grid's hour rows (D3): 0–23, each an hh:00
+    // local time label. Rendered server-side as the grid skeleton (plain
+    // numerals — a 24h ruler's hour marks are zone-independent numbers;
+    // a block's *position* within a day is the TS module's job, via Intl
+    // + data-time-zone, C-DWM·5 / C-DWM·4 display-only). 24 rows give the
+    // 00:00–24:00 span the design doc's §3.3 pins.
+    int[] Hours = Enumerable.Range(0, 24).ToArray();
+
+    // C-EV·7 — nav is plain pre-rendered GET links; the server re-renders,
+    // the authorization re-runs per request. The component filter rides
+    // along so a filtered calendar stays filtered across nav (C-EV·3:
+    // a filter, never a gate).
+    string NavHref(string? from)
+    {
+        var qs = new List<string>();
+        if (from is not null) qs.Add("from=" + Uri.EscapeDataString(from));
+        if (!string.IsNullOrWhiteSpace(Model.CurrentComponentId))
+            qs.Add("componentId=" + Uri.EscapeDataString(Model.CurrentComponentId));
+        // C-DWM·6 / F6 — nav preserves the current view (the server shifted
+        // the anchor by the view's unit, so the links stay in-view).
+        if (!string.IsNullOrWhiteSpace(Model.View))
+            qs.Add("view=" + Uri.EscapeDataString(Model.View));
+        return "/events/calendar" + (qs.Count > 0 ? "?" + string.Join("&", qs) : "");
+    }
+
+    // D5 / C-DWM·6 — the Day/Week/Month toggle: plain GET links to the same
+    // route, the current anchor (?from=) + the component filter riding
+    // along, only ?view= changing. (U05 — the 3 events.calendar.view.*
+    // kw-l keys are registered in all four languages, so the labels
+    // resolve through the normal per-string chain, en floor inline.)
+    string ViewHref(string view)
+    {
+        var qs = new List<string>
+        {
+            "view=" + Uri.EscapeDataString(view),
+            "from=" + Uri.EscapeDataString(Model.FromAnchor),
+        };
+        if (!string.IsNullOrWhiteSpace(Model.CurrentComponentId))
+            qs.Add("componentId=" + Uri.EscapeDataString(Model.CurrentComponentId));
+        return "/events/calendar?" + string.Join("&", qs);
+    }
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1><kw-l key="events.calendar.title">Calendar</kw-l></h1>
+                    <p class="lede">@Model.Label</p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- D5 — the Day/Week/Month toggle: three plain GET links
+                         (?view= + ?from= + ?componentId= riding along,
+                         C-DWM·6); the active view is rendered pressed.
+                         Labels through the 3 events.calendar.view.* kw-l
+                         keys (U05 — registered in all four languages, the
+                         inline text is the en floor, C-DWM·9). -->
+                    <div class="btn-group btn-group-sm events-view-toggle" role="group" aria-label="Calendar view">
+                        <a class="btn btn-outline-secondary @(Model.View == "day" ? "active" : null)" href="@ViewHref("day")" aria-pressed="@(Model.View == "day" ? "true" : "false")"><kw-l key="events.calendar.view.day">Day</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
+                        <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>
+                    </div>
+                    <a class="btn btn-outline-secondary" href="/events"><kw-l key="events.calendar.list_view">List</kw-l></a>
+                </div>
+            </div>
+        </header>
+
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+            <a class="btn btn-outline-secondary" href="@NavHref(Model.PrevAnchor)"><kw-l key="events.calendar.prev">Prev</kw-l></a>
+            <a class="btn btn-outline-secondary" href="@NavHref(null)"><kw-l key="events.calendar.today">Today</kw-l></a>
+            <a class="btn btn-outline-secondary" href="@NavHref(Model.NextAnchor)"><kw-l key="events.calendar.next">Next</kw-l></a>
+            @if (Model.Components.Count > 0)
+            {
+                <form method="get" action="/events/calendar" class="ms-auto d-flex gap-2 align-items-end">
+                    <input type="hidden" name="from" value="@Model.FromAnchor" />
+                    @if (!string.IsNullOrWhiteSpace(Model.View))
+                    {
+                        <input type="hidden" name="view" value="@Model.View" />
+                    }
+                    <div>
+                        <label class="form-label" for="calendar-component-filter" style="font-weight:600;"><kw-l key="nav.community">Community</kw-l></label>
+                        <select class="form-select" id="calendar-component-filter" name="componentId">
+                            <option value=""><kw-l key="events.all_communities">All communities</kw-l></option>
+                            @foreach (var (id, name) in Model.Components)
+                            {
+                                <option value="@id" selected="@(id == Model.CurrentComponentId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
+                </form>
+            }
+        </div>
+
+        @* The grid renders even when the window is empty (C-DWM: the day/week
+             time-ruler and the month chip grid are the empty state — the
+             structure shows even with no events, so a resident sees the
+             hours/days at a glance and knows where to look. The pool/stacks
+             are simply empty; the TS modules no-op over zero rows. *@
+        @if (Model.View == "day" || Model.View == "week")
+        {
+            <!-- U04 / D3 — the Day/Week time-ruler grid: an hour-ruler
+                 column (00:00–24:00, server-rendered skeleton) + one
+                 day-column per WindowDays entry (Day = 1, Week = 7,
+                 Monday-first, C-DWM·5). Each day-column carries an
+                 absolutely-positioned .event-block-stack; the hidden
+                 .event-block-pool (one block per event, data-start-utc /
+                 data-end-utc / data-title / data-href) is the single
+                 source of truth — events-calendar-time.ts (C-DWM·4) moves
+                 one instance per touched day-column into the stack,
+                 positioned by top%/height% of that day, and flags overlap
+                 (the same [startUtc, endUtc) intersection rule as Month —
+                 all client-side display, never an access decision). -->
+            <div id="events-calendar"
+                 data-time-zone="@Model.TimeZoneId"
+                 data-from="@Model.FromAnchor"
+                 data-view="@Model.View"
+                 data-overlap-hint="@overlapHint">
+                <div class="events-time-grid @((Model.View == "day") ? "events-time-grid--day" : "events-time-grid--week")">
+                    <div class="events-time-ruler" aria-hidden="true">
+                        @* The 2rem head band mirrors each day-column's day-label
+                             header (".events-time-column-label"), so the ruler's
+                             hour rows start at the same y as the day-body's hour
+                             rows — the two stay pixel-aligned (the hour rows are
+                             24 × 3rem in both; only the head offsets them). *@
+                        <div class="events-time-ruler-head"></div>
+                        @foreach (var h in Hours)
+                        {
+                            <div class="events-time-ruler-label">@h.ToString("00"):00</div>
+                        }
+                    </div>
+                    <div class="events-time-day-area">
+                        @foreach (var day in days)
+                        {
+                            <div class="events-time-column" data-date="@day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)">
+                                <div class="events-time-column-label">@DayLabel(day)</div>
+                                <div class="events-time-body">
+                                    <div class="event-block-stack"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="event-block-pool" hidden>
+                    @foreach (var row in Model.Events)
+                    {
+                        <div class="event-block"
+                             style="@(row.Color is { Length: > 0 } c ? $"--event-color:{c}" : null)"
+                             data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-title="@row.Title"
+                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
+                            <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div id="events-calendar"
+                 data-time-zone="@Model.TimeZoneId"
+                 data-from="@Model.FromAnchor"
+                 data-view="@Model.View"
+                 data-overlap-hint="@overlapHint">
+                <!-- The day-columns (Model.WindowDays — U02's per-view
+                     window; month = the true calendar month, 5–6 full
+                     weeks, D4): each shows its date label + an empty chip
+                     stack. The TS module (client/lib/events-calendar.ts,
+                     reused unchanged — C-DWM·7) moves one chip instance
+                     into each day-column an event touches, using
+                     Intl + data-time-zone (C-EV·5 display-only; the zone
+                     id is never an authorization input). -->
+                <div class="events-calendar-grid">
+                    @foreach (var day in days)
+                    {
+                        <div class="events-calendar-day @(IsOutsideMonth(day) ? "events-calendar-day-outside" : null)"
+                             data-date="@day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)">
+                            <div class="events-calendar-day-label text-muted small mb-1">
+                                @day.Day
+                            </div>
+                            <div class="event-chip-stack"></div>
+                        </div>
+                    }
+                </div>
+                <!-- The chip pool: one chip per event in the window, each
+                     carrying the 4 data-attributes the U06 TS module
+                     reads to distribute (data-start-utc / data-end-utc,
+                     via Intl + data-time-zone) and to flag overlap (the
+                     [startUtc, endUtc) intersection — C-EV·4, client-side
+                     only, never an access decision). The pool is the
+                     single source of truth for the view's events. -->
+                <div class="events-calendar-chip-pool" hidden>
+                    @foreach (var row in Model.Events)
+                    {
+                        <div class="event-chip"
+                             style="@(row.Color is { Length: > 0 } c ? $"--event-color:{c}" : null)"
+                             data-start-utc="@row.StartUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-end-utc="@row.EndUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                             data-title="@row.Title"
+                             data-href="@Url.Action("Detail", "Event", new { id = row.Id })">
+                            <a href="@Url.Action("Detail", "Event", new { id = row.Id })">@row.Title</a>
+                            <span class="text-muted small"><kw-dt dt="@row.StartUtc" format="timeonly"></kw-dt></span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Events calendar (EV-CAL, ADR 0063) — client/lib/events-calendar.ts,
+         tsc-built; distributes chips into day-columns (Intl + the effective
+         zone id, C-EV·5 display-only) + the overlap flag (C-EV·4). Runs on
+         the Month path only (the view ships data-view, the module's guard
+         is data-view != "month" — events-calendar-time.ts takes Day/Week). -->
+    <script type="module" src="~/js/lib/events-calendar.js"></script>
+    <!-- EV-DWM (ADR 0064, U04) — the Day/Week time-ruler grid module:
+         positions each .event-block by top%/height% within its touched
+         day-column(s) (Intl + data-time-zone, display-only) + the overlap
+         flag (C-DWM·4, mirrored from events-calendar.ts so the EV-CAL
+         module stays untouched — C-DWM·7). -->
+    <script type="module" src="~/js/lib/events-calendar-time.js"></script>
+}

@@ -185,7 +185,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     public async Task UG_Guides_DaFrDaBaselines_AtFirstBoot()
     {
         // ADR 0057 D2 (amended 2026-09-21) — the guides ship with curated
-        // de/fr/da baselines on a pristine DB: 8 guides × 3 languages = 24
+        // de/fr/da baselines on a pristine DB: 10 guides × 3 languages = 30
         // PageTranslation rows. The ADR 0042 D1 "create-if-missing" invariant
         // still holds (a human Translator's edit is never clobbered by a
         // later deploy); the "never machine-translated" ADR 0005 C clause is
@@ -211,7 +211,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
         // Exactly the guide set (sanity: the guides are present).
         Assert.Equal(guideSlugs.Length, guideIds.Count);
 
-        // 8 guides × 3 languages (de/fr/da) = 24 PageTranslation rows.
+        // 10 guides × 3 languages (de/fr/da) = 30 PageTranslation rows.
         var total = await q.Query<PageTranslation>()
             .Where(t => guideIds.Contains(t.PageId))
             .CountAsync(ct);
@@ -240,7 +240,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
     {
         // ADR 0042 D1 — create-if-missing: a second boot must not create
         // duplicate PageTranslation rows for the guide baselines. The count
-        // stays at 24 (8 × 3), not 48.
+        // stays at 30 (10 × 3), not 60.
         var store = await BootStoreAsync();
         var ct = TestContext.Current.CancellationToken;
 
@@ -318,7 +318,7 @@ public class UG_GuideRegistryTests(PostgresFixture fixture) : IClassFixture<Post
             await bf.SaveChangesAsync(ct);
         }
 
-        // Verify: 24 rows (8 × 3) created, platform author.
+        // Verify: 30 rows (10 × 3) created, platform author.
         await using (var q1 = store.QuerySession())
         {
             var systemRoot = await q1.Query<Page>()

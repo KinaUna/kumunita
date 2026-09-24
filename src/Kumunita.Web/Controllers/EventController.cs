@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using Kumunita.Core.Events;
@@ -216,6 +217,18 @@ public sealed class EventController : Controller
     /// <paramref name="componentId"/> query is a filter (C-M3·2), never a gate.
     /// Author + component display names are *read* lookups (never access
     /// decisions).
+    /// <para>
+    /// **ADR 0065 (the <c>EV-MINE</c> lane):** the same read also resolves the
+    /// viewer's **own upcoming events** (<see cref="IEventService
+    /// .ListMineAsync"/> — their RSVPed events, any status, ∪ their authored
+    /// events, upcoming + live only) and hands them to the view as
+    /// <see cref="EventIndexViewModel.MyEvents"/>. The section is rendered
+    /// first, before the feed, and only when non-empty. No
+    /// <c>AccessAudit</c> row (the per-row write lane already committed its
+    /// decision — the <see cref="IEventService.GetMyRsvpAsync"/> posture); the
+    /// union is inherently non-leaky (a non-author can only hold an RSVP row on
+    /// an event they may already read — <c>RsvpAsync</c> gates standing first).
+    /// </para>
     /// </summary>
     [HttpGet("/events")]
     public async Task<IActionResult> Index(string? componentId, int page = 1)
@@ -232,22 +245,247 @@ public sealed class EventController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0065 (the EV-MINE lane) — the viewer's own upcoming events: the
+        // union of their RSVPed events (any status — the row is the sign-up)
+        // and their authored events, upcoming + live only. No AccessAudit row
+        // (the GetMyRsvpAsync posture — each row's write lane already committed
+        // its decision); the union is inherently non-leaky (a non-author can
+        // only see an event they hold an RSVP row on — and RsvpAsync gates
+        // standing first, so a denied actor never holds such a row). Empty for
+        // a viewer with no sign-ups — the view hides the whole section then.
+        IReadOnlyList<Event> myEvents = Array.Empty<Event>();
+        if (actorId.Length > 0)
+        {
+            try
+            {
+                myEvents = await this.events.ListMineAsync(actorId, HttpContext.RequestAborted);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new ForbidResult();
+            }
+        }
+
         // ADR 0051 — extend ADR 0049's default-visible-variant rule to the feed
         // surface: each row shows the event's title/body in the viewer's current
         // language when a translation exists (else the authored-in text — the
         // ADR 0022 floor). One read of the shared per-request chain; a "a read,
         // not a decision" surface (the feed's CanSeeAsync already ran). No Core /
-        // schema change (the posts feed's ADR 0051 idiom).
+        // schema change (the posts feed's ADR 0051 idiom). The EV-MINE rows get
+        // the same treatment — the viewer's own events are a list surface.
         if (translationProvider is not null)
         {
             var effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
             foreach (var e in events)
                 await ApplyEventTranslationAsync(e, effLang);
+            foreach (var e in myEvents)
+                await ApplyEventTranslationAsync(e, effLang);
         }
 
         // Author display names (a *read* lookup, never an access decision — the
-        // audience gate already ran in ListUpcomingAsync). Missing profile →
-        // the raw subject id.
+        // audience gate already ran in ListUpcomingAsync; the EV-MINE union is
+        // inherently the viewer's own rows). Missing profile → the raw subject
+        // id.
+        var authorIds = events
+            .Concat(myEvents)
+            .Select(e => e.AuthorId).Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
+        var authorName = new Dictionary<string, string>();
+        foreach (var authorId in authorIds)
+        {
+            var profile = await userInfo.GetProfileAsync(authorId);
+            authorName[authorId] =
+                profile?.DisplayName is not null && profile.DisplayName.Length > 0
+                    ? profile.DisplayName : authorId;
+        }
+
+        // Component display names (a *read* lookup, never a gate — C-M3·2).
+        var componentIds = events
+            .Concat(myEvents)
+            .Select(e => e.ComponentId).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+        var allComponents = await userInfo.GetComponentsAsync(enabledOnly: true);
+        var componentById = allComponents
+            .Where(c => componentIds.Contains(c.Id))
+            .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
+
+        static EventRow ProjectRow(Event e, IReadOnlyDictionary<string, string> authorName,
+                                   IReadOnlyDictionary<string, string> componentById)
+            => new EventRow(
+                Id: e.Id,
+                Title: e.Title,
+                Body: e.Body,
+                Start: e.Start,
+                End: e.End,
+                Location: e.Location,
+                AuthorId: e.AuthorId,
+                AuthorDisplayName: authorName.TryGetValue(e.AuthorId, out var an) ? an : e.AuthorId,
+                ComponentId: e.ComponentId,
+                ComponentDisplayName: e.ComponentId is not null && componentById.TryGetValue(e.ComponentId, out var cn) ? cn : null,
+                IsDraft: e.IsDraft,
+                IsDeleted: e.IsDeleted,
+                Color: e.Color);
+
+        var rows = events.Select(e => ProjectRow(e, authorName, componentById)).ToList();
+        var myRows = myEvents.Select(e => ProjectRow(e, authorName, componentById)).ToList();
+
+        var vm = new EventIndexViewModel(
+            Events: rows,
+            Components: allComponents
+                .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
+                .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            CurrentComponentId: componentId,
+            CurrentPage: page,
+            MyEvents: myRows);
+
+        return View(vm);
+    }
+
+    /// <summary>
+    /// <c>GET /events/calendar</c> — the EV-CAL calendar (ADR 0063) with the
+    /// EV-DWM Day/Week/Month views (ADR 0064): a display-only overview of the
+    /// caller's visible events over a **view-appropriate window**. The
+    /// <paramref name="view"/> query is a **display selector, never an
+    /// access input** (C-DWM·3): <c>day</c> (the anchor day), <c>week</c>
+    /// (the anchor's **Monday-start** week, C-DWM·5), or <c>month</c> (the
+    /// anchor's calendar month) — missing / invalid / out-of-set values fall
+    /// back to <c>month</c> (the backward-compatible EV-CAL default,
+    /// C-DWM·8; a display fallback, not an error). The <paramref name="from"/>
+    /// query is the anchor **date in the viewer's effective zone** (C-EV·5;
+    /// default: the zone's today) — each window bound is that date's
+    /// zone-local midnight as a UTC instant; the *span* (1d / 7d /
+    /// days-in-month) is this controller's policy, the seam's
+    /// <c>Take(WindowCap)</c> is only a backstop. The window is **window-
+    /// agnostic on the seam** (C-DWM·1 / D1) — <see cref="IEventService
+    /// .ListInRangeAsync"/> is called unchanged. The visibility split is the
+    /// seam's — the single <c>CanSeeAsync(Read)</c> gate (C-EV·1 non-leak
+    /// pin); the controller is thin (ADR 0006-D). The
+    /// <paramref name="componentId"/> query is a filter, never a gate
+    /// (C-M3·2 / C-EV·3). <see cref="EventCalendarViewModel.PrevAnchor"/> /
+    /// <see cref="EventCalendarViewModel.NextAnchor"/> are the anchor shifted
+    /// by the **view's unit** (±1 day / ±1 week / ±1 month), <c>yyyy-MM-dd</c>
+    /// — pre-rendered plain-GET-link targets (C-DWM·6); <see
+    /// cref="EventCalendarViewModel.TimeZoneId"/> is the effective zone id
+    /// shipped to the view as a **display** input only (C-EV·5 — never an
+    /// authorization input).
+    /// </summary>
+    [HttpGet("/events/calendar")]
+    public async Task<IActionResult> Calendar(string? from, string? componentId, string? view = null)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        var zone = await this.timezone.GetAsync();
+
+        // `view` = the EV-DWM display selector (ADR 0064 §6.2 step 1):
+        // exactly {"day","week","month"} (case-insensitive); missing /
+        // invalid / out-of-set falls back to "month" (the backward-compatible
+        // EV-CAL default — C-DWM·3 / C-DWM·8; a display fallback, not an
+        // error). Never an access input (C-DWM·3).
+        var resolvedView = view?.Trim()?.ToLowerInvariant() switch
+        {
+            "day" => "day",
+            "week" => "week",
+            "month" => "month",
+            _ => "month",
+        };
+
+        // Anchor = the `from` query parsed as a date in the viewer's effective
+        // zone (default: the zone's today). Invalid/missing values fall back
+        // to today — a display anchor, never an access decision.
+        var nowInZone = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone);
+        var anchorDate = DateTime.TryParse(from, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var parsed)
+            ? parsed.Date
+            : nowInZone.Date;
+
+        // Per-view window (ADR 0064 §6.2 step 3): each bound = the window's
+        // first/last day's zone-local midnight → UTC instant (the anchor's
+        // local midnight is a display anchor, not a stored value — a
+        // DST-ambiguous midnight is still a well-defined zone-local time).
+        // The span is this controller's policy; the seam's Take(WindowCap)
+        // is only a backstop.
+        static DateTimeOffset LocalMidnightUtc(DateTime date, TimeZoneInfo z) =>
+            new DateTimeOffset(
+                new DateTime(date.Year, date.Month, date.Day, 0, 0, 0, DateTimeKind.Unspecified),
+                z.GetUtcOffset(date)).ToUniversalTime();
+
+        DateTime windowStartLocal, windowEndLocalExclusive;
+        List<DateTime> windowDays;
+        switch (resolvedView)
+        {
+            case "day":
+            {
+                // Day (F1): [anchorLocalStartUtc, anchorLocalStartUtc + 1d);
+                // WindowDays = [anchorDate].
+                windowStartLocal = anchorDate;
+                windowEndLocalExclusive = anchorDate.AddDays(1);
+                windowDays = [anchorDate];
+                break;
+            }
+            case "week":
+            {
+                // Week (F2, C-DWM·5): the anchor's ISO **Monday-start** week —
+                // Monday = anchor minus ((int)DayOfWeek + 6) % 7 days;
+                // [mondayLocalStartUtc, mondayLocalStartUtc + 7d); WindowDays
+                // = the 7 days monday .. monday+6 (Monday-first).
+                var monday = anchorDate.AddDays(-(((int)anchorDate.DayOfWeek + 6) % 7));
+                windowStartLocal = monday;
+                windowEndLocalExclusive = monday.AddDays(7);
+                windowDays = Enumerable.Range(0, 7).Select(n => monday.AddDays(n)).ToList();
+                break;
+            }
+            default:
+            {
+                // Month (F3): the anchor's calendar month —
+                // [1stLocalStartUtc, 1stLocalStartUtc + DaysInMonth);
+                // WindowDays = the 5–6 full weeks covering the month,
+                // starting on the Monday on or before the 1st (D4).
+                var monthStart = new DateTime(anchorDate.Year, anchorDate.Month, 1);
+                var daysInMonth = DateTime.DaysInMonth(anchorDate.Year, anchorDate.Month);
+                var gridMonday = monthStart.AddDays(-(((int)monthStart.DayOfWeek + 6) % 7));
+                var monthEndInclusive = monthStart.AddDays(daysInMonth - 1);
+                var gridEndExclusive = monthEndInclusive.AddDays(1 + ((6 - (int)monthEndInclusive.DayOfWeek) % 7));
+                windowStartLocal = monthStart;
+                windowEndLocalExclusive = monthStart.AddDays(daysInMonth);
+                windowDays = new List<DateTime>();
+                for (var d = gridMonday; d < gridEndExclusive; d = d.AddDays(1))
+                    windowDays.Add(d);
+                break;
+            }
+        }
+
+        var windowStartUtc = LocalMidnightUtc(windowStartLocal, zone);
+        var windowEndUtc = LocalMidnightUtc(windowEndLocalExclusive, zone);
+
+        IReadOnlyList<Event> events;
+        try
+        {
+            events = await this.events.ListInRangeAsync(windowStartUtc, windowEndUtc, componentId, actorId, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // ADR 0049 — the calendar is a list surface, so each row shows the
+        // event's title in the viewer's current language when a translation
+        // exists, else the authored-in title (the ADR 0022 floor) — exactly
+        // the feed's <see cref="ApplyEventTranslationAsync"/> idiom (ADR 0051).
+        // A read, not a decision: the <c>CanSeeAsync</c> gate already ran in
+        // ListInRangeAsync. The body is not on the chip, so only the title is
+        // surfaced here; one effective-language read per request, a null
+        // <c>translationProvider</c> (test construction) is a no-op (the
+        // authored-in title stays). The resolved code is also reused below to
+        // render the nav label (day/month names) in the same language.
+        string? effectiveLangCode = null;
+        if (translationProvider is not null)
+        {
+            effectiveLangCode = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var e in events)
+                await ApplyEventTranslationAsync(e, effectiveLangCode);
+        }
+
+        // Author display names (a *read* lookup, never an access decision —
+        // the audience gate already ran in ListInRangeAsync). Missing profile
+        // → the raw subject id (the feed action's idiom).
         var authorIds = events.Select(e => e.AuthorId).Where(a => !string.IsNullOrEmpty(a)).Distinct().ToList();
         var authorName = new Dictionary<string, string>();
         foreach (var authorId in authorIds)
@@ -265,6 +503,9 @@ public sealed class EventController : Controller
             .Where(c => componentIds.Contains(c.Id))
             .ToDictionary(c => c.Id, c => string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name);
 
+        // The U03 additive fields (StartUtc / EndUtc) are set **explicitly
+        // here** — the calendar path is the only call site that sets them
+        // (design §5.2); the feed action's call site keeps them defaulted.
         var rows = events
             .Select(e => new EventRow(
                 Id: e.Id,
@@ -278,17 +519,82 @@ public sealed class EventController : Controller
                 ComponentId: e.ComponentId,
                 ComponentDisplayName: e.ComponentId is not null && componentById.TryGetValue(e.ComponentId, out var cn) ? cn : null,
                 IsDraft: e.IsDraft,
-                IsDeleted: e.IsDeleted))
+                IsDeleted: e.IsDeleted,
+                StartUtc: e.Start,
+                EndUtc: e.End,
+                Color: e.Color))
             .ToList();
 
-        var vm = new EventIndexViewModel(
+        // Nav anchors (C-DWM·6 — plain pre-rendered GET links): the anchor
+        // shifted by the **view's unit** (day: ±1 day; week: ±7 days —
+        // preserving the Monday-start alignment; month: ±1 month),
+        // yyyy-MM-dd. The view + component filter ride along in the view's
+        // NavHref (C-DWM·6 / C-EV·3).
+        var prevDate = resolvedView switch
+        {
+            "day" => anchorDate.AddDays(-1),
+            "week" => anchorDate.AddDays(-7),
+            _ => anchorDate.AddMonths(-1),
+        };
+        var nextDate = resolvedView switch
+        {
+            "day" => anchorDate.AddDays(1),
+            "week" => anchorDate.AddDays(7),
+            _ => anchorDate.AddMonths(1),
+        };
+        var fromAnchor = anchorDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var prevAnchor = prevDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var nextAnchor = nextDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        // Label — the view-appropriate display string in the viewer's language
+        // (ADR 0064 §6.2 step 6; a computed display string, **not** a registry
+        // key — C-DWM·9): Day → full date; Week → "Mon d – Mon d" range;
+        // Month → month name + year (the EV-CAL shape). Rendered in the
+        // request's effective language (ADR 0049) so day/month names match the
+        // language the resident is reading the platform in; a null
+        // <c>effectiveLangCode</c> (no translation provider — test
+        // construction) falls to the ambient current culture (the
+        // <c>Calendar_Label_IsViewAppropriate</c> pin, invariant/en-GB).
+        CultureInfo labelCulture = effectiveLangCode is not null
+            ? CultureInfo.GetCultureInfo(effectiveLangCode)
+            : CultureInfo.CurrentCulture;
+        var fmt = labelCulture.DateTimeFormat;
+        string label;
+        if (resolvedView == "day")
+        {
+            label = $"{fmt.GetDayName(anchorDate.DayOfWeek)} {anchorDate.Day} {fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
+        }
+        else if (resolvedView == "week")
+        {
+            var monday = windowDays[0];
+            var sunday = windowDays[^1];
+            label = $"{fmt.GetAbbreviatedDayName(monday.DayOfWeek)} {monday:d} – {fmt.GetAbbreviatedDayName(sunday.DayOfWeek)} {sunday:d}";
+        }
+        else
+        {
+            label = $"{fmt.GetMonthName(anchorDate.Month)} {anchorDate.Year}";
+        }
+
+        var vm = new EventCalendarViewModel(
             Events: rows,
+            FromAnchor: fromAnchor,
+            PrevAnchor: prevAnchor,
+            NextAnchor: nextAnchor,
+            Label: label,
+            CurrentComponentId: componentId,
             Components: allComponents
                 .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
                 .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
-            CurrentComponentId: componentId,
-            CurrentPage: page);
+            // C-EV·5 — the effective zone id: a DISPLAY input for the view's
+            // TS day-distribution (Intl via zone id) only; never an
+            // authorization input.
+            TimeZoneId: zone.Id,
+            // EV-DWM (ADR 0064 §6.1) — the resolved view echoed back to the
+            // view (the toggle's active button) + the ordered grid
+            // day-columns (the view's columns, C-DWM·3 / D4).
+            View: resolvedView,
+            WindowDays: windowDays);
 
         return View(vm);
     }
@@ -509,12 +815,16 @@ public sealed class EventController : Controller
 
         var request = new CreateEventRequest
         {
-            Title = model.Title,
-            Body = model.Body,
+            // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
+            // above returns unless both are non-whitespace (the [Required] pin), so
+            // this assignment can never actually store a null (CS8601).
+            Title = model.Title!,
+            Body = model.Body!,
             ComponentId = model.ComponentId,
             Start = model.Start,
             End = model.End,
             Location = model.Location,
+            Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             ReminderEnabled = model.ReminderEnabled,
@@ -598,6 +908,7 @@ public sealed class EventController : Controller
             Start = ev.Start,
             End = ev.End,
             Location = ev.Location,
+            Color = ev.Color,
             Capacity = ev.Capacity,
             Audience = AudienceEditorModel.FromAudience(ev.Audience),
             ReminderEnabled = ev.ReminderEnabled,
@@ -667,12 +978,16 @@ public sealed class EventController : Controller
 
         var request = new UpdateEventRequest
         {
-            Title = model.Title,
-            Body = model.Body,
+            // `!` — Title/Body are guaranteed non-null: the `if (!model.IsValid)` gate
+            // above returns unless both are non-whitespace (the [Required] pin), so
+            // this assignment can never actually store a null (CS8601).
+            Title = model.Title!,
+            Body = model.Body!,
             ComponentId = model.ComponentId,
             Start = model.Start,
             End = model.End,
             Location = model.Location,
+            Color = string.IsNullOrWhiteSpace(model.Color) ? null : model.Color.Trim(), // display metadata (the Location shape).
             Capacity = model.Capacity,
             Audience = model.Audience.BuildAudience(),
             ReminderEnabled = model.ReminderEnabled,

@@ -1,0 +1,884 @@
+@model Kumunita.Web.Models.BoardDetailViewModel
+@using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@using Marten
+@inject Marten.IDocumentStore Store
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Board.Title) ? "Board" : Model.Board.Title;
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    // ADR 0072 — the add-to-do / add-lane input placeholders (the only
+    // Kanban-board UI strings that were still hardcoded; the rest of the
+    // board is kw-l-wrapped). Resolved the same way the optional status
+    // placeholder above is: provider by the effective language, the
+    // provider floor (en registry) is the backstop.
+    var addTodoPlaceholder = await Translation.GetAsync("projects.board.lane.add_todo_placeholder", _kwL);
+    var addLanePlaceholder = await Translation.GetAsync("projects.board.lane.add_lane_placeholder", _kwL);
+    // The copy-to / move-to pickers need the *other* boards (the target
+    // board option list). The frozen view model carries no such list
+    // (C-M5·3: a board detail is board-scoped), so this is a read-only
+    // display convenience — never a gate (the audience decision already ran
+    // in the service's GetBoardAsync). The M4 / U07 board-placement idiom.
+    var otherBoards = await Store.QuerySession().Query<KanbanBoard>()
+        .Where(b => !b.IsDeleted && b.Id != Model.Board.Id)
+        .ToListAsync(CancellationToken.None);
+    otherBoards = otherBoards
+        .OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    // ── Status icon + label (ADR 0069) ────────────────────────────────────
+    // The fixed status vocabulary (KanbanStatuses) maps each code to an
+    // inline lucide-style SVG (the repo's icon convention — no icon font);
+    // a null/unknown code falls back to a plain circle. The status is
+    // stored as a free string on the document (no schema change), so the
+    // glyph is best-effort: an unrecognized value still renders the raw
+    // text next to the fallback circle (C3 — the view renders what the
+    // service stored). The <c>title</c> attr + a <kw-l> text sibling keep
+    // the icon accessible / screen-reader-legible.
+    static string StatusGlyph(string? status)
+    {
+        const string open = "<svg class=\"kanban-status-icon\" xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">";
+        switch (status)
+        {
+            case KanbanStatuses.NotStarted:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"1\" fill=\"currentColor\"/>" + "</svg>";
+            case KanbanStatuses.InProgress:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>" + "</svg>";
+            case KanbanStatuses.Done:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"8 12 10 14 14 10\"/>" + "</svg>";
+            case KanbanStatuses.Cancelled:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"15\" y1=\"9\" x2=\"9\" y2=\"15\"/><line x1=\"9\" y1=\"9\" x2=\"15\" y2=\"15\"/>" + "</svg>";
+            default:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/>" + "</svg>";
+        }
+    }
+
+    static string StatusLabelKey(string? status)
+    {
+        switch (status)
+        {
+            case KanbanStatuses.NotStarted: return "projects.board.status.not_started";
+            case KanbanStatuses.InProgress: return "projects.board.status.in_progress";
+            case KanbanStatuses.Done: return "projects.board.status.done";
+            case KanbanStatuses.Cancelled: return "projects.board.status.cancelled";
+            default: return "projects.board.status.none";
+        }
+    }
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/projects/boards" class="btn btn-link p-0 kanban-back"><kw-l key="projects.board.back">← Back to boards</kw-l></a>
+        </p>
+
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>
+                        @if (string.IsNullOrWhiteSpace(Model.Board.Title))
+                        {
+                            <span class="text-body-tertiary"><kw-l key="projects.board.untitled">Untitled board</kw-l></span>
+                        }
+                        else
+                        {
+                            @Model.Board.Title
+                        }
+                    </h1>
+                    <div class="text-muted small mt-1">
+                        @Model.Board.AuthorDisplayName
+                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                        <kw-dt dt="@Model.Board.Created" format="g"></kw-dt></span>
+                        @if (Model.Board.Modified is not null)
+                        {
+                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                            <kw-dt dt="@Model.Board.Modified" format="g"></kw-dt></span>
+                        }
+                        @if (Model.Board.ComponentDisplayName is not null)
+                        {
+                            <span class="badge text-bg-light border ms-2">@Model.Board.ComponentDisplayName</span>
+                        }
+                    </div>
+                </div>
+                @* The board action dropdown (the _AccountNav.cshtml Bootstrap
+                   dropdown shape): delete board — a plain POST form to the
+                   U08 route, CSRF-tokenized, redirect-after-POST. The cascade
+                   is the service's (F2 / F8); the view renders what the
+                   service returns (C3). *@
+                <div class="d-flex align-items-center gap-2">
+                    @* The full-screen toggle (the board is the Fullscreen API
+                       element — the browser hides the rest of the page and
+                       client/lib/projects-board.ts syncs the .kanban-full
+                       class + the ⛶ / ✕ label on fullscreenchange). Works in
+                       a regular viewport; the :fullscreen styles in site.css
+                       give it the full-bleed look. *@
+                    <button type="button" class="btn btn-sm btn-outline-secondary kanban-fullscreen-toggle"
+                            aria-pressed="false">
+                        <svg class="kanban-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                        <span><kw-l key="projects.board.fullscreen">Full screen</kw-l></span>
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-sm kanban-glyph-btn dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Board actions">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.CanEdit)
+                            {
+                                @* ADR 0070 — the board edit lane (the card
+                                   ⋮ menu's "Edit" item shape, reused): a
+                                   link, not a form. The standing (creator ∪
+                                   GlobalAdmin) is the service's on write —
+                                   the CanEdit flag is the same matrix. *@
+                                <li>
+                                    <a class="dropdown-item text-dark" href="@($"/projects/boards/{Model.Board.Id}/edit")"><kw-l key="projects.board.edit">Edit board</kw-l></a>
+                                </li>
+                            }
+                            <li>
+                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/delete")"
+                                      data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Board.Description))
+        {
+            <div class="card mb-4">
+                <div class="card-body rc-body">
+                    @Html.Raw(MarkdownRenderer.RenderHtml(Model.Board.Description))
+                </div>
+            </div>
+        }
+
+        @if (Model.Lanes.Count == 0)
+        {
+            <p class="kanban-board-empty p-4 text-muted border rounded">
+                <kw-l key="projects.board.no_lanes">This board has no lanes yet.</kw-l>
+            </p>
+        }
+
+        <div class="kanban-board" data-board-id="@Model.Board.Id">
+            @* The full-screen close button — INSIDE the board because the
+               board element is what enters the Fullscreen API, so the
+               browser hides the rest of the page (header + toggle button
+               included). This is the visible way out (client/lib/
+               projects-board.ts posts exitFullscreen on click; Esc still
+               works too). Shown only while .kanban-full (site.css), fixed-
+               positioned relative to the fullscreen element. *@
+            <button type="button" class="btn btn-sm btn-outline-secondary kanban-fullscreen-close">
+                <svg class="kanban-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span><kw-l key="projects.board.exit_fullscreen">Exit full screen</kw-l></span>
+            </button>
+            @foreach (var lane in Model.Lanes)
+            {
+                @* A lane has a left neighbor iff another lane on this board
+                   carries a lower Order; a right neighbor iff a higher one.
+                   The ⋮ dropdown's Move left / Move right items are rendered
+                   only when the neighbor exists (the user's requirement); the
+                   service's MoveLaneAsync also no-ops at the edge as a
+                   server-side backstop (C3 — the view renders what the
+                   service permits, never a gate). *@
+                var hasLeft = Model.Lanes.Any(l => l.Order < lane.Order);
+                var hasRight = Model.Lanes.Any(l => l.Order > lane.Order);
+                @* The Add to-do button is shown only while the lane has spare
+                   capacity (a null MaxItems = unlimited). The service's
+                   AddTodoToLaneAsync re-checks the limit server-side and
+                   refuses (C-M5·5) — the view just hides the affordance when
+                   the lane is visibly full. *@
+                var laneHasSpare = lane.MaxItems is null || lane.Cards.Count < lane.MaxItems;
+
+                @* The whole lane is draggable (ADR 0069 — the drag-drop
+                   channel; the server stays authoritative, C-M5·9). The
+                   dragstart handler disambiguates: if the grab point is
+                   inside a .kanban-card it starts a *card* drag (reading that
+                   card's data-placement-id), otherwise a *lane* drag (reading
+                   this lane's data-lane-id). data-lane-id is read at drop
+                   time from the lane under the drop point. *@
+                <div class="kanban-lane @(laneHasSpare ? "" : "kanban-lane-at-limit")" draggable="true" data-lane-id="@lane.LaneId">
+                    <div class="kanban-lane-head">
+                        <h3 class="h5 mb-0 kanban-lane-title">
+                            @if (!string.IsNullOrWhiteSpace(lane.Status))
+                            {
+                                @* The fixed-status icon (ADR 0069) — an inline
+                                   SVG glyph for the lane's Status code (a null
+                                   code shows the fallback circle); the raw
+                                   value is carried in the title attr + the
+                                   dropdown's Set status so a free-text /
+                                   unrecognized value is never lost (C3). *@
+                                <span class="kanban-status" title="@lane.Status">@Html.Raw(StatusGlyph(lane.Status))</span>
+                            }
+                            @lane.Title
+                            @* The count / limit badge (ADR 0069, KinaUna
+                               parity): "N / MaxItems" when the lane has a
+                               limit (the at-limit state is styled), a bare
+                               "N" when unlimited. *@
+                            <span class="badge text-bg-light border ms-2 kanban-count"
+                                  title="@(lane.MaxItems is null ? ("Cards: " + lane.Cards.Count) : ("Cards: " + lane.Cards.Count + " / " + lane.MaxItems))">
+                                @lane.Cards.Count@(lane.MaxItems is null ? "" : " / " + lane.MaxItems)
+                            </span>
+                        </h3>
+                        @* Lane editing (ADR 0071) — a single ⋮ dropdown at
+                           the head's right edge, holding every lane action
+                           in one menu. The Rename and Set limit rows are
+                           single-field forms to the U08 lane-update route
+                           (POST /projects/boards/{id}/lanes/{laneId}, the
+                           LaneEditorModel shape — a partial update; the
+                           service's UpdateLaneAsync change-detection is the
+                           authority; each non-Title form carries a hidden
+                           <c>Title</c> so the field can be edited without
+                           renaming), each submitted by a → arrow icon
+                           button to the right of its input (in place of
+                           the old named "Rename" / "Set limit" buttons).
+                           Set status is a Status select with NO submit
+                           button — it auto-POSTs on change via
+                           client/lib/projects-board.ts (a blank "None" is
+                           an explicit update). A <hr> divider separates the
+                           rename/limit/status group from the Move left /
+                           Move right reorder actions (the ADR 0068 lane-
+                           reorder routes, the service's MoveLaneAsync; the
+                           edge lane is a service no-op backstop, C-M5·9),
+                           which render only when a neighbor exists. The
+                           standing + limit decisions are the service's
+                           (F7 / F8 / F6); the view renders what the service
+                           returns (C3). *@
+                        <div class="dropdown kanban-lane-menu ms-auto" data-detach>
+                            <button class="btn btn-sm kanban-glyph-btn dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="@("Actions for lane " + lane.Title)">⋮</button>
+                            <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
+                                @* ADR 0071 (amendment) — the lane Rename row is a
+                                   button opening a Bootstrap modal (the inline
+                                   input + arrow is replaced; a single Title input
+                                   fits cleanly in a modal). The MaxItems row below
+                                   keeps its inline input + arrow (a single number
+                                   field is fine inline). *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="@($"#rename-lane-{lane.LaneId}")">
+                                        <kw-l key="projects.board.lane.rename">Rename</kw-l>
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Title" value="@lane.Title" />
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="lane-limit-@lane.LaneId">
+                                                <kw-l key="projects.board.lane.max_items">Max items</kw-l>
+                                            </label>
+                                            <div class="d-flex align-items-center gap-1">
+                                                <input class="form-control form-control-sm" type="number" name="MaxItems"
+                                                       id="lane-limit-@lane.LaneId"
+                                                       min="1" value="@lane.MaxItems" />
+                                                <button type="submit" class="kanban-arrow-submit"
+                                                        aria-label="@("Set limit on lane " + lane.Title)" title="@("Set limit on lane " + lane.Title)">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Title" value="@lane.Title" />
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="lane-status-@lane.LaneId">
+                                                <kw-l key="projects.board.lane.status">Status</kw-l>
+                                            </label>
+                                            @* The fixed status vocabulary (ADR
+                                               0069) — None + the four known
+                                               codes. A free-text value is
+                                               preserved as an extra option so
+                                               editing never loses it (C3). *@
+                                            <select class="form-select form-select-sm kanban-lane-autosubmit" name="Status" id="lane-status-@lane.LaneId">
+                                                <option value="" selected="@(string.IsNullOrWhiteSpace(lane.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                                @if (!string.IsNullOrWhiteSpace(lane.Status) && !KanbanStatuses.Known.Contains(lane.Status))
+                                                {
+                                                    <option value="@lane.Status" selected>@lane.Status</option>
+                                                }
+                                                @foreach (var code in KanbanStatuses.Known)
+                                                {
+                                                    <option value="@code" selected="@(lane.Status == code)">
+                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                    </option>
+                                                }
+                                            </select>
+                                        </div>
+                                    </form>
+                                </li>
+                                @if (hasLeft || hasRight)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @if (hasLeft)
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/move-left")" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_left">Move left</kw-l></button>
+                                            </form>
+                                        </li>
+                                    }
+                                    @if (hasRight)
+                                    {
+                                        <li>
+                                            <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/move-right")" style="margin:0;">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_right">Move right</kw-l></button>
+                                            </form>
+                                        </li>
+                                    }
+                                }
+                            </ul>
+                        </div>
+                    </div>
+
+                    @* ADR 0071 (amendment) — the Rename modal. The lane head's ⋮
+                       menu "Rename" button opens this (Bootstrap 5 modal — the
+                       first in-repo use; the bundle is already loaded). It posts
+                       the lane-update route with just the new Title (MaxItems
+                       omitted → preserved); Cancel dismisses. The submit button
+                       lives in the modal footer outside the form, so it names the
+                       form via the `form` attribute. *@
+                    <div class="modal fade" id="@($"rename-lane-{lane.LaneId}")" tabindex="-1"
+                         aria-labelledby="@($"rename-lane-label-{lane.LaneId}")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}")"
+                                      id="@($"rename-lane-form-{lane.LaneId}")">
+                                    @Html.AntiForgeryToken()
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"rename-lane-label-{lane.LaneId}")">
+                                            <kw-l key="projects.board.lane.rename">Rename</kw-l> lane
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="@("Close")"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <label class="form-label" for="@($"rename-lane-input-{lane.LaneId}")">
+                                            <kw-l key="projects.board.lane.title">Lane title</kw-l>
+                                        </label>
+                                        <input class="form-control" type="text" name="Title"
+                                               id="@($"rename-lane-input-{lane.LaneId}")" value="@lane.Title"
+                                               maxlength="120" required />
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"rename-lane-form-{lane.LaneId}")">
+                                            <kw-l key="common.save">Save</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="kanban-cards">
+                        @if (lane.Cards.Count == 0)
+                        {
+                            <p class="kanban-lane-empty text-body-tertiary small mb-2">
+                                <kw-l key="projects.board.lane.empty">No cards in this lane.</kw-l>
+                            </p>
+                        }
+                        @foreach (var card in lane.Cards)
+                        {
+                            @* The card carries the ids the drag-drop handler
+                               posts (ADR 0069 — HTML5 DnD as an input channel
+                               on top of the keyboard / menu channels; the
+                               server stays authoritative — no optimistic DOM
+                               reordering, C-M5·9). The drag itself is owned
+                               by the .kanban-lane (see below); the card's
+                               data-* attrs are read at dragstart when the grab
+                               point is a card. The assignee avatar (left) +
+                               the status badge (own Status, else the lane's
+                               — C-M5·4) are display only, never a gate. *@
+                            @* The card's effective status — the to-do's own
+                               Status when it has one (C-M5·4 — the stored
+                               state label), else the status the lane imparts
+                               (C-M5·4 — a card moved into a lane reads the
+                               lane's status; on a board the column *is* the
+                               status, so every card carries the glyph). The
+                               glyph mapping is the StatusGlyph helper above
+                               (a free-text / unrecognized value shows the
+                               fallback circle + the raw text, C3). *@
+                            string effectiveStatus = !string.IsNullOrWhiteSpace(card.Status) ? card.Status : lane.Status;
+                            // The badge text: the card's own raw Status when it
+                            // has one (C3 — the view renders what the service
+                            // stored), else the lane's status resolved through
+                            // the same translation registry the lane dropdown
+                            // uses (projects.board.status.*). The provider
+                            // floor (en registry) is the backstop.
+                            string effectiveStatusLabel = !string.IsNullOrWhiteSpace(card.Status)
+                                ? card.Status
+                                : (await Translation.GetAsync(StatusLabelKey(lane.Status), _kwL));
+                            @* The assignee avatar (the Directory / posts
+                               pattern): the <img> links the audited serving
+                               lane (GET /profile/avatar/{subjectId}) and
+                               avatar.ts hides it on the 404 it fails closed
+                               to (no avatar set), showing the monogram
+                               sibling — the assignee's initial. *@
+                            string assigneeInitial = !string.IsNullOrWhiteSpace(card.AssigneeDisplayName)
+                                ? char.ToUpperInvariant(card.AssigneeDisplayName.TrimStart()[0]).ToString()
+                                : string.Empty;
+                            <div class="kanban-card mb-2"
+                                 data-placement-id="@card.PlacementId" data-todo-id="@card.TodoId">
+                                <div class="d-flex align-items-start gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                    {
+                                        <span class="d-inline-flex align-items-center mt-1">
+                                            <img class="avatar avatar-sm" src="/profile/avatar/@card.AssigneeId" alt=""
+                                                 data-avatar-fallback>
+                                            <span class="avatar-mono avatar-sm" style="display:none;">@assigneeInitial</span>
+                                        </span>
+                                    }
+                                    <div class="flex-grow-1">
+                                        <h4 class="h6 mb-1">
+                                            <a href="@($"/projects/todos/{card.TodoId}")">@card.Title</a>
+                                        </h4>
+                                        <div class="text-muted small">
+                                            @if (!string.IsNullOrWhiteSpace(effectiveStatus))
+                                            {
+                                                <span class="badge text-bg-light border d-inline-flex align-items-center gap-1" title="@effectiveStatus">
+                                                    @Html.Raw(StatusGlyph(effectiveStatus))
+                                                    <span>@effectiveStatusLabel</span>
+                                                </span>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.assignee">Assignee</kw-l>: @card.AssigneeDisplayName</span>
+                                            }
+                                        </div>
+                                    </div>
+                                    @* The card action dropdown (the
+                                       _AccountNav.cshtml Bootstrap dropdown
+                                       shape, the U09 to-do dropdown idiom):
+                                       unassign / add-subtask / delete — thin
+                                       POST forms to the U07 to-do routes;
+                                       copy-to / move-to — POST forms to the
+                                       U08 board routes with the target-board
+                                       picker; move up / down / left / right
+                                       — POST forms to the U08 reorder
+                                       routes (the placement's id is the
+                                       service's first arg, §2.3). The
+                                       standing + cascade + limit decisions
+                                       are the service's (F7 / F8 / F6); the
+                                       view renders what the service returns
+                                       (C3). *@
+                                    <div class="dropdown" data-detach>
+                                        <button class="btn btn-sm kanban-glyph-btn dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                aria-label="Actions for @card.Title">⋮</button>
+                                        @* ADR 0071 — horizontal dividers group
+                                           the card menu's functions: Edit /
+                                           Unassign / Add subtask (the card's
+                                           own shape), then Copy / Move to
+                                           another board, then the reorder
+                                           moves, then Delete (the destructive
+                                           action, always separated). *@
+                                        <ul class="dropdown-menu dropdown-menu-end kanban-divided-menu">
+                                            @* ADR 0074 — "Assign to…" (always first): a
+                                               button opening a per-card Bootstrap modal
+                                               with one <select> each for People / Groups /
+                                               Communities; the modal posts the existing
+                                               assign route with a same-site returnUrl back
+                                               to this board (the standing decision is the
+                                               service's on write — the options are a display
+                                               convenience, never a gate). *@
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#assign-{card.TodoId}")">
+                                                    <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item text-dark" href="@($"/projects/todos/{card.TodoId}")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                                            </li>
+                                            @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                            {
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")"
+                                                          data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            @* ADR 0071 (amendment) — "Add subtask" is a
+                                               button opening a Bootstrap modal (the
+                                               inline Title input is replaced; a modal
+                                               gives the field room + a proper Save /
+                                               Cancel). The modal posts the to-do
+                                               subtask route (POST /projects/todos/{id}
+                                               /subtasks) with the subtask's Title; the
+                                               optional Status is carried as a free-text
+                                               label (C-M5·4). *@
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#subtask-{card.TodoId}")">
+                                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                                </button>
+                                            </li>
+                                            @if (otherBoards.Count > 0)
+                                            {
+                                                <li><hr class="dropdown-divider" /></li>
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/copy-to")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="copy-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.copy_to">Copy to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="copy-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.copy_to">Copy to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form method="post" action="@($"/projects/todos/{card.TodoId}/move-to")"
+                                                          data-confirm="@("Move this to-do to another board? It will no longer be on this board.")" style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <div class="px-3 py-2">
+                                                            <label class="form-label small text-muted mb-1" for="move-target-@card.PlacementId">
+                                                                <kw-l key="projects.todo.move_to">Move to board</kw-l>
+                                                            </label>
+                                                            <select class="form-select form-select-sm mb-2" id="move-target-@card.PlacementId" name="targetBoardId">
+                                                                @foreach (var b in otherBoards)
+                                                                {
+                                                                    <option value="@b.Id">@b.Title</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_to">Move to board</kw-l></button>
+                                                    </form>
+                                                </li>
+                                            }
+                                            <li><hr class="dropdown-divider" /></li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-up")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_up">Move up</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-down")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_down">Move down</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-left")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_left">Move left</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/cards/{card.PlacementId}/move-right")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.move_right">Move right</kw-l></button>
+                                                </form>
+                                            </li>
+                                            <li><hr class="dropdown-divider" /></li>
+                                            <li>
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/delete")"
+                                                      data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    @* ADR 0071 (amendment) — the Add-subtask modal.
+                                       The card ⋮ menu's "Add subtask" button opens
+                                       this (Bootstrap 5 modal — the first in-repo
+                                       use; the bundle is already loaded). It posts
+                                       the to-do subtask route (POST /projects/todos
+                                       /{id}/subtasks, the AddSubtaskModel shape)
+                                       with the subtask's Title (required), an
+                                       optional free-text Status (C-M5·4), and an
+                                       optional Assignee (the seeded standing
+                                       options; display + standing, never a gate).
+                                       Cancel dismisses. The footer submit names the
+                                       form via the `form` attribute. Placed inside
+                                       the card div (fixed-position, display:none
+                                       until opened — it never affects the card's
+                                       drag-drop / menu markup). *@
+                                    <div class="modal fade" id="@($"subtask-{card.TodoId}")" tabindex="-1"
+                                         aria-labelledby="@($"subtask-label-{card.TodoId}")" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/subtasks")"
+                                                      id="@($"subtask-form-{card.TodoId}")">
+                                                    @Html.AntiForgeryToken()
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="@($"subtask-label-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                                aria-label="@("Close")"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="mb-3">
+                                                            <label class="form-label" for="@($"subtask-title-{card.TodoId}")">
+                                                                <kw-l key="common.title">Title</kw-l>
+                                                            </label>
+                                                            <input class="form-control" type="text" name="Title"
+                                                                   id="@($"subtask-title-{card.TodoId}")"
+                                                                   maxlength="120" required />
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label" for="@($"subtask-status-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.status">Status</kw-l>
+                                                            </label>
+                                                            @* ADR 0069 — the fixed status vocabulary (the same
+                                                               <c>KanbanStatuses.Known</c> set the lane's Set-status
+                                                               select offers: None + the four codes). A new subtask
+                                                               starts with no status, so "None" is the selected
+                                                               default (no legacy free-text value to preserve here,
+                                                               unlike the lane editor which edits an existing lane). *@
+                                                            <select class="form-select" name="Status" id="@($"subtask-status-{card.TodoId}")">
+                                                                <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
+                                                                @foreach (var code in KanbanStatuses.Known)
+                                                                {
+                                                                    <option value="@code">
+                                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                                    </option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label" for="@($"subtask-assignee-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                                            </label>
+                                                            @{
+                                                                var subtaskAssigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            }
+                                                            <select class="form-control" name="AssigneeId"
+                                                                    id="@($"subtask-assignee-{card.TodoId}")">
+                                                                <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                                                @foreach (var o in subtaskAssigneeOptions)
+                                                                {
+                                                                    <option value="@o.Id">@o.Label</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                                        </button>
+                                                        <button type="submit" class="btn btn-primary" form="@($"subtask-form-{card.TodoId}")">
+                                                            <kw-l key="common.add">Add</kw-l>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @* ADR 0074 — the "Assign to…" modal. The card ⋮
+                                       menu's "Assign to…" button opens this (the
+                                       ADR 0071 modal shape: a Bootstrap 5 modal in
+                                       the card div, fixed-position, display:none
+                                       until opened — it never affects the card's
+                                       drag-drop / menu markup). A single
+                                       <c>name="assigneeId"</c> <select> with three
+                                       optgroups — People (the seeded
+                                       Audience_Users: verified, non-blocked, non-self
+                                       profiles), Groups (the seeded
+                                       Audience_Groups: public groups, ADR 0010),
+                                       and Communities (the seeded
+                                       Assign_Communities: the instance's enabled
+                                       components) — led by the Unassigned option
+                                       (an empty value clears the assignee on
+                                       submit). The current assignee is preselected
+                                       when it matches an option (person, group, or
+                                       community — the id spaces are disjoint). The
+                                       form posts the existing assign route (POST
+                                       /projects/todos/{id}/assign — the standing
+                                       gate is the service's, creator ∪ assignee ∪
+                                       GlobalAdmin, never re-derived here) with a
+                                       same-site <c>returnUrl</c> back to this
+                                       board, so the flash toast ("To-do assigned."
+                                       / "Assignee removed.") lands here, not on the
+                                       to-do's detail. The options are a display
+                                       convenience, never a gate. Cancel dismisses.
+                                       The footer submit names the form via the
+                                       <c>form</c> attribute. *@
+                                    <div class="modal fade" id="@($"assign-{card.TodoId}")" tabindex="-1"
+                                         aria-labelledby="@($"assign-label-{card.TodoId}")" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="post" action="@($"/projects/todos/{card.TodoId}/assign")"
+                                                      id="@($"assign-form-{card.TodoId}")">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="returnUrl"
+                                                           value="@($"/projects/boards/{Model.Board.Id}")" />
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title" id="@($"assign-label-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.assign_to">Assign to…</kw-l>
+                                                            <span class="text-body-secondary">· @card.Title</span>
+                                                        </h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                                aria-label="@("Close")"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        @* The current assignee (the names the controller resolved —
+                                                           person, group, or community; a raw id is the fallback). *@
+                                                        @if (!string.IsNullOrWhiteSpace(card.AssigneeId))
+                                                        {
+                                                            <p class="mb-3">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>: <span>@card.AssigneeDisplayName</span>
+                                                            </p>
+                                                        }
+                                                        @{
+                                                            var assignPeople = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            var assignGroups = (ViewData["Audience_Groups"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            var assignCommunities = (ViewData["Assign_Communities"] as List<GrantOption>) ?? new List<GrantOption>();
+                                                            // ADR 0074 — the optgroup labels (the <kw-l> TagHelper
+                                                            // renders text nodes, not attributes, so the labels are
+                                                            // resolved the ADR 0072 way: provider by the effective
+                                                            // language, the en registry the floor).
+                                                            var assignPeopleLabel = await Translation.GetAsync("projects.todo.assign_people", _kwL);
+                                                            var assignGroupsLabel = await Translation.GetAsync("projects.todo.assign_groups", _kwL);
+                                                            var assignCommunitiesLabel = await Translation.GetAsync("projects.todo.assign_communities", _kwL);
+                                                            bool IsCurrent(string? oId) =>
+                                                                !string.IsNullOrEmpty(card.AssigneeId) && card.AssigneeId == oId;
+                                                        }
+                                                        <div>
+                                                            <label class="form-label" for="@($"assign-select-{card.TodoId}")">
+                                                                <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                                            </label>
+                                                            <select class="form-control" name="assigneeId"
+                                                                    id="@($"assign-select-{card.TodoId}")">
+                                                                <option value=""
+                                                                        selected="@(!string.IsNullOrEmpty(card.AssigneeId) ? null : "selected")">
+                                                                    <kw-l key="projects.todo.unassigned">Unassigned</kw-l>
+                                                                </option>
+                                                                @if (assignPeople.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignPeopleLabel">
+                                                                        @foreach (var o in assignPeople)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                                @if (assignGroups.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignGroupsLabel">
+                                                                        @foreach (var o in assignGroups)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                                @if (assignCommunities.Count > 0)
+                                                                {
+                                                                    <optgroup label="@assignCommunitiesLabel">
+                                                                        @foreach (var o in assignCommunities)
+                                                                        {
+                                                                            <option value="@o.Id"
+                                                                                    selected="@(IsCurrent(o.Id) ? "selected" : null)">@o.Label</option>
+                                                                        }
+                                                                    </optgroup>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                                        </button>
+                                                        <button type="submit" class="btn btn-primary" form="@($"assign-form-{card.TodoId}")">
+                                                            <kw-l key="projects.todo.assign">Assign</kw-l>
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    @* The add-to-do form at the lane's foot (ADR 0068) — a
+                       single Title input + submit posting to the U08
+                       add-to-do route (POST
+                       /projects/boards/{id}/lanes/{laneId}/todos, the
+                       service's AddTodoToLaneAsync: the new to-do is placed
+                       on this lane at the end, the lane's Status imparted,
+                       the lane's MaxItems the refusal gate). Shown only while
+                       the lane has spare capacity (laneHasSpare — a null
+                       MaxItems = unlimited); a full lane hides the affordance
+                       and the service's server-side limit refusal (C-M5·5)
+                       is the backstop. The standing decision is the
+                       service's (C-M5·6); the view renders what the service
+                       permits (C3). *@
+                    @if (laneHasSpare)
+                    {
+                        <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/todos")" class="kanban-lane-add">
+                            @Html.AntiForgeryToken()
+                            <input class="form-control form-control-sm" type="text" name="Title"
+                                   maxlength="120" required
+                                   aria-label="@addTodoPlaceholder" placeholder="@addTodoPlaceholder" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_todo">Add to-do</kw-l></button>
+                        </form>
+                    }
+                </div>
+            }
+
+            @* The add-lane placeholder lane (the far-right empty slot — the
+               flex row places it last). A dashed "new lane" column carrying
+               the single Title input + Add lane button that posts to the U08
+               add-lane route (POST /projects/boards/{id}/lanes, the
+               service's CreateLaneAsync: a new lane appended at the end, no
+               status imparted, no limit). NOT a real lane — a distinct class
+               (not .kanban-lane) so the drag-drop channel (client/lib/
+               projects-board.ts's .kanban-lane queries + lane drop index)
+               never sees it; not draggable, no data-lane-id. The standing +
+               shape decisions are the service's (C-M5·6); the view renders
+               what the service returns (C3). *@
+            <div class="kanban-lane-new">
+                <div class="kanban-lane-new-body">
+                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes")" class="kanban-add-lane">
+                        @Html.AntiForgeryToken()
+                        <input class="form-control form-control-sm" type="text" name="Title"
+                               maxlength="120" required
+                               aria-label="@addLanePlaceholder" placeholder="@addLanePlaceholder" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_lane">+ Add lane</kw-l></button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Projects board (M5 — ADR 0067) — client/lib/projects-board.ts,
+         tsc-built; keyboard reorder / move on a focused card (Arrow keys →
+         the card's own move-… POST form, CSRF-aware, server-authoritative —
+         C-M5·9 / D10: no HTML5 drag, no optimistic reordering). The menu
+         channel is the plain POST forms above (the browser handles them). -->
+    <script type="module" src="~/js/lib/projects-board.js"></script>
+}

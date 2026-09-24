@@ -36,6 +36,17 @@ public sealed class EventService : IEventService
 {
     private const int PageSize = 30;
 
+    // EV-CAL (ADR 0063 D2) — the calendar window's result-count backstop
+    // (re-purposing the PageSize = 30 precedent as a window bound; the 30-day
+    // *span* is the controller's policy, not the service's).
+    private const int WindowCap = 30;
+
+    // EV-MINE (ADR 0065) — the "your upcoming events" section's result-count
+    // backstop: the per-actor RSVP/authorship set is small at one-neighborhood
+    // scale, and the section does not page — the cap guards against a
+    // misconfigured or abusive RSVP history, it is not a page size.
+    private const int MineCap = 50;
+
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
@@ -80,6 +91,53 @@ public sealed class EventService : IEventService
         // Standalone form (no IDocumentSession overload): this is a plain read
         // with no in-flight caller transaction (the M2 ListAsync precedent), so
         // the standalone method's own commit is the correct C3 lane.
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(e => new EventToAuditableResource(e)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(e => visibleIds.Contains(e.Id)).ToList();
+    }
+
+    /// <summary>
+    /// The <c>EV-CAL</c> calendar window (ADR 0063 D2) — <see
+    /// cref="ListUpcomingAsync"/> restricted to the window predicate
+    /// <c>Start &gt;= windowStartUtc &amp;&amp; Start &lt; windowEndUtc</c>
+    /// (an event is in the window on the day it <b>starts</b>; the multi-day
+    /// chip repeat is a display concern, U06). Mirrors that method's body
+    /// verbatim: same candidate filter (<c>!IsDeleted &amp;&amp; !IsDraft</c>,
+    /// optional <c>ComponentId</c> filter — C-M3·2, a filter never a gate,
+    /// C-EV·3), the same single <see cref="IAuthorizationService.CanSeeAsync(string, AccessAction, System.Collections.Generic.IEnumerable{IAuditableResource})"/>
+    /// standalone gate (C6, one matching pass; C-EV·2, one aggregate
+    /// <see cref="AccessAudit"/> row <c>TargetKind = "event"</c> via the
+    /// <see cref="EventToAuditableResource"/>), then the <c>visibleIds</c>
+    /// filter. <b>C-EV·1</b>: shows exactly what <see
+    /// cref="ListUpcomingAsync"/> would for this window. The result is capped
+    /// at <see cref="WindowCap"/> (a backstop, not the 30-day policy — the span
+    /// lives in the controller, U04).
+    /// </summary>
+    public async Task<IReadOnlyList<Event>> ListInRangeAsync(
+        DateTimeOffset windowStartUtc,
+        DateTimeOffset windowEndUtc,
+        string? componentId,
+        string actorId,
+        CancellationToken ct = default)
+    {
+        await using var session = _store.QuerySession();
+        IQueryable<Event> q = session.Query<Event>()
+            .Where(e => !e.IsDeleted && !e.IsDraft)
+            .Where(e => e.Start >= windowStartUtc && e.Start < windowEndUtc);
+        if (componentId is not null)
+            q = q.Where(e => e.ComponentId == componentId);
+        var candidates = await q.OrderBy(e => e.Start).Take(WindowCap).ToListAsync(ct).ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<Event>();
+
+        // C6 — one shared matching pass; C-EV·2 — one aggregate audit row
+        // (TargetKind "event"), from that single call (the ListUpcomingAsync shape).
+        // Standalone form (no IDocumentSession overload): this is a plain read
+        // with no in-flight caller transaction (the ListUpcomingAsync precedent).
         var visibleSet = await _authorization
             .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(e => new EventToAuditableResource(e)))
             .ConfigureAwait(false);
@@ -215,6 +273,61 @@ public sealed class EventService : IEventService
         return await session.Query<EventRsvp>()
             .Where(r => r.EventId == eventId && r.UserId == actorId)
             .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The actor's **own upcoming events** (ADR 0065, the <c>EV-MINE</c> lane) —
+    /// the <c>/events</c> feed's "your events" section. The candidate set is
+    /// the **union** of the actor's RSVP rows (any
+    /// <see cref="RsvpStatus"/> — a <c>No</c> / <c>Maybe</c> RSVP is still a
+    /// sign-up, the row exists) and the events they authored, restricted to
+    /// **upcoming** (<c>Start &gt; now</c>) and **live** (<c>!IsDeleted</c> —
+    /// the ADR 0024 read-lane shape). **Drafts are included**: ADR 0037's
+    /// author-only draft gate makes the union inherently non-leaky — every
+    /// result row is authored by the actor or has an
+    /// <see cref="EventRsvp"/> row keyed to them (an RSVP row can only exist
+    /// on an event the actor may already read — <see cref="RsvpAsync"/>
+    /// verifies standing first), so no other actor can ever see an event
+    /// through this seam. <b>No <c>AccessAudit</c> row</b> (the
+    /// <see cref="GetMyRsvpAsync"/> posture): the row's own write lane already
+    /// committed its decision; no <see cref="IAuthorizationService"/> call
+    /// here. Ordered by <see cref="Event.Start"/> ascending, capped at
+    /// <see cref="MineCap"/> (a backstop, not a page).
+    /// </summary>
+    public async Task<IReadOnlyList<Event>> ListMineAsync(string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An actor is required to read their events.");
+
+        await using var session = _store.QuerySession();
+        var now = DateTimeOffset.UtcNow;
+
+        var mineIds = await (
+            from r in session.Query<EventRsvp>()
+            where r.UserId == actorId
+            select r.EventId
+        ).Distinct().ToListAsync(ct).ConfigureAwait(false);
+
+        var authoredIds = await (
+            from e in session.Query<Event>()
+            where e.AuthorId == actorId
+            select e.Id
+        ).ToListAsync(ct).ConfigureAwait(false);
+
+        if (mineIds.Count == 0 && authoredIds.Count == 0)
+            return Array.Empty<Event>();
+
+        var idSet = new HashSet<string>(mineIds);
+        foreach (var id in authoredIds)
+            idSet.Add(id);
+
+        var nowLocal = now;
+        return await session.Query<Event>()
+            .Where(e => !e.IsDeleted && e.Start > nowLocal && idSet.Contains(e.Id))
+            .OrderBy(e => e.Start)
+            .Take(MineCap)
+            .ToListAsync(ct)
             .ConfigureAwait(false);
     }
 
@@ -420,6 +533,7 @@ public sealed class EventService : IEventService
             End = request.End,
             Location = request.Location,
             Capacity = request.Capacity,
+            Color = request.Color,                    // display metadata (the Location shape) — written verbatim.
             Audience = request.Audience,              // ADR 0001-B — written verbatim; never mutated here.
             ReminderEnabled = request.ReminderEnabled,
             IsDraft = request.IsDraft,                // ADR 0037 — a newly created event is a draft by default.
@@ -507,6 +621,7 @@ public sealed class EventService : IEventService
             || existing.End != request.End
             || !string.Equals(existing.Location, request.Location, StringComparison.Ordinal)
             || existing.Capacity != request.Capacity
+            || !string.Equals(existing.Color, request.Color, StringComparison.Ordinal)
             || !AudiencesEqual(existing.Audience, request.Audience)
             || existing.ReminderEnabled != request.ReminderEnabled
             || existingLanguageCode != updatedLanguageCode
@@ -524,6 +639,7 @@ public sealed class EventService : IEventService
         existing.Start = request.Start;
         existing.End = request.End;
         existing.Location = request.Location;
+        existing.Color = request.Color;                 // display metadata (the Location shape) — written verbatim.
         existing.Capacity = request.Capacity;
         existing.Audience = request.Audience;           // ADR 0001-B — written verbatim; never mutated.
         existing.ReminderEnabled = request.ReminderEnabled;

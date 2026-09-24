@@ -32,15 +32,6 @@
             }
         </p>
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @*
             ADR 0012 — the mandatory state. A single checkbox IS the whole
             surface (the Groups "Private group" toggle shape, ADR 0010):

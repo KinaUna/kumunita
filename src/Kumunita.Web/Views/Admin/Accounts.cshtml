@@ -13,15 +13,6 @@
 
 @await Html.PartialAsync("_AdminNav.cshtml")
 
-@if (TempData["info"] is string info)
-{
-    <div class="alert alert-success">@info</div>
-}
-@if (TempData["error"] is string err)
-{
-    <div class="alert alert-danger">@err</div>
-}
-
 @if (Model.UnverifiedCount > 0)
 {
     @* Verify queue — the safety valve for accounts that never completed email

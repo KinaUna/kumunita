@@ -42,15 +42,6 @@
             <p class="text-muted"><kw-l key="community.translations_view_only">You can view the translations; only a GlobalAdmin or a Translator can add, edit, or remove them.</kw-l></p>
         }
 
-        @if (TempData["info"] is string info)
-        {
-            <div class="alert alert-success" role="alert">@info</div>
-        }
-        @if (TempData["error"] is string err)
-        {
-            <div class="alert alert-danger" role="alert">@err</div>
-        }
-
         @if (Model.CommunityTranslations.Count > 0 || Model.CanTranslate)
         {
             <div class="mb-3 border-top pt-3 mt-3">
