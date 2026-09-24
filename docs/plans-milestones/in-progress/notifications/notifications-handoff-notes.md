@@ -19,7 +19,12 @@ handoff-note precedent — the *lean* shape).
 
 ---
 
-<!-- U00 appends `## U00` here on completion. -->
+## U00
+
+- **Shipped:** `docs/design/m6-notifications-design.md` Part 1 (§1–§5 complete; §6.1–§6.6 placeholder headers for U01). Eleven invariants C-M6·1…11 (verbatim from the register), twelve FACES F1–F12 (verbatim), eleven decisions D1–D11 in [PROPOSED] state, one-to-one D#↔C-M6·# mapping. No code, no ADR.
+- **One thing the next agent must not change:** the §5 D#↔C-M6·# mapping is 1:1 and complete (eleven each); U01 locks them into ADR 0076 as-is — do not renumber, merge, or split any D#
+- **Drift:** none recorded.
+
 <!-- U01 appends `## U01` here on completion. -->
 <!-- U02 appends `## U02` here on completion. -->
 <!-- U03 appends `## U03` here on completion. -->

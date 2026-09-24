@@ -7,7 +7,7 @@
 > with statused, limitable lanes). The **primary reference tier** (the exact C#
 > seams + the locked decisions) is the design doc
 > `docs/design/m5-projects-design.md` (authored U00–U01); the **scratch tier**
-> is `docs/plans-milestones/in-progress/projects/projects-handoff-notes.md`
+> is `docs/plans-milestones/done/projects/projects-handoff-notes.md`
 > (one appended `## U#` section per unit, never rewritten).
 >
 > **What this is:** a **new bounded context** `Kumunita.Core.Projects` (the
@@ -259,7 +259,7 @@ unit per fresh agent with a **~32K context window**.
   and the acceptance-gate shape. U00–U01 are the **sign-off gate** — **ADR
   0067** (Accepted) is the decisions source; the design doc turns it into exact
   shapes.
-- **Secondary — this file** (`docs/plans-milestones/plan-m5-projects.md`) —
+- **Secondary — this file** (`docs/plans-milestones/done/projects/plan-m5-projects.md`) —
   the lane register: understanding, assumptions, invariants, FACES, and the
   unit index (each pointing at its unit file).
 - **Unit files — `docs/plans-milestones/in-progress/projects/U0#.md`** — one
