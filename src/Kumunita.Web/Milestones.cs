@@ -43,7 +43,14 @@ public static class Milestones
         new("EV-CAL", "Events calendar — a month-anchored overview of the caller's visible events over a rolling 30-day window (overlap pairs highlighted; prev/next/today navigation to go back in time); one additive read seam on `IEventService` + one view; display-only, zero document changes (ADR 0063)", StatusDone),
         new("EV-DWM", "Events calendar day/week/month views — Day, Week (Monday-start, time-ruler), and Month (true calendar month) views over the same authorized events; one additive `?view=` selector on the existing route + per-view window in the controller; zero Core change (ADR 0064)", StatusDone),
         new("M5", "Projects — goals, tasks, contributors", StatusDone),
-        new("M6", "Portability (export/import), iCal, notifications, search", StatusNext),
+        new("M6", "Notifications", StatusNext),
+        new("M7", "Pagination and filtering", StatusPlanned),
+        new("M8", "Search", StatusPlanned),
+        new("M9", "PWA and responsive design", StatusPlanned),
+        new("M10", "Portability (import/export)", StatusPlanned),
+        new("M11", "iCal", StatusPlanned),
+        new("M12", "Logging and analytics", StatusPlanned),
+        new("M13", "Integration of Events and Projects", StatusPlanned),
     };
 
     public static string LabelFor(string status) => status switch
