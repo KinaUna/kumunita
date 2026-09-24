@@ -81,10 +81,13 @@ public sealed class NotificationService
         //     this session or in a prior commit — the <c>IdempotencyKey</c>
         //     index in <c>M6DocTypes</c>) makes this emission a no-op: no
         //     second row, no <c>StageAsync</c> call.
+        // (U09 fix: `FirstAsync` throws on an empty sequence — i.e. on every
+        //  first emission, which is the normal path. The intent (and the null
+        //  check below) is "no row yet" → proceed. `FirstOrDefaultAsync`.)
         var existing = await session.Query<Notification>()
             .Where(n => n.IdempotencyKey == idempotencyKey)
             .OrderBy(n => n.Created)
-            .FirstAsync(ct).ConfigureAwait(false);
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (existing is not null)
             return existing;
 
@@ -108,6 +111,7 @@ public sealed class NotificationService
         //     the durable record; the email is the best-effort nudge).
         var notification = new Notification
         {
+            Id = Guid.NewGuid().ToString("N"),            // the codebase idiom (PostService / EventService — externally-assigned string key; Marten does not auto-generate string Ids)
             RecipientId = recipientId,
             Kind = kind,
             IdempotencyKey = idempotencyKey,
@@ -194,7 +198,7 @@ public sealed class NotificationService
         var now = DateTimeOffset.UtcNow;
         foreach (var n in unread)
             n.ReadAt = now;
-        session.Store(unread);
+        session.Store(unread.ToArray());
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 

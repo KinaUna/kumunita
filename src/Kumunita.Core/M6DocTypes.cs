@@ -29,7 +29,13 @@ public static class M6DocTypes
                .Index(n => n.IdempotencyKey);
 
         // NotificationPreference — the RecipientId is the document id (one
-        // row per recipient); no additional indexes needed.
-        opts.Schema.For<NotificationPreference>();
+        // row per recipient; the §6.1 shape has no separate Id field), so the
+        // identity is pinned to RecipientId — the <see cref="M1DocTypes"/>
+        // <c>Profile</c> precedent (<c>.Identity(p => p.SubjectId)</c>). A bare
+        // <c>Schema.For&lt;NotificationPreference&gt;()</c> would fail Marten's
+        // identity resolution at schema-compile time (InvalidDocumentException)
+        // — this pin completes the registration to match the frozen doc shape.
+        opts.Schema.For<NotificationPreference>()
+               .Identity(p => p.RecipientId);
     }
 }

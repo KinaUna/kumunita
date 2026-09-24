@@ -1,0 +1,606 @@
+using Kumunita.Core;
+using Kumunita.Core.Authorization;
+using Kumunita.Core.Identity;
+using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
+using Kumunita.Core.UserInfo;
+using Marten;
+using NSubstitute;
+using Xunit;
+
+namespace Kumunita.Core.Tests;
+
+/// <summary>
+/// The <see cref="NotificationService"/> (M6 — the **shared awareness** arrow,
+/// ADR 0076) business-logic harness: the **12 FACES** from design doc §6.4
+/// (F1–F12), one <c>Method_Face_Expectation</c> test each, run against a live
+/// scratch-Postgres <see cref="IDocumentStore"/> (<see cref="PostgresFixture"/>)
+/// with the frozen <see cref="IMailerStage"/> stand-in that *records* the staged
+/// emails (key + recipient + subject + body) rather than dispatching over SMTP
+/// (the <see cref="EventReminderServiceTests"/> recording-mailer precedent), and
+/// a <see cref="ITranslationProvider"/> stand-in that resolves the
+/// <c>notification.{kind}.subject</c> / <c>notification.{kind}.body</c> keys in
+/// the *recipient's* <c>Profile.EmailLanguage</c> (the ADR 0061 seam).
+/// <para>
+/// The frozen six-method surface (U03 — design doc §6.2) is exercised
+/// verbatim: <c>EmitAsync</c> (the writer — D4 / D5 / D7 + the F10 service-side
+/// <c>IdempotencyKey</c> dedup), <c>ListInboxAsync</c> /
+/// <c>CountUnreadAsync</c> / <c>MarkAllReadAsync</c> (the read + state lanes),
+/// and <c>GetPreferencesAsync</c> / <c>SetPreferencesAsync</c> (the
+/// preference lanes). No <c>IAuthorizationService</c> anywhere (C-M6·3 — a
+/// notification is a *personal read*, not an <c>AccessAction</c> decision);
+/// the F11 test asserts that directly (zero <see cref="AccessAudit"/> rows).
+/// </para>
+/// <para>
+/// **F7 (U04's recorded drift):** the design doc §6.4 name
+/// <c>Emit_ReportResolved_Stores_InboxRow_And_Stages_Email_For_Resident</c>
+/// reads "the resident" generically; U04 shipped only the **filer** emission
+/// (the <c>notification:report.resolved:{reportId}:filed</c> key — the frozen
+/// <c>Report</c> entity has no assigned-moderator field, so the assignee
+/// emission is a follow-on lane). This test codes against **what shipped**:
+/// one row for the filer. Recorded as a drift note for U10 to settle at gate
+/// time — the test name is kept verbatim (a rename is a breaking change to §6.4).
+/// </para>
+/// </summary>
+public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+{
+    // ── F1 — Emit_PostReply_Stores_InboxRow_And_Stages_Email_For_Author ─────
+    //
+    // C-M6·2 (the closed kind set — the stored <c>Kind</c> is the code-owned
+    // <c>post.reply</c> constant) + C-M6·7 (the inbox row is stored
+    // unconditionally; the email is staged because the recipient's preference
+    // is the lean-default = all enabled). One row for the post's author, with
+    // the §6.3 key shape <c>notification:post.reply:{replyId}</c>.
+
+    [Fact]
+    public async Task Emit_PostReply_Stores_InboxRow_And_Stages_Email_For_Author()
+    {
+        var (store, svc, mailer, staged) = await BootAsync();
+
+        const string author = "u-f1-author";
+        const string replier = "u-f1-replier";
+        await PlantProfile(store, author, "f1-author@kumunita", emailLanguage: "de");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, author,
+            NotificationKinds.PostReply,
+            "notification:post.reply:reply-f1", "Neuer Kommentar von " + replier);
+
+        // The inbox row is the durable record (D5) — stored once, unread.
+        Assert.Equal(author, row.RecipientId);
+        Assert.Equal(NotificationKinds.PostReply, row.Kind);
+        Assert.Equal("reply-f1", row.SourceId);                     // derived from the §6.3 key
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, author));
+        // C-M6·7: lean-default → the email is staged exactly once, same key.
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:post.reply:reply-f1", email.Key);
+        Assert.Equal("f1-author@kumunita", email.Recipient);
+    }
+
+    // ── F2 — Emit_GroupPost_Stores_InboxRow_And_Stages_Email_For_Member ─────
+    //
+    // C-M6·2 (the <c>group.post</c> constant) + C-M6·7 (inbox unconditional;
+    // email gated by the preference). A group post notifies **each member** —
+    // the emitter (U04) calls <c>EmitAsync</c> once per member with the
+    // per-member §6.3 key <c>notification:group.post:{postId}:{member}</c>; the
+    // service stores one row per call. Here the service is exercised for the
+    // *member* recipient: one row + one staged email for that member.
+
+    [Fact]
+    public async Task Emit_GroupPost_Stores_InboxRow_And_Stages_Email_For_Member()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string author = "u-f2-author";
+        const string member = "u-f2-member";
+        await PlantProfile(store, member, "f2-member@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, member,
+            NotificationKinds.GroupPost,
+            "notification:group.post:post-f2:" + member, "Neuer Gruppenbeitrag");
+
+        Assert.Equal(member, row.RecipientId);
+        Assert.Equal(NotificationKinds.GroupPost, row.Kind);
+        Assert.Equal($"post-f2:{member}", row.SourceId);            // the per-member stable source id
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, member));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:group.post:post-f2:" + member, email.Key);
+        Assert.Equal("f2-member@kumunita", email.Recipient);
+        // The author is not this member — no row for the author in this call.
+        Assert.Equal(0, await CountNotifications(store, author));
+    }
+
+    // ── F3 — Emit_EventRsvp_Stores_InboxRow_And_Stages_Email_For_Author ─────
+    //
+    // C-M6·2 (the <c>event.rsvp</c> constant) + C-M6·7. A resident RSVP'd to an
+    // event the resident authored → one row for the event author, key
+    // <c>notification:event.rsvp:{rsvpId}</c>.
+
+    [Fact]
+    public async Task Emit_EventRsvp_Stores_InboxRow_And_Stages_Email_For_Author()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string author = "u-f3-author";
+        await PlantProfile(store, author, "f3-author@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, author,
+            NotificationKinds.EventRsvp, "notification:event.rsvp:rsvp-f3", "Hat sich angemeldet");
+
+        Assert.Equal(author, row.RecipientId);
+        Assert.Equal(NotificationKinds.EventRsvp, row.Kind);
+        Assert.Equal("rsvp-f3", row.SourceId);
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, author));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:event.rsvp:rsvp-f3", email.Key);
+        Assert.Equal("f3-author@kumunita", email.Recipient);
+    }
+
+    // ── F4 — Emit_EventReminder_Stores_InboxRow_Email_Is_M4s ────────────────
+    //
+    // C-M6·2 (the <c>event.reminder</c> constant) + C-M6·5 (the inbox row is
+    // M6's addition; the *email* is M4's — the M4 §6.4 reminder email key
+    // <c>remind:{eventId}:{userId}</c> is a **different** key, so the two
+    // coexist). M6 stores the inbox row keyed
+    // <c>notification:event.reminder:{eventId}:{date}</c>; a *re-emission* of
+    // the M4-style email key is an unrelated logical event (a distinct key →
+    // a distinct row, not a dedup collision).
+
+    [Fact]
+    public async Task Emit_EventReminder_Stores_InboxRow_Email_Is_M4s()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string recipient = "u-f4-recipient";
+        await PlantProfile(store, recipient, "f4@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        // The M6 inbox row (this test's subject) — the §6.3 shape with the
+        // recipient's formatted {date} (U04's recorded superset of {date}).
+        var m6Row = await Emit(svc, session, recipient,
+            NotificationKinds.EventReminder,
+            "notification:event.reminder:ev-f4:2026-09-24", "Event morgen");
+
+        Assert.Equal(NotificationKinds.EventReminder, m6Row.Kind);
+        Assert.Equal("ev-f4:2026-09-24", m6Row.SourceId);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        Assert.Single(staged, s => s.Key == "notification:event.reminder:ev-f4:2026-09-24");
+
+        // The M4 email is a *separate* logical event — its own key, its own
+        // row (the two keys coexist; no cross-key dedup).
+        var m4Row = await Emit(svc, session, recipient,
+            NotificationKinds.EventReminder,
+            "remind:ev-f4:" + recipient, "M4 reminder email");
+
+        // A distinct idempotency key → a distinct row (no cross-key dedup);
+        // the M4 email's SourceId is not derivable (non-<c>notification:</c>
+        // prefix — the emitter's responsibility, D4), which is fine: the two
+        // keys coexist as the pin requires.
+        Assert.Null(m4Row.SourceId);
+        Assert.Equal(2, await CountNotifications(store, recipient));
+        Assert.Contains(staged, s => s.Key == "remind:ev-f4:" + recipient);
+    }
+
+    // ── F5 — Emit_ReportFiled_Stores_InboxRow_And_Stages_Email_For_Author ───
+    //
+    // C-M6·2 (the <c>report.filed</c> constant) + C-M6·7. A report is filed
+    // against content the resident authored → one row for the author, key
+    // <c>notification:report.filed:{reportId}</c>.
+
+    [Fact]
+    public async Task Emit_ReportFiled_Stores_InboxRow_And_Stages_Email_For_Author()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string author = "u-f5-author";
+        await PlantProfile(store, author, "f5-author@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, author,
+            NotificationKinds.ReportFiled,
+            "notification:report.filed:report-f5", "Dein Beitrag wurde gemeldet");
+
+        Assert.Equal(author, row.RecipientId);
+        Assert.Equal(NotificationKinds.ReportFiled, row.Kind);
+        Assert.Equal("report-f5", row.SourceId);
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, author));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:report.filed:report-f5", email.Key);
+        Assert.Equal("f5-author@kumunita", email.Recipient);
+    }
+
+    // ── F6 — Emit_ReportAssigned_Stores_InboxRow_And_Stages_Email_For_Moderator
+    //
+    // C-M6·2 (the <c>report.assigned</c> constant) + C-M6·7. A report is
+    // assigned to a moderator → one row for that moderator, key
+    // <c>notification:report.assigned:{reportId}</c>.
+
+    [Fact]
+    public async Task Emit_ReportAssigned_Stores_InboxRow_And_Stages_Email_For_Moderator()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string moderator = "u-f6-moderator";
+        await PlantProfile(store, moderator, "f6-mod@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, moderator,
+            NotificationKinds.ReportAssigned,
+            "notification:report.assigned:report-f6", "Ihnen zugewiesen");
+
+        Assert.Equal(moderator, row.RecipientId);
+        Assert.Equal(NotificationKinds.ReportAssigned, row.Kind);
+        Assert.Equal("report-f6", row.SourceId);
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, moderator));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:report.assigned:report-f6", email.Key);
+        Assert.Equal("f6-mod@kumunita", email.Recipient);
+    }
+
+    // ── F7 — Emit_ReportResolved_Stores_InboxRow_And_Stages_Email_For_Resident
+    //
+    // C-M6·2 (the <c>report.resolved</c> constant) + C-M6·7. **Shipped shape
+    // (U04's drift, recorded for U10):** U04 wired **only the filer**
+    // emission — the frozen <c>Report</c> entity (M3b) has no
+    // assigned-moderator field, so the assignee emission is a follow-on lane.
+    // This test codes against the shipped form: **one** row for the filer,
+    // keyed <c>notification:report.resolved:{reportId}:filed</c>. The test
+    // name is kept verbatim from §6.4 (a rename is a breaking change).
+    //
+    // The §6.4 name reads "…For_Resident" — the shipped "resident" is the
+    // filer. The assignee row (the design doc's "two rows" reading) is NOT
+    // asserted here; see the handoff-note drift record.
+
+    [Fact]
+    public async Task Emit_ReportResolved_Stores_InboxRow_And_Stages_Email_For_Resident()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string filer = "u-f7-filer";
+        await PlantProfile(store, filer, "f7-filer@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, filer,
+            NotificationKinds.ReportResolved,
+            "notification:report.resolved:report-f7:filed", "Die Meldung zu deinem Beitrag wurde aufgelöst");
+
+        Assert.Equal(filer, row.RecipientId);
+        Assert.Equal(NotificationKinds.ReportResolved, row.Kind);
+        Assert.Equal("report-f7:filed", row.SourceId);
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, filer));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:report.resolved:report-f7:filed", email.Key);
+        Assert.Equal("f7-filer@kumunita", email.Recipient);
+    }
+
+    // ── F8 — Emit_TodoAssign_Stores_InboxRow_And_Stages_Email_For_Resident ──
+    //
+    // C-M6·2 (the <c>todo.assign</c> constant) + C-M6·7. A to-do is assigned to
+    // a resident (person-only — the group / community assign is a follow-on
+    // lane, not a test failure here) → one row for the assignee, key
+    // <c>notification:todo.assign:{todoId}</c>.
+
+    [Fact]
+    public async Task Emit_TodoAssign_Stores_InboxRow_And_Stages_Email_For_Resident()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string assignee = "u-f8-assignee";
+        await PlantProfile(store, assignee, "f8-assignee@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, assignee,
+            NotificationKinds.TodoAssign,
+            "notification:todo.assign:todo-f8", "Eine Aufgabe wurde dir zugewiesen");
+
+        Assert.Equal(assignee, row.RecipientId);
+        Assert.Equal(NotificationKinds.TodoAssign, row.Kind);
+        Assert.Equal("todo-f8", row.SourceId);
+        Assert.Null(row.ReadAt);
+        Assert.Equal(1, await CountNotifications(store, assignee));
+        var email = Assert.Single(staged);
+        Assert.Equal("notification:todo.assign:todo-f8", email.Key);
+        Assert.Equal("f8-assignee@kumunita", email.Recipient);
+    }
+
+    // ── F9 — Emit_DisabledKind_Stores_InboxRow_But_Not_Email ────────────────
+    //
+    // C-M6·7 (the D7 email gate): a resident who has **disabled** a kind in
+    // their <see cref="NotificationPreference"/> **still gets the inbox row**
+    // (the inbox is the durable record) but **not the email** (the preference
+    // governs the *email*, not the *inbox*). The service resolves the
+    // preference on the caller's session before staging; a non-null,
+    // non-empty <c>KindsEnabled</c> that omits the kind suppresses the email.
+
+    [Fact]
+    public async Task Emit_DisabledKind_Stores_InboxRow_But_Not_Email()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string recipient = "u-f9-recipient";
+        await PlantProfile(store, recipient, "f9@kumunita");
+
+        // The recipient has disabled <c>post.reply</c> (a non-empty enabled
+        // set that does NOT contain the kind) — the D7 gate's suppression case.
+        await svc.SetPreferencesAsync(
+            recipient,
+            new[] { NotificationKinds.TodoAssign },          // enabled: todo.assign only
+            TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, recipient,
+            NotificationKinds.PostReply,               // the disabled kind
+            "notification:post.reply:reply-f9", "Deaktiviert");
+
+        // The inbox row is stored **unconditionally** (D5 / F9).
+        Assert.Equal(NotificationKinds.PostReply, row.Kind);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        // ...but the email is NOT staged (the D7 gate suppresses it).
+        Assert.Empty(staged);
+    }
+
+    // ── F10 — Emit_DuplicateKey_SameLogicalEvent_Is_NoOp ────────────────────
+    //
+    // C-M6·4 (D4 / F10): a **re-emission of the same logical event** (the same
+    // <c>idempotencyKey</c>) is a **no-op** — no second inbox row, no second
+    // email. The service-side dedup is the <c>IdempotencyKey</c> look-up in
+    // <c>EmitAsync</c> (design doc §6.3's two-layer pin, layer 1): a second
+    // <c>EmitAsync</c> call with the same key returns the existing row without
+    // storing a second one and without calling <c>StageAsync</c> again.
+
+    [Fact]
+    public async Task Emit_DuplicateKey_SameLogicalEvent_Is_NoOp()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string recipient = "u-f10-recipient";
+        await PlantProfile(store, recipient, "f10@kumunita");
+
+        const string key = "notification:post.reply:reply-f10";
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var first = await Emit(svc, session, recipient,
+            NotificationKinds.PostReply, key, "Erste");
+
+        // The re-emission — same key, same logical event.
+        var second = await Emit(svc, session, recipient,
+            NotificationKinds.PostReply, key, "Zweite");
+
+        // ...returns the **same** row (the existing one), not a new one.
+        Assert.Equal(first.Id, second.Id);
+        // Exactly ONE inbox row — no second row.
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        // Exactly ONE staged email — no second <c>StageAsync</c> call.
+        Assert.Single(staged, s => s.Key == key);
+    }
+
+    // ── F11 — ListInbox_Does_Not_Emit_AuditRow ───────────────────────────────
+    //
+    // C-M6·3 (D3 / F11): the inbox read (<c>ListInboxAsync</c> +
+    // <c>CountUnreadAsync</c>) does **not** emit an audit row — a *personal
+    // read*, not an <c>AccessAction</c> decision (the recipient reads their
+    // own rows; the <c>RecipientId</c> is the whole access story). Asserted
+    // against the live store: zero <see cref="AccessAudit"/> rows after the
+    // read + the unread count (the <see cref="EventReminderServiceTests"/>
+    // no-audit-row precedent).
+
+    [Fact]
+    public async Task ListInbox_Does_Not_Emit_AuditRow()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+
+        const string recipient = "u-f11-recipient";
+        await PlantProfile(store, recipient, "f11@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        await Emit(svc, session, recipient,
+            NotificationKinds.PostReply,
+            "notification:post.reply:reply-f11", "Ein Eintrag");
+
+        // The personal read — no <c>IAuthorizationService</c> call, no audit row.
+        var inbox = await svc.ListInboxAsync(recipient, TestContext.Current.CancellationToken);
+        var unread = await svc.CountUnreadAsync(recipient, TestContext.Current.CancellationToken);
+
+        Assert.Single(inbox);
+        Assert.Equal(1, unread);
+        // The no-audit-row pin: zero AccessAudit rows after the read.
+        Assert.Empty(await AuditRows(store));
+    }
+
+    // ── F12 — Emit_Email_In_Recipients_Language_UgcSnippet_In_Senders_Language
+    //
+    // C-M6·6 (D6 / F12): the **subject + body templates** are resolved in the
+    // **recipient's** <c>Profile.EmailLanguage</c> (the ADR 0061 seam — the
+    // <see cref="ITranslationProvider"/> receives the recipient's language
+    // code, not the sender's); the **UGC snippet** (the
+    // <c>body</c> parameter — the sender's authored content, ADR 0018) is
+    // appended verbatim in the **sender's** authored language. The
+    // <c>Notification.Subject</c> / <c>Body</c> stored on the row (and the
+    // staged email's subject + body) reflect exactly that split.
+
+    [Fact]
+    public async Task Emit_Email_In_Recipients_Language_UgcSnippet_In_Senders_Language()
+    {
+        var (store, svc, translator, staged) = await BootAsync();
+
+        const string recipient = "u-f12-recipient";
+        // The recipient's outbound-channel language is **German** (ADR 0061 —
+        // the recipient's choice is the authority; the sender's UI language is
+        // irrelevant).
+        await PlantProfile(store, recipient, "f12@kumunita", emailLanguage: "de");
+
+        const string snippet = "English-authored UGC snippet";   // the sender's authored language (ADR 0018)
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await Emit(svc, session, recipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-f12", snippet);
+
+        // The subject + body templates were resolved in the **recipient's**
+        // language — the <c>ITranslationProvider</c> was called with "de".
+        await translator.Received(2).GetAsync(
+            Arg.Any<string>(), "de");                             // subject + body, both in de
+
+        // The staged email's subject is the recipient-language template (no
+        // UGC snippet — the subject is template-only).
+        var email = Assert.Single(staged);
+        Assert.Equal("SUBJ-de", email.Subject);
+        // The staged email's body = the recipient-language template + " " + the
+        // **sender-authored** UGC snippet (verbatim, not re-translated).
+        Assert.Equal("BODY-de " + snippet, email.Body);
+        // The stored row carries the same display values (the inbox shows them).
+        Assert.Equal("SUBJ-de", row.Subject);
+        Assert.Equal("BODY-de " + snippet, row.Body);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Boots the scratch store with the M1 + M3 + M6 surfaces (the
+    /// <see cref="EventReminderServiceTests"/> / <see cref="ProjectServiceTests"/>
+    /// shape) so the <see cref="Notification"/> /
+    /// <see cref="NotificationPreference"/> / <see cref="Profile"/> /
+    /// <see cref="AccessAudit"/> tables exist, and builds the
+    /// <see cref="NotificationService"/> over the frozen seams: a **real**
+    /// <c>IUserInfoService</c> stand-in (the <see cref="IUserInfoService
+    /// .GetProfileAsync"/> read lane for the recipient's
+    /// <c>Profile.EmailLanguage</c> + <c>Email</c>), a
+    /// <see cref="ITranslationProvider"/> stand-in (resolving the
+    /// <c>notification.{kind}.subject</c> / <c>.body</c> keys in the
+    /// recipient's language), and the <see cref="RecordingMailer"/>.
+    /// </summary>
+    private async Task<(IDocumentStore store, NotificationService svc,
+        ITranslationProvider translator, List<(string Key, string Recipient, string Subject, string Body)> staged)>
+        BootAsync()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            M1DocTypes.Configure(opts);
+            M3DocTypes.Configure(opts);
+            M6DocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+
+        var translator = RecordingTranslator();
+        var (mailer, staged) = RecordingMailer();
+        var userInfo = Substitute.For<IUserInfoService>();
+        // GetProfileAsync reads the **planted** Profile (the recipient's
+        // EmailLanguage + Email) from the live store — the ADR 0061 seam.
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci => PlantProfileReadAsync(store, (string)ci[0]));
+
+        var svc = new NotificationService(store, userInfo, translator, mailer);
+        return (store, svc, translator, staged);
+    }
+
+    /// <summary>A <b>frozen</b> <see cref="IMailerStage"/> stand-in that records
+    /// the staged (key, recipient, subject, body) tuples — the
+    /// <see cref="EventReminderServiceTests"/> recording-mailer precedent,
+    /// extended to capture subject + body for the F12 language pin.</summary>
+    private static (IMailerStage mailer, List<(string Key, string Recipient, string Subject, string Body)> staged)
+        RecordingMailer()
+    {
+        var staged = new List<(string Key, string Recipient, string Subject, string Body)>();
+        var mailer = Substitute.For<IMailerStage>();
+        mailer.StageAsync(
+                Arg.Any<IDocumentSession>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                staged.Add(((string)callInfo[1], (string)callInfo[2], (string)callInfo[3], (string)callInfo[4]));
+                return Task.CompletedTask;
+            });
+        return (mailer, staged);
+    }
+
+    /// <summary>A <see cref="ITranslationProvider"/> stand-in that resolves the
+    /// <c>notification.{kind}.subject</c> / <c>.body</c> keys to a fixed
+    /// per-language marker (so F12 can assert the recipient's language was
+    /// used) and returns the key as a floor for anything else.</summary>
+    private static ITranslationProvider RecordingTranslator()
+    {
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(
+                Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci =>
+            {
+                var key = (string)ci[0];
+                var lang = (string?)ci[1] ?? "en";
+                // The post.reply templates resolve to fixed markers (so F12
+                // can pin the recipient's language); anything else returns a
+                // key-derived marker — the floor, not the subject of a pin.
+                if (key == "notification.post.reply.subject") return Task.FromResult($"SUBJ-{lang}");
+                if (key == "notification.post.reply.body") return Task.FromResult($"BODY-{lang}");
+                return Task.FromResult($"{key}-{lang}");
+            });
+        return translator;
+    }
+
+    /// <summary>The <see cref="IUserInfoService.GetProfileAsync"/> read lane
+    /// (the ADR 0061 seam) — reads the planted <see cref="Profile"/> from the
+    /// live store; <c>null</c> when no profile exists for the subject.</summary>
+    private static async Task<Profile?> PlantProfileReadAsync(IDocumentStore store, string subjectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.LoadAsync<Profile>(subjectId, ct);
+    }
+
+    private static async Task PlantProfile(IDocumentStore store, string subjectId, string email,
+        string? emailLanguage = null)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var w = store.OpenSession(new Marten.Services.SessionOptions());
+        w.Store(new Profile
+        {
+            SubjectId = subjectId,
+            DisplayName = subjectId,
+            Verified = true,
+            Email = email,
+            EmailLanguage = emailLanguage,
+        });
+        await w.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Emits a notification **and commits** the session — the
+    /// caller's responsibility per the design-doc contract ("the caller
+    /// commits the session — the service does not").</summary>
+    private static async Task<Notification> Emit(
+        NotificationService svc, IDocumentSession session,
+        string recipientId, string kind, string key, string? body)
+    {
+        var row = await svc.EmitAsync(session, recipientId, kind, key, body,
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+        return row;
+    }
+
+    private static async Task<int> CountNotifications(IDocumentStore store, string recipientId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<Notification>()
+            .Where(n => n.RecipientId == recipientId)
+            .CountAsync(ct);
+    }
+
+    private static async Task<IReadOnlyList<AccessAudit>> AuditRows(IDocumentStore store)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>().ToListAsync(ct);
+    }
+}
