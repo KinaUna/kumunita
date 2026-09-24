@@ -100,7 +100,8 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 ✓ (ADR 0054) — Event + EventRsvp docs + EventService (feed/detail/compose + last-write-wins RSVP) + EventToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService) + the EventReminders §6.4 job (EventReminderService/Handler/Tick over the M1 durable-email trio) + the author ∪ GlobalAdmin standing matrix enforced **server-side** in the EventService (the edit/delete write lanes carry the principal's actorRoles, the AnnouncementService/PageService precedent — the GlobalAdmin override is exercised in the service, not deferred to the Web boundary; the audit row tags the branch: Owner/Admin); gate 2026-09-21: Core 668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests green together; re-verified after U13's GlobalAdmin-override seam fix: Core 670/670 + Web 351/351, the 25 M4 seam tests (T01–T25) green together; see design/m4-events-design.md § Run result (M4 acceptance gate — 2026-09-21)
-    │   │   └── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md
+    │   │   ├── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md
+    │   │   └── Notifications/      # M6 ✓ (ADR 0076) — Notification + NotificationPreference docs (the M6DocTypes surface) + NotificationService (the EmitAsync writer + the inbox / preference lanes, reusing the M1 durable-email trio, no IAuthorizationService — a personal read, not an AccessAction decision); see design/m6-notifications-design.md
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
     │       ├── Milestones.cs       # home-page roadmap (kept in sync with README's "Roadmap" — AGENTS.md)
@@ -125,8 +126,12 @@ Two projects. `Core` holds all business logic behind interfaces and never refere
 ASP.NET HTTP types — keeping it testable and leaving the door open for a future API/MCP
 layer. `Web` is a thin HTTP/Razor/TS shell. `Projects/` (M5) is now live —
 ADR 0067 ships the `TodoItem` / `KanbanBoard` / `KanbanLane` /
-`BoardItemPlacement` docs + the `ProjectService` surface; the next milestone
-addition is `M6` (Notifications). (`Events/`, M4, is live — ADR 0054.)
+`BoardItemPlacement` docs + the `ProjectService` surface. `Notifications/` (M6)
+is now live — ADR 0076 ships the `Notification` + `NotificationPreference` docs
+(the `M6DocTypes` surface) + the `NotificationService` (the `EmitAsync` writer +
+the inbox / preference lanes, reusing the M1 durable-email trio, no
+`IAuthorizationService` — a personal read, not an `AccessAction` decision).
+(`Events/`, M4, is live — ADR 0054.)
 
 ## 3. Modular monolith & bounded contexts
 
@@ -139,7 +144,7 @@ the seam for later extraction.
 - **LocalizationModule** — language catalog, default language, and translated UI
   strings (ADR 0005); consumed by the presentation layer, never by feature
   authorization. (Static pages live in the `Pages` context now, ADR 0039.)
-- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067).
+- **Feature modules** — Directory, Posts, Pages, Moderation, Media, Tags, Events (M4 ✓ — ADR 0054), Projects (M5 ✓ — ADR 0067), Notifications (M6 ✓ — ADR 0076).
   Directory and Posts are both *consumers* of the single bulk visibility
   capability (`CanSeeAsync`, §4.2) — list authorization is one platform
   primitive, not per-feature logic. Media (ADR 0011) is a byte-store module:

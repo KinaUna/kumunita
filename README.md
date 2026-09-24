@@ -47,7 +47,7 @@ four surfaces.
 account (ADR 0028); **PG is done** — the hierarchical, audience-restricted,
 translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
 (ADR 0054); **EV-DWM is done** — events calendar day/week/month views
-(ADR 0064); **M5 is done** — projects (ADR 0067); **next is M6** — notifications, then M7–M13 (pagination & filtering, search, PWA, portability, iCal, logging & analytics, Events+Projects integration — see the "Roadmap" below).
+(ADR 0064); **M5 is done** — projects (ADR 0067); **M6 is done** — notifications (ADR 0076); **next is M7** — pagination & filtering, then M8–M13 (search, PWA, portability, iCal, logging & analytics, Events+Projects integration — see the "Roadmap" below).
 
 ## Principles
 
@@ -231,8 +231,8 @@ stays trivial and the authorization rules can grow freely.
 - **Events calendar** (`EV-CAL`, ADR 0063) — a month-anchored, display-only overview of the caller's visible events over a rolling 30-day window: overlap pairs highlighted client-side, prev/next/today navigation to go back in time; one additive read seam (`IEventService.ListInRangeAsync`) + one view + one `client/lib` TS module (tsc-only, no dependency); zero document / schema / seeding changes; M5 stays Projects; M6 stays Portability. **Done.**
 - **Events calendar day/week/month views** (`EV-DWM`, ADR 0064) — the same `GET /events/calendar` surface turned into the **three named views** residents expect (Day / Week / Month): one additive `?view=` selector on the existing route + a view-appropriate anchor window computed in the controller (1 day / the anchor's Monday-start week / the anchor's calendar month); Day + Week as time-ruler grids (a new `client/lib/events-calendar-time.ts`, tsc-only, zero dependencies) and Month reframed to a true calendar month (the existing `events-calendar.ts` reused untouched); **zero Core change** — the `ListInRangeAsync` seam is reused unchanged, already window-agnostic; M5 stays Projects; M6 stays Portability. **Done.**
 - **M5** — Projects (goals, tasks, contributors). **Done.**
-- **M6** — Notifications. **In progress.**
-- **M7** — Pagination and filtering.
+- **M6** — Notifications. **Done.** (ADR 0076 — a `Notification` + `NotificationPreference` doc in a new `Kumunita.Core.Notifications` context; the personal inbox (a flat, 50-row-capped list, "mark all read") + per-kind email preferences (lean-default) + the layout bell (a 30-second poller) + the per-recipient `Profile.EmailLanguage` outbound email through the M1 durable-email trio — inbox is the durable record, email is the best-effort nudge; **no** `IAuthorizationService` (a personal read, not an `AccessAction` decision). *Deliberately not in M6 (follow-on lanes, own ADRs):* push / PWA push (M9), daily / weekly digests, per-kind inbox sub-filters, group / community `todo.assign`, notification to the assigned guardian (GU / GA — still deferred), read receipts / delivery confirmation, cross-neighborhood federation.)
+- **M7** — Pagination and filtering. **In progress.**
 - **M8** — Search.
 - **M9** — PWA and responsive design.
 - **M10** — Portability (import/export).
