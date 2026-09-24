@@ -286,10 +286,10 @@
                                                so "None" is the selected default. *@
                                             <select class="form-select" name="Status" id="@($"subtask-status-{row.Id}")">
                                                 <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
-                                                @foreach (var code in KanbanStatuses.Known)
+                                                @foreach (var statusCode in KanbanStatuses.Known)
                                                 {
-                                                    <option value="@code">
-                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                    <option value="@statusCode">
+                                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
                                                     </option>
                                                 }
                                             </select>
