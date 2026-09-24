@@ -200,6 +200,22 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
             sp.GetRequiredService<IUserInfoService>()));
+
+        // M6 (ADR 0076, plan U03): the Notifications bounded context's service
+        // (bounded context Kumunita.Core.Notifications — the "shared awareness"
+        // arrow: the Notification + NotificationPreference documents, the
+        // EmitAsync writer + the inbox / unread / preference lanes). A
+        // concrete service — no INotificationService interface (the design
+        // doc §6.2 pin), composing **only** the frozen seams (D11 — no ADD on
+        // any of them; no IAuthorizationService — a personal read, not an
+        // AccessAction decision, D3). The host-registered
+        // Marten.IDocumentStore is injected the same way as the M4 / M5
+        // services above.
+        services.AddTransient<Notifications.NotificationService>(sp => new Notifications.NotificationService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IUserInfoService>(),
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<IMailerStage>()));
         return services;
     }
 }
