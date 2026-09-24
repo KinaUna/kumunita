@@ -1,7 +1,20 @@
 @model Kumunita.Web.Models.TodoDetailViewModel
 @using Kumunita.Web.Security
+@using Kumunita.Core.Projects
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Todo.Title) ? "To-do" : Model.Todo.Title;
+    // ADR 0069 — the fixed status vocabulary's label keys (the same closed
+    // set the Kanban lane's Set-status select offers: None + the four codes).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
 }
 
 <div class="row justify-content-center">
@@ -27,40 +40,121 @@
             {
                 <span class="badge text-bg-light border">@Model.Todo.ComponentDisplayName</span>
             }
+            @if (Model.Todo.GroupNames is { Count: > 0 })
+            {
+                <span class="badge text-bg-light border">
+                    <kw-l key="projects.todo.addressed_to">Addressed to</kw-l>: @string.Join(", ", Model.Todo.GroupNames)
+                </span>
+            }
             <div class="dropdown ms-auto">
                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
                         data-bs-toggle="dropdown" aria-expanded="false"
                         aria-label="Actions for @Model.Todo.Title">⋮</button>
                 <ul class="dropdown-menu dropdown-menu-end">
+                    @if (Model.Todo.CanClaim)
+                    {
+                        <li>
+                            <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/claim")" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.claim">Claim</kw-l></button>
+                            </form>
+                        </li>
+                    }
                     <li>
-                        <a class="dropdown-item text-dark" href="@($"/projects/todos/@Model.Todo.Id/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
+                        <a class="dropdown-item text-dark" href="@($"/projects/todos/{Model.Todo.Id}/edit")"><kw-l key="projects.todo.edit">Edit</kw-l></a>
                     </li>
                     <li>
-                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/assign")"
+                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/assign")"
                               data-confirm="@("Remove the assignee from this to-do?")" style="margin:0;">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.unassign">Unassign</kw-l></button>
                         </form>
                     </li>
                     <li>
-                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/subtasks")" style="margin:0;">
-                            @Html.AntiForgeryToken()
-                            <div class="px-3 py-2">
-                                <input class="form-control form-control-sm mb-2" type="text" name="Title"
-                                       maxlength="120" required
-                                       placeholder="@("Subtask title")" />
-                            </div>
-                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.todo.add_subtask">Add subtask</kw-l></button>
-                        </form>
+                        <button type="button" class="dropdown-item text-dark"
+                                data-bs-toggle="modal"
+                                data-bs-target="#subtask-modal">
+                            <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                        </button>
                     </li>
                     <li>
-                        <form method="post" action="@($"/projects/todos/@Model.Todo.Id/delete")"
+                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/delete")"
                               data-confirm="@("Delete this to-do and its subtasks? This cannot be undone.")" style="margin:0;">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.todo.delete">Delete</kw-l></button>
                         </form>
                     </li>
                 </ul>
+            </div>
+
+            @* ADR 0071 — the Add-subtask modal (same convention as the Kanban
+               board card; the inline Title input is replaced). *@
+            <div class="modal fade" id="subtask-modal" tabindex="-1"
+                 aria-labelledby="subtask-modal-label" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="post" action="@($"/projects/todos/{Model.Todo.Id}/subtasks")" id="subtask-modal-form">
+                            @Html.AntiForgeryToken()
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="subtask-modal-label">
+                                    <kw-l key="projects.todo.add_subtask">Add subtask</kw-l>
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="@("Close")"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label" for="subtask-modal-title">
+                                        <kw-l key="common.title">Title</kw-l>
+                                    </label>
+                                    <input class="form-control" type="text" name="Title"
+                                           id="subtask-modal-title" maxlength="120" required />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label" for="subtask-modal-status">
+                                        <kw-l key="projects.todo.status">Status</kw-l>
+                                    </label>
+                                    @* ADR 0069 — the fixed status vocabulary
+                                       (the same <c>KanbanStatuses.Known</c> set
+                                       the Kanban lane's Set-status select offers:
+                                       None + the four codes). A new subtask
+                                       starts with no status, so "None" is the
+                                       selected default. *@
+                                    <select class="form-select" name="Status" id="subtask-modal-status">
+                                        <option value="" selected><kw-l key="projects.board.status.none">None</kw-l></option>
+                                        @foreach (var code in KanbanStatuses.Known)
+                                        {
+                                            <option value="@code">
+                                                <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="subtask-modal-assignee">
+                                        <kw-l key="projects.todo.assignee">Assignee</kw-l>
+                                    </label>
+                                    @{ var _opts = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>(); }
+                                    <select class="form-control" name="AssigneeId" id="subtask-modal-assignee">
+                                        <option value=""><kw-l key="projects.todo.unassigned">Unassigned</kw-l></option>
+                                        @foreach (var o in _opts)
+                                        {
+                                            <option value="@o.Id">@o.Label</option>
+                                        }
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <kw-l key="common.cancel">Cancel</kw-l>
+                                </button>
+                                <button type="submit" class="btn btn-primary" form="subtask-modal-form">
+                                    <kw-l key="common.add">Add</kw-l>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -83,6 +177,10 @@
                     {
                         <span> · <kw-l key="projects.todo.assignee">Assignee</kw-l>: @Model.Todo.AssigneeDisplayName</span>
                     }
+                    else
+                    {
+                        <span> · <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
+                    }
                     <span> · <kw-l key="projects.todo.created">Created</kw-l>
                     <kw-dt dt="@Model.Todo.Created" format="g"></kw-dt></span>
                     @if (Model.Todo.Modified is not null)
@@ -98,7 +196,7 @@
                 {
                     <div class="mb-3">
                         <span class="text-muted small"><kw-l key="projects.todo.parent">Parent</kw-l> · </span>
-                        <a href="@($"/projects/todos/@Model.Todo.ParentId")">@Model.Todo.ParentTitle</a>
+                        <a href="@($"/projects/todos/{Model.Todo.ParentId}")">@Model.Todo.ParentTitle</a>
                     </div>
                 }
 
@@ -141,7 +239,7 @@
                         <div class="airy-ann-row">
                             <div>
                                 <h3 class="airy-ann-title">
-                                    <a href="@($"/projects/todos/@sub.Id")">@sub.Title</a>
+                                    <a href="@($"/projects/todos/{sub.Id}")">@sub.Title</a>
                                 </h3>
                                 <div class="text-muted small mb-1">
                                     @sub.AuthorDisplayName
@@ -172,7 +270,7 @@
                     @foreach (var placement in Model.Placements)
                     {
                         <div class="list-group-item">
-                            <a href="@($"/projects/boards/@placement.BoardId")">
+                            <a href="@($"/projects/boards/{placement.BoardId}")">
                                 @placement.BoardTitle
                                 @if (string.IsNullOrWhiteSpace(placement.BoardTitle))
                                 {

@@ -62,8 +62,18 @@ public sealed class ProjectService : IProjectService
     /// -filtered (C6, one shared matching pass; C3, the single aggregate
     /// <see cref="AccessAudit"/> row with <c>TargetKind = "todo"</c> via the
     /// <see cref="TodoItemToAuditableResource"/>, U03).
+    /// <para>
+    /// <paramref name="unassignedOnly"/> (ADR 0073) is the **unassigned pool
+    /// filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/> / <paramref name="assigneeId"/>). When
+    /// <c>true</c>, only to-dos with <see cref="TodoItem.AssigneeId"/> null
+    /// are in the candidate set (the pool a group / community member can pick
+    /// up and <see cref="ClaimTodoAsync"/>); it narrows candidates before
+    /// pagination, it does **not** change the audience decision (a to-do still
+    /// only appears if the actor passes the <c>CanSeeAsync(Read)</c> pass).
+    /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -74,6 +84,8 @@ public sealed class ProjectService : IProjectService
             q = q.Where(t => t.ComponentId == componentId);
         if (assigneeId is not null)
             q = q.Where(t => t.AssigneeId == assigneeId);
+        if (unassignedOnly)
+            q = q.Where(t => t.AssigneeId == null);
         var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -629,6 +641,109 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// **Claim** a to-do (ADR 0073 — the self-assign lane): sets
+    /// <see cref="TodoItem.AssigneeId"/> to <paramref name="actorId"/> (the
+    /// claimer takes the unassigned to-do onto themselves) + stamps
+    /// <see cref="TodoItem.Modified"/>. Standing (server-side, C3): the to-do
+    /// must be **unassigned** (<see cref="TodoItem.AssigneeId"/> null) **and**
+    /// the actor must be a **member of a group in the to-do's
+    /// <see cref="TodoItem.Audience"/> grants** (the ADR 0013 group lane)
+    /// **or** a **member of the to-do's <see cref="TodoItem.ComponentId"/>
+    /// community** (the ADR 0036 community lane) — probed through the frozen
+    /// <see cref="IUserInfoService"/> <see cref="IUserInfoService.
+    /// GetGroupIdsAsync"/> / <see cref="IUserInfoService.
+    /// GetCommunityIdsAsync"/> seams (strong-consistency, invariant C4). A
+    /// missing / soft-deleted id is <see cref="KeyNotFoundException"/> (404);
+    /// a to-do that is **already assigned** (a claim is a pick-up, not a
+    /// take-over — the existing assignee reclaims via the assign lane), or the
+    /// actor lacks the group / community standing, is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>todo.claim</c>, <c>TargetKind =
+    /// "todo"</c>, <c>Via</c> = <see cref="AccessVia.Group"/> for the group
+    /// branch / <see cref="AccessVia.Community"/> for the community branch)
+    /// commits atomically with the write (C3). **No new
+    /// <see cref="AccessVia"/> value, no new <c>AccessAction</c>, no new
+    /// branch in <c>Decide()</c>** (C-M5·11) — the lane reuses the existing
+    /// frozen <c>AccessVia</c> values.
+    /// </summary>
+    public async Task<TodoItem> ClaimTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to claim a to-do.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to claim.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to claim.");
+
+        // Standing (server-side, C3 single-source): unassigned + a group or
+        // community membership standing (ADR 0073). The helper returns the
+        // AccessVia the actor qualified under (for the audit tag) or throws 403.
+        var via = await ClaimStandingAsync(todo, actorId, ct).ConfigureAwait(false);
+
+        todo.AssigneeId = actorId;                        // the claimer becomes the assignee.
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        StoreAuditRow(session, actorId, "todo.claim", todo.Id, TargetKindTodo, via);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return todo;
+    }
+
+    /// <summary>
+    /// The **claim** standing (ADR 0073 — the C3 server-side re-check): a
+    /// to-do may be claimed iff it is **unassigned** (<see
+    /// cref="TodoItem.AssigneeId"/> null) **and** the actor holds a
+    /// membership standing over it — a member of a **group** in the to-do's
+    /// <see cref="TodoItem.Audience"/> <see cref="Audience.GrantKind.Group"/>
+    /// grants (the ADR 0013 lane) **or** a member of the to-do's
+    /// <see cref="TodoItem.ComponentId"/> community (the ADR 0036 lane).
+    /// Membership is probed through the frozen <see cref="IUserInfoService"/>
+    /// (strong-consistency, invariant C4). Returns the <see cref="AccessVia"/>
+    /// the actor qualified under (the audit tag — the group branch tags
+    /// <see cref="AccessVia.Group"/>; a group-less, community-only standing
+    /// tags <see cref="AccessVia.Community"/>); a to-do that is already
+    /// assigned, or an actor with no such standing, is <see
+    /// cref="UnauthorizedAccessException"/> (the Web layer's 403).
+    /// </summary>
+    private async Task<AccessVia> ClaimStandingAsync(TodoItem todo, string actorId, CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(todo.AssigneeId))
+            throw new UnauthorizedAccessException(
+                "This to-do already has an assignee — only an unassigned to-do can be claimed.");
+
+        var audience = todo.Audience;
+        var groupGrantIds = audience is not null
+            ? audience.Grants
+                .Where(g => g.Kind == GrantKind.Group && !string.IsNullOrEmpty(g.Id))
+                .Select(g => g.Id)
+                .ToHashSet(StringComparer.Ordinal)
+            : new HashSet<string>(StringComparer.Ordinal);
+
+        var myGroupIds = await _userInfo.GetGroupIdsAsync(actorId).ConfigureAwait(false);
+        var groupStanding = groupGrantIds.Any(myGroupIds.Contains);
+
+        bool communityStanding = false;
+        if (!string.IsNullOrEmpty(todo.ComponentId))
+        {
+            var myCommunityIds = await _userInfo.GetCommunityIdsAsync(actorId).ConfigureAwait(false);
+            communityStanding = myCommunityIds.Contains(todo.ComponentId);
+        }
+
+        if (groupStanding)
+            return AccessVia.Group;                        // the group lane (ADR 0013).
+        if (communityStanding)
+            return AccessVia.Community;                    // the community lane (ADR 0036).
+
+        throw new UnauthorizedAccessException(
+            "Only a member of the to-do's group or community may claim it.");
+    }
+
+    /// <summary>
     /// **Add a subtask** (design doc §2.5): inserts a new <see cref="TodoItem"/>
     /// with <c>ParentId = parentTodoItemId</c> (the sole hierarchy mechanism —
     /// C-M5·7); the subtask is a full to-do (its own status / assignee /
@@ -817,6 +932,65 @@ public sealed class ProjectService : IProjectService
         }
 
         StoreAuditRow(session, actorId, "board.create", board.Id, TargetKindBoard, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return board;
+    }
+
+    /// <summary>
+    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
+    /// the board edit lane). A **full update** of those two fields (the edit
+    /// page posts both; a blank <c>Description</c> clears it to <c>null</c>).
+    /// The board's standing, audience, component, and language are
+    /// creation-time choices — **not** editable here (ADR 0070). <see
+    /// cref="KanbanBoard.Modified"/> is stamped **only on a real change**
+    /// (the <see cref="UpdateLaneAsync"/> no-op shape — a no-op re-save
+    /// leaves the stamp untouched). Standing (server-side, C3): **creator ∪
+    /// GlobalAdmin** over the board (the <see cref="CheckBoardStanding"/>
+    /// shape — C-M5·6). A missing board is <see cref="KeyNotFoundException"/>
+    /// (404); a denied actor is <see cref="UnauthorizedAccessException"/>
+    /// (403); a blank <c>Title</c> is <see cref="ArgumentException"/> (the
+    /// write shape's 400). One <see cref="AccessAudit"/> row
+    /// (<c>board.update</c>, <c>TargetKind = "board"</c>, the board's id as
+    /// the target — creator <c>Via Owner</c>, otherwise <c>Via Admin</c>, the
+    /// <see cref="BoardAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<KanbanBoard> UpdateBoardAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, UpdateBoardRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId)) throw new KeyNotFoundException("A board id is required.");
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to update a board.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A board title is required.", nameof(request));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to update.");
+
+        // Standing re-check (server-side, C3 single-source) over the **board**
+        // (C-M5·6): creator ∪ GlobalAdmin.
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // A "real change" is either field differing from the stored row (the
+        // UpdateLaneAsync `changed` shape — a no-op re-save leaves the stamp
+        // untouched). A blank Description clears it to null (full-update
+        // semantics — the edit page always posts both fields).
+        var normalizedDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        var changed = board.Title != request.Title
+            || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal);
+
+        board.Title = request.Title;
+        board.Description = normalizedDescription;
+        if (changed)
+            board.Modified = DateTimeOffset.UtcNow;
+
+        // Track the loaded document for save explicitly (the UpdateLaneAsync /
+        // CreateBoardAsync `session.Store(...)` shape) — the sibling write
+        // lanes never rely on dirty-tracking of a loaded row.
+        session.Store(board);
+        StoreAuditRow(session, actorId, "board.update", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return board;
     }

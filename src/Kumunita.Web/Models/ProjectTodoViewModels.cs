@@ -8,6 +8,19 @@ namespace Kumunita.Web.Models;
 /// /projects/todos</c> feed + the subtask rows on the detail page — the
 /// M4 <c>EventRow</c> shape, design doc §2.3 / lane plan U07).
 /// <para>
+/// **<see cref="GroupNames"/>** (ADR 0073) is the to-do's **addressed-to**
+/// group metadata — the group grants in its <see cref="TodoItem.Audience"/>
+/// (resolved to display names). **<see cref="CanClaim"/>** (ADR 0073) is the
+/// row-level **claim affordance** — whether this actor may claim this to-do
+/// now (it is unassigned **and** the actor is a member of an addressed group
+/// or community), computed server-side over the *same* standing the service
+/// enforces (a convenience mirror for rendering the button, never a gate —
+/// the authoritative decision is the service's <c>ClaimTodoAsync</c> lane).
+/// The **community** addressed-to hint is already carried by
+/// <see cref="ComponentDisplayName"/> (the to-do's
+/// <see cref="TodoItem.ComponentId"/> — the community it is scoped to).
+/// </para>
+/// <para>
 /// The audience gate is the service's (the feed's single
 /// <c>CanSeeAsync(Read)</c>, the detail's single <c>CanAsync(Read)</c> —
 /// C3, C6); every display name here is a **read** lookup via
@@ -41,7 +54,15 @@ public sealed record TodoRow(
     string? ComponentDisplayName,
     string LanguageCode,
     DateTimeOffset Created,
-    DateTimeOffset? Modified);
+    DateTimeOffset? Modified,
+    IReadOnlyList<string> GroupNames,
+    bool CanClaim,
+    // The to-do's board-placement board ids (a read lookup — the feed's
+    // copy-to / move-to pickers exclude the boards a to-do already sits on;
+    // a board never offers itself as its own target). Empty when the row
+    // was not read with its placements (the detail lane resolves them
+    // itself, in Placements).
+    IReadOnlyList<string> PlacementBoardIds);
 
 /// <summary>
 /// The <b>to-do feed</b> view model (the <c>GET /projects/todos</c> read
@@ -55,6 +76,9 @@ public sealed record TodoRow(
 /// unfiltered). **<see cref="AssigneeId"/>** is the optional assignee
 /// filter (a filter, never a gate — C-M5·6); <see
 /// cref="CurrentAssigneeId"/> is the selected value (null ⇒ unfiltered).
+/// **<see cref="UnassignedOnly"/>** (ADR 0073) is the **unassigned pool**
+/// filter (a filter, never a gate) — when set, the feed shows only the
+/// unassigned to-dos a group / community member can pick up and claim.
 /// <see cref="CurrentPage"/> is the current page number (1-based).
 /// </para>
 /// </summary>
@@ -63,6 +87,7 @@ public sealed record TodoIndexViewModel(
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
     string? CurrentAssigneeId,
+    bool UnassignedOnly,
     int CurrentPage);
 
 /// <summary>

@@ -7,6 +7,9 @@
     string[] modes = { "Any", "All" };
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
+    // ADR 0072 — the initial-lane suggested-title placeholder (was the
+    // hardcoded "Planned"), resolved the same way as optionalPlaceholder.
+    var firstLanePlaceholder = await Translation.GetAsync("projects.board.lane.first_title_placeholder", _kwL);
 }
 
 <div class="row justify-content-center">
@@ -142,7 +145,7 @@
                     {
                         <div class="form-label" style="font-weight:600;"><kw-l key="projects.board.lane.title">Lane title</kw-l></div>
                         <input class="form-control" type="text" name="Lanes[0].Title" maxlength="120" required
-                               placeholder="@("Planned")" />
+                               placeholder="@firstLanePlaceholder" />
                         <div class="text-muted small mt-2">
                             <kw-l key="projects.board.single_lane_hint">The board starts with one lane — add more lanes and statuses on the board page after creating it.</kw-l>
                         </div>

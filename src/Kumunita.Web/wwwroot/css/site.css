@@ -1421,21 +1421,27 @@ body.kmb-page-fullbleed .navbar {
 /* The lanes container — a flexbox row, equal-width columns that keep
    their min-width and scroll horizontally on a narrow viewport
    (the .events-calendar-grid / responsive .events-time-grid--week
-   shape, reused). */
+   shape, reused). Minimum 60vh tall so a lane is never squeezed into a
+   stubby strip — the lanes stretch to fill it and the cards stack
+   inside (scrolling within the lane rather than the page). */
 .kanban-board {
   display: flex;
   gap: 0.75rem;
-  align-items: flex-start;
+  align-items: stretch;
+  min-height: 60vh;
   overflow-x: auto;
   padding-bottom: 0.25rem;
 }
 
 /* A single lane column (the .events-calendar-day shape, reused): a
-   tinted, bordered, rounded strip — head, toolbar, then the cards. */
+   tinted, bordered, rounded strip — head, then the cards (growing to
+   fill the lane and scrolling internally when they overflow), then the
+   add-to-do form. */
 .kanban-lane {
   flex: 1 1 0;
   min-width: 14rem;
   max-width: 20rem;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -1446,22 +1452,93 @@ body.kmb-page-fullbleed .navbar {
 }
 
 /* The lane head (title + the status / max-items badges the view ships
-   as .badge spans). Baseline-aligned, wrapping when long. */
+   as .badge spans, + the ⋮ menu pinned to the head's right edge via
+   ms-auto). The head itself never wraps — that is what kept pushing the
+   menu button onto a second line when the lane is narrow or the title is
+   long; instead the title (and its status / count badges) wrap *inside*
+   the <h3>, which stays a single flex child that can shrink, so the
+   ⋮ menu always sits at the top-right corner of the lane. */
 .kanban-lane-head {
+  display: flex;
+  align-items: flex-start; /* the ⋮ menu pins to the head's TOP-right, even when the title wraps below it */
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+.kanban-lane-head h3 {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: baseline;
   gap: 0.25rem;
   flex-wrap: wrap;
-}
-.kanban-lane-head h3 {
   font-weight: 600;
 }
 
-/* The lane action dropdown (the ⋮ menu in the lane head — the board-head
-   ⋮ shape, reused). Pushed to the right edge of the flex baseline head;
-   the head's flex-wrap keeps it on the first row for a wide lane. */
-.kanban-lane-actions {
-  margin-left: auto;
+/* The board's dropdown menus (lane-edit, lane-action, and card menus —
+   ADR 0071): the <hr class="dropdown-divider"> items between the menu's
+   functional groups get a slightly stronger hairline + a touch of margin
+   so "which functions belong together" reads at a glance. */
+.kanban-divided-menu .dropdown-divider {
+  opacity: 1;
+  border-top-color: rgba(0, 0, 0, 0.18);
+  margin: 0.25rem 0;
+}
+
+/* A menu re-homed onto <body> by client/lib/detach-menu.ts (opt-in via
+   `data-detach` on the .dropdown wrapper). Detaching escapes the Kanban
+   board's overflow-x / lane overflow-y clipping (and the to-do feed's
+   overflow-hidden rows), so the whole menu is visible without scrolling the
+   container. It now stacks against the page, not the board — guarantee it
+   sits above the board's own surfaces (the full-screen close button is
+   z-index 100). Bootstrap's .dropdown-menu default is already 1000; this
+   makes it explicit + independent of the board's stacking context. */
+.detached-menu {
+  z-index: 1000;
+}
+
+/* The Rename / Set-limit submit button (ADR 0071) — a quiet → arrow icon
+   that sits to the right of the row's input (replacing the old named
+   "Rename" / "Set limit" text buttons). A compact icon button: no default
+   btn padding, a faint hover/focus tint, the arrow centered. */
+.kanban-arrow-submit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  background-color: transparent;
+  color: var(--bs-body-color);
+  border-radius: 0.25rem;
+}
+.kanban-arrow-submit:hover,
+.kanban-arrow-submit:focus {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--bs-body-color);
+}
+.kanban-arrow-submit svg {
+  flex: none;
+}
+
+/* The ⋮ action triggers in the board head + lane heads (ADR 0070) —
+   borderless: no outline border and a transparent ground, so the glyph
+   reads as a quiet affordance next to the title, not a button. Bootstrap
+   loads AFTER this file, so we also pin the hover/focus/active ground (a
+   faint tint, not the .btn-outline-secondary grey fill) and clear any
+   border it might restore on those states. */
+.kanban-glyph-btn {
+  border: 0;
+  background-color: transparent;
+  color: var(--bs-body-color);
+}
+.kanban-glyph-btn:hover,
+.kanban-glyph-btn:focus,
+.kanban-glyph-btn:active {
+  border-color: transparent;
+  background-color: rgba(0, 0, 0, 0.06);
+  color: var(--bs-body-color);
 }
 
 /* The add-to-do form at the lane's foot (the "Add to-do" button + the
@@ -1473,12 +1550,54 @@ body.kmb-page-fullbleed .navbar {
   gap: 0.25rem;
 }
 
-/* The cards stack — a column with its own gap (the .event-block-stack
-   vertical rhythm, reused). */
-.kanban-cards {
+/* The add-lane placeholder lane (the far-right "new lane" slot — a dashed
+   empty column that reads as the place a new lane will drop in). A
+   DISTINCT class from .kanban-lane on purpose: the drag-drop module queries
+   .kanban-lane for its drop-index math, and this lane is not a real lane
+   (no data-lane-id, not draggable), so it must stay out of that set. Reuses
+   the lane's column sizing + tint but a dashed border for the placeholder
+   read; the add-lane form sits at the top so it aligns with the lane
+   heads beside it (ADR 0070) and reads as the place a new lane will
+   drop in. */
+.kanban-lane-new {
+  flex: 1 1 0;
+  min-width: 12rem;
+  max-width: 16rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  background: var(--kmb-tint-a);
+  border: 1px dashed var(--kmb-border-soft);
+  border-radius: var(--kmb-radius);
+  padding: 0.75rem;
+  cursor: default;
+}
+.kanban-lane-new-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: cflex-start
+  justify-content: center;
+  gap: 0.75rem;
+}
+/* The add-lane form inside the placeholder lane — a column (input + button)
+   that inherits the lane's width. */
+.kanban-add-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* The cards stack — a column with its own gap (the .event-block-stack
+   vertical rhythm, reused). Grows to fill the lane's height and scrolls
+   internally when the cards overflow (the lane stays one column, the
+   page doesn't grow a per-lane scrollbar). */
+.kanban-cards {
+  flex: 1 1 auto;
+  min-height: 0; /* allow the flex child to shrink below content size */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
 }
 
 /* A single card (the .event-chip shape, reused): white over the lane's
@@ -1589,6 +1708,58 @@ body.kmb-page-fullbleed .navbar {
   outline-offset: 2px;
 }
 
+/* ── The full-screen board (the board-head ⛶ toggle — client/lib/
+   projects-board.ts adds .kanban-full when the board enters the browser
+   Fullscreen API and removes it on exit) ─────────────────────────────
+   The board fills the viewport, gets a neutral page-colored ground (the
+   site's white content background — no new token), and the page chrome
+   (back link / header) yields to the board. Many lanes are the point: the
+   lanes keep their min-widths and the board scrolls horizontally. */
+.kanban-board:fullscreen {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  overflow: auto;
+  background: #fff;
+  padding: 1rem;
+}
+/* 3 classes beats .btn's 2 (bootstrap.css loads after this file, and
+   .btn's `display: inline-block` would otherwise win the tie). */
+.kanban-board.kanban-full .kanban-lane {
+  flex: 0 0 auto; /* many lanes → a horizontal scroll, not 12 squeezed columns */
+  max-width: none;
+}
+.kanban-board.kanban-full .kanban-lane-new {
+  flex: 0 0 auto;
+  max-width: none;
+}
+.kanban-board.kanban-full .kanban-lane-head h3 { font-size: 1.05rem; }
+.kanban-board.kanban-full .kanban-card {
+  padding: 0.625rem 0.875rem;
+}
+.kanban-board.kanban-full .kanban-card h4 { font-size: 1rem; }
+
+/* The full-screen close button (✕, in the board head area). Hidden
+   outside full-screen; while full-screen it is fixed to the top-right of
+   the fullscreen element — the :fullscreen element is the containing
+   block for fixed-position descendants, and the board's `overflow: auto`
+   cannot scroll it away. Inline-flex so the SVG + label align with a
+   gap. */
+.kanban-fullscreen-close {
+  display: none;
+}
+.kanban-board:fullscreen .kanban-fullscreen-close,
+.kanban-board.kanban-full .kanban-fullscreen-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 100;
+  background: #fff;
+}
+
 @media (max-width: 767.98px) {
   .kanban-board {
     min-width: 0;
@@ -1596,8 +1767,8 @@ body.kmb-page-fullbleed .navbar {
   .kanban-lane {
     min-width: 12rem;
   }
-  .kanban-add-lane-input {
-    min-width: 7rem;
+  .kanban-lane-new {
+    min-width: 10rem;
   }
 }
 

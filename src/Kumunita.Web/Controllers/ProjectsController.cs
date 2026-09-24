@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Kumunita.Core.Authorization;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Projects;
 using Kumunita.Core.UserInfo;
@@ -205,17 +206,48 @@ public sealed class ProjectsController : Controller
     /// shared row shape — the feed + the subtask rows + the detail's own
     /// row), using the caller-resolved name lookups. <paramref name="parent"/>
     /// is the parent to-do (when the row is a subtask) or null (top-level);
-    /// its title is a read surface, never a decision.
+    /// its title is a read surface, never a decision. <paramref
+    /// name="groupNames"/> maps a group id → display name (the ADR 0073
+    /// **addressed-to** projection — a read lookup, never a gate).
+    /// <paramref name="actorGroupIds"/> / <paramref name="actorCommunityIds"/>
+    /// are the actor's live group / community memberships (ADR 0073) — used
+    /// **only** to compute the row's <see cref="TodoRow.CanClaim"/> affordance
+    /// (a convenience mirror of the service's claim standing, never the
+    /// authoritative gate — that is <c>ClaimTodoAsync</c>).
     /// </summary>
     private static TodoRow ProjectRow(
         TodoItem todo,
         TodoItem? parent,
         IReadOnlyDictionary<string, string> authorNames,
-        IReadOnlyDictionary<string, string> componentNames)
+        IReadOnlyDictionary<string, string> componentNames,
+        IReadOnlyDictionary<string, string> groupNames,
+        IReadOnlySet<string> actorGroupIds,
+        IReadOnlyCollection<string> actorCommunityIds)
     {
         string AuthorName(string id) =>
             string.IsNullOrEmpty(id) ? string.Empty
                 : (authorNames.TryGetValue(id, out var n) ? n : id);
+
+        // ADR 0073 — the addressed-to groups: the group grants in the to-do's
+        // audience, resolved to display names (a read lookup — never a gate).
+        var groupIds = todo.Audience is not null
+            ? todo.Audience.Grants
+                .Where(g => g.Kind == GrantKind.Group && !string.IsNullOrEmpty(g.Id))
+                .Select(g => g.Id)
+                .Distinct(StringComparer.Ordinal)
+            : Array.Empty<string>();
+        var groupNamesList = groupIds
+            .Select(id => groupNames.TryGetValue(id, out var gn) ? gn : id)
+            .ToList();
+
+        // ADR 0073 — the claim affordance (a convenience mirror of the
+        // service's ClaimStandingAsync, never the authoritative gate): the
+        // to-do is unassigned and the actor is a member of an addressed group
+        // or the to-do's community.
+        var canClaim = string.IsNullOrEmpty(todo.AssigneeId)
+            && (groupIds.Any(actorGroupIds.Contains)
+                || (!string.IsNullOrEmpty(todo.ComponentId)
+                    && actorCommunityIds.Contains(todo.ComponentId)));
 
         return new TodoRow(
             Id: todo.Id,
@@ -234,7 +266,85 @@ public sealed class ProjectsController : Controller
             ComponentDisplayName: todo.ComponentId is not null && componentNames.TryGetValue(todo.ComponentId, out var cn) ? cn : null,
             LanguageCode: todo.LanguageCode,
             Created: todo.Created,
-            Modified: todo.Modified);
+            Modified: todo.Modified,
+            GroupNames: groupNamesList,
+            CanClaim: canClaim,
+            // The row builder is placement-agnostic (the detail lane resolves
+            // its own placements in TodoPlacementRow); the feed action
+            // enriches its rows' PlacementBoardIds after the fact (the
+            // copy-to / move-to pickers need each to-do's board ids).
+            PlacementBoardIds: []);
+    }
+
+    /// <summary>
+    /// Resolves the to-dos' addressed-to group ids (the <c>Audience</c>
+    /// group grants) to a group id → display name lookup (a
+    /// <see cref="IUserInfoService.GetPublicGroupsAsync"/> read — never a
+    /// gate; a private group that is not public renders its raw id). ADR
+    /// 0073's addressed-to display.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> ResolveGroupNamesAsync(IReadOnlyCollection<TodoItem> todos)
+    {
+        var groupIds = todos
+            .Where(t => t.Audience is not null)
+            .SelectMany(t => t.Audience!.Grants)
+            .Where(g => g.Kind == GrantKind.Group && !string.IsNullOrEmpty(g.Id))
+            .Select(g => g.Id)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (groupIds.Count == 0)
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+
+        var groups = await userInfo.GetPublicGroupsAsync();
+        return groups
+            .Where(g => groupIds.Contains(g.Id))
+            .ToDictionary(
+                g => g.Id,
+                g => string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+                StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Resolves the platform's public groups to a group id → display name
+    /// lookup (a <see cref="IUserInfoService.GetPublicGroupsAsync"/> read —
+    /// never a gate; a private group renders its raw id). The whole-map
+    /// overload ADR 0074's board assignee display uses (the card's
+    /// assignee may be any public group, not just one addressed-to).
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> ResolveGroupNamesAsync()
+    {
+        var groups = await userInfo.GetPublicGroupsAsync();
+        return groups
+            .Where(g => !string.IsNullOrEmpty(g.Id))
+            .ToDictionary(
+                g => g.Id,
+                g => string.IsNullOrWhiteSpace(g.Name) ? g.Id : g.Name,
+                StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Resolves the actor's live group + community memberships (ADR 0073) —
+    /// read lookups only, used to compute the row-level
+    /// <see cref="TodoRow.CanClaim"/> affordance. Never an authorization gate:
+    /// the authoritative claim standing is <c>ProjectService.ClaimTodoAsync</c>,
+    /// which re-checks membership server-side against the frozen
+    /// <c>IUserInfoService</c> seams. An empty / not-signed-in actor id yields
+    /// empty sets (the affordance is simply hidden — never a leak).
+    /// </summary>
+    private async Task<(IReadOnlySet<string> GroupIds, IReadOnlyCollection<string> CommunityIds)>
+        ActorMembershipAsync(string actorId)
+    {
+        if (string.IsNullOrEmpty(actorId))
+            return (new HashSet<string>(StringComparer.Ordinal), Array.Empty<string>());
+
+        // Defensive: the seams return non-null by contract, but a null is
+        // treated as "no membership" (the affordance is simply hidden — never
+        // a leak, never an NRE) so the affordance computation degrades safely.
+        var groupIds = (await userInfo.GetGroupIdsAsync(actorId))
+            ?? new HashSet<string>(StringComparer.Ordinal);
+        var communityIds = (await userInfo.GetCommunityIdsAsync(actorId))
+            ?? Array.Empty<string>();
+        return (groupIds, communityIds);
     }
 
     // ── Read lanes ─────────────────────────────────────────────────────────────
@@ -247,18 +357,21 @@ public sealed class ProjectsController : Controller
     /// service's, the controller's <c>ForbidResult</c> / <c>NotFound</c>
     /// split is the C3 pin only). The <paramref name="componentId"/> +
     /// <paramref name="assigneeId"/> queries are *filters, never gates*
-    /// (C-M3·2 / C-M5·6). Author + assignee + component display names are
-    /// *read* lookups (never access decisions).
+    /// (C-M3·2 / C-M5·6). <paramref name="unassignedOnly"/> (ADR 0073) is
+    /// the **unassigned pool** filter (a filter, never a gate) — when set,
+    /// the feed shows only the unassigned to-dos a group / community member
+    /// can pick up and claim. Author + assignee + component + group display
+    /// names are *read* lookups (never access decisions).
     /// </summary>
     [HttpGet("/projects/todos")]
-    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, int page = 1)
+    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, int page = 1)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
         IReadOnlyList<TodoItem> todos;
         try
         {
-            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, HttpContext.RequestAborted);
+            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException)
         {
@@ -276,14 +389,59 @@ public sealed class ProjectsController : Controller
             names[subjectId] = await ResolveDisplayNameAsync(subjectId);
 
         var componentNames = await ResolveComponentNamesAsync();
-        var rows = todos.Select(t => ProjectRow(t, null, names, componentNames)).ToList();
+        var groupNames = await ResolveGroupNamesAsync(todos);
+        var (actorGroupIds, actorCommunityIds) = await ActorMembershipAsync(actorId);
+        var rows = todos
+            .Select(t => ProjectRow(t, null, names, componentNames, groupNames, actorGroupIds, actorCommunityIds))
+            .ToList();
+
+        // The row dropdown's "Copy to board" / "Move to board" pickers must
+        // offer only the to-do's *other* boards (a board never offers itself
+        // as its own target, the board card menu's convention). Read each
+        // to-do's placement board ids in one query (a read lookup over the
+        // frozen store — never a gate; the feed's own CanSeeAsync(Read)
+        // already ran).
+        if (todos.Count > 0)
+        {
+            var todoIds = todos.Select(t => t.Id).ToList();
+            await using var session = store.QuerySession();
+            var placements = await session.Query<BoardItemPlacement>()
+                .Where(p => todoIds.Contains(p.TodoItemId))
+                .ToListAsync(HttpContext.RequestAborted);
+            var boardsByTodo = placements
+                .GroupBy(p => p.TodoItemId)
+                .ToDictionary(g => g.Key, g => g.Select(p => p.BoardId).Distinct(StringComparer.Ordinal).ToList());
+            rows = rows
+                .Select(r => boardsByTodo.TryGetValue(r.Id, out var boardIds)
+                    ? r with { PlacementBoardIds = boardIds }
+                    : r)
+                .ToList();
+        }
 
         var vm = new TodoIndexViewModel(
             Todos: rows,
             Components: await SeedComponentPickerAsync(),
             CurrentComponentId: componentId,
             CurrentAssigneeId: assigneeId,
+            UnassignedOnly: unassignedOnly,
             CurrentPage: page);
+
+        // ADR 0071 — the "Add subtask" modal's optional Assignee picker
+        // (the same idiom as the BoardDetail / Create / BoardNew views).
+        await SeedGrantPickerOptionsAsync();
+        // The row dropdown's "Assign to…" modal (the board card menu's ADR 0074
+        // shape) needs the instance's enabled components as the community
+        // choices — the same seeded list BoardDetail's card modal reads.
+        var communityOptions = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            .Select(c => new GrantOption
+            {
+                Id = c.Id,
+                Label = string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name,
+                Kind = "Community",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        ViewData["Assign_Communities"] = communityOptions;
 
         return View(vm);
     }
@@ -330,8 +488,13 @@ public sealed class ProjectsController : Controller
             names[subjectId] = await ResolveDisplayNameAsync(subjectId);
 
         var componentNames = await ResolveComponentNamesAsync();
-        var row = ProjectRow(result.Todo, null, names, componentNames);
-        var subtasks = result.Subtasks.Select(t => ProjectRow(t, null, names, componentNames)).ToList();
+        var detailTodos = new List<TodoItem> { result.Todo }.Concat(result.Subtasks).ToList();
+        var groupNames = await ResolveGroupNamesAsync(detailTodos);
+        var (actorGroupIds, actorCommunityIds) = await ActorMembershipAsync(actorId);
+        var row = ProjectRow(result.Todo, null, names, componentNames, groupNames, actorGroupIds, actorCommunityIds);
+        var subtasks = result.Subtasks
+            .Select(t => ProjectRow(t, null, names, componentNames, groupNames, actorGroupIds, actorCommunityIds))
+            .ToList();
 
         // F2 — the to-do's board placements: which boards + lanes it sits on
         // (a read over the frozen store, after the to-do's own Read decision
@@ -375,6 +538,10 @@ public sealed class ProjectsController : Controller
             Subtasks: subtasks,
             Placements: placementRows);
 
+        // ADR 0071 — the "Add subtask" modal's optional Assignee picker
+        // (the same idiom as the BoardDetail / Create / BoardNew views).
+        await SeedGrantPickerOptionsAsync();
+
         return View(vm);
     }
 
@@ -408,7 +575,7 @@ public sealed class ProjectsController : Controller
         {
             try
             {
-                parentCandidates = (await projects.ListTodosAsync(null, null, actorId, page: 1, HttpContext.RequestAborted))
+                parentCandidates = (await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted))
                     .Where(t => t.ParentId is null)
                     .ToList();
             }
@@ -524,7 +691,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<TodoItem> candidates;
         try
         {
-            candidates = await projects.ListTodosAsync(null, null, actorId, page: 1, HttpContext.RequestAborted);
+            candidates = await projects.ListTodosAsync(null, null, actorId, page: 1, ct: HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException)
         {
@@ -613,11 +780,14 @@ public sealed class ProjectsController : Controller
     /// (sets <c>AssigneeId</c>; <c>null</c> / empty = unassign). **Creator
     /// ∪ assignee ∪ GlobalAdmin** (F7 / F8) — the service's server-side
     /// standing gate; a missing id is 404, a denied actor 403 (the C3
-    /// split).
+    /// split). A same-site <c>returnUrl</c> form field (ADR 0074 — the
+    /// board card's "Assign to…" modal) redirects back to the board instead
+    /// of the to-do's detail; the default target is unchanged.
     /// </summary>
     [HttpPost("/projects/todos/{id}/assign")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> AssignPost(string id, [FromForm] string? assigneeId)
+    public async Task<IActionResult> AssignPost(
+        string id, [FromForm] string? assigneeId, [FromForm] string? returnUrl = null)
     {
         var actorId = SubjectId(User) ?? string.Empty;
         try
@@ -639,6 +809,49 @@ public sealed class ProjectsController : Controller
         }
 
         TempData["info"] = string.IsNullOrWhiteSpace(assigneeId) ? "Assignee removed." : "To-do assigned.";
+        // ADR 0074 — when the caller came from a board (the card's "Assign
+        // to…" modal) and posted a same-site returnUrl, go back there;
+        // otherwise the to-do's detail (the lane's original target). A
+        // non-local (external) returnUrl is never followed (no open
+        // redirect); the guard degrades to the default target when there
+        // is no Url helper in play (the seam-test harness).
+        return Redirect(Url is { } url && url.IsLocalUrl(returnUrl)
+            ? returnUrl!
+            : $"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/claim</c> — the **claim** write lane (ADR
+    /// 0073 — the self-assign): the actor takes an **unassigned** to-do onto
+    /// themselves iff they are a member of one of the to-do's audience
+    /// **groups** or its **community** (the service's server-side standing
+    /// gate — unassigned + group / community membership). A missing id is 404,
+    /// a to-do that is already assigned or a denied actor is 403 (the C3
+    /// split; the claim is a pick-up, not a take-over).
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/claim")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ClaimPost(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.ClaimTodoAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "You claimed this to-do.";
         return Redirect($"/projects/todos/{id}");
     }
 
@@ -857,6 +1070,7 @@ public sealed class ProjectsController : Controller
             names[subjectId] = await ResolveDisplayNameAsync(subjectId);
 
         var componentNames = await ResolveComponentNamesAsync();
+        var groupNames = await ResolveGroupNamesAsync();
         var boardRow = ProjectBoardRow(result.Board, names, componentNames);
 
         var laneRows = new List<LaneDetailRow>();
@@ -871,9 +1085,8 @@ public sealed class ProjectsController : Controller
                     Title: card.Title,
                     Status: card.Status,
                     AssigneeId: card.AssigneeId,
-                    AssigneeDisplayName: string.IsNullOrEmpty(card.AssigneeId)
-                        ? null
-                        : (names.TryGetValue(card.AssigneeId, out var an) ? an : card.AssigneeId),
+                    AssigneeDisplayName: ResolveAssigneeDisplayName(
+                        card.AssigneeId, names, groupNames, componentNames),
                     Order: p?.Order ?? 0);
             }).ToList();
 
@@ -886,8 +1099,156 @@ public sealed class ProjectsController : Controller
                 Cards: cards));
         }
 
-        var vm = new BoardDetailViewModel(Board: boardRow, Lanes: laneRows);
+        var vm = new BoardDetailViewModel(
+            Board: boardRow,
+            Lanes: laneRows,
+            // ADR 0070 — the board-head ⋮ menu's "Edit board" item (creator
+            // ∪ GlobalAdmin — the same standing the service's
+            // UpdateBoardAsync server-enforces; a non-signed-in viewer is
+            // never an author and never carries the role).
+            CanEdit: !string.IsNullOrEmpty(actorId)
+                     && (string.Equals(result.Board.AuthorId, actorId, StringComparison.Ordinal)
+                         || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)));
+        // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
+        // assignee picker. Seed the standing assignee options (verified,
+        // non-self profiles) the way the Create / BoardNew views do, so the
+        // modal's <select> can read them from ViewData.
+        // ADR 0074 — the card "Assign to…" modal reuses the same seeded
+        // Audience_Users (people) + Audience_Groups (public groups) lists
+        // and adds the instance's enabled components as the community
+        // choices; all three are display options, never a gate (the
+        // standing decision is the service's on write).
+        await SeedGrantPickerOptionsAsync();
+        var communityOptions = (await userInfo.GetComponentsAsync(enabledOnly: true))
+            .Select(c => new GrantOption
+            {
+                Id = c.Id,
+                Label = string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name,
+                Kind = "Community",
+            })
+            .OrderBy(o => o.Label, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        ViewData["Assign_Communities"] = communityOptions;
         return View("BoardDetail", vm);
+    }
+
+    /// <summary>
+    /// Resolves a board card's <c>AssigneeId</c> to a display name
+    /// (ADR 0074) — the assignee may be a **person** (a <c>Profile</c>
+    /// subject id), a **group** (a <c>Group</c> id), or a **community**
+    /// (a <c>Component</c> id); the first lookup that hits wins (the id
+    /// spaces are disjoint on a real instance). A miss falls back to the
+    /// raw id (null-safe — a read surface, never an access decision).
+    /// </summary>
+    private static string? ResolveAssigneeDisplayName(
+        string? assigneeId,
+        IReadOnlyDictionary<string, string> profileNames,
+        IReadOnlyDictionary<string, string> groupNames,
+        IReadOnlyDictionary<string, string> componentNames)
+    {
+        if (string.IsNullOrEmpty(assigneeId))
+            return null;
+        if (profileNames.TryGetValue(assigneeId, out var profile) && profile.Length > 0)
+            return profile;
+        if (groupNames.TryGetValue(assigneeId, out var group) && group.Length > 0)
+            return group;
+        if (componentNames.TryGetValue(assigneeId, out var community) && community.Length > 0)
+            return community;
+        return assigneeId;
+    }
+
+    /// <summary>
+    /// <c>GET /projects/boards/{id}/edit</c> — the board edit page (ADR 0070)
+    /// — the board's own <c>Title</c> + <c>Description</c> (the
+    /// <see cref="BoardUpdateModel"/> shape; the audience / component /
+    /// language are creation-time choices, not editable here). The board is
+    /// loaded through the frozen seam's <see
+    /// cref="IProjectService.GetBoardAsync"/> (the audience gate is the
+    /// service's single entry <c>CanAsync(Read)</c>, C-M5·3) — a missing
+    /// board is 404, a denied actor 403 (the C3 split). The standing
+    /// decision (creator ∪ GlobalAdmin) is the service's on write; the view
+    /// renders the form (the board-head ⋮ menu's "Edit board" item is
+    /// <see cref="BoardDetailViewModel.CanEdit"/>-gated, the same matrix).
+    /// </summary>
+    [HttpGet("/projects/boards/{id}/edit")]
+    public async Task<IActionResult> BoardEditGet(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        KanbanBoard board;
+        try
+        {
+            board = (await projects.GetBoardAsync(id, actorId, HttpContext.RequestAborted)).Board;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        var model = new BoardUpdateModel
+        {
+            Title = board.Title,
+            Description = board.Description,
+        };
+        ViewData["boardId"] = id; // the edit form's POST action (POST /projects/boards/{id}).
+        return View("BoardEdit", model);
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}</c> — the board update write lane (ADR
+    /// 0070 — the service's <see cref="IProjectService.UpdateBoardAsync"/>:
+    /// a full update of the board's <c>Title</c> + <c>Description</c>, a
+    /// blank description clearing it to <c>null</c>). **Creator ∪
+    /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split); a blank title is a form error (the M4 "a form is a shape"
+    /// precedent — re-render the edit view with the error). Redirect-after-
+    /// POST back to the board.
+    /// </summary>
+    [HttpPost("/projects/boards/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardEditPost(string id, [FromForm] BoardUpdateModel model)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        if (!model.IsValid)
+        {
+            if (string.IsNullOrWhiteSpace(model.Title))
+                ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            return View("BoardEdit", model);
+        }
+
+        var request = new UpdateBoardRequest
+        {
+            Title = model.Title!,
+            Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+        };
+
+        try
+        {
+            await projects.UpdateBoardAsync(id, actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (ArgumentException ex)
+        {
+            // A blank title (the service's 400) — a form error, not a 500.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("BoardEdit", model);
+        }
+
+        TempData["info"] = "Board updated.";
+        return Redirect($"/projects/boards/{id}");
     }
 
     // ── Board write lanes (U08) ─────────────────────────────────────────────

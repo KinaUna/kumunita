@@ -10,6 +10,7 @@ using Kumunita.Web.Models;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using NSubstitute;
 using Xunit;
@@ -64,10 +65,18 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         };
         projects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns([todo]);
 
-        var controller = Build(projects, subjectId: actor);
+        // The feed's copy-to / move-to pickers read each to-do's placement
+        // board ids (the board card menu's convention: a board never offers
+        // itself as a target) — a live Marten query, so a real store (the
+        // same <c>BuildRealStoreAsync</c> the <c>Todo_Detail_*</c> /
+        // <c>Board_Detail_*</c> lanes use). The denied path below returns a
+        // clean ForbidResult before reaching that query, so it can stay on
+        // the plain substitute.
+        var store = await BuildRealStoreAsync();
+        var controller = Build(projects, store: store, subjectId: actor);
         var result = await controller.TodosIndex(componentId: null, assigneeId: null, page: 1);
 
         var view = Assert.IsType<ViewResult>(result);
@@ -76,18 +85,18 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("todo-1", vm.Todos[0].Id);
         Assert.Equal("subj-author", vm.Todos[0].AuthorDisplayName); // no profile → raw id
         await projects.Received(1).ListTodosAsync(
-            null, null, actor, 1, Arg.Any<CancellationToken>());
+            null, null, actor, 1, false, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
         var deniedProjects = Substitute.For<IProjectService>();
         deniedProjects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<TodoItem>>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(
-            await deniedController.TodosIndex(null, null, 1));
+            await deniedController.TodosIndex(null, null, page: 1));
     }
 
     // ── 2 — Todo_Detail_SubtasksRendered (real store) ────────────────────────
@@ -433,6 +442,113 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
         Assert.IsType<ForbidResult>(await deniedController.AssignPost(todoId, assignee));
+    }
+
+    // ── 8a — Todo_Assign_ReturnUrl_BoardTarget (ADR 0074) ──────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/assign</c> with a <c>returnUrl</c> (the
+    /// board card's "Assign to…" modal, ADR 0074): a **same-site**
+    /// <c>returnUrl</c> is the redirect target (the board the modal came
+    /// from, so the flash toast lands there); an **external**
+    /// <c>returnUrl</c> is refused and the lane's original target (the to-do's
+    /// detail) is used (no open redirect — the C3 404/403 split aside, the
+    /// redirect target is this layer's pin).
+    /// </summary>
+    [Fact]
+    public async Task Todo_Assign_ReturnUrl_BoardTarget()
+    {
+        const string actor = "subj-assign-url-actor";
+        const string todoId = "todo-assign-url";
+        const string assignee = "subj-assignee-url";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.AssignTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), assignee, Arg.Any<CancellationToken>())
+            .Returns(new TodoItem
+            {
+                Id = todoId, Title = "Assigned", AuthorId = actor, AssigneeId = assignee,
+                Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            });
+        var controller = Build(projects, subjectId: actor);
+
+        // The activator normally sets Url from DI; stand in a local-url
+        // check so both the same-site and external branches are exercised.
+        var urlHelper = Substitute.For<IUrlHelper>();
+        urlHelper.IsLocalUrl(
+                Arg.Is<string?>(u => !string.IsNullOrEmpty(u) && u.StartsWith("/", StringComparison.Ordinal)))
+            .Returns(true);
+        controller.Url = urlHelper;
+
+        // A same-site returnUrl (the board the modal lives on) is the target.
+        var boardUrl = $"/projects/boards/board-assign-url";
+        var sameSite = await controller.AssignPost(todoId, assignee, boardUrl);
+        var sameSiteRedirect = Assert.IsType<RedirectResult>(sameSite);
+        Assert.Equal(boardUrl, sameSiteRedirect.Url);
+        Assert.Equal("To-do assigned.", controller.TempData["info"] as string);
+
+        // An external returnUrl is refused: the lane's original target
+        // (the to-do's detail) is used — never the posted URL.
+        var external = await controller.AssignPost(
+            todoId, assignee, "https://evil.example/phish");
+        var externalRedirect = Assert.IsType<RedirectResult>(external);
+        Assert.Equal($"/projects/todos/{todoId}", externalRedirect.Url);
+    }
+
+    // ── 8b — Todo_Claim_StandingGranted (ADR 0073) ───────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/claim</c>: the controller forwards the
+    /// actor to the seam's
+    /// <see cref="IProjectService.ClaimTodoAsync"/> verbatim (the standing —
+    /// unassigned + group / community membership — is the seam's server-side
+    /// decision, ADR 0073, not re-derived here) and redirects to the to-do's
+    /// detail on success with <c>TempData["info"]</c> set; the service's
+    /// <see cref="UnauthorizedAccessException"/> maps to a clean
+    /// <see cref="ForbidResult"/> (the C3 403), and a
+    /// <see cref="KeyNotFoundException"/> maps to a clean
+    /// <see cref="NotFoundResult"/> (the C3 404).
+    /// </summary>
+    [Fact]
+    public async Task Todo_Claim_StandingGranted()
+    {
+        const string actor = "subj-claim-actor";
+        const string todoId = "todo-claim";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.ClaimTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new TodoItem
+            {
+                Id = todoId, Title = "Claimed", AuthorId = actor, AssigneeId = actor,
+                Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            });
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.ClaimPost(todoId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/todos/{todoId}", redirect.Url);
+        Assert.Equal("You claimed this to-do.", controller.TempData["info"] as string);
+        await projects.Received(1).ClaimTodoAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 403 split: a refused claim (already assigned, or no standing)
+        // is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.ClaimTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<TodoItem>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ClaimPost(todoId));
+
+        // The C3 404 split: a missing to-do is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.ClaimTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<TodoItem>(new KeyNotFoundException("no to-do")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ClaimPost(todoId));
     }
 
     // ── 9 — Board_AddLane_AppendsAtEnd (ADR 0069) ────────────────────────────

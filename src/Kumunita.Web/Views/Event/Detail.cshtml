@@ -165,7 +165,7 @@
                                         <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
                                     </summary>
                                     <div class="ms-2">
-                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/update")">
+                                        <form method="post" action="@($"/events/{Model.Event.Id}/translations/update")">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
                                             <label class="form-label small">
@@ -182,7 +182,7 @@
                                                 <kw-l key="posts.translation_save">Save translation</kw-l>
                                             </button>
                                         </form>
-                                        <form method="post" action="@($"/events/@Model.Event.Id/translations/remove")"
+                                        <form method="post" action="@($"/events/{Model.Event.Id}/translations/remove")"
                                               class="mt-2" data-confirm="Remove this translation?">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
@@ -201,7 +201,7 @@
                                         <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
                                     </summary>
                                     <form class="ms-2" method="post"
-                                          action="@($"/events/@Model.Event.Id/translations")">
+                                          action="@($"/events/{Model.Event.Id}/translations")">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="languageCode" value="@lang.Code" />
                                         <label class="form-label small" for="event-t-title">

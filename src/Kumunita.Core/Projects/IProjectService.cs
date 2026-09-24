@@ -42,8 +42,18 @@ public interface IProjectService
     /// descending (the newest first — the post feed shape); paged. The
     /// **aggregate** <c>AccessAudit</c> row (<c>TargetKind = "todo"</c>,
     /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape.
+    /// <para>
+    /// <paramref name="unassignedOnly"/> (ADR 0073) is the **unassigned pool
+    /// filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/> / <paramref name="assigneeId"/>). When
+    /// <c>true</c>, only to-dos with <see cref="TodoItem.AssigneeId"/> null are
+    /// returned (the pool a group / community member can pick up and
+    /// <see cref="ClaimTodoAsync"/>); it narrows the candidate set, it does not
+    /// change the audience decision (a to-do still only appears if the actor
+    /// passes the <c>CanSeeAsync(Read)</c> pass).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, CancellationToken ct = default);
+    Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, CancellationToken ct = default);
 
     /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
@@ -121,6 +131,28 @@ public interface IProjectService
     Task<TodoItem> AssignTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? assigneeId, CancellationToken ct = default);
 
     /// <summary>
+    /// **Claim** a to-do (ADR 0073 — the self-assign lane): sets <c>
+    /// AssigneeId</c> to <paramref name="actorId"/> (the claimer takes the
+    /// unassigned to-do onto themselves). Standing (server-side, C3):
+    /// the to-do must be **unassigned** (<see cref="TodoItem.AssigneeId"/>
+    /// null) **and** the actor must be a member of a **group** in the to-do's
+    /// <see cref="TodoItem.Audience"/> grants **or** a member of the to-do's
+    /// <see cref="TodoItem.ComponentId"/> community (the ADR 0013 group lane /
+    /// ADR 0036 community lane, probed through the frozen <c>
+    /// IUserInfoService</c> <c>GetGroupIdsAsync</c> / <c>GetCommunityIdsAsync</c>
+    /// seams). A missing / soft-deleted id is <see cref="KeyNotFoundException"/>
+    /// (404); a to-do that is already assigned, or the actor lacks the group /
+    /// community standing, is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <c>AccessAudit</c> row (<c>todo.claim</c>, <c>TargetKind = "todo"</c>,
+    /// <c>Via</c> = the branch the actor qualified under) is stored in the
+    /// caller's session (C3). **No new <c>AccessAction</c>, no new
+    /// <c>AccessVia</c>, no new branch in <c>Decide()</c>** — the lane reuses
+    /// the existing <c>AccessVia.Group</c> / <c>AccessVia.Community</c> values
+    /// (C-M5·11: M5 adds an *adapter*, not a *branch*).
+    /// </summary>
+    Task<TodoItem> ClaimTodoAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
     /// Add a subtask — a new <see cref="TodoItem"/> with <c>ParentId =
     /// parentTodoItemId</c> (the sole hierarchy mechanism — C-M5·7); the
     /// subtask is a full to-do (its own status / assignee / placements) and its
@@ -154,6 +186,28 @@ public interface IProjectService
     /// caller's session (C3).
     /// </summary>
     Task<KanbanBoard> CreateBoardAsync(string actorId, IReadOnlySet<string> actorRoles, CreateBoardRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
+    /// the board edit lane, <c>GET /projects/boards/{id}/edit</c> +
+    /// <c>POST /projects/boards/{id}</c>). A **full update** of those two
+    /// fields (the edit page posts both; a blank description clears it to
+    /// <c>null</c> — the <see cref="UpdateBoardRequest"/> shape). The board's
+    /// standing, audience, component, and language are creation-time choices
+    /// — **not** editable here (ADR 0070). <see cref="KanbanBoard.Modified"/>
+    /// is stamped **only on a real change** (the
+    /// <see cref="UpdateLaneAsync"/> no-op shape). Standing (server-side,
+    /// C3): **creator ∪ GlobalAdmin** over the board (the
+    /// <see cref="CheckBoardStanding"/> shape — C-M5·6). A missing board is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403); a blank <c>Title</c> is
+    /// <see cref="ArgumentException"/> (the write shape's 400). One <see
+    /// cref="AccessAudit"/> row (<c>board.update</c>, <c>TargetKind =
+    /// "board"</c>, the board's id as the target — creator <c>Via Owner</c>,
+    /// otherwise <c>Via Admin</c>) is stored in the same session (C3) and
+    /// commits atomically with the write.
+    /// </summary>
+    Task<KanbanBoard> UpdateBoardAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, UpdateBoardRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Update a lane — set the lane's <c>Title</c> / <c>Status</c> /

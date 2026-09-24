@@ -72,6 +72,21 @@ public sealed record CreateBoardRequest
 }
 
 /// <summary>
+/// The update-a-board request (the
+/// <see cref="IProjectService.UpdateBoardAsync"/> shape, ADR 0070) — a
+/// **full update** of the board's <c>Title</c> + <c>Description</c> (the
+/// board edit page posts both fields; a blank <see cref="Description"/>
+/// clears it to <c>null</c>). The board's standing, audience, component,
+/// and language are **creation-time choices** — not editable here (ADR
+/// 0070). Standing: **creator ∪ GlobalAdmin** over the board (C-M5·6).
+/// </summary>
+public sealed record UpdateBoardRequest
+{
+    public required string Title { get; init; }
+    public string? Description { get; init; }
+}
+
+/// <summary>
 /// One initial <see cref="KanbanLane"/> of a <see cref="CreateBoardRequest"/> —
 /// the lane's label + its optional imparted <c>Status</c> (C-M5·4) + its
 /// optional advisory <c>MaxItems</c> capacity (C-M5·5) + its 0-based

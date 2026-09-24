@@ -51,7 +51,7 @@
                 <div class="airy-ann-row">
                     <div>
                         <h3 class="airy-ann-title">
-                            <a href="@($"/projects/boards/@row.Id")">@row.Title</a>
+                            <a href="@($"/projects/boards/{row.Id}")">@row.Title</a>
                         </h3>
                         <div class="text-muted small mb-1">
                             @row.AuthorDisplayName
@@ -79,7 +79,7 @@
                                 aria-label="Actions for @row.Title">⋮</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li>
-                                <form method="post" action="@($"/projects/boards/@row.Id/delete")"
+                                <form method="post" action="@($"/projects/boards/{row.Id}/delete")"
                                       data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
                                     @Html.AntiForgeryToken()
                                     <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>

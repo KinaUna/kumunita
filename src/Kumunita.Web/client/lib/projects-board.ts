@@ -17,6 +17,15 @@
  *     The server is authoritative (C3 — the server's 200/302/403/404
  *     decides the outcome) and the next render re-shapes the board.
  *
+ * (b2) Lane auto-submit (ADR 0071): the lane ⋮ dropdown's Set status
+ *     select (class `.kanban-lane-autosubmit`) carries no submit button —
+ *     changing it auto-POSTs the lane-update route (the form's own action,
+ *     the form's own Title field, the `__RequestVerificationToken` field
+ *     the view renders) via the same `postAndRedirect` shape; a blank
+ *     Status sets "None". The Rename and Set-limit rows keep a → arrow
+ *     submit button (the row's own `type="submit"` icon button). The
+ *     server stays authoritative (C3) — the redirect re-renders the board.
+ *
  * (c) Drag-and-drop (ADR 0069, this module): HTML5 DnD as an input channel
  *     on top of (a) + (b). A drag started on a `.kanban-card` is a *card*
  *     move (drop into a lane → `POST …/cards/{placementId}/move` with a
@@ -52,6 +61,48 @@ import { getAntiForgeryToken } from './api.js';
   for (const card of board.querySelectorAll<HTMLElement>('.kanban-card')) {
     card.setAttribute('tabindex', '0');
   }
+
+  // ── Full-screen (the ⛶ toggle in the board head) ───────────────────────
+  // The board element is the Fullscreen API target: the browser hides the
+  // rest of the page (header + the ⛶ toggle included), and the `:fullscreen`
+  // styles in site.css give it the full-bleed look (many lanes scroll
+  // horizontally instead of squeezing into 12 columns). Two ways out:
+  //   • the ⛶ toggle (header, visible only outside full-screen) — click to
+  //     enter,
+  //   • the ✕ close button (the `.kanban-fullscreen-close` INSIDE the board,
+  //     the only board control the browser keeps visible in full-screen —
+  //     shown only while `.kanban-full`) — click to exit,
+  //   • the browser's native Esc (always works).
+  // Labels are inline `<span>`s the kw-l TagHelper rendered per-language, so
+  // there is no text to swap in JS here — `.kanban-full` only gates
+  // visibility + the toggle's aria-pressed. `exitFullscreen` is on the
+  // prototype in all modern browsers; the `requestFullscreen` guard covers
+  // the rare absence (an undefined member there just no-ops).
+  const fsButton = document.querySelector<HTMLElement>('.kanban-fullscreen-toggle');
+  const fsClose = document.querySelector<HTMLElement>('.kanban-fullscreen-close');
+
+  if (fsButton) {
+    if (typeof (board as HTMLElement).requestFullscreen !== 'function') {
+      fsButton.hidden = true;
+      if (fsClose) fsClose.remove();
+    } else {
+      fsButton.addEventListener('click', () => {
+        void (board as HTMLElement).requestFullscreen?.();
+      });
+    }
+  }
+
+  if (fsClose) {
+    fsClose.addEventListener('click', () => {
+      void (document as Document).exitFullscreen?.();
+    });
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    const isFs = document.fullscreenElement === board;
+    board.classList.toggle('kanban-full', isFs);
+    fsButton?.setAttribute('aria-pressed', String(isFs));
+  });
 
   // The C3 / D10 pin — the server is authoritative: POST the card's own
   // direction form (the U10 view ships one thin `<form method="post">`
@@ -97,6 +148,31 @@ import { getAntiForgeryToken } from './api.js';
         window.location.href = url;
       });
   }
+
+  // Lane auto-submit (ADR 0071) — the Set status select changed in the
+  // lane ⋮ dropdown auto-POSTs its own form's action (the lane-update
+  // route) with the changed field + the form's own Title (required by the
+  // endpoint) + the view's antiforgery token.
+  // The server is authoritative (C3 / C-M5·9) — the redirect re-renders
+  // the board; no optimistic updates.
+  board.addEventListener('change', (e: Event) => {
+    const el = e.target as HTMLElement & { name?: string; value?: string };
+    if (!el.classList.contains('kanban-lane-autosubmit')) return;
+    const form = el.closest<HTMLFormElement>('form');
+    if (!form?.action) return;
+
+    const fields: Record<string, string> = {};
+    const title = form.querySelector<HTMLInputElement>('input[name="Title"]');
+    if (title?.value) fields['Title'] = title.value;
+    const key = (el.name ?? el.id) as string;
+    fields[key] = el.value ?? '';
+    const token = form.querySelector<HTMLInputElement>(
+      'input[name="__RequestVerificationToken"]',
+    )?.value;
+    if (token) fields['__RequestVerificationToken'] = token;
+
+    postAndRedirect(form.action, fields);
+  });
 
   // Keyboard shortcuts (C-M5·9 / D10 — plain TS, zero deps, explicit
   // server round trips; no HTML5 drag, no optimistic reordering):

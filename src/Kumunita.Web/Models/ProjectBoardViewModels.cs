@@ -120,12 +120,16 @@ public sealed record TodoCardRow(
 /// <c>Audience</c>, the service's single entry <c>CanAsync(Read)</c>).
 /// **<see cref="Lanes"/>** are the board's lanes (ordered by <c>Order</c>
 /// ascending), each with its visible cards — the two-level decision is the
-/// service's (C-M5·3, the §2.3 pin).
+/// service's (C-M5·3, the §2.3 pin). **<see cref="CanEdit"/>** (ADR 0070)
+/// gates the board-head ⋮ menu's "Edit board" item (creator ∪ GlobalAdmin
+/// — the same standing the service's <c>UpdateBoardAsync</c>
+/// server-enforces; the view renders what the action knows, C3).
 /// </para>
 /// </summary>
 public sealed record BoardDetailViewModel(
     BoardRow Board,
-    IReadOnlyList<LaneDetailRow> Lanes);
+    IReadOnlyList<LaneDetailRow> Lanes,
+    bool CanEdit = false);
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +
@@ -222,6 +226,33 @@ public sealed class BoardEditorModel
             return true;
         }
     }
+}
+
+/// <summary>
+/// The **board edit** form model (the <c>GET /projects/boards/{id}/edit</c>
+/// + <c>POST /projects/boards/{id}</c> lanes — ADR 0070). A **full update**
+/// of the board's <see cref="Title"/> (required) + optional <see
+/// cref="Description"/> Markdown (a blank description clears it to
+/// <c>null</c> — the <see cref="Kumunita.Core.Projects.UpdateBoardRequest"/>
+/// shape). The board's standing, audience, component, and language are
+/// creation-time choices — **not** editable here (ADR 0070).
+/// </summary>
+public sealed class BoardUpdateModel
+{
+    /// <summary>The board's display label (the feed's title — the
+    /// <see cref="KanbanBoard.Title"/> row). Required.</summary>
+    [Required(ErrorMessage = "A title is required.")]
+    public string? Title { get; set; }
+
+    /// <summary>The board's optional rich description (Markdown — the one
+    /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/>, edited by the
+    /// one <c>bindRichEditor</c>; a blank value clears it).</summary>
+    public string? Description { get; set; }
+
+    /// <summary>true when the model is well-formed for a round-trip.
+    /// <see cref="Title"/> is required (a board with no title is a
+    /// malformed shape, not a silent blank row).</summary>
+    public bool IsValid => !string.IsNullOrWhiteSpace(Title);
 }
 
 /// <summary>

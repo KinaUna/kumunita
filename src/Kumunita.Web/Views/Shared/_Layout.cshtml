@@ -195,6 +195,12 @@
     <!-- Reset-form (SECURITY.md §6 no-inline-script; replaces the
          onclick="this.form.reset()" pattern) -->
     <script type="module" src="~/js/lib/reset-form.js"></script>
+    <!-- Detach menu (SECURITY.md §6 no-inline-script): while an opted-in
+         dropdown (data-detach) is open, re-home its .dropdown-menu onto <body>
+         so it escapes overflow-clipping ancestors (Kanban board / to-do feed)
+         and always renders fully on top. Loaded after bootstrap.bundle so
+         window.bootstrap is available. -->
+    <script type="module" src="~/js/lib/detach-menu.js"></script>
     <!-- Audience-toggle (SECURITY.md §6; ADR 0036 checkbox→panel visibility) -->
     <script type="module" src="~/js/lib/audience-toggle.js"></script>
     <!-- Name-filter (SECURITY.md §6; Groups/Detail invite + add-member forms) -->

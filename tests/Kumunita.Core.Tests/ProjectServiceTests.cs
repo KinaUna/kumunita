@@ -1468,6 +1468,394 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         }
     }
 
+    // ── F16 — update a board's title + description (ADR 0070) ───────────────
+
+    /// <summary>
+    /// <b>F16</b> (author, C-M5·6): the board's **creator** updates the
+    /// <c>Title</c> + <c>Description</c>. Both fields are applied,
+    /// <see cref="KanbanBoard.Modified"/> is stamped (a real change), and a
+    /// <see cref="AccessAudit"/> row (<c>board.update</c>, board target) is
+    /// written.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_AuthorUpdates_TitleDescriptionStampedAudited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Old title",
+            Description = "Old description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "New title", Description = "New description" });
+
+        Assert.Equal("New title", updated.Title);
+        Assert.Equal("New description", updated.Description);
+        Assert.NotNull(updated.Modified);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            Assert.Equal("New title", reloaded.Title);
+            Assert.Equal("New description", reloaded.Description);
+        }
+
+        // The board.update audit row (C3) is written.
+        var audits = await BoardAuditRows(store, "f16-board");
+        Assert.Contains(audits, a => a.Action == "board.update");
+    }
+
+    /// <summary>
+    /// <b>F16</b> (GlobalAdmin, C-M5·6): a <see cref="Roles.GlobalAdmin"/> who
+    /// is **not** the board's creator may update it — the standing matrix
+    /// admits the admin branch.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_GlobalAdminMayUpdate()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16b-author";
+        const string admin = "u-u12-f16b-admin";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", admin, GlobalAdminRoles,
+            new UpdateBoardRequest { Title = "Board (admin edit)" });
+
+        Assert.Equal("Board (admin edit)", updated.Title);
+    }
+
+    /// <summary>
+    /// <b>F16</b> (refuse, C-M5·6): a stranger who is neither the creator nor
+    /// a GlobalAdmin is **denied** the write with <see
+    /// cref="UnauthorizedAccessException"/> (403); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_StrangerRefused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16c-author";
+        const string stranger = "u-u12-f16c-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Author's board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateBoardAsync("f16-board", stranger, MemberRoles,
+                new UpdateBoardRequest { Title = "Intrusion" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            Assert.Equal("Author's board", reloaded.Title);
+        }
+    }
+
+    /// <summary>
+    /// <b>F16</b> (blank title): a blank <c>Title</c> is refused with <see
+    /// cref="ArgumentException"/> (the write shape's 400); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_BlankTitle_Refused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16d-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Author's board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            svc.UpdateBoardAsync("f16-board", author, MemberRoles,
+                new UpdateBoardRequest { Title = "   " }));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            Assert.Equal("Author's board", reloaded.Title);
+        }
+    }
+
+    /// <summary>
+    /// <b>F16</b> (no-op): posting the board's **same** <c>Title</c> +
+    /// <c>Description</c> is a no-op — <see cref="KanbanBoard.Modified"/> is
+    /// left untouched (the <see cref="ProjectService.UpdateLaneAsync"/>
+    /// no-op shape).
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_NoChange_ModifiedUntouched()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16e-author";
+
+        var board = new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Same title",
+            Description = "Same description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        };
+        await Plant(store, board);
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
+
+        // A no-op re-save leaves the stamp untouched.
+        Assert.Null(updated.Modified);
+    }
+
+    // ── C — the claim lane (ADR 0073) ────────────────────────────────────────
+
+    /// <summary>
+    /// <b>C1</b> (group branch): an **unassigned** to-do whose <see
+    /// cref="TodoItem.Audience"/> grants a specific group may be **claimed**
+    /// by a member of that group — the to-do's <see
+    /// cref="TodoItem.AssigneeId"/> becomes the claimer, <see
+    /// cref="TodoItem.Modified"/> is stamped, and one <see cref="AccessAudit"/>
+    /// row is written: <c>todo.claim</c>, <c>TargetKind = "todo"</c>,
+    /// <c>Via = AccessVia.Group</c> (the ADR 0013 lane — the group membership
+    /// is the standing; a plain-member actor, no elevated role).
+    /// </summary>
+    [Fact]
+    public async Task C1_ClaimUnassigned_ByGroupMember_Succeeds_AuditedGroupVia()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-c1-author";
+        const string claimer = "u-u12-c1-claimer";
+        const string group = "g-c1";
+
+        await Plant(store, new GroupMembership
+        {
+            Id = "gm-c1",
+            GroupId = group,
+            UserId = claimer,
+            AddedBy = author,
+            At = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        });
+
+        await Plant(store, new TodoItem
+        {
+            Id = "c1-todo",
+            AuthorId = author,
+            Title = "Unassigned group to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.Group, group),
+        });
+
+        var claimed = await svc.ClaimTodoAsync("c1-todo", claimer, MemberRoles);
+
+        Assert.Equal(claimer, claimed.AssigneeId);
+        Assert.NotNull(claimed.Modified);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("c1-todo"))!;
+            Assert.Equal(claimer, reloaded.AssigneeId);
+        }
+
+        var audits = await TodoAuditRows(store, "c1-todo");
+        var claim = Assert.Single(audits, a => a.Action == "todo.claim");
+        Assert.Equal(AccessVia.Group, claim.Via);
+        Assert.Equal(claimer, claim.ActorId);
+    }
+
+    /// <summary>
+    /// <b>C2</b> (refuse — already assigned): a to-do that **already has an
+    /// assignee** is a 403 for a would-be claimer (a claim is a pick-up, not a
+    /// take-over — the ADR 0073 standing gate); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task C2_ClaimAlreadyAssigned_Refused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-c2-author";
+        const string assignee = "u-u12-c2-assignee";
+        const string claimer = "u-u12-c2-claimer";
+        const string group = "g-c2";
+
+        await Plant(store, new GroupMembership
+        {
+            Id = "gm-c2", GroupId = group, UserId = claimer,
+            AddedBy = author, At = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        });
+
+        await Plant(store, new TodoItem
+        {
+            Id = "c2-todo",
+            AuthorId = author,
+            Title = "Assigned group to-do",
+            AssigneeId = assignee, // already assigned
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.Group, group),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.ClaimTodoAsync("c2-todo", claimer, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("c2-todo"))!;
+            Assert.Equal(assignee, reloaded.AssigneeId); // untouched
+        }
+    }
+
+    /// <summary>
+    /// <b>C3</b> (refuse — no standing): a stranger who is a member of a group
+    /// the to-do does **not** address is 403 (the membership standing is absent
+    /// for *this* to-do); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task C3_Claim_ByMemberOfUnaddressedGroup_Refused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-c3-author";
+        const string stranger = "u-u12-c3-stranger";
+        const string addressedGroup = "g-c3-addressed";
+        const string strangerGroup = "g-c3-stranger";
+
+        await Plant(store, new GroupMembership
+        {
+            Id = "gm-c3", GroupId = strangerGroup, UserId = stranger,
+            AddedBy = author, At = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        });
+
+        await Plant(store, new TodoItem
+        {
+            Id = "c3-todo",
+            AuthorId = author,
+            Title = "To-do addressed to another group",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.Group, addressedGroup), // not the stranger's group
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.ClaimTodoAsync("c3-todo", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("c3-todo"))!;
+            Assert.Null(reloaded.AssigneeId);
+        }
+    }
+
+    /// <summary>
+    /// <b>C4</b> (community branch): an **unassigned** to-do that has **no**
+    /// audience group grants but carries a <see cref="TodoItem.ComponentId"/>
+    /// may be **claimed** by a resident of that community (the ADR 0036 lane)
+    /// — <see cref="TodoItem.AssigneeId"/> becomes the claimer, and the one
+    /// <c>todo.claim</c> audit row is <c>Via = AccessVia.Community</c> (the
+    /// group branch tags <c>Group</c>; a group-less, community-only standing
+    /// tags <c>Community</c>).
+    /// </summary>
+    [Fact]
+    public async Task C4_ClaimUnassigned_ByCommunityMember_Succeeds_AuditedCommunityVia()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-c4-author";
+        const string claimer = "u-u12-c4-claimer";
+        const string community = "comp-c4";
+
+        await Plant(store, new ComponentMembership
+        {
+            Id = "cm-c4", ComponentId = community, UserId = claimer,
+            AddedBy = author, At = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        });
+
+        await Plant(store, new TodoItem
+        {
+            Id = "c4-todo",
+            AuthorId = author,
+            Title = "Unassigned community to-do",
+            ComponentId = community,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null, // public — no group grants, so the standing is purely community
+        });
+
+        var claimed = await svc.ClaimTodoAsync("c4-todo", claimer, MemberRoles);
+
+        Assert.Equal(claimer, claimed.AssigneeId);
+        Assert.NotNull(claimed.Modified);
+
+        var audits = await TodoAuditRows(store, "c4-todo");
+        var claim = Assert.Single(audits, a => a.Action == "todo.claim");
+        Assert.Equal(AccessVia.Community, claim.Via);
+        Assert.Equal(claimer, claim.ActorId);
+    }
+
+    /// <summary>
+    /// <b>C5</b> (the unassigned pool filter): <see
+    /// cref="ProjectService.ListTodosAsync"/> with <c>unassignedOnly: true</c>
+    /// returns **only** the unassigned to-dos — an assigned sibling in the
+    /// actor's audience is excluded from the filtered feed (a filter, never a
+    /// gate: the audience gate still ran; the flag only narrows the
+    /// already-visible candidate set, ADR 0073 §3).
+    /// </summary>
+    [Fact]
+    public async Task C5_ListTodos_UnassignedOnly_FiltersOutAssigned()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-c5-author";
+        const string reader = "u-u12-c5-reader";
+
+        // Both to-dos are public (null audience) so the reader sees both
+        // without the audience gate interfering — the filter is the only axis.
+        await Plant(store, new TodoItem
+        {
+            Id = "c5-unassigned",
+            AuthorId = author,
+            Title = "Unassigned to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "c5-assigned",
+            AuthorId = author,
+            Title = "Assigned to-do",
+            AssigneeId = "someone-else",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var unassigned = await svc.ListTodosAsync(null, null, reader, 1, unassignedOnly: true);
+        Assert.Contains("c5-unassigned", unassigned.Select(t => t.Id));
+        Assert.DoesNotContain("c5-assigned", unassigned.Select(t => t.Id));
+
+        var all = await svc.ListTodosAsync(null, null, reader, 1);
+        Assert.Contains("c5-unassigned", all.Select(t => t.Id));
+        Assert.Contains("c5-assigned", all.Select(t => t.Id));
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
