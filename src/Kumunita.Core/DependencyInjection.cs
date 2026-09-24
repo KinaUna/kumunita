@@ -78,7 +78,12 @@ public static class ServiceCollectionExtensions
             // ADR 0006-D lane pin) — the PostService's new ctor param is a
             // new dependency on PostService, not a new seam on a frozen
             // interface (§2.6).
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            // M6 (U04) — the frozen notification emitter (U03). The PostService
+            // ctor param is optional (CS1736); production wiring passes the
+            // DI-registered instance so the post-reply / group-post emitters
+            // fire in production (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // M3b (the "platform announcements" lane, bounded context
         // Kumunita.Core.Announcements — part of M3's roadmap scope): the service seam — a store-composing
@@ -128,7 +133,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Moderation.ModerationService>(sp => new Moderation.ModerationService(
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<Marten.IDocumentStore>()));
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the report.filed / report.assigned /
+            // report.resolved emitters fire (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         services.AddTransient<IEmailDeadLetterCounter, EmailDeadLetterCounter>();
 
@@ -186,7 +196,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Events.IEventService>(sp => new Events.EventService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<IUserInfoService>()));
+            sp.GetRequiredService<IUserInfoService>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the event.rsvp emitter fires (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // M5 (ADR 0067, plan U04): the Projects bounded context's service seam
         // (bounded context Kumunita.Core.Projects — the "outcome" arrow: the
@@ -199,7 +213,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<Projects.IProjectService>(sp => new Projects.ProjectService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IAuthorizationService>(),
-            sp.GetRequiredService<IUserInfoService>()));
+            sp.GetRequiredService<IUserInfoService>(),
+            // M6 (U04) — the frozen notification emitter (U03); the ctor param
+            // is optional (CS1736), production wiring passes the registered
+            // instance so the todo.assign emitter fires (the C-M6 lane).
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

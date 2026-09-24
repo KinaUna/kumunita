@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -51,11 +52,22 @@ public sealed class EventService : IEventService
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
 
-    public EventService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo)
+    // M6 (ADR 0076, plan U04) — the M6 notification emitter seam (F3 event-rsvp).
+    // **Optional** (nullable default) so the existing test call sites that
+    // construct `EventService` positionally (store, authz, userInfo) keep
+    // compiling unchanged — the same CS1736 shape the TG lane used on
+    // `PostService`. The DI registration passes the live
+    // `Notifications.NotificationService`; the frozen service's `EmitAsync`
+    // surface is untouched (unit-series rule 4).
+    private readonly NotificationService? _notifications;
+
+    public EventService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
+        NotificationService? notifications = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _notifications = notifications;
     }
 
     // --- Read lanes (U03) -------------------------------------------------------
@@ -815,6 +827,30 @@ public sealed class EventService : IEventService
         // PostService "re-store + save" quirk. Storing the freshly-created row
         // here too keeps the idiom uniform.
         session.Store(rsvp);
+
+        // M6 (ADR 0076, plan U04) — the F3 event-rsvp emitter. The **event's**
+        // author is the recipient (the RSVPing resident is the *sender*). The
+        // UGC snippet is the RSVP status + the resident's display name (ADR
+        // 0018 — the sender's own content). The idempotency key is the §6.3
+        // `notification:event.rsvp:{rsvpId}` shape (D4, F10). `EmitAsync` runs
+        // on the caller's session and does **not** commit — the
+        // `SaveChangesAsync` below is the single commit (C3). A self-RSVP (the
+        // author RSVPing to their own event) is skipped — no self-notification.
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(@event.AuthorId)
+            && !string.Equals(@event.AuthorId, actorId, StringComparison.Ordinal))
+        {
+            var profile = await _userInfo.GetProfileAsync(actorId).ConfigureAwait(false);
+            var name = string.IsNullOrWhiteSpace(profile?.DisplayName) ? actorId : profile!.DisplayName;
+            await _notifications.EmitAsync(
+                session,
+                recipientId: @event.AuthorId,
+                kind: NotificationKinds.EventRsvp,
+                idempotencyKey: $"notification:event.rsvp:{rsvp.Id}",
+                body: $"{name} RSVP'd {status}",
+                ct: ct).ConfigureAwait(false);
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return rsvp;
     }

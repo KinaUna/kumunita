@@ -1,4 +1,5 @@
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Posts;
 using Kumunita.Core.UserInfo;
 using Marten;
@@ -47,14 +48,34 @@ public sealed class ModerationService
     private readonly IAuthorizationService _authz;
     private readonly IDocumentStore _store;
 
+    // M6 (U04) — the notification emitter (frozen surface, U03). Optional so the
+    // existing (pre-M6) positional call sites keep compiling (CS1736, the TG-lane
+    // precedent); production wiring passes the DI-registered instance.
+    private readonly NotificationService? _notifications;
+
     public ModerationService(
         IUserInfoService userInfo,
         IAuthorizationService authz,
-        IDocumentStore store)
+        IDocumentStore store,
+        NotificationService? notifications = null)
     {
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _authz    = authz    ?? throw new ArgumentNullException(nameof(authz));
         _store    = store    ?? throw new ArgumentNullException(nameof(store));
+        _notifications = notifications;
+    }
+
+    /// <summary>
+    /// M6 (U04) — the emitter-body truncation helper (design doc §6.3
+    /// "the report's reason, truncated"; ADR 0018 the sender-language
+    /// pin). Caps the stored snippet at 200 chars + a trailing ellipsis
+    /// so an inbox row never carries a full report body inline.
+    /// </summary>
+    private static string? Truncate(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return text;
+        var trimmed = text.Trim();
+        return trimmed.Length <= 200 ? trimmed : trimmed[..200] + "…";
     }
 
     /// <summary>
@@ -157,6 +178,25 @@ public sealed class ModerationService
         };
 
         session.Store(audit);
+
+        // M6 (U04, F5) — report-filed emitter (design doc §6.3): the
+        // content's author is notified that their post was reported.
+        // Skip the self-report case (reporter == author — no point
+        // notifying someone of their own filing). Staged into the
+        // caller's session and committed by the single SaveChangesAsync
+        // below (C3).
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(post.AuthorId)
+            && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
+        {
+            await _notifications.EmitAsync(
+                session,
+                recipientId: post.AuthorId,
+                kind: NotificationKinds.ReportFiled,
+                idempotencyKey: $"notification:report.filed:{report.Id}",
+                body: Truncate(reason),
+                ct: default).ConfigureAwait(false);
+        }
 
         // C3 — one SaveChangesAsync: the Report row and the AccessAudit
         // row commit atomically (no partial write; ADR 0006-C; §2.3
@@ -393,6 +433,21 @@ public sealed class ModerationService
                 Via                  = decision.Via,
                 Outcome              = AccessOutcome.Allow
             });
+
+            // M6 (U04, F6) — report-assigned emitter (design doc §6.3):
+            // the assigned moderator is notified. Staged into the
+            // caller's session; committed by the single SaveChangesAsync
+            // below (C3).
+            if (_notifications is not null)
+            {
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: assignedToModeratorId,
+                    kind: NotificationKinds.ReportAssigned,
+                    idempotencyKey: $"notification:report.assigned:{report.Id}",
+                    body: Truncate(report.Reason),
+                    ct: default).ConfigureAwait(false);
+            }
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);
@@ -530,6 +585,27 @@ public sealed class ModerationService
                 Via                  = decision.Via,
                 Outcome              = AccessOutcome.Allow
             });
+
+            // M6 (U04, F7) — report-resolved emitter (design doc §6.3):
+            // the **filer** is notified their report was resolved.
+            // The *assignee* emission named by the spec cannot be
+            // resolved from the frozen M3b shapes: the Report row has
+            // no assigned-moderator field (only ComponentId), and
+            // ModeratorAssignment is a component-scope governance row,
+            // not a per-report assignment. Resolving it would require
+            // reshaping a frozen entity (unit-series rule 4) — out of
+            // U04 scope. Staged into the caller's session; committed by
+            // the single SaveChangesAsync below (C3).
+            if (_notifications is not null && !string.IsNullOrWhiteSpace(report.ReporterId))
+            {
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: report.ReporterId,
+                    kind: NotificationKinds.ReportResolved,
+                    idempotencyKey: $"notification:report.resolved:{report.Id}:filed",
+                    body: Truncate(report.Reason),
+                    ct: default).ConfigureAwait(false);
+            }
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);

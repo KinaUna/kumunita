@@ -1,6 +1,7 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 
@@ -41,11 +42,17 @@ public sealed class ProjectService : IProjectService
     private readonly IAuthorizationService _authorization;
     private readonly IUserInfoService _userInfo;
 
-    public ProjectService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo)
+    // M6 (U04) — the notification emitter (frozen surface, U03). Optional so
+    // the existing (pre-M6) positional call sites keep compiling (CS1736, the
+    // TG-lane precedent); production wiring passes the DI-registered instance.
+    private readonly NotificationService? _notifications;
+
+    public ProjectService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo, NotificationService? notifications = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _notifications = notifications;
     }
 
     // --- Read lanes (U04) -------------------------------------------------------
@@ -636,6 +643,25 @@ public sealed class ProjectService : IProjectService
 
         session.Store(todo);
         StoreAuditRow(session, actorId, "todo.assign", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+
+        // M6 (U04, F8) — todo-assign emitter (design doc §6.3): the
+        // assignee is notified. `null` = unassign (no recipient); skip the
+        // self-assign case (actor == assignee — no self-notification).
+        // Staged into the caller's session and committed by the single
+        // SaveChangesAsync below (C3).
+        if (_notifications is not null
+            && !string.IsNullOrWhiteSpace(assigneeId)
+            && !string.Equals(assigneeId, actorId, StringComparison.Ordinal))
+        {
+            await _notifications.EmitAsync(
+                session,
+                recipientId: assigneeId,
+                kind: NotificationKinds.TodoAssign,
+                idempotencyKey: $"notification:todo.assign:{todo.Id}",
+                body: todo.Title,
+                ct: ct).ConfigureAwait(false);
+        }
+
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return todo;
     }
