@@ -25,7 +25,13 @@ handoff-note precedent — the *lean* shape).
 - **One thing the next agent must not change:** the §5 D#↔C-M6·# mapping is 1:1 and complete (eleven each); U01 locks them into ADR 0076 as-is — do not renumber, merge, or split any D#
 - **Drift:** none recorded.
 
-<!-- U01 appends `## U01` here on completion. -->
+## U01
+
+- **Shipped:** design doc Part 2 (§6.1–§6.6 complete: exact C# for `Notification` / `NotificationPreference` / `NotificationKinds` (nine constants) / `M6DocTypes` / the six-method `NotificationService` surface; the 8-key idempotency table; the 12 pinned Core test names + 5 Web route pins; the 3 gate-test names; the drift-guard rule). `docs/adr/0076-notifications-inbox-and-recipient-email.md` authored **Accepted**, D1–D11 1:1 with C-M6·1…11 (locked as-is, no renumber/merge/split). Roadmap trio **confirmed, no edit**: `Milestones.cs` (M5 `StatusDone` / M6 `StatusNext` / M7 `StatusPlanned`), README Roadmap (M5 "Done" / M6 "In progress"), `MilestonesTests.cs` pins the exact trio.
+- **One thing the next agent must not change:** the §6.2 `EmitAsync` signature — `Task<Notification> EmitAsync(IDocumentSession session, string recipientId, string kind, string idempotencyKey, string? body, CancellationToken ct = default)` — and the dedup pin: `EmitAsync` dedups **itself** via an `IdempotencyKey` look-up on the caller's session (F10: a same-key re-emission returns the existing row, no second row, no second `StageAsync` call). U02 codes the docs against §6.1 verbatim; U03 the service against §6.2 verbatim.
+- **Drift:** none recorded. (Note: §6.3 names the dedup as **two layers** — the service-side `IdempotencyKey` look-up (inbox) + the `StageAsync` guarantee (email) — which is how F10's "no second inbox row" is testable against the service alone; read D4/C-M6·4 as the emitter-supplies-a-stable-key + service-enforces-the-no-op split.)
+
+<!-- U02 appends `## U02` here on completion. -->
 <!-- U02 appends `## U02` here on completion. -->
 <!-- U03 appends `## U03` here on completion. -->
 <!-- U04 appends `## U04` here on completion. -->

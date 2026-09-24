@@ -1,24 +1,25 @@
-# M6 — Notifications — design (Part 1)
+# M6 — Notifications — design (Parts 1 + 2)
 
 > **Milestone.** `M6` — the **shared awareness** arrow (the
 > `docs/ARCHITECTURE.md` §0 value-chain row: *"the platform reaches out to
 > the resident where they are"*, already pinned). **ADR 0076** is this
-> milestone's decision record — **not yet authored**; this unit (U00) authors
-> Part 1 only, and every decision below is marked **[PROPOSED]** until **U01**
-> locks it into ADR 0076.
+> milestone's decision record — **authored Accepted by U01**; the decisions
+> D1–D11 below are the `[PROPOSED]` text U01 locked verbatim into it.
 >
-> **Status.** **Part 1 (U00) [PROPOSED]; Part 2 (U01) not yet authored.** The
-> decisions D1–D11 are **[PROPOSED]**; **U01** locks them into **ADR 0076
-> (Accepted)** and authors Part 2 (the exact C# shapes, the full
-> `NotificationService` surface, the pinned test names, the gate, and the
-> drift-guard). The sealed-unit register is
+> **Status.** **Part 1 (U00) complete; Part 2 (U01) complete** — §6.1–§6.6
+> carry the **exact C# shapes** (the two documents + `NotificationKinds`, the
+> `M6DocTypes` registration, the full `NotificationService` surface, the
+> idempotency-key table, the pinned test names, the gate, and the
+> drift-guard); **ADR 0076 (Accepted)** is the decisions source; the roadmap
+> trio (M5 `StatusDone` / M6 `StatusNext` / M7 `StatusPlanned`) is
+> **confirmed** on `Milestones.cs` + README + `MilestonesTests.cs` (a
+> confirmation, not a change). The sealed-unit register is
 > `docs/plans-milestones/plan-m6-notifications.md`; the scratch log is
 > `docs/plans-milestones/in-progress/notifications/notifications-handoff-notes.md`.
 >
-> **Scope of this file (Part 1):** what this milestone is; the scope in/out
+> **Scope of this file:** Part 1 — what this milestone is; the scope in/out
 > split; the 11 invariants (C-M6·1…11); the 12 FACES (F1–F12); and the
-> decisions D1–D11 (each **[PROPOSED]**).
-> **Not in this file (U01 owns Part 2):** the exact POCO field sets, the exact
+> decisions D1–D11. Part 2 (§6) — the exact POCO field sets, the exact
 > `NotificationService` signatures, the idempotency-key table, the pinned test
 > names, the gate, and the drift-guard.
 
@@ -339,38 +340,426 @@ new authorization path, a new email mechanism, or a new UI dependency.
 *Precedent reused:* every named seam verbatim (the M4 / M5 additive-and-reusing
 precedent).
 
-## 6. Part 2 (U01 — not yet authored)
+## 6. Part 2 (U01 — authored; ADR 0076 Accepted)
 
-*The following sections are authored by U01, after ADR 0076 is Accepted.*
+The shapes below are **exact**: a later unit copies them verbatim into `.cs`
+files. All timestamps are `DateTimeOffset` (the M4 `Event` / M5 `TodoItem`
+convention). All documents are Marten-native POCOs with the conventional
+`string` `Id` (the M5 `TodoItem` shape). The `NotificationService` composes
+**only** the frozen seams — no new seam on any frozen interface
+(C-M6·11; the unit-series rule 6).
 
 ### 6.1 Document shapes
 
-*(U01: the exact POCO field sets for `Notification` and
-`NotificationPreference`, the `M6DocTypes` registration, and the
-`NotificationKinds` static class.)*
+**`NotificationKinds`** — `src/Kumunita.Core/Notifications/NotificationKinds.cs`
+(D2; the M5 `KanbanStatuses` static-const-string shape, verbatim pattern):
+
+```csharp
+namespace Kumunita.Core.Notifications;
+
+/// <summary>
+/// The closed, code-owned notification kind vocabulary (ADR 0076 D2).
+/// The stored <see cref="Notification.Kind"/> remains a plain <c>string</c> —
+/// these constants define the closed set the emitters and the settings page
+/// use (the M5 <c>KanbanStatuses</c> shape; a resident cannot choose their own
+/// kind string — only the code's emitters can).
+/// </summary>
+public static class NotificationKinds
+{
+    /// <summary>A reply was added to a post the resident authored (wired, U04).</summary>
+    public const string PostReply = "post.reply";
+
+    /// <summary>
+    /// A reply mentions the resident (RESERVED — the constant + the <c>kw-l</c>
+    /// keys exist; no M6 emitter calls it — mention detection is a follow-on
+    /// lane, ADR 0076 D2).
+    /// </summary>
+    public const string PostMention = "post.mention";
+
+    /// <summary>A new post was added to a group the resident is a member of (wired, U04).</summary>
+    public const string GroupPost = "group.post";
+
+    /// <summary>A resident RSVP'd to an event the resident authored (wired, U04).</summary>
+    public const string EventRsvp = "event.rsvp";
+
+    /// <summary>The M4 §6.4 day-before reminder (wired, U04 — M6 adds the inbox row; the email is M4's).</summary>
+    public const string EventReminder = "event.reminder";
+
+    /// <summary>A report was filed against content the resident authored (wired, U04).</summary>
+    public const string ReportFiled = "report.filed";
+
+    /// <summary>A report was assigned to the resident (a moderator) (wired, U04).</summary>
+    public const string ReportAssigned = "report.assigned";
+
+    /// <summary>A report the resident filed (or was assigned to) was resolved (wired, U04).</summary>
+    public const string ReportResolved = "report.resolved";
+
+    /// <summary>A to-do was assigned to the resident (person-only; wired, U04).</summary>
+    public const string TodoAssign = "todo.assign";
+
+    /// <summary>
+    /// The ordered, closed kind set (for the settings toggles + the <c>kw-l</c>
+    /// key table). Order is the settings page's canonical display order.
+    /// </summary>
+    public static IReadOnlyList<string> Known { get; } =
+    [
+        PostReply, PostMention, GroupPost, EventRsvp, EventReminder,
+        ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
+    ];
+}
+```
+
+**`Notification`** — `src/Kumunita.Core/Notifications/Notification.cs` (D1, D3):
+
+```csharp
+namespace Kumunita.Core.Notifications;
+
+/// <summary>
+/// A notification row — a **personal** inbound record for one recipient
+/// (ADR 0076 D3: the <c>RecipientId</c> is the whole access story; no
+/// <c>Audience</c>, no <c>AccessAction</c>, no <c>IAuditableResource</c>
+/// adapter, no audit row on read). The inbox is the **durable** record
+/// (D5); the email is the best-effort nudge staged alongside it.
+/// </summary>
+public sealed class Notification
+{
+    public string Id { get; set; } = string.Empty;             // surrogate (Marten default)
+
+    public string RecipientId { get; set; } = string.Empty;    // the SubjectId the row is FOR (D3 — the whole access story)
+    public string Kind { get; set; } = string.Empty;           // one of <see cref="NotificationKinds"/> (D2 — code-owned closed set)
+    public string IdempotencyKey { get; set; } = string.Empty; // the <c>notification:{kind}:{stable-source-id}</c> key (D4, §6.3) — the service-side dedup anchor; a re-emission with the same key is a no-op (F10)
+    public string? SourceId { get; set; }                      // the stable source id from the idempotency key (the §6.3 table) — display/debug, never a gate
+    public string? Subject { get; set; }                       // the localized subject used for the email (the recipient's language, D6); stored for the inbox row's display
+    public string? Body { get; set; }                          // the localized body (the recipient's language, D6) with the UGC snippet (the sender's authored language, ADR 0018)
+
+    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset? ReadAt { get; set; }                // `null` = unread (D8 — the "mark all read" set is one bulk update)
+}
+```
+
+**`NotificationPreference`** — `src/Kumunita.Core/Notifications/NotificationPreference.cs` (D9):
+
+```csharp
+namespace Kumunita.Core.Notifications;
+
+/// <summary>
+/// The recipient's notification preference (ADR 0076 D9 — lean: **one**
+/// field). <see cref="KindsEnabled"/> is the subset of the nine
+/// <see cref="NotificationKinds"/> constants the resident has **enabled**;
+/// <c>null</c> / empty = **all enabled** (the lean-default — the M5
+/// <c>KanbanLane.MaxItems?</c> nullable precedent: <c>null</c> means "no
+/// limit", here "all on"). The preference governs the **email** nudge,
+/// never the inbox row (D7).
+/// </summary>
+public sealed class NotificationPreference
+{
+    public string RecipientId { get; set; } = string.Empty;    // the document id — one preference row per recipient (Marten identity)
+
+    public IReadOnlyList<string>? KindsEnabled { get; set; }   // subset of <see cref="NotificationKinds.Known"/>; `null` / empty = all enabled (D9)
+
+    public DateTimeOffset? Updated { get; set; }
+}
+```
+
+**`M6DocTypes`** — `src/Kumunita.Core/M6DocTypes.cs` (D1; the `M5DocTypes`
+pattern verbatim — same file placement, same `Configure(StoreOptions)` shape):
+
+```csharp
+using Kumunita.Core.Notifications;
+using Marten;
+
+namespace Kumunita.Core;
+
+/// <summary>
+/// The <c>M6</c> (Notifications) bounded context's Marten-native document
+/// registration surface (ADR 0004 §B.1 / ADR 0076 D1) — the parallel surface
+/// to <see cref="M5DocTypes"/> for the new <c>Kumunita.Core.Notifications</c>
+/// context. Both documents are POCOs with the conventional <c>string</c>
+/// <c>Id</c> identity (the M5 convention), so only the feed/index needs
+/// pinning. The docs are new, not additive; the surface is additive —
+/// <c>ApplyAllConfiguredChangesToDatabaseAsync()</c> delta-detects and
+/// applies the new tables idempotently at boot. **Zero migrations for
+/// existing surfaces.**
+/// </summary>
+public static class M6DocTypes
+{
+    public static void Configure(StoreOptions opts)
+    {
+        // Notification — conventional string Id (Marten's default); the
+        // (RecipientId, Created) **feed-ordering** index (the
+        // <c>ListInboxAsync</c> feed orders survivors by `Created` descending —
+        // the M5 <c>TodoItem</c> (ComponentId, Created) index shape); the
+        // <c>IdempotencyKey</c> index (the F10 re-emission dedup anchor — the
+        // <c>EmitAsync</c> look-up that makes a same-key re-emission a no-op).
+        opts.Schema.For<Notification>()
+               .Index(n => new { n.RecipientId, n.Created })
+               .Index(n => n.IdempotencyKey);
+
+        // NotificationPreference — the RecipientId is the document id (one
+        // row per recipient); no additional indexes needed.
+        opts.Schema.For<NotificationPreference>();
+    }
+}
+```
 
 ### 6.2 Service surface
 
-*(U01: the exact `NotificationService` method signatures — the `EmitAsync`
-writer, the `ListInboxAsync` / `CountUnreadAsync` / `MarkAllReadAsync` read +
-state lanes, and the `GetPreferencesAsync` / `SetPreferencesAsync` preference
-lanes.)*
+**`NotificationService`** — `src/Kumunita.Core/Notifications/NotificationService.cs`
+(D3, D4, D5, D7, D8, D11). **No `INotificationService` interface** (the
+`EventService` / `ProjectService` precedent, as stated in the register).
+The constructor composes **only** frozen seams — no ADD on any frozen
+interface (unit-series rule 6). `EmitAsync` runs on the **caller's**
+`IDocumentSession` so the inbox row + the outbox row + the durable envelope
+commit atomically (D5, C3; the `IMailerStage.StageAsync` contract,
+`IMailerStage.cs` line 54).
+
+```csharp
+namespace Kumunita.Core.Notifications;
+
+/// <summary>
+/// The <c>M6</c> (Notifications) composition service (ADR 0076). A
+/// store-composing service over the frozen seams:
+/// <see cref="Marten.IDocumentStore"/> (reads open their own
+/// <c>QuerySession</c>), <see cref="UserInfo.IUserInfoService"/> (the
+/// frozen <c>GetProfileAsync</c> read lane for the recipient's
+/// <c>Profile.EmailLanguage</c> + <c>Email</c> — ADR 0061),
+/// <see cref="Localization.ITranslationProvider"/> (the ADR 0061
+/// <c>preferredLanguageCode</c> → <c>DefaultLanguageCode</c> → <c>en</c>
+/// chain), and <see cref="Identity.IMailerStage"/> (the M1 durable-email
+/// seam — the <c>StageAsync</c> idempotency guarantee is the **sole
+/// email-side** dedup mechanism; the inbox-side dedup is the
+/// <c>IdempotencyKey</c> look-up in <c>EmitAsync</c>, D4 / F10).
+/// <para>
+/// **Personal read, not an <c>AccessAction</c> decision (D3):** no
+/// <see cref="Authorization.IAuthorizationService"/> in the constructor —
+/// the <c>RecipientId</c> is the whole access story; no audit row is
+/// emitted for an inbox read (F11).
+/// </para>
+/// </summary>
+public sealed class NotificationService
+{
+    /// <summary>The inbox cap (D8) — the most recent 50 rows, newest-first.</summary>
+    public const int InboxCap = 50;
+
+    private readonly IDocumentStore _store;
+    private readonly IUserInfoService _userInfo;
+    private readonly ITranslationProvider _translator;
+    private readonly IMailerStage _mailer;
+
+    public NotificationService(
+        IDocumentStore store,
+        IUserInfoService userInfo,
+        ITranslationProvider translator,
+        IMailerStage mailer)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
+        _translator = translator ?? throw new ArgumentNullException(nameof(translator));
+        _mailer = mailer ?? throw new ArgumentNullException(nameof(mailer));
+    }
+
+    /// <summary>
+    /// The writer (D4, D5, D7): stores the <see cref="Notification"/> row on
+    /// <paramref name="session"/> (the inbox is the durable record) and
+    /// **conditionally** calls <see cref="IMailerStage.StageAsync"/> (only if
+    /// the recipient's preference enables the kind, D7), in the same
+    /// transaction (C3 — the domain write + the outbox row + the envelope
+    /// commit atomically). **Dedup (D4, F10):** if a <see cref="Notification"/>
+    /// row with the same <paramref name="idempotencyKey"/> already exists
+    /// (looked up on <paramref name="session"/>, the
+    /// <c>IdempotencyKey</c> index in <c>M6DocTypes</c>), the method returns
+    /// that existing row **without** storing a second row and **without**
+    /// calling <c>StageAsync</c> — a re-emission of the same logical event is
+    /// a no-op (no second inbox row, no second email). The key itself is the
+    /// **emitter's** responsibility (D4) — a stable, content-derived
+    /// <c>notification:{kind}:{stable-source-id}</c> string (the §6.3 table).
+    /// Returns the stored (or pre-existing) row.
+    /// </summary>
+    public async Task<Notification> EmitAsync(
+        IDocumentSession session,
+        string recipientId,
+        string kind,
+        string idempotencyKey,
+        string? body,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The inbox read (D8): the most recent <see cref="InboxCap"/> (50)
+    /// rows for the recipient, newest-first (<c>Created</c> descending).
+    /// **No pagination, no per-kind filter in M6** (D8). A personal read —
+    /// no <c>IAuthorizationService</c> call, no audit row (D3, F11).
+    /// </summary>
+    public async Task<IReadOnlyList<Notification>> ListInboxAsync(
+        string recipientId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The unread count (D8): the number of the recipient's rows with
+    /// <c>ReadAt</c> null. A personal read — no audit row (D3, F11).
+    /// </summary>
+    public Task<int> CountUnreadAsync(string recipientId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The "mark all read" state lane (D8): sets <c>ReadAt = now</c> on
+    /// **all** the recipient's unread rows in one bulk update (no per-row
+    /// loop — the M3b bulk-update precedent). A state lane, not a read —
+    /// no audit row (D3).
+    /// </summary>
+    public Task MarkAllReadAsync(string recipientId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The preference read (D9): the recipient's
+    /// <see cref="NotificationPreference"/>; returns a **default** instance
+    /// (<c>KindsEnabled = null</c> = all enabled) when none exists — the
+    /// lean-default, never a <see cref="KeyNotFoundException"/>. A personal
+    /// read — no audit row (D3).
+    /// </summary>
+    public async Task<NotificationPreference> GetPreferencesAsync(
+        string recipientId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// The preference write lane (D9): upserts the recipient's
+    /// <see cref="NotificationPreference"/> with <paramref name="kindsEnabled"/>
+    /// (the subset of the nine kind constants the resident has enabled;
+    /// <c>null</c> / empty = all enabled — the lean-default) and sets
+    /// <c>Updated = now</c>. A state lane — no audit row (D3).
+    /// </summary>
+    public Task SetPreferencesAsync(
+        string recipientId,
+        IReadOnlyList<string>? kindsEnabled,
+        CancellationToken ct = default);
+}
+```
+
+**The C3 same-transaction pin (D5), verbatim from `IMailerStage.StageAsync`:**
+`EmitAsync` calls `session.Store(notification)` **then**
+`_mailer.StageAsync(session, idempotencyKey, recipient, subject, body, ct)`
+**on the caller's** `IDocumentSession` — the `OutboxEmailStager` (the frozen
+implementation) `Store`s the `OutboxEmail` row on that same session **and**
+enqueues the durable envelope via `IMessageContext.PublishAsync` in the
+ambient Marten transaction, so one `session.SaveChangesAsync()` = the
+`Notification` row + the outbox row + the envelope commit atomically (the
+C3 guarantee, `IMailerStage.cs` line 30). The `EmitAsync` method does **not**
+call `SaveChangesAsync` itself — the caller's commit is the single commit.
+
+**The D7 email-gate shape, verbatim:** `EmitAsync` resolves the preference
+(`GetPreferencesAsync`-equivalent on the same session — `LoadAsync` /
+`Query()` on `NotificationPreference` by `RecipientId`) **before** deciding
+to stage; if `KindsEnabled` is non-null and non-empty **and** does not
+contain `kind`, the method stores the `Notification` row and returns **without**
+calling `StageAsync` (F9). If `KindsEnabled` is null or empty, the email is
+staged (the lean-default). The `Notification` row is stored **unconditionally**
+in both branches.
 
 ### 6.3 Idempotency keys
 
-*(U01: the full idempotency-key table — one row per kind, the key shape, and
-the stable-source-id derivation.)*
+The **eight** wired-key shapes (D4 — the `IMailerStage.StageAsync`
+idempotency guarantee is the **sole** dedup mechanism; a re-emission with
+the same key is a no-op — no second inbox row, no second email, F10).
+The `PostMention` kind is **reserved, not wired** (D2) — no key shape
+exists in M6 (the constant + the `kw-l` keys exist; no emitter calls it).
+
+| Kind | Idempotency key shape | Stable source id |
+|------|----------------------|------------------|
+| `post.reply` | `notification:post.reply:{replyId}` | the `Reply.Id` (a reply is a unique source) |
+| `group.post` | `notification:group.post:{postId}` | the `Post.Id` (a group post is a unique source) |
+| `event.rsvp` | `notification:event.rsvp:{rsvpId}` | the `EventRsvp.Id` (an RSVP is a unique source) |
+| `event.reminder` | `notification:event.reminder:{eventId}:{date}` | the `Event.Id` + the reminder's date (a day is a unique source for a given event) |
+| `report.filed` | `notification:report.filed:{reportId}` | the `Report.Id` (a report is a unique source) |
+| `report.assigned` | `notification:report.assigned:{reportId}` | the `Report.Id` (a report is a unique source; assignment is idempotent per report) |
+| `report.resolved` | `notification:report.resolved:{reportId}` | the `Report.Id` (a report is a unique source; resolution is idempotent per report) |
+| `todo.assign` | `notification:todo.assign:{todoId}` | the `TodoItem.Id` (a to-do is a unique source; person-only — D2) |
+
+**The re-emission-is-a-no-op pin (D4, F10):** a re-emission of the same
+logical event is a no-op — **no second inbox row, no second email.** The
+dedup has two layers, both keyed on the **same**
+`idempotencyKey`: (1) **inbox side** — `EmitAsync` looks up an existing
+`Notification` row by `IdempotencyKey` on the caller's session (the
+`IdempotencyKey` index in `M6DocTypes`) **before** storing; if one exists it
+returns it and does not store a second row; (2) **email side** —
+`IMailerStage.StageAsync`'s idempotency guarantee (the `OutboxEmailStager`
+contract — a duplicate key is a no-op, not a second email) is the **sole**
+email-side dedup mechanism; the service does not re-check the outbox. The
+**emitter's** responsibility (D4) is to supply a **stable, content-derived**
+key (a re-emission of the same logical event must produce the same key); the
+service-side look-up then makes the re-emission a no-op on both sides, so the
+F10 test (`Emit_DuplicateKey_SameLogicalEvent_Is_NoOp`) can assert it by
+calling `EmitAsync` twice with the same key and observing one inbox row + one
+staged email.
 
 ### 6.4 Pinned tests
 
-*(U01: the exact pinned test names for the 12 FACES over the service (Core,
-`PostgresFixture`) and the Web controller pins (NSubstitute).)*
+**Core — `Kumunita.Core.Tests.NotificationServiceTests`** (12 FACES, one per
+test; `PostgresFixture`; the `Method_Face_Expectation` shape — the method
+under test, the FACE it pins, and the expectation). The **exact** test names
+(a later unit codes against these names, not a re-derivation):
+
+| # | Test name | FACE | Pins |
+|---|-----------|------|------|
+| 1 | `Emit_PostReply_Stores_InboxRow_And_Stages_Email_For_Author` | F1 | C-M6·2, C-M6·7 |
+| 2 | `Emit_GroupPost_Stores_InboxRow_And_Stages_Email_For_Member` | F2 | C-M6·2, C-M6·7 |
+| 3 | `Emit_EventRsvp_Stores_InboxRow_And_Stages_Email_For_Author` | F3 | C-M6·2, C-M6·7 |
+| 4 | `Emit_EventReminder_Stores_InboxRow_Email_Is_M4s` | F4 | C-M6·2, C-M6·5 |
+| 5 | `Emit_ReportFiled_Stores_InboxRow_And_Stages_Email_For_Author` | F5 | C-M6·2, C-M6·7 |
+| 6 | `Emit_ReportAssigned_Stores_InboxRow_And_Stages_Email_For_Moderator` | F6 | C-M6·2, C-M6·7 |
+| 7 | `Emit_ReportResolved_Stores_InboxRow_And_Stages_Email_For_Resident` | F7 | C-M6·2, C-M6·7 |
+| 8 | `Emit_TodoAssign_Stores_InboxRow_And_Stages_Email_For_Resident` | F8 | C-M6·2, C-M6·7 |
+| 9 | `Emit_DisabledKind_Stores_InboxRow_But_Not_Email` | F9 | C-M6·7 |
+| 10 | `Emit_DuplicateKey_SameLogicalEvent_Is_NoOp` | F10 | C-M6·4 |
+| 11 | `ListInbox_Does_Not_Emit_AuditRow` | F11 | C-M6·3 |
+| 12 | `Emit_Email_In_Recipients_Language_UgcSnippet_In_Senders_Language` | F12 | C-M6·6 |
+
+**Web — `Kumunita.Web.Tests.NotificationsControllerTests`** (NSubstitute; the
+5 route pins — the **exact** route + method + expectation):
+
+| # | Route | Method | Expectation |
+|---|-------|--------|-------------|
+| 1 | `/notifications` | `GET` | 200 + the 50-row cap (the `InboxCap` constant) |
+| 2 | `/notifications/unread-count` | `GET` | 200 + JSON `{ "count": N }` |
+| 3 | `/notifications/mark-all-read` | `POST` | 302 + the `ReadAt` set on all unread rows |
+| 4 | `/notifications/preferences` | `GET` | 200 + the toggles (the nine `NotificationKinds.Known` entries) |
+| 5 | `/notifications/preferences` | `POST` | 302 + the `KindsEnabled` update |
 
 ### 6.5 Acceptance gate
 
-*(U01: the three-test acceptance gate — closed-loop / handoff /
-part-vs-whole.)*
+The **three-test acceptance gate** (the M4 / M5 gate precedent — the
+`closed-loop` / `handoff` / `part-vs-whole` shapes), **recorded by U10** in
+the handoff note. The three gate tests (the **exact** names — a later unit
+codes against these names, not a re-derivation):
+
+| # | Gate test name | Shape | FACES covered |
+|---|----------------|-------|---------------|
+| 1 | `Gate_ClosedLoop_F1_Face_EndToEnd` | **closed-loop**: the F1 FACE (a reply on a post the resident authored) end-to-end — the emitter calls `EmitAsync`, the inbox row is stored, the email is staged, the `ListInboxAsync` read returns the row, the `CountUnreadAsync` count is 1, the `MarkAllReadAsync` call sets `ReadAt` | F1 |
+| 2 | `Gate_Handoff_F9_F10_Faces_Preference_And_ReEmission` | **handoff**: the F9 FACE (a disabled kind still gets the inbox row but not the email) + the F10 FACE (a re-emission of the same logical event is a no-op) — the preference is read at emit time, the email is gated, the inbox row is unconditional; a second `EmitAsync` call with the same `idempotencyKey` does not produce a second email (the `StageAsync` dedup) | F9, F10 |
+| 3 | `Gate_PartVsWhole_F11_F12_Faces_NoAuditRow_And_RecipientLanguage` | **part-vs-whole**: the F11 FACE (the inbox read does not emit an audit row — a personal read, not an `AccessAction` decision) + the F12 FACE (the email is in the recipient's `Profile.EmailLanguage`, the UGC snippet is in the sender's authored language) — the `ListInboxAsync` / `CountUnreadAsync` lanes do not call `IAuthorizationService`; the `EmitAsync` email body is resolved in the recipient's language, the UGC snippet is in the sender's authored language | F11, F12 |
+
+**The U10 recording (the close unit):** the gate result (pass / fail) is
+appended to the handoff note (`docs/plans-milestones/in-progress/notifications/
+notifications-handoff-notes.md`, the `## U10` section); the lane's unit files
+move `in-progress/notifications/` → `done/notifications/`; the roadmap trio
+is confirmed (M5 `StatusDone`, M6 `StatusNext` → `StatusDone`, M7
+`StatusPlanned` → `StatusNext`); the ARCHITECTURE.md §3 + §5 sync, the README
+Roadmap, and the handoff summary are all honest at ship time.
 
 ### 6.6 Drift-guard
 
-*(U01: the drift-guard rules for U02–U10.)*
+The rule (the M4 / M5 drift-guard precedent — the **sole** mechanism for a
+mid-lane doc fix, the register's unit-series rule 9):
+
+If any unit's (U02–U09) entry reads reveal the design doc is out of date — a
+shape changed, a seam was re-shaped, a pinned name no longer matches the
+code — the unit **pauses** and records `## U<m> — Drift pause` in the
+handoff note (the `## U<m>` section, **appended**, never rewritten). The
+pause records: (1) **what** drifted (the exact shape / name / seam that no
+longer matches the design doc); (2) **where** the unit found it (the file +
+line / the design-doc §); (3) **what the unit proposes** (the exact change
+to the design doc, or the exact change to the code to match the doc). The
+next unit (or the same unit, if the drift is trivial and the unit is
+confident) applies the fix, re-reads the affected sections, and continues.
+**No unit rewrites the design doc outside the drift-guard mechanism** (the
+register's unit-series rule 2) — a unit that wants to change a pinned shape
+must record the drift first, then apply the fix, then continue. The U10
+close unit is the **sole** unit that rewrites the design doc's status header
+(the Part 1 → Part 2 transition, the ADR 0076 Accepted lock, the roadmap
+trio confirmation) — all other units code against the frozen text.
