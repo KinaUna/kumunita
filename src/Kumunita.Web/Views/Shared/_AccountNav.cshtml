@@ -70,6 +70,27 @@
 <ul class="navbar-nav">
     @if (isAuthenticated)
     {
+        @* M6 (U06) — the notification bell (C-M6·10): a static anchor to the
+           inbox + the unread-count badge. **Static markup only** — the badge
+           is hidden by default and the unread-count poller (GET
+           /notifications/unread-count, the 30-second setInterval) + dropdown
+           render are U08's client/lib/notifications-bell.ts module (the ADR 0031
+           tsc-only pin — no inline script here). U08 wires the two ids this
+           element ships: #notifications-bell (the anchor) and #notifications-badge
+           (the badge). *@
+        <li class="nav-item">
+            <a class="nav-link position-relative d-inline-flex align-items-center"
+               href="/notifications" id="notifications-bell" aria-label="Notifications">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"
+                     fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M8 1.6c-2.4 0-4 1.9-4 4.3 0 2.5-1 3.6-1.6 4.2-.3.3-.1.8.3.8h10.6c.4 0 .6-.5.3-.8-.6-.6-1.6-1.7-1.6-4.2 0-2.4-1.6-4.3-4-4.3z"/>
+                    <path d="M6.4 13.2a1.7 1.7 0 0 0 3.2 0"/>
+                </svg>
+                <span class="visually-hidden"><kw-l key="notifications.bell">Notifications</kw-l></span>
+                <span class="badge rounded-pill text-bg-danger position-absolute top-0 start-100 translate-middle"
+                      id="notifications-badge" style="display:none;" data-count="0"></span>
+            </a>
+        </li>
         @* One account dropdown (visible to signed-in residents only): the globe
            language switcher sits inside it as a sub-section, so the navbar
            carries a single toggle instead of six flat links. *@
