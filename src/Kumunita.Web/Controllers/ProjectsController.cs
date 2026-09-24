@@ -1042,6 +1042,180 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/move-left</c> — the
+    /// lane-reorder lane (ADR 0068 — the service's
+    /// <see cref="IProjectService.MoveLaneAsync"/> <c>"left"</c> pin).
+    /// **Creator ∪ GlobalAdmin** over the board (C-M5·6) — the service's
+    /// server-side standing gate; a missing id is 404, a denied actor 403
+    /// (the C3 split); an edge lane (no lane to the left) is a service no-op
+    /// (nothing written — the redirect is a harmless round-trip).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/move-left")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveLaneLeftPost(string id, string laneId)
+    {
+        return await MoveLaneAsync(id, laneId, "left");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/move-right</c> — the
+    /// lane-reorder lane (ADR 0068 — the service's
+    /// <see cref="IProjectService.MoveLaneAsync"/> <c>"right"</c> pin).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/move-right")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveLaneRightPost(string id, string laneId)
+    {
+        return await MoveLaneAsync(id, laneId, "right");
+    }
+
+    /// <summary>
+    /// Shared implementation for the lane-reorder endpoints (move-left /
+    /// move-right) — calls <see
+    /// cref="IProjectService.MoveLaneAsync"/>; the C3 split.
+    /// </summary>
+    private async Task<IActionResult> MoveLaneAsync(string boardId, string laneId, string direction)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.MoveLaneAsync(laneId, direction, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = $"Lane moved {direction}.";
+        return Redirect($"/projects/boards/{boardId}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes</c> — the add-lane write lane
+    /// (ADR 0069 — the service's
+    /// <see cref="IProjectService.CreateLaneAsync"/>: a new lane appended at
+    /// the end of the board, no status imparted, no limit). **Creator ∪
+    /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split); a blank title is a form error (the M4 "a form is a shape"
+    /// precedent).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LaneCreatePost(string id, [FromForm] string Title)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(Title))
+        {
+            TempData["error"] = "A lane title is required.";
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        try
+        {
+            await projects.CreateLaneAsync(id, Title, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (ArgumentException ex)
+        {
+            // A blank title (the service's 400) — a form error, not a 500.
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        TempData["info"] = "Lane added.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/move</c> — the
+    /// lane-reorder lane (ADR 0069 — the service's
+    /// <see cref="IProjectService.MoveLaneToPositionAsync"/>: move the lane
+    /// to a 0-based index, renumbering the board's lanes 0..n-1). **Creator
+    /// ∪ GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3 split);
+    /// an out-of-range index is a service no-op (the clamp).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveLanePost(string id, string laneId, [FromForm] int index)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.MoveLaneToPositionAsync(laneId, index, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Lane moved.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/todos</c> — the
+    /// add-to-do-to-lane write lane (ADR 0068 — the service's
+    /// <see cref="IProjectService.AddTodoToLaneAsync"/>: a new to-do placed
+    /// on the lane at the end, the lane's <c>Status</c> imparted, the lane's
+    /// <c>MaxItems</c> limit the refusal gate). **Creator ∪ GlobalAdmin**
+    /// over the board (C-M5·6) — the service's server-side standing gate; a
+    /// missing id is 404, a denied actor 403 (the C3 split); a lane-limit
+    /// refusal or a blank title is a form error (the M4 "a form is a shape"
+    /// precedent).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/todos")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTodoToLanePost(string id, string laneId, [FromForm] string Title)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.AddTodoToLaneAsync(id, laneId, Title, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (ArgumentException ex)
+        {
+            // A blank title (the service's 400) — a form error, not a 500
+            // (the M4 "a form is a shape" precedent).
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{id}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) — a form error, not a 500.
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        TempData["info"] = "To-do added.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
     /// <c>POST /projects/boards/{id}/delete</c> — the board soft-delete
     /// write lane (the cascade to the board's <see cref="KanbanLane"/> rows
     /// + <see cref="BoardItemPlacement"/> rows is the service's — the §2.3
@@ -1194,6 +1368,47 @@ public sealed class ProjectsController : Controller
 
         TempData["info"] = $"Card moved {direction}.";
         return Redirect($"/projects/boards/{boardId}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{targetLaneId}/cards/{placementId}/
+    /// move</c> — the drag-drop move-to-position lane (ADR 0069 — the
+    /// service's <see cref="IProjectService.MoveTodoToLanePositionAsync"/>:
+    /// move the card into <c>targetLaneId</c> at a 0-based index, imparting
+    /// the lane's <c>Status</c> when set (C-M5·4) and gate-limiting on a
+    /// cross-lane move (C-M5·5); same-lane moves skip both). **Creator ∪
+    /// assignee ∪ GlobalAdmin** over the to-do (C-M5·6) — the service's
+    /// server-side standing gate; a missing placement/lane is 404, a denied
+    /// actor 403 (the C3 split); a lane-limit refusal is a form error (the M4
+    /// "a form is a shape" precedent).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{targetLaneId}/cards/{placementId}/move")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MoveCardPost(string id, string targetLaneId, string placementId, [FromForm] int index)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.MoveTodoToLanePositionAsync(placementId, targetLaneId, index, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The lane-limit refusal (C-M5·5, F6) on a cross-lane move — a
+            // form error, not a 500.
+            TempData["error"] = ex.Message;
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        TempData["info"] = "Card moved.";
+        return Redirect($"/projects/boards/{id}");
     }
 
     // ── Copy-to / move-to board lanes (U08) ─────────────────────────────────

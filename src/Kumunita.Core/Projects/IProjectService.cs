@@ -166,6 +166,134 @@ public interface IProjectService
     Task<KanbanLane> UpdateLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, UpdateLaneRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// **Move a lane** to an adjacent position on the same board (ADR 0068) —
+    /// <paramref name="direction"/> is <c>"left"</c> or <c>"right"</c> (a
+    /// string, not an enum — the ADR 0031 plain-GET/POST posture, the
+    /// <see cref="MoveTodoToAdjacentLaneAsync"/> shape): the lane's
+    /// <c>Order</c> is **swapped** with the adjacent lane — the
+    /// <see cref="KanbanLane"/> row with the nearest lower
+    /// (<c>"left"</c>) / higher (<c>"right"</c>) <c>Order</c> in the same
+    /// board; a lane at the board's edge has no adjacent lane in that
+    /// direction and the call is a **no-op** (nothing is written, no audit
+    /// row — the <see cref="MoveTodoToAdjacentLaneAsync"/> edge pin). The
+    /// cards on the lane are **untouched** (a lane's
+    /// <see cref="BoardItemPlacement"/> rows keep their lane + position — only
+    /// the lane's own <c>Order</c> moves). **Creator ∪ GlobalAdmin** over the
+    /// **board** (the lane's standing is the board's — the
+    /// <c>CheckBoardStanding</c> shape; the assignee branch does not apply to
+    /// a lane, C-M5·6). A missing lane or board is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is
+    /// <see cref="UnauthorizedAccessException"/> (403). One <c>AccessAudit</c>
+    /// row (<c>board.move_lane</c>, <c>TargetKind = "board"</c>, the
+    /// **board's** id as the target — the lane is not an auditable resource of
+    /// its own) is stored in the caller's session (C3).
+    /// </summary>
+    Task<KanbanLane> MoveLaneAsync(string laneId, string direction, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Create a to-do directly on a board lane** (ADR 0068): a new
+    /// <see cref="TodoItem"/> (the actor is its <c>AuthorId</c>,
+    /// <c>IsDeleted = false</c> — published on creation, D8a; the authored-in
+    /// <c>LanguageCode</c> is materialized through the ADR 0018 resolver, the
+    /// <see cref="CreateTodoAsync"/> shape) **plus** a single
+    /// <see cref="BoardItemPlacement"/> row placing it on the given lane at
+    /// the **end** of the lane (the max <c>Order</c> + 1 — the
+    /// <see cref="MoveTodoToAdjacentLaneAsync"/> end-of-lane shape). **The
+    /// lane-status auto-update (C-M5·4):** if the lane's <c>Status</c> is
+    /// non-null, the to-do's <c>Status</c> is set to that lane's status in the
+    /// same transaction (C3); a null lane <c>Status</c> leaves the to-do's
+    /// status <c>null</c>. **The lane-limit refusal (C-M5·5):** if the lane's
+    /// <c>MaxItems</c> is non-null and the lane already has <c>MaxItems</c>
+    /// placements, the create is **refused** (<see
+    /// cref="InvalidOperationException"/> with the lane's <c>Title</c> in the
+    /// message; **nothing is written** — the F6 FACES). Standing (server-side,
+    /// C3 single-source): **creator ∪ GlobalAdmin over the board** (the
+    /// <c>CheckBoardStanding</c> shape — the to-do is new so its own creator
+    /// branch is trivially the actor; the board is the standing surface
+    /// because the placement touches the board). A missing board or lane is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is
+    /// <see cref="UnauthorizedAccessException"/> (403). One <c>AccessAudit</c>
+    /// row (<c>board.add_todo</c>, <c>TargetKind = "board"</c>, the
+    /// **board's** id as the target — the placement is not an auditable
+    /// resource of its own) is stored in the caller's session (C3).
+    /// </summary>
+    Task<TodoItem> AddTodoToLaneAsync(string boardId, string laneId, string title, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Add a lane** to a board (ADR 0069 — the add-lane affordance): a new
+    /// <see cref="KanbanLane"/> on the given board with the given <c>Title</c>
+    /// (<c>Status = null</c>, <c>MaxItems = null</c>, <c>Order</c> = the
+    /// board's <c>max Order + 1</c> — the end of the board, the
+    /// <see cref="AddTodoToLaneAsync"/> end-of-lane shape). The new lane is
+    /// empty (no <see cref="BoardItemPlacement"/> rows). **Creator ∪
+    /// GlobalAdmin** over the **board** (the lane's standing is the board's —
+    /// the <c>CheckBoardStanding</c> shape; the assignee branch does not apply
+    /// to a lane, C-M5·6). A blank title is
+    /// <see cref="ArgumentException"/> (400); a missing / soft-deleted board
+    /// is <see cref="KeyNotFoundException"/> (404); a denied actor is
+    /// <see cref="UnauthorizedAccessException"/> (403). One <c>AccessAudit</c>
+    /// row (<c>board.add_lane</c>, <c>TargetKind = "board"</c>, the **board's**
+    /// id as the target — the lane is not an auditable resource of its own) is
+    /// stored in the caller's session (C3).
+    /// </summary>
+    Task<KanbanLane> CreateLaneAsync(string boardId, string title, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Move a lane to a position** on the same board (ADR 0069 — the lane
+    /// drag; a generalization of the adjacent <see cref="MoveLaneAsync"/>):
+    /// <paramref name="index"/> is the lane's **0-based position** (clamped to
+    /// <c>[0, laneCount-1]</c>) among the board's lanes ordered by
+    /// <c>Order</c>. This is a **reorder, not a renumber of cards**: the
+    /// board's lanes are re-settled to a clean <c>0..n-1</c> <c>Order</c>
+    /// sequence with the moved lane at <paramref name="index"/>, and every
+    /// card's <see cref="BoardItemPlacement"/> (its <c>LaneId</c> +
+    /// <c>Order</c>) is **untouched** — a card keeps its lane and its slot. A
+    /// no-op when the lane is already at <paramref name="index"/>. **The
+    /// renumber is executed park-then-settle, in two commits** (the ADR 0068
+    /// 23505 rationale generalized — the <c>(BoardId, Order)</c> unique index
+    /// is enforced row-by-row, so the lanes are parked to a guaranteed-free
+    /// band and then settled). **Creator ∪ GlobalAdmin** over the **board**
+    /// (C-M5·6). A missing lane or board is <see cref="KeyNotFoundException"/>
+    /// (404); a denied actor is <see cref="UnauthorizedAccessException"/> (403).
+    /// One <c>AccessAudit</c> row (<c>board.move_lane</c>,
+    /// <c>TargetKind = "board"</c>, the **board's** id as the target) is stored
+    /// in the caller's session (C3) — the same verb as the adjacent
+    /// <see cref="MoveLaneAsync"/>, so a drag and a menu-move are the same
+    /// audit event.
+    /// </summary>
+    Task<KanbanLane> MoveLaneToPositionAsync(string laneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Move a card to a lane + position** (ADR 0069 — the card drag;
+    /// generalizes the adjacent <see cref="MoveTodoToAdjacentLaneAsync"/>):
+    /// the placement's <c>LaneId</c> is set to the target lane and its
+    /// <c>Order</c> to the lane's **0-based position <paramref
+    /// name="index"/></c> (clamped to <c>[0, laneCardCount-1]</c>). The
+    /// target lane's placements are re-settled to a clean <c>0..n-1</c>
+    /// sequence with the moved card at <paramref name="index"/> (park-then-
+    /// settle, two commits — the <c>(BoardId, LaneId, Order)</c> unique index
+    /// is enforced row-by-row); the **source** lane is not renumbered (its
+    /// remaining cards keep their relative order). **The lane-status
+    /// auto-update (C-M5·4):** if the target lane's <c>Status</c> is non-null
+    /// the to-do's <c>Status</c> is set to that lane's status in the same
+    /// transaction; a null lane <c>Status</c> leaves the to-do's status
+    /// unchanged. **The lane-limit refusal (C-M5·5):** if the card is moving
+    /// into a **different** lane and that lane is already at its
+    /// <c>MaxItems</c> limit, the move is **refused** (<see
+    /// cref="InvalidOperationException"/> with the lane's <c>Title</c> in the
+    /// message; **nothing is written**); a reorder within the same lane never
+    /// trips the limit. **Creator ∪ assignee ∪ GlobalAdmin** over the **to-do**
+    /// (C-M5·6 — the <c>CheckTodoStanding</c> shape). A missing placement /
+    /// to-do / lane is <see cref="KeyNotFoundException"/> (404); a denied actor
+    /// is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <c>AccessAudit</c> row (<c>todo.move_to_lane</c>,
+    /// <c>TargetKind = "todo"</c>, the **to-do's** id as the target — the same
+    /// verb + target as the adjacent-lane move) is stored in the caller's
+    /// session (C3).
+    /// </summary>
+    Task<BoardItemPlacement> MoveTodoToLanePositionAsync(string placementId, string targetLaneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
     /// **Soft-delete** a board — sets <c>IsDeleted = true</c> (the ADR 0024
     /// author-lane shape) + **deletes** the board's <see cref="KanbanLane"/>
     /// rows + **deletes** the board's <see cref="BoardItemPlacement"/> rows (the

@@ -847,7 +847,641 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         }
     }
 
+    // ── F11 — move a lane to an adjacent position (ADR 0068) ───────────────
+
+    /// <summary>
+    /// <b>F11</b> (move): <see cref="ProjectService.MoveLaneAsync"/> swaps the
+    /// moved lane's <c>Order</c> with the adjacent lane's (a transposition —
+    /// the <c>(BoardId, Order)</c> business key stays unique). The cards on
+    /// the moved lane are **untouched** (they keep their lane + position —
+    /// only the lane's column position moves).
+    /// </summary>
+    [Fact]
+    public async Task F11_MoveLane_SwapsOrderWithAdjacent()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f11-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // Three lanes: A (Order 0), B (Order 1), C (Order 2).
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-laneA", BoardId = "f11-board", Title = "A", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-laneB", BoardId = "f11-board", Title = "B", Order = 1,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-laneC", BoardId = "f11-board", Title = "C", Order = 2,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        // A card on lane B (to prove the card is untouched by the lane move).
+        await Plant(store, new TodoItem
+        {
+            Id = "f11-todo", AuthorId = author, Title = "Card on B",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "f11-p1", TodoItemId = "f11-todo", BoardId = "f11-board", LaneId = "f11-laneB",
+            Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        // Move lane B one to the right: B (Order 1) and C (Order 2) swap.
+        var moved = await svc.MoveLaneAsync("f11-laneB", "right", author, MemberRoles);
+        Assert.Equal(2, moved.Order);
+
+        await using (var q = store.QuerySession())
+        {
+            var laneB = (await q.LoadAsync<KanbanLane>("f11-laneB"))!;
+            var laneC = (await q.LoadAsync<KanbanLane>("f11-laneC"))!;
+            Assert.Equal(2, laneB.Order);
+            Assert.Equal(1, laneC.Order);   // the transposition, not a renumber
+            // The card on B is untouched — still in lane B, same position.
+            var p = (await q.LoadAsync<BoardItemPlacement>("f11-p1"))!;
+            Assert.Equal("f11-laneB", p.LaneId);
+            Assert.Equal(0, p.Order);
+        }
+    }
+
+    /// <summary>
+    /// <b>F11</b> (edge no-op): a lane at the board's edge has no adjacent
+    /// lane in that direction — the move is a **no-op** (nothing is written,
+    /// the lane's <c>Order</c> is unchanged; the
+    /// <see cref="ProjectService.MoveTodoToAdjacentLaneAsync"/> edge pin).
+    /// </summary>
+    [Fact]
+    public async Task F11_MoveLane_AtEdge_NoOp()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f11-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // First lane (Order 0) — no lane to its left.
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-first", BoardId = "f11-board", Title = "First", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-second", BoardId = "f11-board", Title = "Second", Order = 1,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        // Moving the first lane left is a no-op.
+        var moved = await svc.MoveLaneAsync("f11-first", "left", author, MemberRoles);
+        Assert.Equal(0, moved.Order);
+
+        await using (var q = store.QuerySession())
+        {
+            var first = (await q.LoadAsync<KanbanLane>("f11-first"))!;
+            var second = (await q.LoadAsync<KanbanLane>("f11-second"))!;
+            Assert.Equal(0, first.Order);   // unchanged
+            Assert.Equal(1, second.Order);  // unchanged
+        }
+    }
+
+    /// <summary>
+    /// <b>F11</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the lane move with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F11_MoveLane_NonCreatorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11c-author";
+        const string stranger = "u-u12-f11c-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f11-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-first", BoardId = "f11-board", Title = "First", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f11-second", BoardId = "f11-board", Title = "Second", Order = 1,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.MoveLaneAsync("f11-first", "right", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            var first = (await q.LoadAsync<KanbanLane>("f11-first"))!;
+            Assert.Equal(0, first.Order);   // untouched by the refused move
+        }
+    }
+
+    // ── F12 — add a to-do directly onto a board lane (ADR 0068) ────────────
+
+    /// <summary>
+    /// <b>F12</b> (add): <see cref="ProjectService.AddTodoToLaneAsync"/>
+    /// creates a new to-do (authored by the actor, published on creation) and
+    /// places it on the lane at the **end** (max <c>Order</c> + 1). The lane's
+    /// non-null <c>Status</c> is **imparted** on the to-do (C-M5·4, in the
+    /// same transaction).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_PlacesAtEnd_AndImpartsStatus()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A lane that imparts a status (C-M5·4).
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12-lane", BoardId = "f12-board", Title = "Doing", Status = "In progress", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        // An existing card so the new one is placed at the end (Order 1).
+        await Plant(store, new TodoItem
+        {
+            Id = "f12-existing", AuthorId = author, Title = "Existing card",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "f12-p-existing", TodoItemId = "f12-existing", BoardId = "f12-board", LaneId = "f12-lane",
+            Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var todo = await svc.AddTodoToLaneAsync("f12-board", "f12-lane", "New card", author, MemberRoles);
+
+        Assert.NotEqual("f12-existing", todo.Id);
+        Assert.Equal("New card", todo.Title);
+        Assert.Equal(author, todo.AuthorId);
+        Assert.False(todo.IsDeleted);
+        Assert.Equal("In progress", todo.Status);   // imparted by the lane (C-M5·4)
+
+        // A placement row exists on the lane, at the end (max Order + 1 = 0 + 1).
+        await using (var q = store.QuerySession())
+        {
+            var placements = await q.Query<BoardItemPlacement>()
+                .Where(p => p.TodoItemId == todo.Id && p.BoardId == "f12-board")
+                .ToListAsync();
+            Assert.Single(placements);
+            Assert.Equal("f12-lane", placements[0].LaneId);
+            Assert.Equal(1, placements[0].Order);
+        }
+    }
+
+    /// <summary>
+    /// <b>F12</b> (refuse, C-M5·5): a lane already at its <c>MaxItems</c>
+    /// limit **refuses** the add with <see cref="InvalidOperationException"/>
+    /// (the lane's <c>Title</c> in the message) and **nothing is written**
+    /// (the F6 FACES — no new to-do, no new placement).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_AtMax_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A lane at its limit (MaxItems = 1, 1 card already on it).
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12-lane", BoardId = "f12-board", Title = "Full lane", MaxItems = 1, Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f12-resident", AuthorId = author, Title = "Resident card",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "f12-p-resident", TodoItemId = "f12-resident", BoardId = "f12-board", LaneId = "f12-lane",
+            Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Rejected card", author, MemberRoles));
+        Assert.Contains("Full lane", ex.Message);
+
+        // Nothing was written — the lane has exactly one placement (the
+        // resident), and no new to-do exists.
+        await using (var q = store.QuerySession())
+        {
+            var count = await q.Query<BoardItemPlacement>()
+                .Where(p => p.BoardId == "f12-board" && p.LaneId == "f12-lane")
+                .CountAsync();
+            Assert.Equal(1, count);
+        }
+    }
+
+    /// <summary>
+    /// <b>F12</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the add with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_NonCreatorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12c-author";
+        const string stranger = "u-u12-f12c-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12-lane", BoardId = "f12-board", Title = "A lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.AddTodoToLaneAsync("f12-board", "f12-lane", "Intrusion", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            var count = await q.Query<BoardItemPlacement>()
+                .Where(p => p.BoardId == "f12-board")
+                .CountAsync();
+            Assert.Equal(0, count);   // nothing written by the refused add
+        }
+    }
+
+    // ── F13 — add a lane (ADR 0069) ─────────────────────────────────────────
+
+    /// <summary>
+    /// <b>F13</b> (add): <see cref="ProjectService.CreateLaneAsync"/> appends
+    /// a new lane at the **end** of the board (max <c>Order</c> + 1), no
+    /// status imparted, no <c>MaxItems</c> limit. A
+    /// <see cref="AccessAudit"/> row (<c>board.add_lane</c>, board target) is
+    /// written.
+    /// </summary>
+    [Fact]
+    public async Task F13_CreateLane_AppendsAtEnd_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f13-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f13-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // Two existing lanes (Order 0, 1) — the new one must land at Order 2.
+        await Plant(store, new KanbanLane
+        {
+            Id = "f13-laneA", BoardId = "f13-board", Title = "A", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f13-laneB", BoardId = "f13-board", Title = "B", Order = 1,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var lane = await svc.CreateLaneAsync("f13-board", "C", author, MemberRoles);
+
+        Assert.Equal("C", lane.Title);
+        Assert.Equal("f13-board", lane.BoardId);
+        Assert.Null(lane.Status);          // no imparted status on a fresh lane
+        Assert.Null(lane.MaxItems);        // no advisory capacity on a fresh lane
+        Assert.Equal(2, lane.Order);       // appended at the end (max Order + 1)
+
+        // The board.add_lane audit row (C3) is written.
+        var audits = await BoardAuditRows(store, "f13-board");
+        Assert.Contains(audits, a => a.Action == "board.add_lane");
+    }
+
+    /// <summary>
+    /// <b>F13</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the add with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F13_CreateLane_NonCreatorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f13b-author";
+        const string stranger = "u-u12-f13b-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f13-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateLaneAsync("f13-board", "Intrusion", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            var count = await q.Query<KanbanLane>().Where(l => l.BoardId == "f13-board").CountAsync();
+            Assert.Equal(0, count);        // nothing written by the refused add
+        }
+    }
+
+    // ── F14 — move a lane to a position (ADR 0069) ──────────────────────────
+
+    /// <summary>
+    /// <b>F14</b> (move): <see cref="ProjectService.MoveLaneToPositionAsync"/>
+    /// settles the board's lanes to a clean <c>0..n-1</c> <c>Order</c> with
+    /// the moved lane at <paramref name="index"/>; the cards are **untouched**
+    /// (a card keeps its lane + slot). A
+    /// <see cref="AccessAudit"/> row (<c>board.move_lane</c>, board target) is
+    /// written.
+    /// </summary>
+    [Fact]
+    public async Task F14_MoveLaneToPosition_Renumerates_CardsUntouched()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f14-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f14-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A (0), B (1), C (2) — a card on A to prove it is untouched.
+        await Plant(store, new KanbanLane { Id = "f14-A", BoardId = "f14-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f14-C", BoardId = "f14-board", Title = "C", Order = 2, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f14-todo", AuthorId = author, Title = "Card on A", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f14-p1", TodoItemId = "f14-todo", BoardId = "f14-board", LaneId = "f14-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        // Move C (index 2) to the front (index 0): the new order is C, A, B.
+        var moved = await svc.MoveLaneToPositionAsync("f14-C", 0, author, MemberRoles);
+        Assert.Equal(0, moved.Order);
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-C"))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);
+            Assert.Equal(2, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);
+            // The card on A is untouched — still in A, same slot.
+            var p = (await q.LoadAsync<BoardItemPlacement>("f14-p1"))!;
+            Assert.Equal("f14-A", p.LaneId);
+            Assert.Equal(0, p.Order);
+        }
+
+        // The board.move_lane audit row (C3) is written.
+        var audits = await BoardAuditRows(store, "f14-board");
+        Assert.Contains(audits, a => a.Action == "board.move_lane");
+    }
+
+    /// <summary>
+    /// <b>F14</b> (clamp): an <paramref name="index"/> beyond the board's lane
+    /// count is **clamped** to the last position (no out-of-range write, no
+    /// exception).
+    /// </summary>
+    [Fact]
+    public async Task F14_MoveLaneToPosition_IndexBeyondEnd_ClampsToLast()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f14b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f14-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f14-A", BoardId = "f14-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+
+        // Move A (index 0) to index 99 — clamped to the last position (1):
+        // the new order is B, A.
+        var moved = await svc.MoveLaneToPositionAsync("f14-A", 99, author, MemberRoles);
+        Assert.Equal(1, moved.Order);
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);
+        }
+    }
+
+    /// <summary>
+    /// <b>F14</b> (no-op): a lane already at the requested <paramref
+    /// name="index"/> is a **no-op** (nothing is written, the lane's
+    /// <c>Order</c> is unchanged).
+    /// </summary>
+    [Fact]
+    public async Task F14_MoveLaneToPosition_AlreadyAtIndex_NoOp()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f14c-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f14-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f14-A", BoardId = "f14-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+
+        // Move A (already at index 0) to index 0 — a no-op.
+        var moved = await svc.MoveLaneToPositionAsync("f14-A", 0, author, MemberRoles);
+        Assert.Equal(0, moved.Order);
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);   // unchanged
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f14-B"))!.Order);  // unchanged
+        }
+    }
+
+    /// <summary>
+    /// <b>F14</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the move with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written.
+    /// </summary>
+    [Fact]
+    public async Task F14_MoveLaneToPosition_NonCreatorRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f14d-author";
+        const string stranger = "u-u12-f14d-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f14-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f14-A", BoardId = "f14-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f14-B", BoardId = "f14-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.MoveLaneToPositionAsync("f14-A", 1, stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f14-A"))!.Order);   // untouched by the refused move
+        }
+    }
+
+    // ── F15 — move a card to a lane + position (ADR 0069) ───────────────────
+
+    /// <summary>
+    /// <b>F15</b> (move + impart): <see cref="ProjectService.
+    /// MoveTodoToLanePositionAsync"/> moves the card into the target lane at
+    /// the 0-based <paramref name="index"/> (the target lane's placements are
+    /// re-settled to <c>0..n-1</c>) and the target lane's non-null
+    /// <c>Status</c> is **imparted** on the to-do (C-M5·4). A
+    /// <see cref="AccessAudit"/> row (<c>todo.move_to_lane</c>, to-do target)
+    /// is written.
+    /// </summary>
+    [Fact]
+    public async Task F15_MoveCardToLanePosition_Moves_ImpartsStatus_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f15-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f15-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // Source lane (no status), target lane (status "done").
+        await Plant(store, new KanbanLane { Id = "f15-src", BoardId = "f15-board", Title = "Src", Status = null, Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f15-dst", BoardId = "f15-board", Title = "Dst", Status = "done", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        // A card on the source; a resident card already on the target.
+        await Plant(store, new TodoItem { Id = "f15-moving", AuthorId = author, Title = "Moving", Status = "open", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new TodoItem { Id = "f15-resident", AuthorId = author, Title = "Resident", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f15-p-moving", TodoItemId = "f15-moving", BoardId = "f15-board", LaneId = "f15-src", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+        await Plant(store, new BoardItemPlacement { Id = "f15-p-resident", TodoItemId = "f15-resident", BoardId = "f15-board", LaneId = "f15-dst", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        // Move the card into the target lane at index 1 (after the resident).
+        var moved = await svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 1, author, MemberRoles);
+        Assert.Equal("f15-dst", moved.LaneId);
+
+        await using (var q = store.QuerySession())
+        {
+            // The target lane's placements are re-settled to 0..n-1.
+            var dst = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving"))!;
+            var resident = (await q.LoadAsync<BoardItemPlacement>("f15-p-resident"))!;
+            Assert.Equal(0, resident.Order);   // the resident stays first
+            Assert.Equal(1, dst.Order);        // the moved card lands at index 1
+            // The target lane's status was imparted on the to-do (C-M5·4).
+            Assert.Equal("done", (await q.LoadAsync<TodoItem>("f15-moving"))!.Status);
+        }
+
+        // The todo.move_to_lane audit row (C3) is written.
+        var audits = await TodoAuditRows(store, "f15-moving");
+        Assert.Contains(audits, a => a.Action == "todo.move_to_lane");
+    }
+
+    /// <summary>
+    /// <b>F15</b> (refuse, C-M5·5): a move into a **different** lane at its
+    /// <c>MaxItems</c> limit is **refused** with
+    /// <see cref="InvalidOperationException"/> (the lane's <c>Title</c> in the
+    /// message); **nothing** is written (the card stays on its source lane).
+    /// </summary>
+    [Fact]
+    public async Task F15_MoveCardToLanePosition_CrossLaneAtLimit_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f15b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f15-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f15-src", BoardId = "f15-board", Title = "Src", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        // A full target lane (MaxItems = 1, 1 resident card already on it).
+        await Plant(store, new KanbanLane { Id = "f15-dst", BoardId = "f15-board", Title = "Full lane", MaxItems = 1, Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f15-moving", AuthorId = author, Title = "Moving", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new TodoItem { Id = "f15-resident", AuthorId = author, Title = "Resident", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f15-p-moving", TodoItemId = "f15-moving", BoardId = "f15-board", LaneId = "f15-src", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+        await Plant(store, new BoardItemPlacement { Id = "f15-p-resident", TodoItemId = "f15-resident", BoardId = "f15-board", LaneId = "f15-dst", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.MoveTodoToLanePositionAsync("f15-p-moving", "f15-dst", 0, author, MemberRoles));
+        Assert.Contains("Full lane", ex.Message);
+
+        // Nothing was written — the card is still on its source lane.
+        await using (var q = store.QuerySession())
+        {
+            var p = (await q.LoadAsync<BoardItemPlacement>("f15-p-moving"))!;
+            Assert.Equal("f15-src", p.LaneId);
+            var dstCount = await q.Query<BoardItemPlacement>()
+                .Where(x => x.BoardId == "f15-board" && x.LaneId == "f15-dst")
+                .CountAsync();
+            Assert.Equal(1, dstCount);   // the resident only — the move was refused
+        }
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database whose <c>TargetId</c> is the given board (the fresh-
+    /// postgres-per-test isolation makes "all rows for this board"
+    /// unambiguous).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> BoardAuditRows(IDocumentStore store, string boardId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "board" && a.TargetId == boardId)
+            .ToListAsync(ct);
+    }
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
     /// database whose <c>TargetId</c> is the given to-do (the fresh-

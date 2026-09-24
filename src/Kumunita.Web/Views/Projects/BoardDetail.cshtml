@@ -16,6 +16,45 @@
     otherBoards = otherBoards
         .OrderBy(b => b.Title, StringComparer.OrdinalIgnoreCase)
         .ToList();
+
+    // ── Status icon + label (ADR 0069) ────────────────────────────────────
+    // The fixed status vocabulary (KanbanStatuses) maps each code to an
+    // inline lucide-style SVG (the repo's icon convention — no icon font);
+    // a null/unknown code falls back to a plain circle. The status is
+    // stored as a free string on the document (no schema change), so the
+    // glyph is best-effort: an unrecognized value still renders the raw
+    // text next to the fallback circle (C3 — the view renders what the
+    // service stored). The <c>title</c> attr + a <kw-l> text sibling keep
+    // the icon accessible / screen-reader-legible.
+    static string StatusGlyph(string? status)
+    {
+        const string open = "<svg class=\"kanban-status-icon\" xmlns=\"http://www.w3.org/2000/svg\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\">";
+        switch (status)
+        {
+            case KanbanStatuses.NotStarted:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><circle cx=\"12\" cy=\"12\" r=\"1\" fill=\"currentColor\"/>" + "</svg>";
+            case KanbanStatuses.InProgress:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"12 6 12 12 16 14\"/>" + "</svg>";
+            case KanbanStatuses.Done:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><polyline points=\"8 12 10 14 14 10\"/>" + "</svg>";
+            case KanbanStatuses.Cancelled:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/><line x1=\"15\" y1=\"9\" x2=\"9\" y2=\"15\"/><line x1=\"9\" y1=\"9\" x2=\"15\" y2=\"15\"/>" + "</svg>";
+            default:
+                return open + "<circle cx=\"12\" cy=\"12\" r=\"10\"/>" + "</svg>";
+        }
+    }
+
+    static string StatusLabelKey(string? status)
+    {
+        switch (status)
+        {
+            case KanbanStatuses.NotStarted: return "projects.board.status.not_started";
+            case KanbanStatuses.InProgress: return "projects.board.status.in_progress";
+            case KanbanStatuses.Done: return "projects.board.status.done";
+            case KanbanStatuses.Cancelled: return "projects.board.status.cancelled";
+            default: return "projects.board.status.none";
+        }
+    }
 }
 
 <div class="row justify-content-center">
@@ -57,19 +96,34 @@
                    U08 route, CSRF-tokenized, redirect-after-POST. The cascade
                    is the service's (F2 / F8); the view renders what the
                    service returns (C3). *@
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                            data-bs-toggle="dropdown" aria-expanded="false"
-                            aria-label="Board actions">⋮</button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <form method="post" action="@($"/projects/boards/@Model.Board.Id/delete")"
-                                  data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
-                            </form>
-                        </li>
-                    </ul>
+                <div class="d-flex align-items-center gap-2">
+                    @* The Add-lane button (ADR 0069) — a plain POST form to
+                       the U08 add-lane route (POST /projects/boards/{id}/lanes,
+                       the service's CreateLaneAsync: a new lane appended at the
+                       end, no status imparted, no limit). A single Title input;
+                       the standing + shape decisions are the service's
+                       (C-M5·6); the view renders what the service returns (C3). *@
+                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes")" class="d-inline-flex align-items-center gap-2">
+                        @Html.AntiForgeryToken()
+                        <input class="form-control form-control-sm kanban-add-lane-input" type="text" name="Title"
+                               maxlength="120" required
+                               aria-label="@("New lane title")" placeholder="@("New lane title")" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_lane">+ Add lane</kw-l></button>
+                    </form>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                data-bs-toggle="dropdown" aria-expanded="false"
+                                aria-label="Board actions">⋮</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <form method="post" action="@($"/projects/boards/@Model.Board.Id/delete")"
+                                      data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.delete">Delete board</kw-l></button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </header>
@@ -90,55 +144,159 @@
             </p>
         }
 
-        <div class="kanban-board">
+        <div class="kanban-board" data-board-id="@Model.Board.Id">
             @foreach (var lane in Model.Lanes)
             {
-                <div class="kanban-lane">
+                @* A lane has a left neighbor iff another lane on this board
+                   carries a lower Order; a right neighbor iff a higher one.
+                   The ⋮ dropdown's Move left / Move right items are rendered
+                   only when the neighbor exists (the user's requirement); the
+                   service's MoveLaneAsync also no-ops at the edge as a
+                   server-side backstop (C3 — the view renders what the
+                   service permits, never a gate). *@
+                var hasLeft = Model.Lanes.Any(l => l.Order < lane.Order);
+                var hasRight = Model.Lanes.Any(l => l.Order > lane.Order);
+                @* The Add to-do button is shown only while the lane has spare
+                   capacity (a null MaxItems = unlimited). The service's
+                   AddTodoToLaneAsync re-checks the limit server-side and
+                   refuses (C-M5·5) — the view just hides the affordance when
+                   the lane is visibly full. *@
+                var laneHasSpare = lane.MaxItems is null || lane.Cards.Count < lane.MaxItems;
+
+                @* The whole lane is draggable (ADR 0069 — the drag-drop
+                   channel; the server stays authoritative, C-M5·9). The
+                   dragstart handler disambiguates: if the grab point is
+                   inside a .kanban-card it starts a *card* drag (reading that
+                   card's data-placement-id), otherwise a *lane* drag (reading
+                   this lane's data-lane-id). data-lane-id is read at drop
+                   time from the lane under the drop point. *@
+                <div class="kanban-lane @(laneHasSpare ? "" : "kanban-lane-at-limit")" draggable="true" data-lane-id="@lane.LaneId">
                     <div class="kanban-lane-head">
-                        <h3 class="h5 mb-0">
-                            @lane.Title
+                        <h3 class="h5 mb-0 kanban-lane-title">
                             @if (!string.IsNullOrWhiteSpace(lane.Status))
                             {
-                                <span class="badge text-bg-light border ms-2">@lane.Status</span>
+                                @* The fixed-status icon (ADR 0069) — an inline
+                                   SVG glyph for the lane's Status code (a null
+                                   code shows the fallback circle); the raw
+                                   value is carried in the title attr + the
+                                   dropdown's Set status so a free-text /
+                                   unrecognized value is never lost (C3). *@
+                                <span class="kanban-status" title="@lane.Status">@StatusGlyph(lane.Status)</span>
                             }
-                            @if (lane.MaxItems is not null)
-                            {
-                                <span class="badge text-bg-light border ms-2">
-                                    <kw-l key="projects.board.lane.max_items">Max items</kw-l>: @lane.MaxItems
-                                </span>
-                            }
+                            @lane.Title
+                            @* The count / limit badge (ADR 0069, KinaUna
+                               parity): "N / MaxItems" when the lane has a
+                               limit (the at-limit state is styled), a bare
+                               "N" when unlimited. *@
+                            <span class="badge text-bg-light border ms-2 kanban-count"
+                                  title="@(lane.MaxItems is null ? ("Cards: " + lane.Cards.Count) : ("Cards: " + lane.Cards.Count + " / " + lane.MaxItems))">
+                                @lane.Cards.Count@(lane.MaxItems is null ? "" : " / " + lane.MaxItems)
+                            </span>
                         </h3>
-                    </div>
-
-                    @* The lane toolbar — an inline update form posting to the
-                       U08 lane-update route (POST
-                       /projects/boards/{id}/lanes/{laneId}, the
-                       LaneEditorModel shape: Title / Status / MaxItems /
-                       Order). Title + status + limit are the input to the
-                       F4 / F5 / F6 FACES the service's reorder + move lanes
-                       read — the service's pins (the §2.3 pin); the view
-                       only submits the shape. *@
-                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId")" class="kanban-lane-toolbar mb-3">
-                        @Html.AntiForgeryToken()
-                        <div class="row g-1">
-                            <div class="col-sm-4">
-                                <input class="form-control form-control-sm" type="text" name="Title"
-                                       required maxlength="120" value="@lane.Title"
-                                       aria-label="@("Lane title")" />
-                            </div>
-                            <div class="col-sm-3">
-                                <input class="form-control form-control-sm" type="text" name="Status"
-                                       value="@lane.Status" aria-label="@("Lane status")" />
-                            </div>
-                            <div class="col-sm-3">
-                                <input class="form-control form-control-sm" type="number" name="MaxItems"
-                                       min="1" value="@lane.MaxItems" aria-label="@("Max items")" />
-                            </div>
-                            <div class="col-sm-2">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.save">Save</kw-l></button>
-                            </div>
+                        @* The lane action dropdown (the board-head ⋮ Bootstrap
+                           dropdown shape, reused). Each item is a plain POST
+                           form (CSRF-tokenized, redirect-after-POST — the
+                           board delete + the card dropdown idiom). Rename /
+                           Set limit / Set status are the single-field lanes of
+                           the U08 lane-update route (POST
+                           /projects/boards/{id}/lanes/{laneId}, the
+                           LaneEditorModel shape): the form submits only the
+                           one field being edited (a partial update — the
+                           service's UpdateLaneAsync change-detection is the
+                           authority), and — because that endpoint requires a
+                           Title — a hidden <c>Title</c> field carries the
+                           lane's current title so the other two lanes can edit
+                           their single field without renaming. Move left /
+                           Move right post to the ADR 0068 lane-reorder routes
+                           (the service's MoveLaneAsync). The standing +
+                           limit decisions are the service's (F7 / F8 / F6);
+                           the view renders what the service returns (C3). *@
+                        <div class="dropdown kanban-lane-actions">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="@("Actions for lane " + lane.Title)">⋮</button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="lane-rename-@lane.LaneId">
+                                                <kw-l key="projects.board.lane.title">Lane title</kw-l>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" type="text" name="Title"
+                                                   id="lane-rename-@lane.LaneId"
+                                                   maxlength="120" required
+                                                   value="@lane.Title" />
+                                        </div>
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.rename">Rename</kw-l></button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Title" value="@lane.Title" />
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="lane-limit-@lane.LaneId">
+                                                <kw-l key="projects.board.lane.max_items">Max items</kw-l>
+                                            </label>
+                                            <input class="form-control form-control-sm mb-2" type="number" name="MaxItems"
+                                                   id="lane-limit-@lane.LaneId"
+                                                   min="1" value="@lane.MaxItems" />
+                                        </div>
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.set_limit">Set limit</kw-l></button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId")" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Title" value="@lane.Title" />
+                                        <div class="px-3 py-2">
+                                            <label class="form-label small text-muted mb-1" for="lane-status-@lane.LaneId">
+                                                <kw-l key="projects.board.lane.status">Status</kw-l>
+                                            </label>
+                                            @* The fixed status vocabulary (ADR
+                                               0069) — None + the four known
+                                               codes. A free-text value is
+                                               preserved as an extra option so
+                                               editing never loses it (C3). *@
+                                            <select class="form-select form-select-sm mb-2" name="Status" id="lane-status-@lane.LaneId">
+                                                <option value="" selected="@(string.IsNullOrWhiteSpace(lane.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                                @if (!string.IsNullOrWhiteSpace(lane.Status) && !KanbanStatuses.Known.Contains(lane.Status))
+                                                {
+                                                    <option value="@lane.Status" selected>@lane.Status</option>
+                                                }
+                                                @foreach (var code in KanbanStatuses.Known)
+                                                {
+                                                    <option value="@code" selected="@(lane.Status == code)">
+                                                        <kw-l key="@StatusLabelKey(code)">@code</kw-l>
+                                                    </option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.set_status">Set status</kw-l></button>
+                                    </form>
+                                </li>
+                                @if (hasLeft)
+                                {
+                                    <li>
+                                        <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/move-left")" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_left">Move left</kw-l></button>
+                                        </form>
+                                    </li>
+                                }
+                                @if (hasRight)
+                                {
+                                    <li>
+                                        <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/move-right")" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-dark"><kw-l key="projects.board.lane.move_right">Move right</kw-l></button>
+                                        </form>
+                                    </li>
+                                }
+                            </ul>
                         </div>
-                    </form>
+                    </div>
 
                     <div class="kanban-cards">
                         @if (lane.Cards.Count == 0)
@@ -149,7 +307,16 @@
                         }
                         @foreach (var card in lane.Cards)
                         {
-                            <div class="kanban-card mb-2">
+                            @* The card carries the ids the drag-drop handler
+                               posts (ADR 0069 — HTML5 DnD as an input channel
+                               on top of the keyboard / menu channels; the
+                               server stays authoritative — no optimistic DOM
+                               reordering, C-M5·9). The drag itself is owned
+                               by the .kanban-lane (see below); the card's
+                               data-* attrs are read at dragstart when the grab
+                               point is a card. *@
+                            <div class="kanban-card mb-2"
+                                 data-placement-id="@card.PlacementId" data-todo-id="@card.TodoId">
                                 <div class="d-flex align-items-start gap-2">
                                     <div class="flex-grow-1">
                                         <h4 class="h6 mb-1">
@@ -158,7 +325,9 @@
                                         <div class="text-muted small">
                                             @if (!string.IsNullOrWhiteSpace(card.Status))
                                             {
-                                                <span class="badge text-bg-light border">@card.Status</span>
+                                                <span class="badge text-bg-light border d-inline-flex align-items-center gap-1">
+                                                    @StatusGlyph(card.Status)<span>@card.Status</span>
+                                                </span>
                                             }
                                             @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
                                             {
@@ -285,6 +454,30 @@
                             </div>
                         }
                     </div>
+
+                    @* The add-to-do form at the lane's foot (ADR 0068) — a
+                       single Title input + submit posting to the U08
+                       add-to-do route (POST
+                       /projects/boards/{id}/lanes/{laneId}/todos, the
+                       service's AddTodoToLaneAsync: the new to-do is placed
+                       on this lane at the end, the lane's Status imparted,
+                       the lane's MaxItems the refusal gate). Shown only while
+                       the lane has spare capacity (laneHasSpare — a null
+                       MaxItems = unlimited); a full lane hides the affordance
+                       and the service's server-side limit refusal (C-M5·5)
+                       is the backstop. The standing decision is the
+                       service's (C-M5·6); the view renders what the service
+                       permits (C3). *@
+                    @if (laneHasSpare)
+                    {
+                        <form method="post" action="@($"/projects/boards/@Model.Board.Id/lanes/@lane.LaneId/todos")" class="kanban-lane-add">
+                            @Html.AntiForgeryToken()
+                            <input class="form-control form-control-sm" type="text" name="Title"
+                                   maxlength="120" required
+                                   aria-label="@("To-do title")" placeholder="@("To-do title")" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="projects.board.lane.add_todo">Add to-do</kw-l></button>
+                        </form>
+                    }
                 </div>
             }
         </div>

@@ -1457,11 +1457,20 @@ body.kmb-page-fullbleed .navbar {
   font-weight: 600;
 }
 
-/* The lane toolbar (the inline Title / Status / MaxItems + Save form
-   the view ships). The row gutter comes from the view's .row.g-1; the
-   toolbar itself needs no box of its own (transparent on the tint). */
-.kanban-lane-toolbar {
-  display: block;
+/* The lane action dropdown (the ⋮ menu in the lane head — the board-head
+   ⋮ shape, reused). Pushed to the right edge of the flex baseline head;
+   the head's flex-wrap keeps it on the first row for a wide lane. */
+.kanban-lane-actions {
+  margin-left: auto;
+}
+
+/* The add-to-do form at the lane's foot (the "Add to-do" button + the
+   title input, hidden behind the button). A column with its own gap; the
+   input is a .form-control so it inherits the lane's width. */
+.kanban-lane-add {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 /* The cards stack — a column with its own gap (the .event-block-stack
@@ -1484,6 +1493,7 @@ body.kmb-page-fullbleed .navbar {
   padding: 0.5rem 0.75rem;
   box-shadow: 0 1px 2px rgba(19, 32, 26, 0.05);
   transition: box-shadow 120ms ease;
+  cursor: grab; /* the drag-drop channel (ADR 0069) — the card is a grab point */
 }
 .kanban-card:hover {
   box-shadow: 0 1px 6px rgba(19, 32, 26, 0.08);
@@ -1519,12 +1529,75 @@ body.kmb-page-fullbleed .navbar {
   text-align: center;
 }
 
+/* ── ADR 0069 — status icon, count/limit badge, drag-drop states ──
+   The fixed-status icon is an inline SVG (the repo's icon convention — no
+   icon font); sized + colored to sit inline in the lane title. The
+   count/limit badge reuses the .badge shape the view ships; the at-limit
+   lane is tinted amber (the KinaUna "lane is full" affordance) so a full
+   lane reads at a glance. The drag states (channel c — the TS module
+   toggles .dragging / .drag-over) are cosmetic only: the server is
+   authoritative (C-M5·9 / D10), so they carry no logic. */
+
+/* The fixed-status icon span (a .kanban-status wrapping the inline SVG);
+   inline-flex so the glyph aligns on the title baseline. */
+.kanban-status {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -2px;
+  margin-right: 0.15rem;
+}
+.kanban-status-icon {
+  color: var(--kmb-muted);
+  flex: 0 0 auto;
+}
+
+/* The count/limit badge — the .badge the view ships; a slightly larger
+   tap/reading target than the default badge. */
+.kanban-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A lane that is at its MaxItems limit (the view ships the
+   .kanban-lane-at-limit class) — an amber left rule + tint so a full lane
+   reads at a glance (the KinaUna full-lane affordance). The cards inside
+   are unchanged; the server's limit refusal (C-M5·5) is the backstop. */
+.kanban-lane-at-limit {
+  border-color: var(--kmb-amber-soft);
+  box-shadow: inset 3px 0 0 var(--kmb-amber);
+}
+
+/* The lane is the drag source (the whole .kanban-lane is draggable; the
+   TS disambiguates card vs. lane from the grab point). While a drag is in
+   progress, dim the source so the drop target reads clearly. */
+.kanban-lane.dragging {
+  opacity: 0.45;
+}
+.kanban-card.dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* A lane that is a valid drop target (the TS adds .drag-over on
+   dragover) — a primary-tinted border + a soft fill so the pointer's
+   destination reads. Card drops highlight the lane; the board's gutter
+   (below all lanes) is an implicit "end of lane order" drop for a lane
+   move and needs no separate class. */
+.kanban-lane.drag-over {
+  border-color: var(--bs-primary);
+  background: color-mix(in srgb, var(--bs-primary) 6%, var(--kmb-tint-a));
+  outline: 2px dashed var(--bs-primary);
+  outline-offset: 2px;
+}
+
 @media (max-width: 767.98px) {
   .kanban-board {
     min-width: 0;
   }
   .kanban-lane {
     min-width: 12rem;
+  }
+  .kanban-add-lane-input {
+    min-width: 7rem;
   }
 }
 

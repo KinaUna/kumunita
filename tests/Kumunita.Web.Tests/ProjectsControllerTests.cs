@@ -18,7 +18,8 @@ namespace Kumunita.Web.Tests;
 
 /// <summary>
 /// The <see cref="ProjectsController"/> Web-boundary seam tests (M5, ADR 0067
-/// — U12's 8 Web names, the §2.8 table verbatim). Mirrors the
+/// — U12's 8 Web names, the §2.8 table verbatim; plus the three ADR 0069
+/// drag/DnD + add-lane write lanes). Mirrors the
 /// <see cref="EventControllerTests"/> / <see cref="TagControllerTests"/> harness
 /// shape: the **frozen** <see cref="IProjectService"/> seam is substituted with
 /// NSubstitute (the controller never re-derives access — the C3 404/403 split
@@ -26,14 +27,14 @@ namespace Kumunita.Web.Tests;
 /// <see cref="IUserInfoService"/> + <see cref="ILocalizationService"/> are
 /// plain substitutes for the display-name / picker-read lanes.
 /// <para>
-/// Two of the eight (the <c>Todo_Detail_*</c> / <c>Board_Detail_*</c> read
+/// Two of the eleven (the <c>Todo_Detail_*</c> / <c>Board_Detail_*</c> read
 /// lanes) run a **real** scratch-Postgres <see cref="IDocumentStore"/>
 /// (<see cref="PostgresFixture"/>, the <see cref="TagControllerTests"/> /
 /// <see cref="GuardianAssignmentTests"/> precedent): those actions open
 /// <c>store.QuerySession()</c> and run Marten 9's async LINQ
 /// <c>Query&lt;BoardItemPlacement&gt;().Where(…).ToListAsync()</c>, which
 /// casts to the internal <c>MartenLinqQueryable</c> and cannot be
-/// NSubstituted. The other six are pure NSubstitute (the store is an unused
+/// NSubstituted. The other nine are pure NSubstitute (the store is an unused
 /// plain substitute).
 /// </para>
 /// </summary>
@@ -434,12 +435,215 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(await deniedController.AssignPost(todoId, assignee));
     }
 
+    // ── 9 — Board_AddLane_AppendsAtEnd (ADR 0069) ────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes</c>: the controller passes the
+    /// posted <c>Title</c> to the seam's
+    /// <see cref="IProjectService.CreateLaneAsync"/> verbatim (the
+    /// append-at-end semantics, F13, are the seam's — not re-derived here)
+    /// and redirects back to the board with <c>TempData["info"] =
+    /// "Lane added."</c> on success. The C3 split is this layer's pin: a
+    /// missing board is a clean <see cref="NotFoundResult"/>, a denied actor
+    /// a clean <see cref="ForbidResult"/>. A blank title is a **form error**
+    /// (the M4 "a form is a shape" precedent): the seam is never called,
+    /// <c>TempData["error"]</c> carries the message, the board is the
+    /// redirect target.
+    /// </summary>
+    [Fact]
+    public async Task Board_AddLane_AppendsAtEnd()
+    {
+        const string actor = "subj-addlane-actor";
+        const string boardId = "board-addlane";
+        var lane = new KanbanLane
+        {
+            Id = "lane-addlane", BoardId = boardId, Title = "New lane",
+            Order = 2, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.CreateLaneAsync(
+                boardId, "New lane", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(lane);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.LaneCreatePost(boardId, "New lane");
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
+        Assert.Equal("Lane added.", controller.TempData["info"] as string);
+        await projects.Received(1).CreateLaneAsync(
+            boardId, "New lane", actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing board is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.CreateLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<KanbanLane>(new KeyNotFoundException("no board")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.LaneCreatePost(boardId, "New lane"));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.CreateLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<KanbanLane>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.LaneCreatePost(boardId, "New lane"));
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: actor);
+        var blankResult = await blankController.LaneCreatePost(boardId, "   ");
+        var blankRedirect = Assert.IsType<RedirectResult>(blankResult);
+        Assert.Equal($"/projects/boards/{boardId}", blankRedirect.Url);
+        Assert.Equal("A lane title is required.", blankController.TempData["error"] as string);
+        await blankProjects.DidNotReceive()
+            .CreateLaneAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    // ── 10 — Board_MoveLane_Renumerates (ADR 0069) ───────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/move</c>: the controller
+    /// passes the posted <c>index</c> to the seam's
+    /// <see cref="IProjectService.MoveLaneToPositionAsync"/> verbatim (the
+    /// renumber + clamp semantics, F14, are the seam's — not re-derived
+    /// here) and redirects back to the board with
+    /// <c>TempData["info"] = "Lane moved."</c> on success; the C3
+    /// 404/403 split is the same as the other board write lanes.
+    /// </summary>
+    [Fact]
+    public async Task Board_MoveLane_Renumerates()
+    {
+        const string actor = "subj-movelane-actor";
+        const string boardId = "board-movelane";
+        const string laneId = "lane-movelane";
+        var lane = new KanbanLane
+        {
+            Id = laneId, BoardId = boardId, Title = "Movable",
+            Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.MoveLaneToPositionAsync(
+                laneId, 0, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(lane);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.MoveLanePost(boardId, laneId, 0);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
+        Assert.Equal("Lane moved.", controller.TempData["info"] as string);
+        await projects.Received(1).MoveLaneToPositionAsync(
+            laneId, 0, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing lane is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.MoveLaneToPositionAsync(
+                Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<KanbanLane>(new KeyNotFoundException("no lane")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.MoveLanePost(boardId, laneId, 0));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.MoveLaneToPositionAsync(
+                Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<KanbanLane>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.MoveLanePost(boardId, laneId, 0));
+    }
+
+    // ── 11 — Board_MoveCard_DropPosition (ADR 0069) ──────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{targetLaneId}/cards/{placementId}/
+    /// move</c>: the controller passes the posted drop <c>index</c> to the
+    /// seam's <see cref="IProjectService.MoveTodoToLanePositionAsync"/>
+    /// verbatim (the lane-status impart + lane-limit refusal, F15, are the
+    /// seam's — not re-derived here) and redirects back to the board with
+    /// <c>TempData["info"] = "Card moved."</c> on success. The C3 split is
+    /// the same as the other card write lanes, and a lane-limit refusal
+    /// (<see cref="InvalidOperationException"/>) is a **form error**, never a
+    /// <see cref="ForbidResult"/> (the M4 "a form is a shape" precedent).
+    /// </summary>
+    [Fact]
+    public async Task Board_MoveCard_DropPosition()
+    {
+        const string actor = "subj-movecard-actor";
+        const string boardId = "board-movecard";
+        const string targetLaneId = "lane-movecard-target";
+        const string placementId = "place-movecard";
+        var placement = new BoardItemPlacement
+        {
+            Id = placementId, TodoItemId = "todo-movecard", BoardId = boardId,
+            LaneId = targetLaneId, Order = 1,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.MoveTodoToLanePositionAsync(
+                placementId, targetLaneId, 1, actor,
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(placement);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.MoveCardPost(boardId, targetLaneId, placementId, 1);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
+        Assert.Equal("Card moved.", controller.TempData["info"] as string);
+        await projects.Received(1).MoveTodoToLanePositionAsync(
+            placementId, targetLaneId, 1, actor,
+            Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing placement is a clean NotFoundResult.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.MoveTodoToLanePositionAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<BoardItemPlacement>(new KeyNotFoundException("no placement")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(
+            await missingController.MoveCardPost(boardId, targetLaneId, placementId, 1));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.MoveTodoToLanePositionAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<BoardItemPlacement>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(
+            await deniedController.MoveCardPost(boardId, targetLaneId, placementId, 1));
+
+        // A lane-limit refusal is a form error: ex.Message on TempData["error"],
+        // redirect back to the board — never a ForbidResult, never a 500.
+        var limitProjects = Substitute.For<IProjectService>();
+        limitProjects.MoveTodoToLanePositionAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<BoardItemPlacement>(new InvalidOperationException("Full lane")));
+        var limitController = Build(limitProjects, subjectId: actor);
+        var limitResult = await limitController.MoveCardPost(boardId, targetLaneId, placementId, 1);
+        var limitRedirect = Assert.IsType<RedirectResult>(limitResult);
+        Assert.Equal($"/projects/boards/{boardId}", limitRedirect.Url);
+        Assert.Equal("Full lane", limitController.TempData["error"] as string);
+    }
+
     // ── Shared scaffolding ────────────────────────────────────────────────────
 
     /// <summary>
     /// Builds a <see cref="ProjectsController"/> over NSubstitute seams. When
     /// <paramref name="store"/> is <c>null</c> the <see cref="IDocumentStore"/>
-    /// is a plain substitute (six of the eight tests never open a session); a
+    /// is a plain substitute (nine of the eleven tests never open a session); a
     /// real scratch-Postgres store is passed for the two detail read lanes. A
     /// no-op <see cref="ITempDataProvider"/> closes the <c>TempData</c> bag so
     /// the write lanes' success branches don't NRE (<c>DefaultHttpContext</c>
