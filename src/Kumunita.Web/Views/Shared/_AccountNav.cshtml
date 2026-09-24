@@ -91,6 +91,12 @@
                       id="notifications-badge" style="display:none;" data-count="0"></span>
             </a>
         </li>
+        @* M6 (U08) — the bell's client module (client/lib/notifications-bell.ts,
+           the ADR 0031 tsc-only pin): the 30-second unread-count poller +
+           the dropdown render. Loaded signed-in only — the bell markup
+           above (and its #notifications-bell / #notifications-badge ids)
+           is the module's only DOM target. *@
+        <script type="module" src="~/js/lib/notifications-bell.js"></script>
         @* One account dropdown (visible to signed-in residents only): the globe
            language switcher sits inside it as a sub-section, so the navbar
            carries a single toggle instead of six flat links. *@

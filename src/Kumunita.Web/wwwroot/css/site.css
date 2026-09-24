@@ -1823,3 +1823,46 @@ body.kmb-page-fullbleed .navbar {
   }
 }
 
+/* ── M6 (U08) — the notification bell: badge + dropdown ──
+   The bell anchor (U06's _AccountNav markup) ships the .badge with
+   `position-absolute top-0 start-100 translate-middle` (Bootstrap
+   utilities) — that already puts it at the bell's top-right corner;
+   these rules only tighten its size + offset so it reads as a
+   notification badge (the U08 unit file's shape), and give the
+   client-built dropdown (.notifications-dropdown, the
+   client/lib/notifications-bell.ts module's class) a fixed width, a
+   scrollable height, and a compact item density. */
+
+/* The unread-count badge — a slightly larger tap/reading target than
+   the default .badge, tucked at the bell's top-right corner. */
+#notifications-badge {
+  top: -0.25rem;
+  right: -0.5rem;
+  left: auto; /* override `start-100` (Bootstrap sets `left`) so the
+                 `right` offset is what positions it — same corner */
+  font-size: 0.625rem;
+  min-width: 1rem;
+  height: 1rem;
+  line-height: 1rem;
+  padding: 0 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The dropdown — the notifications-bell.ts module creates + appends
+   this <ul> to the bell's <li>; fixed width + scrollable height
+   (the M2/M3/M4 nav-dropdown shape). */
+.notifications-dropdown {
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* The compact list-item density — the dropdown's items are
+   .dropdown-item elements (the module builds them), tighter than
+   the default dropdown padding so a five-item list reads at a
+   glance. */
+.notifications-dropdown .dropdown-item {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
