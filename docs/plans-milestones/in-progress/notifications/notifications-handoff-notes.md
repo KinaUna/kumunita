@@ -31,8 +31,12 @@ handoff-note precedent — the *lean* shape).
 - **One thing the next agent must not change:** the §6.2 `EmitAsync` signature — `Task<Notification> EmitAsync(IDocumentSession session, string recipientId, string kind, string idempotencyKey, string? body, CancellationToken ct = default)` — and the dedup pin: `EmitAsync` dedups **itself** via an `IdempotencyKey` look-up on the caller's session (F10: a same-key re-emission returns the existing row, no second row, no second `StageAsync` call). U02 codes the docs against §6.1 verbatim; U03 the service against §6.2 verbatim.
 - **Drift:** none recorded. (Note: §6.3 names the dedup as **two layers** — the service-side `IdempotencyKey` look-up (inbox) + the `StageAsync` guarantee (email) — which is how F10's "no second inbox row" is testable against the service alone; read D4/C-M6·4 as the emitter-supplies-a-stable-key + service-enforces-the-no-op split.)
 
-<!-- U02 appends `## U02` here on completion. -->
-<!-- U02 appends `## U02` here on completion. -->
+## U02
+
+- **Shipped:** `src/Kumunita.Core/Notifications/NotificationKinds.cs` (nine `public const string` members + the `Known` ordered list, the `KanbanStatuses` shape), `Notification.cs` (8 fields: `Id` / `RecipientId` / `Kind` / `IdempotencyKey` / `SourceId?` / `Subject?` / `Body?` / `Created` / `ReadAt?`), `NotificationPreference.cs` (3 fields: `RecipientId` doc-id / `KindsEnabled?` nullable list / `Updated?`), `M6DocTypes.cs` ((RecipientId, Created) feed index + IdempotencyKey index; `NotificationPreference` bare), and the boot-wiring line `M6DocTypes.Configure(opts)` after `M5DocTypes` in `src/Kumunita.Web/Program.cs` (the true M5 precedent location — the U02 entry-read named `DependencyInjection.cs`, which holds no surface registration). All four Core files are **verbatim** from design doc §6.1. `dotnet build Kumunita.slnx -c Debug` green (one pre-existing unrelated `BoardDetail.cshtml` CS8600 warning).
+- **One thing the next agent must not change:** the §6.1 field sets, esp. `Notification.IdempotencyKey` (non-nullable, `string.Empty` default — the F10 dedup anchor U03's `EmitAsync` looks up on the caller's session) and `NotificationPreference.RecipientId` being the **document id** (one row per recipient — U03's `GetPreferencesAsync` / `SetPreferencesAsync` load/upsert by it, no separate `Id` field).
+- **Drift:** none against the frozen text; the boot-wiring file location follows the true `M5DocTypes` precedent (`Program.cs`), recorded here per rule 9.
+
 <!-- U03 appends `## U03` here on completion. -->
 <!-- U04 appends `## U04` here on completion. -->
 <!-- U05 appends `## U05` here on completion. -->

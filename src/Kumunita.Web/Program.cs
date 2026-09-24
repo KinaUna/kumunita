@@ -124,6 +124,15 @@ var marten = builder.Services.AddMarten(opts =>
     // precedent). The dev-only ApplyAllDatabaseChangesOnStartup loop and the
     // SchemaBootstrap versioned boot both pick the surface up automatically.
     M5DocTypes.Configure(opts);
+
+    // M6 (ADR 0076 D1, plan U02): the Notifications bounded context's documents
+    // (Notification + NotificationPreference, ADR 0004 §B.1 — the (RecipientId,
+    // Created) feed-ordering index on Notification and the IdempotencyKey
+    // re-emission dedup anchor (F10)). Without this call the docs are invisible
+    // to Marten (the M3/Media/Page/Tag/M4/M5 precedent). The dev-only
+    // ApplyAllDatabaseChangesOnStartup loop and the SchemaBootstrap versioned
+    // boot both pick the surface up automatically.
+    M6DocTypes.Configure(opts);
 })
 .IntegrateWithWolverine();
 //  ^ Registers Wolverine's Postgres-backed IMessageStore (envelope/inbox) AND the
