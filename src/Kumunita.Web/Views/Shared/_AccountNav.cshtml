@@ -78,7 +78,13 @@
            tsc-only pin — no inline script here). U08 wires the two ids this
            element ships: #notifications-bell (the anchor) and #notifications-badge
            (the badge). *@
-        <li class="nav-item">
+        @* The bell's <li> is the dropdown's positioned containing block: the
+           notifications-bell.ts module appends an absolutely-positioned
+           .notifications-dropdown to this <li>, so it must be position:relative
+           (the .dropdown wrapper the account menu uses). Without it the menu
+           would anchor to the .navbar and render at its static flow position
+           (auto top/left) — 320px wide, spilling past the viewport. *@
+        <li class="nav-item position-relative">
             <a class="nav-link position-relative d-inline-flex align-items-center"
                href="/notifications" id="notifications-bell" aria-label="Notifications">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16"

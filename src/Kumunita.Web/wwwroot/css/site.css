@@ -425,6 +425,16 @@ body.kmb-page-fullbleed .navbar {
   color: #1c4532;
   font-weight: 600;
 }
+/* Vertically center each nav item in the bar so an icon-only item (the
+   notification bell — its anchor is ~4.5px shorter than a text nav-link
+   because only the 18px SVG is in-flow) sits on the same line as the text
+   links instead of reading high. Both nav <ul>s stretch to the same
+   height, so centering their <li> children puts every anchor's center on
+   one shared line (the icon is unaffected — it is already centered in its
+   own anchor). */
+.navbar .navbar-nav {
+  align-items: center;
+}
 
 /* --- Pinned announcement (Views/Shared/_PinnedAnnouncement.cshtml) --------
    Full-bleed banner above the navbar: warm cream band, amber left accent. */
@@ -1871,8 +1881,19 @@ body.kmb-page-fullbleed .navbar {
 
 /* The dropdown — the notifications-bell.ts module creates + appends
    this <ul> to the bell's <li>; fixed width + scrollable height
-   (the M2/M3/M4 nav-dropdown shape). */
+   (the M2/M3/M4 nav-dropdown shape). The module does NOT run the
+   Bootstrap Dropdown plugin (no data-bs-toggle on the bell), so the
+   [data-bs-popper] top/left + .dropdown-menu-end right rules never apply —
+   we set the anchor here. The bell's <li> is position:relative (see
+   _AccountNav.cshtml), so top:100% / right:0 drop the menu below the
+   bell and right-align it to the bell (the dropdown-menu-end behavior),
+   keeping it on-screen instead of spilling past the viewport edge. */
 .notifications-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  z-index: 1000; /* the Bootstrap .dropdown-menu default — above page content */
   width: 320px;
   max-height: 400px;
   overflow-y: auto;
