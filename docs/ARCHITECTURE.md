@@ -449,6 +449,25 @@ shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-des
   // (ComponentId, Created) on each, GoalId on Project) + the ProjectId indexes
   // on TodoItem + KanbanBoard.
 
+  // TBD ✓ (ADR 0087; design/tbd-todo-dependency-design.md) — the "waiting on"
+  // dependency lane on top of M5, additive on this same context + M5DocTypes
+  // (zero migration). A to-do points at the other to-do it is waiting on
+  // (BlockedByTodoId?) — a hint, never a gate (C-TBD·2): it never changes the
+  // to-do's own Audience decision, a write, or a hard-delete cascade. Standing
+  // over the to-do stays creator ∪ assignee ∪ GlobalAdmin (C-M5·6, the
+  // AssignTodoAsync shape), re-checked server-side in the write lane. Read of
+  // the blocker's title / status goes through the existing
+  // TodoItemToAuditableResource (no new adapter) — the chip is access-scoped:
+  // an unreadable / absent / soft-deleted blocker degrades to the generic
+  // label (the C3 404-vs-403 split idiom). The only refusal this lane adds is
+  // one cycle guard (self + transitive, the C-M5·7 ParentId-guard shape;
+  // clearing to null is always allowed). The IProjectService surface gains
+  // additively: the ListPickerTodosAsync seam + the BlockedByTodoId field on
+  // CreateTodoRequest / UpdateTodoRequest (with the ClearBlockedBy flag) + the
+  // additive blockedOnly feed filter param on ListTodosAsync (a filter, never
+  // a gate — the unassignedOnly / projectId discipline). M5DocTypes registers
+  // the BlockedByTodoId index on TodoItem.
+
 Localization (ADR 0005 — languages and translations are data, not env)
   LanguageCatalog     { code, nativeName, enabled, sortOrder }                 # one row per supported language
   LocaleSettings      { defaultLanguageCode }                                  # singleton document

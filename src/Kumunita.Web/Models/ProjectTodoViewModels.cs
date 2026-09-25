@@ -94,7 +94,10 @@ public sealed record TodoIndexViewModel(
     string? CurrentComponentId,
     string? CurrentAssigneeId,
     bool UnassignedOnly,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0087 D6 — the "blocked only" feed filter (a filter, never a gate —
+    // C-TBD·2); the toggle link toggles this.
+    bool BlockedOnly = false);
 
 /// <summary>
 /// One <see cref="BoardItemPlacement"/> of the to-do, enriched with the
@@ -151,7 +154,12 @@ public sealed record TodoDetailViewModel(
     IReadOnlyList<Kumunita.Core.Projects.TodoTranslation>? Translations = null,
     IReadOnlyList<LanguageOption>? Languages = null,
     bool CanTranslate = false,
-    string OriginalLanguageCode = "");
+    string OriginalLanguageCode = "",
+    // ADR 0087 D4 — the "waiting on" chip (the service's
+    // <see cref="Kumunita.Core.Projects.TodoDetailResult.Blocker"/> —
+    // access-scoped: an unreadable / absent / soft-deleted blocker degrades to
+    // the generic label). `null` = the to-do is not blocked (no chip).
+    Kumunita.Core.Projects.BlockerChip? Blocker = null);
 
 /// <summary>
 /// The **compose / edit** form model (the <c>GET /projects/todos/new</c>
@@ -229,6 +237,19 @@ public sealed class TodoEditorModel
     /// invalid-POST re-renders.</summary>
     public bool ClearParent { get; set; }
 
+    /// <summary>The "waiting on" to-do's id (ADR 0087 D5) — a non-null value
+    /// sets the <c>BlockedByTodoId</c> (a hint, never a gate — C-TBD·2);
+    /// <c>null</c> = not blocked. Picked from <see cref="BlockerOptions"/>
+    /// (the actor's readable, non-deleted to-dos — the C-TBD·4 display
+    /// surface; the C-TBD·3 cycle guard is the service's).</summary>
+    public string? BlockedByTodoId { get; set; }
+
+    /// <summary>Explicit un-block (the edit lane only — sets
+    /// <c>BlockedByTodoId = null</c>; <see cref="Kumunita.Core.Projects
+    /// .UpdateTodoRequest.ClearBlockedBy"/>). <see cref="ClearParent"/>
+    /// idiom — the flag survives invalid-POST re-renders.</summary>
+    public bool ClearBlockedBy { get; set; }
+
     /// <summary>The feed organizer (a <c>Component</c> id) — a
     /// <b>filter, never a gate</b> (C-M3·2).</summary>
     public string? ComponentId { get; set; }
@@ -277,6 +298,15 @@ public sealed class TodoEditorModel
     /// — the form POSTs a <see cref="ParentId"/>.</summary>
     [BindNever]
     public IReadOnlyList<(string Id, string Title)> ParentOptions { get; set; } = [];
+
+    /// <summary>The **blocker picker** options — the actor's **readable,
+    /// non-deleted** to-dos (<see cref="Kumunita.Core.Projects.IProjectService
+    /// .ListPickerTodosAsync"/>, audience-filtered by the service's
+    /// <c>CanSeeAsync(Read)</c>). A **display** surface, never a gate
+    /// (C-TBD·4). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="BlockedByTodoId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Title)> BlockerOptions { get; set; } = [];
 
     /// <summary>The to-do's **project association** (ADR 0086 D4 / D9) —
     /// the <see cref="Kumunita.Core.Projects.TodoItem.ProjectId"/>: a feed

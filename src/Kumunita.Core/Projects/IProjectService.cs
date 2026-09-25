@@ -64,7 +64,7 @@ public interface IProjectService
     /// <c>CanSeeAsync(Read)</c> pass — C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, CancellationToken ct = default);
+Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default);
 
     /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
@@ -78,6 +78,15 @@ public interface IProjectService
     /// </summary>
     Task<TodoDetailResult> GetTodoAsync(string todoItemId, string actorId, CancellationToken ct = default);
 
+        /// <summary>
+        /// The **blocker picker** read lane (ADR 0087 D7) — the actor's readable,
+        /// non-deleted to-dos (the candidates are <c>!IsDeleted</c>; the
+        /// survivors are <c>CanSeeAsync(Read)</c>-filtered (C6 / C3) over the
+        /// <see cref="TodoItemToAuditableResource"/>; ordered by <c>Created</c>
+        /// descending; paged). A **display** surface, never a gate (C-TBD·4) —
+        /// it does not pre-check cycles (the write lane does — C-TBD·3).
+        /// </summary>
+        Task<IReadOnlyList<TodoItem>> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default);
     /// <summary>
     /// The board list (the feed): candidates = <c>!IsDeleted</c>, filtered by
     /// the optional <paramref name="componentId"/> (a filter, never a gate —

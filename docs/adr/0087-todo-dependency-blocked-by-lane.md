@@ -1,7 +1,7 @@
 # ADR 0087 — Todo dependency lane (`TBD`): one `BlockedByTodoId?` on `TodoItem` — the "waiting on" pointer (a display chip + a feed filter + one write lane; **never a gate**, never a graph)
 
-Status: Proposed (draft for evaluation; Accepted at sign-off)
-Date: 2026-09-25
+Status: Accepted
+Date: 2026-09-25 (sign-off U00, 2026-09-25)
 Amends: **0067** (the M5 `Projects` context — this ADR adds **one optional field**
 to `TodoItem` (`BlockedByTodoId`, additive on the `M5DocTypes` surface, the
 ADR 0086 `ProjectId`-on-`TodoItem` precedent) and **additive seams** on the

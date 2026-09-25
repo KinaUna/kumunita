@@ -139,6 +139,29 @@
                 </div>
             }
 
+            @* ADR 0087 — the "waiting on" picker (D7): the actor's readable,
+               non-deleted to-dos (a display surface, never a gate — C-TBD·4;
+               the cycle guard is the service's, C-TBD·3). A leading "No
+               blocker" option; a blank selection posts as "no blocker". *@
+            @if (Model.BlockerOptions.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="blocked-by" style="font-weight:600;"><kw-l key="todo.blocked_by">Waiting on</kw-l></label>
+                        <select class="form-control" id="blocked-by" name="BlockedByTodoId">
+                            <option value=""><kw-l key="todo.blocked_by_none">No blocker</kw-l></option>
+                            @foreach (var (id, title) in Model.BlockerOptions)
+                            {
+                                <option value="@id" selected="@(id == Model.BlockedByTodoId ? "selected" : null)">@title</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="todo.blocked_by">Waiting on</kw-l> — purely informational: a blocker never blocks this to-do itself, and a reference back into the blocker's own chain is refused (cycle guard).
+                        </div>
+                    </div>
+                </div>
+            }
+
             @* U08 (ADR 0086 §3.9) — the project picker (D10): posts the optional
                ProjectId with the create. The association is a display surface,
                never a gate (C-PL·3); the controller applies it post-create via

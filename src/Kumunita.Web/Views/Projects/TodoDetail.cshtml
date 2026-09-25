@@ -387,6 +387,33 @@
                     </div>
                 }
 
+                @* ADR 0087 — the "waiting on" chip (the D4 surface). The
+                   service resolved the blocker over the existing
+                   TodoItemToAuditableResource; a to-do the actor may not read,
+                   or one that is absent/soft-deleted, is a **Generic** chip
+                   (no title, no link, no leak — C-TBD·4). A resolved chip is
+                   a link to the blocker's detail (LinkPath non-null). The
+                   blocker is purely informational — it never gates the to-do
+                   itself (D2). *@
+                @if (Model.Blocker is not null)
+                {
+                    <div class="mb-3">
+                        <span class="text-muted small"><kw-l key="todo.blocked_by">Waiting on</kw-l> · </span>
+                        @if (Model.Blocker.Generic)
+                        {
+                            <span class="badge text-bg-secondary"><kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l></span>
+                        }
+                        else
+                        {
+                            <a href="@Model.Blocker.LinkPath">@Model.Blocker.Title</a>
+                            @if (!string.IsNullOrWhiteSpace(Model.Blocker.Status))
+                            {
+                                <span class="text-muted small"> · @Model.Blocker.Status</span>
+                            }
+                        }
+                    </div>
+                }
+
                 @* ADR 0079 — the optional start / due dates (the <kw-dt>
                    TagHelper renders null as empty; the label is gated on the
                    value so an unset date shows nothing at all). Shown to

@@ -638,6 +638,34 @@
                                                     <span>@effectiveStatusLabel</span>
                                                 </span>
                                             }
+                                            @* ADR 0087 D4 — the card's "waiting on" chip (the D4
+                                               surface — the to-do detail + the board card). The service
+                                               resolved the access-scoped chip (the CardBlockers map); a
+                                               blocker the actor may not read, or one that is
+                                               absent/soft-deleted, is a **Generic** chip (no title, no
+                                               link, no leak — C-TBD·4). A resolved chip links to the
+                                               blocker's detail. Purely informational — it never gates the
+                                               card (D2). *@
+                                            @if (card.Blocker is not null)
+                                            {
+                                                @if (card.Blocker.Generic)
+                                                {
+                                                    <span class="badge text-bg-secondary">
+                                                        <kw-l key="todo.blocked_by">Waiting on</kw-l> · <kw-l key="todo.blocked_generic">Another to-do (not visible to you)</kw-l>
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <a class="badge text-bg-light border text-decoration-none"
+                                                       href="@card.Blocker.LinkPath">
+                                                        <kw-l key="todo.blocked_by">Waiting on</kw-l> · @card.Blocker.Title
+                                                        @if (!string.IsNullOrWhiteSpace(card.Blocker.Status))
+                                                        {
+                                                            <span class="text-muted"> · @card.Blocker.Status</span>
+                                                        }
+                                                    </a>
+                                                }
+                                            }
                                             @if (!string.IsNullOrWhiteSpace(card.AssigneeDisplayName))
                                             {
                                                 <span class="ms-1"><kw-l key="projects.todo.assignee">Assignee</kw-l>: @card.AssigneeDisplayName</span>

@@ -66,7 +66,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         projects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns([todo]);
 
         // The feed's copy-to / move-to pickers read each to-do's placement
@@ -86,14 +86,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("todo-1", vm.Todos[0].Id);
         Assert.Equal("subj-author", vm.Todos[0].AuthorDisplayName); // no profile → raw id
         await projects.Received(1).ListTodosAsync(
-            null, null, actor, 1, false, null, Arg.Any<CancellationToken>());
+            null, null, actor, 1, false, null, false, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
         var deniedProjects = Substitute.For<IProjectService>();
         deniedProjects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
                 Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
-                Arg.Any<CancellationToken>())
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<TodoItem>>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);
@@ -1643,6 +1643,240 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
         Assert.IsType<ForbidResult>(await deniedController.ProjectDelete(projectId));
+    }
+
+    // ── ADR 0087 — the "waiting on" dependency lane (U03's 6 Web pins) ─────
+
+    /// <summary>
+    /// ADR 0087 D6 — <c>GET /projects/todos?blockedOnly=true</c>: the
+    /// <c>blockedOnly</c> feed filter is passed to the frozen seam verbatim
+    /// (it **narrows the candidate set, never the audience decision**) and
+    /// the view model carries the toggle's current state back so the switch
+    /// renders checked.
+    /// </summary>
+    [Fact]
+    public async Task TodosIndex_BlockedOnlyTrue_PassesFilterToService()
+    {
+        const string actor = "subj-tbd-index-actor";
+        var projects = Substitute.For<IProjectService>();
+        projects.ListTodosAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        var store = await BuildRealStoreAsync();
+        var controller = Build(projects, store: store, subjectId: actor);
+
+        var result = await controller.TodosIndex(
+            componentId: null, assigneeId: null, blockedOnly: true, page: 1);
+
+        var vm = Assert.IsType<TodoIndexViewModel>(
+            Assert.IsType<ViewResult>(result).ViewData.Model);
+        Assert.True(vm.BlockedOnly);
+        // blockedOnly=true is the 7th positional argument (before ct).
+        await projects.Received(1).ListTodosAsync(
+            null, null, actor, 1, false, null, true, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D4 — <c>GET /projects/todos/{id}</c>: a **resolved** blocker
+    /// (exists, !IsDeleted, and passes its own <c>CanAsync(Read)</c>) carries
+    /// the blocker's title + status + detail link into the view model, so the
+    /// chip renders a link (C-TBD·4 — access-scoped, non-leaky).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_RendersBlockerChip_WhenReadable()
+    {
+        const string actor = "subj-tbd-detail-actor";
+        const string todoId = "tbd-detail";
+
+        // The detail read lane runs a live Marten placement query — a real
+        // scratch store (empty placements = an empty list).
+        var store = await BuildRealStoreAsync();
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Waiting to-do", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+                Blocker = new BlockerChip
+                {
+                    TodoId = "tbd-detail-blocker",
+                    Title = "The blocker",
+                    Status = "In Progress",
+                    LinkPath = $"/projects/todos/tbd-detail-blocker",
+                },
+            });
+
+        var controller = Build(projects, store: store, subjectId: actor);
+        var vm = Assert.IsType<TodoDetailViewModel>(
+            Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
+
+        Assert.NotNull(vm.Blocker);
+        Assert.False(vm.Blocker!.Generic);
+        Assert.Equal("The blocker", vm.Blocker.Title);
+        Assert.Equal("In Progress", vm.Blocker.Status);
+        Assert.Equal($"/projects/todos/tbd-detail-blocker", vm.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// ADR 0087 D4 — <c>GET /projects/todos/{id}</c>: a blocker the actor may
+    /// not read (or that is absent / soft-deleted) is a **Generic** chip —
+    /// <c>Generic</c> true and <c>Title</c> / <c>Status</c> / <c>LinkPath</c>
+    /// all null, so nothing is leaked (the C3 404-vs-403 split idiom).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_RendersGenericChip_WhenUnreadable()
+    {
+        const string actor = "subj-tbd-detail-generic-actor";
+        const string todoId = "tbd-detail-generic";
+
+        // The detail read lane runs a live Marten placement query — a real
+        // scratch store (empty placements = an empty list).
+        var store = await BuildRealStoreAsync();
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Waiting to-do", AuthorId = actor,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+                Blocker = new BlockerChip { TodoId = "tbd-detail-generic-blocker", Generic = true },
+            });
+
+        var controller = Build(projects, store: store, subjectId: actor);
+        var vm = Assert.IsType<TodoDetailViewModel>(
+            Assert.IsType<ViewResult>(await controller.TodoDetail(todoId)).ViewData.Model);
+
+        Assert.NotNull(vm.Blocker);
+        Assert.True(vm.Blocker!.Generic);
+        Assert.Null(vm.Blocker.Title);
+        Assert.Null(vm.Blocker.Status);
+        Assert.Null(vm.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// ADR 0087 D7 — <c>GET /projects/todos/new</c>: the create form seeds the
+    /// **blocker picker** (the actor's readable, non-deleted to-dos from
+    /// <c>ListPickerTodosAsync</c>, sorted by title — a display surface, never
+    /// a gate; C-TBD·4). A blank prefill posts as "no blocker".
+    /// </summary>
+    [Fact]
+    public async Task CreateGet_SeedBlockerPicker()
+    {
+        const string actor = "subj-tbd-create-actor";
+
+        var projects = Substitute.For<IProjectService>();
+        // The parent picker (F9) reads ListTodosAsync — an empty candidate set
+        // (a valid shape) so the lane doesn't NRE.
+        projects.ListTodosAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<bool>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        projects.ListPickerTodosAsync(
+                Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<TodoItem>
+            {
+                new() { Id = "tbd-opt-b", Title = "Beta blocker", AuthorId = actor, Created = default },
+                new() { Id = "tbd-opt-a", Title = "Alpha blocker", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor); // no real store needed (all reads are substituted)
+        var vm = Assert.IsType<TodoEditorModel>(
+            Assert.IsType<ViewResult>(await controller.CreateGet()).ViewData.Model);
+
+        // Sorted by title (Alpha before Beta).
+        Assert.Equal(2, vm.BlockerOptions.Count);
+        Assert.Equal("tbd-opt-a", vm.BlockerOptions[0].Id);
+        Assert.Equal("Alpha blocker", vm.BlockerOptions[0].Title);
+        Assert.Equal("tbd-opt-b", vm.BlockerOptions[1].Id);
+        // A new to-do has no blocker yet.
+        Assert.Null(vm.BlockedByTodoId);
+        await projects.Received(1).ListPickerTodosAsync(
+            actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D5 — <c>POST /projects/todos/{id}</c>: a non-blank
+    /// <c>BlockedByTodoId</c> posts through to the frozen seam's
+    /// <c>UpdateTodoRequest.BlockedByTodoId</c> verbatim (the service's C-TBD·3
+    /// cycle guard is the enforcement — not this layer's), while
+    /// <c>ClearBlockedBy</c> stays false (no clear intent on a set).
+    /// </summary>
+    [Fact]
+    public async Task UpdatePost_BlockedByTodoId_PassesFieldToService()
+    {
+        const string actor = "subj-tbd-update-actor";
+        const string todoId = "tbd-update";
+        const string blockerId = "tbd-update-blocker";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new TodoEditorModel
+        {
+            Title = "Edited title",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            BlockedByTodoId = blockerId,
+        };
+
+        Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
+
+        await projects.Received(1).UpdateTodoAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+            Arg.Is<UpdateTodoRequest>(r =>
+                r.BlockedByTodoId == blockerId && !r.ClearBlockedBy),
+            Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// ADR 0087 D5 — <c>POST /projects/todos/{id}</c>: a "no blocker"
+    /// selection (blank <c>BlockedByTodoId</c>) with the <c>ClearBlockedBy</c>
+    /// checkbox posts <c>ClearBlockedBy = true</c> (an explicit un-block — the
+    /// service sets <c>BlockedByTodoId = null</c>; always safe, never a cycle).
+    /// </summary>
+    [Fact]
+    public async Task UpdatePost_ClearBlockedBy_PassesFlagToService()
+    {
+        const string actor = "subj-tbd-clear-actor";
+        const string todoId = "tbd-clear";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateTodoAsync(
+                todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+                Arg.Any<UpdateTodoRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new TodoItem { Id = todoId, Title = "Edited title", AuthorId = actor }));
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new TodoEditorModel
+        {
+            Title = "Edited title",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+            BlockedByTodoId = null,
+            ClearBlockedBy = true,
+        };
+
+        Assert.IsType<RedirectResult>(await controller.UpdatePost(todoId, model));
+
+        await projects.Received(1).UpdateTodoAsync(
+            todoId, actor, Arg.Any<IReadOnlySet<string>>(),
+            Arg.Is<UpdateTodoRequest>(r =>
+                r.BlockedByTodoId == null && r.ClearBlockedBy),
+            Arg.Any<CancellationToken>());
     }
 
     // ── Shared scaffolding ────────────────────────────────────────────────────

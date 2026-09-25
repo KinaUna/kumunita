@@ -107,7 +107,7 @@ public sealed class ProjectService : IProjectService
     /// **not** change the audience decision (C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -125,6 +125,12 @@ public sealed class ProjectService : IProjectService
         // stays the access boundary (C-M5·3).
         if (projectId is not null)
             q = q.Where(t => t.ProjectId == projectId);
+        // The TBD "waiting on" filter (ADR 0087 D6): a feed filter, never a
+        // gate (C-TBD·2) — narrows the candidates to the blocked to-dos
+        // (the `unassignedOnly` shape), it does not change the audience
+        // decision (C-M5·3).
+        if (blockedOnly)
+            q = q.Where(t => t.BlockedByTodoId != null);
         var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -194,7 +200,75 @@ public sealed class ProjectService : IProjectService
                 subtasks.Add(sub);
         }
 
-        return new TodoDetailResult { Todo = todo, Subtasks = subtasks };
+        // ADR 0087 D4 — the "waiting on" chip, access-scoped (C-TBD·4). The
+        // blocker's read is an *access decision* within the same session (the
+        // ListBoardsForTodoAsync per-parent precedent), not a separate audit
+        // event (C3 — the single aggregate row is preserved). An absent /
+        // soft-deleted / unreadable blocker degrades to the generic label; the
+        // C3 404-vs-403 split idiom — an unreadable blocker's title / status
+        // are not leaked.
+        BlockerChip? blocker = null;
+        if (todo.BlockedByTodoId is not null)
+        {
+            var blockerTodo = await session.LoadAsync<TodoItem>(todo.BlockedByTodoId, ct).ConfigureAwait(false);
+            if (blockerTodo is null || blockerTodo.IsDeleted)
+            {
+                blocker = new BlockerChip { TodoId = todo.BlockedByTodoId, Generic = true };
+            }
+            else
+            {
+                var blockerDecision = await _authorization
+                    .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(blockerTodo))
+                    .ConfigureAwait(false);
+                blocker = blockerDecision.Allowed
+                    ? new BlockerChip
+                    {
+                        TodoId = blockerTodo.Id,
+                        Title = blockerTodo.Title,
+                        Status = blockerTodo.Status,
+                        LinkPath = $"/projects/todos/{blockerTodo.Id}"
+                    }
+                    : new BlockerChip { TodoId = blockerTodo.Id, Generic = true };
+            }
+        }
+
+        return new TodoDetailResult { Todo = todo, Subtasks = subtasks, Blocker = blocker };
+    }
+
+    /// <summary>
+    /// The **blocker picker** read lane (ADR 0087 D7) — the actor's readable,
+    /// non-deleted to-dos: the candidate set is <c>!IsDeleted</c>, ordered by
+    /// <see cref="TodoItem.Created"/> descending, paged; the survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3, the
+    /// single aggregate <see cref="AccessAudit"/> row with <c>TargetKind =
+    /// "todo"</c>) over the <see cref="TodoItemToAuditableResource"/> (U03).
+    /// A **display** surface, never a gate (C-TBD·4) — it does not pre-check
+    /// cycles (the write lane does — C-TBD·3).
+    /// </summary>
+    public async Task<IReadOnlyList<TodoItem>> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        var candidates = await session.Query<TodoItem>()
+            .Where(t => !t.IsDeleted)
+            .OrderByDescending(t => t.Created)
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<TodoItem>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "todo"), from that single call (the ListTodosAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(t => new TodoItemToAuditableResource(t)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(t => visibleIds.Contains(t.Id)).ToList();
     }
 
     /// <summary>
@@ -381,7 +455,61 @@ public sealed class ProjectService : IProjectService
             laneDetails.Add(new LaneDetail { Lane = lane, Cards = cards });
         }
 
-        return new BoardDetailResult { Board = board, Lanes = laneDetails };
+        // ADR 0087 D4 — the board **card** chip (the D4 surface): resolve the
+        // access-scoped `BlockerChip` for each *visible* card that has a
+        // `BlockedByTodoId` (a denied card is not returned, so it is not
+        // resolved — the two-level decision already ran). Each card's blocker
+        // is its **own** read (the `GetTodoAsync` chip precedent, C-TBD·4):
+        // an absent / soft-deleted / unreadable blocker degrades to
+        // `Generic` (no title / link — no leak). **Additive** — `Cards` is
+        // untouched; the chip lives on the `CardBlockers` map (D9).
+        var cardBlockers = new Dictionary<string, BlockerChip>();
+        foreach (var card in laneDetails.SelectMany(l => l.Cards))
+        {
+            if (card.BlockedByTodoId is null)
+                continue;
+            var chip = await ResolveBlockerChipAsync(session, actorId, card.BlockedByTodoId, ct).ConfigureAwait(false);
+            cardBlockers[card.Id] = chip;
+        }
+
+        return new BoardDetailResult { Board = board, Lanes = laneDetails, CardBlockers = cardBlockers };
+    }
+
+    /// <summary>
+    /// Resolves the access-scoped <see cref="BlockerChip"/> for a card's /
+    /// to-do's <see cref="TodoItem.BlockedByTodoId"/> target (ADR 0087 D4,
+    /// C-TBD·4) — the **single** resolution path shared by the to-do detail
+    /// (<see cref="GetTodoAsync"/>'s <c>Blocker</c>) and the board card
+    /// (<see cref="GetBoardAsync"/>'s <c>CardBlockers</c>). A to-do the actor
+    /// may not read, or one that is absent / soft-deleted, degrades to
+    /// <see cref="BlockerChip.Generic"/> (<c>true</c>) — no title, no link,
+    /// no leak (the C3 404-vs-403 split idiom). Reuses the **existing**
+    /// <see cref="TodoItemToAuditableResource"/> (D9 — no new adapter /
+    /// <c>AccessAction</c> / <c>AccessVia</c>).
+    /// </summary>
+    private async Task<BlockerChip> ResolveBlockerChipAsync(
+        IQuerySession session, string actorId, string blockerTodoId, CancellationToken ct)
+    {
+        var blockerTodo = await session.LoadAsync<TodoItem>(blockerTodoId, ct).ConfigureAwait(false);
+        if (blockerTodo is null || blockerTodo.IsDeleted)
+            return new BlockerChip { TodoId = blockerTodoId, Generic = true };
+
+        // The blocker's **own** read decision (C-TBD·4) — within the caller's
+        // session, not a separate audit event (C3 — the aggregate row is
+        // preserved: the blocker's read is within the to-do / board's read).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new TodoItemToAuditableResource(blockerTodo))
+            .ConfigureAwait(false);
+
+        return decision.Allowed
+            ? new BlockerChip
+            {
+                TodoId = blockerTodo.Id,
+                Title = blockerTodo.Title,
+                Status = blockerTodo.Status,
+                LinkPath = $"/projects/todos/{blockerTodo.Id}"
+            }
+            : new BlockerChip { TodoId = blockerTodo.Id, Generic = true };
     }
 
     // --- Write lanes (U05) — standing re-checked server-side (C-M5·6, C3) ---
@@ -624,6 +752,7 @@ public sealed class ProjectService : IProjectService
             AuthorId = actorId,                            // C-M5·6 — the author becomes the standing owner.
             AssigneeId = request.AssigneeId,               // display + standing, never a gate (C-M5·3 / C-M5·6).
             ParentId = request.ParentId,                   // C-M5·7 — the sole hierarchy mechanism; `null` = top-level.
+            BlockedByTodoId = request.BlockedByTodoId,      // ADR 0087 D5 — the "waiting on" pointer; written verbatim, a hint never a gate (C-TBD·2).
             StartAt = request.StartAt,                     // ADR 0079 — the optional start (`null` = no date); the Event Start/End shape, but optional.
             DueAt = request.DueAt,                         // ADR 0079 — the optional due date (`null` = no date).
             Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
@@ -639,6 +768,25 @@ public sealed class ProjectService : IProjectService
         // EventService.ResolveLanguageCodeAsync shape).
         await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
         todo.LanguageCode = await ResolveLanguageCodeAsync(todo.LanguageCode, session, ct).ConfigureAwait(false);
+
+        // ADR 0087 D5 / the C3 404-vs-403 split — a non-null BlockedByTodoId must
+        // point at a to-do that exists and is not soft-deleted (the actor's
+        // read of the blocker is an *access decision* in the same session, not a
+        // write refusal — the unreadable-blocker case degrades to the generic
+        // chip at read time, C-TBD·4). A self-reference is also refused (the
+        // to-do is new, so it cannot yet be its own blocker — the C-TBD·3 guard's
+        // trivial branch).
+        if (!string.IsNullOrEmpty(todo.BlockedByTodoId))
+        {
+            if (todo.BlockedByTodoId == todo.Id)
+                throw new InvalidOperationException(
+                    $"To-do '{todo.Id}' cannot block itself.");
+
+            var blocker = await session.LoadAsync<TodoItem>(todo.BlockedByTodoId, ct).ConfigureAwait(false);
+            if (blocker is null || blocker.IsDeleted)
+                throw new KeyNotFoundException(
+                    $"To-do '{todo.BlockedByTodoId}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
+        }
 
         session.Store(todo);
         StoreAuditRow(session, actorId, "todo.create", todo.Id, TargetKindTodo, AccessVia.Owner);
@@ -739,6 +887,51 @@ public sealed class ProjectService : IProjectService
             newParentId = wouldBeParent;
         }
 
+        // **The "waiting on" association (ADR 0087 D5 / C-TBD·3)** — resolved
+        // **before** any write (the guard runs before the store, so a refused
+        // set writes nothing):
+        //   * `ClearBlockedBy == true`  → un-block (BlockedByTodoId = null) —
+        //     always safe (removing a blocker can never create a cycle).
+        //   * `BlockedByTodoId != null` → the **cycle guard**: if the target is
+        //     the to-do itself or the to-do is reachable by following the
+        //     BlockedByTodoId chain **up** from the target, the association
+        //     would create a cycle — refuse (C-TBD·3). The target must also
+        //     exist and not be soft-deleted (C3 404-vs-403 split).
+        //   * neither                   → no-op on the association.
+        string? newBlockedByTodoId = todo.BlockedByTodoId;
+        if (request.ClearBlockedBy)
+        {
+            newBlockedByTodoId = null;
+        }
+        else if (!string.IsNullOrEmpty(request.BlockedByTodoId))
+        {
+            var wouldBeBlocker = request.BlockedByTodoId;
+            if (wouldBeBlocker == todoItemId)
+                throw new InvalidOperationException(
+                    $"To-do '{todoItemId}' cannot be blocked by itself.");
+
+            // The target must exist and not be soft-deleted (C3 split).
+            var blocker = await session.LoadAsync<TodoItem>(wouldBeBlocker, ct).ConfigureAwait(false);
+            if (blocker is null || blocker.IsDeleted)
+                throw new KeyNotFoundException(
+                    $"To-do '{wouldBeBlocker}' (the would-be blocker) was not found; a blocked-by target must exist and not be soft-deleted.");
+
+            // The cycle guard: walk the BlockedByTodoId chain UP from the target.
+            // Each to-do has at most ONE blocker (BlockedByTodoId), so this is
+            // a linear chain — if the chain reaches todoItemId, setting this
+            // to-do's blocker to the target would close the cycle (C-TBD·3).
+            var current = blocker;
+            while (current.BlockedByTodoId is not null)
+            {
+                if (current.BlockedByTodoId == todoItemId)
+                    throw new InvalidOperationException(
+                        $"To-do '{todoItemId}' cannot be blocked by '{blocker.Title ?? wouldBeBlocker}': following the blocker chain would create a cycle.");
+                current = (await session.LoadAsync<TodoItem>(current.BlockedByTodoId, ct).ConfigureAwait(false))!;
+            }
+
+            newBlockedByTodoId = wouldBeBlocker;
+        }
+
         // ADR 0018 — resolve the authored-in tag on **both** sides before
         // comparing (the EventService.UpdateAsync shape): a no-op re-save that
         // leaves the picker at the instance default must compare as
@@ -759,6 +952,7 @@ public sealed class ProjectService : IProjectService
             || request.ComponentId is not null && !string.Equals(todo.ComponentId, request.ComponentId, StringComparison.Ordinal)
             || request.Status is not null && !string.Equals(todo.Status, request.Status, StringComparison.Ordinal)
             || newParentId != todo.ParentId
+            || newBlockedByTodoId != todo.BlockedByTodoId
             || todo.StartAt != request.StartAt
             || todo.DueAt != request.DueAt
             || (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
@@ -784,6 +978,7 @@ public sealed class ProjectService : IProjectService
         todo.StartAt = request.StartAt;
         todo.DueAt = request.DueAt;
         todo.ParentId = newParentId;                       // C-M5·7 — the resolved hierarchy (no-op when unchanged).
+        todo.BlockedByTodoId = newBlockedByTodoId;         // ADR 0087 D5 — the resolved "waiting on" (no-op when unchanged; C-TBD·3 cycle guard applied above).
         if (request.LanguageCode is not null)
             todo.LanguageCode = updatedLanguageCode;       // ADR 0018
         if (request.TagIds is not null)

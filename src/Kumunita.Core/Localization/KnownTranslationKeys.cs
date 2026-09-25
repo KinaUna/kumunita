@@ -113,6 +113,12 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "No parent (top-level)",
             ["projects.todo.clear_parent"]   = "Clear parent (make top-level)",
             ["projects.todo.reparent_hint"]  = "A subtask is a full to-do with its own status, assignee, and board placement. Reparenting to a descendant is refused (cycle guard).",
+            // ADR 0087 — the "waiting on" dependency lane (the chip, the
+            // picker, and the feed toggle — the D8 four keys × 4 languages).
+            ["todo.blocked_by"]              = "Waiting on",
+            ["todo.blocked_by_none"]         = "No blocker",
+            ["todo.blocked_generic"]         = "Another to-do (not visible to you)",
+            ["todo.blocked_filter"]          = "Waiting on something",
             // ADR 0079 — optional start/due dates on a to-do.
             ["projects.todo.start"]          = "Start",
             ["projects.todo.due"]            = "Due",
@@ -1532,6 +1538,11 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Keine Elternaufgabe (Top-Level)",
             ["projects.todo.clear_parent"]   = "Elternaufgabe löschen (zur Top-Level machen)",
             ["projects.todo.reparent_hint"]  = "Eine Unteraufgabe ist eine vollständige Aufgabe mit eigenem Status, Zuweisung und Board-Platzierung. Das Umhängen an einen Nachkommen wird abgelehnt (Zyklusschutz).",
+            // ADR 0087 — die "Wartet auf"-Abhängigkeit (Chip, Picker, Feed-Schalter).
+            ["todo.blocked_by"]              = "Wartet auf",
+            ["todo.blocked_by_none"]         = "Kein Blocker",
+            ["todo.blocked_generic"]         = "Eine andere Aufgabe (dir nicht sichtbar)",
+            ["todo.blocked_filter"]          = "Wartet auf etwas",
             // ADR 0079 — optionale Start-/Fälligkeitsdaten auf einer Aufgabe.
             ["projects.todo.start"]          = "Beginn",
             ["projects.todo.due"]            = "Fällig",
@@ -2923,6 +2934,11 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Pas de tâche parente (niveau supérieur)",
             ["projects.todo.clear_parent"]   = "Retirer la tâche parente (rendre de niveau supérieur)",
             ["projects.todo.reparent_hint"]  = "Une sous-tâche est une tâche complète avec son propre statut, son assignation et sa position sur un tableau. Replacer sous un descendant est refusé (garde anti-cycle).",
+            // ADR 0087 — la dépendance « en attente de » (puce, sélecteur, bascule du flux).
+            ["todo.blocked_by"]              = "En attente de",
+            ["todo.blocked_by_none"]         = "Aucun bloquant",
+            ["todo.blocked_generic"]         = "Une autre tâche (non visible pour vous)",
+            ["todo.blocked_filter"]          = "En attente de quelque chose",
             // ADR 0079 — dates de début/échéance optionnelles sur une tâche.
             ["projects.todo.start"]          = "Début",
             ["projects.todo.due"]            = "Échéance",
@@ -4271,6 +4287,11 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Ingen forældreopgave (tophængende)",
             ["projects.todo.clear_parent"]   = "Fjern forældreopgave (gør top-hængende)",
             ["projects.todo.reparent_hint"]  = "En delopgave er en fuldstændig opgave med egen status, tildeling og boardplacering. Omhængning til en efterkommer nægtes (cyklusvagt).",
+            // ADR 0087 — "venter på"-afhængigheden (chip, picker, feed-skift).
+            ["todo.blocked_by"]              = "Venter på",
+            ["todo.blocked_by_none"]         = "Ingen bloker",
+            ["todo.blocked_generic"]         = "En anden opgave (ikke synlig for dig)",
+            ["todo.blocked_filter"]          = "Venter på noget",
             // ADR 0079 — valgfri start-/forfaldsdato på en opgave.
             ["projects.todo.start"]          = "Start",
             ["projects.todo.due"]            = "Faldig",

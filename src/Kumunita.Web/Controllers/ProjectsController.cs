@@ -482,14 +482,14 @@ public sealed class ProjectsController : Controller
     /// names are *read* lookups (never access decisions).
     /// </summary>
     [HttpGet("/projects/todos")]
-    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, int page = 1)
+    public async Task<IActionResult> TodosIndex(string? componentId, string? assigneeId, bool unassignedOnly = false, bool blockedOnly = false, int page = 1)
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
         IReadOnlyList<TodoItem> todos;
         try
         {
-            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, ct: HttpContext.RequestAborted);
+            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, blockedOnly, ct: HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException)
         {
@@ -554,7 +554,8 @@ public sealed class ProjectsController : Controller
             CurrentComponentId: componentId,
             CurrentAssigneeId: assigneeId,
             UnassignedOnly: unassignedOnly,
-            CurrentPage: page);
+            CurrentPage: page,
+            BlockedOnly: blockedOnly);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -715,7 +716,8 @@ public sealed class ProjectsController : Controller
             Translations: todoTranslations,
             Languages: todoLanguages,
             CanTranslate: canTranslateTodo,
-            OriginalLanguageCode: result.Todo.LanguageCode);
+            OriginalLanguageCode: result.Todo.LanguageCode,
+            Blocker: result.Blocker);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -778,6 +780,12 @@ public sealed class ProjectsController : Controller
             // prefill posts blank = clear).
             ProjectId   = todo.ProjectId,
             Projects    = await SeedProjectPickerAsync(),
+            // ADR 0087 — the **blocker picker** (C-TBD·4 display surface):
+            // prefill the current association + seed the actor's readable,
+            // non-deleted to-do options. `ClearBlockedBy` defaults false (the
+            // ClearParent idiom); the "no blocker" checkbox sets it.
+            BlockedByTodoId = todo.BlockedByTodoId,
+            BlockerOptions  = await SeedBlockerPickerAsync(),
         };
         await ReSeedParentOptionsAsync(model, actorId);
         await SeedGrantPickerOptionsAsync();
@@ -842,6 +850,10 @@ public sealed class ProjectsController : Controller
             // association yet, so `ProjectId` stays `null` and the picker
             // offers a leading "no project" option.
             Projects = await SeedProjectPickerAsync(),
+            // ADR 0087 — the **blocker picker** (C-TBD·4 display surface):
+            // the actor's readable, non-deleted to-do options (a blank
+            // prefill posts as "no blocker").
+            BlockerOptions = await SeedBlockerPickerAsync(),
         };
         await SeedGrantPickerOptionsAsync();
         return View("Create", model);
@@ -873,10 +885,12 @@ public sealed class ProjectsController : Controller
         }
 
         // Re-seed the pickers so a failed-shape re-render below still shows
-        // the language + component + grant + parent + project options.
+        // the language + component + grant + parent + project + blocker
+        // options.
         model.Languages = await SeedLanguagePickerAsync();
         model.Components = await SeedComponentPickerAsync();
         model.Projects = await SeedProjectPickerAsync();
+        model.BlockerOptions = await SeedBlockerPickerAsync();
         await SeedGrantPickerOptionsAsync();
         await ReSeedParentOptionsAsync(model, actorId);
 
@@ -903,6 +917,13 @@ public sealed class ProjectsController : Controller
             ComponentId = model.ComponentId,
             AssigneeId = string.IsNullOrWhiteSpace(model.AssigneeId) ? null : model.AssigneeId,
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
+            // ADR 0087 — the **blocker** ("waiting on" target): a blank
+            // picker posts as `null` (no blocker — the F7 pin: the field is
+            // purely informational, never blocks the to-do itself). The
+            // service's cycle guard (C-TBD·3) is the lane's only
+            // server-side refusal (a self-ref is an `InvalidOperationException`
+            // — the F13 pin).
+            BlockedByTodoId = string.IsNullOrWhiteSpace(model.BlockedByTodoId) ? null : model.BlockedByTodoId,
             // ADR 0079 — the optional dates pass through verbatim (`null`
             // = no date).
             StartAt = model.StartAt,
@@ -1041,6 +1062,7 @@ public sealed class ProjectsController : Controller
             await SeedGrantPickerOptionsAsync();
             await ReSeedParentOptionsAsync(model, actorId);
             await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
+            model.BlockerOptions = await SeedBlockerPickerAsync(); // ADR 0087 — the blocker picker (C-TBD·4 display surface).
             if (string.IsNullOrWhiteSpace(model.Title))
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
             if (model.Audience is null || !model.Audience.IsValid)
@@ -1060,6 +1082,13 @@ public sealed class ProjectsController : Controller
             Status = model.Status,
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
             ClearParent = model.ClearParent,
+            // ADR 0087 — the **blocker** ("waiting on" target): a blank
+            // picker posts as `null` (the service's `ClearBlockedBy` flag —
+            // or a non-null target re-points the pointer, the C-TBD·3 cycle
+            // guard applying; a self-ref is an `InvalidOperationException`
+            // — the F13 pin, re-rendered as a form error).
+            BlockedByTodoId = string.IsNullOrWhiteSpace(model.BlockedByTodoId) ? null : model.BlockedByTodoId,
+            ClearBlockedBy = model.ClearBlockedBy,
             // ADR 0079 — the optional dates: non-null applied, null *clears*
             // (the edit form posts a blank `datetime-local` as null — the
             // field is always in the form, unlike the other partial fields
@@ -1085,14 +1114,16 @@ public sealed class ProjectsController : Controller
         catch (InvalidOperationException ex)
         {
             // The hierarchy cycle guard (C-M5·7, F9_ReparentToDescendant_Refused)
-            // or another shape refusal — a form error, not a 500 (the M4
-            // "a form is a shape" precedent).
+            // or the blocker cycle guard (C-TBD·3, F13 — a self-ref / a
+            // would-be cycle) or another shape refusal — a form error, not
+            // a 500 (the M4 "a form is a shape" precedent).
             ModelState.AddModelError(string.Empty, ex.Message);
             model.Languages = await SeedLanguagePickerAsync();
             model.Components = await SeedComponentPickerAsync();
             await SeedGrantPickerOptionsAsync();
             await ReSeedParentOptionsAsync(model, actorId);
             await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
+            model.BlockerOptions = await SeedBlockerPickerAsync(); // ADR 0087 — the blocker picker (C-TBD·4 display surface).
             return View("Edit", model);
         }
 
@@ -1466,6 +1497,11 @@ public sealed class ProjectsController : Controller
             var cards = laneDetail.Cards.Select(card =>
             {
                 placementByKey.TryGetValue((laneDetail.Lane.Id, card.Id), out var p);
+                // ADR 0087 D4 — the card's waiting-on chip: the access-scoped
+                // `BlockerChip` the service resolved (the `CardBlockers` map —
+                // an unreadable / absent / soft-deleted blocker degrades to
+                // `Generic`, C-TBD·4); absent key = no blocker = `null`.
+                result.CardBlockers.TryGetValue(card.Id, out var blocker);
                 return new TodoCardRow(
                     PlacementId: p?.Id ?? string.Empty,
                     TodoId: card.Id,
@@ -1478,7 +1514,8 @@ public sealed class ProjectsController : Controller
                     // ADR 0079 — the optional dates pass through verbatim
                     // (`null` = no date; the card gates the line on non-null).
                     StartAt: card.StartAt,
-                    DueAt: card.DueAt);
+                    DueAt: card.DueAt,
+                    Blocker: blocker);
             }).ToList();
 
             laneRows.Add(new LaneDetailRow(
@@ -3371,6 +3408,37 @@ public sealed class ProjectsController : Controller
         return (list ?? [])
             .Select(p => (Id: p.Id, Name: string.IsNullOrWhiteSpace(p.Title) ? p.Id : p.Title))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Seeds the **blocker picker** options (ADR 0087 D7 — the
+    /// <see cref="IProjectService.ListPickerTodosAsync"/> read lane) — the
+    /// actor's readable, non-deleted to-dos. A **display** surface, never a
+    /// gate (C-TBD·4); the C-TBD·3 cycle guard is the service's. A null
+    /// result (a seam that returns no list) is the same display surface as an
+    /// empty one — the picker card hides.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Title)>> SeedBlockerPickerAsync()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        IReadOnlyList<Kumunita.Core.Projects.TodoItem> list;
+        try
+        {
+            list = await projects.ListPickerTodosAsync(actorId, 1, ct: HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        return (list ?? [])
+            .Select(t => (Id: t.Id, Title: string.IsNullOrWhiteSpace(t.Title) ? t.Id : t.Title))
+            .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 

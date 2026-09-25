@@ -73,6 +73,13 @@
                     <input class="form-check-input" type="checkbox" role="switch" id="unassigned-filter" name="unassignedOnly" value="true" checked="@(Model.UnassignedOnly ? "checked" : null)" />
                     <label class="form-check-label" for="unassigned-filter"><kw-l key="projects.todo.filter_unassigned">Unassigned only</kw-l></label>
                 </div>
+                @* ADR 0087 — the "waiting on" feed filter (D6, the D8 key):
+                   narrows the candidate set to to-dos with a blocker; it
+                   never narrows the audience decision. *@
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="blocked-filter" name="blockedOnly" value="true" checked="@(Model.BlockedOnly ? "checked" : null)" />
+                    <label class="form-check-label" for="blocked-filter"><kw-l key="todo.blocked_filter">Waiting on something</kw-l></label>
+                </div>
                 <button type="submit" class="btn btn-outline-secondary"><kw-l key="common.filter">Filter</kw-l></button>
             </div>
         </form>

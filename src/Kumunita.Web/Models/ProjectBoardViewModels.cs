@@ -127,7 +127,14 @@ public sealed record TodoCardRow(
     // TagHelper renders it in the effective timezone; null renders empty,
     // the card gates the line on non-null).
     DateTimeOffset? StartAt,
-    DateTimeOffset? DueAt);
+    DateTimeOffset? DueAt,
+    // ADR 0087 D4 — the card's **waiting-on chip** (the D4 surface): the
+    // access-scoped `BlockerChip` the service resolved for this card's
+    // `BlockedByTodoId` (an unreadable / absent / soft-deleted blocker
+    // degrades to `Generic`, no title / link — C-TBD·4). `null` = the card
+    // has no blocker, so the chip is omitted entirely (the TodoDetail chip
+    // idiom). A **hint** — it never gates the card (D2).
+    Kumunita.Core.Projects.BlockerChip? Blocker = null);
 
 /// <summary>
 /// The <b>board detail</b> view model (the <c>GET /projects/boards/{id}</c>

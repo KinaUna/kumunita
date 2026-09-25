@@ -2957,6 +2957,555 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     /// database whose <c>TargetId</c> is the given goal (the fresh-
     /// postgres-per-test isolation makes "all rows for this goal"
     /// unambiguous — the <see cref="BoardAuditRows"/> shape).</summary>
+    // ── TBD — the "waiting on" dependency lane (ADR 0087 / the design doc §7.5) ──
+
+    /// <summary>
+    /// <b>F4</b> (C-TBD·2): <c>blockedOnly = true</c> narrows the candidate set
+    /// to to-dos with <c>BlockedByTodoId != null</c> **before** the audience
+    /// pass — the unblocked to-do A is excluded, the blocked to-do B is
+    /// included, and the filter does not change the audience decision (a
+    /// denied blocked to-do is still dropped — the "filter, never a gate" pin).
+    /// </summary>
+    [Fact]
+    public async Task ListTodos_BlockedOnly_ReturnsOnlyToDosWithBlockedByTodoId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f4-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f4-a", AuthorId = author, Title = "Unblocked",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f4-b", AuthorId = author, Title = "Blocked",
+            BlockedByTodoId = "tbd-f4-a",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var blockedFeed = await svc.ListTodosAsync(null, null, author, 1, blockedOnly: true);
+        Assert.Contains("tbd-f4-b", blockedFeed.Select(t => t.Id));
+        Assert.DoesNotContain("tbd-f4-a", blockedFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
+    /// <b>F1</b> (C-TBD·4): a to-do whose <c>BlockedByTodoId</c> points at a
+    /// readable blocker resolves the chip — title + status + link path
+    /// (the <c>/projects/todos/{id}</c> shape).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithReadableBlocker_ResolvesBlockerChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f1-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f1-blocker", AuthorId = author, Title = "The blocker",
+            Status = "In Progress",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f1-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f1-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f1-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.False(detail.Blocker!.Generic);
+        Assert.Equal("tbd-f1-blocker", detail.Blocker.TodoId);
+        Assert.Equal("The blocker", detail.Blocker.Title);
+        Assert.Equal("In Progress", detail.Blocker.Status);
+        Assert.Equal("/projects/todos/tbd-f1-blocker", detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F2</b> (C-TBD·4): a to-do whose blocker is **unreadable** to the
+    /// actor degrades to the generic chip — <c>Generic = true</c>, and the
+    /// blocker's title / status / link are **not leaked** (all null).
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithUnreadableBlocker_ReturnsGenericChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f2-author";
+        const string stranger = "u-tbd-f2-stranger";
+
+        // The blocker is audience-restricted to a third party — the actor (author
+        // of the waiting to-do) may read the to-do itself but not the blocker.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2-blocker", AuthorId = "u-tbd-f2-blocker-author", Title = "Restricted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, stranger),
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f2-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f2-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.True(detail.Blocker!.Generic);
+        Assert.Equal("tbd-f2-blocker", detail.Blocker.TodoId);
+        Assert.Null(detail.Blocker.Title);
+        Assert.Null(detail.Blocker.Status);
+        Assert.Null(detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F2</b> (C-TBD·4): a to-do whose blocker has been **soft-deleted**
+    /// degrades to the generic chip — the read lane never surfaces a
+    /// deleted blocker's title / link.
+    /// </summary>
+    [Fact]
+    public async Task GetTodo_WithSoftDeletedBlocker_ReturnsGenericChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f2c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2c-blocker", AuthorId = author, Title = "Deleted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f2c-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f2c-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var detail = await svc.GetTodoAsync("tbd-f2c-todo", author);
+        Assert.NotNull(detail.Blocker);
+        Assert.True(detail.Blocker!.Generic);
+        Assert.Null(detail.Blocker.Title);
+        Assert.Null(detail.Blocker.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>F3</b> (C-TBD·3): setting a to-do's <c>BlockedByTodoId</c> to
+    /// **itself** is refused (the self-cycle guard) —
+    /// <see cref="InvalidOperationException"/>, **nothing is written** (the
+    /// to-do's <c>BlockedByTodoId</c> stays null).
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_SetBlockedBy_SelfRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f3-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3-todo", AuthorId = author, Title = "Self",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateTodoAsync("tbd-f3-todo", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3-todo" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f3-todo"))!;
+            Assert.Null(todo.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F3</b> (C-TBD·3): setting a to-do's <c>BlockedByTodoId</c> to a
+    /// target **downstream** of it (the target's own <c>BlockedByTodoId</c>
+    /// chain reaches the to-do) closes a cycle — refused (the transitive
+    /// guard). A→B→C: setting A's blocker to C would make A a blocker of
+    /// itself (A→C→B→A).
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_SetBlockedBy_TransitiveRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f3c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-a", AuthorId = author, Title = "A",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // B is blocked by A; C is blocked by B — the chain A ← B ← C.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-b", AuthorId = author, Title = "B",
+            BlockedByTodoId = "tbd-f3c-a",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f3c-c", AuthorId = author, Title = "C",
+            BlockedByTodoId = "tbd-f3c-b",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 2, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // Setting A's blocker to C closes A → C → B → A.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateTodoAsync("tbd-f3c-a", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f3c-c" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var a = (await q.LoadAsync<TodoItem>("tbd-f3c-a"))!;
+            Assert.Null(a.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F5</b>: <c>ClearBlockedBy = true</c> is an explicit un-block — the
+    /// to-do's <c>BlockedByTodoId</c> is set to null, and a real change stamps
+    /// <c>Modified</c>.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_ClearBlockedBy_Allowed()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f5-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f5-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f5-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f5-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var updated = await svc.UpdateTodoAsync(
+            "tbd-f5-todo", author, MemberRoles,
+            new UpdateTodoRequest { ClearBlockedBy = true });
+
+        Assert.Null(updated.BlockedByTodoId);
+        Assert.NotNull(updated.Modified);
+    }
+
+    /// <summary>
+    /// <b>F6</b> (C-TBD·5): a stranger who is neither the author, the assignee,
+    /// nor a GlobalAdmin is **denied** a <c>BlockedByTodoId</c> write — the
+    /// standing matrix refuses with <see cref="UnauthorizedAccessException"/>
+    /// (403, not 404), and the to-do is untouched.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_DeniedActor_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f6-author";
+        const string stranger = "u-tbd-f6-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6-todo", AuthorId = author, Title = "Author's to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateTodoAsync("tbd-f6-todo", stranger, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6-todo" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f6-todo"))!;
+            Assert.Null(todo.BlockedByTodoId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F6</b> (C3 404-vs-403 split): setting a to-do's <c>BlockedByTodoId</c>
+    /// to an id that is **soft-deleted** is refused with <see
+    /// cref="KeyNotFoundException"/> (the 404 — the target does not exist for
+    /// read), not a 403 — the target is an access boundary, the association is
+    /// not.
+    /// </summary>
+    [Fact]
+    public async Task UpdateTodo_NonNullTargetAtSoftDeletedRefused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f6c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6c-todo", AuthorId = author, Title = "To-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f6c-blocker", AuthorId = author, Title = "Deleted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.UpdateTodoAsync("tbd-f6c-todo", author, MemberRoles,
+                new UpdateTodoRequest { BlockedByTodoId = "tbd-f6c-blocker" }));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (C-TBD·2): moving a to-do (relocating its placement to another
+    /// board) **never clears** <c>BlockedByTodoId</c> — the hint persists (the
+    /// human lifts it explicitly), and the blocker is untouched.
+    /// </summary>
+    [Fact]
+    public async Task MoveTodoToDoneLane_NeverClearsBlockedByTodoId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f7-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f7-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // Source board + lane (the to-do's current placement).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-f7-source", AuthorId = author, Title = "Source",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-f7-source-lane", BoardId = "tbd-f7-source", Title = "In Progress",
+            Status = "In Progress", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-f7-p-src", TodoItemId = "tbd-f7-todo", BoardId = "tbd-f7-source",
+            LaneId = "tbd-f7-source-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+        // Target board + its single lane (a "Done"-statused lane).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-f7-target", AuthorId = author, Title = "Target",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-f7-target-lane", BoardId = "tbd-f7-target", Title = "Done",
+            Status = "Done", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var moved = await svc.MoveTodoToBoardAsync("tbd-f7-todo", "tbd-f7-target", author, MemberRoles);
+        Assert.Equal("tbd-f7-target", moved.BoardId); // the placement relocated
+
+        // The BlockedByTodoId persists — moving never clears the hint.
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7-todo"))!;
+            Assert.Equal("tbd-f7-blocker", todo.BlockedByTodoId);
+
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7-blocker"))!;
+            Assert.False(blocker.IsDeleted); // the blocker is untouched
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (C-TBD·2): soft-deleting a to-do **never clears** its
+    /// <c>BlockedByTodoId</c> (and does not cascade to the blocker) — the
+    /// hint persists on the soft-deleted row, and the blocker itself is
+    /// untouched (still present, not deleted).
+    /// </summary>
+    [Fact]
+    public async Task DeleteTodo_WithBlockedBy_SoftDeleteUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-f7c-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7c-blocker", AuthorId = author, Title = "Blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-f7c-todo", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-f7c-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        await svc.DeleteTodoAsync("tbd-f7c-todo", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var todo = (await q.LoadAsync<TodoItem>("tbd-f7c-todo"))!;
+            Assert.True(todo.IsDeleted);
+            Assert.Equal("tbd-f7c-blocker", todo.BlockedByTodoId); // the hint persists
+
+            var blocker = (await q.LoadAsync<TodoItem>("tbd-f7c-blocker"))!;
+            Assert.False(blocker.IsDeleted); // the blocker is untouched
+        }
+    }
+
+    /// <summary>
+    /// <b>D4 board-card surface</b> (C-TBD·4): a card whose
+    /// <c>BlockedByTodoId</c> points at a **readable** blocker resolves the
+    /// chip on the **board card** — the <see cref="BoardDetailResult
+    /// .CardBlockers"/> map carries the card's id → a non-generic chip with
+    /// title + status + link path (the to-do *detail* <c>Blocker</c> and the
+    /// board *card* chip are the same D4 surface, now both present).
+    /// </summary>
+    [Fact]
+    public async Task GetBoard_WithReadableBlocker_ResolvesCardChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-b1-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b1-blocker", AuthorId = author, Title = "The blocker",
+            Status = "In Progress",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b1-card", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-b1-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-b1-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-b1-lane", BoardId = "tbd-b1-board", Title = "L1", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-b1-p1", TodoItemId = "tbd-b1-card", BoardId = "tbd-b1-board",
+            LaneId = "tbd-b1-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var board = await svc.GetBoardAsync("tbd-b1-board", author);
+        Assert.True(board.CardBlockers.ContainsKey("tbd-b1-card"));
+        var chip = board.CardBlockers["tbd-b1-card"];
+        Assert.False(chip.Generic);
+        Assert.Equal("tbd-b1-blocker", chip.TodoId);
+        Assert.Equal("The blocker", chip.Title);
+        Assert.Equal("In Progress", chip.Status);
+        Assert.Equal("/projects/todos/tbd-b1-blocker", chip.LinkPath);
+    }
+
+    /// <summary>
+    /// <b>D4 board-card surface</b> (C-TBD·4): a card whose blocker is
+    /// **unreadable** to the actor degrades the **board card** chip to the
+    /// generic label — the card itself is visible (the author owns the board
+    /// + the public card), but the blocker's title / status / link are
+    /// **not leaked** on the card.
+    /// </summary>
+    [Fact]
+    public async Task GetBoard_WithUnreadableBlocker_ResolvesGenericCardChip()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-tbd-b2-author";
+        const string stranger = "u-tbd-b2-stranger";
+
+        // The blocker is audience-restricted to a third party — the author
+        // (board + card owner) reads the board and the card but not the
+        // blocker, so the card chip degrades to Generic.
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b2-blocker", AuthorId = "u-tbd-b2-blocker-author", Title = "Restricted blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, stranger),
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "tbd-b2-card", AuthorId = author, Title = "Waiting",
+            BlockedByTodoId = "tbd-b2-blocker",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 1, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "tbd-b2-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "tbd-b2-lane", BoardId = "tbd-b2-board", Title = "L1", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+        await Plant(store, new BoardItemPlacement
+        {
+            Id = "tbd-b2-p1", TodoItemId = "tbd-b2-card", BoardId = "tbd-b2-board",
+            LaneId = "tbd-b2-lane", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+        });
+
+        var board = await svc.GetBoardAsync("tbd-b2-board", author);
+        Assert.True(board.CardBlockers.ContainsKey("tbd-b2-card"));
+        var chip = board.CardBlockers["tbd-b2-card"];
+        Assert.True(chip.Generic);
+        Assert.Equal("tbd-b2-blocker", chip.TodoId);
+        Assert.Null(chip.Title);
+        Assert.Null(chip.Status);
+        Assert.Null(chip.LinkPath);
+    }
+
     private static async Task<IReadOnlyList<AccessAudit>> GoalAuditRows(IDocumentStore store, string goalId)
     {
         var ct = TestContext.Current.CancellationToken;

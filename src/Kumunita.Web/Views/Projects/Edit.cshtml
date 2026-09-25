@@ -125,6 +125,41 @@
                 </div>
             </div>
 
+            @* ADR 0087 — the "waiting on" picker (D7): the actor's readable,
+               non-deleted to-dos (a display surface, never a gate — C-TBD·4;
+               the cycle guard is the service's, C-TBD·3). A leading "No
+               blocker" option + a "no blocker" checkbox post the clear
+               (the ClearParent idiom). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-6">
+                            <label class="form-label" for="blocked-by" style="font-weight:600;"><kw-l key="todo.blocked_by">Waiting on</kw-l></label>
+                            <select class="form-control" id="blocked-by" name="BlockedByTodoId">
+                                <option value=""><kw-l key="todo.blocked_by_none">No blocker</kw-l></option>
+                                @foreach (var (id, title) in Model.BlockerOptions)
+                                {
+                                    <option value="@id" selected="@(id == Model.BlockedByTodoId ? "selected" : null)">@title</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-sm-6 d-flex align-items-end pb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="clear-blocked-by"
+                                       name="ClearBlockedBy" value="true" @(Model.ClearBlockedBy ? "checked" : null) />
+                                <input type="hidden" name="ClearBlockedBy" value="false" />
+                                <label class="form-check-label" for="clear-blocked-by">
+                                    <kw-l key="todo.blocked_by_none">No blocker</kw-l>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="todo.blocked_by">Waiting on</kw-l> — purely informational: a blocker never blocks this to-do itself, and a reference back to a to-do already in its own chain is refused (cycle guard).
+                    </div>
+                </div>
+            </div>
+
             @* ADR 0079 — the optional start / due dates (the Event Start/End
                `datetime-local` shape, but OPTIONAL). On the edit lane a blank
                field posts null, which *clears* the stored date (the

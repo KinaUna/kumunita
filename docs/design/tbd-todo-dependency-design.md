@@ -4,18 +4,20 @@
 > "waiting on" pointer on the M5 to-do surface: one optional
 > `BlockedByTodoId` on `TodoItem`, a display chip, a feed filter, one write
 > field + one picker read lane. **ADR 0087** is this lane's decision record —
-> **Status: Proposed (draft for evaluation)**; the decisions D1–D9 below are
-> the pre-lock shape and become **Accepted** at sign-off (the ADR 0086
-> precedent: authored in the lane's U00, the `[PROPOSED]` markers in the
-> lane plan `plan-tbd-todo-dependency.md` retire on that lock). The
-> sealed-unit register is
+> **authored in this unit (U00)**, **Accepted 2026-09-25**; every decision
+> D1–D9 below is **locked** (the `[PROPOSED]` markers in the lane plan
+> `plan-tbd-todo-dependency.md` were the pre-lock shape and are retired by
+> this lock — the ADR 0086 precedent). The sealed-unit register is
 > `docs/plans-milestones/in-progress/tbd/plan-tbd-todo-dependency.md`; the
 > scratch log is
 > `docs/plans-milestones/in-progress/tbd/tbd-handoff-notes.md` (one `## U#`
 > section per unit, appended, never rewritten).
 >
-> **Status.** **Part 1 + Part 2 authored in this unit (U00); decisions
-> [PROPOSED] until the U00 sign-off into ADR 0087.**
+> **Status.** **Part 1 + Part 2 LOCKED.** The decisions D1–D9 are locked in
+> **ADR 0087 (Accepted, 2026-09-25)**; **Part 2** (the exact C# shapes, the
+> additive `IProjectService` seams, the request DTOs, the `M5DocTypes`
+> additive shape, the pinned test names, the three-test acceptance gate, and
+> the drift-guard) follows in the "Seams & contracts" section below.
 >
 > **Roadmap confirm (U00):** `M7` ("Pagination and filtering") is the single
 > `StatusNext` on `Milestones.cs` (verified 2026-09-25); `TBD` is a
@@ -141,13 +143,12 @@ builds on without re-inventing:
     `postgres:18`) — the harness the Core pinned tests run over;
     `Kumunita.Web.Tests` uses NSubstitute (no Postgres) for the Web pins.
 
-## 3. The design decisions
+## 3. The design decisions (locked)
 
-Each is **[PROPOSED]** in this unit (U00); the U00 sign-off locks them into
-**ADR 0087** and gives them the exact C# shapes in Part 2.
+Locked by **ADR 0087 (Accepted, 2026-09-25)**; the `[PROPOSED]` markers in
+the lane plan are retired by this lock.
 
 ### 3.1 One optional pointer, additive, zero migration (D1)
-**[PROPOSED]**
 
 One `string? BlockedByTodoId` on **`TodoItem`** (the ADR 0004 §B.1 / ADR
 0086 `ProjectId` additive shape; existing rows simply have `null`);
@@ -158,7 +159,6 @@ things uses the `ParentId` subtask structure or three to-dos, not a list.
 *(C-TBD·1.)*
 
 ### 3.2 A display chip + a feed filter, never a gate (D2)
-**[PROPOSED]**
 
 `BlockedByTodoId` changes **nothing** about who may see the to-do (its own
 `Audience` decision stays the boundary — C-M5·3), **nothing** about what
@@ -170,7 +170,6 @@ set behaves exactly like one without it — the D6 dangling rule). It is a
 *hint*, rendered and filterable. *(C-TBD·2.)*
 
 ### 3.3 The cycle guard (D3)
-**[PROPOSED]**
 
 Setting `BlockedByTodoId = X` is **refused** when `X == todoItemId` (self)
 or when `X` **transitively** reaches `todoItemId` through the
@@ -179,7 +178,6 @@ descendant-cycle guard shape — the `InvalidOperationException` refusal,
 **nothing written**). Clearing to `null` is always allowed. *(C-TBD·3.)*
 
 ### 3.4 The chip (read, access-scoped) (D4)
-**[PROPOSED]**
 
 `GetTodoAsync`'s `TodoDetailResult` gains a `Blocker?`: the blocker's
 **title + status** — resolved only when the blocker exists, is **not
@@ -192,7 +190,6 @@ chip. **No new adapter, no new `AccessAction`, no new `AccessVia`.**
 *(C-TBD·4.)*
 
 ### 3.5 The write lane (standing + guard + audit) (D5)
-**[PROPOSED]**
 
 The create form gains an optional blocker picker; the edit lane carries
 `BlockedByTodoId?` (a non-null value sets it) + `ClearBlockedBy` (an
@@ -205,7 +202,6 @@ absent/soft-deleted or unreadable is **refused** (the C3 404-vs-403 split);
 (`todo.update`, `TargetKind = "todo"`). *(C-TBD·5.)*
 
 ### 3.6 The `blockedOnly` feed filter (D6)
-**[PROPOSED]**
 
 `ListTodosAsync` gains an optional `blockedOnly` (default `false`) — the
 `unassignedOnly` (ADR 0073) / `projectId` (ADR 0086) filter discipline:
@@ -216,7 +212,6 @@ only appears if the actor passes the `CanSeeAsync(Read)` pass). **
 item). *(C-TBD·2.)*
 
 ### 3.7 The picker (D7)
-**[PROPOSED]**
 
 The to-do create + edit forms seed a `<select>` of the actor's readable,
 non-deleted to-dos (one **`ListPickerTodosAsync`** read lane over the same
@@ -227,7 +222,6 @@ the `TodoItemToAuditableResource`) with a leading "None" option — the ADR
 service does, D3). *(C-TBD·4.)*
 
 ### 3.8 `kw-l` keys (D8)
-**[PROPOSED]**
 
 Four new keys, **× 4 languages** (the `KnownTranslationKeys.cs` registry;
 the ADR 0052 warm-boot baseline backfill covers the non-`en` rows):
@@ -237,7 +231,6 @@ blocker is absent / soft-deleted / unreadable), and `todo.blocked_filter`
 (the feed toggle label).
 
 ### 3.9 Additive on the frozen M5 surface (D9)
-**[PROPOSED]**
 
 No new `AccessAction`, no new `AccessVia`, no new `Decide()` branch, no new
 adapter, no new bounded context, no new document (the `TodoItem` field is
@@ -664,12 +657,53 @@ Postgres):
    is **untouched** (the C-TBD·6 pin); the chip is **access-scoped** — an
    unreadable blocker degrades to the generic label (the C-TBD·4 pin).
 
-## 8. Drift-guard (the one-paragraph pin)
+**Recorded at close (U04, 2026-09-25) — all three PASS**, confirmed by
+reading the named handoff sections + the code (the full record is in
+`docs/plans-milestones/done/tbd/tbd-handoff-notes.md`, `## U04`):
 
-- **No new `AccessAction`**, **no new `AccessVia`**, **no new
-  `Decide()` branch**, **no new adapter** — `TBD` adds one *field + a
-  chip*, not a *branch* (the C-M5·11 precedent; the chip reuses the
-  **existing** `TodoItemToAuditableResource`).
+- **Closed loop — PASS.** U01 adds `TodoItem.BlockedByTodoId?` + the
+  `M5DocTypes` index; U02 lands the seams + the cycle guard + the
+  `BlockerChip` (11 Core pins); U03 wires the chip on `TodoDetail.cshtml`,
+  the picker on `Create.cshtml` / `Edit.cshtml`, the `?blockedOnly=true`
+  toggle on `TodosIndex.cshtml`, the `None`→`ClearBlockedBy` clear, and the
+  four `todo.*` `kw-l` keys × 4 languages (6 Web pins).
+- **Handoff — PASS.** The `IProjectService` surface is frozen (U03's
+  `ProjectsController` codes against the U02 seams — `ListTodosAsync` /
+  `GetTodoAsync` / `CreateTodoAsync` / `UpdateTodoAsync` /
+  `ListPickerTodosAsync`; no access re-derivation, the ADR 0006-D pin); the
+  standing matrix (creator ∪ assignee ∪ GlobalAdmin) is re-checked
+  server-side in the `UpdateTodoAsync` / `CreateTodoAsync` write lane
+  (C-TBD·5); the `AccessAudit` row (`todo.update`, `TargetKind = "todo"`)
+  is stored in the caller's session (C3).
+- **Part-vs-whole — PASS.** `BlockedByTodoId` is a hint, never a gate
+  (C-TBD·2); the `CreateTodoRequest` / `UpdateTodoRequest` DTOs gain only
+  the `BlockedByTodoId` field (+ the `ClearBlockedBy` flag) — no gate field;
+  the M5 route surface (`/projects/todos` / `/projects/boards`) is untouched
+  (C-TBD·6); the chip is access-scoped (C-TBD·4); `Milestones.cs` /
+  `MilestonesTests.cs` are **untouched** (`M7` stays the single in-progress
+  milestone).
+
+**Gate run (AGENTS.md test-runner quirk — build then in-process, not
+`dotnet test` / VS Test Explorer):**
+
+```
+dotnet build Kumunita.slnx -c Debug
+dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+```
+
+Result: build clean (0 errors); `Kumunita.Web.Tests` — **Total: 453,
+Failed: 0**; `Kumunita.Core.Tests` — **Total: 830, Failed: 0**
+(in-process xunit.v3; Core via Testcontainers `postgres:18`).
+
+## 8. Drift-guard
+
+- **C-TBD·6 — additive on the frozen M5 surface.** No new `AccessAction`,
+  no new `AccessVia`, no new `Decide()` branch, no new adapter, no new
+  bounded context, no new document (the `TodoItem` field is the whole
+  schema change); `TBD` adds one *field + a chip*, not a *branch* (the
+  C-M5·11 precedent; the chip reuses the **existing**
+  `TodoItemToAuditableResource`).
 - **The `BlockedByTodoId` is a hint, never a gate** (C-TBD·2) — it never
   changes the to-do's own `Audience` decision (C-M5·3), never enables or
   blocks a write, never trips a lane limit (C-M5·5), and never cascades a

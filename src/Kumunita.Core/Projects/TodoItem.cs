@@ -33,6 +33,7 @@ public sealed class TodoItem
     public string? AssigneeId { get; set; }                    // a SubjectId — display + standing, NEVER a gate (C-M5·3 / C-M5·6)
     public string? Status { get; set; }                         // nullable string state label; `null` = no status — NOT an enum (C-M5·4)
     public string? ParentId { get; set; }                       // the sole hierarchy mechanism; `null` = top-level (C-M5·7)
+    public string? BlockedByTodoId { get; set; }                // the "waiting on" pointer; a hint, never a gate (C-TBD·2 — ADR 0087)
     public DateTimeOffset? StartAt { get; set; }                 // optional start — the ADR 0054 Event Start/End shape, but OPTIONAL (ADR 0079)
     public DateTimeOffset? DueAt { get; set; }                   // optional due date — `null` = no date (ADR 0079)
 

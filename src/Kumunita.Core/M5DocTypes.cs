@@ -63,7 +63,12 @@ public static class M5DocTypes
                .Index(t => t.ParentId)
                // the `ProjectId` feed-filter lookup (the PL `projectId`
                // filter — a feed filter, never a gate, ADR 0086 D4 / C-PL·3)
-               .Index(t => t.ProjectId);
+               .Index(t => t.ProjectId)
+               // the TBD "waiting on" lookup (ADR 0087 D1 — additive on
+               // M5DocTypes, zero migration for existing rows; the ADR 0004
+               // §B.1 delta-detect shape; unnamed: the auto-derived name stays
+               // under Postgres' 64-char NAMEDATALEN cap, the note above)
+               .Index(t => t.BlockedByTodoId);
 
         // KanbanBoard — conventional string Id; the (ComponentId, Created)
         // feed-ordering index (the ListBoardsAsync feed shape) — unnamed for
