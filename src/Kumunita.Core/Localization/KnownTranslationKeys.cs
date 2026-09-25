@@ -1425,6 +1425,23 @@ public static class KnownTranslationKeys
             ["pl.index.projects_empty"] = "No standalone projects yet — create one to start managing the shared work.",
             ["pl.index.start"] = "Start",
             ["pl.index.due"] = "Due",
+
+            // ── PL (ADR 0086, U06) — the goal detail + composer + edit ──
+            ["pl.goal.new_heading"] = "New goal",
+            ["pl.goal.new_lede"] = "A goal is a direction for the shared work — an optional description, a community filter, and an audience. Projects can hang off it later.",
+            ["pl.goal.create"] = "Create goal",
+            ["pl.goal.edit_heading"] = "Edit goal",
+            ["pl.goal.edit_lead"] = "Update this goal's title and description. Its audience, community, and language are fixed when the goal is created.",
+            ["pl.goal.save"] = "Save changes",
+            ["pl.goal.edit"] = "Edit goal",
+            ["pl.goal.title_hint"] = "A short name for the goal — the feed label.",
+            ["pl.goal.description_hint"] = "An optional description of the direction this goal gives the shared work. A goal is usable title-only.",
+            ["pl.goal.audience_heading"] = "Audience — who can see this goal",
+            ["pl.goal.audience_public"] = "Visible to everyone on the instance.",
+            ["pl.goal.audience_restricted"] = "Restricted to the audience grants below.",
+            ["pl.goal.projects_heading"] = "Projects in this goal",
+            ["pl.goal.projects_empty"] = "No projects under this goal yet — create one to start managing the shared work.",
+            ["pl.goal.empty_description"] = "This goal has no description yet.",
         };
 
     /// <summary>
@@ -2717,6 +2734,23 @@ public static class KnownTranslationKeys
             ["pl.index.projects_empty"] = "Noch keine unabhängigen Projekte — erstelle eines, um die gemeinsame Arbeit zu managen.",
             ["pl.index.start"] = "Start",
             ["pl.index.due"] = "Fällig",
+
+            // ── PL (ADR 0086, U06) — Ziel-Detail + Composer + Bearbeitung ──
+            ["pl.goal.new_heading"] = "Neues Ziel",
+            ["pl.goal.new_lede"] = "Ein Ziel gibt der gemeinsamen Arbeit eine Richtung — mit optionaler Beschreibung, Community-Filter und Zielgruppe. Projekte können später daran hängen.",
+            ["pl.goal.create"] = "Ziel anlegen",
+            ["pl.goal.edit_heading"] = "Ziel bearbeiten",
+            ["pl.goal.edit_lead"] = "Titel und Beschreibung dieses Ziels aktualisieren. Zielgruppe, Community und Sprache sind bei der Anlage festgelegt.",
+            ["pl.goal.save"] = "Änderungen speichern",
+            ["pl.goal.edit"] = "Ziel bearbeiten",
+            ["pl.goal.title_hint"] = "Ein kurzer Name für das Ziel — die Feed-Bezeichnung.",
+            ["pl.goal.description_hint"] = "Eine optionale Beschreibung der Richtung, die dieses Ziel der gemeinsamen Arbeit gibt. Ein Ziel funktioniert auch ohne Beschreibung.",
+            ["pl.goal.audience_heading"] = "Zielgruppe — wer dieses Ziel sehen kann",
+            ["pl.goal.audience_public"] = "Für alle auf der Instanz sichtbar.",
+            ["pl.goal.audience_restricted"] = "Eingeschränkt auf die unten genannten Berechtigungen.",
+            ["pl.goal.projects_heading"] = "Projekte in diesem Ziel",
+            ["pl.goal.projects_empty"] = "Noch keine Projekte unter diesem Ziel — lege eines an, um die gemeinsame Arbeit zu managen.",
+            ["pl.goal.empty_description"] = "Dieses Ziel hat noch keine Beschreibung.",
         };
 
     /// <summary>
@@ -4011,6 +4045,23 @@ public static class KnownTranslationKeys
             ["pl.index.projects_empty"] = "Pas encore de projets autonomes — crée-en un pour commencer à organiser le travail partagé.",
             ["pl.index.start"] = "Début",
             ["pl.index.due"] = "Échéance",
+
+            // ── PL (ADR 0086, U06) — le détail d'objectif + composer + édition ──
+            ["pl.goal.new_heading"] = "Nouvel objectif",
+            ["pl.goal.new_lede"] = "Un objectif donne une direction au travail partagé — avec une description optionnelle, un filtre de communauté et une audience. Des projets peuvent s'y rattacher plus tard.",
+            ["pl.goal.create"] = "Créer l'objectif",
+            ["pl.goal.edit_heading"] = "Modifier l'objectif",
+            ["pl.goal.edit_lead"] = "Mets à jour le titre et la description de cet objectif. Son audience, sa communauté et sa langue sont fixés à la création.",
+            ["pl.goal.save"] = "Enregistrer les modifications",
+            ["pl.goal.edit"] = "Modifier l'objectif",
+            ["pl.goal.title_hint"] = "Un court nom pour l'objectif — l'étiquette du flux.",
+            ["pl.goal.description_hint"] = "Une description optionnelle de la direction que cet objectif donne au travail partagé. Un objectif fonctionne aussi sans description.",
+            ["pl.goal.audience_heading"] = "Audience — qui peut voir cet objectif",
+            ["pl.goal.audience_public"] = "Visible par toute l'instance.",
+            ["pl.goal.audience_restricted"] = "Restreint aux accords d'audience ci-dessous.",
+            ["pl.goal.projects_heading"] = "Projets de cet objectif",
+            ["pl.goal.projects_empty"] = "Pas encore de projets sous cet objectif — crée-en un pour commencer à organiser le travail partagé.",
+            ["pl.goal.empty_description"] = "Cet objectif n'a pas encore de description.",
         };
 
     /// <summary>
@@ -5300,6 +5351,23 @@ public static class KnownTranslationKeys
             ["pl.index.projects_empty"] = "Ingen selvstændige projekter endnu — opret et for at komme i gang med at styre det fælles arbejde.",
             ["pl.index.start"] = "Start",
             ["pl.index.due"] = "Forfaldt",
+
+            // ── PL (ADR 0086, U06) — måldetal + composer + redigering ──
+            ["pl.goal.new_heading"] = "Nyt mål",
+            ["pl.goal.new_lede"] = "Et mål giver det fælles arbejde en retning — med valgfri beskrivelse, community-filter og publikum. Projekter kan senere hænge af det.",
+            ["pl.goal.create"] = "Opret mål",
+            ["pl.goal.edit_heading"] = "Rediger mål",
+            ["pl.goal.edit_lead"] = "Opdater titlen og beskrivelsen på dette mål. Dets publikum, community og sprog er fastlagt ved oprettelse.",
+            ["pl.goal.save"] = "Gem ændringer",
+            ["pl.goal.edit"] = "Rediger mål",
+            ["pl.goal.title_hint"] = "Et kort navn på målet — feedens etiket.",
+            ["pl.goal.description_hint"] = "En valgfri beskrivelse af den retning, dette mål giver det fælles arbejde. Et mål kan fungere med kun titel.",
+            ["pl.goal.audience_heading"] = "Publikum — hvem der kan se dette mål",
+            ["pl.goal.audience_public"] = "Synlig for alle på instansen.",
+            ["pl.goal.audience_restricted"] = "Begrænset til de tilgange nedenfor.",
+            ["pl.goal.projects_heading"] = "Projekter i dette mål",
+            ["pl.goal.projects_empty"] = "Ingen projekter under dette mål endnu — opret et for at komme i gang med at styre det fælles arbejde.",
+            ["pl.goal.empty_description"] = "Dette mål har endnu ingen beskrivelse.",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

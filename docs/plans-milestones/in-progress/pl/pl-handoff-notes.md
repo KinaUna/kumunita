@@ -275,6 +275,95 @@ first entry of the tab trio, and the `pl.*` `kw-l` keys used by this page
   view renders it with `Html.Raw` inside `<div class="markdown">` (the
   `Page/Show.cshtml` / `Notifications/Index.cshtml` idiom — the card
   surface, not the WYSIWYG `rc-editor`).
+
+## U06 — goal authoring surface (detail + composer + edit)
+
+Shipped on top of U05 (the goal lane) and U03–U04 (the goal *service*). U06
+adds the three goal surfaces the M5 lane never had, plus the `pl.goal.*` keys
+and their tests. Nothing M5-route is touched (regression pins still green);
+no commit/stage/move (U10's close does the move).
+
+**The six actions** — `ProjectsController` (`/projects`), in this order after
+`ProjectsIndex`:
+
+- `GoalDetail` — `GET /projects/goals/{id:guid}`. `GetGoalForStanding` →
+  `KeyNotFoundException` → `NotFound` (404) / `UnauthorizedAccessException` →
+  `ForbidResult` (403) (the C3 split, mirrored from the board actions). Loads
+  the goal's projects via `ListProjectsInGoal` and renders the author +
+  project-author display names in one `ResolveDisplayNameAsync` batch.
+  `CanEdit = Standing(User).Contains(goal.AuthorId) || User.IsInRole(GlobalAdmin)`
+  is **display-only** (the service re-checks; the controller never re-derives
+  access, ADR 0006).
+- `GoalNew` — `GET /projects/goals/new`. Seeds component + language +
+  grant-picker options; the audience defaults to public (`CommunityVisible =
+  true`, `Mode = "Any"`, empty `Grants`).
+- `GoalCreate` — `POST /projects/goals`. Binds the composer + a single-source
+  `AudienceEditorModel`; `BuildAudience()` is the one deserialization site
+  (reused verbatim from the board composer). `audience is null` → public. On
+  success `RedirectToAction` to `GoalDetail`; on `UnauthorizedAccessException`
+  → re-render `GoalNew` with `ViewData["formError"] = "forbidden"` (not a raw
+  403, so the user sees why); on `KeyNotFoundException` → `NotFound` (404);
+  on `ArgumentException` → re-render with `formError = "argument"`.
+- `GoalEdit` — `GET /projects/goals/{id}/edit`. `GetGoalForStanding` (C3);
+  sets `ViewData["goalId"]`; pre-fills **Title + Description only**.
+- `GoalUpdate` — `POST /projects/goals/{id}`. `UpdateGoal` (full update of
+  Title + Description only — audience/component/language are **not** editable,
+  ADR 0070). C3 + same form-error re-render as `GoalCreate`. On success
+  `RedirectToAction` to `GoalDetail`.
+
+**The three view-models** — `Models/ProjectViewModels.cs`:
+
+- `GoalDetailViewModel(GoalId, Title, DescriptionHtml, AuthorName,
+  ComponentName?, AudiencePublic, Projects)` — `Projects` is
+  `IReadOnlyList<GoalProjectCard>` (each `ProjectId, Title,
+  AuthorName, Status`); `CanEdit` is a `[BindNever]` display flag (it needs a
+  `using Microsoft.AspNetCore.Mvc.ModelBinding` — added to the file).
+- `GoalComposerViewModel` — Title + Description + the picker lists + the
+  `AudienceEditorModel Audience` (all `[BindNever]`/`[NotForBinding]` the
+  server-side lists). `IsValid` = non-empty Title + `Audience.IsValid`. The
+  component/language/grant lists are `[NotForBinding]` server-seeded.
+
+**The three views** — `Views/Projects/`:
+
+- `GoalDetail.cshtml` — header (back link → `/projects`, title, author ·
+  Created/Modified via `kw-dt`, component badge, audience line
+  public/restricted); Edit button (gated on `CanEdit`, → `/projects/goals/{id}/edit`);
+  description card (`Html.Raw(DescriptionHtml)` in `<div class="markdown">`,
+  else the `pl.goal.empty_description` placeholder); "Projects in this goal"
+  section (cards → `/projects/projects/{id}`, empty state `pl.goal.projects_empty`);
+  `_ProjectsTabs` partial (the `/projects` tab strip).
+- `GoalNew.cshtml` — Title, Description (`rc-editor`), component picker
+  (when `Components.Count > 0`), language picker, audience trio
+  (`CommunityVisible` switch + `Any`/`All` radios + `_GrantPickers`), submit
+  `pl.goal.create`, POST `/projects/goals`. Scripts: `rich-editor.js` +
+  `_GrantPickerScripts`.
+- `GoalEdit.cshtml` — mirrors `BoardEdit`: Title + Description only (ADR 0070),
+  POST `/projects/goals/@(ViewData["goalId"])`, submit `pl.goal.save`, cancel
+  back to the goal detail. Scripts: `rich-editor.js`.
+
+**The `pl.goal.*` keys** (all four languages — en/de/fr/da): `new_heading`,
+`new_lede`, `create`, `edit_heading`, `edit_lead`, `save`, `edit`, `title_hint`,
+`description_hint`, `audience_heading`, `audience_public`, `audience_restricted`,
+`projects_heading`, `projects_empty`, `empty_description`. The four-language
+`KnownTranslationKeys` test (Core) pins all of them and passes. The detail
+view reuses the shared `pl.index.*` / `projects.board.*` / `common.*` / `rc.*`
+keys (already present), so no new keys were needed there.
+
+**Tests** — `tests/Kumunita.Web.Tests/ProjectsControllerTests.cs`:
+
+- `Goal_Detail_ShowsGoalAndProjects` — the detail VM's goal + its projects.
+- `Goal_Create_RedirectsToDetail` — create succeeds → `RedirectToAction(
+  nameof(GoalDetail))`; `ViewBag["goalId"]` carries the new id.
+- `Goal_Edit_RendersTitleAndDescription` — the edit VM pre-fills Title +
+  Description from the standing-loaded goal.
+- `Goal_Update_RedirectsOr403` — `UpdateGoal` returns the updated goal →
+  redirect; `UpdateGoal` throws `UnauthorizedAccessException` → `ForbidResult`
+  (the C3 split, asserted).
+
+**Status** — `dotnet build Kumunita.slnx -c Debug` clean; `npm --prefix
+src/Kumunita.Web run build` clean; Web suite **435/435** (431 + 4 new goal
+pins); Core suite **817/817** (including the four-language kw-l pin). Not
+committed / staged / moved — U10's close does the move.
 - **View** — new `Views/Projects/ProjectsIndex.cshtml` (mirrors the
   `TodosIndex` / `BoardIndex` markup): header (`pl.index.title` /
   `pl.index.lede`) + the two composer buttons (`/projects/goals/new`,
