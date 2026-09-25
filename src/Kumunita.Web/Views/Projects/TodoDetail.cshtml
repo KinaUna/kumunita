@@ -208,6 +208,20 @@
                     }
                 </div>
 
+                @* U08 (ADR 0086 §3.9) — the Project link (D9): the to-do's
+                   project association (F3) rendered as a link to the project
+                   detail (ADR 0085 D4). The controller's read surface resolved
+                   the title (a dangling / unreadable association — F6 / F8 —
+                   yields null fields and the whole line is hidden: the link is
+                   a display surface, not an error for the to-do). *@
+                @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+                {
+                    <div class="text-muted small mt-2 mb-3">
+                        <kw-l key="pl.todo.project_link">Project</kw-l>:
+                        <a href="@($"/projects/projects/{Model.ProjectId}")">@Model.ProjectTitle</a>
+                    </div>
+                }
+
                 @* F9 — the parent link (a subtask is a full to-do shown under
                    its parent; the service's read surface, the view renders it). *@
                 @if (!string.IsNullOrWhiteSpace(Model.Todo.ParentId) && !string.IsNullOrWhiteSpace(Model.Todo.ParentTitle))

@@ -554,3 +554,113 @@ Kumunita.slnx -c Debug` succeeds with only the pre-existing
 `BoardDetail.cshtml` CS8600 warning (the allowed one); `npm --prefix
 src/Kumunita.Web run build` (tsc) clean — no new TS this unit. Not committed /
 staged / moved — U10's close does the move.
+
+## U08 — the project picker on the to-do/board edit + new forms, and the project link on their detail views
+
+Web-only (the one in-repo edit allowed outside `Kumunita.Web` is the
+`KnownTranslationKeys.cs` key additions). Puts (a) a **project picker** on
+the to-do + board **edit** and **new** forms, and (b) a **`Project: {title}`
+link** on the to-do + board **detail** views. The association is a **display
+surface, never a gate** (C-PL·3): the to-do / board exists with or without the
+association; the picker's empty choice clears it (posts blank = `null`).
+
+**The two new routes** (thin HTTP, ADR 0006-D; the seam's standing re-check is
+the enforcement — the C3 split):
+
+- `TodoSetProject` — `POST /projects/todos/{id}/set-project` +
+  `[ValidateAntiForgeryToken]`. Takes `[FromForm] string? projectId`; blank =
+  `null` (clear). Calls the frozen `SetTodoProjectAsync(id, actorId,
+  RoleSet(User), projectId, ct)`; `KeyNotFoundException` → `NotFound()` 404,
+  `UnauthorizedAccessException` → `ForbidResult` 403. On success →
+  `Redirect($"/projects/todos/{id}")` + `TempData["info"] = "Project set."` /
+  `"Project cleared."`.
+- `BoardSetProject` — `POST /projects/boards/{id}/set-project` (same shape)
+  via the frozen `SetBoardProjectAsync`.
+
+**The two detail read surfaces (D9)** — `TodoDetail` + `BoardDetail` gain a
+link line: when the to-do / board's `ProjectId` is non-blank, the controller
+resolves the title via a frozen `GetProjectAsync(projectId, actorId, ct)`
+**read** (never a gate). A `KeyNotFoundException` / `UnauthorizedAccessException`
+(the project is soft-deleted / denied — F6 / F8, the dangling-association
+case) is swallowed → both view-model fields stay `null` and the line is
+hidden; the detail is still a 200 (the link is a display surface, not an error
+for the to-do / board).
+
+**The picker seed (D10)** — `SeedProjectPickerAsync()` (private, the
+`SeedGoalPickerAsync` / `SeedComponentPickerAsync` shape):
+`ListProjectsAsync(null, null, actorId, 1, ct)` (component- + goal-unfiltered,
+page 1), `[]` on `KeyNotFoundException` / `UnauthorizedAccessException`,
+null-safe (a `null` result is the same display surface as an empty one),
+sorted by name; each option is `(Id, Name)` with the name falling back to the
+id. `ReSeedProjectPickerAsync(model, todoId)` re-prefills the current
+`ProjectId` (a denied re-read is swallowed) + re-seeds the options for the
+failed-form re-renders.
+
+**The forms** — the **edit** forms (the standalone set-project card) keep the
+frozen `UpdateTodoRequest` / `UpdateBoardRequest` DTOs untouched (C-PL·8: zero
+migrations): the card is a separate `POST {detail}/set-project` (the U08
+routes above), a `ProjectId` select with a leading blank "—" option, a "Set
+project" submit, hidden when `Model.Projects` is empty (F10). The **new**
+forms (the in-form picker) post `ProjectId` with the create; since the frozen
+`CreateTodoRequest` / `CreateBoardRequest` have **no** `ProjectId` field (Core
+frozen), the association is applied **post-create** via the frozen
+`SetTodoProjectAsync` / `SetBoardProjectAsync` — **best-effort**: a
+`KeyNotFoundException` / `UnauthorizedAccessException` on that second call is
+swallowed so the create still succeeds (a picker is a display surface, never a
+gate — the C-PL·3 race is handled on the write path, not the read path).
+
+**The view-models** — `Models/ProjectTodoViewModels.cs` +
+`Models/ProjectBoardViewModels.cs`:
+
+- `TodoEditorModel` += `string? ProjectId` + `[BindNever]
+  IReadOnlyList<(string Id, string Name)> Projects`.
+- `BoardEditorModel` += `ProjectId?` + `[BindNever] Projects`;
+  `BoardUpdateModel` += `ProjectId?` + `[BindNever] Projects`.
+- `TodoDetailViewModel` (record) += `string? ProjectId = null,
+  string? ProjectTitle = null`; `BoardDetailViewModel` (record) += the same
+  two fields.
+
+**The five views** — `Views/Projects/`:
+
+- `TodoDetail.cshtml` + `BoardDetail.cshtml` — a `Project: {title}` link line
+  (the `pl.todo.project_link` / `pl.board.project_link` label + an `<a>` →
+  `/projects/projects/{ProjectId}`), gated on `Model.ProjectId` +
+  `Model.ProjectTitle` both non-null.
+- `Edit.cshtml` + `BoardEdit.cshtml` — the standalone set-project card after
+  the main form (`action="{detail}/set-project"`), a `ProjectId` select over
+  `Model.Projects` (blank "—" + `selected` on the current association), a
+  "Set project" submit (`pl.todo.set_project` / `pl.board.set_project`),
+  gated on `Model.Projects.Count > 0`.
+- `Create.cshtml` + `BoardNew.cshtml` — the in-form picker card (a `ProjectId`
+  select over `Model.Projects`), gated on `Model.Projects.Count > 0`.
+
+**The four `pl.*` keys** (all four languages — en/de/fr/da):
+`pl.todo.project_link`, `pl.todo.set_project`, `pl.board.project_link`,
+`pl.board.set_project`. Each appended to **all four**
+`KnownTranslationKeys` dictionaries (after its `pl.project.empty_description`
+line) — the four-language parity pin (Core) covers the new keys
+automatically.
+
+**Tests** — `tests/Kumunita.Web.Tests/ProjectsControllerTests.cs` (4 new pins,
+names frozen in the design §9.6, before the shared scaffolding):
+
+- `TodoEdit_ProjectPickerSeeded_ReadableNonDeleted` (F10 / C-PL·3) — the edit
+  VM's `Projects` seeded (readable, non-deleted, name-sorted) + `ProjectId`
+  prefilled; `ListProjectsAsync` received once at page 1 unfiltered.
+- `TodoDetail_ProjectLink_RendersWhenReadable` (F6 / F8) — the detail VM's
+  `ProjectId` + `ProjectTitle` set when the association resolves (`GetProjectAsync`
+  received once); a **dangling** association (`GetProjectAsync` throws
+  `KeyNotFoundException`) → both fields null, detail still 200.
+- `BoardEdit_ProjectPickerSeeded_ReadableNonDeleted` — the board edit mirror.
+- `BoardDetail_ProjectLink_RendersWhenReadable` — the board detail mirror.
+
+**M5-route-untouched + goal/project-surface regression:** the existing M5
+`ProjectsControllerTests` pins and the U06 goal / U07 project pins pass
+unmodified — no M5 action / view / route / key changed, no goal / project
+action touched. **Tests pass:** `Kumunita.Web.Tests` — `Total: 443, Errors: 0,
+Failed: 0` (439 + 4 new pins); `Kumunita.Core.Tests` — `Total: 817, Errors: 0,
+Failed: 0` (including the four-language `kw-l` pin, which now covers the 4
+new keys). **Builds clean:** `dotnet build Kumunita.slnx -c Debug` succeeds
+with only the pre-existing `BoardDetail.cshtml` CS8600 warning (the allowed
+one); no new TS this unit. Not committed / staged / moved — U10's close does
+the move.

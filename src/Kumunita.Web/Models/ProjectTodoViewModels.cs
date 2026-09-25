@@ -133,7 +133,14 @@ public sealed record TodoPlacementRow(
 public sealed record TodoDetailViewModel(
     TodoRow Todo,
     IReadOnlyList<TodoRow> Subtasks,
-    IReadOnlyList<TodoPlacementRow> Placements);
+    IReadOnlyList<TodoPlacementRow> Placements,
+    // ADR 0086 D9 — the **project link** on the to-do detail (the D6
+    // dangling-association rule: both fields are `null` when the to-do has
+    // no `ProjectId`, or the target project is soft-deleted / unreadable by
+    // the actor — the link is then omitted entirely, never a 404/403 for the
+    // to-do itself; the `pl.todo.project_link` kw-l key labels it).
+    string? ProjectId = null,
+    string? ProjectTitle = null);
 
 /// <summary>
 /// The **compose / edit** form model (the <c>GET /projects/todos/new</c>
@@ -259,6 +266,24 @@ public sealed class TodoEditorModel
     /// — the form POSTs a <see cref="ParentId"/>.</summary>
     [BindNever]
     public IReadOnlyList<(string Id, string Title)> ParentOptions { get; set; } = [];
+
+    /// <summary>The to-do's **project association** (ADR 0086 D4 / D9) —
+    /// the <see cref="Kumunita.Core.Projects.TodoItem.ProjectId"/>: a feed
+    /// filter, never a gate (C-PL·3). Bound from the <c>name="ProjectId"</c>
+    /// picker on the new-form lane; on the **edit** lane it is the current
+    /// association the standalone set-project form prefills (the U04
+    /// <c>SetTodoProjectAsync</c> seam is the enforcement — a blank choice is
+    /// <c>null</c> = clear). Optional — a to-do is usable project-less.</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>The composer's **project picker** options — the actor's
+    /// readable, non-deleted <see cref="Kumunita.Core.Projects.Project"/> set
+    /// (the <c>SeedProjectPickerAsync</c> seed, the
+    /// <see cref="SeedGoalPickerAsync"/> shape). A **display** surface, never
+    /// a gate (C-PL·3). <b>[BindNever]</b> — the form POSTs a
+    /// <see cref="ProjectId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Projects { get; set; } = [];
 
     /// <summary>The composer's **tag** input — a <see cref="string"/>
     /// form field (JSON array of labels or a CSV fallback), parsed

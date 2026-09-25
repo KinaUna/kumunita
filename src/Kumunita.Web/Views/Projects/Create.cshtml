@@ -114,6 +114,27 @@
                 </div>
             }
 
+            @* U08 (ADR 0086 §3.9) — the project picker (D10): posts the optional
+               ProjectId with the create. The association is a display surface,
+               never a gate (C-PL·3); the controller applies it post-create via
+               the frozen SetTodoProjectAsync seam (C-PL·8: no DTO change). The
+               empty option is the unassociated case. *@
+            @if (Model.Projects.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="project" style="font-weight:600;"><kw-l key="pl.todo.project_link">Project</kw-l></label>
+                        <select class="form-control" id="project" name="ProjectId">
+                            <option value="">@(Html.Raw("&mdash;"))</option>
+                            @foreach (var (id, name) in Model.Projects)
+                            {
+                                <option value="@id" selected="@(id == Model.ProjectId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            }
+
             <div class="card mb-4">
                 <div class="card-body">
                     <label class="form-label" for="body" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>

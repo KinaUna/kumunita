@@ -1296,6 +1296,247 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(deniedResult);
     }
 
+    // ── U08 (ADR 0086) — the project picker + the project link (D9 / D10) ───
+
+    /// <summary>
+    /// U08 / F10 (C-PL·3) — <c>GET /projects/todos/{id}/edit</c> seeds the
+    /// actor's **readable, non-deleted** project options for the standalone
+    /// set-project card (D10) and prefills the current association (F3). The
+    /// options come from the frozen <see cref="IProjectService.ListProjectsAsync"/>
+    /// read (a display surface, never a gate), and the picker's prefill posts
+    /// the stored <c>ProjectId</c> (blank = clear).
+    /// </summary>
+    [Fact]
+    public async Task TodoEdit_ProjectPickerSeeded_ReadableNonDeleted()
+    {
+        const string actor = "subj-todo-edit-actor";
+        const string todoId = "todo-edit";
+        const string projectId = "proj-edit";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Editable to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>
+            {
+                new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
+                new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.TodoEditGet(todoId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<TodoEditorModel>(view.ViewData.Model);
+        // The picker is seeded (F10) — the readable, non-deleted projects,
+        // sorted by name (Alpha before Beta).
+        Assert.Equal(2, vm.Projects.Count);
+        Assert.Equal("Alpha project", vm.Projects[0].Name);
+        Assert.Equal(projectId, vm.Projects[0].Id);
+        Assert.Equal("proj-b", vm.Projects[1].Id);
+        // The current association is prefilled (F3 — the post blank = clear).
+        Assert.Equal(projectId, vm.ProjectId);
+        await projects.Received(1).ListProjectsAsync(
+            null, null, actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// U08 / F6 + F8 (D9) — <c>GET /projects/todos/{id}</c> renders the
+    /// to-do's project association (F3) as a **link** to the project detail
+    /// (the controller's read surface resolves the title via the frozen
+    /// <see cref="IProjectService.GetProjectAsync"/>). A **dangling**
+    /// association (the project is gone / denied) is a display surface, not an
+    /// error: the fields are left null and the link is hidden (F6 / F8).
+    /// </summary>
+    [Fact]
+    public async Task TodoDetail_ProjectLink_RendersWhenReadable()
+    {
+        const string actor = "subj-todo-detail-actor";
+        const string todoId = "todo-detail";
+        const string projectId = "proj-detail";
+
+        // Readable: the association resolves to a project title.
+        var projects = Substitute.For<IProjectService>();
+        projects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Detail to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(new Project
+            {
+                Id = projectId, Title = "The Project", AuthorId = actor, Created = default,
+            });
+
+        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var result = await controller.TodoDetail(todoId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<TodoDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.ProjectId);
+        Assert.Equal("The Project", vm.ProjectTitle);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // Dangling: the association points at a project the actor can no longer
+        // read (the soft-deleted / denied case — F6 / F8) → the link fields are
+        // null (the view hides the line) and the detail is still 200.
+        var danglingProjects = Substitute.For<IProjectService>();
+        danglingProjects.GetTodoAsync(todoId, actor, Arg.Any<CancellationToken>())
+            .Returns(new TodoDetailResult
+            {
+                Todo = new TodoItem
+                {
+                    Id = todoId, Title = "Detail to-do", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+                },
+                Subtasks = [],
+            });
+        danglingProjects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("gone")));
+
+        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingResult = await danglingController.TodoDetail(todoId);
+
+        var danglingView = Assert.IsType<ViewResult>(danglingResult);
+        var danglingVm = Assert.IsType<TodoDetailViewModel>(danglingView.ViewData.Model);
+        Assert.Null(danglingVm.ProjectId);
+        Assert.Null(danglingVm.ProjectTitle);
+    }
+
+    /// <summary>
+    /// U08 / F10 (C-PL·3) — <c>GET /projects/boards/{id}/edit</c> seeds the
+    /// actor's **readable, non-deleted** project options for the standalone
+    /// set-project card (D10) and prefills the current association (F3). The
+    /// options come from the frozen <see cref="IProjectService.ListProjectsAsync"/>
+    /// read; the prefill posts the stored <c>ProjectId</c> (blank = clear).
+    /// </summary>
+    [Fact]
+    public async Task BoardEdit_ProjectPickerSeeded_ReadableNonDeleted()
+    {
+        const string actor = "subj-board-edit-actor";
+        const string boardId = "board-edit";
+        const string projectId = "proj-edit";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Editable board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>
+            {
+                new() { Id = "proj-b", Title = "Beta project", AuthorId = actor, Created = default },
+                new() { Id = projectId, Title = "Alpha project", AuthorId = actor, Created = default },
+            });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.BoardEditGet(boardId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<BoardUpdateModel>(view.ViewData.Model);
+        Assert.Equal(2, vm.Projects.Count);
+        Assert.Equal("Alpha project", vm.Projects[0].Name);
+        Assert.Equal(projectId, vm.Projects[0].Id);
+        Assert.Equal("proj-b", vm.Projects[1].Id);
+        Assert.Equal(projectId, vm.ProjectId);
+        await projects.Received(1).ListProjectsAsync(
+            null, null, actor, 1, Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// U08 / F6 + F8 (D9) — <c>GET /projects/boards/{id}</c> renders the
+    /// board's project association (F3) as a **link** to the project detail
+    /// (the controller's read surface resolves the title via the frozen
+    /// <see cref="IProjectService.GetProjectAsync"/>). A **dangling**
+    /// association (the project is gone / denied) is a display surface, not an
+    /// error: the fields are left null and the link is hidden (F6 / F8).
+    /// </summary>
+    [Fact]
+    public async Task BoardDetail_ProjectLink_RendersWhenReadable()
+    {
+        const string actor = "subj-board-detail-actor";
+        const string boardId = "board-detail";
+        const string projectId = "proj-detail";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Detail board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(new Project
+            {
+                Id = projectId, Title = "The Project", AuthorId = actor, Created = default,
+            });
+
+        var controller = Build(projects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var result = await controller.BoardDetail(boardId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<BoardDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.ProjectId);
+        Assert.Equal("The Project", vm.ProjectTitle);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // Dangling → the link fields are null and the detail is still 200.
+        var danglingProjects = Substitute.For<IProjectService>();
+        danglingProjects.GetBoardAsync(boardId, actor, Arg.Any<CancellationToken>())
+            .Returns(new BoardDetailResult
+            {
+                Board = new KanbanBoard
+                {
+                    Id = boardId, Title = "Detail board", AuthorId = actor,
+                    ProjectId = projectId,
+                    Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+                },
+                Lanes = [],
+            });
+        danglingProjects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("gone")));
+
+        var danglingController = Build(danglingProjects, store: await BuildRealStoreAsync(), subjectId: actor);
+        var danglingResult = await danglingController.BoardDetail(boardId);
+
+        var danglingView = Assert.IsType<ViewResult>(danglingResult);
+        var danglingVm = Assert.IsType<BoardDetailViewModel>(danglingView.ViewData.Model);
+        Assert.Null(danglingVm.ProjectId);
+        Assert.Null(danglingVm.ProjectTitle);
+    }
+
     // ── Shared scaffolding ────────────────────────────────────────────────────
 
     /// <summary>

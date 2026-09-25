@@ -538,10 +538,43 @@ public sealed class ProjectsController : Controller
                 Order: p.Order))
             .ToList();
 
+        // ADR 0086 D9 — the **project link** (the D6 dangling-association
+        // rule): resolve the to-do's `ProjectId` to a readable, non-deleted
+        // project title for the detail view. Only when `ProjectId` is
+        // non-empty is `GetProjectAsync` called (a `null` association is the
+        // common case — no extra read); a soft-deleted target (404) or an
+        // unreadable one (403) leaves both fields `null`, and the link is
+        // omitted entirely — **not** a 404/403 for the to-do itself (C-PL·6 /
+        // the display-surface rule: a read convenience, never an error).
+        string? projectLinkId = null;
+        string? projectLinkTitle = null;
+        if (result.Todo.ProjectId is { Length: > 0 })
+        {
+            try
+            {
+                var linked = await projects.GetProjectAsync(result.Todo.ProjectId, actorId, HttpContext.RequestAborted);
+                projectLinkId = linked.Id;
+                projectLinkTitle = linked.Title;
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted project — the association dangles; the link is
+                // hidden (C-PL·6), the to-do itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A project the actor may not read — a hidden link, not a 403
+                // for the to-do (C-PL·3 — the to-do's own Audience is the
+                // access boundary).
+            }
+        }
+
         var vm = new TodoDetailViewModel(
             Todo: row,
             Subtasks: subtasks,
-            Placements: placementRows);
+            Placements: placementRows,
+            ProjectId: projectLinkId,
+            ProjectTitle: projectLinkTitle);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -598,6 +631,12 @@ public sealed class ProjectsController : Controller
                 : null,
             Languages   = await SeedLanguagePickerAsync(),
             Components  = await SeedComponentPickerAsync(),
+            // ADR 0086 D9 — the **project picker** (display surface, never a
+            // gate — C-PL·3): prefill the current association + seed the actor's
+            // readable, non-deleted project options (a `null` association
+            // prefill posts blank = clear).
+            ProjectId   = todo.ProjectId,
+            Projects    = await SeedProjectPickerAsync(),
         };
         await ReSeedParentOptionsAsync(model, actorId);
         await SeedGrantPickerOptionsAsync();
@@ -657,6 +696,11 @@ public sealed class ProjectsController : Controller
                 .Select(t => (Id: t.Id, Title: t.Title))
                 .OrderBy(t => t.Title, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
+            // ADR 0086 D9 — the **project picker** on the new form (a
+            // display surface, never a gate — C-PL·3); a new to-do has no
+            // association yet, so `ProjectId` stays `null` and the picker
+            // offers a leading "no project" option.
+            Projects = await SeedProjectPickerAsync(),
         };
         await SeedGrantPickerOptionsAsync();
         return View("Create", model);
@@ -688,9 +732,10 @@ public sealed class ProjectsController : Controller
         }
 
         // Re-seed the pickers so a failed-shape re-render below still shows
-        // the language + component + grant + parent options.
+        // the language + component + grant + parent + project options.
         model.Languages = await SeedLanguagePickerAsync();
         model.Components = await SeedComponentPickerAsync();
+        model.Projects = await SeedProjectPickerAsync();
         await SeedGrantPickerOptionsAsync();
         await ReSeedParentOptionsAsync(model, actorId);
 
@@ -741,6 +786,37 @@ public sealed class ProjectsController : Controller
             return NotFound();
         }
 
+        // ADR 0086 D9 — the **project association** on the new form. The
+        // frozen `CreateTodoRequest` carries no `ProjectId` (Core is frozen —
+        // C-PL·8 additive-only), so the association is applied **after** the
+        // to-do exists, through the U04 <c>SetTodoProjectAsync</c> seam (the
+        // same seam the edit form's standalone set-project form uses). The
+        // picker is a **display surface, never a gate** (C-PL·3): the actor
+        // is the creator (the standing re-check passes), and a project that
+        // is soft-deleted (404) or unreadable (403) at write time — a race
+        // past the seeded list — simply leaves the to-do created and
+        // unassociated (no error is surfaced over an already-successful
+        // create).
+        if (!string.IsNullOrWhiteSpace(model.ProjectId))
+        {
+            try
+            {
+                await projects.SetTodoProjectAsync(
+                    todo.Id, actorId, RoleSet(User), model.ProjectId, HttpContext.RequestAborted);
+            }
+            catch (KeyNotFoundException)
+            {
+                // The chosen project was soft-deleted after the picker seeded
+                // — the association dangles; the to-do is still created.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // The chosen project is unreadable at write time — the
+                // association is not applied; the to-do is still created
+                // (C-PL·3 — the picker is a display surface, never a gate).
+            }
+        }
+
         TempData["info"] = "To-do created.";
         return Redirect($"/projects/todos/{todo.Id}");
     }
@@ -772,6 +848,35 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// Re-seeds the <see cref="TodoEditorModel"/> project picker (the
+    /// standalone <c>set-project</c> card) on an invalid-POST re-render of the
+    /// <c>Edit</c> view — the <see cref="TodoEditorModel.ProjectId"/> prefill
+    /// (the to-do's current association, read via
+    /// <see cref="IProjectService.GetTodoAsync"/>) + the actor's readable
+    /// project options (the <see cref="SeedProjectPickerAsync"/> seed). A
+    /// read, never a decision (the to-do's own <c>CanSeeAsync(Read)</c>
+    /// already ran in the action entry; a re-denied read is swallowed so a
+    /// second error is not raised over an already-failing re-render).
+    /// </summary>
+    private async Task ReSeedProjectPickerAsync(TodoEditorModel model, string todoId)
+    {
+        try
+        {
+            var loaded = (await projects.GetTodoAsync(todoId, SubjectId(User) ?? string.Empty, HttpContext.RequestAborted)).Todo;
+            model.ProjectId = loaded.ProjectId;
+        }
+        catch (KeyNotFoundException)
+        {
+            // The to-do is gone — leave the posted prefill in place.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // A denied re-read — leave the posted prefill in place.
+        }
+        model.Projects = await SeedProjectPickerAsync();
+    }
+
+    /// <summary>
     /// <c>POST /projects/todos/{id}</c> — the update write lane (**creator ∪
     /// assignee ∪ GlobalAdmin** — F7 / F8, enforced **server-side** by the
     /// service; the Web <c>[Authorize]</c> is a convenience pre-gate only).
@@ -794,6 +899,7 @@ public sealed class ProjectsController : Controller
             model.Components = await SeedComponentPickerAsync();
             await SeedGrantPickerOptionsAsync();
             await ReSeedParentOptionsAsync(model, actorId);
+            await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
             if (string.IsNullOrWhiteSpace(model.Title))
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
             if (model.Audience is null || !model.Audience.IsValid)
@@ -845,6 +951,7 @@ public sealed class ProjectsController : Controller
             model.Components = await SeedComponentPickerAsync();
             await SeedGrantPickerOptionsAsync();
             await ReSeedParentOptionsAsync(model, actorId);
+            await ReSeedProjectPickerAsync(model, id); // ADR 0086 D9 — the standalone set-project card.
             return View("Edit", model);
         }
 
@@ -895,6 +1002,49 @@ public sealed class ProjectsController : Controller
         return Redirect(Url is { } url && url.IsLocalUrl(returnUrl)
             ? returnUrl!
             : $"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/todos/{id}/set-project</c> — the **project
+    /// association** write lane (ADR 0086 D9 / C-PL·2). A **standalone** form
+    /// POST (its own small form on the edit page — **not** the main M5 update
+    /// form, whose frozen <see cref="Kumunita.Core.Projects
+    /// .UpdateTodoRequest"/> is untouched). Sets the to-do's
+    /// <see cref="Kumunita.Core.Projects.TodoItem.ProjectId"/> through the U04
+    /// <see cref="IProjectService.SetTodoProjectAsync"/> seam; a blank choice
+    /// posts <c>null</c> = **clear** the association. **Creator ∪ assignee ∪
+    /// GlobalAdmin** over the to-do — the service's server-side standing
+    /// re-check + project guard (C3 split) is the enforcement; the controller
+    /// does no standing math (the ADR 0006-D split). A missing to-do is 404,
+    /// a denied actor 403, a missing / unreadable project 404 / 403.
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/set-project")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> TodoSetProject(string id, [FromForm] string? projectId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetTodoProjectAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(projectId) ? null : projectId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(projectId)
+            ? "Project cleared."
+            : "Project set.";
+        return Redirect($"/projects/todos/{id}");
     }
 
     /// <summary>
@@ -1180,6 +1330,36 @@ public sealed class ProjectsController : Controller
                 Cards: cards));
         }
 
+        // ADR 0086 D9 — the **project link** (the D6 dangling-association
+        // rule): resolve the board's `ProjectId` to a readable, non-deleted
+        // project title for the detail view. Only when `ProjectId` is
+        // non-empty is `GetProjectAsync` called (a `null` association is the
+        // common case — no extra read); a soft-deleted target (404) or an
+        // unreadable one (403) leaves both fields `null`, and the link is
+        // omitted entirely — **not** a 404/403 for the board itself (C-PL·6 /
+        // the display-surface rule: a read convenience, never an error).
+        string? projectLinkId = null;
+        string? projectLinkTitle = null;
+        if (result.Board.ProjectId is { Length: > 0 })
+        {
+            try
+            {
+                var linked = await projects.GetProjectAsync(result.Board.ProjectId, actorId, HttpContext.RequestAborted);
+                projectLinkId = linked.Id;
+                projectLinkTitle = linked.Title;
+            }
+            catch (KeyNotFoundException)
+            {
+                // Soft-deleted project — the association dangles; the link is
+                // hidden (C-PL·6), the board itself is unaffected.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A project the actor may not read — a hidden link, not a 403
+                // for the board (C-PL·3).
+            }
+        }
+
         var vm = new BoardDetailViewModel(
             Board: boardRow,
             Lanes: laneRows,
@@ -1189,7 +1369,10 @@ public sealed class ProjectsController : Controller
             // never an author and never carries the role).
             CanEdit: !string.IsNullOrEmpty(actorId)
                      && (string.Equals(result.Board.AuthorId, actorId, StringComparison.Ordinal)
-                         || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)));
+                         || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)),
+            // ADR 0086 D9 — the project link (the D6 dangling rule above).
+            ProjectId: projectLinkId,
+            ProjectTitle: projectLinkTitle);
         // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
         // assignee picker. Seed the standing assignee options (verified,
         // non-self profiles) the way the Create / BoardNew views do, so the
@@ -1274,6 +1457,12 @@ public sealed class ProjectsController : Controller
         {
             Title = board.Title,
             Description = board.Description,
+            // ADR 0086 D9 — the **project picker** (display surface, never a
+            // gate — C-PL·3): prefill the current association + seed the
+            // actor's readable, non-deleted project options (a `null`
+            // association prefill posts blank = clear).
+            ProjectId = board.ProjectId,
+            Projects = await SeedProjectPickerAsync(),
         };
         ViewData["boardId"] = id; // the edit form's POST action (POST /projects/boards/{id}).
         return View("BoardEdit", model);
@@ -1332,6 +1521,49 @@ public sealed class ProjectsController : Controller
         return Redirect($"/projects/boards/{id}");
     }
 
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/set-project</c> — the **project
+    /// association** write lane (ADR 0086 D9 / C-PL·2). A **standalone** form
+    /// POST (its own small form on the edit page — **not** the main board
+    /// update form, whose frozen <see cref="Kumunita.Core.Projects
+    /// .UpdateBoardRequest"/> is untouched). Sets the board's
+    /// <see cref="Kumunita.Core.Projects.KanbanBoard.ProjectId"/> through the
+    /// U04 <see cref="IProjectService.SetBoardProjectAsync"/> seam; a blank
+    /// choice posts <c>null</c> = **clear** the association. **Creator ∪
+    /// GlobalAdmin** over the board — the service's server-side standing
+    /// re-check + project guard (C3 split) is the enforcement; the controller
+    /// does no standing math (the ADR 0006-D split). A missing board is 404,
+    /// a denied actor 403, a missing / unreadable project 404 / 403.
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/set-project")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> BoardSetProject(string id, [FromForm] string? projectId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.SetBoardProjectAsync(
+                id,
+                actorId,
+                RoleSet(User),
+                string.IsNullOrWhiteSpace(projectId) ? null : projectId,
+                HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = string.IsNullOrWhiteSpace(projectId)
+            ? "Project cleared."
+            : "Project set.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
     // ── Board write lanes (U08) ─────────────────────────────────────────────
 
     /// <summary>
@@ -1354,6 +1586,11 @@ public sealed class ProjectsController : Controller
             },
             Languages = await SeedLanguagePickerAsync(),
             Components = await SeedComponentPickerAsync(),
+            // ADR 0086 D9 — the **project picker** on the new form (a
+            // display surface, never a gate — C-PL·3); a new board has no
+            // association yet, so `ProjectId` stays `null` and the picker
+            // offers a leading "no project" option.
+            Projects = await SeedProjectPickerAsync(),
         };
         await SeedGrantPickerOptionsAsync();
         return View("BoardNew", model);
@@ -1382,9 +1619,10 @@ public sealed class ProjectsController : Controller
         }
 
         // Re-seed the pickers so a failed-shape re-render below still shows
-        // the language + component + grant options.
+        // the language + component + grant + project options.
         model.Languages = await SeedLanguagePickerAsync();
         model.Components = await SeedComponentPickerAsync();
+        model.Projects = await SeedProjectPickerAsync();
         await SeedGrantPickerOptionsAsync();
 
         if (!model.IsValid)
@@ -1428,6 +1666,37 @@ public sealed class ProjectsController : Controller
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+
+        // ADR 0086 D9 — the **project association** on the new form. The
+        // frozen `CreateBoardRequest` carries no `ProjectId` (Core is frozen
+        // — C-PL·8 additive-only), so the association is applied **after**
+        // the board exists, through the U04 <c>SetBoardProjectAsync</c> seam
+        // (the same seam the edit form's standalone set-project form uses).
+        // The picker is a **display surface, never a gate** (C-PL·3): the
+        // actor is the creator (the standing re-check passes), and a project
+        // that is soft-deleted (404) or unreadable (403) at write time — a
+        // race past the seeded list — simply leaves the board created and
+        // unassociated (no error is surfaced over an already-successful
+        // create).
+        if (!string.IsNullOrWhiteSpace(model.ProjectId))
+        {
+            try
+            {
+                await projects.SetBoardProjectAsync(
+                    board.Id, actorId, RoleSet(User), model.ProjectId, HttpContext.RequestAborted);
+            }
+            catch (KeyNotFoundException)
+            {
+                // The chosen project was soft-deleted after the picker seeded
+                // — the association dangles; the board is still created.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // The chosen project is unreadable at write time — the
+                // association is not applied; the board is still created
+                // (C-PL·3 — the picker is a display surface, never a gate).
+            }
         }
 
         TempData["info"] = "Board created.";
@@ -2779,6 +3048,43 @@ public sealed class ProjectsController : Controller
 
         return goals
             .Select(g => (Id: g.Id, Name: string.IsNullOrWhiteSpace(g.Title) ? g.Id : g.Title))
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Seeds a <b>project picker</b> (ADR 0086 D9) — the actor's readable,
+    /// non-deleted <see cref="Kumunita.Core.Projects.Project"/> set (the
+    /// <see cref="IProjectService.ListProjectsAsync"/> feed at page 1,
+    /// component- and goal-unfiltered — the <see cref="SeedGoalPickerAsync"/>
+    /// shape, verbatim). A **display** surface, never a gate (C-PL·3) — the
+    /// service's <c>SetTodoProjectAsync</c> / <c>SetBoardProjectAsync</c>
+    /// standing re-check + project guard on write is the enforcement (the
+    /// C3 split). An empty result (a denied or empty feed) hides the picker
+    /// card in the view — a picker with no options is a noise surface, not a
+    /// control.
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Name)>> SeedProjectPickerAsync()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        IReadOnlyList<Project> list;
+        try
+        {
+            list = await projects.ListProjectsAsync(null, null, actorId, 1, ct: HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        // A null result (a seam that returns no list) is the same display
+        // surface as an empty one — the picker card hides (C-PL·3).
+        return (list ?? [])
+            .Select(p => (Id: p.Id, Name: string.IsNullOrWhiteSpace(p.Title) ? p.Id : p.Title))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }

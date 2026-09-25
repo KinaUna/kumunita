@@ -100,6 +100,19 @@
                             <span class="badge text-bg-light border ms-2">@Model.Board.ComponentDisplayName</span>
                         }
                     </div>
+                    @* ADR 0086 D9 — the **project link**: present only when
+                       the board has a `ProjectId` that resolves to a
+                       readable, non-deleted project (the D6 dangling rule —
+                       both fields are `null` when the target is soft-deleted
+                       or unreadable, and the link is omitted entirely). A
+                       display surface, never a gate (C-PL·3). *@
+                    @if (Model.ProjectId is not null && Model.ProjectTitle is not null)
+                    {
+                        <div class="text-muted small mt-1">
+                            <kw-l key="pl.board.project_link">Project</kw-l>:
+                            <a href="@($"/projects/projects/{Model.ProjectId}")">@Model.ProjectTitle</a>
+                        </div>
+                    }
                 </div>
                 @* The board action dropdown (the _AccountNav.cshtml Bootstrap
                    dropdown shape): delete board — a plain POST form to the

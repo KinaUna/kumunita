@@ -1468,6 +1468,10 @@ public static class KnownTranslationKeys
             ["pl.project.todos_empty"] = "No to-dos are in this project yet.",
             ["pl.project.boards_empty"] = "No boards are in this project yet.",
             ["pl.project.empty_description"] = "This project has no description yet.",
+            ["pl.todo.project_link"] = "Project",
+            ["pl.todo.set_project"] = "Set project",
+            ["pl.board.project_link"] = "Project",
+            ["pl.board.set_project"] = "Set project",
         };
 
     /// <summary>
@@ -2803,6 +2807,10 @@ public static class KnownTranslationKeys
             ["pl.project.todos_empty"] = "Noch keine To-dos in diesem Projekt.",
             ["pl.project.boards_empty"] = "Noch keine Boards in diesem Projekt.",
             ["pl.project.empty_description"] = "Dieses Projekt hat noch keine Beschreibung.",
+            ["pl.todo.project_link"] = "Projekt",
+            ["pl.todo.set_project"] = "Projekt festlegen",
+            ["pl.board.project_link"] = "Projekt",
+            ["pl.board.set_project"] = "Projekt festlegen",
         };
 
     /// <summary>
@@ -4140,6 +4148,10 @@ public static class KnownTranslationKeys
             ["pl.project.todos_empty"] = "Pas encore de tâches dans ce projet.",
             ["pl.project.boards_empty"] = "Pas encore de tableaux dans ce projet.",
             ["pl.project.empty_description"] = "Ce projet n'a pas encore de description.",
+            ["pl.todo.project_link"] = "Projet",
+            ["pl.todo.set_project"] = "Définir le projet",
+            ["pl.board.project_link"] = "Projet",
+            ["pl.board.set_project"] = "Définir le projet",
         };
 
     /// <summary>
@@ -5472,6 +5484,10 @@ public static class KnownTranslationKeys
             ["pl.project.todos_empty"] = "Ingen to-dos i dette projekt endnu.",
             ["pl.project.boards_empty"] = "Ingen boards i dette projekt endnu.",
             ["pl.project.empty_description"] = "Dette projekt har endnu ingen beskrivelse.",
+            ["pl.todo.project_link"] = "Projekt",
+            ["pl.todo.set_project"] = "Vælg projekt",
+            ["pl.board.project_link"] = "Projekt",
+            ["pl.board.set_project"] = "Vælg projekt",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
