@@ -140,14 +140,15 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         Assert.Equal(5, await CountAll(store, Actor));
     }
 
-    // ── 4 — GET /notifications/preferences → 200 + the nine Known toggles ────
+    // ── 4 — GET /notifications/preferences → 200 + the eleven Known toggles ───
 
     /// <summary>
     /// <c>GET /notifications/preferences</c> (route 4, C-M6·2 / C-M6·9): the
     /// preference read returns <c>200</c> + a <see cref="ViewResult"/> whose
     /// model carries the **closed, code-owned** <see cref="NotificationKinds
-    /// .Known"/> nine-entry toggle set (C-M6·2 — a resident cannot mint a kind
-    /// string the emitters don't use) and the actor's <c>KindsEnabled</c>
+    /// .Known"/> eleven-entry toggle set (C-M6·2 — a resident cannot mint a kind
+    /// string the emitters don't use; ADR 0077 adds the two admin-lane kinds) and
+    /// the actor's <c>KindsEnabled</c>
     /// (the lean-default <c>null</c> when no preference row yet — C-M6·9).
     /// </summary>
     [Fact]
@@ -162,9 +163,10 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
 
         var view = Assert.IsType<ViewResult>(result);                    // 200
         var vm = Assert.IsType<NotificationPreferencesViewModel>(view.ViewData.Model);
-        // The nine-entry closed kind set (C-M6·2 / C-M6·9).
+        // The eleven-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
+        // adds the two admin-lane kinds — account.signup / account.verified).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(9, vm.AllKinds.Count);
+        Assert.Equal(11, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

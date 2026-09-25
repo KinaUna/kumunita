@@ -27,8 +27,9 @@ namespace Kumunita.Web.Controllers;
 /// <c>ReadAt = now</c> on **all** the caller's unread rows (one commit,
 /// C-M6·8), then back to the inbox.</item>
 /// <item><c>GET /notifications/preferences</c> — the preference read:
-/// the nine <see cref="NotificationKinds.Known"/> toggles, the
-/// lean-default (C-M6·9 — no preference yet = all enabled).</item>
+/// the eleven <see cref="NotificationKinds.Known"/> toggles (ADR 0077
+/// adds the two admin-lane kinds), the lean-default (C-M6·9 — no
+/// preference yet = all enabled).</item>
 /// <item><c>POST /notifications/preferences</c> — the preference write
 /// (the resident's own choice is the authority at emit time, C-M6·7),
 /// then back to the inbox.</item>
@@ -102,9 +103,10 @@ public sealed class NotificationsController(
 
     /// <summary>
     /// <c>GET /notifications/preferences</c> — the preference read
-    /// (design doc §6.4 route 4, C-M6·9): the nine
-    /// <see cref="NotificationKinds.Known"/> toggles; the
-    /// lean-default — no stored preference yet = <c>KindsEnabled</c>
+    /// (design doc §6.4 route 4, C-M6·9): the eleven
+    /// <see cref="NotificationKinds.Known"/> toggles (ADR 0077 adds the
+    /// two admin-lane kinds); the lean-default — no stored preference yet
+    /// = <c>KindsEnabled</c>
     /// <c>null</c> = all enabled (the service never throws for a missing
     /// preference row). A personal read — no audit row (C-M6·3).
     /// </summary>

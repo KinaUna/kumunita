@@ -1,3 +1,4 @@
+using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
 using Marten.Services;
@@ -39,7 +40,8 @@ public sealed class IdentityService(
     IMailerStage mailer,
     IOptions<VerificationOptions> verificationOptions,
     Microsoft.Extensions.Logging.ILogger<IdentityService> logger,
-    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null) : IIdentityService
+    Kumunita.Core.Localization.ITranslationProvider? translationProvider = null,
+    NotificationService? notifications = null) : IIdentityService
 {
     private const string ComponentKind = "component";
     private const string AccountKind = "account";
@@ -129,6 +131,16 @@ public sealed class IdentityService(
                     subject: verifySubject,
                     body: verifyBody,
                     ct: default);
+
+        // ADR 0077 — notify the GlobalAdmins (inbox + best-effort email) that a new
+        // resident signed up. Best-effort (a throw is swallowed — the signup must
+        // succeed even if the notification lane is unavailable), gated by the
+        // instance NotifyAdminsOnSignup flag, and skipped when no GlobalAdmin
+        // exists (a single-admin seed account is not notified about itself).
+        await EmitAccountNotificationAsync(
+            session, NotificationKinds.AccountSignup, user.Id,
+            $"{displayName} <{email}>");
+
         await session.SaveChangesAsync();
 
         logger.LogInformation("Registered unverified resident {UserId} (email {Email}).", user.Id, email);
@@ -223,6 +235,14 @@ public sealed class IdentityService(
         var now = DateTimeOffset.UtcNow;
         session.Store(AuditRow(now, token.UserId, token.UserId, "verify", AccountKind, token.UserId,
             Authorization.AccessVia.Owner, Authorization.AccessOutcome.Allow));
+
+        // ADR 0077 — notify the GlobalAdmins (inbox + best-effort email) that a
+        // resident verified their account. Same best-effort / gated / no-admin
+        // shape as the RegisterAsync emitter (the account.verified kind).
+        await EmitAccountNotificationAsync(
+            session, NotificationKinds.AccountVerified, token.UserId,
+            $"{profile.DisplayName} <{user.Email}>");
+
         await session.SaveChangesAsync();
 
         // Member is implicit on a verified resident (no EF role needed for the base standing).
@@ -373,6 +393,133 @@ public sealed class IdentityService(
         });
 
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ── Admin account notifications (ADR 0077 — the account.signup /
+    //    account.verified notify gate + the GlobalAdmin emitters) ──
+
+    /// <inheritdoc />
+    public async Task<bool> IsNotifyAdminsOnSignupAsync()
+    {
+        // ADR 0077 read seam: the instance gate (LocaleSettings.NotifyAdminsOnSignup)
+        // with the `true` floor — a missing singleton or an unset value both yield
+        // `true`, so a fresh instance ships with the admin notification on (the M6
+        // "null / empty = all enabled" lean-default, the same shape as
+        // IsSignupOpenAsync's `true` floor). A read (no audit row).
+        using var session = documentStore.QuerySession();
+        var settings = await session.LoadAsync<Localization.LocaleSettings>(
+            Localization.LocaleSettings.SingletonId, CancellationToken.None);
+
+        return settings is null || settings.NotifyAdminsOnSignup;
+    }
+
+    /// <inheritdoc />
+    public async Task SetNotifyAdminsOnSignupAsync(bool notify, string adminSubjectId)
+    {
+        // ADR 0077 write seam: the admin-settled instance gate (LocaleSettings singleton)
+        // + exactly one audit row (via: Admin, action "signup.set-notify", target
+        // "signup") in the same session (C3 — no silent, unaudited access). The same
+        // single-target singleton-toggle shape as SetSignupOpenAsync (the
+        // timezone.set-default / dateformat.set-default precedent).
+        await using var session = documentStore.OpenSession(new Marten.Services.SessionOptions());
+        var ct = System.Threading.CancellationToken.None;
+
+        var settings = await session
+            .LoadAsync<Localization.LocaleSettings>(
+                Localization.LocaleSettings.SingletonId, ct)
+            .ConfigureAwait(false);
+
+        if (settings is null)
+        {
+            settings = new Localization.LocaleSettings { NotifyAdminsOnSignup = notify };
+        }
+        else
+        {
+            settings.NotifyAdminsOnSignup = notify;
+        }
+
+        session.Store(settings);
+
+        session.Store(new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = DateTimeOffset.UtcNow,
+            ActorId = adminSubjectId,
+            EffectivePrincipalId = adminSubjectId,
+            Action = "signup.set-notify",
+            TargetKind = "signup",
+            TargetId = "signup",
+            Via = Authorization.AccessVia.Admin,
+            Outcome = Authorization.AccessOutcome.Allow
+        });
+
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // ── ADR 0077 — the account-lane GlobalAdmin emitters ──────────────────
+
+    /// <summary>
+    /// ADR 0077 — notify every <c>GlobalAdmin</c> (via the frozen
+    /// <see cref="Notifications.NotificationService"/> emitter) of an account
+    /// event (the <c>account.signup</c> or <c>account.verified</c> kind). Called
+    /// on the caller's open <paramref name="session"/> (the C3 single-commit
+    /// shape — the caller commits after). **Best-effort:** any failure (no
+    /// emitter wired, no GlobalAdmin, an emit error) is swallowed and logged —
+    /// the account operation (register / verify) is the primary domain op and
+    /// must succeed even if the notification lane is unavailable (the M6 "email
+    /// is best-effort, the inbox is the durable record" posture, D5). Gated by
+    /// the instance <see cref="Localization.LocaleSettings.NotifyAdminsOnSignup"/>
+    /// flag (the <c>true</c> floor). A fresh instance's single seed-admin
+    /// account is not notified about itself (no other admin exists, so the
+    /// recipient set is empty — a no-op, not a noise path).
+    /// </summary>
+    private async Task EmitAccountNotificationAsync(
+        IDocumentSession session,
+        string kind,
+        string accountId,
+        string snippet)
+    {
+        try
+        {
+            if (notifications is null)
+                return;                                          // not wired (test harness) — the account op still succeeds
+
+            if (!await IsNotifyAdminsOnSignupAsync().ConfigureAwait(false))
+                return;                                          // the admin disabled the notify — a no-op
+
+            var admins = (await userManager
+                .GetUsersInRoleAsync(Roles.GlobalAdmin).ConfigureAwait(false)).ToList();
+            if (admins.Count == 0)
+                return;                                          // no GlobalAdmin (a fresh instance) — nothing to notify
+
+            // D4 / F10 — a stable, content-derived key per recipient: the same
+            // logical event is one inbox row + one email per admin (a re-emission
+            // of the same (event, admin) is a no-op, a different admin is a
+            // distinct key). The recipient id is part of the key because
+            // EmitAsync dedups by key alone (the recipient is a parameter, not part
+            // of the key — the §6.3 shape + the per-admin fan-out).
+            foreach (var admin in admins)
+            {
+                var adminId = admin?.Id ?? string.Empty;
+                if (adminId.Length == 0)
+                    continue;
+                await notifications.EmitAsync(
+                    session,
+                    recipientId: adminId,
+                    kind: kind,
+                    idempotencyKey: $"notification:{kind}:{accountId}:{adminId}",
+                    body: snippet,
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Best-effort (D5): the account operation must not fail because the
+            // notification lane is unavailable — log and let the caller commit the
+            // domain write. The inbox row / email are the nudge, not the record.
+            logger.LogWarning(ex, "Account-lane notification ({Kind}) for {AccountId} was not emitted.",
+                kind, accountId);
+        }
     }
 
     /// <inheritdoc />

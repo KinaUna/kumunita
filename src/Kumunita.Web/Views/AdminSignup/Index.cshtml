@@ -26,3 +26,26 @@
         </div>
     </div>
 </form>
+
+<hr />
+
+<h2 class="h5 mt-4"><kw-l key="admin.signup_notify_title">Notify admins</kw-l></h2>
+<p class="text-muted">
+    <kw-l key="admin.signup_notify_lede">When a new resident signs up and when a resident verifies their account, the GlobalAdmins get an inbox notification and a best-effort email. Turning it off silences that — the account lane itself is unaffected.</kw-l>
+</p>
+
+<form method="post" action="/admin/signup/notify">
+    @Html.AntiForgeryToken()
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-8">
+            <label for="notifyAdmins" class="form-label"><kw-l key="admin.signup_notify_title">Notify admins</kw-l></label>
+            <select class="form-select" name="notifyAdmins" id="notifyAdmins">
+                <option value="True" selected="@(Model.NotifyAdmins ? "selected" : null)"><kw-l key="admin.signup_notify_on">On — admins are notified of new sign-ups and verifications</kw-l></option>
+                <option value="False" selected="@(!Model.NotifyAdmins ? "selected" : null)"><kw-l key="admin.signup_notify_off">Off — no admin notifications on sign-up / verification</kw-l></option>
+            </select>
+        </div>
+        <div class="col-sm-4">
+            <button type="submit" class="btn btn-primary"><kw-l key="admin.signup_save">Save</kw-l></button>
+        </div>
+    </div>
+</form>

@@ -72,4 +72,21 @@ public sealed class LocaleSettings
     /// community widens — SECURITY.md §6, adversary A2).
     /// </summary>
     public bool IsSignupOpen { get; set; } = true;
+
+    /// <summary>
+    /// Whether the <see cref="Kumunita.Core.Identity"/> account lane notifies the
+    /// <b>GlobalAdmins</b> (inbox + best-effort email, the M6 lean-default posture)
+    /// when a new resident <b>signs up</b> (<c>RegisterAsync</c>) and when a
+    /// resident <b>verifies</b> their account (<c>VerifyWithTokenAsync</c>) — the
+    /// two <c>account.signup</c> / <c>account.verified</c> emitters (ADR 0077).
+    /// An *additive* field on the singleton (ADR 0004 §B.1), the same shape as
+    /// <see cref="IsSignupOpen"/> / <see cref="DefaultTimezone"/> /
+    /// <see cref="DefaultDateFormat"/>. Defaults to <c>true</c> so a fresh
+    /// instance ships with the admin notification on — a small neighborhood's
+    /// admins want to know who is joining out of the box (the M6
+    /// "null / empty = all enabled" lean-default and the <see cref="IsSignupOpen"/>
+    /// <c>true</c> floor, ADR 0077 D1). An admin tightens it to <c>false</c> only
+    /// if the signal becomes noise.
+    /// </summary>
+    public bool NotifyAdminsOnSignup { get; set; } = true;
 }

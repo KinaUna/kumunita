@@ -43,6 +43,13 @@ public static class ServiceCollectionExtensions
     {
         services.AddTransient<IUserInfoService, UserInfoService>();
         services.AddTransient<IAuthorizationService, AuthorizationService>();
+        // ADR 0077 — the IdentityService's new optional `NotificationService?` ctor
+        // seam (the account.signup / account.verified admin-lane emitters) is
+        // resolved automatically by the container from the registered
+        // Notifications.NotificationService (the same way its `ITranslationProvider?`
+        // seam is already auto-injected here — the default value is only used when the
+        // type is unregistered, which is how the two direct-construction Core test
+        // harnesses omit it). No factory needed.
         services.AddTransient<IIdentityService, IdentityService>();
 
         // Step-7 (C3 fix, plan U2): OutboxEmailStager now also enqueues the durable

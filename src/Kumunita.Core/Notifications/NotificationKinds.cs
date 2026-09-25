@@ -41,12 +41,35 @@ public static class NotificationKinds
     public const string TodoAssign = "todo.assign";
 
     /// <summary>
+    /// A new resident signed up (an <b>admin-lane</b> kind — the recipient is a
+    /// <c>GlobalAdmin</c>, not the signing-up resident; wired by ADR 0077's
+    /// <c>IdentityService.RegisterAsync</c> emitter, gated by the instance
+    /// <c>NotifyAdminsOnSignup</c> flag). One of the eleven kinds; the other ten
+    /// are the eight wired resident kinds + the reserved <c>post.mention</c> +
+    /// <c>account.verified</c>.
+    /// </summary>
+    public const string AccountSignup = "account.signup";
+
+    /// <summary>
+    /// A resident verified their account (an <b>admin-lane</b> kind — the
+    /// recipient is a <c>GlobalAdmin</c>, not the verifying resident; wired by
+    /// ADR 0077's <c>IdentityService.VerifyWithTokenAsync</c> emitter, gated by
+    /// the instance <c>NotifyAdminsOnSignup</c> flag). One of the eleven kinds.
+    /// </summary>
+    public const string AccountVerified = "account.verified";
+
+    /// <summary>
     /// The ordered, closed kind set (for the settings toggles + the <c>kw-l</c>
     /// key table). Order is the settings page's canonical display order.
+    /// The two admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
+    /// ADR 0077) are appended last — they are a separate lane (the recipient is a
+    /// GlobalAdmin, not the resident whose inbox the other nine serve), so they
+    /// trail the resident-facing kinds.
     /// </summary>
     public static IReadOnlyList<string> Known { get; } =
     [
         PostReply, PostMention, GroupPost, EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
+        AccountSignup, AccountVerified,
     ];
 }

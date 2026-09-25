@@ -109,4 +109,45 @@ public class AdminSignupControllerTests
 
         await identity.Received(1).SetSignupOpenAsync(false, Admin);
     }
+
+    // ── SaveNotify (ADR 0077 — the notify-admins gate, a second independent
+    //    audited lane on the same /admin/signup surface) ────────────────────
+
+    [Fact]
+    public async Task Index_ReturnsViewModel_WithNotifyGateDefault()
+    {
+        var (controller, identity) = Build(isOpen: true);
+        identity.IsNotifyAdminsOnSignupAsync().Returns(true);
+
+        var action = await controller.Index();
+        var view = Assert.IsType<ViewResult>(action);
+        var vm = Assert.IsType<AdminSignupController.SignupAdminViewModel>(view.ViewData.Model);
+
+        Assert.True(vm.IsOpen);
+        Assert.True(vm.NotifyAdmins);
+    }
+
+    [Fact]
+    public async Task SaveNotify_On_CallsServiceAndRedirects()
+    {
+        var (controller, identity) = Build(isOpen: true);
+
+        var action = await controller.SaveNotify(true);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSignupController.Index), redirect.ActionName);
+
+        await identity.Received(1).SetNotifyAdminsOnSignupAsync(true, Admin);
+    }
+
+    [Fact]
+    public async Task SaveNotify_Off_CallsServiceAndRedirects()
+    {
+        var (controller, identity) = Build(isOpen: true);
+
+        var action = await controller.SaveNotify(false);
+        var redirect = Assert.IsType<RedirectToActionResult>(action);
+        Assert.Equal(nameof(AdminSignupController.Index), redirect.ActionName);
+
+        await identity.Received(1).SetNotifyAdminsOnSignupAsync(false, Admin);
+    }
 }

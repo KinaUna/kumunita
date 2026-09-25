@@ -417,6 +417,10 @@ public static class KnownTranslationKeys
             ["admin.signup_open"]     = "Open — residents can sign up",
             ["admin.signup_invitation_only"] = "Invitation-only — new self-service accounts are gated",
             ["admin.signup_save"]     = "Save",
+            ["admin.signup_notify_title"]   = "Notify admins",
+            ["admin.signup_notify_lede"]    = "When a new resident signs up and when a resident verifies their account, the GlobalAdmins get an inbox notification and a best-effort email. Turning it off silences that — the account lane itself is unaffected.",
+            ["admin.signup_notify_on"]      = "On — admins are notified of new sign-ups and verifications",
+            ["admin.signup_notify_off"]     = "Off — no admin notifications on sign-up / verification",
 
             // ── account — sign-up-closed notice (the /account/signup and
             // /account/login surfaces when the admin gate is closed; ADR 0050) ─
@@ -1355,6 +1359,16 @@ public static class KnownTranslationKeys
             ["notification.report.assigned.body"] = "A report was assigned to you as a moderator. ",
             ["notification.report.resolved.body"] = "A report you were involved in was resolved. ",
             ["notification.todo.assign.body"] = "A to-do was assigned to you: ",
+            // admin-lane account kinds (ADR 0077 — the recipient is a GlobalAdmin,
+            // not the resident; gated by the instance NotifyAdminsOnSignup flag)
+            ["notifications.kind.account.signup"] = "New resident",
+            ["notifications.kind.account.verified"] = "Account verified",
+            ["notifications.preference.account.signup.label"] = "When a new resident signs up",
+            ["notifications.preference.account.verified.label"] = "When a resident verifies their account",
+            ["notification.account.signup.subject"] = "A new resident signed up",
+            ["notification.account.signup.body"] = "A new resident signed up: ",
+            ["notification.account.verified.subject"] = "A resident verified their account",
+            ["notification.account.verified.body"] = "A resident verified their account: ",
         };
 
     /// <summary>
@@ -1709,6 +1723,10 @@ public static class KnownTranslationKeys
             ["admin.signup_open"]     = "Offen — Anwohner:innen können sich registrieren",
             ["admin.signup_invitation_only"] = "Nur per Einladung — neue Selbstregistrierungen sind gesperrt",
             ["admin.signup_save"]     = "Speichern",
+            ["admin.signup_notify_title"]   = "Admins benachrichtigen",
+            ["admin.signup_notify_lede"]    = "Wenn ein neues Mitglied sich registriert und wenn ein Mitglied sein Konto verifiziert, bekommen die GlobalAdmins eine Posteingangsbenachrichtigung und eine best-effort-E-Mail. Ausgestellt, wird das stummgeschaltet — der Account-Vorgang selbst ist davon unberührt.",
+            ["admin.signup_notify_on"]      = "An — Admins werden bei neuen Registrierungen und Verifizierungen benachrichtigt",
+            ["admin.signup_notify_off"]     = "Aus — keine Admin-Benachrichtigungen bei Registrierung / Verifizierung",
 
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Die Registrierung ist geschlossen",
@@ -2584,6 +2602,14 @@ public static class KnownTranslationKeys
             ["notification.report.assigned.body"] = "Eine Meldung wurde dir als Moderator zugewiesen. ",
             ["notification.report.resolved.body"] = "Eine Meldung, an der du beteiligt warst, wurde aufgelöst. ",
             ["notification.todo.assign.body"] = "Eine Aufgabe wurde dir zugewiesen: ",
+            ["notifications.kind.account.signup"] = "Neues Mitglied",
+            ["notifications.kind.account.verified"] = "Konto verifiziert",
+            ["notifications.preference.account.signup.label"] = "Wenn ein neues Mitglied sich registriert",
+            ["notifications.preference.account.verified.label"] = "Wenn ein Mitglied sein Konto verifiziert",
+            ["notification.account.signup.subject"] = "Ein neues Mitglied hat sich registriert",
+            ["notification.account.signup.body"] = "Ein neues Mitglied hat sich registriert: ",
+            ["notification.account.verified.subject"] = "Ein Mitglied hat sein Konto verifiziert",
+            ["notification.account.verified.body"] = "Ein Mitglied hat sein Konto verifiziert: ",
         };
 
     /// <summary>
@@ -2938,6 +2964,10 @@ public static class KnownTranslationKeys
             ["admin.signup_open"]     = "Ouvert — les habitants peuvent s'inscrire",
             ["admin.signup_invitation_only"] = "Sur invitation — les inscriptions auto-service sont verrouillées",
             ["admin.signup_save"]     = "Enregistrer",
+            ["admin.signup_notify_title"]   = "Notifier les admins",
+            ["admin.signup_notify_lede"]    = "Quand un nouveau résident s'inscrit et quand un résident vérifie son compte, les GlobalAdmins reçoivent une notification de boîte d'arrivée et un courriel au mieux de l'effort. Désactivé, cela se tait — le compte lui-même n'est pas affecté.",
+            ["admin.signup_notify_on"]      = "Activé — les admins sont notifiés des nouvelles inscriptions et vérifications",
+            ["admin.signup_notify_off"]     = "Désactivé — aucune notification admin sur inscription / vérification",
 
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "L'inscription est fermée",
@@ -3815,6 +3845,14 @@ public static class KnownTranslationKeys
             ["notification.report.assigned.body"] = "Un signalement t'a été assigné en tant que modérateur. ",
             ["notification.report.resolved.body"] = "Un signalement auquel tu étais impliqué a été résolu. ",
             ["notification.todo.assign.body"] = "Une tâche t'a été assignée : ",
+            ["notifications.kind.account.signup"] = "Nouveau résident",
+            ["notifications.kind.account.verified"] = "Compte vérifié",
+            ["notifications.preference.account.signup.label"] = "Quand un nouveau résident s'inscrit",
+            ["notifications.preference.account.verified.label"] = "Quand un résident vérifie son compte",
+            ["notification.account.signup.subject"] = "Un nouveau résident s'est inscrit",
+            ["notification.account.signup.body"] = "Un nouveau résident s'est inscrit : ",
+            ["notification.account.verified.subject"] = "Un résident a vérifié son compte",
+            ["notification.account.verified.body"] = "Un résident a vérifié son compte : ",
         };
 
     /// <summary>
@@ -4169,6 +4207,10 @@ public static class KnownTranslationKeys
             ["admin.signup_open"]     = "Åben — beboere kan tilmelde sig",
             ["admin.signup_invitation_only"] = "Kun på invitation — nye selvtjente-kontoer er låst",
             ["admin.signup_save"]     = "Gem",
+            ["admin.signup_notify_title"]   = "Giv besked til adminer",
+            ["admin.signup_notify_lede"]    = "Når en ny beboer tilmelder sig og når en beboer bekræfter sin konto, får GlobalAdmins en notifikation i indbakken og en e-mail, så vidt muligt. Slår du den fra, bliver den stum — selve konto-processen er ellers uforandret.",
+            ["admin.signup_notify_on"]      = "Til — adminer får besked ved nye tilmeldinger og bekræftelser",
+            ["admin.signup_notify_off"]     = "Fra — ingen besked til adminer ved tilmelding / bekræftelse",
 
             // ── account — sign-up-closed notice (ADR 0050) ─────────────────
             ["account.signup_closed_title"] = "Tilmeldingen er lukket",
@@ -5041,6 +5083,14 @@ public static class KnownTranslationKeys
             ["notification.report.assigned.body"] = "En anmeldelse er tilknyttet dig som moderator. ",
             ["notification.report.resolved.body"] = "En anmeldelse, du var involveret i, er behandlet. ",
             ["notification.todo.assign.body"] = "En opgave er tilknyttet dig: ",
+            ["notifications.kind.account.signup"] = "Ny beboer",
+            ["notifications.kind.account.verified"] = "Konto bekræftet",
+            ["notifications.preference.account.signup.label"] = "Når en ny beboer tilmelder sig",
+            ["notifications.preference.account.verified.label"] = "Når en beboer bekræfter sin konto",
+            ["notification.account.signup.subject"] = "En ny beboer har tilmeldt sig",
+            ["notification.account.signup.body"] = "En ny beboer har tilmeldt sig: ",
+            ["notification.account.verified.subject"] = "En beboer har bekræftet sin konto",
+            ["notification.account.verified.body"] = "En beboer har bekræftet sin konto: ",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
