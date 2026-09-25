@@ -67,7 +67,167 @@
     <div class="col-md-8 col-lg-7">
         <p><a class="text-muted" href="@Url.Action("Index", "Groups")"><kw-l key="groups.back_all">← All groups</kw-l></a></p>
 
-        <h1>@Model.Name</h1>
+        @* ADR 0082 — the group's action surface: one ⋮ dropdown (the
+           ADR 0069 / 0071 todo/board idiom). The Groups context has no
+           group-level Edit / Delete lane (the ADR 0007 / 0010 / 0026
+           surface — description edit, privacy toggle, translation
+           lanes live in the Settings tab, member lanes in the Members
+           tab) so the menu holds the translation Edit / Add / Remove
+           items only, gated on Model.CanTranslate. Translation add /
+           edit open a Bootstrap modal (the ADR 0071 "Add subtask"
+           shape); translation remove is a confirm form in the menu.
+           The service's write-lane re-check at POST is the real gate. *@
+        <div class="d-flex align-items-start gap-2 mb-2">
+            <h1 class="mb-0 flex-grow-1">@Model.Name</h1>
+            @if (Model.CanTranslate)
+            {
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                            data-bs-toggle="dropdown" aria-expanded="false"
+                            aria-label="@($"Actions for {(string.IsNullOrWhiteSpace(Model.Name) ? "group" : Model.Name)}")">⋮</button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        @foreach (var existing in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
+                        {
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#group-trans-edit-{existing.LanguageCode}")">
+                                    <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                </button>
+                            </li>
+                        }
+                        @foreach (var lang in missingLanguages)
+                        {
+                            <li>
+                                <button type="button" class="dropdown-item text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="@($"#group-trans-add-{lang.Code}")">
+                                    <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                </button>
+                            </li>
+                        }
+                        @if (Model.GroupTranslations.Count > 0)
+                        {
+                            <li><hr class="dropdown-divider" /></li>
+                            @foreach (var existing in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
+                            {
+                                <li>
+                                    <form method="post" action="@($"/groups/{Model.GroupId}/translations/remove")"
+                                          data-confirm="Remove this translation?" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </button>
+                                    </form>
+                                </li>
+                            }
+                        }
+                    </ul>
+                </div>
+
+                @* ADR 0071 modal shape — one modal per language the
+                   standing-holder may edit or add. The group's
+                   translation fields are name + description (both
+                   plain text, no rich editor — the ADR 0026 group
+                   translation surface). *@
+                @foreach (var existing in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
+                {
+                    <div class="modal fade" id="@($"group-trans-edit-{existing.LanguageCode}")" tabindex="-1"
+                         aria-labelledby="@($"group-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/groups/{Model.GroupId}/translations/update")" id="@($"group-trans-edit-form-{existing.LanguageCode}")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"group-trans-edit-label-{existing.LanguageCode}")">
+                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                @LangName(existing.LanguageCode) <kw-l key="groups.translation_name_label">Name</kw-l>
+                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control" type="text" name="name" value="@existing.Name" />
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <textarea class="form-control" name="description" rows="4" placeholder="…">@existing.Description</textarea>
+                                        </div>
+                                        <div class="form-text">
+                                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"group-trans-edit-form-{existing.LanguageCode}")">
+                                            <kw-l key="groups.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @foreach (var lang in missingLanguages)
+                {
+                    <div class="modal fade" id="@($"group-trans-add-{lang.Code}")" tabindex="-1"
+                         aria-labelledby="@($"group-trans-add-label-{lang.Code}")" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="@($"/groups/{Model.GroupId}/translations")" id="@($"group-trans-add-form-{lang.Code}")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="languageCode" value="@lang.Code" />
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="@($"group-trans-add-label-{lang.Code}")">
+                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                @LangName(lang.Code) <kw-l key="groups.translation_name_label">Name</kw-l>
+                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <input class="form-control" type="text" name="name" value="@Model.Name" />
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <kw-l key="groups.translation_desc_label">Description</kw-l>
+                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <textarea class="form-control" name="description" rows="4" placeholder="…">@Model.Description</textarea>
+                                        </div>
+                                        <div class="form-text">
+                                            <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                            <kw-l key="common.cancel">Cancel</kw-l>
+                                        </button>
+                                        <button type="submit" class="btn btn-primary" form="@($"group-trans-add-form-{lang.Code}")">
+                                            <kw-l key="groups.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
 
         <p class="text-muted">
             Owned by <strong>@Model.OwnerDisplayName</strong>
@@ -399,35 +559,26 @@
                     </form>
 
                     @*
-                        ADR 0026 — group name/description translations. Mirrors
-                        the ADR 0022 post-detail render: the available
-                        translations as expandable chips (native <details>), and
-                        for each supported language lacking a row an "Add a
-                        <lang> translation" form — the latter offered only when
-                        Model.CanTranslate (a plain member never sees it; the
-                        route's standing gate is the real wall).
+                        ADR 0026 — group name/description translations (the
+                        ADR 0082 surface: read-only chips + per-translation
+                        detail; the Edit / Add / Remove lanes moved to the
+                        header ⋮ dropdown, the ADR 0069 / 0071 todo/board
+                        idiom, with the ADR 0071 Bootstrap modal shape).
                     *@
-                    @if (Model.GroupTranslations.Count > 0 || Model.CanTranslate)
+                    @if (Model.GroupTranslations.Count > 0)
                     {
                         <div class="mt-4 border-top pt-3">
                             <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                                 <span class="text-muted small fw-semibold">
                                     <kw-l key="groups.translations_label">Translations</kw-l>
                                 </span>
-                                @if (Model.GroupTranslations.Count == 0)
+                                @foreach (var t in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
                                 {
-                                    <span class="text-muted small"><kw-l key="groups.translations_none">None yet</kw-l></span>
-                                }
-                                else
-                                {
-                                    @foreach (var t in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
-                                    {
-                                        <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
-                                    }
+                                    <span class="badge text-bg-light border">@LangName(t.LanguageCode)</span>
                                 }
                             </div>
 
-                            @foreach (var t in Model.GroupTranslations)
+                            @foreach (var t in Model.GroupTranslations.OrderBy(x => x.LanguageCode))
                             {
                                 <details class="mb-1">
                                     <summary class="btn btn-sm btn-link p-0 text-decoration-none">@LangName(t.LanguageCode)</summary>
@@ -440,79 +591,8 @@
                                         {
                                             <p class="mb-0">@t.Description</p>
                                         }
-
-                                        @* ADR 0048 — edit + remove lane (standing-holders). *@
-                                        @if (Model.CanTranslate)
-                                        {
-                                            <hr class="my-2" />
-                                            <form method="post"
-                                                  action="@($"/groups/{Model.GroupId}/translations/update")">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="languageCode" value="@t.LanguageCode" />
-                                                <label class="form-label small">
-                                                    <kw-l key="groups.translation_name_label">Name</kw-l>
-                                                    <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                                </label>
-                                                <input class="form-control form-control-sm mb-2" name="name"
-                                                       value="@t.Name" />
-                                                <label class="form-label small">
-                                                    <kw-l key="groups.translation_desc_label">Description</kw-l>
-                                                    <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                                </label>
-                                                <textarea class="form-control form-control-sm mb-2"
-                                                          name="description" rows="3" placeholder="…">@t.Description</textarea>
-                                                <div class="form-text mb-2">
-                                                    <kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l>
-                                                </div>
-                                                <button type="submit" class="btn btn-sm btn-primary">
-                                                    <kw-l key="groups.translation_save">Save translation</kw-l>
-                                                </button>
-                                            </form>
-                                            <form method="post"
-                                                  action="@($"/groups/{Model.GroupId}/translations/remove")"
-                                                  class="mt-2" data-confirm="Remove this translation?">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="languageCode" value="@t.LanguageCode" />
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    <kw-l key="posts.translation_remove">Remove</kw-l>
-                                                </button>
-                                            </form>
-                                        }
                                     </div>
                                 </details>
-                            }
-
-                            @if (Model.CanTranslate)
-                            {
-                                @foreach (var lang in missingLanguages)
-                                {
-                                    <details class="mb-1">
-                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                            <kw-l key="groups.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
-                                        </summary>
-                                        <form class="ms-2" method="post"
-                                              action="@($"/groups/{Model.GroupId}/translations")">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="languageCode" value="@lang.Code" />
-                                            <label class="form-label small" for="group-t-name">
-                                                <kw-l key="groups.translation_name_label">Name</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <input class="form-control form-control-sm mb-2" id="group-t-name"
-                                                   name="name" value="@Model.Name" />
-                                            <label class="form-label small" for="group-t-desc">
-                                                <kw-l key="groups.translation_desc_label">Description</kw-l>
-                                                <span class="text-muted">(<kw-l key="groups.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <textarea class="form-control form-control-sm mb-2" id="group-t-desc"
-                                                      name="description" rows="3" placeholder="…">@Model.Description</textarea>
-                                            <div class="form-text mb-2"><kw-l key="groups.translation_min_one">At least one of name or description is required.</kw-l></div>
-                                            <button type="submit" class="btn btn-sm btn-primary">
-                                                <kw-l key="groups.translation_save">Save translation</kw-l>
-                                            </button>
-                                        </form>
-                                    </details>
-                                }
                             }
                         </div>
                     }
