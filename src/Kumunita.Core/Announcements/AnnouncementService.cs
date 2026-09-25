@@ -242,6 +242,7 @@ public sealed class AnnouncementService : IAnnouncementService
                         kind: NotificationKinds.Announcement,
                         idempotencyKey: $"notification:announcement:{announcement.Id}:{member}",
                         body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
                         targetId: communityId,
                         ct: default).ConfigureAwait(false);
                 }
@@ -260,6 +261,7 @@ public sealed class AnnouncementService : IAnnouncementService
                         kind: NotificationKinds.Announcement,
                         idempotencyKey: $"notification:announcement:{announcement.Id}:{p.SubjectId}",
                         body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
                         targetId: targetId,
                         ct: default).ConfigureAwait(false);
                 }
@@ -488,6 +490,7 @@ public sealed class AnnouncementService : IAnnouncementService
                         kind: NotificationKinds.Announcement,
                         idempotencyKey: $"notification:announcement:{announcement.Id}:{member}",
                         body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
                         targetId: communityId,
                         ct: default).ConfigureAwait(false);
                 }
@@ -506,6 +509,7 @@ public sealed class AnnouncementService : IAnnouncementService
                         kind: NotificationKinds.Announcement,
                         idempotencyKey: $"notification:announcement:{announcement.Id}:{p.SubjectId}",
                         body: UgcSnippets.Truncate(announcement.Title),
+                        linkPath: $"/announcements/{announcement.Id}",
                         targetId: targetId,
                         ct: default).ConfigureAwait(false);
                 }

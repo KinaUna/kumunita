@@ -468,7 +468,11 @@
                     string replyAvatarInitial = !string.IsNullOrWhiteSpace(r.AuthorDisplayName)
                         ? char.ToUpperInvariant(r.AuthorDisplayName.TrimStart()[0]).ToString()
                         : string.Empty;
-                    <li class="list-group-item">
+                    @* ADR 0085 — the reply-anchor id (the /posts/{id}#reply-{id}
+                       fragment a notification link carries). The @section Scripts
+                       script below reads location.hash, matches #reply-{id},
+                       scrolls that reply into view, and highlights it. *@
+                    <li class="list-group-item" id="reply-@r.Id">
                         @* TD (ADR 0027) — the reply's authored-in language is the
                            first, default-visible variant; each added translation
                            is a hidden variant; the chip row is a selector that
@@ -920,4 +924,25 @@
        unshipped; RE·3). RE·3: no editor dependency. One include covers
        every .rc-editor root the module finds on the page. *@
     <script type="module" src="~/js/lib/rich-editor.js"></script>
+
+    @* ADR 0085 — the reply-highlight (the /posts/{id}#reply-{id} fragment a
+       content/reply notification link carries). On load, if the URL hash is a
+       reply anchor (#reply-{id}), scroll that reply into view and flash the
+       .reply-highlight CSS (a tinted background + a soft outline that fades).
+       No module import needed — a plain inline script reading location.hash
+       and the DOM. *@
+    <script type="module">
+        (function highlightReplyFromHash() {
+            var hash = window.location.hash || "";
+            if (!hash.startsWith("#reply-")) return;
+            var el = document.getElementById(hash.slice(1));
+            if (!el) return;
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("reply-highlight");
+            // Auto-clear after the flash (the CSS animation owns the fade;
+            // the class removal is the belt-and-suspenders reset so a
+            // re-click can re-trigger it).
+            window.setTimeout(function () { el.classList.remove("reply-highlight"); }, 4000);
+        })();
+    </script>
 }

@@ -17,6 +17,7 @@ public sealed class Notification
     public string? SourceId { get; set; }                      // the stable source id from the idempotency key (the §6.3 table) — display/debug, never a gate
     public string? Subject { get; set; }                       // the localized subject used for the email (the recipient's language, D6); stored for the inbox row's display
     public string? Body { get; set; }                          // the localized body (the recipient's language, D6) with the UGC snippet (the sender's authored language, ADR 0018)
+    public string? LinkPath { get; set; }                      // the same-origin relative path to the item this notification is about (e.g. /posts/{id}#reply-{replyId}); the inbox renders it as a link and the email carries it BaseUrl-prefixed (the VerificationOptions.BaseUrl absolute-link precedent). `null` = no link (non-content kinds, or emitters that predate the field).
 
     public DateTimeOffset Created { get; set; }
     public DateTimeOffset? ReadAt { get; set; }                // `null` = unread (D8 — the "mark all read" set is one bulk update)

@@ -351,6 +351,7 @@ public sealed class PostService
                     kind: NotificationKinds.CommunityPost,
                     idempotencyKey: $"notification:community.post:{post.Id}:{member}",
                     body: UgcSnippets.Truncate(post.Body),
+                    linkPath: $"/posts/{post.Id}",
                     targetId: draft.ComponentId,
                     ct: default).ConfigureAwait(false);
             }
@@ -639,6 +640,8 @@ public sealed class PostService
                     kind: NotificationKinds.PostReply,
                     idempotencyKey: $"notification:post.reply:{reply.Id}",
                     body: TruncateUgcSnippet(reply.Body),
+                    targetId: null,
+                    linkPath: $"/posts/{postId}#reply-{reply.Id}",
                     ct: default).ConfigureAwait(false);
             }
         }
@@ -1343,6 +1346,7 @@ public sealed class PostService
                     kind: NotificationKinds.GroupPost,
                     idempotencyKey: $"notification:group.post:{post.Id}:{member}",
                     body: TruncateUgcSnippet(post.Body),
+                    linkPath: $"/groups/{draft.GroupId}/posts/{post.Id}",
                     targetId: draft.GroupId,
                     ct: default).ConfigureAwait(false);
             }

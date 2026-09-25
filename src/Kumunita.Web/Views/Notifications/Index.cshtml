@@ -197,6 +197,25 @@
                                    TagHelper is platform-copy-only, M·3). *@
                                 <p class="mb-0">@n.Body</p>
                             }
+                            @if (!string.IsNullOrWhiteSpace(n.LinkPath))
+                            {
+                                @* ADR 0085 — the item link (the content/reply
+                                   lane): the stored <c>LinkPath</c> (a same-origin
+                                   relative path like <c>/posts/{id}#reply-{id}</c>)
+                                   rendered as a clickable "View" link. The email
+                                   carries the same link BaseUrl-prefixed
+                                   (absolute); the inbox carries it relative
+                                   (same-origin). Gated on the field being set — a
+                                   kind with no <c>LinkPath</c> (reports, to-dos,
+                                   group add/invite, the account lanes) renders
+                                   nothing here. *@
+                                <p class="mb-0 mt-2">
+                                    <a href="@n.LinkPath" class="small">
+                                        <kw-l key="notifications.view">View</kw-l>
+                                        <span class="text-muted" aria-hidden="true">→</span>
+                                    </a>
+                                </p>
+                            }
                         }
                     </li>
                 }

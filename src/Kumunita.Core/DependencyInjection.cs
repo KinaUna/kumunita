@@ -255,7 +255,16 @@ public static class ServiceCollectionExtensions
             // !IsDevelopment() in Program.cs). GetService (nullable) so a
             // test harness that doesn't register the option degrades to the
             // permissive default (false) via the ctor's null default.
-            sp.GetService<Microsoft.Extensions.Options.IOptions<Notifications.NotificationOptions>>()));
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Notifications.NotificationOptions>>(),
+            // ADR 0085 — the item-link lane: the instance BaseUrl (bound in
+            // Program.cs from the "Verification" section, the M1
+            // verification email's absolute-link precedent) is prefixed onto
+            // each notification's relative LinkPath to form the email's
+            // absolute view link. GetService (nullable) so a test harness
+            // that doesn't register the option degrades to an empty BaseUrl
+            // (the link still renders, just relative) via the ctor's null
+            // default.
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>()));
         return services;
     }
 }

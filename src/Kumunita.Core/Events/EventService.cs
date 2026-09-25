@@ -848,6 +848,8 @@ public sealed class EventService : IEventService
                 kind: NotificationKinds.EventRsvp,
                 idempotencyKey: $"notification:event.rsvp:{rsvp.Id}",
                 body: $"{name} RSVP'd {status}",
+                targetId: null,
+                linkPath: $"/events/{@event.Id}",
                 ct: ct).ConfigureAwait(false);
         }
 

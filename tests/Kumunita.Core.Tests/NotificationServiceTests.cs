@@ -601,7 +601,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.Announcement,
             "notification:announcement:ann-f13:comm-f13",
             "snippet", targetId: "comm-f13",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(row);
@@ -623,7 +623,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.Announcement,
             "notification:announcement:ann-f14:comm-f14",
             "snippet", targetId: "comm-f14",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
@@ -647,7 +647,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.CommunityPost,
             "notification:community.post:post-f15:comm-f15",
             "snippet", targetId: "comm-f15",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
@@ -671,7 +671,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.CommunityPost,
             "notification:community.post:post-f16:comm-f16",
             "snippet", targetId: "comm-f16",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(row);
@@ -691,7 +691,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.PageChild,
             "notification:page.child:page-f17:parent-f17",
             "snippet", targetId: "parent-f17",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(row);
@@ -713,7 +713,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.PageChild,
             "notification:page.child:page-f18:parent-f18",
             "snippet", targetId: "parent-f18",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
@@ -739,7 +739,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.GroupPost,
             "notification:group.post:post-f19:grp-f19",
             "snippet", targetId: "grp-f19",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(row);
@@ -763,7 +763,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             NotificationKinds.GroupPost,
             "notification:group.post:post-f20:grp-f20",
             "snippet", targetId: "grp-f20",
-            TestContext.Current.CancellationToken);
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(row);
@@ -854,6 +854,79 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             rows.Select(r => (r.Kind, r.TargetId)).ToArray());
     }
 
+    // ── ADR 0085 — the item-link lane (the content/reply notification
+    //    surface) ──────────────────────────────────────────────────────────
+    //
+    // When an emitter supplies a <c>LinkPath</c> (a same-origin relative path
+    // like <c>/posts/{id}#reply-{id}</c>), the stored inbox row carries it
+    // verbatim (the inbox renders it as its own clickable "View" link) and the
+    // **email** body has it appended as an **absolute** link (the instance
+    // BaseUrl + the relative path — the
+    // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
+    // precedent, the M1 verification email's one-time-link shape), prefixed by
+    // the localized <c>notifications.view</c> label. A kind with no
+    // <c>LinkPath</c> (the non-content lanes) appends nothing.
+
+    [Fact]
+    public async Task Emit_WithLinkPath_Stores_Relative_Link_And_Appends_Absolute_Link_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string author = "u-adr85-author";
+        await PlantProfile(store, author, "adr85-author@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        const string linkPath = "/posts/post-adr85#reply-reply-adr85";
+        var row = await svc.EmitAsync(session, author,
+            NotificationKinds.PostReply,
+            "notification:post.reply:reply-adr85", "New reply on your post",
+            targetId: null,
+            linkPath: linkPath,
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // A stored row is the contract (the synthetic recipient is not a
+        // sample account and no NotificationOptions is registered, so the
+        // ADR 0078 suppression gate never fires).
+        Assert.NotNull(row);
+        // The inbox row carries the **relative** link verbatim (the inbox
+        // renders it as its own same-origin clickable "View" link).
+        Assert.Equal(linkPath, row!.LinkPath);
+
+        // The email body carries the **absolute** link (BaseUrl + relative
+        // path), prefixed by the localized "view" label — the
+        // RecordingTranslator resolves notifications.view to the key-derived
+        // marker (en floor here).
+        var email = Assert.Single(staged);
+        Assert.Contains("http://localhost:5123" + linkPath, email.Body);
+        Assert.Contains("notifications.view-en", email.Body);
+        Assert.Contains("http://localhost:5123/posts/post-adr85", email.Body);
+    }
+
+    [Fact]
+    public async Task Emit_WithoutLinkPath_Appends_No_Link_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string author = "u-adr85b-author";
+        await PlantProfile(store, author, "adr85b-author@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, author,
+            NotificationKinds.PostReply,
+            "notification:post.reply:reply-adr85b", "New reply on your post",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        // No LinkPath → no link on the row and no link appended to the email.
+        Assert.Null(row!.LinkPath);
+        var email = Assert.Single(staged);
+        Assert.DoesNotContain("http://localhost:5123", email.Body);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -872,7 +945,7 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
     /// </summary>
     private async Task<(IDocumentStore store, NotificationService svc,
         ITranslationProvider translator, List<(string Key, string Recipient, string Subject, string Body)> staged)>
-        BootAsync()
+        BootAsync(string? baseUrl = null)
     {
         var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
         var store = DocumentStore.For(opts =>
@@ -896,7 +969,14 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         userInfo.GetProfileAsync(Arg.Any<string>())
             .Returns(ci => PlantProfileReadAsync(store, (string)ci[0]));
 
-        var svc = new NotificationService(store, userInfo, translator, mailer);
+        // ADR 0085 — the item-link lane: when a BaseUrl is supplied, bind it
+        // to VerificationOptions so the service prefixes each notification's
+        // LinkPath (the email's absolute view link). null = no BaseUrl (the
+        // relative-path fallback the M1 verification link uses).
+        IOptions<Identity.VerificationOptions>? baseUrlOptions = baseUrl is null
+            ? null
+            : Options.Create(new Identity.VerificationOptions { BaseUrl = baseUrl });
+        var svc = new NotificationService(store, userInfo, translator, mailer, null, baseUrlOptions);
         return (store, svc, translator, staged);
     }
 

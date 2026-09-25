@@ -37,13 +37,24 @@ public sealed class NotificationService
     private readonly ITranslationProvider _translator;
     private readonly IMailerStage _mailer;
     private readonly bool _suppressSampleAccounts;
+    // The instance's public base URL (the VerificationOptions.BaseUrl
+    // absolute-link precedent — the M1 verification email builds its link the
+    // same way). Used to turn the same-origin relative LinkPath into the
+    // absolute link the email carries. Absence (null options, e.g. test
+    // harnesses) → empty (the email carries the relative path, a dev-only
+    // shape — a human can still copy it into the browser bar).
+    private readonly string _baseUrl;
 
     public NotificationService(
         IDocumentStore store,
         IUserInfoService userInfo,
         ITranslationProvider translator,
         IMailerStage mailer,
-        IOptions<NotificationOptions>? options = null)
+        IOptions<NotificationOptions>? options = null,
+        // The instance base URL for the email's absolute link. Optional
+        // (CS1736 trailing-param idiom) so the existing test-construction
+        // sites that pass only the four frozen seams keep compiling unchanged.
+        IOptions<Identity.VerificationOptions>? baseUrlOptions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
@@ -54,6 +65,24 @@ public sealed class NotificationService
         // accounts behave like real residents; in Production/Staging they are
         // silently skipped. Absence (null options, e.g. test harnesses) → false.
         _suppressSampleAccounts = options?.Value.SuppressForSampleAccountsInProduction ?? false;
+        _baseUrl = baseUrlOptions?.Value.BaseUrl ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Turn the same-origin relative <paramref name="linkPath"/> into the
+    /// absolute link the email carries, using the instance's public
+    /// <c>BaseUrl</c> (the <see cref="Identity.VerificationOptions.BaseUrl"/>
+    /// absolute-link precedent — the M1 verification email builds its
+    /// one-time link the same way). When <c>BaseUrl</c> is unset (a dev-only
+    /// shape) the relative path is returned as-is — a human reading the mail
+    /// can still copy it into the browser's bar (the same fallback the
+    /// verification link uses). An empty/whitespace <paramref name="linkPath"/>
+    /// returns <see cref="string.Empty"/> (no link to append).
+    /// </summary>
+    private static string AbsoluteLink(string baseUrl, string? linkPath)
+    {
+        if (string.IsNullOrWhiteSpace(linkPath)) return string.Empty;
+        return (baseUrl is string root and not "" ? root.TrimEnd('/') : string.Empty) + linkPath;
     }
 
     /// <summary>
@@ -82,7 +111,7 @@ public sealed class NotificationService
         string idempotencyKey,
         string? body,
         CancellationToken ct = default)
-        => await EmitAsync(session, recipientId, kind, idempotencyKey, body, targetId: null, ct).ConfigureAwait(false);
+        => await EmitAsync(session, recipientId, kind, idempotencyKey, body, targetId: null, linkPath: null, ct).ConfigureAwait(false);
 
     /// <summary>
     /// ADR 0084 — the writer with the per-target subscription gate. Same
@@ -97,7 +126,16 @@ public sealed class NotificationService
     /// and no email, exactly as if the event never happened. <c>null</c> /
     /// empty <paramref name="targetId"/> (legacy emitters, or kinds with no
     /// per-target scope) skips the gate — the kind's existing behavior is
-    /// unchanged.
+    /// unchanged. <paramref name="linkPath"/> is the same-origin relative
+    /// path to the item this notification is about (e.g.
+    /// <c>/posts/{id}#reply-{replyId}</c>): it is stored on the
+    /// <see cref="Notification.LinkPath"/> field (the inbox renders it as a
+    /// clickable link) and appended to the **email** body as an absolute
+    /// link via the instance <c>BaseUrl</c> (the
+    /// <see cref="Identity.VerificationOptions.BaseUrl"/> precedent).
+    /// <c>null</c> / empty <paramref name="linkPath"/> (the non-content
+    /// kinds: reports, to-dos, group add/invite, account lanes) stores no
+    /// link and appends nothing.
     /// </summary>
     public async Task<Notification?> EmitAsync(
         IDocumentSession session,
@@ -105,7 +143,8 @@ public sealed class NotificationService
         string kind,
         string idempotencyKey,
         string? body,
-        string? targetId,
+        string? targetId = null,
+        string? linkPath = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -190,6 +229,10 @@ public sealed class NotificationService
             SourceId = SourceIdFromKey(kind, idempotencyKey),
             Subject = subject,
             Body = composedBody,
+            // The same-origin relative link to the item (stored as-is for the
+            // inbox; the email below appends the instance BaseUrl to make it
+            // absolute). `null` when the emitter didn't provide one.
+            LinkPath = string.IsNullOrWhiteSpace(linkPath) ? null : linkPath,
             Created = DateTimeOffset.UtcNow,
         };
         session.Store(notification);
@@ -220,7 +263,30 @@ public sealed class NotificationService
         //     precedent; the inbox row is the record, D5).
         if (profile is null || string.IsNullOrWhiteSpace(profile.Email))
             return notification;
-        await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, composedBody, ct).ConfigureAwait(false);
+
+        // (5a) The item link (the content/reply notification surface): when
+        //      the emitter supplied a <c>LinkPath</c>, the email carries it
+        //      as an **absolute** link (the instance <c>BaseUrl</c> + the
+        //      same-origin relative path — the
+        //      <see cref="Identity.VerificationOptions.BaseUrl"/> precedent,
+        //      the M1 verification email builds its one-time link the same
+        //      way). A short localized "view" prefix makes the link read
+        //      naturally (the <c>notifications.view</c> key, the en floor
+        //      "View" / de "Ansehen" / fr "Voir" / da "Se"). The link is
+        //      appended **only to the email** — the stored <see
+        //      cref="Notification.Body"/> stays the inbox's localized text +
+        //      UGC snippet (the inbox renders the <c>LinkPath</c> as its own
+        //      clickable link in the view). A kind with no <c>LinkPath</c>
+        //      (the non-content lanes: reports, to-dos, group add/invite,
+        //      account lanes) appends nothing.
+        var emailBody = composedBody;
+        if (!string.IsNullOrWhiteSpace(notification.LinkPath))
+        {
+            var viewPrefix = await _translator.GetAsync("notifications.view", lang).ConfigureAwait(false);
+            emailBody += "\n\n" + viewPrefix + ": " + AbsoluteLink(_baseUrl, notification.LinkPath);
+        }
+
+        await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, emailBody, ct).ConfigureAwait(false);
         return notification;
     }
 
