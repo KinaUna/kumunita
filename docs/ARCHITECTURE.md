@@ -100,7 +100,7 @@ Rationale: ADR 0001 (stack); ADR 0004 (persistence split & schema evolution).
     │   │   ├── Tags/               # ADR 0044 ✓ (TG) — Tag + TagTranslation docs (the ADR 0011 shared-id-doc shape, `Slug` the language-neutral business key) + TagService (attach / translate / list / by-tag / suggest); referenced by the additive Post.TagIds / Page.TagIds fields (ADR 0004 §B.1, zero migrations); a tag is a label, never a gate — the one access-scoped read seam reuses the content's own Read decision (C-TG·1/2/3); see design/tags-design.md
     │   │   ├── Migrations/         # standard EF Core migrations for the `identity` schema only (ADR 0004); not the domain `mt` schema
     │   │   ├── Events/             # M4 ✓ (ADR 0054) — Event + EventRsvp docs + EventService (feed/detail/compose + last-write-wins RSVP) + EventToAuditableResource (reuses the Audience doc + the frozen IAuthorizationService) + the EventReminders §6.4 job (EventReminderService/Handler/Tick over the M1 durable-email trio) + the author ∪ GlobalAdmin standing matrix enforced **server-side** in the EventService (the edit/delete write lanes carry the principal's actorRoles, the AnnouncementService/PageService precedent — the GlobalAdmin override is exercised in the service, not deferred to the Web boundary; the audit row tags the branch: Owner/Admin); gate 2026-09-21: Core 668/668 + Web 351/351, EventControllerTests 19/19, the 23 M4 seam tests green together; re-verified after U13's GlobalAdmin-override seam fix: Core 670/670 + Web 351/351, the 25 M4 seam tests (T01–T25) green together; see design/m4-events-design.md § Run result (M4 acceptance gate — 2026-09-21)
-    │   │   ├── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md
+    │   │   ├── Projects/           # M5 ✓ (ADR 0067) — TodoItem + KanbanBoard + KanbanLane + BoardItemPlacement docs + ProjectService (read / write / placement lanes) + TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource (TargetKind "board"); standing creator ∪ assignee ∪ GlobalAdmin (C-M5·6); see design/m5-projects-design.md; PL ✓ (ADR 0086) — ProjectGoal + Project docs (additive on M5DocTypes, zero migration) + ProjectGoalToAuditableResource (TargetKind "goal") + ProjectToAuditableResource (TargetKind "project") + the IProjectService goal / project / association / delete lanes (standing creator ∪ GlobalAdmin, the ADR 0070 matrix) + the additive ProjectId? feed-filter field on TodoItem + KanbanBoard (never a gate); see design/pl-goals-projects-design.md
     │   │   └── Notifications/      # M6 ✓ (ADR 0076) — Notification + NotificationPreference docs (the M6DocTypes surface) + NotificationService (the EmitAsync writer + the inbox / preference lanes, reusing the M1 durable-email trio, no IAuthorizationService — a personal read, not an AccessAction decision); see design/m6-notifications-design.md
     │   └── Kumunita.Web/           # ASP.NET Core MVC + Razor, server-rendered
     │       ├── Program.cs          # composition root; dev-only MT boot, boot-block in all envs; Wolverine host (UseWolverine, retry/dead-letter policy)
@@ -423,6 +423,31 @@ shipped `Kumunita.Core.Projects.TodoItem` doc carries — design/m5-projects-des
   // in ProjectService; read is each doc's own Audience (C-M5·3); the two adapters
   // are TodoItemToAuditableResource (TargetKind "todo") + KanbanBoardToAuditableResource
   // (TargetKind "board"). A BoardItemPlacement is not itself an auditable resource.
+
+  // PL ✓ (ADR 0086; design/pl-goals-projects-design.md) — the higher-level goals +
+  // projects page on top of M5, additive on this same context + M5DocTypes
+  // (zero migration): a goal is the organizing container; a project points at
+  // its goal (GoalId?) and is what a to-do / board associates to (ProjectId?).
+  ProjectGoal        { id, title, description?, componentId?, authorId, audience, isDeleted,
+                     languageCode, created, modified? }                                          // no dates, no IsDraft, no ProjectId (D2)
+  Project            { id, title, description?, goalId?, status?, startAt?, dueAt?, componentId?,
+                     authorId, audience, isDeleted, languageCode, created, modified? }           // status is a string, not an enum (C-PL·4); dates optional (ADR 0079)
+  // TodoItem + KanbanBoard each gain one additive string? ProjectId (D4) — a feed
+  // filter, never a gate (C-M3·2); their own Audience stays the access boundary.
+  // Standing over a goal / project is creator ∪ GlobalAdmin (ADR 0070, no assignee
+  // branch), re-checked server-side in ProjectService; read is each doc's own
+  // Audience through the two new adapters ProjectGoalToAuditableResource
+  // (TargetKind "goal") + ProjectToAuditableResource (TargetKind "project").
+  // The IProjectService surface gains additively: the goal read / write lanes
+  // (ListGoalsAsync / GetGoalAsync / CreateGoalAsync / UpdateGoalAsync) + the
+  // project read / write lanes (ListProjectsAsync / GetProjectAsync /
+  // ListProjectsForGoalAsync / CreateProjectAsync / UpdateProjectAsync) + the
+  // association lanes (SetTodoProjectAsync / SetBoardProjectAsync + the additive
+  // projectId filter param on ListTodosAsync / ListBoardsAsync) + the delete
+  // lanes (DeleteGoalAsync / DeleteProjectAsync — soft, D6 dangling-association,
+  // no hard delete). M5DocTypes registers the two new docs (indexes:
+  // (ComponentId, Created) on each, GoalId on Project) + the ProjectId indexes
+  // on TodoItem + KanbanBoard.
 
 Localization (ADR 0005 — languages and translations are data, not env)
   LanguageCatalog     { code, nativeName, enabled, sortOrder }                 # one row per supported language
