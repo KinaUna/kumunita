@@ -3021,6 +3021,77 @@ public sealed class ProjectsController : Controller
         return Redirect($"/projects/projects/{id}");
     }
 
+    // ── PL delete lanes (ADR 0086, U09) ─────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/goals/{id}/delete</c> — the **goal soft-delete**
+    /// write lane (the ADR 0024 author-lane shape): sets the goal's
+    /// <see cref="Kumunita.Core.Projects.ProjectGoal.IsDeleted"/> to
+    /// <c>true</c>. **The D6 dangling-association rule (C-PL·6):** the goal's
+    /// projects are **kept** — their <c>GoalId</c> is **not** cleared (the
+    /// association simply dangles; the read lane's 404-on-soft-deleted
+    /// behavior is the filter). **Creator ∪ GlobalAdmin** over the goal
+    /// (C-PL·2) — the service's server-side standing gate; a missing id is
+    /// 404, a denied actor 403 (the C3 split). Redirect-after-POST back to
+    /// the U05 landing (<c>/projects</c>).
+    /// </summary>
+    [HttpPost("/projects/goals/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GoalDelete(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.DeleteGoalAsync(id, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Goal deleted.";
+        return Redirect("/projects");
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}/delete</c> — the **project
+    /// soft-delete** write lane (the ADR 0024 author-lane shape): sets the
+    /// project's <see cref="Kumunita.Core.Projects.Project.IsDeleted"/> to
+    /// <c>true</c>. **The D6 dangling-association rule (C-PL·6):** the
+    /// project's to-dos / boards are **kept** — their <c>ProjectId</c> is
+    /// **not** cleared (the association simply dangles; the read lane's
+    /// 404-on-soft-deleted behavior is the filter). **Creator ∪
+    /// GlobalAdmin** over the project (C-PL·2) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split). Redirect-after-POST back to the U05 landing
+    /// (<c>/projects</c>).
+    /// </summary>
+    [HttpPost("/projects/projects/{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProjectDelete(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.DeleteProjectAsync(id, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Project deleted.";
+        return Redirect("/projects");
+    }
+
     /// <summary>
     /// Seeds the project composer's <b>goal picker</b> (D10) — the actor's
     /// readable, non-deleted <see cref="Kumunita.Core.Projects.ProjectGoal"/>

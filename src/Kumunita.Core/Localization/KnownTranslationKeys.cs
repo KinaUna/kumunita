@@ -1472,6 +1472,10 @@ public static class KnownTranslationKeys
             ["pl.todo.set_project"] = "Set project",
             ["pl.board.project_link"] = "Project",
             ["pl.board.set_project"] = "Set project",
+            ["pl.goal.delete"] = "Delete goal",
+            ["pl.goal.delete_confirm"] = "Delete this goal? Its projects stay in place — the link to this goal simply stops showing.",
+            ["pl.project.delete"] = "Delete project",
+            ["pl.project.delete_confirm"] = "Delete this project? Its to-dos and boards stay in place — the link to this project simply stops showing.",
         };
 
     /// <summary>
@@ -2811,6 +2815,10 @@ public static class KnownTranslationKeys
             ["pl.todo.set_project"] = "Projekt festlegen",
             ["pl.board.project_link"] = "Projekt",
             ["pl.board.set_project"] = "Projekt festlegen",
+            ["pl.goal.delete"] = "Ziel löschen",
+            ["pl.goal.delete_confirm"] = "Dieses Ziel löschen? Seine Projekte bleiben an ihrem Ort — der Link zu diesem Ziel wird einfach nicht mehr angezeigt.",
+            ["pl.project.delete"] = "Projekt löschen",
+            ["pl.project.delete_confirm"] = "Dieses Projekt löschen? Seine To-dos und Boards bleiben an ihrem Ort — der Link zu diesem Projekt wird einfach nicht mehr angezeigt.",
         };
 
     /// <summary>
@@ -4148,6 +4156,10 @@ public static class KnownTranslationKeys
             ["pl.project.todos_empty"] = "Pas encore de tâches dans ce projet.",
             ["pl.project.boards_empty"] = "Pas encore de tableaux dans ce projet.",
             ["pl.project.empty_description"] = "Ce projet n'a pas encore de description.",
+            ["pl.goal.delete"] = "Supprimer l'objectif",
+            ["pl.goal.delete_confirm"] = "Supprimer cet objectif ? Ses projets restent en place — le lien vers cet objectif n'apparaît tout simplement plus.",
+            ["pl.project.delete"] = "Supprimer le projet",
+            ["pl.project.delete_confirm"] = "Supprimer ce projet ? Ses tâches et tableaux restent en place — le lien vers ce projet n'apparaît tout simplement plus.",
             ["pl.todo.project_link"] = "Projet",
             ["pl.todo.set_project"] = "Définir le projet",
             ["pl.board.project_link"] = "Projet",
@@ -5480,6 +5492,10 @@ public static class KnownTranslationKeys
             ["pl.project.goal_link"] = "Mål",
             ["pl.project.associated_heading"] = "To-dos & boards i dette projekt",
             ["pl.project.todos_heading"] = "To-dos i dette projekt",
+            ["pl.goal.delete"] = "Slet mål",
+            ["pl.goal.delete_confirm"] = "Slet dette mål? Dets projekter forbliver, hvor de er — linket til dette mål vises blot ikke længere.",
+            ["pl.project.delete"] = "Slet projekt",
+            ["pl.project.delete_confirm"] = "Slet dette projekt? Dets to-dos og boards forbliver, hvor de er — linket til dette projekt vises blot ikke længere.",
             ["pl.project.boards_heading"] = "Boards i dette projekt",
             ["pl.project.todos_empty"] = "Ingen to-dos i dette projekt endnu.",
             ["pl.project.boards_empty"] = "Ingen boards i dette projekt endnu.",

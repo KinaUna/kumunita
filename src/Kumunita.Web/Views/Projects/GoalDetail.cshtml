@@ -52,16 +52,26 @@
                         }
                     </div>
                 </div>
-                @* The goal's action (the ADR 0070 board-edit precedent): an
-                   Edit link, gated by the CanEdit standing preview (creator ∪
-                   GlobalAdmin — the display-only affordance; the service's
-                   UpdateGoalAsync re-check is the enforcement). A goal has no
-                   delete lane in U06 (the author soft-delete lane ships
-                   separately), so no ⋮ dropdown — a single Edit button. *@
+                @* The goal's actions (the ADR 0070 board-edit precedent): an
+                   Edit link + a Delete form, both gated by the CanEdit
+                   standing preview (creator ∪ GlobalAdmin — the display-only
+                   affordance; the service's UpdateGoalAsync /
+                   DeleteGoalAsync re-check is the enforcement). The delete
+                   form is the BoardDetail.cshtml delete-button shape: a
+                   <form data-confirm="…"> (SECURITY.md §6 no-inline-script —
+                   the confirm.ts module intercepts the submit), never an
+                   onclick on the button. U09 soft-delete lane: the goal's
+                   projects stay in place (D6 — the dangling-association
+                   rule; the goal link simply stops showing). *@
                 @if (Model.CanEdit)
                 {
                     <div class="d-flex align-items-center gap-2">
                         <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/goals/{Model.Id}/edit")"><kw-l key="pl.goal.edit">Edit goal</kw-l></a>
+                        <form method="post" action="@($"/projects/goals/{Model.Id}/delete")"
+                              data-confirm="@("Delete this goal? Its projects stay in place — the link to this goal simply stops showing.")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="pl.goal.delete">Delete goal</kw-l></button>
+                        </form>
                     </div>
                 }
             </div>

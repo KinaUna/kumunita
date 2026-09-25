@@ -609,6 +609,121 @@ frozen), the association is applied **post-create** via the frozen
 swallowed so the create still succeeds (a picker is a display surface, never a
 gate — the C-PL·3 race is handled on the write path, not the read path).
 
+## U09 — soft-delete lanes for goals + projects
+
+The **last code unit** of the PL lane (ADR 0086). U00–U08 shipped green.
+Adds the **soft-delete surface** for goals + projects — the two service
+seams + two implementations + two POST routes + two delete buttons + four
+translation keys × four languages. The shape mirrors the M5
+`DeleteTodoAsync` / `DeleteBoardAsync` author-lane (ADR 0024) verbatim:
+load (404 on absent / soft-deleted) → standing re-check (403 on denied)
+→ `IsDeleted = true` → stamp `Modified` → one `AccessAudit` row → commit
+atomically (C3).
+
+**The two service seams** (`IProjectService`, in a new
+`// --- PL delete lanes (U09) ---` section **after** the U04 association
+section — the goals → projects → association → delete lane invariant):
+
+- `DeleteGoalAsync(string goalId, string actorId,
+  IReadOnlySet<string> actorRoles, CancellationToken ct = default)` —
+  soft-deletes a `ProjectGoal`.
+- `DeleteProjectAsync(string projectId, string actorId,
+  IReadOnlySet<string> actorRoles, CancellationToken ct = default)` —
+  soft-deletes a `Project`.
+
+Both signatures + XML-doc prose mirror M5 `DeleteTodoAsync` /
+`DeleteBoardAsync` (frozen verbatim in design doc §9.3).
+
+**The two implementations** (`ProjectService.cs`, in the `// --- PL
+delete lanes (U09)` section after the association section, before the
+`// ─── Write-lane helpers ───` region):
+
+- `DeleteGoalAsync` — load `ProjectGoal` (404 on null / `IsDeleted`);
+  `CheckGoalStanding` (C-PL·2: creator ∪ GlobalAdmin); **no cascade**
+  (D6 / C-PL·6: the goal's `Project` rows are **kept** — their `GoalId`
+  is **not** cleared; the association simply dangles — the read lane's
+  `GetGoalAsync` 404-on-soft-deleted behavior is the filter); set
+  `IsDeleted = true`; stamp `Modified`; `StoreAuditRow(..., "goal.delete",
+  goal.Id, TargetKindGoal, GoalAuditViaFor(...))`; commit.
+- `DeleteProjectAsync` — same shape over `Project`
+  (`CheckProjectStanding`; the project's `TodoItem` / `KanbanBoard` rows
+  are **kept** — their `ProjectId` is **not** cleared; the read lane's
+  `GetProjectAsync` 404-on-soft-deleted behavior is the filter);
+  `StoreAuditRow(..., "project.delete", project.Id, TargetKindProject,
+  ProjectAuditViaFor(...))`.
+
+**The two POST routes** (`ProjectsController.cs`, in a new `// ── PL
+delete lanes (ADR 0086, U09) ─` section after `ProjectUpdate`, before
+`SeedGoalPickerAsync` — thin HTTP, ADR 0006-D):
+
+- `GoalDelete` — `POST /projects/goals/{id}/delete` +
+  `[ValidateAntiForgeryToken]`. Calls the frozen
+  `DeleteGoalAsync(id, actorId, RoleSet(User), ct)`;
+  `KeyNotFoundException` → `NotFound()` 404,
+  `UnauthorizedAccessException` → `ForbidResult` 403. On success →
+  `TempData["info"] = "Goal deleted."` + `Redirect("/projects")`.
+- `ProjectDelete` — `POST /projects/projects/{id}/delete` (same shape)
+  via the frozen `DeleteProjectAsync`. `TempData["info"] = "Project
+  deleted."` + `Redirect("/projects")`.
+
+**The two delete buttons** (`GoalDetail.cshtml` + `ProjectDetail.cshtml`,
+inside the existing `@if (Model.CanEdit)` block, alongside the Edit link):
+
+- A `<form method="post" action="…/delete" data-confirm="…"
+  style="margin:0;">` + `@Html.AntiForgeryToken()` +
+  `<button type="submit" class="btn btn-sm btn-outline-danger">` — the
+  BoardDetail.cshtml delete-button shape (SECURITY.md §6 no-inline-script
+  — the `confirm.ts` module intercepts the submit and calls
+  `window.confirm`; never an `onclick` on the button). **Deviation note:**
+  the U09.md spec's `onsubmit="return confirm(...)"` wording is **stale**
+  — the repo has migrated to `data-confirm` (the `confirm.ts` module,
+  loaded once in `_Layout.cshtml`); this unit uses `data-confirm` to
+  match the repo truth (SECURITY.md §6 + the ~18-view convention).
+- The `kw-l` TagHelper is used for the **button label** (`pl.goal.delete`
+  / `pl.project.delete`) but **not** for the `data-confirm` text (kw-l
+  renders a `<span>` — `TagMode.StartTagAndEndTag` — which is not safe
+  inside an HTML attribute value; the `data-confirm` text is an inline
+  literal, the same convention as every other `data-confirm` in the repo).
+
+**The four translation keys × four languages** (`KnownTranslationKeys.cs`,
+appended to all four dictionaries — en / de / fr / da parity):
+
+| Key | en |
+|---|---|
+| `pl.goal.delete` | `Delete goal` |
+| `pl.goal.delete_confirm` | `Delete this goal? Its projects stay in place — the link to this goal simply stops showing.` |
+| `pl.project.delete` | `Delete project` |
+| `pl.project.delete_confirm` | `Delete this project? Its to-dos and boards stay in place — the link to this project simply stops showing.` |
+
+The four-language parity pin (`KwLRegistryConsistencyTests`) passes —
+all four keys are present in all four dictionaries.
+
+**Pinned tests** (design doc §9.6 frozen names, all green):
+
+- **Core** (`ProjectServiceTests.cs`): `F8_DeleteGoal_SoftDeletes_ProjectsKept_GoalLinkDangles`
+  (creator / admin delete → `IsDeleted == true`; the goal's project is
+  **kept** with `GoalId` intact; the read lane 404s on the soft-deleted
+  goal; the stranger is 403 with nothing written; one `goal.delete` audit
+  row, `TargetKind = "goal"`);
+  `F8_DeleteProject_SoftDeletes_TodosAndBoardsKept_ProjectLinkDangles`
+  (creator delete → `IsDeleted == true`; the project's to-do + board are
+  **kept** with `ProjectId` intact; the read lane 404s on the
+  soft-deleted project; the stranger is 403 with nothing written; one
+  `project.delete` audit row, `TargetKind = "project"`).
+- **Web** (`ProjectsControllerTests.cs`): `GoalDelete_SoftDeletes_DanglingProjectKept`
+  (success → `Redirect("/projects")` + `TempData["info"]`; 404 →
+  `NotFoundResult`; 403 → `ForbidResult`);
+  `ProjectDelete_SoftDeletes_AssociatedTodosBoardsKept` (same shape over
+  the project seam).
+
+**Verification** (all green):
+
+- `dotnet build Kumunita.slnx -c Debug` — clean (0 errors).
+- `npm --prefix src/Kumunita.Web run build` — clean (tsc, no errors).
+- `Kumunita.Web.Tests` — **445 passed, 0 failed** (in-process runner).
+- `Kumunita.Core.Tests` — **819 passed, 0 failed** (in-process runner,
+  Testcontainers `postgres:18`).
+
 **The view-models** — `Models/ProjectTodoViewModels.cs` +
 `Models/ProjectBoardViewModels.cs`:
 

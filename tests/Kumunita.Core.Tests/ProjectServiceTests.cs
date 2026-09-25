@@ -2026,6 +2026,181 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(2, audits.Count(a => a.Action == "project.update"));
     }
 
+    // ── F8 — the PL delete lane (ADR 0086, design doc §9.6 pins) ────────────
+
+    /// <summary>
+    /// <b>F8</b> (goal soft-delete, the ADR 0024 author-lane shape): the
+    /// creator <see cref="IProjectService.DeleteGoalAsync"/>s successfully
+    /// (<c>IsDeleted = true</c>, <c>Modified</c> stamped, one
+    /// <c>goal.delete</c> audit row with <c>TargetKind = "goal"</c>,
+    /// <c>Via Owner</c>); a GlobalAdmin who is **not** the creator also
+    /// succeeds (the override branch); a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// **The D6 dangling-association rule (C-PL·6):** the goal's
+    /// <see cref="Project"/> is **kept** — its <see cref="Project.GoalId"/>
+    /// is **not** cleared (a *filter, never a gate* — C-M3·2); the association
+    /// simply dangles — the <see cref="IProjectService.GetGoalAsync"/> read
+    /// lane 404s on the now-soft-deleted goal (the read lane's filter).
+    /// </summary>
+    [Fact]
+    public async Task F8_DeleteGoal_SoftDeletes_ProjectsKept_GoalLinkDangles()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f8-goal-creator";
+        const string admin = "u-pl-f8-goal-admin";
+        const string stranger = "u-pl-f8-goal-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f8-goal",
+            AuthorId = creator,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f8-project",
+            AuthorId = creator,
+            Title = "A project under the goal",
+            GoalId = "f8-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteGoalAsync("f8-goal", stranger, MemberRoles));
+        await using (var q0 = store.QuerySession())
+        {
+            var untouched = (await q0.LoadAsync<ProjectGoal>("f8-goal"))!;
+            Assert.False(untouched.IsDeleted);
+        }
+        Assert.Empty(await GoalAuditRows(store, "f8-goal"));
+
+        // The GlobalAdmin (not the creator) has standing (the override branch).
+        await svc.DeleteGoalAsync("f8-goal", admin, GlobalAdminRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var goal = (await q.LoadAsync<ProjectGoal>("f8-goal"))!;
+            Assert.True(goal.IsDeleted);                 // ADR 0024 — the soft-delete flag.
+            Assert.NotNull(goal.Modified);
+
+            // **The D6 dangling-association rule (C-PL·6):** the project is
+            // kept and its GoalId is **not** cleared.
+            var project = (await q.LoadAsync<Project>("f8-project"))!;
+            Assert.False(project.IsDeleted);
+            Assert.Equal("f8-goal", project.GoalId);     // the link dangles.
+        }
+
+        // The read lane 404s on the now-soft-deleted goal (the read lane's
+        // filter — the dangling project's goal link is not rendered).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetGoalAsync("f8-goal", creator));
+
+        // One goal.delete row (C3), the creator's admin override.
+        var audits = await GoalAuditRows(store, "f8-goal");
+        var row = Assert.Single(audits, a => a.Action == "goal.delete");
+        Assert.Equal("goal", row.TargetKind);
+        Assert.Equal("f8-goal", row.TargetId);
+        Assert.Equal(AccessVia.Admin, row.Via);          // the admin override wrote it.
+    }
+
+    /// <summary>
+    /// <b>F8</b> (project soft-delete, the ADR 0024 author-lane shape): the
+    /// creator <see cref="IProjectService.DeleteProjectAsync"/>s successfully
+    /// (<c>IsDeleted = true</c>, <c>Modified</c> stamped, one
+    /// <c>project.delete</c> audit row with <c>TargetKind = "project"</c>,
+    /// <c>Via Owner</c>); a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// **The D6 dangling-association rule (C-PL·6):** the project's
+    /// <see cref="TodoItem"/> / <see cref="KanbanBoard"/> rows are **kept** —
+    /// their <see cref="TodoItem.ProjectId"/> / <see
+    /// cref="KanbanBoard.ProjectId"/> is **not** cleared (a *filter, never a
+    /// gate* — C-M3·2); the associations simply dangle — the <see
+    /// cref="IProjectService.GetProjectAsync"/> read lane 404s on the
+    /// now-soft-deleted project (the read lane's filter).
+    /// </summary>
+    [Fact]
+    public async Task F8_DeleteProject_SoftDeletes_TodosAndBoardsKept_ProjectLinkDangles()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f8-proj-creator";
+        const string stranger = "u-pl-f8-proj-stranger";
+
+        await Plant(store, new Project
+        {
+            Id = "f8-proj",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f8-proj-todo",
+            AuthorId = creator,
+            Title = "A to-do in the project",
+            ProjectId = "f8-proj",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f8-proj-board",
+            AuthorId = creator,
+            Title = "A board in the project",
+            ProjectId = "f8-proj",
+            Created = new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteProjectAsync("f8-proj", stranger, MemberRoles));
+        await using (var q0 = store.QuerySession())
+        {
+            var untouched = (await q0.LoadAsync<Project>("f8-proj"))!;
+            Assert.False(untouched.IsDeleted);
+        }
+        Assert.Empty(await ProjectAuditRows(store, "f8-proj"));
+
+        // The creator has standing (the Owner branch).
+        await svc.DeleteProjectAsync("f8-proj", creator, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            var project = (await q.LoadAsync<Project>("f8-proj"))!;
+            Assert.True(project.IsDeleted);              // ADR 0024 — the soft-delete flag.
+            Assert.NotNull(project.Modified);
+
+            // **The D6 dangling-association rule (C-PL·6):** the to-do + the
+            // board are kept and their ProjectId is **not** cleared.
+            var todo = (await q.LoadAsync<TodoItem>("f8-proj-todo"))!;
+            Assert.False(todo.IsDeleted);
+            Assert.Equal("f8-proj", todo.ProjectId);     // the link dangles.
+
+            var board = (await q.LoadAsync<KanbanBoard>("f8-proj-board"))!;
+            Assert.False(board.IsDeleted);
+            Assert.Equal("f8-proj", board.ProjectId);    // the link dangles.
+        }
+
+        // The read lane 404s on the now-soft-deleted project (the read lane's
+        // filter — the dangling to-do/board's project link is not rendered).
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetProjectAsync("f8-proj", creator));
+
+        // One project.delete row (C3), the creator (the Owner branch).
+        var audits = await ProjectAuditRows(store, "f8-proj");
+        var row = Assert.Single(audits, a => a.Action == "project.delete");
+        Assert.Equal("project", row.TargetKind);
+        Assert.Equal("f8-proj", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);          // the creator wrote it.
+    }
+
     // ── F — the PL association lane (ADR 0086, design doc §9.6 pins) ────────
 
     /// <summary>

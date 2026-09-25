@@ -2706,6 +2706,120 @@ public sealed class ProjectService : IProjectService
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    // --- PL delete lanes (U09) — ADR 0086, the design doc §9.3 surface -------
+    //
+    // The delete lanes mirror the <see cref="DeleteTodoAsync"/> /
+    // <see cref="DeleteBoardAsync"/> shapes on the <see cref="ProjectGoal"/> /
+    // <see cref="Project"/> surface: load (404 on absent / soft-deleted), the
+    // **creator ∪ GlobalAdmin** standing re-check (the
+    // <see cref="CheckGoalStanding"/> / <see cref="CheckProjectStanding"/>
+    // shapes — C-PL·2, the ADR 0070 board-edit precedent), set
+    // <c>IsDeleted = true</c>, stamp <c>Modified</c>, one <see
+    // cref="AccessAudit"/> row per write (C3, <c>TargetKind = "goal"</c> /
+    // <c>"project"</c>). **The D6 dangling-association rule (C-PL·6):** there
+    // is **no cascade** — the goal's projects keep their <c>GoalId</c>, the
+    // project's to-dos / boards keep their <c>ProjectId</c> (the
+    // associations simply dangle; the read lane's
+    // 404-on-soft-deleted behavior is the filter).
+
+    /// <summary>
+    /// **Soft-delete** a goal (the ADR 0024 author-lane shape): sets
+    /// <see cref="ProjectGoal.IsDeleted"/> to <c>true</c>. **The D6
+    /// dangling-association rule (C-PL·6):** the goal's <see cref="Project"/>
+    /// rows are **kept** — their <see cref="Project.GoalId"/> is **not**
+    /// cleared (a *filter, never a gate* — C-M3·2); the association simply
+    /// dangles — the project's goal link is not rendered (the
+    /// <see cref="GetGoalAsync"/> 404-on-soft-deleted behavior is the read
+    /// lane's filter). Standing (server-side, C3): **creator ∪ GlobalAdmin**
+    /// over the goal (the <see cref="CheckGoalStanding"/> shape — C-PL·2;
+    /// the assignee branch does not apply, the ADR 0070 board-edit
+    /// precedent). A missing / soft-deleted goal is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>goal.delete</c>, <c>TargetKind =
+    /// "goal"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task DeleteGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a goal.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to delete.");
+
+        if (goal.IsDeleted)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the **goal**
+        // (C-PL·2): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a goal (the CheckBoardStanding shape).
+        CheckGoalStanding(actorId, actorRoles, goal);
+
+        // **No cascade (D6 / C-PL·6):** the goal's Project rows are kept
+        // intact — their GoalId is not cleared (the dangling-association
+        // rule). Their goal link simply stops rendering: the read lane's
+        // GetGoalAsync 404-on-soft-deleted behavior is the filter.
+        goal.IsDeleted = true;                             // ADR 0024 — the soft-delete flag.
+        goal.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.delete", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// **Soft-delete** a project (the ADR 0024 author-lane shape): sets
+    /// <see cref="Project.IsDeleted"/> to <c>true</c>. **The D6
+    /// dangling-association rule (C-PL·6):** the project's <see
+    /// cref="TodoItem"/> / <see cref="KanbanBoard"/> rows are **kept** —
+    /// their <see cref="TodoItem.ProjectId"/> / <see
+    /// cref="KanbanBoard.ProjectId"/> is **not** cleared (a *filter, never a
+    /// gate* — C-M3·2); the associations simply dangle — a to-do's / board's
+    /// project link is not rendered (the <see cref="GetProjectAsync"/>
+    /// 404-on-soft-deleted behavior is the read lane's filter). Standing
+    /// (server-side, C3): **creator ∪ GlobalAdmin** over the project (the
+    /// <see cref="CheckProjectStanding"/> shape — C-PL·2; the assignee branch
+    /// does not apply, the ADR 0070 board-edit precedent). A missing /
+    /// soft-deleted project is <see cref="KeyNotFoundException"/> (404); a
+    /// denied actor is <see cref="UnauthorizedAccessException"/> (403). One
+    /// <see cref="AccessAudit"/> row (<c>project.delete</c>, <c>TargetKind =
+    /// "project"</c>) commits atomically with the write (C3).
+    /// </summary>
+    public async Task DeleteProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(projectId)) throw new KeyNotFoundException("A project id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+        if (project is null)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to delete.");
+
+        if (project.IsDeleted)
+            throw new KeyNotFoundException($"Project '{projectId}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the
+        // **project** (C-PL·2): creator ∪ GlobalAdmin — the assignee branch
+        // does not apply to a project (the CheckBoardStanding shape).
+        CheckProjectStanding(actorId, actorRoles, project);
+
+        // **No cascade (D6 / C-PL·6):** the project's TodoItem / KanbanBoard
+        // rows are kept intact — their ProjectId is not cleared (the
+        // dangling-association rule). Their project link simply stops
+        // rendering: the read lane's GetProjectAsync 404-on-soft-deleted
+        // behavior is the filter.
+        project.IsDeleted = true;                          // ADR 0024 — the soft-delete flag.
+        project.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(project);
+        StoreAuditRow(session, actorId, "project.delete", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
     // ─── Write-lane helpers (C3 audit row + ADR 0018 language floor) ───
 
     /// <summary>The <see cref="AccessAudit"/> <c>TargetKind</c> for to-do rows — the exact

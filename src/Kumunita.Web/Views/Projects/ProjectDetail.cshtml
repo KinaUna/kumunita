@@ -78,16 +78,27 @@
                         }
                     </div>
                 </div>
-                @* The project's action (the ADR 0070 board-edit precedent): an
-                   Edit link, gated by the CanEdit standing preview (creator ∪
-                   GlobalAdmin — the display-only affordance; the service's
-                   UpdateProjectAsync re-check is the enforcement). No delete
-                   lane in U07 (the author soft-delete lane ships separately),
-                   so a single Edit button. *@
+                @* The project's actions (the ADR 0070 board-edit precedent):
+                   an Edit link + a Delete form, both gated by the CanEdit
+                   standing preview (creator ∪ GlobalAdmin — the display-only
+                   affordance; the service's UpdateProjectAsync /
+                   DeleteProjectAsync re-check is the enforcement). The
+                   delete form is the BoardDetail.cshtml delete-button shape:
+                   a <form data-confirm="…"> (SECURITY.md §6 no-inline-script
+                   — the confirm.ts module intercepts the submit), never an
+                   onclick on the button. U09 soft-delete lane: the
+                   project's to-dos / boards stay in place (D6 — the
+                   dangling-association rule; the project link simply stops
+                   showing). *@
                 @if (Model.CanEdit)
                 {
                     <div class="d-flex align-items-center gap-2">
                         <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/projects/{Model.Id}/edit")"><kw-l key="pl.project.edit">Edit project</kw-l></a>
+                        <form method="post" action="@($"/projects/projects/{Model.Id}/delete")"
+                              data-confirm="@("Delete this project? Its to-dos and boards stay in place — the link to this project simply stops showing.")" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="pl.project.delete">Delete project</kw-l></button>
+                        </form>
                     </div>
                 }
             </div>

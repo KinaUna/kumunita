@@ -1537,6 +1537,114 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Null(danglingVm.ProjectTitle);
     }
 
+    // ── PL delete lanes (U09 — ADR 0086 / the design doc §9.6 Web names) ─────
+
+    /// <summary>
+    /// <c>POST /projects/goals/{id}/delete</c>: the thin-HTTP boundary (ADR
+    /// 0006-D) — the controller passes the actor's real role set to the frozen
+    /// <c>IProjectService.DeleteGoalAsync</c> seam verbatim, maps the service's
+    /// <see cref="KeyNotFoundException"/> to a clean <see
+    /// cref="NotFoundResult"/> (the C3 404) and its <see
+    /// cref="UnauthorizedAccessException"/> to a clean <see
+    /// cref="ForbidResult"/> (the C3 403), and on success sets
+    /// <c>TempData["info"] = "Goal deleted."</c> + redirects to the U05
+    /// landing (<c>/projects</c>). The D6 dangling-association rule (the
+    /// goal's projects keep their <c>GoalId</c>) is a **service-level**
+    /// concern pinned in Core — this layer only pins the redirect /
+    /// call-log / C3-split mapping.
+    /// </summary>
+    [Fact]
+    public async Task GoalDelete_SoftDeletes_DanglingProjectKept()
+    {
+        const string actor = "subj-goal-delete-actor";
+        const string goalId = "goal-delete";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.GoalDelete(goalId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/projects", redirect.Url);
+        Assert.Equal("Goal deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteGoalAsync(
+            goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing / soft-deleted goal is a clean
+        // NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no goal")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.GoalDelete(goalId));
+
+        // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
+        // clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteGoalAsync(
+                goalId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        Assert.IsType<ForbidResult>(await deniedController.GoalDelete(goalId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}/delete</c>: the thin-HTTP boundary
+    /// (ADR 0006-D) — the controller passes the actor's real role set to the
+    /// frozen <c>IProjectService.DeleteProjectAsync</c> seam verbatim, maps
+    /// the service's <see cref="KeyNotFoundException"/> to a clean <see
+    /// cref="NotFoundResult"/> (the C3 404) and its <see
+    /// cref="UnauthorizedAccessException"/> to a clean <see
+    /// cref="ForbidResult"/> (the C3 403), and on success sets
+    /// <c>TempData["info"] = "Project deleted."</c> + redirects to the U05
+    /// landing (<c>/projects</c>). The D6 dangling-association rule (the
+    /// project's to-dos / boards keep their <c>ProjectId</c>) is a
+    /// **service-level** concern pinned in Core — this layer only pins the
+    /// redirect / call-log / C3-split mapping.
+    /// </summary>
+    [Fact]
+    public async Task ProjectDelete_SoftDeletes_AssociatedTodosBoardsKept()
+    {
+        const string actor = "subj-project-delete-actor";
+        const string projectId = "project-delete";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.ProjectDelete(projectId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/projects", redirect.Url);
+        Assert.Equal("Project deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteProjectAsync(
+            projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing / soft-deleted project is a clean
+        // NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectDelete(projectId));
+
+        // The C3 403 split: a denied actor (not creator ∪ GlobalAdmin) is a
+        // clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteProjectAsync(
+                projectId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor, roles: []);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectDelete(projectId));
+    }
+
     // ── Shared scaffolding ────────────────────────────────────────────────────
 
     /// <summary>

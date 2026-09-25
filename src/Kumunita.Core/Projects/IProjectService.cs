@@ -545,6 +545,45 @@ public interface IProjectService
     /// </summary>
     Task<KanbanBoard> SetBoardProjectAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
 
+    // --- PL delete lanes (U09) — additive on the frozen M5 surface (ADR 0086) ---
+    //
+    // **Delete lanes (U09):**
+
+    /// <summary>
+    /// **Soft-delete** a goal — sets <c>IsDeleted = true</c> (the ADR 0024
+    /// author-lane shape). **The D6 dangling-association rule (C-PL·6):**
+    /// the goal's <see cref="Project"/> rows are **kept** — their
+    /// <see cref="Project.GoalId"/> is **not** cleared (a *filter, never a
+    /// gate* — C-M3·2); the association simply **dangles**: the project's
+    /// goal link is not rendered (the <see cref="GetGoalAsync"/>
+    /// 404-on-soft-deleted behavior is the read lane's filter). **Creator ∪
+    /// GlobalAdmin** over the goal (C-PL·2 — the ADR 0070 board-edit
+    /// precedent, re-checked server-side). A missing / soft-deleted goal is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>goal.delete</c>, <c>TargetKind =
+    /// "goal"</c>) is stored in the caller's session (C3).
+    /// </summary>
+    Task DeleteGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// **Soft-delete** a project — sets <c>IsDeleted = true</c> (the ADR 0024
+    /// author-lane shape). **The D6 dangling-association rule (C-PL·6):**
+    /// the project's <see cref="TodoItem"/> / <see cref="KanbanBoard"/> rows
+    /// are **kept** — their <see cref="TodoItem.ProjectId"/> /
+    /// <see cref="KanbanBoard.ProjectId"/> is **not** cleared (a *filter,
+    /// never a gate* — C-M3·2); the associations simply **dangle**: the
+    /// to-do's / board's project link is not rendered (the
+    /// <see cref="GetProjectAsync"/> 404-on-soft-deleted behavior is the
+    /// read lane's filter). **Creator ∪ GlobalAdmin** over the project
+    /// (C-PL·2, re-checked server-side). A missing / soft-deleted project is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>project.delete</c>, <c>TargetKind =
+    /// "project"</c>) is stored in the caller's session (C3).
+    /// </summary>
+    Task DeleteProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
     // --- Placement + reorder lanes (U06) ------------------------------------
 
     /// <summary>
