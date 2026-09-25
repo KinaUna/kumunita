@@ -64,6 +64,29 @@ public static class SampleDataSeeder
     public const string TranslatorPassword = "Trans123!";
     public const string ResidentPassword = "Resident123!";
 
+    /// <summary>
+    /// The code-owned, closed set of sample-account e-mail addresses (ADR 0078).
+    /// Every account <see cref="SeedAsync"/> creates is identified by one of these
+    /// addresses; the set is the single source of truth the notification
+    /// suppression gate (<c>NotificationService.EmitAsync</c>,
+    /// <c>NotificationOptions.SuppressForSampleAccountsInProduction</c>) compares a
+    /// recipient's profile e-mail against in production. A recipient is a sample
+    /// account when — and only when — their e-mail (case-insensitive, trimmed) is a
+    /// member of this set. The four residents, the scoped moderator, the translator,
+    /// and the seed admin are all covered.
+    /// </summary>
+    public static readonly IReadOnlySet<string> SampleAccountEmails =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            AdminEmail,        // admin@examplium.com
+            ModeratorEmail,    // moderator@examplium.com
+            TranslatorEmail,   // translator@examplium.com
+            "anna@examplium.com",
+            "ben@examplium.com",
+            "carla@examplium.com",
+            "david@examplium.com",
+        };
+
     private static readonly IReadOnlySet<string> GlobalAdminRoles =
         new HashSet<string> { Roles.GlobalAdmin };
 

@@ -1,7 +1,9 @@
+using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.UserInfo;
 using Marten;
+using Microsoft.Extensions.Options;
 
 namespace Kumunita.Core.Notifications;
 
@@ -34,17 +36,24 @@ public sealed class NotificationService
     private readonly IUserInfoService _userInfo;
     private readonly ITranslationProvider _translator;
     private readonly IMailerStage _mailer;
+    private readonly bool _suppressSampleAccounts;
 
     public NotificationService(
         IDocumentStore store,
         IUserInfoService userInfo,
         ITranslationProvider translator,
-        IMailerStage mailer)
+        IMailerStage mailer,
+        IOptions<NotificationOptions>? options = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _translator = translator ?? throw new ArgumentNullException(nameof(translator));
         _mailer = mailer ?? throw new ArgumentNullException(nameof(mailer));
+        // ADR 0078 — the host binds SuppressForSampleAccountsInProduction to
+        // !IsDevelopment() in Program.cs; in Development (Mailpit) sample
+        // accounts behave like real residents; in Production/Staging they are
+        // silently skipped. Absence (null options, e.g. test harnesses) → false.
+        _suppressSampleAccounts = options?.Value.SuppressForSampleAccountsInProduction ?? false;
     }
 
     /// <summary>
@@ -62,9 +71,11 @@ public sealed class NotificationService
     /// a no-op (no second inbox row, no second email). The key itself is the
     /// **emitter's** responsibility (D4) — a stable, content-derived
     /// <c>notification:{kind}:{stable-source-id}</c> string (the §6.3 table).
-    /// Returns the stored (or pre-existing) row.
+    /// Returns the stored (or pre-existing) row, or <c>null</c> when the
+    /// recipient is a sample account in a production environment (ADR 0078 —
+    /// the suppression gate: no inbox row, no email, no side effects).
     /// </summary>
-    public async Task<Notification> EmitAsync(
+    public async Task<Notification?> EmitAsync(
         IDocumentSession session,
         string recipientId,
         string kind,
@@ -100,6 +111,25 @@ public sealed class NotificationService
         //     resolves the templates via <see cref="ITranslationProvider"/>
         //     and appends the UGC content.
         var profile = await _userInfo.GetProfileAsync(recipientId).ConfigureAwait(false);
+
+        // (2a) ADR 0078 — sample-account suppression gate (production only).
+        //      The host binds this to !IsDevelopment(); in Development the
+        //      flag is false so sample accounts behave like real residents
+        //      (Mailpit collects their mail). In Production / Staging the
+        //      flag is true and any recipient whose profile e-mail matches a
+        //      code-owned sample address (SampleDataSeeder.SampleAccountEmails)
+        //      is a no-op: no inbox row stored, no email staged, no
+        //      translation lookup. The gate is a pure return-null — the
+        //      caller's transaction is unaffected (the caller still runs its
+        //      own SaveChangesAsync for the domain write it is performing).
+        if (_suppressSampleAccounts
+            && profile is not null
+            && !string.IsNullOrWhiteSpace(profile.Email)
+            && SampleDataSeeder.SampleAccountEmails.Contains(profile.Email.Trim()))
+        {
+            return null;   // ADR 0078 — sample account in production: suppress
+        }
+
         var lang = profile?.EmailLanguage;                    // the ADR 0061 per-recipient resolution input
         var subject = await _translator.GetAsync($"notification.{kind}.subject", lang).ConfigureAwait(false);
         var bodyTemplate = await _translator.GetAsync($"notification.{kind}.body", lang).ConfigureAwait(false);

@@ -341,6 +341,13 @@ builder.Services.Configure<SeedAdminOptions>(
 // never carry it, so the seeder is unreachable by construction.
 builder.Services.Configure<SampleDataOptions>(
     builder.Configuration.GetSection(SampleDataOptions.SectionName));
+// ADR 0078 — sample-account notification suppression: in Development the flag
+// stays false (Mailpit collects the mail, sample accounts behave like real
+// residents); in Production / Staging it is true and the
+// NotificationService.EmitAsync writer is a no-op for any recipient whose
+// profile e-mail is in SampleDataSeeder.SampleAccountEmails.
+builder.Services.Configure<Kumunita.Core.Notifications.NotificationOptions>(o =>
+    o.SuppressForSampleAccountsInProduction = !builder.Environment.IsDevelopment());
 builder.Services.Configure<VerificationOptions>(
     builder.Configuration.GetSection(VerificationOptions.SectionName));
 // The per-attempt SMTP seam (SmtpSender) binds these per-instance from the SMTP

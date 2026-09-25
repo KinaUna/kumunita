@@ -1,10 +1,12 @@
 using Kumunita.Core;
 using Kumunita.Core.Authorization;
+using Kumunita.Core.Bootstrap;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
 using Kumunita.Core.UserInfo;
 using Marten;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Xunit;
 
@@ -452,6 +454,104 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("BODY-de " + snippet, row.Body);
     }
 
+    // ── ADR 0078 — sample-account suppression gate ────────────────────────────
+    //
+    // When SuppressForSampleAccountsInProduction is true (the Production /
+    // Staging host binding) and the recipient's profile e-mail is a code-owned
+    // sample address, EmitAsync is a complete no-op: returns null, stores no
+    // row, stages no email, and does not even call the ITranslationProvider.
+    // When the flag is false (the Development binding, or a test harness that
+    // does not register the option), a sample account is treated like any
+    // other resident.
+
+    [Fact]
+    public async Task Emit_SampleAccount_Returns_Null_Stores_No_Row_Stages_No_Email_When_Flag_True()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            M1DocTypes.Configure(opts);
+            M3DocTypes.Configure(opts);
+            M6DocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(Task.FromResult("ignored"));
+
+        var (mailer, staged) = RecordingMailer();
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci => PlantProfileReadAsync(store, (string)ci[0]));
+
+        // The production binding: suppress sample accounts.
+        var svc = new NotificationService(store, userInfo, translator, mailer,
+            Options.Create(new NotificationOptions { SuppressForSampleAccountsInProduction = true }));
+
+        const string sampleRecipient = "u-0078-anna";
+        await PlantProfile(store, sampleRecipient, "anna@examplium.com", emailLanguage: "de");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, sampleRecipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-0078", "snippet", TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(row);
+        Assert.Equal(0, await CountNotifications(store, sampleRecipient));
+        Assert.Empty(staged);
+    }
+
+    [Fact]
+    public async Task Emit_SampleAccount_Stores_Row_When_Flag_False()
+    {
+        var conn = await fixture.NewDatabaseAsync(TestContext.Current.CancellationToken);
+        var store = DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<KumunitaFeature>();
+            opts.Storage.Add<AuthorizationFeature>();
+            M1DocTypes.Configure(opts);
+            M3DocTypes.Configure(opts);
+            M6DocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(
+            null, null, TestContext.Current.CancellationToken);
+
+        var translator = Substitute.For<ITranslationProvider>();
+        translator.GetAsync(Arg.Any<string>(), Arg.Any<string?>())
+            .Returns(ci => Task.FromResult((string)ci[0]));
+
+        var (mailer, staged) = RecordingMailer();
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetProfileAsync(Arg.Any<string>())
+            .Returns(ci => PlantProfileReadAsync(store, (string)ci[0]));
+
+        // The Development binding (or absent option): flag false, sample
+        // accounts behave like real residents.
+        var svc = new NotificationService(store, userInfo, translator, mailer,
+            Options.Create(new NotificationOptions { SuppressForSampleAccountsInProduction = false }));
+
+        const string sampleRecipient = "u-0078-ben";
+        await PlantProfile(store, sampleRecipient, "ben@examplium.com", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, sampleRecipient,
+            NotificationKinds.PostReply, "notification:post.reply:reply-0078b", "snippet", TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(1, await CountNotifications(store, sampleRecipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("ben@examplium.com", email.Recipient);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -577,7 +677,11 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         var row = await svc.EmitAsync(session, recipientId, kind, key, body,
             TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
-        return row;
+        // ADR 0078 — EmitAsync returns null only for a sample account in a
+        // production environment; these harnesses register no
+        // NotificationOptions (flag defaults false) and use synthetic
+        // recipients, so a stored row is the contract here.
+        return row!;
     }
 
     private static async Task<int> CountNotifications(IDocumentStore store, string recipientId)

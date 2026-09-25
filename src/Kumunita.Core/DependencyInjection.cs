@@ -240,7 +240,12 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<Marten.IDocumentStore>(),
             sp.GetRequiredService<IUserInfoService>(),
             sp.GetRequiredService<Localization.ITranslationProvider>(),
-            sp.GetRequiredService<IMailerStage>()));
+            sp.GetRequiredService<IMailerStage>(),
+            // ADR 0078 — the sample-account suppression flag (host-bound to
+            // !IsDevelopment() in Program.cs). GetService (nullable) so a
+            // test harness that doesn't register the option degrades to the
+            // permissive default (false) via the ctor's null default.
+            sp.GetService<Microsoft.Extensions.Options.IOptions<Notifications.NotificationOptions>>()));
         return services;
     }
 }
