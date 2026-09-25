@@ -18,9 +18,11 @@
     };
     var activeLabel = action switch
     {
-        "ProjectsIndex" => "Projects", // the PL landing (U05) + the goal/project detail actions (U06/U07)
-        "BoardsIndex"   => "Boards",
-        _               => "To-dos",
+        // the PL landing (U05) + the goal + project authoring actions (U06/U07)
+        "ProjectsIndex" or "GoalDetail" or "GoalNew" or "GoalEdit" or
+        "ProjectDetail" or "ProjectNew" or "ProjectEdit" => "Projects",
+        "BoardsIndex" => "Boards",
+        _             => "To-dos",
     };
 }
 <ul class="nav nav-tabs mb-4" role="tablist">

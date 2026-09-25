@@ -1036,6 +1036,266 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(deniedResult);
     }
 
+    /// <summary>
+    /// <c>GET /projects/projects/{id}</c>: the detail loads the project
+    /// (audience gate = the service's <see cref="IProjectService
+    /// .GetProjectAsync"/>), the D10 goal link (only when <c>GoalId</c> is set
+    /// and the goal is readable + non-deleted), and the associated to-dos /
+    /// boards (the U04 <c>projectId</c> feed filter, C-PL·3). A missing project
+    /// is a clean <see cref="NotFoundResult"/> (C3 404), a denied actor a clean
+    /// <see cref="ForbidResult"/> (C3 403).
+    /// </summary>
+    [Fact]
+    public async Task Project_Detail_ShowsProjectGoalAndAssociatedItems()
+    {
+        const string actor = "subj-project-detail";
+        const string projectId = "project-detail";
+        const string goalId = "goal-detail";
+
+        var goal = new ProjectGoal
+        {
+            Id = goalId, Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+        var project = new Project
+        {
+            Id = projectId, Title = "Project", AuthorId = actor, GoalId = goalId,
+            Status = "In progress",
+            StartAt = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero),
+            DueAt = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero),
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+        var todo = new TodoItem
+        {
+            Id = "todo-detail", Title = "Task", AuthorId = actor, ProjectId = projectId,
+            Created = new DateTimeOffset(2026, 1, 2, 9, 0, 0, TimeSpan.Zero),
+        };
+        var board = new KanbanBoard
+        {
+            Id = "board-detail", Title = "Board", AuthorId = actor, ProjectId = projectId,
+            Created = new DateTimeOffset(2026, 1, 3, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
+        projects.GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>()).Returns(goal);
+        projects.ListTodosAsync(null, null, actor, 1, unassignedOnly: false, projectId: projectId, ct: Arg.Any<CancellationToken>())
+            .Returns(new List<TodoItem> { todo });
+        projects.ListBoardsAsync(null, actor, 1, projectId: projectId, ct: Arg.Any<CancellationToken>())
+            .Returns(new List<KanbanBoard> { board });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectDetail(projectId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectDetailViewModel>(view.ViewData.Model);
+        Assert.Equal(projectId, vm.Id);
+        Assert.Equal("Project", vm.Title);
+        Assert.Equal("In progress", vm.Status);
+        Assert.True(vm.CanEdit); // the actor is the creator — the standing preview.
+        // D10 goal link — the readable, non-deleted goal is linked.
+        Assert.Equal(goalId, vm.GoalId);
+        Assert.Equal("Goal", vm.GoalTitle);
+        // The U04 associated items (the projectId feed filter).
+        Assert.Single(vm.Todos);
+        Assert.Equal("todo-detail", vm.Todos[0].Id);
+        Assert.Equal("Task", vm.Todos[0].Title);
+        Assert.Single(vm.Boards);
+        Assert.Equal("board-detail", vm.Boards[0].Id);
+        Assert.Equal("Board", vm.Boards[0].Title);
+
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+        await projects.Received(1).GetGoalAsync(goalId, actor, Arg.Any<CancellationToken>());
+        await projects.Received(1).ListTodosAsync(null, null, actor, 1, unassignedOnly: false, projectId: projectId, ct: Arg.Any<CancellationToken>());
+        await projects.Received(1).ListBoardsAsync(null, actor, 1, projectId: projectId, ct: Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectDetail(projectId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectDetail(projectId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects</c>: a valid shape writes through the frozen
+    /// seam's <see cref="IProjectService.CreateProjectAsync"/> (the audience
+    /// <see cref="AudienceEditorModel.BuildAudience()"/> is the single
+    /// deserialization site) and redirects to the new project's detail with
+    /// <c>TempData["info"] = "Project created."</c>; a blank title is a form
+    /// error (the seam is never called — a malformed shape, not a silent blank
+    /// row); a denied actor is a form error re-rendering the composer.
+    /// </summary>
+    [Fact]
+    public async Task Project_Create_RedirectsToDetail()
+    {
+        const string actor = "subj-project-create";
+        var created = new Project
+        {
+            Id = "project-created", Title = "Project", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.CreateProjectAsync(
+                actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(created);
+        var controller = Build(projects, subjectId: actor);
+
+        var model = new ProjectComposerViewModel
+        {
+            Title = "Project",
+            Description = "body",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var result = await controller.ProjectCreate(model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/projects/{created.Id}", redirect.Url);
+        Assert.Equal("Project created.", controller.TempData["info"] as string);
+        await projects.Received(1).CreateProjectAsync(
+            actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: actor);
+        var blankModel = new ProjectComposerViewModel
+        {
+            Title = "   ",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        var blankResult = await blankController.ProjectCreate(blankModel);
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .CreateProjectAsync(Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A denied actor is a form error (the C3 403 → re-render split), not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.CreateProjectAsync(
+                Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<CreateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        var deniedModel = new ProjectComposerViewModel
+        {
+            Title = "Project",
+            Audience = new AudienceEditorModel { Mode = "Any", Grants = "[]" },
+        };
+        Assert.IsType<ViewResult>(await deniedController.ProjectCreate(deniedModel));
+    }
+
+    /// <summary>
+    /// <c>GET /projects/projects/{id}/edit</c>: the edit form round-trips the
+    /// project's <c>Title</c> / <c>Description</c> (the ADR 0070 full-update
+    /// shape) + the D10 <c>GoalId</c> / <c>Status</c> / <c>StartAt</c> /
+    /// <c>DueAt</c> (the audience / component / language are creation-time
+    /// choices, not editable here); the <see cref="NotFoundResult"/> /
+    /// <see cref="ForbidResult"/> C3 split is the controller's.
+    /// </summary>
+    [Fact]
+    public async Task Project_Edit_RendersFields()
+    {
+        const string actor = "subj-project-edit";
+        const string projectId = "project-edit";
+        var start = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        var due = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero);
+
+        var project = new Project
+        {
+            Id = projectId, Title = "Project", Description = "the body", AuthorId = actor,
+            GoalId = "goal-edit", Status = "Doing", StartAt = start, DueAt = due,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>()).Returns(project);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.ProjectEdit(projectId);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectComposerViewModel>(view.ViewData.Model);
+        Assert.Equal("Project", vm.Title);
+        Assert.Equal("the body", vm.Description);
+        Assert.Equal("goal-edit", vm.GoalId);
+        Assert.Equal("Doing", vm.Status);
+        Assert.Equal(start, vm.StartAt);
+        Assert.Equal(due, vm.DueAt);
+        Assert.Equal(projectId, (string)view.ViewData["projectId"]!);
+        await projects.Received(1).GetProjectAsync(projectId, actor, Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing project is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new KeyNotFoundException("no project")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.ProjectEdit(projectId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.GetProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectEdit(projectId));
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}</c>: a valid update (Title +
+    /// Description + the D10 GoalId / Status / dates) writes through the
+    /// frozen seam's <see cref="IProjectService.UpdateProjectAsync"/> and
+    /// redirects back to the project with
+    /// <c>TempData["info"] = "Project updated."</c>; a blank title is a form
+    /// error (the seam is never called); a **non-creator** actor is a clean
+    /// <see cref="ForbidResult"/> (the C3 403 split — the standing gate is the
+    /// service's, the controller surfaces it as the ForbidResult).
+    /// </summary>
+    [Fact]
+    public async Task Project_Update_RedirectsOr403()
+    {
+        const string creator = "subj-project-upd-creator";
+        const string other = "subj-project-upd-other";
+        const string projectId = "project-upd";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.UpdateProjectAsync(
+                projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new Project { Id = projectId, Title = "New title" });
+        var controller = Build(projects, subjectId: creator);
+
+        var model = new ProjectComposerViewModel { Title = "New title", Description = "new body", Status = "Done" };
+        var result = await controller.ProjectUpdate(projectId, model);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/projects/{projectId}", redirect.Url);
+        Assert.Equal("Project updated.", controller.TempData["info"] as string);
+        await projects.Received(1).UpdateProjectAsync(
+            projectId, creator, Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A blank title is a form error: the seam is never called at all.
+        var blankProjects = Substitute.For<IProjectService>();
+        var blankController = Build(blankProjects, subjectId: creator);
+        var blankResult = await blankController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "   " });
+        Assert.IsType<ViewResult>(blankResult);
+        await blankProjects.DidNotReceive()
+            .UpdateProjectAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>());
+
+        // A non-creator (no GlobalAdmin role) is a clean ForbidResult — the
+        // service's standing gate, surfaced by the controller as the C3 403.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.UpdateProjectAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>(), Arg.Any<UpdateProjectRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<Project>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: other, roles: []);
+        var deniedResult = await deniedController.ProjectUpdate(projectId, new ProjectComposerViewModel { Title = "New title" });
+        Assert.IsType<ForbidResult>(deniedResult);
+    }
+
     // ── Shared scaffolding ────────────────────────────────────────────────────
 
     /// <summary>

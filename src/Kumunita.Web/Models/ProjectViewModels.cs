@@ -287,3 +287,276 @@ public sealed class GoalComposerViewModel
         }
     }
 }
+
+/// <summary>
+/// One <see cref="Kumunita.Core.Projects.TodoItem"/> in the **project
+/// detail's "to-dos in this project" section** (the <c>GET
+/// /projects/projects/{id}</c> surface — the <see cref="Kumunita.Core.Projects
+/// .IProjectService.ListTodosAsync"/> feed narrowed by the U04 <c>projectId</c>
+/// filter, the PL lane ADR 0086 D4 / C-PL·3). A *feed filter, never a gate* —
+/// the to-do's own <c>Audience</c> is the access boundary (C-M5·3), so the
+/// service's <c>CanSeeAsync(Read)</c> already ran; this card is display-only.
+/// <para>
+/// The M5 <see cref="TodoRow"/> card shape, minus the board placement (not
+/// shown on the project detail): <see cref="Title"/> (the card label),
+/// <see cref="Status"/> (the nullable string state label — C-M5·4, a string
+/// not an enum; rendered verbatim as a badge), the ADR 0079 optional <see
+/// cref="StartAt"/> / <see cref="DueAt"/> pair (the <kw-dt> TagHelper renders
+/// them in the effective timezone, gated on non-null), and the <see
+/// cref="AuthorId"/> / <see cref="AuthorDisplayName"/> /
+/// <see cref="Created"/> provenance. <see cref="AuthorDisplayName"/> is a
+/// **read** lookup (never an access decision) falling back to the raw id.
+/// </para>
+/// </summary>
+public sealed record ProjectAssociatedTodoCard(
+    string Id,
+    string Title,
+    string? Status,
+    string AuthorId,
+    string AuthorDisplayName,
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt,
+    DateTimeOffset Created);
+
+/// <summary>
+/// One <see cref="Kumunita.Core.Projects.KanbanBoard"/> in the **project
+/// detail's "boards in this project" section** (the <c>GET
+/// /projects/projects/{id}</c> surface — the <see cref="Kumunita.Core.Projects
+/// .IProjectService.ListBoardsAsync"/> feed narrowed by the U04 <c>projectId</c>
+/// filter, the PL lane ADR 0086 D4 / C-PL·3). A *feed filter, never a gate* —
+/// the board's own <c>Audience</c> is the access boundary (C-M5·3), so the
+/// service's <c>CanSeeAsync(Read)</c> already ran; this card is display-only.
+/// <para>
+/// The M5 <see cref="BoardRow"/> card shape: <see cref="Title"/> (the board
+/// label), the optional <see cref="DescriptionHtml"/> (pre-rendered through
+/// the one <see cref="Kumunita.Web.Security.MarkdownRenderer"/> — ADR 0025;
+/// <c>null</c> when the board has no description — the view omits the block,
+/// rendered with <c>Html.Raw</c>, never <c>@</c>), and the <see
+/// cref="AuthorId"/> / <see cref="AuthorDisplayName"/> / <see cref="Created"/>
+/// provenance. <see cref="AuthorDisplayName"/> is a **read** lookup (never an
+/// access decision) falling back to the raw id.
+/// </para>
+/// </summary>
+public sealed record ProjectAssociatedBoardCard(
+    string Id,
+    string Title,
+    string? DescriptionHtml,
+    string AuthorId,
+    string AuthorDisplayName,
+    DateTimeOffset Created);
+
+/// <summary>
+/// The **project detail** view model (the <c>GET /projects/projects/{id}</c>
+/// read surface — the <see cref="Kumunita.Core.Projects.Project"/> doc fields
+/// + the <b>goal link</b> (D10) + the **associated to-dos / boards** list
+/// (D10 / C-PL·3), the U07 / ADR 0086 lane; the M5
+/// <see cref="BoardDetailViewModel"/> / the U06 <see
+/// cref="GoalDetailViewModel"/> header shape — title + status-line, the
+/// description block, the <see cref="CanEdit"/> standing preview, the
+/// <see cref="Kumunita.Web.Security.MarkdownRenderer"/>-rendered body).
+/// <para>
+/// **<see cref="DescriptionHtml"/>** is the project's optional Markdown body
+/// pre-rendered to an HTML fragment through the one
+/// <see cref="Kumunita.Web.Security.MarkdownRenderer"/> (the ADR 0025 shape);
+/// <c>null</c> / empty input renders <c>null</c> (the view omits the block and
+/// shows the <c>pl.project.empty_description</c> hint). Safe, sanitized HTML —
+/// rendered with <c>Html.Raw</c>, never with <c>@</c>.
+/// </para>
+/// <para>
+/// **<see cref="Status"/>** is the project's nullable state label (C-PL·4 —
+/// a string, **not** an enum; <c>null</c> = none — the C-M5·4 pin carried
+/// over; rendered verbatim as a badge). **<see cref="StartAt"/> /
+/// <see cref="DueAt"/>** are the ADR 0079 optional dates (C-PL·5;
+/// <c>null</c> = no date) — display metadata; the <kw-dt> TagHelper renders
+/// them in the effective timezone and the view gates each label on non-null.
+/// </para>
+/// <para>
+/// **<see cref="GoalId"/> / <see cref="GoalTitle"/>** are the **goal link**
+/// (D10): present together when the project has a non-null <c>GoalId</c>
+/// **and** the target goal is non-deleted + readable by the actor (the
+/// controller loads it through the frozen <see cref="Kumunita.Core.Projects
+/// .IProjectService.GetGoalAsync"/> seam — a denied / missing goal leaves both
+/// <c>null</c>, and the view omits the link entirely). <see
+/// cref="GoalTitle"/> is the goal's <c>Title</c> for the link label (a **read**
+/// — the goal's own audience gate already ran in <c>GetGoalAsync</c>).
+/// </para>
+/// <para>
+/// **<see cref="Todos"/>** + **<see cref="Boards"/>** are the project's
+/// associated to-dos / boards the actor may read (the
+/// <see cref="Kumunita.Core.Projects.IProjectService.ListTodosAsync"/> /
+/// <see cref="Kumunita.Core.Projects.IProjectService.ListBoardsAsync"/> feeds
+/// narrowed by the <c>projectId</c> filter — the U04 association; a feed
+/// filter, **never a gate** — C-PL·3; the to-do / board's own <c>Audience</c>
+/// decision is the access boundary, so a denied item is dropped, not the whole
+/// set). Each card links to its <c>/projects/todos/{id}</c> /
+/// <c>/projects/boards/{id}</c> detail.
+/// </para>
+/// <para>
+/// **<see cref="CanEdit"/>** is the **standing preview** (creator ∪
+/// GlobalAdmin — C-PL·2, the ADR 0070 board-edit precedent) — a
+/// **display-only** mirror of the service's server-side standing re-check in
+/// <see cref="Kumunita.Core.Projects.IProjectService.UpdateProjectAsync"/>
+/// (the frozen ADR 0006 split: the service is the enforcement, the
+/// controller's flag is the affordance).
+/// </para>
+/// </summary>
+public sealed record ProjectDetailViewModel(
+    string Id,
+    string Title,
+    string? DescriptionHtml,
+    string? Status,
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt,
+    string AuthorId,
+    string AuthorDisplayName,
+    string? ComponentId,
+    string? ComponentDisplayName,
+    string LanguageCode,
+    /// <summary>
+    /// true when the project's <see cref="Kumunita.Core.Authorization
+    /// .Audience"/> is <c>null</c> (public — visible to everyone; the ADR
+    /// 0001-B / 0036 shape). The view renders the <c>pl.project
+    /// .audience_public</c> / <c>pl.project.audience_restricted</c> line from
+    /// this flag (a display surface, never a gate — the audience decision
+    /// already ran in the service's <c>GetProjectAsync</c> entry gate).
+    /// </summary>
+    bool IsPublicAudience,
+    /// <summary>The associated <c>GoalId</c> (D10). <c>null</c> when the
+    /// project is standalone (<c>GoalId == null</c>) or the goal is
+    /// soft-deleted / unreadable by the actor (both leave it <c>null</c> — the
+    /// view omits the goal link).</summary>
+    string? GoalId,
+    /// <summary>The goal's <c>Title</c> for the link label — present iff
+    /// <see cref="GoalId"/> is non-null (D10). A **read** (the goal's audience
+    /// gate already ran in <c>GetGoalAsync</c>).</summary>
+    string? GoalTitle,
+    IReadOnlyList<ProjectAssociatedTodoCard> Todos,
+    IReadOnlyList<ProjectAssociatedBoardCard> Boards,
+    bool CanEdit,
+    DateTimeOffset Created,
+    DateTimeOffset? Modified);
+
+/// <summary>
+/// The **project composer** form model — shared by **both** the
+/// <c>GET /projects/projects/new</c> + <c>POST /projects/projects</c> lanes
+/// (the composer's creation-time choices are the full <see
+/// cref="Kumunita.Core.Projects.CreateProjectRequest"/> shape — the U07
+/// lane, ADR 0086).
+/// <para>
+/// <list type="bullet">
+/// <item><see cref="Title"/> — the project's label (non-empty — the
+/// <see cref="Kumunita.Core.Projects.CreateProjectRequest.Title"/> row).</item>
+/// <item><see cref="Description"/> — optional Markdown (a project is usable
+/// title-only; the one <c>MarkdownRenderer</c> / <c>bindRichEditor</c>,
+/// ADR 0025 / 0031); a blank value clears it to <c>null</c>.</item>
+/// <item><see cref="GoalId"/> — the optional goal to hang off (D10); empty /
+/// unset is <c>null</c> = standalone. The **goal picker** (the actor's
+/// readable, non-deleted goals) is <see cref="Goals"/> — a <b>display</b>
+/// surface, never a gate (the service's <c>GoalId</c> guard on create is the
+/// enforcement, the C3 split).</item>
+/// <item><see cref="Status"/> — the optional state label (C-PL·4 — a string,
+/// not an enum; <c>null</c> = none); a blank value clears it.</item>
+/// <item><see cref="StartAt"/> / <see cref="DueAt"/> — the ADR 0079 optional
+/// dates (C-PL·5); bound from <c>type="datetime-local"</c> inputs; blank →
+/// <c>null</c> (no date).</item>
+/// <item><see cref="ComponentId"/> — a feed organizer (C-M3·2: a filter,
+/// never a gate).</item>
+/// <item><see cref="Audience"/> — the M2 reusable
+/// <see cref="AudienceEditorModel"/> (the single-source pin;
+/// <see cref="AudienceEditorModel.BuildAudience()"/> is the one
+/// deserialization site; ADR 0001-B) — the **sole** access boundary on the
+/// form.</item>
+/// <item><see cref="LanguageCode"/> — the authored-in tag (ADR 0018).</item>
+/// </list>
+/// </para>
+/// </summary>
+public sealed class ProjectComposerViewModel
+{
+    /// <summary>The project's display label (the feed's title — the
+    /// <see cref="Kumunita.Core.Projects.Project.Title"/> row). Required.</summary>
+    [Required(ErrorMessage = "A title is required.")]
+    public string? Title { get; set; }
+
+    /// <summary>The project's optional rich description (Markdown — the one
+    /// <see cref="Kumunita.Web.Security.MarkdownRenderer"/>, edited by the
+    /// one <c>bindRichEditor</c>; a project is usable title-only; a blank
+    /// value clears it).</summary>
+    public string? Description { get; set; }
+
+    /// <summary>The optional goal to organize this project under (D10);
+    /// empty / unset is <c>null</c> = standalone. The <see cref="Goals"/>
+    /// picker is a display surface, never a gate — the service's <c>GoalId</c>
+    /// guard on create is the enforcement (the C3 split).</summary>
+    public string? GoalId { get; set; }
+
+    /// <summary>The optional state label (C-PL·4 — a string, **not** an enum;
+    /// <c>null</c> = none; the project's vocabulary is whatever the author
+    /// names it); a blank value clears it.</summary>
+    public string? Status { get; set; }
+
+    /// <summary>The optional start date (ADR 0079; <c>null</c> = no date).
+    /// Bound from a <c>type="datetime-local"</c> input; a blank field posts
+    /// <c>null</c>.</summary>
+    public DateTimeOffset? StartAt { get; set; }
+
+    /// <summary>The optional due date (ADR 0079; <c>null</c> = no date).
+    /// Bound from a <c>type="datetime-local"</c> input; a blank field posts
+    /// <c>null</c>.</summary>
+    public DateTimeOffset? DueAt { get; set; }
+
+    /// <summary>The feed organizer (a <c>Component</c> id) — a
+    /// <b>filter, never a gate</b> (C-M3·2).</summary>
+    public string? ComponentId { get; set; }
+
+    /// <summary>The project's **audience** editor — the M2 reusable
+    /// <see cref="AudienceEditorModel"/> (the single-source pin; the
+    /// **sole** access boundary on the form — the <see cref="ComponentId"/> is
+    /// a filter, never a gate; ADR 0001-B).</summary>
+    public AudienceEditorModel Audience { get; set; } = new();
+
+    /// <summary>The authored-in language (ADR 0018); empty/unset is
+    /// materialized from the instance default server-side at write time.</summary>
+    public string? LanguageCode { get; set; }
+
+    /// <summary>The composer's **goal picker** options — the actor's readable,
+    /// non-deleted <see cref="Kumunita.Core.Projects.ProjectGoal"/> set (the
+    /// <c>ListGoalsAsync</c> feed at page 1). A **display** surface, never a
+    /// gate (the service's <c>GoalId</c> guard is the enforcement).
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="GoalId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Goals { get; set; } = [];
+
+    /// <summary>The composer's language *picker* options — the instance's
+    /// **enabled** catalog, ordered by <c>SortOrder</c> (the
+    /// <c>SeedLanguagePickerAsync</c> seed). <b>[BindNever]</b> — the form
+    /// POSTs a <see cref="LanguageCode"/>, not a catalog-list shape.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Code, string NativeName)> Languages { get; set; } = [];
+
+    /// <summary>The composer's component *picker* options — the enabled
+    /// <c>Component</c> set (the <c>SeedComponentPickerAsync</c> seed).
+    /// <b>[BindNever]</b> — the form POSTs a <see cref="ComponentId"/>.</summary>
+    [BindNever]
+    public IReadOnlyList<(string Id, string Name)> Components { get; set; } = [];
+
+    /// <summary>
+    /// true when the model is well-formed for a round-trip. <see
+    /// cref="Title"/> is required (a project with no title is a malformed
+    /// shape, not a silent blank row); <see cref="Audience"/> is well-formed
+    /// (the editor's <see cref="AudienceEditorModel.IsValid"/> — a missing mode
+    /// is a malformed post, not a silent default — C1). The <see cref="GoalId"/>
+    /// / <see cref="Status"/> / dates are optional (a project is usable with
+    /// any of them blank).
+    /// </summary>
+    public bool IsValid
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Title))
+                return false;
+            if (Audience is null || !Audience.IsValid)
+                return false;
+            return true;
+        }
+    }
+}

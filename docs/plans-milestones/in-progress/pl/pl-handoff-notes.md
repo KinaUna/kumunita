@@ -413,3 +413,144 @@ src/Kumunita.Web run build` (tsc) clean — no new TS this unit. **Guardrails
 held:** no service changes, no detail views / pickers / delete (U06–U09),
 the goal / project detail + `new` hrefs ship inert. Not committed / staged /
 moved (U10's close does the move).
+
+## U07 — project authoring surface (detail + composer + edit)
+
+Shipped on top of U06 (the goal authoring surface) and U03–U04 (the project
+*service* + association lanes, already green). U07 adds the three project
+surfaces the M5 lane never had, the D10 **goal picker** + **Status** +
+**Start/Due** fields + the **goal link** + the **associated to-dos/boards**
+list on detail, plus the `pl.project.*` keys and their tests. Nothing
+M5-route is touched (regression pins still green); no commit/stage/move
+(U10's close does the move). **Web-only** — the `IProjectService` project
+lanes (ADR 0086) are frozen and already shipped; U07 is the Web surface on
+top of them.
+
+**The five actions** — `ProjectsController` (`/projects`), in this order
+after `GoalUpdate`:
+
+- `ProjectDetail` — `GET /projects/projects/{id}`. `GetProjectAsync` →
+  `KeyNotFoundException` → `NotFound` (404) / `UnauthorizedAccessException` →
+  `ForbidResult` (403) (the C3 split). The **goal link** (D10) is a
+  display-surface read: only when the project has a non-empty `GoalId` is
+  `GetGoalAsync` called; a `KeyNotFoundException` (soft-deleted, D6/C-PL·6
+  dangling-association) or `UnauthorizedAccessException` leaves both `GoalId`
+  / `GoalTitle` null so the view omits the link — **not** a 404/403 for the
+  project itself (the project was already loaded). The **associated to-dos**
+  (`ListTodosAsync(..., projectId: id)`) + **boards**
+  (`ListBoardsAsync(..., projectId: id)`) are the U04 feed filter (C-PL·3, a
+  feed filter never a gate), both unpaged (page 1, the small per-parent list
+  precedent). `CanEdit = creator ∪ GlobalAdmin` is **display-only** (the
+  service's `UpdateProjectAsync` standing re-check is the enforcement, ADR
+  0006).
+- `ProjectNew` — `GET /projects/projects/new`. Seeds the audience trio, the
+  authored-in language picker (ADR 0018), the component picker, the **goal
+  picker** (D10 — the actor's readable, non-deleted goals, a display surface
+  never a gate), and the grant-picker option lists.
+- `ProjectCreate` — `POST /projects/projects` + `[ValidateAntiForgeryToken]`.
+  `IsValid` (non-empty Title + `Audience.IsValid`); `BuildAudience()` is the
+  single deserialization site (ADR 0001-B). On success →
+  `Redirect("/projects/projects/{id}")` + `TempData["info"] = "Project
+  created."`; `UnauthorizedAccessException` → re-render `ProjectNew` (form
+  error, not a 500); `KeyNotFoundException` → `NotFound` (404).
+- `ProjectEdit` — `GET /projects/projects/{id}/edit`. `GetProjectAsync`
+  (C3); sets `ViewData["projectId"]`; pre-fills **Title + Description +
+  GoalId + Status + StartAt + DueAt** (the D10 editable surface). The
+  creation-time choices (audience / community / language) are **not** shown
+  (ADR 0070).
+- `ProjectUpdate` — `POST /projects/projects/{id}` +
+  `[ValidateAntiForgeryToken]`. Builds `UpdateProjectRequest` (Title +
+  Description + GoalId/Status/StartAt/DueAt); the goal picker's empty choice
+  is the **`ClearGoal`** explicit un-goal (D10). C3 split; on success →
+  `Redirect("/projects/projects/{id}")` + `TempData["info"] = "Project
+  updated."`; `ArgumentException` (a blank-title 400) → re-render `ProjectEdit`.
+- Private `SeedGoalPickerAsync()` — `ListGoalsAsync(null, actor, 1)` at page
+  1 (component-unfiltered), `[]` on `KeyNotFoundException` /
+  `UnauthorizedAccessException`; sorted by name (the `SeedComponentPickerAsync`
+  shape).
+
+**The two view-models** — `Models/ProjectViewModels.cs`:
+
+- `ProjectAssociatedTodoCard(Id, Title, Status?, AuthorId, AuthorDisplayName,
+  StartAt?, DueAt?, Created)` and `ProjectAssociatedBoardCard(Id, Title,
+  DescriptionHtml?, AuthorId, AuthorDisplayName, Created)` — the detail's
+  associated-item cards.
+- `ProjectDetailViewModel(Id, Title, DescriptionHtml?, Status?, StartAt?,
+  DueAt?, AuthorId, AuthorDisplayName, ComponentId?, ComponentDisplayName?,
+  LanguageCode, IsPublicAudience, GoalId?, GoalTitle?, Todos, Boards, CanEdit,
+  Created, Modified?)`.
+- `ProjectComposerViewModel` — `[Required] Title`, `Description?`, `GoalId?`,
+  `Status?`, `StartAt?`, `DueAt?`, `ComponentId?`, `AudienceEditorModel
+  Audience`, `LanguageCode?`, + `[BindNever]` `Goals` / `Languages` /
+  `Components` picker lists. `IsValid` = non-empty Title + `Audience.IsValid`.
+
+**The three views** — `Views/Projects/`:
+
+- `ProjectDetail.cshtml` — header (back link → `/projects`, title, author ·
+  Created/Modified/Start/Due via `kw-dt` (Start/Due gated on non-null, ADR
+  0079), verbatim status badge, component badge, **goal link** →
+  `/projects/goals/{id}` (only when `GoalId` + `GoalTitle` present), audience
+  public/restricted line); Edit button (gated on `CanEdit`); description card
+  (`Html.Raw(DescriptionHtml)`, else `pl.project.empty_description`);
+  "To-dos in this project" (cards → `/projects/todos/{id}`, empty state
+  `pl.project.todos_empty`); "Boards in this project" (cards →
+  `/projects/boards/{id}`, empty state `pl.project.boards_empty`);
+  `_ProjectsTabs` partial.
+- `ProjectNew.cshtml` — Title, Body (`rc-editor`), **goal picker**
+  (when `Goals.Count > 0`; empty option = a standalone project,
+  `projects.board.status.none` "None" — the copy-paste "All communities"
+  label was the one bug this unit fixed), Status + Start/Due
+  (`datetime-local`), community picker (when `Components.Count > 0`), language
+  picker, audience trio (`CommunityVisible` switch + `Any`/`All` radios +
+  `_GrantPickers`), submit `pl.project.create`, POST `/projects/projects`.
+  Scripts: `rich-editor.js` + `_GrantPickerScripts`.
+- `ProjectEdit.cshtml` — mirrors the goal edit: Title + Body + **goal picker**
+  + Status + Start/Due only (ADR 0070 + D10), POST
+  `/projects/projects/@(ViewData["projectId"])`, submit `pl.project.save`,
+  cancel back to the project detail. Scripts: `rich-editor.js`.
+
+**The `pl.project.*` keys** (all four languages — en/de/fr/da, 26 keys):
+`new_heading`, `new_lede`, `create`, `edit_heading`, `edit_lead`, `save`,
+`edit`, `title_hint`, `description_hint`, `status`, `status_hint`, `start_date`,
+`due_date`, `dates_hint`, `audience_heading`, `audience_public`,
+`audience_restricted`, `goal_heading`, `goal_hint`, `goal_link`,
+`associated_heading`, `todos_heading`, `boards_heading`, `todos_empty`,
+`boards_empty`, `empty_description`. Each appended to **all four**
+`KnownTranslationKeys` dictionaries immediately after its `pl.goal.*` block;
+the four-language parity pin (Core) passes. The detail view reuses the shared
+`projects.board.status.none` / `projects.todo.*` / `common.*` / `nav.*` /
+`rc.*` keys (already present), so no new keys were needed for those surfaces.
+
+**`_ProjectsTabs.cshtml`** — the Projects tab is now active for the PL
+authoring actions: the `activeLabel` switch gains `"GoalDetail" or "GoalNew"
+or "GoalEdit" or "ProjectDetail" or "ProjectNew" or "ProjectEdit"` alongside
+`"ProjectsIndex"` (previously the `Goal*` / `Project*` detail actions fell
+through to the "To-dos" default until this unit).
+
+**Tests** — `tests/Kumunita.Web.Tests/ProjectsControllerTests.cs` (4 new pins
+mirroring the 4 goal pins, before the shared scaffolding):
+
+- `Project_Detail_ShowsProjectGoalAndAssociatedItems` — the detail VM's
+  project + D10 goal link + associated to-dos/boards (the U04 `projectId`
+  filter); C3 404 + 403 splits asserted.
+- `Project_Create_RedirectsToDetail` — valid shape → `CreateProjectAsync`
+  seam + `Redirect("/projects/projects/{id}")` + `TempData["info"]`; blank
+  title → form error (seam never called); denied actor → re-render.
+- `Project_Edit_RendersFields` — the edit VM pre-fills Title / Description /
+  GoalId / Status / StartAt / DueAt + `ViewData["projectId"]`; C3 404 + 403
+  splits asserted.
+- `Project_Update_RedirectsOr403` — valid update → `UpdateProjectAsync` seam +
+  redirect + `TempData["info"]`; blank title → form error (seam never
+  called); non-creator (no GlobalAdmin) → `ForbidResult` (the C3 403, the
+  service's standing gate).
+
+**M5-route-untouched + goal-surface regression:** the existing M5
+`ProjectsControllerTests` pins and the four U06 goal pins pass unmodified —
+no M5 action / view / route / key changed, no goal action touched. **Tests
+pass:** `Kumunita.Web.Tests` — `Total: 439, Errors: 0, Failed: 0` (435 + 4 new
+project pins); `Kumunita.Core.Tests` — `Total: 817, Errors: 0, Failed: 0`
+(including the four-language `kw-l` pin). **Builds clean:** `dotnet build
+Kumunita.slnx -c Debug` succeeds with only the pre-existing
+`BoardDetail.cshtml` CS8600 warning (the allowed one); `npm --prefix
+src/Kumunita.Web run build` (tsc) clean — no new TS this unit. Not committed /
+staged / moved — U10's close does the move.

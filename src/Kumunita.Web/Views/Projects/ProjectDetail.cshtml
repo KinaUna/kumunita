@@ -1,0 +1,202 @@
+@model Kumunita.Web.Models.ProjectDetailViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Project" : Model.Title;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <p>
+            <a href="/projects" class="btn btn-link p-0 kanban-back"><kw-l key="pl.index.title">Projects</kw-l></a>
+        </p>
+
+        <header class="airy-head">
+            <div class="head-row">
+                <div>
+                    <h1>
+                        @if (string.IsNullOrWhiteSpace(Model.Title))
+                        {
+                            <span class="text-body-tertiary"><kw-l key="pl.project.new_heading">New project</kw-l></span>
+                        }
+                        else
+                        {
+                            @Model.Title
+                        }
+                    </h1>
+                    <div class="text-muted small mt-1">
+                        @Model.AuthorDisplayName
+                        <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                        <kw-dt dt="@Model.Created" format="g"></kw-dt></span>
+                        @if (Model.Modified is not null)
+                        {
+                            <span> · <kw-l key="projects.todo.modified">Modified</kw-l>
+                            <kw-dt dt="@Model.Modified" format="g"></kw-dt></span>
+                        }
+                        @if (Model.StartAt is not null)
+                        {
+                            <span> · <kw-l key="pl.project.start_date">Start</kw-l>
+                            <kw-dt dt="@Model.StartAt" format="d"></kw-dt></span>
+                        }
+                        @if (Model.DueAt is not null)
+                        {
+                            <span> · <kw-l key="pl.project.due_date">Due</kw-l>
+                            <kw-dt dt="@Model.DueAt" format="d"></kw-dt></span>
+                        }
+                        @if (Model.Status is not null)
+                        {
+                            <span class="badge text-bg-light border ms-2">@Model.Status</span>
+                        }
+                        @if (Model.ComponentDisplayName is not null)
+                        {
+                            <span class="badge text-bg-light border ms-2">@Model.ComponentDisplayName</span>
+                        }
+                    </div>
+                    @* The goal link (D10): present only when the project has a
+                       GoalId and the target goal is non-deleted + readable by the
+                       actor — both GoalId + GoalTitle are null otherwise, and the
+                       link is omitted entirely (the dangling-association rule —
+                       D6 / C-PL·6; a denied goal is a hidden link, not a 403). *@
+                    @if (Model.GoalId is not null && Model.GoalTitle is not null)
+                    {
+                        <div class="text-muted small mt-1">
+                            <kw-l key="pl.project.goal_link">Goal</kw-l>:
+                            <a href="@($"/projects/goals/{Model.GoalId}")">@Model.GoalTitle</a>
+                        </div>
+                    }
+                    @* The audience line (the project's Audience is `null` = public
+                       — ADR 0001-B / 0036). A display surface, never a gate —
+                       the audience decision already ran in the service's
+                       GetProjectAsync entry gate. *@
+                    <div class="text-muted small mt-1">
+                        @if (Model.IsPublicAudience)
+                        {
+                            <kw-l key="pl.project.audience_public">Visible to everyone on the instance.</kw-l>
+                        }
+                        else
+                        {
+                            <kw-l key="pl.project.audience_restricted">Restricted to the audience grants below.</kw-l>
+                        }
+                    </div>
+                </div>
+                @* The project's action (the ADR 0070 board-edit precedent): an
+                   Edit link, gated by the CanEdit standing preview (creator ∪
+                   GlobalAdmin — the display-only affordance; the service's
+                   UpdateProjectAsync re-check is the enforcement). No delete
+                   lane in U07 (the author soft-delete lane ships separately),
+                   so a single Edit button. *@
+                @if (Model.CanEdit)
+                {
+                    <div class="d-flex align-items-center gap-2">
+                        <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/projects/{Model.Id}/edit")"><kw-l key="pl.project.edit">Edit project</kw-l></a>
+                    </div>
+                }
+            </div>
+        </header>
+
+        @* The project's body — pre-rendered through the one MarkdownRenderer
+           (ADR 0025; the rendered detail body, not the WYSIWYG rc-editor).
+           A blank description shows the empty-description hint instead. *@
+        <div class="card mb-4">
+            <div class="card-body rc-body">
+                @if (Model.DescriptionHtml is not null)
+                {
+                    @Html.Raw(Model.DescriptionHtml)
+                }
+                else
+                {
+                    <p class="text-muted mb-0"><kw-l key="pl.project.empty_description">This project has no description yet.</kw-l></p>
+                }
+            </div>
+        </div>
+
+        @* The associated to-dos in this project (the U04 projectId feed
+           filter — C-PL·3, a feed filter, never a gate; a denied to-do is
+           dropped, not the whole set; **unpaged** — the small per-parent
+           list precedent). Each card links to its /projects/todos/{id} detail. *@
+        <section class="mb-5">
+            <h2><kw-l key="pl.project.todos_heading">To-dos in this project</kw-l></h2>
+            @if (Model.Todos.Count == 0)
+            {
+                <div class="kanban-board-empty p-4 text-muted border rounded">
+                    <kw-l key="pl.project.todos_empty">No to-dos are in this project yet.</kw-l>
+                </div>
+            }
+            else
+            {
+                <div class="airy-ann-list">
+                    @foreach (var card in Model.Todos)
+                    {
+                        <div class="airy-ann-row">
+                            <div>
+                                <h3 class="airy-ann-title">
+                                    <a href="@($"/projects/todos/{card.Id}")">@card.Title</a>
+                                </h3>
+                                <div class="text-muted small mb-1">
+                                    @card.AuthorDisplayName
+                                    <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                                    <kw-dt dt="@card.Created" format="g"></kw-dt></span>
+                                    @if (card.StartAt is not null)
+                                    {
+                                        <span> · <kw-l key="pl.project.start_date">Start</kw-l>
+                                        <kw-dt dt="@card.StartAt" format="d"></kw-dt></span>
+                                    }
+                                    @if (card.DueAt is not null)
+                                    {
+                                        <span> · <kw-l key="pl.project.due_date">Due</kw-l>
+                                        <kw-dt dt="@card.DueAt" format="d"></kw-dt></span>
+                                    }
+                                    @if (card.Status is not null)
+                                    {
+                                        <span class="badge text-bg-light border ms-2">@card.Status</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        @* The associated boards in this project (the U04 projectId feed
+           filter — C-PL·3, a feed filter, never a gate; a denied board is
+           dropped, not the whole set; **unpaged** — the small per-parent
+           list precedent). Each card links to its /projects/boards/{id} detail. *@
+        <section class="mb-5">
+            <h2><kw-l key="pl.project.boards_heading">Boards in this project</kw-l></h2>
+            @if (Model.Boards.Count == 0)
+            {
+                <div class="kanban-board-empty p-4 text-muted border rounded">
+                    <kw-l key="pl.project.boards_empty">No boards are in this project yet.</kw-l>
+                </div>
+            }
+            else
+            {
+                <div class="airy-ann-list">
+                    @foreach (var card in Model.Boards)
+                    {
+                        <div class="airy-ann-row">
+                            <div>
+                                <h3 class="airy-ann-title">
+                                    <a href="@($"/projects/boards/{card.Id}")">@card.Title</a>
+                                </h3>
+                                <div class="text-muted small mb-1">
+                                    @card.AuthorDisplayName
+                                    <span>· <kw-l key="projects.todo.created">Created</kw-l>
+                                    <kw-dt dt="@card.Created" format="g"></kw-dt></span>
+                                </div>
+                                @if (card.DescriptionHtml is not null)
+                                {
+                                    <div class="markdown mb-2">@Html.Raw(card.DescriptionHtml)</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
+           idiom) — the project detail is part of the /projects section. *@
+        <partial name="_ProjectsTabs" />
+    </div>
+</div>

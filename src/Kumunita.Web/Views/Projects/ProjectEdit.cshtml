@@ -1,0 +1,121 @@
+@model Kumunita.Web.Models.ProjectComposerViewModel
+@using Kumunita.Web.Security
+@{
+    ViewData["Title"] = "Edit project";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-9 col-lg-8">
+        <h1><kw-l key="pl.project.edit_heading">Edit project</kw-l></h1>
+        <p class="text-muted">
+            <kw-l key="pl.project.edit_lead">Update this project's title, description, goal, status, and dates. Its audience, community, and language are fixed when the project is created.</kw-l>
+        </p>
+
+        @if (ViewData.ModelState.ErrorCount > 0)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <ul class="mb-0">
+                    @foreach (var msg in ViewData.ModelState
+                        .SelectMany(kvp => kvp.Value?.Errors ?? [])
+                        .Select(e => e.ErrorMessage))
+                    {
+                        <li>@msg</li>
+                    }
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <form id="edit-project-form" method="post" action="/projects/projects/@(ViewData["projectId"] ?? throw new InvalidOperationException("The project id is not in the view data."))">
+            @Html.AntiForgeryToken()
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="form-label" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></div>
+                    <input class="form-control" type="text" id="title" name="Title"
+                           maxlength="120" required value="@Model.Title" />
+                    <div class="text-muted small mt-1"><kw-l key="pl.project.title_hint">A short name for the project — the feed label.</kw-l></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <label class="form-label" for="description" style="font-weight:600;"><kw-l key="common.body">Body</kw-l></label>
+                    <div class="rc-editor">
+                        <div class="rc-editor-toolbar" data-rich-editor>
+                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                            <partial name="_RichEditorToggle" />
+                        </div>
+                        <textarea class="form-control" id="description" name="Description" rows="5" data-rich-editor>@Model.Description</textarea>
+                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                    </div>
+                    <div class="text-muted small mt-2"><kw-l key="pl.project.description_hint">An optional description of what this project is about. A project is usable title-only.</kw-l></div>
+                </div>
+            </div>
+
+            @* The goal picker (D10) — re-associate or un-goal (the empty
+               choice posts ClearGoal). A display surface, never a gate; the
+               service's standing gate is the enforcement. *@
+            @if (Model.Goals.Count > 0)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label" for="goal" style="font-weight:600;"><kw-l key="pl.project.goal_heading">Goal</kw-l></label>
+                        <select class="form-control" id="goal" name="GoalId">
+                            <option value="" selected="@(Model.GoalId is null ? "selected" : null)"><kw-l key="projects.board.status.none">None</kw-l></option>
+                            @foreach (var (id, name) in Model.Goals)
+                            {
+                                <option value="@id" selected="@(id == Model.GoalId ? "selected" : null)">@name</option>
+                            }
+                        </select>
+                        <div class="text-muted small mt-2">
+                            <kw-l key="pl.project.goal_hint">An optional goal to organize this project under. Leave blank for a standalone project.</kw-l>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="status" style="font-weight:600;"><kw-l key="pl.project.status">Status</kw-l></label>
+                            <input class="form-control" type="text" id="status" name="Status"
+                                   maxlength="60" value="@Model.Status" />
+                            <div class="text-muted small mt-1"><kw-l key="pl.project.status_hint">An optional state label — the project's vocabulary is whatever you name it. Leave blank for none.</kw-l></div>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-3">
+                        <div class="col">
+                            <label class="form-label" for="start-at" style="font-weight:600;"><kw-l key="pl.project.start_date">Start</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="start-at" name="StartAt"
+                                   value="@Model.StartAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="due-at" style="font-weight:600;"><kw-l key="pl.project.due_date">Due</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="due-at" name="DueAt"
+                                   value="@Model.DueAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="pl.project.dates_hint">Both are optional — leave blank for no date. Shown to viewers in their own timezone.</kw-l>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><kw-l key="pl.project.save">Save changes</kw-l></button>
+                <a href="@($"/projects/projects/{ViewData["projectId"]}")" class="btn btn-link p-0"><kw-l key="common.cancel">Cancel</kw-l></a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/lib/rich-editor.js"></script>
+}

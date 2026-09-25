@@ -2356,4 +2356,430 @@ public sealed class ProjectsController : Controller
         TempData["info"] = "Goal updated.";
         return Redirect($"/projects/goals/{id}");
     }
+
+    // ── PL lane (ADR 0086) — the project detail / composer / edit surface (U07) ─
+
+    /// <summary>
+    /// <c>GET /projects/projects/{id}</c> — the **project detail** (the
+    /// <c>PL</c> lane, ADR 0086 / design doc F5 / D10): the project's
+    /// <c>Title</c> + rendered-<c>Description</c> (the one
+    /// <see cref="MarkdownRenderer"/> — ADR 0025), the optional
+    /// <c>Status</c> badge (C-PL·4 — a string, not an enum), the ADR 0079
+    /// optional <c>StartAt</c> / <c>DueAt</c> dates (C-PL·5), the audience
+    /// line (the project's <c>Audience</c> is <c>null</c> = public — ADR
+    /// 0001-B / 0036; a display surface, never a gate — the audience decision
+    /// already ran in the service's <see
+    /// cref="IProjectService.GetProjectAsync"/> entry <c>CanAsync(Read)</c>),
+    /// the **goal link** (D10 — present only when the project's <c>GoalId</c>
+    /// is non-null **and** the target goal is non-deleted + readable by the
+    /// actor, via <see cref="IProjectService.GetGoalAsync"/> — a denied /
+    /// missing goal leaves the link out), the **associated to-dos / boards**
+    /// (the <see cref="IProjectService.ListTodosAsync"/> / <see
+    /// cref="IProjectService.ListBoardsAsync"/> feeds narrowed by the U04
+    /// <c>projectId</c> filter — C-PL·3, a feed filter, never a gate), the
+    /// <c>Created</c> date, the author, and the <see cref="CanEdit"/> standing
+    /// preview (creator ∪ GlobalAdmin — C-PL·2, the ADR 0070 board-edit
+    /// precedent — **display-only**; the service's <see
+    /// cref="IProjectService.UpdateProjectAsync"/> standing re-check is the
+    /// enforcement, the frozen ADR 0006 split). A missing project is 404, a
+    /// denied actor 403 (the C3 split).
+    /// </summary>
+    [HttpGet("/projects/projects/{id}")]
+    public async Task<IActionResult> ProjectDetail(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        Project project;
+        try
+        {
+            project = await projects.GetProjectAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // The goal link (D10): only when the project has a GoalId and the
+        // target goal is non-deleted + readable by the actor (a denied or
+        // missing goal leaves both null — the view omits the link entirely).
+        string? goalId = null;
+        string? goalTitle = null;
+        if (project.GoalId is not null && project.GoalId.Length > 0)
+        {
+            try
+            {
+                var goal = await projects.GetGoalAsync(project.GoalId, actorId, HttpContext.RequestAborted);
+                goalId = goal.Id;
+                goalTitle = goal.Title;
+            }
+            catch (KeyNotFoundException)
+            {
+                // The goal was soft-deleted (the dangling-association rule —
+                // D6 / C-PL·6) — the project's GoalId is kept but the link is
+                // not shown. Not a 404 for the project itself (C3: the goal
+                // read is a display surface, the project was just loaded).
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // The actor cannot read the goal — the link is hidden, not a
+                // 403 for the project (the project's own audience gate already
+                // ran; the goal's is a display-surface read).
+            }
+        }
+
+        // The associated to-dos + boards (the U04 projectId feed filter —
+        // C-PL·3, a feed filter, never a gate; a denied item is dropped, not
+        // the whole set). Both are **unpaged** (page 1) — the small
+        // per-parent list precedent (the goal detail's projects list).
+        IReadOnlyList<TodoItem> todos;
+        try
+        {
+            todos = await projects.ListTodosAsync(null, null, actorId, 1, unassignedOnly: false, projectId: id, ct: HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        IReadOnlyList<KanbanBoard> boards;
+        try
+        {
+            boards = await projects.ListBoardsAsync(null, actorId, 1, projectId: id, ct: HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // Collect the subject ids (project author + each associated to-do
+        // author) for display-name resolution (a read, never a decision).
+        var subjectIds = new[] { project.AuthorId }
+            .Concat(todos.Select(t => t.AuthorId))
+            .Concat(boards.Select(b => b.AuthorId))
+            .Where(a => a is not null && a.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var subjectId in subjectIds)
+            names[subjectId] = await ResolveDisplayNameAsync(subjectId);
+
+        var componentNames = await ResolveComponentNamesAsync();
+        string? componentDisplayName =
+            project.ComponentId is not null && componentNames.TryGetValue(project.ComponentId, out var cn) ? cn : null;
+
+        string? DescriptionHtml(string? markdown) =>
+            string.IsNullOrWhiteSpace(markdown) ? null : MarkdownRenderer.RenderHtml(markdown);
+
+        var todoCards = todos
+            .Select(t => new ProjectAssociatedTodoCard(
+                Id: t.Id,
+                Title: t.Title,
+                Status: t.Status,
+                AuthorId: t.AuthorId,
+                AuthorDisplayName: names.GetValueOrDefault(t.AuthorId, t.AuthorId),
+                StartAt: t.StartAt,
+                DueAt: t.DueAt,
+                Created: t.Created))
+            .ToList();
+
+        var boardCards = boards
+            .Select(b => new ProjectAssociatedBoardCard(
+                Id: b.Id,
+                Title: b.Title,
+                DescriptionHtml: DescriptionHtml(b.Description),
+                AuthorId: b.AuthorId,
+                AuthorDisplayName: names.GetValueOrDefault(b.AuthorId, b.AuthorId),
+                Created: b.Created))
+            .ToList();
+
+        var vm = new ProjectDetailViewModel(
+            Id: project.Id,
+            Title: project.Title,
+            DescriptionHtml: DescriptionHtml(project.Description),
+            Status: project.Status,
+            StartAt: project.StartAt,
+            DueAt: project.DueAt,
+            AuthorId: project.AuthorId,
+            AuthorDisplayName: names.GetValueOrDefault(project.AuthorId, project.AuthorId),
+            ComponentId: project.ComponentId,
+            ComponentDisplayName: componentDisplayName,
+            LanguageCode: project.LanguageCode,
+            IsPublicAudience: project.Audience is null,
+            GoalId: goalId,
+            GoalTitle: goalTitle,
+            Todos: todoCards,
+            Boards: boardCards,
+            // C-PL·2 — the standing preview (creator ∪ GlobalAdmin — the
+            // ADR 0070 board-edit precedent): display-only, the service's
+            // UpdateProjectAsync server-side re-check is the enforcement.
+            CanEdit: !string.IsNullOrEmpty(actorId)
+                     && (string.Equals(project.AuthorId, actorId, StringComparison.Ordinal)
+                         || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)),
+            Created: project.Created,
+            Modified: project.Modified);
+
+        return View("ProjectDetail", vm);
+    }
+
+    /// <summary>
+    /// <c>GET /projects/projects/new</c> — the **project composer** (any
+    /// signed-in resident becomes the author — the <c>Owner</c> branch).
+    /// Seeds the audience editor (the M2 single-source pin, ADR 0001-B — the
+    /// sole access boundary), the authored-in language picker (ADR 0018), the
+    /// component feed-organizer picker (C-M3·2), the **goal picker** (D10 —
+    /// the actor's readable, non-deleted goals, a display surface never a
+    /// gate), and the grant-picker option lists (the M2/M3/M4/M5 shared
+    /// <c>_GrantPickers</c> partial).
+    /// </summary>
+    [HttpGet("/projects/projects/new")]
+    public async Task<IActionResult> ProjectNew()
+    {
+        var model = new ProjectComposerViewModel
+        {
+            Audience = new AudienceEditorModel
+            {
+                Mode = "Any",
+                Grants = "[]",
+            },
+            Languages = await SeedLanguagePickerAsync(),
+            Components = await SeedComponentPickerAsync(),
+            Goals = await SeedGoalPickerAsync(),
+        };
+        await SeedGrantPickerOptionsAsync();
+        return View("ProjectNew", model);
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects</c> — the **project create** write lane (any
+    /// signed-in resident becomes the author; a refused write is a 403 — the
+    /// C3 split). Validates the shape (<see
+    /// cref="ProjectComposerViewModel.IsValid"/>), writes through
+    /// <see cref="IProjectService.CreateProjectAsync"/> (the service opens its
+    /// own write session + audit row, C3; the <c>GoalId</c> guard refuses a
+    /// soft-deleted / unreadable goal, the C3 split), and redirects to the
+    /// new project's <c>/projects/projects/{id}</c>. The audience's
+    /// <see cref="AudienceEditorModel.BuildAudience()"/> is the single
+    /// deserialization site (the M2 single-source pin, ADR 0001-B).
+    /// </summary>
+    [HttpPost("/projects/projects")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProjectCreate([FromForm] ProjectComposerViewModel model)
+    {
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+        {
+            ModelState.AddModelError(string.Empty, "You must sign in to create a project.");
+            return View("ProjectNew", model);
+        }
+
+        // Re-seed the pickers so a failed-shape re-render below still shows
+        // the language + component + goal + grant options (the M5
+        // board-create shape).
+        model.Languages = await SeedLanguagePickerAsync();
+        model.Components = await SeedComponentPickerAsync();
+        model.Goals = await SeedGoalPickerAsync();
+        await SeedGrantPickerOptionsAsync();
+
+        if (!model.IsValid)
+        {
+            if (string.IsNullOrWhiteSpace(model.Title))
+                ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            if (model.Audience is null || !model.Audience.IsValid)
+                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            return View("ProjectNew", model);
+        }
+
+        var request = new CreateProjectRequest
+        {
+            Title = model.Title!,
+            Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            GoalId = string.IsNullOrWhiteSpace(model.GoalId) ? null : model.GoalId,
+            Status = string.IsNullOrWhiteSpace(model.Status) ? null : model.Status,
+            StartAt = model.StartAt,
+            DueAt = model.DueAt,
+            ComponentId = string.IsNullOrWhiteSpace(model.ComponentId) ? null : model.ComponentId,
+            Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
+            LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
+        };
+
+        Project created;
+        try
+        {
+            created = await projects.CreateProjectAsync(actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ModelState.AddModelError(string.Empty, "You do not have permission to create a project.");
+            return View("ProjectNew", model);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        TempData["info"] = "Project created.";
+        return Redirect($"/projects/projects/{created.Id}");
+    }
+
+    /// <summary>
+    /// <c>GET /projects/projects/{id}/edit</c> — the **project edit** page
+    /// (ADR 0070 shape): the project's <c>Title</c> + <c>Description</c>
+    /// (the ADR 0070 full-update surface), plus the D10 lane's editable
+    /// <c>GoalId</c> / <c>Status</c> / <c>StartAt</c> / <c>DueAt</c> (the
+    /// <see cref="IProjectService.UpdateProjectAsync"/> partial-update seam —
+    /// a blank date posts <c>null</c>, ADR 0079; a blank status clears it,
+    /// C-PL·4; the goal picker lets the project be re-associated or un-goal'd
+    /// (the <c>ClearGoal</c> flag when no goal is chosen)). The project is
+    /// loaded through the frozen seam's <see cref="IProjectService
+    /// .GetProjectAsync"/> (the audience gate is the service's single entry
+    /// <c>CanAsync(Read)</c>) — a missing project is 404, a denied actor 403
+    /// (the C3 split). The standing decision (creator ∪ GlobalAdmin) is the
+    /// service's on write (the frozen ADR 0006 split); the form renders
+    /// regardless of standing (the detail's <see cref="ProjectDetailViewModel
+    /// .CanEdit"/> gate is the display-only affordance).
+    /// </summary>
+    [HttpGet("/projects/projects/{id}/edit")]
+    public async Task<IActionResult> ProjectEdit(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        Project project;
+        try
+        {
+            project = await projects.GetProjectAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        // The edit posts Title + Description (the ADR 0070 full-update shape)
+        // + the D10 editable GoalId / Status / StartAt / DueAt (the partial
+        // update shape — a blank date → null, a blank status → clear, and the
+        // goal picker's empty choice → ClearGoal). The model round-trips
+        // those; the creation-time choices (audience / community / language)
+        // are not shown.
+        var model = new ProjectComposerViewModel
+        {
+            Title = project.Title,
+            Description = project.Description,
+            GoalId = project.GoalId,
+            Status = project.Status,
+            StartAt = project.StartAt,
+            DueAt = project.DueAt,
+            Goals = await SeedGoalPickerAsync(),
+        };
+        ViewData["projectId"] = id; // the edit form's POST action (POST /projects/projects/{id}).
+        return View("ProjectEdit", model);
+    }
+
+    /// <summary>
+    /// <c>POST /projects/projects/{id}</c> — the **project update** write
+    /// lane (the ADR 0070 full-update shape for <c>Title</c> /
+    /// <c>Description</c> + the D10 partial update for <c>GoalId</c> /
+    /// <c>Status</c> / <c>StartAt</c> / <c>DueAt</c>): a blank title is a
+    /// form error (re-render the edit view with the error); a blank
+    /// description clears it to <c>null</c>; a blank status clears it
+    /// (C-PL·4); a blank date posts <c>null</c> (ADR 0079); the goal picker's
+    /// empty choice is the <c>ClearGoal</c> explicit un-goal (D10). **Creator
+    /// ∪ GlobalAdmin** over the project (C-PL·2) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3 split).
+    /// Redirect-after-POST back to the project.
+    /// </summary>
+    [HttpPost("/projects/projects/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProjectUpdate(string id, [FromForm] ProjectComposerViewModel model)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        // The edit lane posts Title + Description (the required fields) + the
+        // D10 optional GoalId / Status / dates. Title is the required field
+        // (the BoardUpdateModel.IsValid shape).
+        if (string.IsNullOrWhiteSpace(model.Title))
+        {
+            ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            return View("ProjectEdit", model);
+        }
+
+        var goalChosen = !string.IsNullOrWhiteSpace(model.GoalId);
+        var request = new UpdateProjectRequest
+        {
+            Title = model.Title!,
+            Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            GoalId = goalChosen ? model.GoalId : null,
+            ClearGoal = !goalChosen, // the goal picker's empty choice is an explicit un-goal (D10).
+            Status = string.IsNullOrWhiteSpace(model.Status) ? null : model.Status,
+            StartAt = model.StartAt,
+            DueAt = model.DueAt,
+        };
+
+        try
+        {
+            await projects.UpdateProjectAsync(id, actorId, RoleSet(User), request, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (ArgumentException ex)
+        {
+            // A blank title (the service's 400) — a form error, not a 500.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View("ProjectEdit", model);
+        }
+
+        TempData["info"] = "Project updated.";
+        return Redirect($"/projects/projects/{id}");
+    }
+
+    /// <summary>
+    /// Seeds the project composer's <b>goal picker</b> (D10) — the actor's
+    /// readable, non-deleted <see cref="Kumunita.Core.Projects.ProjectGoal"/>
+    /// set (the <see cref="IProjectService.ListGoalsAsync"/> feed at page 1,
+    /// component-unfiltered). A **display** surface, never a gate (C-PL·3 /
+    /// C-M3·2) — the service's <c>GoalId</c> guard on create is the
+    /// enforcement (the C3 split).
+    /// </summary>
+    private async Task<IReadOnlyList<(string Id, string Name)>> SeedGoalPickerAsync()
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        IReadOnlyList<ProjectGoal> goals;
+        try
+        {
+            goals = await projects.ListGoalsAsync(null, actorId, 1, ct: HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+
+        return goals
+            .Select(g => (Id: g.Id, Name: string.IsNullOrWhiteSpace(g.Title) ? g.Id : g.Title))
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 }
