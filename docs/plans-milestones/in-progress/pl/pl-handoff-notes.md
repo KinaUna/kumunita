@@ -131,3 +131,77 @@ Testcontainers). **No project / association / delete / Web / view / `kw-l`
 change** — `git status` confirms exactly the four U02 files, all additions
 (510 insertions, 0 deletions — the frozen M5 surface is untouched).
 **Not committed / staged / moved** (U10's close does the move).
+
+## U03 — the five project seams + two project DTOs + their implementations
+
+**Four additive edits (all under `src/Kumunita.Core/Projects/`) + one test
+addition** — the design doc §9.3 (seams) + §9.4 (DTOs) landed **verbatim**,
+and the project lanes mirror the U02 goal lanes (which mirror the frozen M5
+board lanes). **`IProjectService.cs`:** the four §9.3 project seams
+(`ListProjectsAsync` / `GetProjectAsync` / `CreateProjectAsync` /
+`UpdateProjectAsync`) in a new `// --- PL project lanes (U03) ---` section
+**after** the U02 goal section (the goals → projects → association → delete
+order is the lane plan's invariant), XML-doc prose verbatim from §9.3,
+**plus** the U03-added `ListProjectsForGoalAsync(goalId, actorId, ct)`
+per-parent seam (the goal detail view's "projects in this goal" seam — the
+M5 `ListBoardsForTodoAsync` per-parent precedent: the goal itself is loaded
+first + `CanAsync(Read)`-gated (the C3 split), then the goal's `!IsDeleted`
+projects `GoalId == goalId` are `CanSeeAsync(Read)`-filtered,
+`Created`-descending, **unpaged**). **`ProjectRequests.cs`:** the two
+sealed records `CreateProjectRequest` (the §9.4 field set — `required
+string Title`, `Description?` / `GoalId?` / `Status?` / `StartAt?` /
+`DueAt?` / `ComponentId?` / `Audience?` / `LanguageCode?` creation-time
+choices) + `UpdateProjectRequest` (the **partial** update — `Title?` /
+`Description?` / `GoalId?` / `ClearGoal` / `Status?` / `StartAt?` /
+`DueAt?`; `Audience` / `ComponentId` / `LanguageCode` **not** editable —
+the ADR 0070 precedent). **`ProjectService.cs`:** the five implementations —
+`ListProjectsAsync` mirrors `ListGoalsAsync` on the `Project` surface
+(`!IsDeleted` + the `ComponentId` filter + the **`goalId` association
+filter** — `goalId == null` selects the **standalone-projects** feed
+(`GoalId == null` rows, the `/projects` landing's projects section — the
+D8 pin), a value selects that goal's projects (`GoalId == goalId` rows); a
+*filter, never a gate* — C-PL·3 — then the `CanSeeAsync(Read)` survivor
+pass over `ProjectToAuditableResource`, `Created`-descending, paged);
+`GetProjectAsync` mirrors `GetGoalAsync` (the `CanAsync(Read)` entry gate,
+the 404-on-absent / soft-deleted + 403-on-denied split);
+`CreateProjectAsync` mirrors `CreateGoalAsync` (the author's choice
+verbatim, `AuthorId = actorId`, the ADR 0018 language floor, one
+`project.create` audit row, `Via Owner`) — **with the `GoalId` guard**:
+when `request.GoalId != null`, the goal is loaded (404 on absent /
+soft-deleted) + `CanAsync(Read)` (403 on denied) **before** the project
+write; `ListProjectsForGoalAsync` is the goal-guarded per-parent list
+above; `UpdateProjectAsync` mirrors `UpdateGoalAsync` (a **new** public
+pure helper `CheckProjectStanding` — the **creator ∪ GlobalAdmin** matrix,
+the assignee branch does **not** apply, C-PL·2 — re-checked server-side
+**first**; the **partial** update of `Title` / `Description` (a blank
+`Description` → `null`, the ADR 0070 shape) / `GoalId` (a non-null value
+re-associates **with the `GoalId` guard re-applied**; `ClearGoal = true` is
+the explicit un-goal — sets `GoalId = null`, no guard) / `Status` (a
+string, not an enum — C-PL·4; `null` clears) / `StartAt` / `DueAt` (ADR
+0079 — non-null applied, `null` clears — C-PL·5); `AuthorId` / `Created`
+preserved, `Modified` stamped on a real change; one `project.update` audit
+row via a **new** `ProjectAuditViaFor` — creator `Owner` / else `Admin`).
+A **new** `private const string TargetKindProject = "project"` is added
+next to `TargetKindGoal`. **`ProjectServiceTests.cs`:** the four §9.6
+project pins **as named** — `F5_ProjectFeed_GoalIdFilter_StandaloneVsUnderGoal`
+(the feed's both sides — the standalone feed excludes under-goal projects
+and vice versa), `F2_ProjectDetail_404OnAbsent_403OnDenied` (the C3
+split), `F5_CreateProject_GoalIdGuard_RefusesDeletedOrUnreadableGoal`
+(the `GoalId` guard — deleted goal → 404, unreadable goal → 403, both with
+**nothing written**; a readable goal carries the association),
+`F4_UpdateProject_ClearGoal_NullsGoalId` (the `ClearGoal` explicit un-goal
++ the ADR 0079 non-null-applied / null-clears date semantics, `AuthorId`
+preserved, the `Modified` stamp, two `project.update` audit rows) — plus a
+new `ProjectAuditRows` query helper (mirrors `GoalAuditRows` /
+`BoardAuditRows`). **Build clean:** `dotnet build Kumunita.slnx -c Debug`
+— `Build succeeded`, zero errors, zero **new** warnings (the one remaining
+`BoardDetail.cshtml` CS8600 is pre-existing, the file is untouched by this
+unit). **Tests pass:** `-class "Kumunita.Core.Tests.ProjectServiceTests"`
+— `Total: 50, Errors: 0, Failed: 0` (the 46 from U02 + the 4 new §9.6
+project pins; the class is a `ClassFixture` so all tests run in one fresh
+scratch Postgres). **No regressions:** full `Kumunita.Core.Tests` run
+green — `Total: 810, Errors: 0, Failed: 0` (in-process xunit.v3,
+Testcontainers). **No association / delete / Web / view / `kw-l` change** —
+`git status` confirms exactly the four U03 files, all additions (759
+insertions, 0 deletions — the frozen M5 + U02 surface is untouched).
+**Not committed / staged / moved** (U10's close does the move).

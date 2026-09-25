@@ -423,7 +423,78 @@ public interface IProjectService
     /// <see cref="ArgumentException"/> (the write shape's 400).
     /// </summary>
     Task<ProjectGoal> UpdateGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, UpdateGoalRequest request, CancellationToken ct = default);
+    // --- PL project lanes (U03) — additive on the frozen M5 surface (ADR 0086) ---
+    //
+    // **Project read lanes (U03):**
 
+    /// <summary>
+    /// The **project list** (the feed): the candidates are <c>!IsDeleted</c>,
+    /// filtered by optional <paramref name="componentId"/> (a filter, never a
+    /// gate — C-M3·2) **and** the <paramref name="goalId"/> association
+    /// filter — <c>goalId == null</c> selects the **standalone-projects**
+    /// feed (the projects with <c>GoalId == null</c>, the
+    /// <c>/projects</c> landing page's projects section) and a specific
+    /// <c>goalId</c> selects that goal's projects (the
+    /// <c>GoalId == goalId</c> row set); the survivors are
+    /// <c>CanSeeAsync(Read)</c>-filtered (C6 / C3) over the
+    /// <see cref="ProjectToAuditableResource"/>; ordered by <c>Created</c>
+    /// descending; paged. The **aggregate** <c>AccessAudit</c> row
+    /// (<c>TargetKind "project"</c>, <c>visibleCount</c> /
+    /// <c>hiddenCount</c>) is the C-M3·3 shape.
+    /// </summary>
+    Task<IReadOnlyList<Project>> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default);
+
+    /// <summary>
+    /// One project; one <c>CanAsync(Read)</c>; the 404-vs-403 split (C3).
+    /// </summary>
+    Task<Project> GetProjectAsync(string projectId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The goal's projects (the <see cref="Project"/> rows with
+    /// <c>GoalId == goalId</c>, <c>!IsDeleted</c>) — the **per-parent list**
+    /// seam (the M5 <see cref="ListBoardsForTodoAsync"/> per-parent
+    /// precedent): the goal itself is loaded first
+    /// (<see cref="KeyNotFoundException"/> (404) on absent / soft-deleted)
+    /// and <c>CanAsync(Read)</c>-gated (<see
+    /// cref="UnauthorizedAccessException"/> (403) on denied — the C3 split);
+    /// then the goal's projects are <c>CanSeeAsync(Read)</c>-filtered (C6 /
+    /// C3) over the <see cref="ProjectToAuditableResource"/> (a denied
+    /// project is dropped, not the whole set); ordered by <c>Created</c>
+    /// descending; **unpaged** (the small per-parent list precedent — the M5
+    /// lane-per-todo list is the same). This is the seam the goal detail
+    /// view's "projects in this goal" section calls.
+    /// </summary>
+    Task<IReadOnlyList<Project>> ListProjectsForGoalAsync(string goalId, string actorId, CancellationToken ct = default);
+
+    // **Project write lanes (U03):**
+
+    /// <summary>
+    /// Create a project — the author becomes the standing owner; the project
+    /// is **live on creation** (no <c>IsDraft</c>); the **<c>GoalId</c>
+    /// guard**: a non-null <c>request.GoalId</c> pointing at a soft-deleted or
+    /// unreadable goal is **refused** (<see cref="KeyNotFoundException"/> 404
+    /// on absent, <see cref="UnauthorizedAccessException"/> 403 on denied — the
+    /// C3 split); the <c>AccessAudit</c> row (<c>project.create</c>,
+    /// <c>TargetKind = "project"</c>) is stored in the caller's session (C3).
+    /// </summary>
+    Task<Project> CreateProjectAsync(string actorId, IReadOnlySet<string> actorRoles, CreateProjectRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit a project — **creator ∪ GlobalAdmin** (the ADR 0070 precedent,
+    /// enforced server-side per C-M5·6); a **partial update** of
+    /// <c>Title</c> / <c>Description</c> / <c>GoalId</c> / <c>Status</c> /
+    /// <c>StartAt</c> / <c>DueAt</c> (the ADR 0079 optional-date shape — a
+    /// non-null value is applied, a <c>null</c> clears it, the edit form's
+    /// blank <c>datetime-local</c> field → <c>null</c>); the **<c>GoalId</c>
+    /// guard** on re-association: a non-null <c>request.GoalId</c> pointing at a
+    /// soft-deleted or unreadable goal is **refused** (the C3 split);
+    /// <c>ClearGoal = true</c> is an explicit un-goal (sets
+    /// <c>GoalId = null</c>); <c>AuthorId</c> / <c>Created</c> preserved
+    /// untouched; <c>Modified</c> stamped on a real change; the
+    /// <c>AccessAudit</c> row (<c>project.update</c>, <c>TargetKind =
+    /// "project"</c>) is stored in the caller's session (C3).
+    /// </summary>
+    Task<Project> UpdateProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, UpdateProjectRequest request, CancellationToken ct = default);
     // --- Placement + reorder lanes (U06) ------------------------------------
 
     /// <summary>

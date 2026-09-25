@@ -204,3 +204,67 @@ public sealed record UpdateGoalRequest
     // `Audience` / `ComponentId` / `LanguageCode` are creation-time choices
     // — NOT editable here (the ADR 0070 board-edit precedent).
 }
+
+// Kumunita.Core.Projects — the two PL project request DTOs (ADR 0086 / the
+// design doc §9.4 shape, verbatim; the M5 `CreateBoardRequest` /
+// `UpdateBoardRequest` shape, ADR 0067 / 0070). The project write lanes (U03)
+// consume these.
+
+/// <summary>
+/// The create-a-project request (the
+/// <see cref="IProjectService.CreateProjectAsync"/> shape, ADR 0086) — the
+/// author's choice is written **verbatim** (ADR 0001-B); the project is
+/// **live on creation** (no <c>IsDraft</c>). <see cref="Title"/> is the
+/// project's label (non-empty); <see cref="Description"/> is optional
+/// Markdown (blank → <c>null</c>); <see cref="GoalId"/> is the optional goal
+/// — <c>null</c> = standalone (the C3 <c>GoalId</c> guard applies when
+/// non-null); <see cref="Status"/> is a **string**, not an enum (C-PL·4);
+/// <see cref="StartAt"/> / <see cref="DueAt"/> are **optional**
+/// <c>DateTimeOffset</c> (<c>null</c> = no date — C-PL·5, the ADR 0079
+/// shape); <see cref="ComponentId"/> is a feed filter, never a gate
+/// (C-M3·2); <see cref="Audience"/> is the **exact** post
+/// <see cref="Audience"/> (ADR 0001-B / 0036, <c>null</c> = public);
+/// <see cref="LanguageCode"/> is the ADR 0018 authored-in tag
+/// (<c>null</c> → the resolver's effective language).
+/// </summary>
+public sealed record CreateProjectRequest
+{
+    public required string Title { get; init; }
+    public string? Description { get; init; }                   // blank → `null`
+    public string? GoalId { get; init; }                        // the optional goal — `null` = standalone (the C3 GoalId guard applies when non-null)
+    public string? Status { get; init; }                        // a string, not an enum (C-PL·4)
+    public DateTimeOffset? StartAt { get; init; }               // `null` = no date (C-PL·5, the ADR 0079 shape)
+    public DateTimeOffset? DueAt { get; init; }                 // `null` = no date (C-PL·5)
+    public string? ComponentId { get; init; }                   // a feed filter, never a gate (C-M3·2)
+    public Authorization.Audience? Audience { get; init; }      // `null` = public
+    public string? LanguageCode { get; init; }                  // `null` → the ADR 0018 resolver's effective language
+}
+
+/// <summary>
+/// The edit-a-project request (the
+/// <see cref="IProjectService.UpdateProjectAsync"/> shape, ADR 0086) — a
+/// **partial update**: each non-<c>null</c> field (plus <see
+/// cref="ClearGoal"/>) is applied, the rest is left untouched. <see
+/// cref="Description"/>: a blank value clears it to <c>null</c> (the ADR
+/// 0070 shape); <see cref="Status"/>: <c>null</c> clears (a string, not an
+/// enum — C-PL·4); <see cref="StartAt"/> / <see cref="DueAt"/>: ADR 0079 —
+/// non-null applied, <c>null</c> clears (C-PL·5); a non-null <see
+/// cref="GoalId"/> **RE-ASSOCIATES** the project to that goal (the C3
+/// <c>GoalId</c> guard applies); <see cref="ClearGoal"/> = <c>true</c> is an
+/// explicit un-goal (sets <c>GoalId = null</c>). The project's
+/// <c>Audience</c> / <c>ComponentId</c> / <c>LanguageCode</c> are
+/// **creation-time choices** — not editable here (ADR 0070). Standing:
+/// **creator ∪ GlobalAdmin** over the project (C-PL·2).
+/// </summary>
+public sealed record UpdateProjectRequest
+{
+    public string? Title { get; init; }                         // `null` = unchanged (the partial-update shape)
+    public string? Description { get; init; }                   // blank → `null` (the ADR 0070 shape)
+    public string? GoalId { get; init; }                        // a non-null value RE-ASSOCIATES the project to that goal (the C3 GoalId guard applies)
+    public bool ClearGoal { get; init; }                        // `true` = explicit un-goal, sets `GoalId = null`
+    public string? Status { get; init; }                        // `null` = clear (a string, not an enum — C-PL·4)
+    public DateTimeOffset? StartAt { get; init; }               // ADR 0079 — non-null applied, `null` clears (C-PL·5)
+    public DateTimeOffset? DueAt { get; init; }                 // ADR 0079 — non-null applied, `null` clears (C-PL·5)
+    // `Audience` / `ComponentId` / `LanguageCode` are creation-time choices
+    // — NOT editable here (the ADR 0070 board-edit precedent).
+}

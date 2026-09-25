@@ -1795,6 +1795,237 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(2, audits.Count(a => a.Action == "goal.update"));
     }
 
+    // ── F — the PL project lane (ADR 0086, design doc §9.6 pins) ────────────
+
+    /// <summary>
+    /// <b>F5</b> (project feed, the <c>goalId</c> filter — standalone vs
+    /// under-goal): the <see cref="IProjectService.ListProjectsAsync"/> feed
+    /// with <c>goalId == null</c> returns only the **standalone** projects
+    /// (<c>GoalId == null</c>) and with a specific <c>goalId</c> returns only
+    /// that goal's projects — the <c>goalId</c> argument is a *filter, never
+    /// a gate* (C-PL·3 / the design doc D8 pin: the <c>goalId == null</c>
+    /// feed is the <c>/projects</c> landing's projects section).
+    /// </summary>
+    [Fact]
+    public async Task F5_ProjectFeed_GoalIdFilter_StandaloneVsUnderGoal()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f5-author";
+
+        await Plant(store, new Project
+        {
+            Id = "f5-standalone",
+            AuthorId = author,
+            Title = "Standalone project",
+            GoalId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-goal",
+            AuthorId = author,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f5-under-goal",
+            AuthorId = author,
+            Title = "Project under the goal",
+            GoalId = "f5-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The standalone feed (goalId == null — the /projects landing's projects section).
+        var standaloneFeed = await svc.ListProjectsAsync(null, null, author, 1);
+        Assert.Contains("f5-standalone", standaloneFeed.Select(p => p.Id));
+        Assert.DoesNotContain("f5-under-goal", standaloneFeed.Select(p => p.Id));
+
+        // The under-goal feed (goalId filter narrows to that goal's projects).
+        var underGoalFeed = await svc.ListProjectsAsync(null, "f5-goal", author, 1);
+        Assert.Contains("f5-under-goal", underGoalFeed.Select(p => p.Id));
+        Assert.DoesNotContain("f5-standalone", underGoalFeed.Select(p => p.Id));
+    }
+
+    /// <summary>
+    /// <b>F2</b> (project detail, the C3 404-vs-403 split): <see
+    /// cref="IProjectService.GetProjectAsync"/> on an **absent** id throws
+    /// <see cref="KeyNotFoundException"/> (404); on an
+    /// **audience-restricted** project a stranger who may not <c>Read</c>
+    /// it is denied with <see cref="UnauthorizedAccessException"/> (403) —
+    /// the resource exists, the actor does not.
+    /// </summary>
+    [Fact]
+    public async Task F2_ProjectDetail_404OnAbsent_403OnDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f2-author";
+        const string grantee = "u-pl-f2-grantee";
+        const string stranger = "u-pl-f2-stranger";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetProjectAsync("no-such-project", author));
+
+        await Plant(store, new Project
+        {
+            Id = "f2-project",
+            AuthorId = author,
+            Title = "Restricted project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.GetProjectAsync("f2-project", stranger));
+    }
+
+    /// <summary>
+    /// <b>F5</b> (create, the <c>GoalId</c> guard — the C3 split): <see
+    /// cref="IProjectService.CreateProjectAsync"/> with a non-null
+    /// <c>GoalId</c> pointing at a **soft-deleted** goal is refused with
+    /// <see cref="KeyNotFoundException"/> (404) and with an
+    /// **unreadable** goal is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) — in **both** cases
+    /// **nothing** is written (no project row, no <c>project.create</c>
+    /// audit row). A non-null <c>GoalId</c> pointing at a readable goal
+    /// succeeds and carries the association (the guard is the only refusal).
+    /// </summary>
+    [Fact]
+    public async Task F5_CreateProject_GoalIdGuard_RefusesDeletedOrUnreadableGoal()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f5-author";
+        const string grantee = "u-pl-f5-grantee";
+        const string stranger = "u-pl-f5-stranger";
+
+        // A readable goal (public) — the happy path carries the association.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-read-goal",
+            AuthorId = author,
+            Title = "Readable goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var created = await svc.CreateProjectAsync(
+            author, MemberRoles,
+            new CreateProjectRequest { Title = "Under a readable goal", GoalId = "f5-read-goal" });
+        Assert.Equal("f5-read-goal", created.GoalId);
+        Assert.Equal("project.create", (await ProjectAuditRows(store, created.Id)).Single().Action);
+
+        // A soft-deleted goal — the 404 side of the C3 split.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-deleted-goal",
+            AuthorId = author,
+            Title = "Deleted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.CreateProjectAsync(author, MemberRoles,
+                new CreateProjectRequest { Title = "Refused (deleted goal)", GoalId = "f5-deleted-goal" }));
+
+        // An unreadable goal (audience-restricted; the author is a third
+        // party so only the audience branch is exercised) — the 403 side.
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f5-restricted-goal",
+            AuthorId = grantee,
+            Title = "Restricted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.CreateProjectAsync(stranger, MemberRoles,
+                new CreateProjectRequest { Title = "Refused (unreadable goal)", GoalId = "f5-restricted-goal" }));
+
+        // Nothing was written for either refusal: the total project count is
+        // still exactly one, and no project.update / project.create row
+        // references the refused attempts (the fresh-scratch-db isolation
+        // makes "all project rows" unambiguous).
+        await using (var q = store.QuerySession())
+        {
+            var allProjects = await q.Query<Project>().ToListAsync(TestContext.Current.CancellationToken);
+            Assert.Single(allProjects);
+            Assert.Equal(created.Id, allProjects[0].Id);
+        }
+    }
+
+    /// <summary>
+    /// <b>F4</b> (update, the <c>ClearGoal</c> explicit un-goal + the ADR
+    /// 0079 partial-date semantics): <see
+    /// cref="IProjectService.UpdateProjectAsync"/> with
+    /// <c>ClearGoal = true</c> sets <see cref="Project.GoalId"/> to
+    /// <c>null</c> (the explicit un-goal — a non-null <c>GoalId</c> value in
+    /// the same request is **not** required to accompany it); setting
+    /// <c>StartAt</c> / <c>DueAt</c> to non-null values applies them, and a
+    /// follow-up request with both <c>null</c> **clears** them (the ADR 0079
+    /// optional-date shape — the edit form's blank <c>datetime-local</c>
+    /// field → <c>null</c>, C-PL·5); the creator ∪ GlobalAdmin standing
+    /// matrix is re-checked server-side in both writes (the
+    /// <see cref="ProjectService.CheckProjectStanding"/> shape — C-PL·2).
+    /// </summary>
+    [Fact]
+    public async Task F4_UpdateProject_ClearGoal_NullsGoalId()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f4-creator";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f4-goal",
+            AuthorId = creator,
+            Title = "A goal",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new Project
+        {
+            Id = "f4-project",
+            AuthorId = creator,
+            Title = "A project",
+            GoalId = "f4-goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The clear-goal write: an explicit un-goal (ClearGoal = true) nulls
+        // the GoalId, and the ADR 0079 non-null StartAt / DueAt values are
+        // both applied in the same request.
+        var startAt = new DateTimeOffset(2026, 2, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 3, 1, 17, 0, 0, TimeSpan.Zero);
+        var unGoaled = await svc.UpdateProjectAsync(
+            "f4-project", creator, MemberRoles,
+            new UpdateProjectRequest { ClearGoal = true, StartAt = startAt, DueAt = dueAt });
+        Assert.Null(unGoaled.GoalId);
+        Assert.Equal(startAt, unGoaled.StartAt);
+        Assert.Equal(dueAt, unGoaled.DueAt);
+        Assert.NotNull(unGoaled.Modified);
+        Assert.Equal(creator, unGoaled.AuthorId);               // AuthorId preserved untouched.
+
+        // ADR 0079: a follow-up with both dates null clears them (the
+        // edit form's blank datetime-local → null shape).
+        var cleared = await svc.UpdateProjectAsync(
+            "f4-project", creator, MemberRoles,
+            new UpdateProjectRequest { StartAt = null, DueAt = null });
+        Assert.Null(cleared.StartAt);
+        Assert.Null(cleared.DueAt);
+
+        // One project.update row per successful write (C3).
+        var audits = await ProjectAuditRows(store, "f4-project");
+        Assert.Equal(2, audits.Count(a => a.Action == "project.update"));
+    }
+
     // ── C — the claim lane (ADR 0073) ────────────────────────────────────────
 
     /// <summary>
@@ -2148,6 +2379,19 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await using var q = store.QuerySession();
         return await q.Query<AccessAudit>()
             .Where(a => a.TargetKind == "goal" && a.TargetId == goalId)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database whose <c>TargetId</c> is the given project (the fresh-
+    /// postgres-per-test isolation makes "all rows for this project"
+    /// unambiguous — the <see cref="GoalAuditRows"/> shape).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> ProjectAuditRows(IDocumentStore store, string projectId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "project" && a.TargetId == projectId)
             .ToListAsync(ct);
     }
 
