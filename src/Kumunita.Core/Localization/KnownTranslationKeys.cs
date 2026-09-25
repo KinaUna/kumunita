@@ -1252,7 +1252,6 @@ public static class KnownTranslationKeys
             ["events.calendar.today"] = "Today",
             ["events.calendar.overlap_hint"] = "Overlaps another event in this window",
             ["events.calendar.empty"] = "No events in this window.",
-            ["events.calendar.list_view"] = "List",
             ["events.calendar.from"] = "From",
             // EV-DWM (ADR 0064, U05) — the Day/Week/Month toggle labels (the Calendar.cshtml
             // view switch; en is authoritative, de/fr/da below are translations — C-DWM·9).
@@ -2517,7 +2516,6 @@ public static class KnownTranslationKeys
             ["events.calendar.today"] = "Heute",
             ["events.calendar.overlap_hint"] = "Überlappt mit einem anderen Termin in diesem Zeitraum",
             ["events.calendar.empty"] = "Keine Termine in diesem Zeitraum.",
-            ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Von",
             // EV-DWM (ADR 0064, U05) — die Tag/Woche/Monat-Umschalter-Labels (C-DWM·9).
             ["events.calendar.view.day"] = "Tag",
@@ -3764,7 +3762,6 @@ public static class KnownTranslationKeys
             ["events.calendar.today"] = "Aujourd'hui",
             ["events.calendar.overlap_hint"] = "Chevauche un autre événement dans cette période",
             ["events.calendar.empty"] = "Aucun événement dans cette période.",
-            ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Depuis",
             // EV-DWM (ADR 0064, U05) — les libellés du commutateur Jour/Semaine/Mois (C-DWM·9).
             ["events.calendar.view.day"] = "Jour",
@@ -5006,7 +5003,6 @@ public static class KnownTranslationKeys
             ["events.calendar.today"] = "I dag",
             ["events.calendar.overlap_hint"] = "Overlapper med et andet arrangement i dette område",
             ["events.calendar.empty"] = "Ingen arrangementer i dette område.",
-            ["events.calendar.list_view"] = "Liste",
             ["events.calendar.from"] = "Fra",
             // EV-DWM (ADR 0064, U05) — Day/Week/Month-omskifterens labels (C-DWM·9).
             ["events.calendar.view.day"] = "Dag",

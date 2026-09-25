@@ -116,10 +116,13 @@
                         <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
                         <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>
                     </div>
-                    <a class="btn btn-outline-secondary" href="/events"><kw-l key="events.calendar.list_view">List</kw-l></a>
                 </div>
             </div>
         </header>
+
+        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
+           the feed and the calendar are both first-class entry points. *@
+        <partial name="_EventsTabs" />
 
         <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
             <a class="btn btn-outline-secondary" href="@NavHref(Model.PrevAnchor)"><kw-l key="events.calendar.prev">Prev</kw-l></a>

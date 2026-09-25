@@ -14,10 +14,13 @@
                         <kw-l key="events.lede">Upcoming events around the neighborhood — see what's on, and RSVP.</kw-l>
                     </p>
                 </div>
-                <a class="btn btn-outline-secondary" href="/events/calendar"><kw-l key="events.calendar.title">Calendar</kw-l></a>
                 <a class="btn btn-outline-primary" href="/events/new"><kw-l key="events.new_event">New event</kw-l></a>
             </div>
         </header>
+
+        @* The Events / Calendar tab strip (the _ProjectsTabs.cshtml idiom):
+           the feed and the calendar are both first-class entry points. *@
+        <partial name="_EventsTabs" />
 
         @if (Model.Components.Count > 0)
         {
