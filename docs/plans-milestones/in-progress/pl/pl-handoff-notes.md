@@ -234,3 +234,93 @@ param + `ct:` named-arg; three NSubstitute stub/verification arities updated
 in `ProjectsControllerTests.Todos_List_AudienceFiltered`. **No delete / Web
 view / `kw-l` change; no U02/U03 seam changed.** Not committed / staged /
 moved (U10's close does the move).
+
+## U05
+
+The **`/projects` landing surface** — `GET /projects` renders the two-section
+feed (goals **then** standalone projects, `GoalId == null`), the `ProjectsIndex`
+action, the view-models, `ProjectsIndex.cshtml`, the **Projects** tab as the
+first entry of the tab trio, and the `pl.*` `kw-l` keys used by this page
+(× 4 languages). **Deliverable shapes:**
+
+- **Action** — `ProjectsController.ProjectsIndex(string? componentId, int
+  page = 1)`, `[HttpGet("/projects")]` (placed at the **end** of the class,
+  after the M5 move-to lane — no existing action reordered/renamed; no
+  `lang` param, matching the existing `TodosIndex` / `BoardsIndex` shape
+  — neither has one). Calls the **frozen** U02/U03 seams as-is:
+  `ListGoalsAsync(componentId, actorId, page, ct:)` +
+  `ListProjectsAsync(componentId, goalId: null, actorId, page, ct:)`
+  (the `goalId == null` filter IS the standalone feed — the U03 pin);
+  one `catch (UnauthorizedAccessException) → new ForbidResult()` (the C3
+  403 split; the service raises it, the controller maps it — same as
+  `TodosIndex`). No `KeyNotFoundException` (both are feed lanes). Actor
+  minted via the existing `SubjectId(User)` helper; author + component
+  display names resolved through the existing `ResolveDisplayNameAsync` /
+  `ResolveComponentNamesAsync` helpers (read lookups, never gates);
+  component picker seeded via the existing `SeedComponentPickerAsync`;
+  returns `View("ProjectsIndex", vm)`. **No new `IProjectService` surface;
+  no service file touched.**
+- **View-models** — new file `src/Kumunita.Web/Models/ProjectViewModels.cs`
+  (the M5 sibling-files convention: `ProjectTodoViewModels.cs` /
+  `ProjectBoardViewModels.cs`): `GoalCard(Id, Title, DescriptionHtml,
+  AuthorId, AuthorDisplayName, ComponentId, ComponentDisplayName, Created,
+  Modified)` — **no** per-card project count (no count seam in the frozen
+  surface; the "View projects →" link is the affordance, per the U05
+  card pin); `ProjectCard(... + Status?, StartAt?, DueAt? ...)` (C-PL·4
+  string-status + C-PL·5 optional dates); `ProjectsIndexViewModel(Goals,
+  StandaloneProjects, ComponentPickerOptions, CurrentComponentId,
+  CurrentPage)`. `DescriptionHtml` is the Markdown body pre-rendered
+  through the one `MarkdownRenderer.RenderHtml` (ADR 0025 — **rendered**
+  HTML, `null` for empty/whitespace so the view omits the block); the
+  view renders it with `Html.Raw` inside `<div class="markdown">` (the
+  `Page/Show.cshtml` / `Notifications/Index.cshtml` idiom — the card
+  surface, not the WYSIWYG `rc-editor`).
+- **View** — new `Views/Projects/ProjectsIndex.cshtml` (mirrors the
+  `TodosIndex` / `BoardIndex` markup): header (`pl.index.title` /
+  `pl.index.lede`) + the two composer buttons (`/projects/goals/new`,
+  `/projects/projects/new` — **inert hrefs, U06/U07 ship the targets** —
+  the deliberate register relaxation); `<partial name="_ProjectsTabs" />`;
+  the component filter form (only when components exist; reuses the M5
+  `projects.todo.all_communities` + `nav.community` + `common.filter`
+  shared keys — the lane boundary is about *new* `pl.*` copy, not
+  re-registering shared nav words); **goals section first** (`h2` +
+  empty-state + `airy-ann-row` cards: title → `/projects/goals/{id}`,
+  author · `kw-dt` created · component badge, `Html.Raw` description,
+  "View projects →" link); **standalone-projects section second** (cards:
+  title → `/projects/projects/{id}`, author · created · optional Start /
+  Due via `kw-dt` (gated on non-null, the ADR 0079 shape) · verbatim
+  status badge · component badge, `Html.Raw` description). `pl.*` keys
+  only for this page's own copy.
+- **Tab trio** — `_ProjectsTabs.cshtml`: the **Projects** tab is now the
+  **first** entry — `("pl.tabs.projects", "Projects", "/projects")` —
+  ahead of the untouched `("projects.todo.title", "To-dos",
+  "/projects/todos")` + `("projects.board.title", "Boards",
+  "/projects/boards")` (exact labels + routes + M5 keys kept — the
+  frozen M5-route pin, C-PL·7). Active derivation extended:
+  `"ProjectsIndex" => "Projects"`, `"BoardsIndex" => "Boards"`, `_ =>
+  "To-dos"` — the `Goal*` / `Project*` actions (U06/U07) fall through to
+  the default until they ship; note the comment was updated to name all
+  three index actions.
+- **`kw-l` keys registered (12, this unit only)** — `pl.tabs.projects`,
+  `pl.index.title`, `pl.index.lede`, `pl.index.goals_heading`,
+  `pl.index.projects_heading`, `pl.index.new_goal`,
+  `pl.index.new_project`, `pl.index.view_projects`,
+  `pl.index.goals_empty`, `pl.index.projects_empty`, `pl.index.start`,
+  `pl.index.due` — each appended at the end of **all four**
+  `KnownTranslationKeys` dictionaries (en/de/fr/da, the ADR 0015
+  four-language parity; the `KwLRegistryConsistencyTests` pin passes —
+  see the Core run below). The `pl.goal.*` / `pl.project.*` /
+  `pl.todo.project_link` / `pl.board.project_link` keys are registered by
+  **their** units (U06–U09).
+
+**M5-route-untouched regression:** the existing M5 `ProjectsControllerTests`
+pins (incl. `Todos_List_AudienceFiltered`) pass unmodified — no M5 action /
+view / route / key changed. **Tests pass:** `Kumunita.Web.Tests` —
+`Total: 431, Errors: 0, Failed: 0`; `Kumunita.Core.Tests` — `Total: 817,
+Errors: 0, Failed: 0` (the four-language `kw-l` pin green). **Builds clean:**
+`dotnet build Kumunita.slnx -c Debug` succeeds with only the pre-existing
+`BoardDetail.cshtml` CS8600 warning (the allowed one); `npm --prefix
+src/Kumunita.Web run build` (tsc) clean — no new TS this unit. **Guardrails
+held:** no service changes, no detail views / pickers / delete (U06–U09),
+the goal / project detail + `new` hrefs ship inert. Not committed / staged /
+moved (U10's close does the move).

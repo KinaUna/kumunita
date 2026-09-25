@@ -1943,4 +1943,106 @@ public sealed class ProjectsController : Controller
         TempData["info"] = "To-do moved to board.";
         return Redirect($"/projects/boards/{targetBoardId}");
     }
+
+    // ── PL lane (ADR 0086) — the /projects landing surface (U05) ────────────
+
+    /// <summary>
+    /// <c>GET /projects</c> — the **goals + projects landing** (the <c>PL</c>
+    /// lane, ADR 0086 D8 / design doc §5 F9): a two-section feed — the
+    /// <see cref="ProjectGoal"/>s (the <see
+    /// cref="IProjectService.ListGoalsAsync"/> <c>CanSeeAsync(Read)</c> gate
+    /// is the sole reader) **then** the <b>standalone</b>
+    /// <see cref="Project"/>s (the <see cref="IProjectService.ListProjectsAsync"/>
+    /// <c>goalId == null</c> feed — the projects with <c>GoalId == null</c>;
+    /// the FACES are the service's, the controller's <c>ForbidResult</c> /
+    /// <c>NotFound</c> split is the C3 pin only). The
+    /// <paramref name="componentId"/> query is a *filter, never a gate*
+    /// (C-M3·2) — passed to both feeds verbatim. Author + component display
+    /// names are *read* lookups (never access decisions — the M5 feed
+    /// actions' idiom).
+    /// <para>
+    /// The card's detail links (<c>/projects/goals/{id}</c> /
+    /// <c>/projects/projects/{id}</c>) and the <c>new</c> composer links are
+    /// the **U06 / U07 routes** — inert until those units ship them (the
+    /// register's deliberate adjacent-unit relaxation, the lane plan's
+    /// sequencing note). The <c>/projects/todos</c> + <c>/projects/boards</c>
+    /// M5 routes are untouched (C-PL·7).
+    /// </para>
+    /// </summary>
+    [HttpGet("/projects")]
+    public async Task<IActionResult> ProjectsIndex(string? componentId, int page = 1)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        IReadOnlyList<ProjectGoal> goals;
+        IReadOnlyList<Project> standaloneProjects;
+        try
+        {
+            goals = await projects.ListGoalsAsync(componentId, actorId, page, ct: HttpContext.RequestAborted);
+            // The landing's projects section is the **standalone** feed
+            // (the `goalId == null` filter — the D8 / design doc §5 pin;
+            // a goal's projects are the goal detail's (U06) surface, not
+            // this page's).
+            standaloneProjects = await projects.ListProjectsAsync(componentId, null, actorId, page, ct: HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        var authorIds = goals
+            .Select(g => g.AuthorId)
+            .Concat(standaloneProjects.Select(p => p.AuthorId))
+            .Where(a => a is not null && a.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var subjectId in authorIds)
+            names[subjectId] = await ResolveDisplayNameAsync(subjectId);
+
+        var componentNames = await ResolveComponentNamesAsync();
+
+        string? ComponentDisplay(string? componentId) =>
+            componentId is not null && componentNames.TryGetValue(componentId, out var n) ? n : null;
+        static string? DescriptionHtml(string? markdown) =>
+            string.IsNullOrWhiteSpace(markdown) ? null : MarkdownRenderer.RenderHtml(markdown);
+
+        var goalCards = goals
+            .Select(g => new GoalCard(
+                Id: g.Id,
+                Title: g.Title,
+                DescriptionHtml: DescriptionHtml(g.Description),
+                AuthorId: g.AuthorId,
+                AuthorDisplayName: names.GetValueOrDefault(g.AuthorId, g.AuthorId),
+                ComponentId: g.ComponentId,
+                ComponentDisplayName: ComponentDisplay(g.ComponentId),
+                Created: g.Created,
+                Modified: g.Modified))
+            .ToList();
+
+        var projectCards = standaloneProjects
+            .Select(p => new ProjectCard(
+                Id: p.Id,
+                Title: p.Title,
+                DescriptionHtml: DescriptionHtml(p.Description),
+                Status: p.Status,
+                StartAt: p.StartAt,
+                DueAt: p.DueAt,
+                AuthorId: p.AuthorId,
+                AuthorDisplayName: names.GetValueOrDefault(p.AuthorId, p.AuthorId),
+                ComponentId: p.ComponentId,
+                ComponentDisplayName: ComponentDisplay(p.ComponentId),
+                Created: p.Created,
+                Modified: p.Modified))
+            .ToList();
+
+        var vm = new ProjectsIndexViewModel(
+            Goals: goalCards,
+            StandaloneProjects: projectCards,
+            ComponentPickerOptions: await SeedComponentPickerAsync(),
+            CurrentComponentId: componentId,
+            CurrentPage: page);
+
+        return View("ProjectsIndex", vm);
+    }
 }

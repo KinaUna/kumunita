@@ -1411,6 +1411,20 @@ public static class KnownTranslationKeys
             ["notifications.subscription.page.child.label"] = "New sub-pages",
             ["pages.subscribe"] = "Subscribe to updates",
             ["pages.unsubscribe"] = "Unsubscribe from updates",
+
+            // ── PL (ADR 0086, U05) — the /projects landing + the Projects tab ──
+            ["pl.tabs.projects"] = "Projects",
+            ["pl.index.title"] = "Projects",
+            ["pl.index.lede"] = "The neighborhood's goals and projects — the higher-level work on top of the to-dos and boards.",
+            ["pl.index.goals_heading"] = "Goals",
+            ["pl.index.projects_heading"] = "Projects",
+            ["pl.index.new_goal"] = "New goal",
+            ["pl.index.new_project"] = "New project",
+            ["pl.index.view_projects"] = "View projects →",
+            ["pl.index.goals_empty"] = "No goals yet — create one to give the shared work a direction.",
+            ["pl.index.projects_empty"] = "No standalone projects yet — create one to start managing the shared work.",
+            ["pl.index.start"] = "Start",
+            ["pl.index.due"] = "Due",
         };
 
     /// <summary>
@@ -2689,6 +2703,20 @@ public static class KnownTranslationKeys
             ["notifications.subscription.page.child.label"] = "Neue Unterseiten",
             ["pages.subscribe"] = "Aktualisierungen abonnieren",
             ["pages.unsubscribe"] = "Abonnierung aufheben",
+
+            // ── PL (ADR 0086, U05) — die /projects-Landing + der Projects-Tab ──
+            ["pl.tabs.projects"] = "Projekte",
+            ["pl.index.title"] = "Projekte",
+            ["pl.index.lede"] = "Die Ziele und Projekte der Nachbarschaft — die übergreifende Arbeit über den Aufgaben und Boards hinaus.",
+            ["pl.index.goals_heading"] = "Ziele",
+            ["pl.index.projects_heading"] = "Projekte",
+            ["pl.index.new_goal"] = "Neues Ziel",
+            ["pl.index.new_project"] = "Neues Projekt",
+            ["pl.index.view_projects"] = "Projekte ansehen →",
+            ["pl.index.goals_empty"] = "Noch keine Ziele — erstelle eines, um die gemeinsame Arbeit eine Richtung zu geben.",
+            ["pl.index.projects_empty"] = "Noch keine unabhängigen Projekte — erstelle eines, um die gemeinsame Arbeit zu managen.",
+            ["pl.index.start"] = "Start",
+            ["pl.index.due"] = "Fällig",
         };
 
     /// <summary>
@@ -3969,6 +3997,20 @@ public static class KnownTranslationKeys
             ["notifications.subscription.page.child.label"] = "Nouvelles sous-pages",
             ["pages.subscribe"] = "S'abonner aux mises à jour",
             ["pages.unsubscribe"] = "Se désabonner des mises à jour",
+
+            // ── PL (ADR 0086, U05) — la landing /projects + l'onglet Projects ──
+            ["pl.tabs.projects"] = "Projets",
+            ["pl.index.title"] = "Projets",
+            ["pl.index.lede"] = "Les objectifs et projets du quartier — le travail de plus haut niveau au-dessus des tâches et des tableaux.",
+            ["pl.index.goals_heading"] = "Objectifs",
+            ["pl.index.projects_heading"] = "Projets",
+            ["pl.index.new_goal"] = "Nouvel objectif",
+            ["pl.index.new_project"] = "Nouveau projet",
+            ["pl.index.view_projects"] = "Voir les projets →",
+            ["pl.index.goals_empty"] = "Pas encore d'objectifs — crée-en un pour donner une direction au travail partagé.",
+            ["pl.index.projects_empty"] = "Pas encore de projets autonomes — crée-en un pour commencer à organiser le travail partagé.",
+            ["pl.index.start"] = "Début",
+            ["pl.index.due"] = "Échéance",
         };
 
     /// <summary>
@@ -5244,6 +5286,20 @@ public static class KnownTranslationKeys
             ["notifications.subscription.page.child.label"] = "Nye undersider",
             ["pages.subscribe"] = "Abonner på opdateringer",
             ["pages.unsubscribe"] = "Opsig abonnement",
+
+            // ── PL (ADR 0086, U05) — /projects-landingen + Projects-taben ──
+            ["pl.tabs.projects"] = "Projekter",
+            ["pl.index.title"] = "Projekter",
+            ["pl.index.lede"] = "Lokalsamfunds mål og projekter — det overordnede arbejde oven på opgaverne og brættene.",
+            ["pl.index.goals_heading"] = "Mål",
+            ["pl.index.projects_heading"] = "Projekter",
+            ["pl.index.new_goal"] = "Nyt mål",
+            ["pl.index.new_project"] = "Nyt projekt",
+            ["pl.index.view_projects"] = "Se projekter →",
+            ["pl.index.goals_empty"] = "Ingen mål endnu — opret et for at give det fælles arbejde en retning.",
+            ["pl.index.projects_empty"] = "Ingen selvstændige projekter endnu — opret et for at komme i gang med at styre det fælles arbejde.",
+            ["pl.index.start"] = "Start",
+            ["pl.index.due"] = "Forfaldt",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
