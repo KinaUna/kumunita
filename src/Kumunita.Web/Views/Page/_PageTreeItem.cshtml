@@ -1,0 +1,49 @@
+@* ADR 0039 §3.8 — the pages tree browse, recursive item (collapsible).
+
+   A page with children renders as a native <details>/<summary> group:
+   the title row stays a link (click the title → the page; click the
+   chevron → expand/collapse), and the children list is <details>'s
+   default content — **collapsed by default** (no `open` attribute), so
+   a long tree stays short until the resident opts into a branch.
+   Leaf pages render a plain row. Indentation comes from the nested
+   <ul>s (no inline padding-left), which also keeps the bordered-ledger
+   look (each <li> carries the 1px separator) at every depth.
+   No JS — <details> is native; this is the same affordance the
+   translation chips and RSVP details already use (Groups/Detail,
+   Event/Detail). *@
+@model Kumunita.Web.Models.PageNode
+@if (Model.Children.Count == 0)
+{
+    <li>
+        <a href="@Model.Path">@Model.Title</a>
+        @if (Model.IsDraft)
+        {
+            <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+                <kw-l key="posts.draft_badge">Draft</kw-l>
+            </span>
+        }
+    </li>
+}
+else
+{
+    <li>
+        <details class="kmb-page-branch">
+            <summary>
+                <a href="@Model.Path">@Model.Title</a>
+                @if (Model.IsDraft)
+                {
+                    <span class="badge text-bg-warning ms-2" title="Only you can see this — it is not yet published">
+                        <kw-l key="posts.draft_badge">Draft</kw-l>
+                    </span>
+                }
+                <span class="kmb-page-branch-count" aria-hidden="true">@Model.Children.Count</span>
+            </summary>
+            <ul>
+                @foreach (var child in Model.Children)
+                {
+                    <partial name="_PageTreeItem" model="child" />
+                }
+            </ul>
+        </details>
+    </li>
+}

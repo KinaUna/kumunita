@@ -1166,6 +1166,58 @@ body.kmb-page-fullbleed .navbar {
 }
 .airy-page-list a:hover { color: var(--bs-primary); }
 
+/* Collapsible branches (native <details>/<summary>, no JS — _PageTreeItem).
+   Children render in a nested <ul>, so the leaf-row padding above still owns
+   the indentation at every depth; the branch rows themselves are flush, with
+   the row separator provided by the <li> they live in (and, for nested
+   branches, the nested <ul>'s own rows). */
+.airy-page-list .kmb-page-branch { display: block; }
+.airy-page-list .kmb-page-branch > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  cursor: pointer;
+  list-style: none;               /* hide the default marker; we draw our own chevron */
+  user-select: none;
+}
+.airy-page-list .kmb-page-branch > summary::-webkit-details-marker { display: none; }
+.airy-page-list .kmb-page-branch > summary::before {
+  content: "\203a";              /* single guillemet ≈ right chevron, like Bootstrap's caret */
+  flex: 0 0 auto;
+  font-family: var(--bs-body-font-family);
+  font-size: 1.125rem;
+  line-height: 1;
+  color: var(--kmb-muted);
+  transition: transform 0.15s ease-in-out;
+}
+.airy-page-list .kmb-page-branch[open] > summary::before { transform: rotate(90deg); }
+.airy-page-list .kmb-page-branch > summary a { flex: 1 1 auto; }
+.kmb-page-branch-count {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--kmb-muted);
+  background: var(--kmb-border-soft);
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+}
+/* Children list: keeps the row separators without double borders (the
+   parent row's <li> border already closes the gap above it), and the
+   borderless nested <ul> keeps the bordered-ledger silhouette intact. */
+.airy-page-list .kmb-page-branch > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.airy-page-list .kmb-page-branch > ul > li { padding: 0.75rem 1.5rem; }
+/* Depth cue: the old flat list encoded tree depth as 1.25rem of extra
+   padding-left per level — keep that visual language, now carried by
+   each branch's own summary row (a branch's children are never rendered
+   unless it is open, so indenting only *open* branches' rows is safe
+   and unambiguous; no :has() needed). */
+.airy-page-list .kmb-page-branch[open] > summary { padding-left: 2.75rem; }
+
 /* C: directory — the cards grid (the "bigger avatars" overview). */
 .dir-cards {
   display: grid;
@@ -1201,6 +1253,8 @@ body.kmb-page-fullbleed .navbar {
   .airy-side-note { display: none; } /* the mandatory badge reappears in the head */
   .airy-group-grid { grid-template-columns: 1fr; }
   .airy-page-list li { padding: 0.75rem 1rem; }
+  .airy-page-list .kmb-page-branch > summary { padding: 0.75rem 1rem; }
+  .airy-page-list .kmb-page-branch > ul > li { padding: 0.625rem 1rem; }
 }
 
 /* The shared base for the Month chip (.event-chip) and the Day/Week block
