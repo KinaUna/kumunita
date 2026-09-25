@@ -29,6 +29,18 @@ public static class M5DocTypes
     /// mapping each time, and the delta is applied idempotently by
     /// <c>ApplyAllConfiguredChangesToDatabaseAsync()</c> at boot (the same
     /// dev-only loop / versioned-boot path as M1/M3/Media/Page/M4).
+    /// <para>
+    /// **PL additive (ADR 0086 D1 / D2 / D3 / D4, the design doc §9.5 shape):**
+    /// the two new docs <see cref="Projects.ProjectGoal"/> +
+    /// <see cref="Projects.Project"/> are registered after the M5 blocks, each
+    /// with a (ComponentId, Created) feed-ordering index, plus the
+    /// <see cref="Projects.Project.GoalId"/> index on <see cref="Projects.Project"/>;
+    /// the two <c>ProjectId</c> feed-filter indexes are additive on the
+    /// existing <see cref="Projects.TodoItem"/> /
+    /// <see cref="Projects.KanbanBoard"/> blocks (the PL <c>projectId</c>
+    /// filter — a feed filter, never a gate, C-PL·3). **Zero migration for
+    /// existing rows** (ADR 0004 §B.1 delta-detect; the C-PL·8 additive pin).
+    /// </para>
     /// </summary>
     public static void Configure(StoreOptions opts)
     {
@@ -48,13 +60,19 @@ public static class M5DocTypes
         // expressible equivalent; the unique indexes below are unaffected.
         opts.Schema.For<TodoItem>()
                .Index(t => new { t.ComponentId, t.Created })
-               .Index(t => t.ParentId);
+               .Index(t => t.ParentId)
+               // the `ProjectId` feed-filter lookup (the PL `projectId`
+               // filter — a feed filter, never a gate, ADR 0086 D4 / C-PL·3)
+               .Index(t => t.ProjectId);
 
         // KanbanBoard — conventional string Id; the (ComponentId, Created)
         // feed-ordering index (the ListBoardsAsync feed shape) — unnamed for
         // the same reason as TodoItem (see the note above).
         opts.Schema.For<KanbanBoard>()
-               .Index(b => new { b.ComponentId, b.Created });
+               .Index(b => new { b.ComponentId, b.Created })
+               // the `ProjectId` feed-filter lookup (the PL `projectId`
+               // filter — a feed filter, never a gate, ADR 0086 D4 / C-PL·3)
+               .Index(b => b.ProjectId);
 
         // KanbanLane — conventional string Id; the (BoardId, Order) **unique**
         // index (a lane's position within its board is a business key — the
@@ -72,5 +90,27 @@ public static class M5DocTypes
         opts.Schema.For<BoardItemPlacement>()
                .UniqueIndex(p => p.BoardId, p => p.LaneId, p => p.Order)
                .UniqueIndex(p => p.TodoItemId, p => p.BoardId);
+
+        // ── PL (Goals & Projects) additive registrations (ADR 0086 D1 / D2 /
+        // D3 / D4 — the design doc §9.5 shape; unnamed for the same reason
+        // as the M5 feed indexes above; **no unique indexes** — a goal may
+        // be associated with many projects, a project with many to-dos /
+        // boards; the `GoalId` is a single field, not a list, so no
+        // business-key index is needed on any of the three):
+        //
+        // ProjectGoal — conventional string Id; the (ComponentId, Created)
+        // **feed-ordering** index (the ListGoalsAsync feed orders survivors
+        // by `Created` descending — the same shape as the existing
+        // `TodoItem` / `KanbanBoard` feed indexes).
+        opts.Schema.For<ProjectGoal>()
+               .Index(g => new { g.ComponentId, g.Created });
+
+        // Project — conventional string Id; the (ComponentId, Created)
+        // **feed-ordering** index (the ListProjectsAsync feed shape); the
+        // `GoalId` index (the "projects in this goal" read — the
+        // ListProjectsAsync `goalId` filter lookup).
+        opts.Schema.For<Project>()
+               .Index(p => new { p.ComponentId, p.Created })
+               .Index(p => p.GoalId);
     }
 }

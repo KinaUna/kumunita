@@ -28,6 +28,7 @@ public sealed class KanbanBoard
     public string? Description { get; set; }                   // optional Markdown — the ADR 0025 shape
 
     public string? ComponentId { get; set; }                   // a feed filter, never a gate (C-M3·2)
+    public string? ProjectId { get; set; }                     // a feed filter, never a gate (C-M3·2) — the Project association (ADR 0086 D4)
     public string AuthorId { get; set; } = string.Empty;       // the standing owner (C-M5·6)
 
     public Authorization.Audience? Audience { get; set; }       // the exact post Audience (ADR 0001-B / 0036; `null` = public)
