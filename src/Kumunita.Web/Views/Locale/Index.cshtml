@@ -1,14 +1,13 @@
 @using Kumunita.Web.Security
 @model Kumunita.Web.Controllers.LocaleController.LocaleSettingsViewModel
-@inject Kumunita.Core.Pages.IPageService Pages
 @{
     ViewData["Title"] = "Settings — Language";
 }
 
 <h1><kw-l key="locale.settings_title">Your settings</kw-l></h1>
+@await Html.PartialAsync("_SettingsTabs.cshtml")
 
-
-<h2 class="mt-4"><kw-l key="locale.language_heading">Language</kw-l></h2>
+<h2 class="mt-1"><kw-l key="locale.language_heading">Language</kw-l></h2>
 <p class="text-muted">
     <kw-l key="locale.lede">Pick the language the platform shows you. Your choice is saved in a browser cookie — it takes effect on the next request, and never affects other residents.</kw-l>
 </p>
@@ -61,161 +60,3 @@
     <input type="hidden" name="clear" value="1" />
     <button type="submit" class="btn btn-outline-secondary"><kw-l key="locale.reset">Reset to instance default</kw-l></button>
 </form>
-
-@if (Model.Timezone is var tz && tz is not null)
-{
-    <h2 class="mt-4"><kw-l key="settings.timezone_title">Time zone</kw-l></h2>
-    <p class="text-muted">
-        <kw-l key="settings.timezone_lede">Pick the time zone the platform shows you. Your choice is saved on your account — it takes effect the next time you load a page, and never affects other residents.</kw-l>
-    </p>
-
-    <form method="post" action="/settings/timezone">
-        @Html.AntiForgeryToken()
-        <div class="row g-2 align-items-end">
-            <div class="col-sm-8">
-                <label for="timezoneId" class="form-label"><kw-l key="settings.timezone_label">Your time zone</kw-l></label>
-                <select class="form-select" name="timezone" id="timezoneId">
-                    @foreach (var (id, name) in tz.Zones)
-                    {
-                        var selected = id == tz.SelectedId;
-                        <option value="@id" selected="@(selected ? "selected" : null)">
-                            @name (@id)
-                            @if (id == tz.DefaultId)
-                            {
-                                <span class="text-muted small"><kw-l key="settings.timezone_default_marker">— platform default</kw-l></span>
-                            }
-                        </option>
-                    }
-                </select>
-                <div class="form-text small">
-                    <kw-l key="settings.timezone_default_note">The platform default is </kw-l><strong>@tz.DefaultId</strong><kw-l key="settings.timezone_default_tail">. If you reset your preference, the platform default is used.</kw-l>
-                </div>
-            </div>
-            <div class="col-sm-4">
-                <button type="submit" class="btn btn-primary"><kw-l key="settings.timezone_save">Save</kw-l></button>
-            </div>
-        </div>
-    </form>
-
-    <form method="post" action="/settings/timezone" class="mt-3"
-          data-confirm="Reset your time zone to the platform default?">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="clear" value="1" />
-        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.timezone_reset">Reset to platform default</kw-l></button>
-    </form>
-}
-
-@if (Model.DateFormat is var df && df is not null)
-{
-    <h2 class="mt-4"><kw-l key="settings.dateformat_title">Date &amp; time format</kw-l></h2>
-    <p class="text-muted">
-        <kw-l key="settings.dateformat_lede">Pick how dates and times are shown to you. Your choice is saved on your account — it takes effect the next time you load a page, and never affects other residents.</kw-l>
-    </p>
-
-    <form method="post" action="/settings/dateformat">
-        @Html.AntiForgeryToken()
-        <div class="row g-2 align-items-end">
-            <div class="col-sm-8">
-                <label for="dateFormat" class="form-label"><kw-l key="settings.dateformat_label">Your date &amp; time format</kw-l></label>
-                <select class="form-select" name="format" id="dateFormat">
-                    @foreach (var (label, format) in df.Presets)
-                    {
-                        <option value="@format" selected="@(format == df.SelectedFormat ? "selected" : null)">@label — @format</option>
-                    }
-                    @if (!df.CurrentIsPreset)
-                    {
-                        <option value="custom" selected="selected"><kw-l key="settings.dateformat_custom_label">Custom…</kw-l></option>
-                    }
-                </select>
-                @if (!df.CurrentIsPreset)
-                {
-                    <input type="text" class="form-control mt-2" name="customFormat" id="customFormat"
-                           value="@df.SelectedFormat" placeholder="yyyy-MM-dd HH:mm" />
-                    <div class="form-text small"><kw-l key="settings.dateformat_custom_hint">A .NET custom datetime format string (e.g. yyyy-MM-dd HH:mm). Leave blank to use a preset.</kw-l></div>
-                }
-                else
-                {
-                    <input type="hidden" name="customFormat" value="" />
-                }
-                <div class="form-text small">
-                    <kw-l key="settings.dateformat_default_note">The platform default is </kw-l><strong>@df.DefaultFormat</strong><kw-l key="settings.dateformat_default_tail">. If you reset your preference, the platform default is used.</kw-l>
-                </div>
-            </div>
-            <div class="col-sm-4">
-                <button type="submit" class="btn btn-primary"><kw-l key="settings.dateformat_save">Save</kw-l></button>
-            </div>
-        </div>
-    </form>
-
-    <form method="post" action="/settings/dateformat" class="mt-3"
-          data-confirm="Reset your date &amp; time format to the platform default?">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="clear" value="1" />
-        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.dateformat_reset">Reset to platform default</kw-l></button>
-    </form>
-}
-
-@if (Model.EmailLanguage is var el && el is not null)
-{
-    @* ADR 0061 — the email & notification language section: the resident's
-       outbound-channel language override. Same shape as the other sections,
-       but the picker offers the enabled catalog and "instance default" is
-       the null (reset) state, not a concrete code. *@
-    <h2 class="mt-4"><kw-l key="settings.email_title">Email &amp; notification language</kw-l></h2>
-    <p class="text-muted">
-        <kw-l key="settings.email_lede">Pick the language the platform writes to you in — account emails and event reminders. Your choice is saved on your account.</kw-l>
-    </p>
-
-    <form method="post" action="/settings/email-language">
-        @Html.AntiForgeryToken()
-        <div class="row g-2 align-items-end">
-            <div class="col-sm-8">
-                <label for="emailLanguage" class="form-label"><kw-l key="settings.email_label">Email &amp; notification language</kw-l></label>
-                <select class="form-select" name="code" id="emailLanguage">
-                    @foreach (var lang in el.Languages)
-                    {
-                        var selected = lang.Code == el.SelectedCode;
-                        <option value="@lang.Code" selected="@(selected ? "selected" : null)">
-                            @lang.NativeName (@lang.Code)
-                            @if (lang.Code == el.DefaultCode)
-                            {
-                                <span class="text-muted small"><kw-l key="locale.instance_default">— instance default</kw-l></span>
-                            }
-                        </option>
-                    }
-                </select>
-                <div class="form-text small">
-                    <kw-l key="settings.email_note">If you choose a language, your emails and reminders are sent in it. If you reset it, the instance default is used.</kw-l>
-                </div>
-            </div>
-            <div class="col-sm-4">
-                <button type="submit" class="btn btn-primary"><kw-l key="settings.email_save">Save</kw-l></button>
-            </div>
-        </div>
-    </form>
-
-    <form method="post" action="/settings/email-language" class="mt-3"
-          data-confirm="Reset your email &amp; notification language to the instance default?">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="clear" value="1" />
-        <button type="submit" class="btn btn-outline-secondary"><kw-l key="settings.email_reset">Reset to instance default</kw-l></button>
-    </form>
-}
-
-@* ADR 0039 §3.8 — the help/account mount slot (the account-help page): the page
-   mounted at this slot renders as a link; an unmounted slot renders nothing.
-   Display, not access — the Show action is the Read decision. Resolved via the
-   same PageMountResolver the footer/community slot uses (_Layout). *@
-@{
-    var accountHelp = await PageMountResolver.ResolveAsync(Pages, "help/account");
-}
-@if (accountHelp is not null)
-{
-    <h2 class="mt-4"><kw-l key="settings.help_heading">Help with your account</kw-l></h2>
-    <p class="text-muted">
-        <kw-l key="settings.help_lede">Stuck on your account — a password, your access, or anything else? This guide walks you through it.</kw-l>
-    </p>
-    <p>
-        <a href="@accountHelp.Value.Href" class="btn btn-outline-primary">@accountHelp.Value.Title</a>
-    </p>
-}
