@@ -821,7 +821,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     /// actor 403, a missing goal 404 — not a 500).
     /// </summary>
     [Fact]
-    public async Task Goal_Detail_ShowsGoalAndProjects()
+    public async Task GoalDetail_ProjectsInThisGoal_ListRendered()
     {
         const string actor = "subj-goal-detail";
         const string goalId = "goal-detail";
@@ -1046,7 +1046,7 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
     /// <see cref="ForbidResult"/> (C3 403).
     /// </summary>
     [Fact]
-    public async Task Project_Detail_ShowsProjectGoalAndAssociatedItems()
+    public async Task ProjectDetail_AssociatedTodosAndBoards_ListRendered()
     {
         const string actor = "subj-project-detail";
         const string projectId = "project-detail";
@@ -1741,5 +1741,99 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         {
             // no-op — the assertion target is the redirect / the call log, not the bag
         }
+    }
+
+    // ── §9.6 pinned tests — the PL lane's Web pins (ADR 0086) ──────────────
+
+    /// <summary>
+    /// <c>GET /projects</c>: the landing renders the **goals** feed (from the
+    /// frozen seam's <see cref="IProjectService.ListGoalsAsync"/>) and the
+    /// **standalone-projects** feed (from
+    /// <see cref="IProjectService.ListProjectsAsync"/> with
+    /// <c>goalId = null</c> — the D8 / design doc §5 second section). Both
+    /// resolve author display names as *reads* (falling back to the raw id
+    /// when the profile row is absent — the Build() default). A denied actor
+    /// is a clean <see cref="ForbidResult"/> (C3 403).
+    /// </summary>
+    [Fact]
+    public async Task ProjectsIndex_GoalsPlusStandaloneProjects_Render()
+    {
+        const string actor = "subj-projects-index";
+        var goal = new ProjectGoal
+        {
+            Id = "goal-idx", Title = "Goal", AuthorId = actor,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        };
+        var project = new Project
+        {
+            Id = "proj-idx", Title = "Project", AuthorId = actor, GoalId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+        };
+
+        var projects = Substitute.For<IProjectService>();
+        projects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProjectGoal> { goal });
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project> { project });
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectsIndex(componentId: null, page: 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<ProjectsIndexViewModel>(view.ViewData.Model);
+        Assert.Single(vm.Goals);
+        Assert.Equal("goal-idx", vm.Goals[0].Id);
+        Assert.Equal("Goal", vm.Goals[0].Title);
+        Assert.Equal(actor, vm.Goals[0].AuthorDisplayName); // no profile → raw id
+        Assert.Single(vm.StandaloneProjects);
+        Assert.Equal("proj-idx", vm.StandaloneProjects[0].Id);
+        Assert.Equal("Project", vm.StandaloneProjects[0].Title);
+        Assert.Equal(actor, vm.StandaloneProjects[0].AuthorDisplayName); // no profile → raw id
+
+        await projects.Received(1).ListGoalsAsync(null, actor, 1, Arg.Any<CancellationToken>());
+        await projects.Received(1).ListProjectsAsync(null, null, actor, 1, Arg.Any<CancellationToken>());
+
+        // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<ProjectGoal>>(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.ProjectsIndex(null, page: 1));
+    }
+
+    /// <summary>
+    /// <c>GET /projects</c>: the <see cref="ProjectsController.ProjectsIndex"/>
+    /// action returns a <see cref="ViewResult"/> whose <c>ViewName</c> is
+    /// <c>"ProjectsIndex"</c> — the same name the <c>_ProjectsTabs</c>
+    /// partial's <c>action switch</c> maps to the active <c>"Projects"</c>
+    /// tab (the F9 / C-PL·7 tab contract). The partial is a shared Razor
+    /// view (no view-rendering test infra in this repo — the same convention
+    /// as <c>Todos_List_AudienceFiltered</c> / <c>Board_Detail_LanesAndCards</c>:
+    /// the seam boundary is the view name + view model, not the rendered HTML);
+    /// the tab-active behavior is verified in the browser harness.
+    /// </summary>
+    [Fact]
+    public async Task ProjectsTabs_ProjectsTab_ActiveOnIndex()
+    {
+        const string actor = "subj-tabs-active";
+        var projects = Substitute.For<IProjectService>();
+        projects.ListGoalsAsync(
+                Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<ProjectGoal>());
+        projects.ListProjectsAsync(
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Project>());
+
+        var controller = Build(projects, subjectId: actor);
+        var result = await controller.ProjectsIndex(componentId: null, page: 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        // The view name is the action name — the _ProjectsTabs partial's
+        // action switch maps "ProjectsIndex" → active "Projects" tab (F9).
+        Assert.Equal("ProjectsIndex", view.ViewName);
+        Assert.IsType<ProjectsIndexViewModel>(view.ViewData.Model);
     }
 }
