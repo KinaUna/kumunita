@@ -1,7 +1,18 @@
 @model Kumunita.Web.Models.ProjectDetailViewModel
 @using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Title) ? "Project" : Model.Title;
+
+    // ADR 0088 — the project's **default-visible** translation variant is the
+    // viewer's current language when a translation exists in it, else the
+    // authored-in language (the ADR 0027 floor) — the ADR 0049 originalHidden
+    // flag (the Event / Announcement detail idiom).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
+    bool _originalHidden = Model.Translations is { Count: > 0 }
+        && Model.Translations.Any(t => String.Equals(t.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase));
 }
 
 <div class="row justify-content-center">
@@ -19,16 +30,64 @@
         <header class="airy-head">
             <div class="head-row">
                 <div>
-                    <h1>
-                        @if (string.IsNullOrWhiteSpace(Model.Title))
+                    @* ADR 0088 — user-added translations of the project (the
+                       ADR 0059 chip-swap: the original + one variant per
+                       translation; ADR 0049 auto-selects the viewer's
+                       current-language variant as default-visible when one
+                       exists). The title + description (the project's two
+                       surfaces) swap together inside the group. The
+                       add/edit/remove management is gated on Model.CanTranslate. *@
+                    <div data-td-group="project-title">
+                        @* Original variant — default-visible unless ADR 0049
+                           auto-selects a translation into the viewer's
+                           language (_originalHidden). *@
+                        <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                             @(_originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                            <h1>
+                                @if (string.IsNullOrWhiteSpace(Model.Title))
+                                {
+                                    <span class="text-body-tertiary"><kw-l key="pl.project.new_heading">New project</kw-l></span>
+                                }
+                                else
+                                {
+                                    @Model.Title
+                                }
+                            </h1>
+                        </div>
+
+                        @* One variant per user-added translation — hidden by
+                           default, except the one matching the viewer's
+                           current language (ADR 0049). *@
+                        @if (Model.Translations is { Count: > 0 })
                         {
-                            <span class="text-body-tertiary"><kw-l key="pl.project.new_heading">New project</kw-l></span>
+                            @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                bool tDefault = String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase);
+                                <div class="td-variant" data-td-variant="@tr.LanguageCode"
+                                     @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                                    @if (!string.IsNullOrWhiteSpace(tr.Title))
+                                    {
+                                        <h1>@tr.Title</h1>
+                                    }
+                                </div>
+                            }
+
+                            <div class="mt-2">
+                                <div class="d-flex flex-wrap align-items-center gap-2">
+                                    <span class="text-muted small fw-semibold"><kw-l key="posts.translations_label">Translations</kw-l></span>
+                                    <button type="button" class="badge text-bg-light border"
+                                            data-translation-chip data-td-group="project-title"
+                                            data-td-variant="@Model.OriginalLanguageCode">@Model.OriginalLanguageCode</button>
+                                    @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                                    {
+                                        <button type="button" class="badge text-bg-light border"
+                                                data-translation-chip data-td-group="project-title"
+                                                data-td-variant="@tr.LanguageCode">@tr.LanguageCode</button>
+                                    }
+                                </div>
+                            </div>
                         }
-                        else
-                        {
-                            @Model.Title
-                        }
-                    </h1>
+                    </div>
                     <div class="text-muted small mt-1">
                         @Model.AuthorDisplayName
                         <span>· <kw-l key="projects.todo.created">Created</kw-l>
@@ -118,21 +177,145 @@
             </div>
         </header>
 
-        @* The project's body — pre-rendered through the one MarkdownRenderer
-           (ADR 0025; the rendered detail body, not the WYSIWYG rc-editor).
-           A blank description shows the empty-description hint instead. *@
-        <div class="card mb-4">
-            <div class="card-body rc-body">
-                @if (Model.DescriptionHtml is not null)
-                {
-                    @Html.Raw(Model.DescriptionHtml)
-                }
-                else
-                {
-                    <p class="text-muted mb-0"><kw-l key="pl.project.empty_description">This project has no description yet.</kw-l></p>
-                }
+        @* The project's body (ADR 0088) — its own td-group (separate from the
+           title group so the card layout is preserved): the original + one
+           variant per translation, each a Markdown body rendered through the
+           one MarkdownRenderer (the ADR 0025 shape). A variant with no body
+           shows the empty-description hint. *@
+        <div data-td-group="project-description" class="card mb-4">
+            <div class="td-variant" data-td-variant="@Model.OriginalLanguageCode"
+                 @(_originalHidden ? Html.Raw(" style=\"display:none\"") : Html.Raw(""))>
+                <div class="card-body rc-body">
+                    @if (Model.DescriptionHtml is not null)
+                    {
+                        @Html.Raw(Model.DescriptionHtml)
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-0"><kw-l key="pl.project.empty_description">This project has no description yet.</kw-l></p>
+                    }
+                </div>
             </div>
+
+            @if (Model.Translations is { Count: > 0 })
+            {
+                @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                {
+                    bool tDefault = String.Equals(tr.LanguageCode, _kwL, StringComparison.OrdinalIgnoreCase);
+                    <div class="td-variant" data-td-variant="@tr.LanguageCode"
+                         @(tDefault ? Html.Raw("") : Html.Raw(" style=\"display:none\""))>
+                        <div class="card-body rc-body">
+                            @if (!string.IsNullOrWhiteSpace(tr.Body))
+                            {
+                                @Html.Raw(MarkdownRenderer.RenderHtml(tr.Body))
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-0"><kw-l key="pl.project.empty_description">This project has no description yet.</kw-l></p>
+                            }
+                        </div>
+                    </div>
+                }
+            }
         </div>
+
+        @* ADR 0088 — the project's translation management (add / edit /
+           remove), gated on the standing (Model.CanTranslate — the service's
+           display pin; the standing is re-pinned server-side on write). The
+           add form offers one language per enabled code that has no
+           translation yet; the existing rows offer edit + remove. Same shape
+           as the Event / Announcement detail translation sections. *@
+        @if (Model.CanTranslate)
+        {
+            <div class="card mb-4">
+                <div class="card-body p-2">
+                    <div class="small text-muted mb-1"><kw-l key="posts.translations_label">Translations</kw-l></div>
+
+                    @foreach (var opt in (Model.Languages ?? []))
+                    {
+                        bool hasTranslation = Model.Translations is not null
+                            && Model.Translations.Any(t => t.LanguageCode == opt.Code);
+                        if (hasTranslation) continue;
+
+                        <details class="mb-1 mt-2">
+                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                <kw-l key="posts.translation_add">Add</kw-l> <b>@opt.NativeName</b>
+                            </summary>
+                            <form class="ms-2" method="post"
+                                  action="@($"/projects/projects/{Model.Id}/translations")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@opt.Code" />
+                                <label class="form-label small" for="proj-t-title-@opt.Code">
+                                    @opt.NativeName <kw-l key="posts.translation_title_label">title</kw-l>
+                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <input class="form-control form-control-sm mb-2" id="proj-t-title-@opt.Code"
+                                       name="title" value="@Model.Title" />
+                                <label class="form-label small" for="proj-t-body-@opt.Code">
+                                    <kw-l key="posts.translation_body_label">Body</kw-l>
+                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                </label>
+                                <div class="rc-editor">
+                                    <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                        <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                        <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                        <partial name="_RichEditorToggle" />
+                                    </div>
+                                    <textarea class="form-control form-control-sm mb-2" id="proj-t-body-@opt.Code"
+                                              name="body" rows="3" placeholder="…" data-rich-editor></textarea>
+                                    <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <kw-l key="posts.translation_save">Save translation</kw-l>
+                                </button>
+                            </form>
+                        </details>
+                    }
+
+                    @if (Model.Translations is { Count: > 0 })
+                    {
+                        <hr class="my-2" />
+                        @foreach (var tr in Model.Translations.OrderBy(x => x.LanguageCode))
+                        {
+                            <details class="mb-1 mt-1">
+                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
+                                    <kw-l key="posts.translation_edit">Edit</kw-l> <b>@tr.LanguageCode</b>
+                                </summary>
+                                <div class="ms-2">
+                                    <form method="post" action="@($"/projects/projects/{Model.Id}/translations/update")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
+                                        <label class="form-label small">
+                                            <kw-l key="posts.translation_title_label">Title</kw-l>
+                                            <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                        </label>
+                                        <input class="form-control form-control-sm mb-2" name="title" value="@tr.Title" />
+                                        <label class="form-label small">
+                                            <kw-l key="posts.translation_body_label">Body</kw-l>
+                                        </label>
+                                        <textarea class="form-control form-control-sm mb-2" name="body" rows="3">@tr.Body</textarea>
+                                        <button type="submit" class="btn btn-sm btn-primary">
+                                            <kw-l key="posts.translation_save">Save translation</kw-l>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="@($"/projects/projects/{Model.Id}/translations/remove")"
+                                          class="mt-2" onsubmit="return confirm('Remove this translation?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="languageCode" value="@tr.LanguageCode" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <kw-l key="posts.translation_remove">Remove</kw-l> <b>@tr.LanguageCode</b>
+                                        </button>
+                                    </form>
+                                </div>
+                            </details>
+                        }
+                    }
+                </div>
+            </div>
+        }
 
         @* The associated to-dos in this project (the U04 projectId feed
            filter — C-PL·3, a feed filter, never a gate; a denied to-do is

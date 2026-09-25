@@ -159,7 +159,18 @@ public sealed record BoardDetailViewModel(
     // (the <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…"
     // modal — a **display** surface, never a gate (C-PL·3). Empty ⇒ the
     // item and the modal hide (the BoardEdit F10 rule).
-    IReadOnlyList<(string Id, string Name)>? Projects = null);
+    IReadOnlyList<(string Id, string Name)>? Projects = null,
+    // ADR 0088 — the board's user-added translations (the ADR 0027 chip-swap +
+    // ADR 0049 default-visible-variant + ADR 0022 add-form shape; the
+    // <see cref="Kumunita.Core.Projects.BoardTranslation"/> rows), the
+    // enabled-catalog language set the chips / add-form render from, the
+    // display pin (creator ∪ Translator ∪ GlobalAdmin — the real gate is the
+    // server-side re-check in the write lanes), and the authored-in language
+    // code.
+    IReadOnlyList<Kumunita.Core.Projects.BoardTranslation>? Translations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "");
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +

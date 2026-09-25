@@ -434,7 +434,18 @@ public sealed record ProjectDetailViewModel(
     IReadOnlyList<ProjectAssociatedBoardCard> Boards,
     bool CanEdit,
     DateTimeOffset Created,
-    DateTimeOffset? Modified);
+    DateTimeOffset? Modified,
+    // ADR 0088 — the project's user-added translations (the ADR 0027 chip-swap
+    // + ADR 0049 default-visible-variant + ADR 0022 add-form shape; the
+    // <see cref="Kumunita.Core.Projects.ProjectTranslation"/> rows), the
+    // enabled-catalog language set the chips / add-form render from, the
+    // display pin (creator ∪ Translator ∪ GlobalAdmin — the real gate is the
+    // server-side re-check in the write lanes), and the authored-in language
+    // code.
+    IReadOnlyList<Kumunita.Core.Projects.ProjectTranslation>? Translations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "");
 
 /// <summary>
 /// The **project composer** form model — shared by **both** the

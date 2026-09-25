@@ -112,5 +112,22 @@ public static class M5DocTypes
         opts.Schema.For<Project>()
                .Index(p => new { p.ComponentId, p.Created })
                .Index(p => p.GoalId);
+
+        // ── Translation lanes (ADR 0088) — the ADR 0059 `EventTranslation`
+        // shape carried to the three M5/PL parent surfaces (todo / board /
+        // project). Each is a separate row per (parent, language) pair, so a
+        // (ParentId, LanguageCode) **unique** index is the business key — the
+        // exact `EventRsvp` (EventId, UserId) / `BoardItemPlacement`
+        // (TodoItemId, BoardId) unique-index shape used throughout this file
+        // (unnamed: the auto-derived names stay under Postgres' 64-char
+        // NAMEDATALEN cap, the ADR 0059 / ADR 0029 note).
+        opts.Schema.For<TodoTranslation>()
+               .UniqueIndex(t => t.TodoItemId, t => t.LanguageCode);
+
+        opts.Schema.For<BoardTranslation>()
+               .UniqueIndex(b => b.BoardId, b => b.LanguageCode);
+
+        opts.Schema.For<ProjectTranslation>()
+               .UniqueIndex(p => p.ProjectId, p => p.LanguageCode);
     }
 }

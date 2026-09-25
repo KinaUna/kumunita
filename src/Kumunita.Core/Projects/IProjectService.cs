@@ -648,4 +648,222 @@ public interface IProjectService
     /// "todo"</c>) is stored in the caller's session (C3).
     /// </summary>
     Task<TodoItem> CopyTodoToBoardAsync(string todoItemId, string targetBoardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    // --- Translation lanes (ADR 0088 — the ADR 0059 `EventTranslation` lane
+    // carried to the three M5/PL parent surfaces) ---------------------------
+    //
+    // Mirrors the IEventService translation seams (ADR 0059) / the
+    // IPostService / IAnnouncementService lanes (ADR 0022 / 0029 / 0048) on
+    // the **M5/PL self-composed-session convention** (ADR 0067 §4 — no caller
+    // IDocumentSession; ProjectService opens its own write session). The
+    // display pin (ADR 0027 shape, the <see cref="IEventService"/>
+    // CanAddTranslation precedent) is the static
+    // <see cref="ProjectService.CanAddTodoTranslation"/> /
+    // <see cref="ProjectService.CanAddBoardTranslation"/> /
+    // <see cref="ProjectService.CanAddProjectTranslation"/> helpers.
+
+    /// <summary>
+    /// The **read** seam for a to-do's user-added translations (ADR 0088):
+    /// every <see cref="TodoTranslation"/> whose <see cref="TodoTranslation.TodoItemId"/>
+    /// is <paramref name="todoItemId"/>, ordered by
+    /// <see cref="TodoTranslation.LanguageCode"/>. Owns its own
+    /// <c>QuerySession</c> (C3 read lane); **not** an authorization surface and
+    /// writes **no** audit row (C-M3·1 — inherits the parent to-do's single
+    /// <c>Read</c> decision; the Web reads this only after
+    /// <see cref="GetTodoAsync"/> returned the to-do).
+    /// </summary>
+    Task<IReadOnlyList<TodoTranslation>> GetTodoTranslationsAsync(string todoItemId);
+
+    /// <summary>
+    /// Add a **user-added translation** of a to-do into a language other than
+    /// the one it was authored in (ADR 0088). One row per
+    /// <c>(todoItemId, languageCode)</c> pair (the
+    /// <see cref="M5DocTypes.Configure"/>'s <c>(TodoItemId, LanguageCode)</c>
+    /// unique index). <b>Standing (ADR 0088 D3):</b> the to-do's
+    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), the to-do's
+    /// <b>assignee</b> (the ADR 0067 assignee branch, <see cref="AccessVia.Admin"/>),
+    /// a <b>Translator</b> (ADR 0021, <see cref="AccessVia.Admin"/>), or a
+    /// <b>GlobalAdmin</b> (ADR 0030, <see cref="AccessVia.Admin"/>). A denied
+    /// actor throws <see cref="UnauthorizedAccessException"/> before anything is
+    /// stored. The <c>AccessAudit</c> row (<c>todotranslation.add</c>,
+    /// <c>TargetKind = "todo"</c>) commits atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
+    Task<TodoTranslation> AddTodoTranslationAsync(
+        string todoItemId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit an existing to-do translation (ADR 0088, the ADR 0048 edit-lane
+    /// shape): updates the <see cref="TodoTranslation.Title"/> /
+    /// <see cref="TodoTranslation.Body"/> for the
+    /// <c>(todoItemId, languageCode)</c> pair, stamps
+    /// <see cref="TodoTranslation.Created"/> and re-records
+    /// <see cref="TodoTranslation.AuthorId"/>. Same standing as
+    /// <see cref="AddTodoTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>todotranslation.update</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do or the (to-do, language)
+    /// row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
+    Task<TodoTranslation> UpdateTodoTranslationAsync(
+        string todoItemId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Remove a to-do translation (ADR 0088, the ADR 0048 remove-lane shape):
+    /// deletes the <c>(todoItemId, languageCode)</c> row. Same standing as
+    /// <see cref="AddTodoTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>todotranslation.remove</c>, <c>TargetKind = "todo"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The to-do or the (to-do, language)
+    /// row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / assignee / Translator / GlobalAdmin standings.</exception>
+    Task RemoveTodoTranslationAsync(
+        string todoItemId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// The **read** seam for a Kanban board's user-added translations (ADR 0088):
+    /// every <see cref="BoardTranslation"/> whose <see cref="BoardTranslation.BoardId"/>
+    /// is <paramref name="boardId"/>, ordered by
+    /// <see cref="BoardTranslation.LanguageCode"/>. Owns its own
+    /// <c>QuerySession</c> (C3 read lane); **not** an authorization surface and
+    /// writes **no** audit row (C-M3·1 — inherits the parent board's single
+    /// <c>Read</c> decision; the Web reads this only after
+    /// <see cref="GetBoardAsync"/> returned the board).
+    /// </summary>
+    Task<IReadOnlyList<BoardTranslation>> GetBoardTranslationsAsync(string boardId);
+
+    /// <summary>
+    /// Add a **user-added translation** of a Kanban board into a language other
+    /// than the one it was authored in (ADR 0088). One row per
+    /// <c>(boardId, languageCode)</c> pair (the
+    /// <see cref="M5DocTypes.Configure"/>'s <c>(BoardId, LanguageCode)</c>
+    /// unique index). <b>Standing (ADR 0088 D3):</b> the board's
+    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
+    /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>
+    /// (ADR 0030, <see cref="AccessVia.Admin"/>). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is stored. The
+    /// <c>AccessAudit</c> row (<c>boardtranslation.add</c>,
+    /// <c>TargetKind = "board"</c>) commits atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The board id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task<BoardTranslation> AddBoardTranslationAsync(
+        string boardId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit an existing board translation (ADR 0088, the ADR 0048 edit-lane
+    /// shape): updates the <see cref="BoardTranslation.Title"/> /
+    /// <see cref="BoardTranslation.Body"/> for the
+    /// <c>(boardId, languageCode)</c> pair, stamps
+    /// <see cref="BoardTranslation.Created"/> and re-records
+    /// <see cref="BoardTranslation.AuthorId"/>. Same standing as
+    /// <see cref="AddBoardTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>boardtranslation.update</c>, <c>TargetKind = "board"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The board or the (board, language)
+    /// row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task<BoardTranslation> UpdateBoardTranslationAsync(
+        string boardId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Remove a board translation (ADR 0088, the ADR 0048 remove-lane shape):
+    /// deletes the <c>(boardId, languageCode)</c> row. Same standing as
+    /// <see cref="AddBoardTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>boardtranslation.remove</c>, <c>TargetKind = "board"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The board or the (board, language)
+    /// row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task RemoveBoardTranslationAsync(
+        string boardId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// The **read** seam for a project's user-added translations (ADR 0088):
+    /// every <see cref="ProjectTranslation"/> whose
+    /// <see cref="ProjectTranslation.ProjectId"/> is <paramref name="projectId"/>,
+    /// ordered by <see cref="ProjectTranslation.LanguageCode"/>. Owns its own
+    /// <c>QuerySession</c> (C3 read lane); **not** an authorization surface and
+    /// writes **no** audit row (C-M3·1 — inherits the parent project's single
+    /// <c>Read</c> decision; the Web reads this only after
+    /// <see cref="GetProjectAsync"/> returned the project).
+    /// </summary>
+    Task<IReadOnlyList<ProjectTranslation>> GetProjectTranslationsAsync(string projectId);
+
+    /// <summary>
+    /// Add a **user-added translation** of a project into a language other than
+    /// the one it was authored in (ADR 0088). One row per
+    /// <c>(projectId, languageCode)</c> pair (the
+    /// <see cref="M5DocTypes.Configure"/>'s <c>(ProjectId, LanguageCode)</c>
+    /// unique index). <b>Standing (ADR 0088 D3):</b> the project's
+    /// <b>creator</b> (<see cref="AccessVia.Owner"/>), a <b>Translator</b>
+    /// (ADR 0021, <see cref="AccessVia.Admin"/>), or a <b>GlobalAdmin</b>
+    /// (ADR 0030, <see cref="AccessVia.Admin"/>). A denied actor throws
+    /// <see cref="UnauthorizedAccessException"/> before anything is stored. The
+    /// <c>AccessAudit</c> row (<c>projecttranslation.add</c>,
+    /// <c>TargetKind = "project"</c>) commits atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The project id is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task<ProjectTranslation> AddProjectTranslationAsync(
+        string projectId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit an existing project translation (ADR 0088, the ADR 0048 edit-lane
+    /// shape): updates the <see cref="ProjectTranslation.Title"/> /
+    /// <see cref="ProjectTranslation.Body"/> for the
+    /// <c>(projectId, languageCode)</c> pair, stamps
+    /// <see cref="ProjectTranslation.Created"/> and re-records
+    /// <see cref="ProjectTranslation.AuthorId"/>. Same standing as
+    /// <see cref="AddProjectTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>projecttranslation.update</c>, <c>TargetKind = "project"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The project or the (project,
+    /// language) row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task<ProjectTranslation> UpdateProjectTranslationAsync(
+        string projectId, string languageCode, string? title, string? body,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
+    /// Remove a project translation (ADR 0088, the ADR 0048 remove-lane shape):
+    /// deletes the <c>(projectId, languageCode)</c> row. Same standing as
+    /// <see cref="AddProjectTranslationAsync"/>. A missing row is a
+    /// <see cref="KeyNotFoundException"/> (404). The <c>AccessAudit</c> row
+    /// (<c>projecttranslation.remove</c>, <c>TargetKind = "project"</c>) commits
+    /// atomically with the write (C3).
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">The project or the (project,
+    /// language) row is not found.</exception>
+    /// <exception cref="UnauthorizedAccessException">The actor holds none of the
+    /// creator / Translator / GlobalAdmin standings.</exception>
+    Task RemoveProjectTranslationAsync(
+        string projectId, string languageCode,
+        string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 }

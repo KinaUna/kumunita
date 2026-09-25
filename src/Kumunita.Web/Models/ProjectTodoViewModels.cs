@@ -140,7 +140,18 @@ public sealed record TodoDetailViewModel(
     // the actor — the link is then omitted entirely, never a 404/403 for the
     // to-do itself; the `pl.todo.project_link` kw-l key labels it).
     string? ProjectId = null,
-    string? ProjectTitle = null);
+    string? ProjectTitle = null,
+    // ADR 0088 — the to-do's user-added translations (the ADR 0027 chip-swap +
+    // ADR 0049 default-visible-variant + ADR 0022 add-form shape; the
+    // <see cref="Kumunita.Core.Projects.TodoTranslation"/> rows), the
+    // enabled-catalog language set the chips / add-form render from, the
+    // display pin (creator ∪ assignee ∪ Translator ∪ GlobalAdmin — the real
+    // gate is the server-side re-check in the write lanes), and the authored-in
+    // language code.
+    IReadOnlyList<Kumunita.Core.Projects.TodoTranslation>? Translations = null,
+    IReadOnlyList<LanguageOption>? Languages = null,
+    bool CanTranslate = false,
+    string OriginalLanguageCode = "");
 
 /// <summary>
 /// The **compose / edit** form model (the <c>GET /projects/todos/new</c>

@@ -68,16 +68,25 @@ public sealed class ProjectsController : Controller
     private readonly ILocalizationService localization;
     private readonly IDocumentStore store;
 
+    // ADR 0088 / ADR 0051 — the shared per-request translation provider used
+    // to resolve the viewer's current language for the feed's default-visible
+    // variant swap (the <see cref="EventController"/> /
+    // <see cref="PostsController"/> optional-ctor-param precedent — test
+    // construction sites pass no value, which is a no-op).
+    private readonly ITranslationProvider? translationProvider;
+
     public ProjectsController(
         IProjectService projects,
         IUserInfoService userInfo,
         ILocalizationService localization,
-        IDocumentStore store)
+        IDocumentStore store,
+        ITranslationProvider? translationProvider = null)
     {
         this.projects = projects;
         this.userInfo = userInfo;
         this.localization = localization;
         this.store = store;
+        this.translationProvider = translationProvider;
     }
 
     private static string? SubjectId(ClaimsPrincipal user) =>
@@ -165,6 +174,110 @@ public sealed class ProjectsController : Controller
             .Select(c => (c.Id, Name: string.IsNullOrWhiteSpace(c.Name) ? c.Id : c.Name))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    /// Resolves a BCP-47 code to its catalog <c>NativeName</c> for a
+    /// <c>TempData</c> confirmation message (a display convenience — a
+    /// <see cref="ILocalizationService.ListLanguagesAsync"/> read, not a
+    /// decision). Falls back to the raw code when the language is not in the
+    /// catalog (a never-blank shape — the
+    /// <see cref="EventController.SeedLanguageName"/> idiom, ADR 0088).
+    /// </summary>
+    private async Task<string> SeedLanguageName(string code)
+    {
+        var catalog = await localization.ListLanguagesAsync();
+        return catalog.FirstOrDefault(l => l.Id == code)?.NativeName ?? code;
+    }
+
+    /// <summary>
+    /// ADR 0088 — builds the detail page's <see cref="LanguageOption"/> set from
+    /// the entity's existing translation rows + the enabled-catalog language
+    /// list: each catalog language maps to a <c>LanguageOption</c> whose
+    /// <c>HasTranslation</c> flag reflects whether a translation row already
+    /// exists for it (the ADR 0027 chip-swap affordance — the "add a
+    /// translation" candidate list + the per-language chips). The exact
+    /// <see cref="EventController"/> detail-build idiom, generalized over the
+    /// per-entity translation row's <c>LanguageCode</c> selector.
+    /// </summary>
+    private static IReadOnlyList<LanguageOption> LanguageOptionsFrom<T>(
+        IReadOnlyList<T> translations,
+        IReadOnlyList<(string Code, string NativeName)> enabledLanguages,
+        Func<T, string> codeSelector)
+    {
+        var existing = new HashSet<string>(translations.Select(codeSelector), StringComparer.OrdinalIgnoreCase);
+        return enabledLanguages
+            .Select(l => new LanguageOption(l.Code, l.NativeName, existing.Contains(l.Code)))
+            .ToList();
+    }
+
+    /// <summary>
+    /// ADR 0051 (the ADR 0088 feed lane) — in place, swap <paramref
+    /// name="todo"/>'s Title (and Body, when both present) to the translation
+    /// row in the viewer's current language when one exists: the translation's
+    /// title when non-blank (otherwise the authored title is kept — the ADR
+    /// 0022 floor), and its body when non-blank (a to-do body is optional, the
+    /// ADR 0088 deviation). A read, not a decision: the to-do's
+    /// <c>CanSeeAsync</c> already ran in the feed read. No content is generated,
+    /// rewritten, or fetched — only the exact human-authored row (ADR 0018/0022)
+    /// is selected. A null <see cref="translationProvider"/> (test construction
+    /// site) is a no-op — the authored-in text stays, exactly the
+    /// <see cref="EventController"/> / <see cref="PostsController"/> shape.
+    /// </summary>
+    private async Task ApplyTodoTranslationAsync(TodoItem todo, string effLang)
+    {
+        if (translationProvider is null)
+            return;
+        var translations = await projects.GetTodoTranslationsAsync(todo.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(match.Title))
+            todo.Title = match.Title;
+        if (!string.IsNullOrWhiteSpace(match.Body))
+            todo.Body = match.Body;
+    }
+
+    /// <summary>
+    /// ADR 0051 (the ADR 0088 feed lane) — in place, swap <paramref
+    /// name="board"/>'s Title (and Body, when both present) to the translation
+    /// row in the viewer's current language when one exists. A read, not a
+    /// decision; a null <see cref="translationProvider"/> is a no-op (the
+    /// <see cref="EventController"/> shape).
+    /// </summary>
+    private async Task ApplyBoardTranslationAsync(KanbanBoard board, string effLang)
+    {
+        if (translationProvider is null)
+            return;
+        var translations = await projects.GetBoardTranslationsAsync(board.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(match.Title))
+            board.Title = match.Title;
+        if (!string.IsNullOrWhiteSpace(match.Body))
+            board.Description = match.Body;
+    }
+
+    /// <summary>
+    /// ADR 0051 (the ADR 0088 feed lane) — in place, swap <paramref
+    /// name="project"/>'s Title (and Description, when both present) to the
+    /// translation row in the viewer's current language when one exists. A
+    /// read, not a decision; a null <see cref="translationProvider"/> is a
+    /// no-op (the <see cref="EventController"/> shape).
+    /// </summary>
+    private async Task ApplyProjectTranslationAsync(Project project, string effLang)
+    {
+        if (translationProvider is null)
+            return;
+        var translations = await projects.GetProjectTranslationsAsync(project.Id);
+        var match = translations.FirstOrDefault(t => String.Equals(t.LanguageCode, effLang, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+            return;
+        if (!string.IsNullOrWhiteSpace(match.Title))
+            project.Title = match.Title;
+        if (!string.IsNullOrWhiteSpace(match.Body))
+            project.Description = match.Body;
     }
 
     // ── Display-name resolution (a read surface only, never a decision) ────
@@ -383,6 +496,18 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0088 / ADR 0051 — the feed translation swap: the viewer's
+        // current-language translation of each to-do (title + body) swaps in
+        // over the authored-in value (the Event feed idiom). A read
+        // convenience (the audience decision already ran in ListTodosAsync);
+        // a no-op when no provider is wired.
+        if (translationProvider is not null)
+        {
+            string effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var t in todos)
+                await ApplyTodoTranslationAsync(t, effLang);
+        }
+
         var authorIds = todos
             .SelectMany(t => new[] { t.AuthorId, t.AssigneeId })
             .Where(a => a is not null && a.Length > 0)
@@ -569,12 +694,28 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0088 — the to-do's user-added translations (the ADR 0027
+        // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
+        // shape). A "a read, not a decision" surface; the parent to-do's single
+        // Read decision already ran in GetTodoAsync (C-M3·1). CanTranslate is
+        // the ADR 0088 display pin (creator ∪ assignee ∪ Translator ∪
+        // GlobalAdmin) — the real gate is the server-side re-check in the
+        // Add/Update/Remove lanes at POST.
+        var todoTranslations = await projects.GetTodoTranslationsAsync(id);
+        var todoLanguages = LanguageOptionsFrom(todoTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode);
+        var canTranslateTodo = !string.IsNullOrEmpty(actorId)
+            && ProjectService.CanAddTodoTranslation(result.Todo.AuthorId, result.Todo.AssigneeId, actorId, RoleSet(User));
+
         var vm = new TodoDetailViewModel(
             Todo: row,
             Subtasks: subtasks,
             Placements: placementRows,
             ProjectId: projectLinkId,
-            ProjectTitle: projectLinkTitle);
+            ProjectTitle: projectLinkTitle,
+            Translations: todoTranslations,
+            Languages: todoLanguages,
+            CanTranslate: canTranslateTodo,
+            OriginalLanguageCode: result.Todo.LanguageCode);
 
         // ADR 0071 — the "Add subtask" modal's optional Assignee picker
         // (the same idiom as the BoardDetail / Create / BoardNew views).
@@ -1220,6 +1361,18 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0088 / ADR 0051 — the feed translation swap: the viewer's
+        // current-language translation of each board (title + description)
+        // swaps in over the authored-in value (the Event feed idiom). A read
+        // convenience (the audience decision already ran in ListBoardsAsync);
+        // a no-op when no provider is wired.
+        if (translationProvider is not null)
+        {
+            string effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var b in boards)
+                await ApplyBoardTranslationAsync(b, effLang);
+        }
+
         var authorIds = boards
             .Select(b => b.AuthorId)
             .Where(a => a is not null && a.Length > 0)
@@ -1367,6 +1520,12 @@ public sealed class ProjectsController : Controller
             }
         }
 
+        // ADR 0088 — the board's user-added translations (the ADR 0027
+        // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
+        // shape). A "a read, not a decision" surface; the parent board's
+        // single Read decision already ran in GetBoardAsync (C-M3·1).
+        var boardTranslations = await projects.GetBoardTranslationsAsync(id);
+
         var vm = new BoardDetailViewModel(
             Board: boardRow,
             Lanes: laneRows,
@@ -1383,7 +1542,19 @@ public sealed class ProjectsController : Controller
             // ADR 0086 D9 — the ⋮ menu's "Add to Project…" modal picker
             // (a display surface, never a gate — C-PL·3; empty ⇒ the item
             // + modal hide, the BoardEdit F10 rule).
-            Projects: await SeedProjectPickerAsync());
+            Projects: await SeedProjectPickerAsync(),
+            // ADR 0088 — the board's user-added translations (the ADR 0027
+            // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
+            // shape). A "a read, not a decision" surface; the parent board's
+            // single Read decision already ran in GetBoardAsync (C-M3·1).
+            // CanTranslate is the ADR 0088 display pin (creator ∪ Translator ∪
+            // GlobalAdmin) — the real gate is the server-side re-check in the
+            // Add/Update/Remove lanes at POST.
+            Translations: boardTranslations,
+            Languages: LanguageOptionsFrom(boardTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode),
+            CanTranslate: !string.IsNullOrEmpty(actorId)
+                          && ProjectService.CanAddBoardTranslation(result.Board.AuthorId, actorId, RoleSet(User)),
+            OriginalLanguageCode: result.Board.LanguageCode);
         // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
         // assignee picker. Seed the standing assignee options (verified,
         // non-self profiles) the way the Create / BoardNew views do, so the
@@ -2270,6 +2441,20 @@ public sealed class ProjectsController : Controller
             return new ForbidResult();
         }
 
+        // ADR 0088 / ADR 0051 — the feed translation swap: the viewer's
+        // current-language translation of each **project** (title +
+        // description) swaps in over the authored-in value (the Event feed
+        // idiom). ProjectGoal is out of scope (the ADR 0088 follow-on note),
+        // so only the standalone projects are swapped. A read convenience
+        // (the audience decision already ran in ListProjectsAsync); a no-op
+        // when no provider is wired.
+        if (translationProvider is not null)
+        {
+            string effLang = await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider);
+            foreach (var p in standaloneProjects)
+                await ApplyProjectTranslationAsync(p, effLang);
+        }
+
         var authorIds = goals
             .Select(g => g.AuthorId)
             .Concat(standaloneProjects.Select(p => p.AuthorId))
@@ -2784,6 +2969,12 @@ public sealed class ProjectsController : Controller
                 Created: b.Created))
             .ToList();
 
+        // ADR 0088 — the project's user-added translations (the ADR 0027
+        // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
+        // shape). A "a read, not a decision" surface; the parent project's
+        // single Read decision already ran in GetProjectAsync (C-M3·1).
+        var projectTranslations = await projects.GetProjectTranslationsAsync(id);
+
         var vm = new ProjectDetailViewModel(
             Id: project.Id,
             Title: project.Title,
@@ -2808,7 +2999,19 @@ public sealed class ProjectsController : Controller
                      && (string.Equals(project.AuthorId, actorId, StringComparison.Ordinal)
                          || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)),
             Created: project.Created,
-            Modified: project.Modified);
+            Modified: project.Modified,
+            // ADR 0088 — the project's user-added translations (the ADR 0027
+            // chip-swap + ADR 0049 default-visible-variant + ADR 0022 add-form
+            // shape). A "a read, not a decision" surface; the parent project's
+            // single Read decision already ran in GetProjectAsync (C-M3·1).
+            // CanTranslate is the ADR 0088 display pin (creator ∪ Translator ∪
+            // GlobalAdmin) — the real gate is the server-side re-check in the
+            // Add/Update/Remove lanes at POST.
+            Translations: projectTranslations,
+            Languages: LanguageOptionsFrom(projectTranslations, await SeedLanguagePickerAsync(), t => t.LanguageCode),
+            CanTranslate: !string.IsNullOrEmpty(actorId)
+                          && ProjectService.CanAddProjectTranslation(project.AuthorId, actorId, RoleSet(User)),
+            OriginalLanguageCode: project.LanguageCode);
 
         return View("ProjectDetail", vm);
     }
@@ -3169,5 +3372,628 @@ public sealed class ProjectsController : Controller
             .Select(p => (Id: p.Id, Name: string.IsNullOrWhiteSpace(p.Title) ? p.Id : p.Title))
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    // ── Translations (ADR 0088) — user-added translations of the three M5/PL
+    // parent surfaces (todo / board / project) ───────────────────────────
+    //
+    // Thin Web lanes (ADR 0006-D: routes + shape) that delegate the write +
+    // standing decision to the frozen <see cref="IProjectService"/>
+    // translation seams (the standing — creator ∪ assignee (to-do) ∪ Translator
+    // ∪ GlobalAdmin — is re-pinned server-side; the detail page's
+    // <see cref="TodoDetailViewModel.CanTranslate"/> /
+    // <see cref="BoardDetailViewModel.CanTranslate"/> /
+    // <see cref="ProjectDetailViewModel.CanTranslate"/> is only the display
+    // affordance). A denied standing actor is a 403 (<see
+    // cref="UnauthorizedAccessException"/> → <c>ForbidResult</c>); a missing
+    // parent/row is a 404 (<see cref="KeyNotFoundException"/> → <c>NotFound</c>).
+    // The M5/PL convention: the service opens its **own** write session (C3) —
+    // the controller does **not** wrap the call in <see
+    // cref="IDocumentStore.LightweightSession"/> (the <see
+    // cref="EventController"/> M4 precedent). **Body is optional** (the ADR
+    // 0088 deviation from ADR 0059 — M5 rows are title-usable), so the
+    // validation gate here is "title or body", not a required body.
+
+    /// <summary>
+    /// Adds a **user-added translation** of the to-do into
+    /// <paramref name="languageCode"/> (ADR 0088):
+    /// <c>POST /projects/todos/{id}/translations</c>. A thin Web lane (ADR
+    /// 0006-D) delegating to <see cref="IProjectService.AddTodoTranslationAsync"/>.
+    /// <para>
+    /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the to-do
+    /// (re-run the parent's single <c>Read</c> decision via
+    /// <see cref="IProjectService.GetTodoAsync"/> — a <c>KeyNotFoundException</c>
+    /// is a 404, a <c>UnauthorizedAccessException</c> a 403 — the C3
+    /// non-leaky posture).
+    /// </para>
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddTodoTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/todos/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.AddTodoTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the to-do in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
+    /// shape): <c>POST /projects/todos/{id}/translations/update</c>. Thin Web
+    /// lane; delegates to <see cref="IProjectService.UpdateTodoTranslationAsync"/>.
+    /// Precondition + failure shapes mirror <see cref="AddTodoTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateTodoTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/todos/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.UpdateTodoTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the to-do in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
+    /// shape): <c>POST /projects/todos/{id}/translations/remove</c>. Thin Web
+    /// lane; delegates to
+    /// <see cref="IProjectService.RemoveTodoTranslationAsync"/>. Failure shapes
+    /// mirror <see cref="AddTodoTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/todos/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveTodoTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/todos/{id}");
+        }
+
+        try
+        {
+            await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.RemoveTodoTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
+        return Redirect($"/projects/todos/{id}");
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of the board into
+    /// <paramref name="languageCode"/> (ADR 0088):
+    /// <c>POST /projects/boards/{id}/translations</c>. A thin Web lane (ADR
+    /// 0006-D) delegating to <see cref="IProjectService.AddBoardTranslationAsync"/>.
+    /// <para>
+    /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the board
+    /// (re-run the parent's single <c>Read</c> decision via
+    /// <see cref="IProjectService.GetBoardAsync"/> — a
+    /// <c>KeyNotFoundException</c> is a 404, a
+    /// <c>UnauthorizedAccessException</c> a 403 — the C3 non-leaky posture).
+    /// </para>
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddBoardTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/boards/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        try
+        {
+            await projects.GetBoardAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.AddBoardTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the board in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
+    /// shape): <c>POST /projects/boards/{id}/translations/update</c>. Thin Web
+    /// lane; delegates to
+    /// <see cref="IProjectService.UpdateBoardTranslationAsync"/>. Precondition +
+    /// failure shapes mirror <see cref="AddBoardTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateBoardTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/boards/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        try
+        {
+            await projects.GetBoardAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.UpdateBoardTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the board in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
+    /// shape): <c>POST /projects/boards/{id}/translations/remove</c>. Thin Web
+    /// lane; delegates to
+    /// <see cref="IProjectService.RemoveBoardTranslationAsync"/>. Failure
+    /// shapes mirror <see cref="AddBoardTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveBoardTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/boards/{id}");
+        }
+
+        try
+        {
+            await projects.GetBoardAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.RemoveBoardTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
+    /// Adds a **user-added translation** of the project into
+    /// <paramref name="languageCode"/> (ADR 0088):
+    /// <c>POST /projects/projects/{id}/translations</c>. A thin Web lane (ADR
+    /// 0006-D) delegating to
+    /// <see cref="IProjectService.AddProjectTranslationAsync"/>.
+    /// <para>
+    /// <b>Precondition (C-M3·1):</b> the viewer must be able to see the project
+    /// (re-run the parent's single <c>Read</c> decision via
+    /// <see cref="IProjectService.GetProjectAsync"/> — a
+    /// <c>KeyNotFoundException</c> is a 404, a
+    /// <c>UnauthorizedAccessException</c> a 403 — the C3 non-leaky posture).
+    /// </para>
+    /// </summary>
+    [HttpPost("/projects/projects/{id}/translations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddProjectTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/projects/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/projects/{id}");
+        }
+
+        try
+        {
+            await projects.GetProjectAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.AddProjectTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation added ({name}).";
+        return Redirect($"/projects/projects/{id}");
+    }
+
+    /// <summary>
+    /// **Updates** the existing user-added translation of the project in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 edit-lane
+    /// shape): <c>POST /projects/projects/{id}/translations/update</c>. Thin
+    /// Web lane; delegates to
+    /// <see cref="IProjectService.UpdateProjectTranslationAsync"/>.
+    /// Precondition + failure shapes mirror <see cref="AddProjectTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/projects/{id}/translations/update")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateProjectTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode,
+        [FromForm] string? title,
+        [FromForm] string? body)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/projects/{id}");
+        }
+        if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
+        {
+            TempData["error"] = "A translation needs a title or some text.";
+            return Redirect($"/projects/projects/{id}");
+        }
+
+        try
+        {
+            await projects.GetProjectAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.UpdateProjectTranslationAsync(
+                id, languageCode,
+                string.IsNullOrWhiteSpace(title) ? null : title,
+                string.IsNullOrWhiteSpace(body) ? null : body,
+                actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation updated ({name}).";
+        return Redirect($"/projects/projects/{id}");
+    }
+
+    /// <summary>
+    /// **Removes** the existing user-added translation of the project in
+    /// <paramref name="languageCode"/> (ADR 0088, the ADR 0048 remove-lane
+    /// shape): <c>POST /projects/projects/{id}/translations/remove</c>. Thin
+    /// Web lane; delegates to
+    /// <see cref="IProjectService.RemoveProjectTranslationAsync"/>. Failure
+    /// shapes mirror <see cref="AddProjectTranslation"/>.
+    /// </summary>
+    [HttpPost("/projects/projects/{id}/translations/remove")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RemoveProjectTranslation(
+        [FromRoute] string id,
+        [FromForm] string? languageCode)
+    {
+        if (string.IsNullOrEmpty(id))
+            return NotFound();
+
+        var actorId = SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return new ForbidResult();
+
+        if (string.IsNullOrWhiteSpace(languageCode))
+        {
+            TempData["error"] = "Choose a language for the translation.";
+            return Redirect($"/projects/projects/{id}");
+        }
+
+        try
+        {
+            await projects.GetProjectAsync(id, actorId, HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        try
+        {
+            await projects.RemoveProjectTranslationAsync(id, languageCode, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+
+        var name = await SeedLanguageName(languageCode);
+        TempData["info"] = $"Translation removed ({name}).";
+        return Redirect($"/projects/projects/{id}");
     }
 }
