@@ -1,5 +1,7 @@
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Pages;
 using Kumunita.Core.Projects;
+using Kumunita.Core.UserInfo;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -49,7 +51,15 @@ namespace Kumunita.Web.Controllers;
 [Authorize]
 public sealed class NotificationsController(
     NotificationService notifications,
-    IProjectService? projects = null) : Controller
+    IProjectService? projects = null,
+    // ADR 0084 — the subscriptions settings surface (the per-target list)
+    // resolves display names for the resident's communities / groups / pages
+    // through these seams. Optional so existing test-construction sites keep
+    // compiling (the CS1736 idiom this repo uses for additive ctor params);
+    // the subscriptions routes degrade to nameless rows when a seam is absent
+    // (the name is a display gap, never a decision).
+    IUserInfoService? userInfo = null,
+    IPageService? pages = null) : Controller
 {
     /// <summary>
     /// <c>GET /notifications</c> — the inbox (design doc §6.4 route 1,
@@ -191,5 +201,145 @@ public sealed class NotificationsController(
 
         await notifications.SetPreferencesAsync(actorId, enabled);
         return RedirectToAction(nameof(Index));
+    }
+
+    // ── ADR 0084 — the per-target subscriptions settings surface ────────────
+
+    /// <summary>
+    /// The <c>"announcements"</c> target sentinel shared with the Core
+    /// emitters (<see cref="Kumunita.Core.Announcements.AnnouncementService"/>'s
+    /// flat/public announcement lane): a flat/public announcement has no
+    /// community to key the subscription by, so its (recipient, kind, target)
+    /// triple uses this constant instead of a community id.
+    /// </summary>
+    internal const string AnnouncementsTargetSentinel = "announcements";
+
+    /// <summary>
+    /// ADR 0084 — the kinds that have a per-target scope (the four ADR 0084
+    /// lanes; every other kind is either not target-scoped or a
+    /// directed kind whose recipient is fixed by the event, not by a
+    /// subscription). A hand-crafted POST naming any other kind is rejected
+    /// (a client cannot mint a (kind, target) the emitters don't consult).
+    /// </summary>
+    private static readonly HashSet<string> SubscriptionKinds = new(StringComparer.Ordinal)
+    {
+        NotificationKinds.Announcement,
+        NotificationKinds.CommunityPost,
+        NotificationKinds.GroupPost,
+        NotificationKinds.PageChild,
+    };
+
+    /// <summary>
+    /// <c>GET /notifications/subscriptions</c> — ADR 0084's settings list:
+    /// every (kind, target) pair the resident can subscribe to, with its
+    /// effective state (the stored row's <c>Enabled</c> when one exists,
+    /// else the kind's default from
+    /// <see cref="NotificationKinds.OptInKinds"/> — opt-IN kinds default to
+    /// disabled, opt-OUT kinds to enabled; the same rule the emit gate uses,
+    /// so the toggle the resident sees is exactly what the emitters
+    /// consult). A personal read — the <c>[Authorize]</c> gate + the actor
+    /// being the recipient is the whole decision; no audit row (D3 / F11).
+    /// </summary>
+    [HttpGet("/notifications/subscriptions")]
+    public async Task<IActionResult> Subscriptions()
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        var rows = await notifications.GetSubscriptionsAsync(actorId).ConfigureAwait(false);
+        // The (kind, targetId) pair as a single composite key string — the
+        // row's business key (a '/' separator cannot appear in a kind or a
+        // target id, so the composite is unambiguous).
+        static string Key(string kind, string targetId) => kind + "\u0000" + targetId;
+        var byKey = rows
+            .GroupBy(r => Key(r.Kind, r.TargetId))
+            .ToDictionary(g => g.Key, g => g.First().Enabled);
+
+        bool Effective(string kind, string targetId) =>
+            byKey.TryGetValue(Key(kind, targetId), out var enabled)
+                ? enabled
+                : !NotificationKinds.OptInKinds.Contains(kind, StringComparer.Ordinal);
+
+        // The communities the resident is a member of — the targets of the
+        // announcement / community.post lanes (a candidate read, C-M2·2:
+        // membership is the single source; no audit row).
+        var communityIds = userInfo is null
+            ? new List<string>()
+            : (await userInfo.GetCommunityIdsAsync(actorId).ConfigureAwait(false)).ToList();
+        var components = userInfo is null
+            ? new List<Kumunita.Core.UserInfo.Component>()
+            : await userInfo.GetComponentsAsync(true).ConfigureAwait(false);
+        var communityNames = components.ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
+        string CommunityName(string id) => communityNames.TryGetValue(id, out var n) ? n : id;
+
+        var list = new List<SubscriptionRow>();
+
+        // Announcements: one toggle per member community (the emitter's
+        // community-scoped target) + the flat/public sentinel.
+        foreach (var communityId in communityIds)
+            list.Add(new SubscriptionRow(NotificationKinds.Announcement, communityId, CommunityName(communityId),
+                Effective(NotificationKinds.Announcement, communityId)));
+        list.Add(new SubscriptionRow(NotificationKinds.Announcement, AnnouncementsTargetSentinel,
+            "platform", Effective(NotificationKinds.Announcement, AnnouncementsTargetSentinel)));
+
+        // Community posts: one toggle per member community.
+        foreach (var communityId in communityIds)
+            list.Add(new SubscriptionRow(NotificationKinds.CommunityPost, communityId, CommunityName(communityId),
+                Effective(NotificationKinds.CommunityPost, communityId)));
+
+        // Group posts: one toggle per group the resident owns ∪ is a member of
+        // (the GetGroupsForUserAsync projection, the single "my groups" read).
+        var groups = userInfo is null
+            ? new List<Kumunita.Core.UserInfo.Group>()
+            : await userInfo.GetGroupsForUserAsync(actorId).ConfigureAwait(false);
+        foreach (var group in groups)
+            list.Add(new SubscriptionRow(NotificationKinds.GroupPost, group.Id, group.Name,
+                Effective(NotificationKinds.GroupPost, group.Id)));
+
+        // New sub-pages: one toggle per parent page the resident has a
+        // page.child subscription row for (an opt-IN kind — no default-on
+        // rows to surface), named from the live page forest (a page later
+        // deleted degrades to its id — a display gap, not an error).
+        var parentPageIds = rows
+            .Where(r => r.Kind == NotificationKinds.PageChild)
+            .Select(r => r.TargetId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var pageTitleById = pages is null || parentPageIds.Count == 0
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            : (await pages.GetTreeAsync().ConfigureAwait(false)).ToDictionary(p => p.Id, p => p.Title, StringComparer.Ordinal);
+        foreach (var parentId in parentPageIds)
+            list.Add(new SubscriptionRow(NotificationKinds.PageChild, parentId,
+                pageTitleById.TryGetValue(parentId, out var title) ? title : parentId,
+                Effective(NotificationKinds.PageChild, parentId)));
+
+        return View(new NotificationSubscriptionsViewModel(list));
+    }
+
+    /// <summary>
+    /// <c>POST /notifications/subscriptions</c> — ADR 0084's toggle write:
+    /// upserts the caller's <see cref="NotificationSubscription"/> row for
+    /// the named (kind, target) (the <see cref="NotificationService
+    /// .SetSubscriptionAsync"/> lane — the row is the record of the
+    /// resident's last explicit choice, never deleted). A hand-crafted POST
+    /// naming a kind outside the four per-target kinds, or an empty target,
+    /// is rejected (400 — a client cannot mint a subscription the emitters
+    /// don't consult). A state lane — no audit row (D3).
+    /// </summary>
+    [HttpPost("/notifications/subscriptions")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveSubscription([FromForm] string? kind, [FromForm] string? targetId, [FromForm] bool enabled)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        if (string.IsNullOrWhiteSpace(kind) || !SubscriptionKinds.Contains(kind!)
+            || string.IsNullOrWhiteSpace(targetId))
+            return BadRequest();
+
+        await notifications.SetSubscriptionAsync(actorId, kind!, targetId!, enabled).ConfigureAwait(false);
+        return RedirectToAction(nameof(Subscriptions));
     }
 }

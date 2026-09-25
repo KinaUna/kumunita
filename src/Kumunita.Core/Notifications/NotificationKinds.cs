@@ -74,6 +74,51 @@ public static class NotificationKinds
     /// </summary>
     public const string AccountVerified = "account.verified";
 
+    // ── ADR 0084 — per-target subscription kinds ─────────────────────────
+
+    /// <summary>
+    /// ADR 0084 — a new announcement was published. Recipient universe: the
+    /// target community's members (for a community-scoped announcement) or,
+    /// for a flat/public announcement, every verified resident. The emitter
+    /// consults <see cref="NotificationService.IsSubscriptionEnabledAsync"/>
+    /// to resolve the recipient's effective choice (opt-IN default: the kind
+    /// is disabled until the resident stores an explicit
+    /// <c>NotificationSubscription.Enabled = true</c> row for the target).
+    /// </summary>
+    public const string Announcement = "announcement";
+
+    /// <summary>
+    /// ADR 0084 — a new post appeared in a community the resident is a member
+    /// of. Recipient universe: the community's members, excluding the author.
+    /// Opt-OUT default (same shape as <see cref="GroupPost"/>): enabled until
+    /// the resident stores an explicit <c>Enabled = false</c> row for the
+    /// target community id.
+    /// </summary>
+    public const string CommunityPost = "community.post";
+
+    /// <summary>
+    /// ADR 0084 — a new page was added under a parent page. Recipient universe:
+    /// the parent page's subscribers (the subscription target is the parent
+    /// page's id). Opt-IN default: disabled until the resident stores an
+    /// explicit <c>Enabled = true</c> row for the target parent-page id.
+    /// </summary>
+    public const string PageChild = "page.child";
+
+    /// <summary>
+    /// ADR 0084 — the set of kinds that default to <b>disabled</b> (opt-IN):
+    /// the kind's default is off until the resident explicitly enables it with
+    /// an <c>Enabled = true</c> subscription row. The complement of this set
+    /// (the kinds not in <c>OptInKinds</c>) default to <b>enabled</b> (opt-OUT):
+    /// the kind is on until the resident explicitly disables it with an
+    /// <c>Enabled = false</c> row. <see cref="NotificationService
+    /// .IsSubscriptionEnabledAsync"/> consults this table to resolve the
+    /// effective default for a given kind.
+    /// </summary>
+    public static readonly IReadOnlySet<string> OptInKinds = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Announcement, PageChild,
+    };
+
     /// <summary>
     /// The ordered, closed kind set (for the settings toggles + the <c>kw-l</c>
     /// key table). Order is the settings page's canonical display order.
@@ -88,5 +133,6 @@ public static class NotificationKinds
         EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
+        Announcement, CommunityPost, PageChild,
     ];
 }

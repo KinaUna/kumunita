@@ -1388,6 +1388,28 @@ public static class KnownTranslationKeys
             ["notification.account.signup.body"] = "A new resident signed up: ",
             ["notification.account.verified.subject"] = "A resident verified their account",
             ["notification.account.verified.body"] = "A resident verified their account: ",
+
+            // ── ADR 0084 — per-target subscription kinds + the subscriptions UI ──
+            ["notification.announcement.subject"] = "A new announcement",
+            ["notification.announcement.body"] = "A new announcement was published: ",
+            ["notification.community.post.subject"] = "A new post in your community",
+            ["notification.community.post.body"] = "A new post in one of your communities: ",
+            ["notification.page.child.subject"] = "A new page was added",
+            ["notification.page.child.body"] = "A new page was added under a page you follow: ",
+            ["notifications.kind.announcement"] = "New announcement",
+            ["notifications.kind.community.post"] = "New community post",
+            ["notifications.kind.page.child"] = "New sub-page",
+            ["notifications.preference.announcement.label"] = "New announcements",
+            ["notifications.preference.community.post.label"] = "New posts in my communities",
+            ["notifications.preference.page.child.label"] = "New sub-pages on pages I follow",
+            ["notifications.subscriptions.title"] = "Notification subscriptions",
+            ["notifications.subscriptions.intro"] = "Choose which communities, groups, and pages notify you. Preferences decide which kinds you also get by email; these switches decide which targets notify you at all.",
+            ["notifications.subscription.announcement.label"] = "New announcements",
+            ["notifications.subscription.community.post.label"] = "New posts in communities",
+            ["notifications.subscription.group.post.label"] = "New posts in groups",
+            ["notifications.subscription.page.child.label"] = "New sub-pages",
+            ["pages.subscribe"] = "Subscribe to updates",
+            ["pages.unsubscribe"] = "Unsubscribe from updates",
         };
 
     /// <summary>
@@ -2643,6 +2665,28 @@ public static class KnownTranslationKeys
             ["notification.account.signup.body"] = "Ein neues Mitglied hat sich registriert: ",
             ["notification.account.verified.subject"] = "Ein Mitglied hat sein Konto verifiziert",
             ["notification.account.verified.body"] = "Ein Mitglied hat sein Konto verifiziert: ",
+
+            // ── ADR 0084 ──
+            ["notification.announcement.subject"] = "Eine neue Ankündigung",
+            ["notification.announcement.body"] = "Eine neue Ankündigung wurde veröffentlicht: ",
+            ["notification.community.post.subject"] = "Neuer Beitrag in deiner Community",
+            ["notification.community.post.body"] = "Neuer Beitrag in einer deiner Communities: ",
+            ["notification.page.child.subject"] = "Eine neue Seite wurde hinzugefügt",
+            ["notification.page.child.body"] = "Eine neue Seite wurde unter einer Seite hinzugefügt, die du beobachtest: ",
+            ["notifications.kind.announcement"] = "Neue Ankündigung",
+            ["notifications.kind.community.post"] = "Neuer Community-Beitrag",
+            ["notifications.kind.page.child"] = "Neue Unterseite",
+            ["notifications.preference.announcement.label"] = "Neue Ankündigungen",
+            ["notifications.preference.community.post.label"] = "Neue Beiträge in meinen Communities",
+            ["notifications.preference.page.child.label"] = "Neue Unterseiten auf Seiten, die ich beobachte",
+            ["notifications.subscriptions.title"] = "Benachrichtigungsabonnements",
+            ["notifications.subscriptions.intro"] = "Wähle aus, welche Communities, Gruppen und Seiten dich benachrichtigen. Einstellungen entscheiden, welche Arten du auch per E-Mail erhältst; diese Schalter entscheiden, welche Ziele dich überhaupt benachrichtigen.",
+            ["notifications.subscription.announcement.label"] = "Neue Ankündigungen",
+            ["notifications.subscription.community.post.label"] = "Neue Beiträge in Communities",
+            ["notifications.subscription.group.post.label"] = "Neue Beiträge in Gruppen",
+            ["notifications.subscription.page.child.label"] = "Neue Unterseiten",
+            ["pages.subscribe"] = "Aktualisierungen abonnieren",
+            ["pages.unsubscribe"] = "Abonnierung aufheben",
         };
 
     /// <summary>
@@ -3900,6 +3944,28 @@ public static class KnownTranslationKeys
             ["notification.account.signup.body"] = "Un nouveau résident s'est inscrit : ",
             ["notification.account.verified.subject"] = "Un résident a vérifié son compte",
             ["notification.account.verified.body"] = "Un résident a vérifié son compte : ",
+
+            // ── ADR 0084 ──
+            ["notification.announcement.subject"] = "Une nouvelle annonce",
+            ["notification.announcement.body"] = "Une nouvelle annonce a été publiée : ",
+            ["notification.community.post.subject"] = "Une nouvelle publication dans ta communauté",
+            ["notification.community.post.body"] = "Nouvelle publication dans l'une de tes communautés : ",
+            ["notification.page.child.subject"] = "Une nouvelle page a été ajoutée",
+            ["notification.page.child.body"] = "Une nouvelle page a été ajoutée sous une page que tu suis : ",
+            ["notifications.kind.announcement"] = "Nouvelle annonce",
+            ["notifications.kind.community.post"] = "Nouvelle publication de communauté",
+            ["notifications.kind.page.child"] = "Nouvelle sous-page",
+            ["notifications.preference.announcement.label"] = "Nouvelles annonces",
+            ["notifications.preference.community.post.label"] = "Nouvelles publications dans mes communautés",
+            ["notifications.preference.page.child.label"] = "Nouvelles sous-pages sur les pages que je suis",
+            ["notifications.subscriptions.title"] = "Abonnements aux notifications",
+            ["notifications.subscriptions.intro"] = "Choisis quelles communautés, quels groupes et quelles pages t'informent. Les préférences décident des types que tu reçois aussi par e-mail ; ces interrupteurs décident des cibles qui t'informent.",
+            ["notifications.subscription.announcement.label"] = "Nouvelles annonces",
+            ["notifications.subscription.community.post.label"] = "Nouvelles publications dans les communautés",
+            ["notifications.subscription.group.post.label"] = "Nouvelles publications dans les groupes",
+            ["notifications.subscription.page.child.label"] = "Nouvelles sous-pages",
+            ["pages.subscribe"] = "S'abonner aux mises à jour",
+            ["pages.unsubscribe"] = "Se désabonner des mises à jour",
         };
 
     /// <summary>
@@ -5152,6 +5218,28 @@ public static class KnownTranslationKeys
             ["notification.account.signup.body"] = "En ny beboer har tilmeldt sig: ",
             ["notification.account.verified.subject"] = "En beboer har bekræftet sin konto",
             ["notification.account.verified.body"] = "En beboer har bekræftet sin konto: ",
+
+            // ── ADR 0084 ──
+            ["notification.announcement.subject"] = "En ny meddelelse",
+            ["notification.announcement.body"] = "En ny meddelelse er blevet udgivet: ",
+            ["notification.community.post.subject"] = "Nyt indlæg i dit lokalsamfund",
+            ["notification.community.post.body"] = "Nyt indlæg i ét af dine lokalsamfund: ",
+            ["notification.page.child.subject"] = "En ny side er tilføjet",
+            ["notification.page.child.body"] = "En ny side er tilføjet under en side, du følger: ",
+            ["notifications.kind.announcement"] = "Ny meddelelse",
+            ["notifications.kind.community.post"] = "Nyt lokalsamfundsindlæg",
+            ["notifications.kind.page.child"] = "Ny underside",
+            ["notifications.preference.announcement.label"] = "Nye meddelelser",
+            ["notifications.preference.community.post.label"] = "Nye indlæg i mine lokalsamfund",
+            ["notifications.preference.page.child.label"] = "Nye undersider på sider, jeg følger",
+            ["notifications.subscriptions.title"] = "Notifikationsabonnementer",
+            ["notifications.subscriptions.intro"] = "Vælg hvilke lokalsamfund, grupper og sider, der giver dig besked. Indstillinger afgør hvilke typer du også får på e-mail; disse indstillingsknapper afgør hvilke mål der giver dig besked.",
+            ["notifications.subscription.announcement.label"] = "Nye meddelelser",
+            ["notifications.subscription.community.post.label"] = "Nye indlæg i lokalsamfund",
+            ["notifications.subscription.group.post.label"] = "Nye indlæg i grupper",
+            ["notifications.subscription.page.child.label"] = "Nye undersider",
+            ["pages.subscribe"] = "Abonner på opdateringer",
+            ["pages.unsubscribe"] = "Opsig abonnement",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.

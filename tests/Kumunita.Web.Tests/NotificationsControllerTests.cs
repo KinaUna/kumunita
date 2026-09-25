@@ -5,6 +5,7 @@ using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
 using Kumunita.Core.Localization;
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Pages;
 using Kumunita.Core.UserInfo;
 using Kumunita.Web.Controllers;
 using Kumunita.Web.Models;
@@ -164,12 +165,13 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
 
         var view = Assert.IsType<ViewResult>(result);                    // 200
         var vm = Assert.IsType<NotificationPreferencesViewModel>(view.ViewData.Model);
-        // The thirteen-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
+        // The sixteen-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
         // adds the two admin-lane kinds — account.signup / account.verified;
         // ADR 0083 adds the two group-membership kinds — group.added /
-        // group.invite).
+        // group.invite; ADR 0084 adds the three per-target subscription
+        // kinds — announcement / community.post / page.child).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(13, vm.AllKinds.Count);
+        Assert.Equal(16, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }
@@ -210,6 +212,151 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         Assert.Equal(posted, stored!.KindsEnabled);
     }
 
+    // ── ADR 0084 — the per-target subscriptions settings surface ────────────
+
+    // S1 — GET /notifications/subscriptions: one row per (kind, target) the
+    //      resident can subscribe to, with the effective state (the stored
+    //      row's Enabled when present, else the kind's default from
+    //      NotificationKinds.OptInKinds — opt-IN kinds default off,
+    //      opt-OUT kinds default on).
+    //
+    // S2 — POST /notifications/subscriptions (valid kind + target): upserts
+    //      the row and redirects to Subscriptions.
+    //
+    // S3 — POST /notifications/subscriptions (kind outside the four
+    //      per-target kinds, or empty target): 400.
+
+    [Fact]
+    public async Task S1_GET_Subscriptions_Returns_200_And_Effective_Rows()
+    {
+        var store = await BootStoreAsync();
+        const string community = "safety";
+        const string group = "grp-s1";
+        const string parentPage = "parent-s1";
+
+        // Plant an explicit opt-IN row for (announcement, community) saying
+        // "enabled" — the toggle the resident sees should reflect the stored
+        // row's value (true), not the opt-IN default (false).
+        var svc = new NotificationService(store,
+            Substitute.For<IUserInfoService>(), Substitute.For<ITranslationProvider>(),
+            Substitute.For<IMailerStage>());
+        await svc.SetSubscriptionAsync(Actor, NotificationKinds.Announcement,
+            community, enabled: true, TestContext.Current.CancellationToken);
+        // And an explicit opt-OUT row for (group.post, group) saying
+        // "disabled" — the toggle the resident sees should reflect false,
+        // not the opt-OUT default (true).
+        await svc.SetSubscriptionAsync(Actor, NotificationKinds.GroupPost,
+            group, enabled: false, TestContext.Current.CancellationToken);
+        // And an opt-IN row for (page.child, parentPage) saying "enabled".
+        await svc.SetSubscriptionAsync(Actor, NotificationKinds.PageChild,
+            parentPage, enabled: true, TestContext.Current.CancellationToken);
+
+        // The display-name seams: one member community, one owned group, one
+        // parent page the resident has a page.child row for.
+        var userInfo = Substitute.For<IUserInfoService>();
+        userInfo.GetCommunityIdsAsync(Actor)
+            .Returns(Task.FromResult<IReadOnlyCollection<string>>(new[] { community }));
+        userInfo.GetComponentsAsync(true)
+            .Returns(Task.FromResult<IReadOnlyList<Component>>(new List<Component>
+            {
+                new Component { Id = community, Name = "Safety" },
+            }));
+        userInfo.GetGroupsForUserAsync(Actor)
+            .Returns(Task.FromResult<IReadOnlyList<Group>>(new List<Group>
+            {
+                new Group { Id = group, Name = "My Group" },
+            }));
+        var pages = Substitute.For<IPageService>();
+        pages.GetTreeAsync()
+            .Returns(Task.FromResult<IReadOnlyList<Page>>(new List<Page>
+            {
+                new Page { Id = parentPage, Title = "Parent S1" },
+            }));
+
+        var controller = Build(store, userInfo, pages);
+        var result = await controller.Subscriptions();
+
+        var view = Assert.IsType<ViewResult>(result);
+        var vm = Assert.IsType<NotificationSubscriptionsViewModel>(view.ViewData.Model);
+        var rows = vm.Rows;
+
+        // The expected set: announcement/community (stored true),
+        // announcement/announcements (no row → opt-IN default false),
+        // community.post/community (no row → opt-OUT default true),
+        // group.post/grp-s1 (stored false),
+        // page.child/parent-s1 (stored true).
+        Assert.Equal(5, rows.Count);
+
+        var byKey = rows.ToDictionary(r => (r.Kind, r.TargetId));
+        // Stored rows reflect the resident's explicit choice.
+        Assert.True(byKey[(NotificationKinds.Announcement, community)].Enabled);
+        Assert.False(byKey[(NotificationKinds.GroupPost, group)].Enabled);
+        Assert.True(byKey[(NotificationKinds.PageChild, parentPage)].Enabled);
+        // The flat-announcement sentinel: opt-IN default (false) — no row.
+        Assert.False(byKey[(NotificationKinds.Announcement, "announcements")].Enabled);
+        // community.post: opt-OUT default (true) — no row.
+        Assert.True(byKey[(NotificationKinds.CommunityPost, community)].Enabled);
+
+        // The display names resolve through the seams (a nameless row is a
+        // display gap, not an error — the controller degrades to the id).
+        Assert.Equal("Safety", byKey[(NotificationKinds.Announcement, community)].Name);
+        Assert.Equal("My Group", byKey[(NotificationKinds.GroupPost, group)].Name);
+        Assert.Equal("Parent S1", byKey[(NotificationKinds.PageChild, parentPage)].Name);
+    }
+
+    [Fact]
+    public async Task S2_POST_Subscriptions_ValidKindAndTarget_Updates_Row_And_Redirects()
+    {
+        var store = await BootStoreAsync();
+        const string community = "safety";
+
+        var controller = Build(store);
+        var result = await controller.SaveSubscription(
+            kind: NotificationKinds.CommunityPost,
+            targetId: community,
+            enabled: false);
+
+        // 302 — the redirect back to the Subscriptions list (the toggle
+        // page is the same page — the switch's new state is reflected on
+        // the next GET).
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(NotificationsController.Subscriptions), redirect.ActionName);
+
+        // The live store shows the actor's row now carries Enabled=false
+        // (the SetSubscriptionAsync upsert — the row is the record of the
+        // resident's last explicit choice, never deleted).
+        var svc = new NotificationService(store,
+            Substitute.For<IUserInfoService>(), Substitute.For<ITranslationProvider>(),
+            Substitute.For<IMailerStage>());
+        var rows = await svc.GetSubscriptionsAsync(Actor, TestContext.Current.CancellationToken);
+        var mine = Assert.Single(rows, r => r.Kind == NotificationKinds.CommunityPost && r.TargetId == community);
+        Assert.False(mine.Enabled);
+    }
+
+    [Fact]
+    public async Task S3_POST_Subscriptions_UnknownKind_Returns_400()
+    {
+        var store = await BootStoreAsync();
+        var controller = Build(store);
+
+        // A kind outside the four per-target lanes (e.g. the legacy
+        // post.reply kind, which has no per-target scope) is rejected — a
+        // client cannot mint a subscription the emitters don't consult.
+        var result = await controller.SaveSubscription(
+            kind: NotificationKinds.PostReply,
+            targetId: "some-target",
+            enabled: true);
+        Assert.IsType<BadRequestResult>(result);
+
+        // And an empty target is rejected (the (kind, target) business key
+        // requires both parts).
+        result = await controller.SaveSubscription(
+            kind: NotificationKinds.CommunityPost,
+            targetId: "",
+            enabled: true);
+        Assert.IsType<BadRequestResult>(result);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -242,19 +389,23 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
     /// <see cref="NotificationService"/> (the concrete sealed service — the
     /// M5 precedent) on the scratch store, with plain NSubstitute stands-ins
     /// for the three frozen seams (the read + state lanes exercised here never
-    /// touch them). The actor is the <c>subj-notif-actor</c> claim principal
-    /// (the <see cref="KumunitaPrincipal"/> subject-claim shape); a no-op
-    /// <see cref="ITempDataProvider"/> closes the <c>TempData</c> bag so the
-    /// <c>RedirectToActionResult</c> branches don't NRE.
+    /// touch them). The ADR 0084 <c>userInfo</c> / <c>pages</c> display-name
+    /// seams are optional — pass <c>null</c> (the default) when the test
+    /// doesn't exercise the subscriptions surface, or substitute them with
+    /// the S1 test's display-name stubs. The actor is the
+    /// <c>subj-notif-actor</c> claim principal (the <see cref="KumunitaPrincipal"/>
+    /// subject-claim shape); a no-op <see cref="ITempDataProvider"/> closes
+    /// the <c>TempData</c> bag so the <c>RedirectToActionResult</c> branches
+    /// don't NRE.
     /// </summary>
-    private static NotificationsController Build(IDocumentStore store)
+    private static NotificationsController Build(IDocumentStore store,
+        IUserInfoService? userInfo = null, IPageService? pages = null)
     {
-        var userInfo = Substitute.For<IUserInfoService>();
         var translator = Substitute.For<ITranslationProvider>();
         var mailer = Substitute.For<IMailerStage>();
 
-        var service = new NotificationService(store, userInfo, translator, mailer);
-        var controller = new NotificationsController(service);
+        var service = new NotificationService(store, userInfo ?? Substitute.For<IUserInfoService>(), translator, mailer);
+        var controller = new NotificationsController(service, userInfo: userInfo, pages: pages);
 
         controller.ControllerContext = new ControllerContext
         {

@@ -99,7 +99,10 @@ public static class ServiceCollectionExtensions
         // (mirrors IEmailDeadLetterCounter's registration pattern; the
         // scope-vs-role split lives inside CreateAsync, not in a
         // separate IUserInfoService / IAuthorizationService pairing).
-        services.AddTransient<Announcements.IAnnouncementService, Announcements.AnnouncementService>();
+        services.AddTransient<Announcements.IAnnouncementService>(sp => new Announcements.AnnouncementService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<UserInfo.IUserInfoService>(),
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // PG (ADR 0039, plan U01): the pages-side service seam (bounded
         // context Kumunita.Core.Pages — the "hierarchical, audience-restricted,
@@ -111,7 +114,8 @@ public static class ServiceCollectionExtensions
         // this unit is the seam + registration only).
         services.AddTransient<Pages.IPageService>(sp => new Pages.PageService(
             sp.GetRequiredService<Marten.IDocumentStore>(),
-            sp.GetRequiredService<Tags.ITagService>()));
+            sp.GetRequiredService<Tags.ITagService>(),
+            sp.GetRequiredService<Notifications.NotificationService>()));
 
         // TG (ADR 0044, plan U5/U6): the tags-side service (bounded context
         // Kumunita.Core.Tags — the ADR 0011 shared-id-doc lane that composes

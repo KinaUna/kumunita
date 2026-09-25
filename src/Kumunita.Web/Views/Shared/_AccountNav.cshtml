@@ -137,6 +137,12 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" href="/settings/language"><kw-l key="settings.settings">Settings</kw-l></a>
                 </li>
+                @* ADR 0084 — the per-target subscriptions surface (the resident's
+                   explicit "notify me for this community / group / page" choice,
+                   distinct from the per-kind email preferences). *@
+                <li class="nav-item">
+                    <a class="dropdown-item text-dark" href="/notifications/subscriptions"><kw-l key="notifications.subscriptions.title">Notification subscriptions</kw-l></a>
+                </li>
                 @if (isGlobalAdmin)
                 {
                     <li class="nav-item">

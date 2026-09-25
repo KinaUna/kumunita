@@ -159,7 +159,19 @@ public sealed record PageShowViewModel(
     /// per-request read seam is absent (e.g. a test harness) — the view
     /// degrades to the ADR 0027 floor (authored-in variant default-visible).
     /// </summary>
-    string? DefaultVariant);
+    string? DefaultVariant,
+    /// <summary>
+    /// ADR 0084 — whether the viewer's current effective choice for the
+    /// <c>page.child</c> kind is enabled for <b>this page's id</b> (the
+    /// target is the page the viewer is on: subscribing means "notify me
+    /// when a new page is added under this one"). The view renders the
+    /// subscribe/unsubscribe toggle from this flag; the toggle's POST
+    /// (<c>POST /pages/{id}/subscribe</c>) flips the
+    /// <see cref="Kumunita.Core.Notifications.NotificationSubscription"/>
+    /// row and the effective state re-resolves (opt-IN default: disabled
+    /// until an explicit row says otherwise).
+    /// </summary>
+    bool Subscribed);
 
 /// <summary>
 /// The composer form-bound model — <c>GET/POST /pages/new</c> and

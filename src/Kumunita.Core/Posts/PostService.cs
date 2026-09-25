@@ -326,6 +326,36 @@ public sealed class PostService
         };
 
         session.Store(post);
+
+        // ADR 0084 — the community-post emitter (opt-OUT kind: the kind is on
+        // by default — every member of the community is notified; the resident
+        // can store an Enabled=false subscription row for the target community
+        // id to opt out). Recipient universe: the community's members (via
+        // ComponentMembership), excluding the author. The IsDraft pin is the
+        // ADR 0037 intake-honesty gate (a draft is invisible to all but the
+        // author, so a notification for it would leak intake). One
+        // SaveChangesAsync commits the post + the inbox rows atomically (C3).
+        if (_notifications is not null && !(draft.IsDraft ?? false))
+        {
+            var members = await session.Query<UserInfo.ComponentMembership>()
+                .Where(m => m.ComponentId == draft.ComponentId)
+                .Select(m => m.UserId)
+                .ToListAsync().ConfigureAwait(false);
+            foreach (var member in members)
+            {
+                if (string.Equals(member, actorId, StringComparison.Ordinal))
+                    continue;                                   // the post's author does not notify themselves
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: member,
+                    kind: NotificationKinds.CommunityPost,
+                    idempotencyKey: $"notification:community.post:{post.Id}:{member}",
+                    body: UgcSnippets.Truncate(post.Body),
+                    targetId: draft.ComponentId,
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         // TG (ADR 0044, U8b) — the tag attach lane (C3 single-transaction
@@ -1313,6 +1343,7 @@ public sealed class PostService
                     kind: NotificationKinds.GroupPost,
                     idempotencyKey: $"notification:group.post:{post.Id}:{member}",
                     body: TruncateUgcSnippet(post.Body),
+                    targetId: draft.GroupId,
                     ct: default).ConfigureAwait(false);
             }
         }

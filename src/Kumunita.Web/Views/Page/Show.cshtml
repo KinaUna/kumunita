@@ -28,6 +28,12 @@
     // the page's scope).
     var missingLanguages = Model.Languages
         .Where(l => !l.HasTranslation && l.Code != originalCode).ToList();
+
+    // ADR 0084 — the subscribe button's kw-l key + class (pre-resolved into
+    // locals so the tag-helper attribute can use a simple identifier, not a
+    // ternary with embedded string literals).
+    var subscribeKey = Model.Subscribed ? "pages.unsubscribe" : "pages.subscribe";
+    var subscribeClass = Model.Subscribed ? "btn-outline-primary" : "btn-primary";
 }
 
 <div class="row justify-content-center">
@@ -67,15 +73,36 @@
                 </span>
             }
 
-            @* ADR 0082 — the action surface: one ⋮ dropdown (the ADR 0069 / 0071
-               todo/board idiom). Edit + Delete inline in the menu; translation
-               add / edit each open a Bootstrap modal; translation remove is a
-               confirm form inside the menu. The service's write-lane re-check
-               at POST is the real gate; the same standing rules (CanEdit,
-               CanTranslate) are the only gates. *@
-            @if (Model.CanEdit || Model.CanTranslate)
+            @* ADR 0084 — the page's subscribe/unsubscribe toggle (the
+               page.child kind): subscribing to a page means "notify me when
+               a new page is added under it". Shown to every signed-in
+               viewer (a personal write — no standing required; the
+               RecipientId is the whole access story); anonymous viewers
+               have no RecipientId, so no toggle. The button reflects the
+               current effective state (opt-IN default: disabled until
+               subscribed) and POSTs to the flip lane *@
+            @if (User.Identity?.IsAuthenticated ?? false)
             {
-                <div class="dropdown ms-auto">
+                <div class="ms-auto d-inline-flex align-items-center gap-2">
+                    <form class="d-inline" method="post" action="/pages/@Model.Id/subscribe">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="@($"btn btn-sm {subscribeClass}")">
+                            <kw-l key="@subscribeKey">
+                                @(Model.Subscribed ? "Unsubscribe from updates" : "Subscribe to updates")
+                            </kw-l>
+                        </button>
+                    </form>
+
+                    @* ADR 0082 — the action surface: one ⋮ dropdown (the ADR
+                       0069 / 0071 todo/board idiom). Edit + Delete inline in
+                       the menu; translation add / edit each open a Bootstrap
+                       modal; translation remove is a confirm form inside the
+                       menu. The service's write-lane re-check at POST is the
+                       real gate; the same standing rules (CanEdit,
+                       CanTranslate) are the only gates. *@
+                    @if (Model.CanEdit || Model.CanTranslate)
+                    {
+                        <div class="dropdown">
                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
                             data-bs-toggle="dropdown" aria-expanded="false"
                             aria-label="@($"Actions for {Model.Title}")">⋮</button>
@@ -147,7 +174,10 @@
                             </li>
                         }
                     </ul>
+                        </div>
+                    }
                 </div>
+            }
 
                 @* ADR 0071 modal shape — translation edit / add. The rich editor
                    is self-wired at module load (class-based, no dependency on the

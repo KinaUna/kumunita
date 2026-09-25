@@ -70,7 +70,12 @@ public sealed class PageController(
     // PageTranslation rows) is default-visible. Optional so existing
     // test-construction sites keep compiling; DI always supplies the live
     // ITranslationProvider in the app.
-    ITranslationProvider? translationProvider = null) : Controller
+    ITranslationProvider? translationProvider = null,
+    // ADR 0084 — the per-target subscriptions seam (the page's
+    // subscribe/unsubscribe toggle + the page.child emitter's gate).
+    // Optional so existing test-construction sites keep compiling (the
+    // CS1736 idiom); DI always supplies the live service in the app.
+    Kumunita.Core.Notifications.NotificationService? notifications = null) : Controller
 {
     // ── GET /pages — the tree browse (C6 CanSeeAsync(Read)-filtered) ─────────
 
@@ -253,6 +258,22 @@ public sealed class PageController(
                 HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
         }
 
+        // ADR 0084 — the viewer's effective page.child subscription for THIS
+        // page's id (subscribing to a page = "notify me when a new page is
+        // added under it"). Resolved the same way the emit gate resolves it
+        // (a stored row's Enabled value when one exists, else the kind's
+        // opt-IN default — disabled) so the toggle the viewer sees is exactly
+        // what the emitters consult. A personal read — no audit row. When
+        // the seam is absent (test harness) the toggle degrades to
+        // unsubscribed (the opt-IN default).
+        var subscribed = false;
+        if (notifications is not null && actorId is not null)
+        {
+            await using var subSession = store.LightweightSession();
+            subscribed = await notifications.IsSubscriptionEnabledForAsync(
+                subSession, actorId, Kumunita.Core.Notifications.NotificationKinds.PageChild, page.Id).ConfigureAwait(false);
+        }
+
         return View(new PageShowViewModel(
             page.Id,
             page.Title,
@@ -267,7 +288,8 @@ public sealed class PageController(
             authorProfile?.DisplayName,
             communityName,
             canTranslate,
-            defaultVariant
+            defaultVariant,
+            subscribed
         ));
     }
 
@@ -624,6 +646,57 @@ public sealed class PageController(
         {
             return NotFound();
         }
+    }
+
+    // ── POST /pages/{id}/subscribe — ADR 0084 the page's subscribe toggle ──
+
+    /// <summary>
+    /// <c>POST /pages/{id}/subscribe</c> — ADR 0084's per-target subscription
+    /// lane for the <c>page.child</c> kind: flips the caller's
+    /// <see cref="Kumunita.Core.Notifications.NotificationSubscription"/>
+    /// row for (kind <c>page.child</c>, target = <b>this page's id</b> —
+    /// subscribing to a page means "notify me when a new page is added
+    /// under it") to the opposite of its current effective state (a stored
+    /// row's <c>Enabled</c> value when one exists, else the kind's opt-IN
+    /// default — disabled — so the first toggle is always an explicit
+    /// subscribe). The <see cref="Kumunita.Core.Notifications
+    /// .NotificationService.SetSubscriptionAsync"/> upserts the row (the row
+    /// is the record of the resident's last explicit choice, never deleted).
+    /// A <c>[Authorize]</c>-gated personal write — the RecipientId is the
+    /// whole access story; no audit row (D3 / F11). A hand-crafted POST on
+    /// an absent page still flips the row (a subscription is the resident's
+    /// own choice, not a page property — the toggle on a live page is the
+    /// normal path).
+    /// </summary>
+    [HttpPost]
+    [Route("{id:guid}/subscribe")]
+    [ValidateAntiForgeryToken]
+    [Authorize]
+    public async Task<IActionResult> Subscribe(string id)
+    {
+        var actorId = KumunitaPrincipal.SubjectId(User);
+        if (string.IsNullOrEmpty(actorId))
+            return NotFound();
+
+        var kind = Kumunita.Core.Notifications.NotificationKinds.PageChild;
+        bool current = false;
+        if (notifications is not null)
+        {
+            await using var readSession = store.LightweightSession();
+            current = await notifications.IsSubscriptionEnabledForAsync(readSession, actorId, kind, id).ConfigureAwait(false);
+        }
+
+        if (notifications is not null)
+            await notifications.SetSubscriptionAsync(actorId, kind, id, !current).ConfigureAwait(false);
+
+        // Back to the page the toggle lives on (the Show redirect shape —
+        // the page's path, not its id).
+        var tree = await pages.GetTreeAsync().ConfigureAwait(false);
+        var byId = tree.ToDictionary(p => p.Id, StringComparer.Ordinal);
+        var page = byId.TryGetValue(id, out var p) ? p : null;
+        return page is not null
+            ? RedirectToAction(nameof(Show), new { path = PagePaths.Href(byId, page) })
+            : RedirectToAction(nameof(Index));
     }
 
     // ── POST /pages/{id}/reset-seeded — ADR 0058 reset to seeded text ───────

@@ -37,5 +37,16 @@ public static class M6DocTypes
         // — this pin completes the registration to match the frozen doc shape.
         opts.Schema.For<NotificationPreference>()
                .Identity(p => p.RecipientId);
+
+        // ── ADR 0084 — per-target notification subscriptions ─────────────
+        // One row per (recipient, kind, target) triple; the surrogate Id is
+        // the Marten identity (the GroupMembership / ComponentMembership
+        // business-key convention), the indexes support the recipient-scoped
+        // look-up + the per-(kind, target) uniqueness check in the write lane.
+        opts.Schema.For<NotificationSubscription>()
+               .Identity(s => s.Id)
+               .Index(s => s.RecipientId)
+               .Index(s => s.Kind)
+               .Index(s => s.TargetId);
     }
 }

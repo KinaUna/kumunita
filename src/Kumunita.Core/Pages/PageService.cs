@@ -1,5 +1,6 @@
 using Kumunita.Core.Authorization;
 using Kumunita.Core.Identity;
+using Kumunita.Core.Notifications;
 using Kumunita.Core.Tags;
 using Marten;
 using Marten.Services;
@@ -57,10 +58,19 @@ public sealed class PageService : IPageService
     // that exercise the tag path construct it explicitly.
     private readonly ITagService? _tags;
 
-    public PageService(IDocumentStore store, ITagService? tags = null)
+    // ADR 0084 — the M6 notification emitter seam (optional nullable default
+    // so the existing test call sites that construct PageService(store) or
+    // PageService(store, tags) keep compiling unchanged — the same CS1736
+    // shape as PostService._notifications / AnnouncementService._notifications).
+    // The DI registration passes the live Notifications.NotificationService.
+    private readonly NotificationService? _notifications;
+
+    public PageService(IDocumentStore store, ITagService? tags = null,
+        NotificationService? notifications = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _tags = tags;
+        _notifications = notifications;
     }
 
     // ─── Read lanes (ADR 0039 §3.3 / §3.4 / §3.5) ─────────────────────────
@@ -622,6 +632,41 @@ public sealed class PageService : IPageService
 
         session.Store(page);
         session.Store(audit);
+
+        // ADR 0084 — the page-child emitter (opt-IN kind: the resident must
+        // have stored an Enabled=true subscription row for the parent page's
+        // id; IsSubscriptionEnabledForAsync short-circuits the emission for
+        // unsubscribed recipients). Recipient universe: the parent page's
+        // subscribers (via the NotificationSubscription rows for the parent
+        // page's id + the page.child kind). A draft (ADR 0037 — invisible to
+        // all but the author) must **not** notify subscribers: they could
+        // not yet see the content, so an inbox row + email for it would leak
+        // intake they did not consent to reading (intake honesty — the same
+        // pin as PostService's group/post lane). Notification is deferred to
+        // the publish lane (the moment the page becomes visible).
+        // One SaveChangesAsync commits the page + the audit row + the inbox
+        // rows atomically (C3).
+        if (_notifications is not null && !page.IsDraft && page.ParentId is { } parentId)
+        {
+            var subscribers = await session.Query<Notifications.NotificationSubscription>()
+                .Where(s => s.Kind == NotificationKinds.PageChild && s.TargetId == parentId && s.Enabled)
+                .Select(s => s.RecipientId)
+                .ToListAsync().ConfigureAwait(false);
+            foreach (var recipient in subscribers)
+            {
+                if (string.Equals(recipient, actorId, StringComparison.Ordinal))
+                    continue;                                   // the author does not notify themselves
+                await _notifications.EmitAsync(
+                    session,
+                    recipientId: recipient,
+                    kind: NotificationKinds.PageChild,
+                    idempotencyKey: $"notification:page.child:{page.Id}:{recipient}",
+                    body: UgcSnippets.Truncate(page.Title),
+                    targetId: parentId,
+                    ct: default).ConfigureAwait(false);
+            }
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
 
         // TG (ADR 0044, U8b) — the tag attach lane on the create path (C3

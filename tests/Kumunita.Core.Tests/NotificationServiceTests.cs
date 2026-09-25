@@ -552,6 +552,308 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Equal("ben@examplium.com", email.Recipient);
     }
 
+    // ── ADR 0084 — per-target subscription lanes ────────────────────────────
+    //
+    // The <see cref="NotificationService"/> gains three public lanes in ADR
+    // 0084 (the per-target subscription lane): <c>GetSubscriptionsAsync</c>
+    // (the settings-page list), <c>SetSubscriptionAsync</c> (the upsert —
+    // the row is the record of the resident's last explicit choice and is
+    // never deleted), and <c>IsSubscriptionEnabledForAsync</c> (the gate —
+    // resolves a stored row verbatim or falls back to the kind's default
+    // from the <c>NotificationKinds.OptInKinds</c> table: opt-IN kinds
+    // default to disabled, opt-OUT kinds default to enabled). The 7-arg
+    // <c>EmitAsync</c> overload consults the gate **first** when
+    // <c>targetId</c> is provided — a disabled recipient short-circuits
+    // with <c>null</c> (no inbox row, no email) before dedup, before the
+    // profile read, before staging (the ADR 0078 sample-suppression shape).
+    //
+    // F13 — opt-IN (announcement) no-row default suppresses the emission.
+    // F14 — opt-IN (announcement) row Enabled=true fires.
+    // F15 — opt-OUT (community.post) no-row default fires.
+    // F16 — opt-OUT (community.post) row Enabled=false suppresses.
+    // F17 — opt-IN (page.child) no-row default suppresses.
+    // F18 — opt-IN (page.child) row Enabled=true fires.
+    // F19 — opt-OUT (group.post) no-row default fires (the legacy shape).
+    // F20 — opt-OUT (group.post) row Enabled=false suppresses.
+    // F21 — legacy 6-arg <c>EmitAsync</c> (targetId absent) skips the
+    //      gate entirely — a disabled (kind, target) row does not affect
+    //      a kind without a per-target scope (or a legacy call site).
+    // F22 — <c>SetSubscriptionAsync</c> upserts on the (recipient, kind,
+    //      target) business key: a second call with the opposite
+    //      <c>Enabled</c> value flips the same row (no duplicate row,
+    //      no delete).
+    // F23 — <c>GetSubscriptionsAsync</c> returns the recipient's rows in
+    //      (Kind, TargetId) order — the settings page's stable display
+    //      order (and only that recipient's rows — another recipient's
+    //      row does not leak).
+
+    [Fact]
+    public async Task ADR0084_F13_OptIn_NoRow_DefaultsDisabled_Suppresses()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f13";
+        await PlantProfile(store, recipient, "f13@kumunita");
+
+        // announcement is opt-IN (in OptInKinds): no row → default disabled
+        // → gate short-circuits with null before dedup / profile / staging.
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.Announcement,
+            "notification:announcement:ann-f13:comm-f13",
+            "snippet", targetId: "comm-f13",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(row);
+        Assert.Equal(0, await CountNotifications(store, recipient));
+        Assert.Empty(staged);
+    }
+
+    [Fact]
+    public async Task ADR0084_F14_OptIn_RowEnabledTrue_Fires()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f14";
+        await PlantProfile(store, recipient, "f14@kumunita");
+        await svc.SetSubscriptionAsync(recipient, NotificationKinds.Announcement,
+            "comm-f14", enabled: true, TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.Announcement,
+            "notification:announcement:ann-f14:comm-f14",
+            "snippet", targetId: "comm-f14",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(NotificationKinds.Announcement, row!.Kind);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("f14@kumunita", email.Recipient);
+    }
+
+    [Fact]
+    public async Task ADR0084_F15_OptOut_NoRow_DefaultsEnabled_Fires()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f15";
+        await PlantProfile(store, recipient, "f15@kumunita");
+
+        // community.post is opt-OUT (not in OptInKinds): no row → default
+        // enabled → the gate lets the emission through (the legacy shape).
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.CommunityPost,
+            "notification:community.post:post-f15:comm-f15",
+            "snippet", targetId: "comm-f15",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(NotificationKinds.CommunityPost, row!.Kind);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("f15@kumunita", email.Recipient);
+    }
+
+    [Fact]
+    public async Task ADR0084_F16_OptOut_RowEnabledFalse_Suppresses()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f16";
+        await PlantProfile(store, recipient, "f16@kumunita");
+        await svc.SetSubscriptionAsync(recipient, NotificationKinds.CommunityPost,
+            "comm-f16", enabled: false, TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.CommunityPost,
+            "notification:community.post:post-f16:comm-f16",
+            "snippet", targetId: "comm-f16",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(row);
+        Assert.Equal(0, await CountNotifications(store, recipient));
+        Assert.Empty(staged);
+    }
+
+    [Fact]
+    public async Task ADR0084_F17_PageChild_OptIn_NoRow_Suppresses()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f17";
+        await PlantProfile(store, recipient, "f17@kumunita");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PageChild,
+            "notification:page.child:page-f17:parent-f17",
+            "snippet", targetId: "parent-f17",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(row);
+        Assert.Equal(0, await CountNotifications(store, recipient));
+        Assert.Empty(staged);
+    }
+
+    [Fact]
+    public async Task ADR0084_F18_PageChild_OptIn_RowEnabledTrue_Fires()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f18";
+        await PlantProfile(store, recipient, "f18@kumunita");
+        await svc.SetSubscriptionAsync(recipient, NotificationKinds.PageChild,
+            "parent-f18", enabled: true, TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.PageChild,
+            "notification:page.child:page-f18:parent-f18",
+            "snippet", targetId: "parent-f18",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(NotificationKinds.PageChild, row!.Kind);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("f18@kumunita", email.Recipient);
+    }
+
+    [Fact]
+    public async Task ADR0084_F19_GroupPost_OptOut_NoRow_DefaultsEnabled_Fires()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f19";
+        await PlantProfile(store, recipient, "f19@kumunita");
+
+        // group.post is opt-OUT (same shape as community.post): no row →
+        // default enabled. This is the legacy behavior, now gated on the
+        // (kind, target) pair — the row's absence still means "enabled" for
+        // opt-OUT kinds, so existing residents see no behavior change.
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.GroupPost,
+            "notification:group.post:post-f19:grp-f19",
+            "snippet", targetId: "grp-f19",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(NotificationKinds.GroupPost, row!.Kind);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("f19@kumunita", email.Recipient);
+    }
+
+    [Fact]
+    public async Task ADR0084_F20_GroupPost_OptOut_RowEnabledFalse_Suppresses()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f20";
+        await PlantProfile(store, recipient, "f20@kumunita");
+        await svc.SetSubscriptionAsync(recipient, NotificationKinds.GroupPost,
+            "grp-f20", enabled: false, TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.GroupPost,
+            "notification:group.post:post-f20:grp-f20",
+            "snippet", targetId: "grp-f20",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(row);
+        Assert.Equal(0, await CountNotifications(store, recipient));
+        Assert.Empty(staged);
+    }
+
+    [Fact]
+    public async Task ADR0084_F21_Legacy_SixArgOverload_SkipsGate()
+    {
+        var (store, svc, _, staged) = await BootAsync();
+        const string recipient = "u-f21";
+        await PlantProfile(store, recipient, "f21@kumunita");
+
+        // An explicit row for (announcement, comm-f21) saying "disabled" —
+        // the legacy 6-arg EmitAsync (targetId absent) must not consult
+        // it: the gate is skipped when targetId is null/empty, so the
+        // emission proceeds on the kind's existing (lean-default-enabled)
+        // preference path.
+        await svc.SetSubscriptionAsync(recipient, NotificationKinds.Announcement,
+            "comm-f21", enabled: false, TestContext.Current.CancellationToken);
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, recipient,
+            NotificationKinds.Announcement,
+            "notification:announcement:ann-f21-legacy",
+            "snippet", TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(1, await CountNotifications(store, recipient));
+        var email = Assert.Single(staged);
+        Assert.Equal("f21@kumunita", email.Recipient);
+    }
+
+    [Fact]
+    public async Task ADR0084_F22_SetSubscription_Upserts_On_BusinessKey_NeverDeletes()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipient = "u-f22";
+        const string kind = NotificationKinds.Announcement;
+        const string target = "comm-f22";
+
+        var ct = TestContext.Current.CancellationToken;
+        await svc.SetSubscriptionAsync(recipient, kind, target, enabled: true, ct);
+        await svc.SetSubscriptionAsync(recipient, kind, target, enabled: false, ct);
+        await svc.SetSubscriptionAsync(recipient, kind, target, enabled: true, ct);
+
+        // Exactly one row for the (recipient, kind, target) pair — the
+        // upsert flipped Enabled rather than deleting + re-inserting (the
+        // row is the record of the last explicit choice, never absent).
+        var rows = await svc.GetSubscriptionsAsync(recipient, ct);
+        var mine = rows.Where(s => s.Kind == kind && s.TargetId == target).ToList();
+        Assert.Single(mine);
+        Assert.True(mine[0].Enabled);
+
+        // A different (kind, target) for the same recipient is a separate
+        // row — the business key is (recipient, kind, target), not
+        // (recipient, kind).
+        await svc.SetSubscriptionAsync(recipient, kind, "other-target", enabled: false, ct);
+        rows = await svc.GetSubscriptionsAsync(recipient, ct);
+        Assert.Equal(2, rows.Count);
+    }
+
+    [Fact]
+    public async Task ADR0084_F23_GetSubscriptions_Returns_Only_Own_Rows_In_Stable_Order()
+    {
+        var (store, svc, _, _) = await BootAsync();
+        const string recipientA = "u-f23-a";
+        const string recipientB = "u-f23-b";
+        const string kind = NotificationKinds.Announcement;
+
+        var ct = TestContext.Current.CancellationToken;
+        await svc.SetSubscriptionAsync(recipientA, kind, "zeta", enabled: true, ct);
+        await svc.SetSubscriptionAsync(recipientA, kind, "alpha", enabled: false, ct);
+        await svc.SetSubscriptionAsync(recipientA, NotificationKinds.GroupPost, "grp-a", enabled: true, ct);
+        // recipientB's row must not leak into recipientA's read.
+        await svc.SetSubscriptionAsync(recipientB, kind, "alpha", enabled: true, ct);
+
+        var rows = await svc.GetSubscriptionsAsync(recipientA, ct);
+        Assert.Equal(3, rows.Count);
+        // (Kind, TargetId) order — the settings page's stable display order:
+        //   announcement/alpha  <  announcement/zeta  <  group.post/grp-a
+        Assert.Equal(
+            new[] { (NotificationKinds.Announcement, "alpha"),
+                    (NotificationKinds.Announcement, "zeta"),
+                    (NotificationKinds.GroupPost, "grp-a") },
+            rows.Select(r => (r.Kind, r.TargetId)).ToArray());
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>

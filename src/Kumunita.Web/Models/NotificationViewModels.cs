@@ -81,3 +81,31 @@ public sealed record TodoCard(
 public sealed record NotificationPreferencesViewModel(
     IReadOnlyList<string>? KindsEnabled,
     IReadOnlyList<string> AllKinds);
+
+/// <summary>
+/// ADR 0084 — one row of the <c>GET /notifications/subscriptions</c> settings
+/// list (the per-target subscriptions surface, as distinct from the
+/// per-kind <see cref="NotificationPreferencesViewModel"/>): the target's
+/// stable id, its display name (a community's / group's / page's name, or
+/// the section label for a sentinel target), and the resident's effective
+/// choice for that (kind, target) — the stored row's <c>Enabled</c> value
+/// when one exists, else the kind's default from
+/// <see cref="Kumunita.Core.Notifications.NotificationKinds.OptInKinds"/>
+/// (opt-IN kinds default to disabled, opt-OUT kinds default to enabled).
+/// </summary>
+public sealed record SubscriptionRow(
+    string Kind,
+    string TargetId,
+    string Name,
+    bool Enabled);
+
+/// <summary>
+/// The <c>GET/POST /notifications/subscriptions</c> view model (ADR 0084 —
+/// the per-target subscriptions settings surface): the ordered
+/// <see cref="SubscriptionRow"/> list the view renders, one toggle per
+/// (kind, target) pair (announcements per community + the flat/public
+/// sentinel, community posts per community, group posts per group, and new
+/// sub-pages per parent page the resident has subscribed to).
+/// </summary>
+public sealed record NotificationSubscriptionsViewModel(
+    IReadOnlyList<SubscriptionRow> Rows);

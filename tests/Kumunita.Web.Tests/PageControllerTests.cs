@@ -90,7 +90,7 @@ namespace Kumunita.Web.Tests;
 /// repo's role-claim convention).
 /// </para>
 /// </summary>
-public class PageControllerTests
+public class PageControllerTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
 {
     // ── 404 vs 403 split (the page-specific pin) ─────────────────────────
 
@@ -1100,6 +1100,87 @@ public class PageControllerTests
         return localization;
     }
 
+    // ── ADR 0084 — POST /pages/{id}/subscribe (the page's subscribe toggle) ─
+
+    /// <summary>
+    /// <c>POST /pages/{id}/subscribe</c> (ADR 0084): flips the actor's
+    /// <see cref="Kumunita.Core.Notifications.NotificationSubscription"/> row
+    /// for (kind <c>page.child</c>, target = the page's id) to the opposite
+    /// of its current effective state (the opt-IN default — disabled — when
+    /// no row exists, so the first toggle is an explicit subscribe). The
+    /// row is upserted by <see cref="Kumunita.Core.Notifications
+    /// .NotificationService.SetSubscriptionAsync"/> (never deleted — the
+    /// row is the record of the resident's last explicit choice). A
+    /// <c>[Authorize]</c>-gated personal write; the RecipientId is the
+    /// whole access story (no audit row, D3 / F11).
+    /// </summary>
+    [Fact]
+    public async Task Subscribe_Post_Flips_Row_And_Redirects_To_Page()
+    {
+        var store = await BootStoreAsync();
+        var pages = Substitute.For<IPageService>();
+        const string pageId = "parent-s1";
+        const string actor = "subj-resident-001";
+        pages.GetTreeAsync().Returns(new List<Page>
+        {
+            new Page { Id = pageId, Title = "Parent S1", Slug = "parent" },
+        });
+        var authz = Substitute.For<IAuthorizationService>();
+        var userInfo = Substitute.For<IUserInfoService>();
+        var controller = Build(pages, authz, userInfo, store,
+            IsAuthenticated: true, subjectId: actor,
+            notifications: new Kumunita.Core.Notifications.NotificationService(
+                store, userInfo,
+                Substitute.For<Kumunita.Core.Localization.ITranslationProvider>(),
+                Substitute.For<Kumunita.Core.Identity.IMailerStage>()));
+
+        var result = await controller.Subscribe(pageId);
+
+        // The redirect goes back to the page the toggle lives on (the
+        // Show redirect shape — the page's path, not its id).
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(PageController.Show), redirect.ActionName);
+        Assert.Equal("/pages/parent", redirect.RouteValues?["path"]);
+
+        // The live store shows the actor's row now carries Enabled=true
+        // (the first toggle is an explicit subscribe — the opt-IN default
+        // is disabled, so the flip lands on true).
+        var svc = new Kumunita.Core.Notifications.NotificationService(
+            store, userInfo,
+            Substitute.For<Kumunita.Core.Localization.ITranslationProvider>(),
+            Substitute.For<Kumunita.Core.Identity.IMailerStage>());
+        var rows = await svc.GetSubscriptionsAsync(actor, TestContext.Current.CancellationToken);
+        var mine = Assert.Single(rows, r => r.Kind == Kumunita.Core.Notifications.NotificationKinds.PageChild
+            && r.TargetId == pageId);
+        Assert.True(mine.Enabled);
+
+        // A second toggle flips the row to Enabled=false (the resident's
+        // explicit unsubscribe) — the row is preserved, not deleted.
+        await controller.Subscribe(pageId);
+        rows = await svc.GetSubscriptionsAsync(actor, TestContext.Current.CancellationToken);
+        mine = Assert.Single(rows, r => r.Kind == Kumunita.Core.Notifications.NotificationKinds.PageChild
+            && r.TargetId == pageId);
+        Assert.False(mine.Enabled);
+    }
+
+    private async Task<IDocumentStore> BootStoreAsync()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var conn = await fixture.NewDatabaseAsync(ct);
+        var store = Marten.DocumentStore.For(opts =>
+        {
+            opts.Connection(conn);
+            opts.DatabaseSchemaName = "mt";
+            opts.Storage.Add<Kumunita.Core.KumunitaFeature>();
+            opts.Storage.Add<Kumunita.Core.Authorization.AuthorizationFeature>();
+            Kumunita.Core.M1DocTypes.Configure(opts);
+            Kumunita.Core.M3DocTypes.Configure(opts);
+            Kumunita.Core.M6DocTypes.Configure(opts);
+        });
+        await store.Storage.Database.ApplyAllConfiguredChangesToDatabaseAsync(null, null, ct);
+        return store;
+    }
+
     private static PageController Build(
         IPageService pages,
         IAuthorizationService? authz = null,
@@ -1107,7 +1188,8 @@ public class PageControllerTests
         IDocumentStore? store = null,
         string[]? roles = null,
         bool IsAuthenticated = false,
-        string? subjectId = null)
+        string? subjectId = null,
+        Kumunita.Core.Notifications.NotificationService? notifications = null)
     {
         var authzImpl = authz ?? Substitute.For<IAuthorizationService>();
         var userInfoImpl = userInfo ?? Substitute.For<IUserInfoService>();
@@ -1130,7 +1212,8 @@ public class PageControllerTests
 
         var localization = DefaultLocalization();
 
-        var controller = new PageController(pages, authzImpl, localization, userInfoImpl, storeImpl);
+        var controller = new PageController(pages, authzImpl, localization, userInfoImpl, storeImpl,
+            notifications: notifications);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

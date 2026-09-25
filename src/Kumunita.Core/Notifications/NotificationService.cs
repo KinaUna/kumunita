@@ -82,11 +82,53 @@ public sealed class NotificationService
         string idempotencyKey,
         string? body,
         CancellationToken ct = default)
+        => await EmitAsync(session, recipientId, kind, idempotencyKey, body, targetId: null, ct).ConfigureAwait(false);
+
+    /// <summary>
+    /// ADR 0084 — the writer with the per-target subscription gate. Same
+    /// contract as <see cref="EmitAsync(IDocumentSession, string, string, string, string, CancellationToken)"/>,
+    /// plus: when <paramref name="kind"/> is in
+    /// <see cref="NotificationKinds.OptInKinds"/> and <paramref name="targetId"/>
+    /// is provided, the recipient's effective
+    /// <see cref="IsSubscriptionEnabledForAsync"/> choice is consulted **
+    /// first** (before dedup, before the profile read, before staging — the
+    /// gate short-circuits with a <c>null</c> return, the ADR 0078
+    /// sample-suppression shape): a disabled recipient stores no inbox row
+    /// and no email, exactly as if the event never happened. <c>null</c> /
+    /// empty <paramref name="targetId"/> (legacy emitters, or kinds with no
+    /// per-target scope) skips the gate — the kind's existing behavior is
+    /// unchanged.
+    /// </summary>
+    public async Task<Notification?> EmitAsync(
+        IDocumentSession session,
+        string recipientId,
+        string kind,
+        string idempotencyKey,
+        string? body,
+        string? targetId,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(session);
         if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
         if (string.IsNullOrWhiteSpace(kind)) throw new ArgumentException("A kind is required.", nameof(kind));
         if (string.IsNullOrWhiteSpace(idempotencyKey)) throw new ArgumentException("An idempotency key is required.", nameof(idempotencyKey));
+
+        // (0) ADR 0084 — the per-target subscription gate. Consulted **
+        //     first** (before dedup, before the profile read, before the
+        //     sample-suppression gate — a disabled recipient short-circuits
+        //     with no side effects of any kind). Skipped for a kind with no
+        //     per-target scope (targetId absent — the gate has nothing to
+        //     resolve against): legacy emitters that don't pass targetId are
+        //     unaffected. The default (opt-in vs opt-out) is resolved inside
+        //     IsSubscriptionEnabledForAsync from the
+        //     NotificationKinds.OptInKinds table: opt-IN kinds (the 3 new
+        //     ADR 0084 kinds) default to disabled, opt-OUT kinds (group.post
+        //     and the other 10 legacy kinds) default to enabled.
+        if (!string.IsNullOrWhiteSpace(targetId)
+            && !await IsSubscriptionEnabledForAsync(session, recipientId, kind, targetId, ct).ConfigureAwait(false))
+        {
+            return null;   // ADR 0084 — recipient disabled this (kind, target): suppress
+        }
 
         // (1) Inbox-side dedup (D4 / F10): a same-key row already stored (on
         //     this session or in a prior commit — the <c>IdempotencyKey</c>
@@ -282,6 +324,115 @@ public sealed class NotificationService
         preference.Updated = DateTimeOffset.UtcNow;
         session.Store(preference);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // --- ADR 0084 — per-target subscription lanes (the §6.1
+    //     NotificationSubscription shape; the same personal-read / no-audit
+    //     convention as the NotificationPreference lanes, D3 / F11) ──────
+
+    /// <summary>
+    /// ADR 0084 — the subscription read (the settings page's list): the
+    /// recipient's <see cref="NotificationSubscription"/> rows, in
+    /// (Kind, TargetId) order (the stable display order). A personal read
+    /// — no audit row (D3).
+    /// </summary>
+    public async Task<IReadOnlyList<NotificationSubscription>> GetSubscriptionsAsync(
+        string recipientId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        await using var session = _store.QuerySession();
+        return await session.Query<NotificationSubscription>()
+            .Where(s => s.RecipientId == recipientId)
+            .OrderBy(s => s.Kind).ThenBy(s => s.TargetId)
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// ADR 0084 — the subscription write lane (upsert on the
+    /// (RecipientId, Kind, TargetId) business key): stores the recipient's
+    /// explicit <paramref name="enabled"/> choice for the named (kind, target)
+    /// and sets <c>Updated = now</c>. The row is **never deleted** — an
+    /// opt-in toggle-off stores an <c>Enabled = false</c> row (the gate
+    /// consults the row's value, not its presence, so the row is the record
+    /// of the resident's last explicit choice — the same convention as the
+    /// <see cref="SetPreferencesAsync"/> lane, which stores the whole
+    /// preference rather than deleting it on an opt-out). A state lane — no
+    /// audit row (D3).
+    /// </summary>
+    public async Task SetSubscriptionAsync(
+        string recipientId,
+        string kind,
+        string targetId,
+        bool enabled,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        if (string.IsNullOrWhiteSpace(kind)) throw new ArgumentException("A kind is required.", nameof(kind));
+        if (string.IsNullOrWhiteSpace(targetId)) throw new ArgumentException("A target id is required.", nameof(targetId));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var existing = await session.Query<NotificationSubscription>()
+            .Where(s => s.RecipientId == recipientId && s.Kind == kind && s.TargetId == targetId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var sub = existing ?? new NotificationSubscription
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            RecipientId = recipientId,
+            Kind = kind,
+            TargetId = targetId,
+        };
+        sub.Enabled = enabled;
+        sub.Updated = DateTimeOffset.UtcNow;
+        session.Store(sub);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// ADR 0084 — the per-target subscription gate, on the caller's session
+    /// (the <see cref="EmailEnabledForAsync"/> / preference-gate pattern, but
+    /// resolved per-(recipient, kind, target) rather than per-(recipient,
+    /// kind)). Resolves the recipient's effective choice for the named (kind,
+    /// target) by combining the stored
+    /// <see cref="NotificationSubscription"/> row (if any) with the kind's
+    /// default from <see cref="NotificationKinds.OptInKinds"/>:
+    /// <list type="bullet">
+    /// <item>an **opt-IN** kind (in <see cref="NotificationKinds.OptInKinds"/>)
+    ///   defaults to <b>disabled</b> — an absent row is treated as
+    ///   <c>false</c>, a stored row's <c>Enabled</c> value is returned
+    ///   verbatim.</item>
+    /// <item>an **opt-OUT** kind (not in <see cref="NotificationKinds.OptInKinds"/>)
+    ///   defaults to <b>enabled</b> — an absent row is treated as
+    ///   <c>true</c>, a stored row's <c>Enabled</c> value is returned
+    ///   verbatim (an <c>Enabled = false</c> row disables).</item>
+    /// </list>
+    /// **Personal read, no audit row** (D3 / F11 carried): the
+    /// <c>RecipientId</c> is the whole access story. A pure read — no write,
+    /// no commit (the caller's transaction is unaffected).
+    /// </summary>
+    public async Task<bool> IsSubscriptionEnabledForAsync(
+        IDocumentSession session,
+        string recipientId,
+        string kind,
+        string targetId,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        if (string.IsNullOrWhiteSpace(recipientId)) throw new ArgumentException("A recipient id is required.", nameof(recipientId));
+        if (string.IsNullOrWhiteSpace(kind)) throw new ArgumentException("A kind is required.", nameof(kind));
+        if (string.IsNullOrWhiteSpace(targetId)) throw new ArgumentException("A target id is required.", nameof(targetId));
+
+        var row = await session.Query<NotificationSubscription>()
+            .Where(s => s.RecipientId == recipientId && s.Kind == kind && s.TargetId == targetId)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (row is not null)
+            return row.Enabled;
+
+        // No row stored — fall back to the kind's default (the
+        // <see cref="NotificationKinds.OptInKinds"/> table: opt-IN kinds
+        // default to disabled, everything else defaults to enabled — the
+        // ADR 0084 "fresh install behaves exactly like before" pin).
+        return !NotificationKinds.OptInKinds.Contains(kind, StringComparer.Ordinal);
     }
 
     // --- Internals ------------------------------------------------------------
