@@ -188,13 +188,18 @@ async function submitForm(page: Page, scope?: string): Promise<void> {
     .first().click();
 }
 
-// The Detail page's "Report this" card (M3b U8) keeps the form
-// body in a collapsed `<div id="report-form">` until the toggle
-// button is clicked; a direct `fill` on a hidden textarea would
-// time out, so expand it first. Spec-local, same as submitForm.
+// ADR 0082 — the Detail page's "Report this" surface (M3b U8) is now a
+// Bootstrap *modal* opened from the post's `⋮` dropdown: the `#report-form`
+// form and `#report-reason` textarea live inside `#report-modal`, hidden
+// until the dropdown item (a `data-bs-target="#report-modal"` button) is
+// clicked. A direct `fill` on a hidden textarea would time out, so open the
+// modal first. The *post's* dropdown is the first `.dropdown` on the page
+// (the reply dropdowns come after); its menu is already open when the item
+// is clicked, so the toggle is unambiguous. Spec-local, same as submitForm.
 async function expandReportForm(page: Page): Promise<void> {
+  await page.locator('.dropdown button.dropdown-toggle').first().click();
   await page.locator(
-    'button[data-bs-toggle="collapse"][data-bs-target="#report-form"]',
+    'button[data-bs-toggle="modal"][data-bs-target="#report-modal"]',
   ).click();
   await expect(page.locator('#report-reason')).toBeVisible();
 }

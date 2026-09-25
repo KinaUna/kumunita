@@ -74,25 +74,95 @@
                             </form>
                         </div>
                     }
-
-                    <div class="d-flex justify-content-end mb-2">
-                        @if (Model.Post.DeletedAt is null)
-                        {
-                            <a class="btn btn-sm btn-outline-secondary"
-                               href="@($"/posts/{postId}/edit")">
-                                <kw-l key="posts.detail_edit">Edit</kw-l>
-                            </a>
-                            <form class="d-inline ms-1" method="post"
-                                  action="@($"/posts/{postId}/delete")"
-                                  data-confirm="Delete this post? Your replies will remain visible.">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    <kw-l key="posts.delete">Delete</kw-l>
-                                </button>
-                            </form>
-                        }
-                    </div>
                 }
+                @* ADR 0082 — the post's action surface: one ⋮ dropdown (the
+                   ADR 0069 / 0071 todo/board idiom). Edit is a link; Report
+                   opens a Bootstrap modal; translation add / edit each open
+                   a modal; translation remove is a confirm form in the menu;
+                   Delete is a confirm form in the menu. The Report is always
+                   available (resident-facing intake, C-M3b·1) — it is not
+                   gated on IsAuthor. The service's write-lane re-check at
+                   POST is the real gate. The dropdown itself is rendered
+                   unconditionally so a non-author can still file a report. *@
+                <div class="d-flex justify-content-end mb-2">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                                {
+                                    <li>
+                                        <a class="dropdown-item text-dark" href="@($"/posts/{postId}/edit")">
+                                            <kw-l key="posts.detail_edit">Edit</kw-l>
+                                        </a>
+                                    </li>
+                                }
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal" data-bs-target="#report-modal">
+                                        <kw-l key="posts.report_button">Report this post</kw-l>
+                                    </button>
+                                </li>
+
+                                @if (Model.CanTranslate)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                    {
+                                        <li>
+                                            <button type="button" class="dropdown-item text-dark"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="@($"#post-trans-edit-{existing.LanguageCode}")">
+                                                <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                            </button>
+                                        </li>
+                                    }
+                                    @foreach (var lang in missingLanguages)
+                                    {
+                                        <li>
+                                            <button type="button" class="dropdown-item text-dark"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="@($"#post-trans-add-{lang.Code}")">
+                                                <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                            </button>
+                                        </li>
+                                    }
+                                    @if (Model.PostTranslations.Count > 0)
+                                    {
+                                        <li><hr class="dropdown-divider" /></li>
+                                        @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+                                        {
+                                            <li>
+                                                <form method="post" action="@($"/posts/{postId}/translations/remove")"
+                                                      data-confirm="Remove this translation?" style="margin:0;">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        }
+                                    }
+                                }
+
+                                @if (Model.IsAuthor && Model.Post.DeletedAt is null)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li>
+                                        <form method="post" action="@($"/posts/{postId}/delete")"
+                                              data-confirm="Delete this post? Your replies will remain visible." style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <kw-l key="posts.delete">Delete</kw-l>
+                                            </button>
+                                        </form>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    </div>
                 @if (Model.Post.DeletedAt is null)
                 {
                     <div class="d-flex align-items-center gap-2 text-muted small mb-3">
@@ -189,102 +259,10 @@
                                 }
                             </div>
 
-                            @* ADR 0048 — edit + remove lane for existing translations.
-                               For each language that already has a row, offer an
-                               "Edit" (pre-filled) + "Remove" (confirm) control.
-                               The add lane (below) is unchanged. *@
-                            @if (Model.CanTranslate)
-                            {
-                                @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
-                                {
-                                    <details class="mb-1">
-                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                            <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
-                                        </summary>
-                                        <div class="ms-2">
-                                            <form method="post" action="@($"/posts/{postId}/translations/update")">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                                <label class="form-label small">
-                                                    @LangName(existing.LanguageCode) <kw-l key="posts.translation_title_label">title</kw-l>
-                                                    <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                                </label>
-                                                <input class="form-control form-control-sm mb-2" name="title"
-                                                       value="@existing.Title" />
-                                                <label class="form-label small">
-                                                    <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                </label>
-                                                <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
-                                                <button type="submit" class="btn btn-sm btn-primary">
-                                                    <kw-l key="posts.translation_save">Save translation</kw-l>
-                                                </button>
-                                            </form>
-                                            <form method="post" action="@($"/posts/{postId}/translations/remove")"
-                                                  class="mt-2" data-confirm="Remove this translation?">
-                                                @Html.AntiForgeryToken()
-                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                    <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </details>
-                                }
-
-                                @* The "add a translation" lane — one form per supported
-                                   language that has no translation yet. The authored-in
-                                   language is excluded (missingLanguages). *@
-                                @foreach (var lang in missingLanguages)
-                                {
-                                    <details class="mb-1">
-                                        <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                            <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
-                                        </summary>
-                                        <form class="ms-2" method="post"
-                                              action="@($"/posts/{postId}/translations")">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="languageCode" value="@lang.Code" />
-                                            <label class="form-label small" for="post-t-title">
-                                                @LangName(lang.Code) <kw-l key="posts.translation_title_label">title</kw-l>
-                                                <span class="text-muted">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
-                                            </label>
-                                            <input class="form-control form-control-sm mb-2" id="post-t-title"
-                                                   name="title" value="@Model.Post.Title" />
-                                            <label class="form-label small" for="post-t-body">
-                                                <kw-l key="posts.translation_body_label">Body</kw-l>
-                                            </label>
-                                            @* RE U06 — toolbar + live preview on the reply body (image
-                                               OFF: RC's reply-image lane is unshipped — CreateReplyAsync/
-                                               UpdateReplyAsync never set PostReply.ImageIds [RC drift pause (a)]
-                                               and ContentImageController.Serve has no reply branch [RC U03
-                                               inert-404]; RE·3 forbids inventing that seam). name="body" and the
-                                               id/value bindings are preserved exactly. *@
-                                            <div class="rc-editor">
-                                                <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                                    <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                                    <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
-                                                    <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
-                                                    <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
-                                                    <partial name="_RichEditorToggle" />
-                                                </div>
-                                                <textarea class="form-control form-control-sm mb-2" id="post-t-body"
-                                                          name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
-                                                <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                                            </div>
-                                            <button type="submit" class="btn btn-sm btn-primary">
-                                                <kw-l key="posts.translation_save">Save translation</kw-l>
-                                            </button>
-                                        </form>
-                                    </details>
-                                }
-                            }
+                            @* ADR 0082 — the translation add / edit / remove lanes
+                               are now in the ⋮ dropdown above (modals for add/edit,
+                               confirm form for remove). The chip row above is the
+                               *selector* — it stays. *@
                         </div>
                     </div>
                 }
@@ -310,32 +288,168 @@
             </div>
         </div>
 
-        @* M3b U8 — resident-facing "Report this" intake (C-M3b·1, F1).
-           The form body stays collapsed; the button expands it. *@
-        <form class="card mb-3" method="post"
-              action="@($"/posts/{postId}/report")">
-            <div class="card-body py-2">
-                <button type="button" class="btn btn-sm btn-link text-muted text-decoration-none p-0"
-                        data-bs-toggle="collapse" data-bs-target="#report-form"
-                        aria-expanded="false" aria-controls="report-form">
-                    <kw-l key="posts.report_button">Report this post</kw-l>
-                </button>
-                <div class="collapse" id="report-form">
-                    <label class="form-label mt-3" for="report-reason" style="font-weight:600;">
-                        <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted small">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
-                    </label>
-                    <textarea class="form-control mb-3" id="report-reason" name="reason" rows="2"
-                              placeholder="@reportReasonPlaceholder"></textarea>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="text-muted small">
-                            <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+        @* ADR 0082 — the "Report this" modal (C-M3b·1, F1). The form is
+           inside a Bootstrap modal (the ADR 0071 idiom) opened from the ⋮
+           dropdown above. The #report-form id is preserved on the form so
+           the e2e helper (e2e-m3.spec.ts expandReportForm) can still
+           locate it. *@
+        <div class="modal fade" id="report-modal" tabindex="-1"
+             aria-labelledby="report-modal-label" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form class="mb-0" method="post" id="report-form"
+                          action="@($"/posts/{postId}/report")">
+                        @Html.AntiForgeryToken()
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="report-modal-label">
+                                <kw-l key="posts.report_button">Report this post</kw-l>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <button type="submit" class="btn btn-outline-danger ms-2"><kw-l key="posts.report_submit">Report</kw-l></button>
-                    </div>
-                    @Html.AntiForgeryToken()
+                        <div class="modal-body">
+                            <label class="form-label" for="report-reason" style="font-weight:600;">
+                                <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted small">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
+                            </label>
+                            <textarea class="form-control mb-3" id="report-reason" name="reason" rows="3"
+                                      placeholder="@reportReasonPlaceholder"></textarea>
+                            <div class="text-muted small">
+                                <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <kw-l key="common.cancel">Cancel</kw-l>
+                            </button>
+                            <button type="submit" class="btn btn-outline-danger" form="report-form">
+                                <kw-l key="posts.report_submit">Report</kw-l>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
-        </form>
+        </div>
+
+        @* ADR 0082 — the post's translation modals (referenced by the ⋮
+           dropdown above). Each is scoped by language code, so they coexist
+           on the same page. *@
+        @if (Model.CanTranslate)
+        {
+            @foreach (var existing in Model.PostTranslations.OrderBy(x => x.LanguageCode))
+            {
+                <div class="modal fade" id="@($"post-trans-edit-{existing.LanguageCode}")" tabindex="-1"
+                     aria-labelledby="@($"post-trans-edit-label-{existing.LanguageCode}")" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/posts/{postId}/translations/update")"
+                                  id="@($"post-trans-edit-form-{existing.LanguageCode}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"post-trans-edit-label-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <label class="form-label mb-1">
+                                        <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted small">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <input type="text" class="form-control mb-2" name="title" value="@existing.Title" />
+                                    <label class="form-label">
+                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                    </label>
+                                    @* RE U06 — image OFF (same RC gap as the
+                                       original inline lane). *@
+                                    <div class="rc-editor">
+                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                            <partial name="_RichEditorToggle" />
+                                        </div>
+                                        <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor>@existing.Body</textarea>
+                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"post-trans-edit-form-{existing.LanguageCode}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @foreach (var lang in missingLanguages)
+            {
+                <div class="modal fade" id="@($"post-trans-add-{lang.Code}")" tabindex="-1"
+                     aria-labelledby="@($"post-trans-add-label-{lang.Code}")" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <form method="post" action="@($"/posts/{postId}/translations")"
+                                  id="@($"post-trans-add-form-{lang.Code}")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="@($"post-trans-add-label-{lang.Code}")">
+                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <label class="form-label mb-1">
+                                        <kw-l key="posts.translation_title_label">Title</kw-l> <span class="text-muted small">(<kw-l key="posts.translation_optional">optional</kw-l>)</span>
+                                    </label>
+                                    <input type="text" class="form-control mb-2" name="title" value="@Model.Post.Title" />
+                                    <label class="form-label">
+                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                    </label>
+                                    <div class="rc-editor">
+                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                            <partial name="_RichEditorToggle" />
+                                        </div>
+                                        <textarea class="form-control" name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
+                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                    </button>
+                                    <button type="submit" class="btn btn-primary" form="@($"post-trans-add-form-{lang.Code}")">
+                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
 
         <h5 class="mt-4 mb-2" style="font-weight:600;">
             <kw-l key="posts.replies_heading">Replies</kw-l> <span class="text-muted">(@Model.Replies.Count)</span>
@@ -411,86 +525,10 @@
                                         }
                                     </div>
 
-                                    @* ADR 0048 — edit + remove lane for the reply's existing
-                                       translations. Pre-filled from the existing row; the
-                                       add lane below is unchanged. *@
-                                    @if (r.CanTranslate)
-                                    {
-                                        @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
-                                        {
-                                            <details class="mb-1">
-                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                                    <kw-l key="posts.translation_edit">Edit</kw-l> <b>@LangName(existing.LanguageCode)</b>
-                                                </summary>
-                                                <div class="ms-2">
-                                                    <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/update")">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                                        <label class="form-label small">
-                                                            <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                        </label>
-                                                        <textarea class="form-control form-control-sm mb-2" name="body" rows="3" required>@existing.Body</textarea>
-                                                        <button type="submit" class="btn btn-sm btn-primary">
-                                                            <kw-l key="posts.translation_save">Save translation</kw-l>
-                                                        </button>
-                                                    </form>
-                                                    <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/remove")"
-                                                          class="mt-2" data-confirm="Remove this translation?">
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                            <kw-l key="posts.translation_remove">Remove</kw-l> <b>@LangName(existing.LanguageCode)</b>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </details>
-                                        }
-
-                                        @* Drive "has a translation yet" from the reply's own
-                                           r.Translations rows (not the post's l.HasTranslation),
-                                           so a post's translation never suppresses a reply's
-                                           add-lane. The authored-in language stays excluded. *@
-                                        @foreach (var lang in Model.Languages.Where(l => l.Code != r.OriginalLanguageCode && !r.Translations.Any(t => t.LanguageCode == l.Code)))
-                                        {
-                                            <details class="mb-1">
-                                                <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                                    <kw-l key="posts.translation_add">Add</kw-l> <b>@LangName(lang.Code)</b>
-                                                </summary>
-                                                <form class="ms-2" method="post"
-                                                      action="@($"/posts/{postId}/replies/{r.Id}/translations")">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="languageCode" value="@lang.Code" />
-                                                    <label class="form-label small" for="reply-t-body">
-                                                        <kw-l key="posts.translation_body_label">Body</kw-l>
-                                                    </label>
-                                                    @* RE U06 — image OFF (same RC reply-image gap as the post
-                                                       translation lane above). *@
-                                                    <div class="rc-editor">
-                                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
-                                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
-                                                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
-                                                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
-                                                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
-                                                            <partial name="_RichEditorToggle" />
-                                                        </div>
-                                                        <textarea class="form-control form-control-sm mb-2" id="reply-t-body"
-                                                                  name="body" rows="3" required placeholder="…" data-rich-editor></textarea>
-                                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
-                                                    </div>
-                                                    <button type="submit" class="btn btn-sm btn-primary">
-                                                        <kw-l key="posts.translation_save">Save translation</kw-l>
-                                                    </button>
-                                                </form>
-                                            </details>
-                                        }
-                                    }
+                                    @* ADR 0082 — the reply's translation add / edit / remove
+                                       lanes are now in the ⋮ dropdown below (modals for
+                                       add/edit, confirm form for remove). The chip row above
+                                       is the *selector* — it stays. *@
                                 </div>
                             }
                             else
@@ -513,17 +551,127 @@
                                         <span class="avatar-mono" style="display:none;">@replyAvatarInitial</span>
                                     </span>
                                     <span>@r.AuthorDisplayName</span>
-                                    @* Author-only reply edit (ADR 0016) + delete
-                                       (ADR 0024) — offered only while the reply is
-                                       live; a non-author never sees either
-                                       (r.IsAuthor). *@
-                                    @if (r.IsAuthor && r.DeletedAt is null)
+                                    @* ADR 0082 — the reply's action surface: one ⋮ dropdown
+                                       (the ADR 0069 / 0071 todo/board idiom). Edit opens a
+                                       modal (the rich editor is heavy); Report opens a modal;
+                                       translation add / edit open modals; translation remove
+                                       + Delete are confirm forms in the menu. Report is always
+                                       available (resident-facing intake, ADR 0023) — it is not
+                                       gated on IsAuthor. The service's write-lane re-check at
+                                       POST is the real gate. *@
+                                    <div class="dropdown d-inline-block">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                aria-label="@($"Actions for reply by {r.AuthorDisplayName}")">⋮</button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            @if (r.IsAuthor && r.DeletedAt is null)
+                                            {
+                                                <li>
+                                                    <button type="button" class="dropdown-item text-dark"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="@($"#reply-edit-modal-{r.Id}")">
+                                                        <kw-l key="posts.reply_edit">Edit</kw-l>
+                                                    </button>
+                                                </li>
+                                            }
+                                            <li>
+                                                <button type="button" class="dropdown-item text-dark"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="@($"#reply-report-modal-{r.Id}")">
+                                                    <kw-l key="posts.reply_report_button">Report this reply</kw-l>
+                                                </button>
+                                            </li>
+
+                                            @if (r.CanTranslate)
+                                            {
+                                                <li><hr class="dropdown-divider" /></li>
+                                                @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
+                                                {
+                                                    <li>
+                                                        <button type="button" class="dropdown-item text-dark"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="@($"#reply-trans-edit-{r.Id}-{existing.LanguageCode}")">
+                                                            <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                        </button>
+                                                    </li>
+                                                }
+                                                @foreach (var lang in Model.Languages.Where(l => l.Code != r.OriginalLanguageCode && !r.Translations.Any(t => t.LanguageCode == l.Code)))
+                                                {
+                                                    <li>
+                                                        <button type="button" class="dropdown-item text-dark"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="@($"#reply-trans-add-{r.Id}-{lang.Code}")">
+                                                            <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                                        </button>
+                                                    </li>
+                                                }
+                                                @if (r.Translations.Count > 0)
+                                                {
+                                                    <li><hr class="dropdown-divider" /></li>
+                                                    @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
+                                                    {
+                                                        <li>
+                                                            <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/remove")"
+                                                                  data-confirm="Remove this translation?" style="margin:0;">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                                <button type="submit" class="dropdown-item text-danger">
+                                                                    <kw-l key="posts.translation_remove">Remove</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                                </button>
+                                                            </form>
+                                                        </li>
+                                                    }
+                                                }
+                                            }
+
+                                            @if (r.IsAuthor && r.DeletedAt is null)
+                                            {
+                                                <li><hr class="dropdown-divider" /></li>
+                                                <li>
+                                                    <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/delete")"
+                                                          data-confirm="Delete this reply? It will be replaced by a note. The record is kept." style="margin:0;">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <kw-l key="posts.reply_delete">Delete</kw-l>
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div>
+                                    <kw-dt dt="@r.Created" format="g"></kw-dt>
+                                    @if (r.Modified is not null)
                                     {
-                                        <details class="d-inline-block">
-                                            <summary class="btn btn-sm btn-link p-0 text-decoration-none"><kw-l key="posts.reply_edit">Edit</kw-l></summary>
-                                            <form class="mt-2 text-start" method="post"
-                                                  action="@($"/posts/{postId}/replies/{r.Id}/edit")">
-                                                @Html.AntiForgeryToken()
+                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> <kw-dt dt="@r.Modified.Value" format="g"></kw-dt></span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        @* ADR 0082 — the reply's modals (one per reply, ids scoped by
+                           reply id so multiple replies on the page do not collide).
+                           The reply-edit modal carries the full rich editor (the
+                           ADR 0016 surface). The reply-report modal is the ADR 0023
+                           intake. The translation modals are the ADR 0048 / 0029
+                           lanes. *@
+                        @if (r.IsAuthor && r.DeletedAt is null)
+                        {
+                            <div class="modal fade" id="@($"reply-edit-modal-{r.Id}")" tabindex="-1"
+                                 aria-labelledby="@($"reply-edit-modal-label-{r.Id}")" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/edit")"
+                                              id="@($"reply-edit-form-{r.Id}")">
+                                            @Html.AntiForgeryToken()
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="@($"reply-edit-modal-label-{r.Id}")">
+                                                    <kw-l key="posts.reply_edit">Edit</kw-l> — <kw-l key="posts.reply_heading">reply</kw-l>
+                                                </h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
                                                 @* RE U06 — image OFF (same RC reply-image gap). *@
                                                 <div class="rc-editor">
                                                     <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
@@ -540,56 +688,157 @@
                                                         <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
                                                         <partial name="_RichEditorToggle" />
                                                     </div>
-                                                    <textarea class="form-control mb-2" name="body" rows="3"
+                                                    <textarea class="form-control" name="body" rows="4"
                                                               required placeholder="…" data-rich-editor>@r.Body</textarea>
                                                     <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
                                                 </div>
-                                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="posts.reply_save">Save</kw-l></button>
-                                            </form>
-                                        </details>
-                                        <form class="d-inline" method="post"
-                                              action="@($"/posts/{postId}/replies/{r.Id}/delete")"
-                                              data-confirm="Delete this reply? It will be replaced by a note. The record is kept.">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm btn-link p-0 text-danger text-decoration-none">
-                                                <kw-l key="posts.reply_delete">Delete</kw-l>
-                                            </button>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                    <kw-l key="common.cancel">Cancel</kw-l>
+                                                </button>
+                                                <button type="submit" class="btn btn-primary" form="@($"reply-edit-form-{r.Id}")">
+                                                    <kw-l key="posts.reply_save">Save</kw-l>
+                                                </button>
+                                            </div>
                                         </form>
-                                    }
+                                    </div>
                                 </div>
-                                <div>
-                                    <kw-dt dt="@r.Created" format="g"></kw-dt>
-                                    @if (r.Modified is not null)
-                                    {
-                                        <span> — <kw-l key="posts.reply_edited">edited</kw-l> <kw-dt dt="@r.Modified.Value" format="g"></kw-dt></span>
-                                    }
+                            </div>
+                        }
+
+                        <div class="modal fade" id="@($"reply-report-modal-{r.Id}")" tabindex="-1"
+                             aria-labelledby="@($"reply-report-modal-label-{r.Id}")" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/report")"
+                                          id="@($"reply-report-form-{r.Id}")">
+                                        @Html.AntiForgeryToken()
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="@($"reply-report-modal-label-{r.Id}")">
+                                                <kw-l key="posts.reply_report_button">Report this reply</kw-l>
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <label class="form-label" for="@($"reply-report-reason-{r.Id}")" style="font-weight:600;">
+                                                <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted small">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
+                                            </label>
+                                            <textarea class="form-control mb-2" name="reason" rows="3"
+                                                      id="@($"reply-report-reason-{r.Id}")"
+                                                      placeholder="@reportReasonPlaceholder"></textarea>
+                                            <div class="text-muted small">
+                                                <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                <kw-l key="common.cancel">Cancel</kw-l>
+                                            </button>
+                                            <button type="submit" class="btn btn-outline-danger" form="@($"reply-report-form-{r.Id}")">
+                                                <kw-l key="posts.report_submit">Report</kw-l>
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
                         </div>
-                        @* ADR 0023 — the reply-report-target lane (resident-facing
-                           intake, mirroring the post-report form above). A native
-                           <details> (the ADR 0016 per-reply-edit precedent) — one
-                           per reply, no JS dependency, no id collision. *@
-                        <details class="mt-2">
-                            <summary class="btn btn-sm btn-link p-0 text-decoration-none">
-                                <kw-l key="posts.reply_report_button">Report this reply</kw-l>
-                            </summary>
-                            <form class="mt-2 text-start" method="post"
-                                  action="@($"/posts/{postId}/replies/{r.Id}/report")">
-                                @Html.AntiForgeryToken()
-                                <label class="form-label small mb-1" style="font-weight:600;">
-                                    <kw-l key="posts.report_reason_label">What's wrong?</kw-l> <span class="text-muted">(<kw-l key="posts.report_optional">optional</kw-l>)</span>
-                                </label>
-                                <textarea class="form-control mb-2" name="reason" rows="2"
-                                          placeholder="@reportReasonPlaceholder"></textarea>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="text-muted small">
-                                        <kw-l key="posts.report_note">Filing a report is an intake action — it doesn't change what you can see, and a moderator may follow up.</kw-l>
+
+                        @if (r.CanTranslate)
+                        {
+                            @foreach (var existing in r.Translations.OrderBy(x => x.LanguageCode))
+                            {
+                                <div class="modal fade" id="@($"reply-trans-edit-{r.Id}-{existing.LanguageCode}")" tabindex="-1"
+                                     aria-labelledby="@($"reply-trans-edit-label-{r.Id}-{existing.LanguageCode}")" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations/update")"
+                                                  id="@($"reply-trans-edit-form-{r.Id}-{existing.LanguageCode}")">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@existing.LanguageCode" />
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="@($"reply-trans-edit-label-{r.Id}-{existing.LanguageCode}")">
+                                                        <kw-l key="posts.translation_edit">Edit</kw-l> — <b>@LangName(existing.LanguageCode)</b>
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <label class="form-label" for="@($"reply-trans-edit-body-{r.Id}-{existing.LanguageCode}")">
+                                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                    </label>
+                                                    @* The original inline reply-translation edit lane was a
+                                                       plain textarea (no rc-editor) — preserve that verbatim. *@
+                                                    <textarea class="form-control" id="@($"reply-trans-edit-body-{r.Id}-{existing.LanguageCode}")"
+                                                              name="body" rows="4" required>@existing.Body</textarea>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                                    </button>
+                                                    <button type="submit" class="btn btn-primary" form="@($"reply-trans-edit-form-{r.Id}-{existing.LanguageCode}")">
+                                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
                                     </div>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger ms-2"><kw-l key="posts.report_submit">Report</kw-l></button>
                                 </div>
-                            </form>
-                        </details>
+                            }
+
+                            @foreach (var lang in Model.Languages.Where(l => l.Code != r.OriginalLanguageCode && !r.Translations.Any(t => t.LanguageCode == l.Code)))
+                            {
+                                <div class="modal fade" id="@($"reply-trans-add-{r.Id}-{lang.Code}")" tabindex="-1"
+                                     aria-labelledby="@($"reply-trans-add-label-{r.Id}-{lang.Code}")" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <form method="post" action="@($"/posts/{postId}/replies/{r.Id}/translations")"
+                                                  id="@($"reply-trans-add-form-{r.Id}-{lang.Code}")">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="languageCode" value="@lang.Code" />
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="@($"reply-trans-add-label-{r.Id}-{lang.Code}")">
+                                                        <kw-l key="posts.translation_add">Add</kw-l> — <b>@LangName(lang.Code)</b>
+                                                    </h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <label class="form-label" for="@($"reply-trans-add-body-{r.Id}-{lang.Code}")">
+                                                        <kw-l key="posts.translation_body_label">Body</kw-l>
+                                                    </label>
+                                                    <div class="rc-editor">
+                                                        <div class="rc-editor-toolbar" data-rich-editor data-rich-editor-no-image>
+                                                            <button type="button" class="rc-btn" data-md="bold"><kw-l key="rc.editor.bold">B</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="italic"><kw-l key="rc.editor.italic">I</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="code"><kw-l key="rc.editor.code">C</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h1"><kw-l key="rc.editor.h1">H1</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h2"><kw-l key="rc.editor.h2">H2</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="h3"><kw-l key="rc.editor.h3">H3</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ul"><kw-l key="rc.editor.list">•</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="ol"><kw-l key="rc.editor.olist">1.</kw-l></button>
+                                                            <button type="button" class="rc-btn" data-md="link"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg><span class="visually-hidden"><kw-l key="rc.editor.link">Link</kw-l></span></button>
+                                                            <button type="button" class="rc-btn" data-md="image"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span class="visually-hidden"><kw-l key="rc.editor.image">Image</kw-l></span></button>
+                                                            <button type="button" class="rc-btn" data-md="attach"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="visually-hidden"><kw-l key="rc.editor.attach">Attach file</kw-l></span></button>
+                                                            <partial name="_RichEditorToggle" />
+                                                        </div>
+                                                        <textarea class="form-control" id="@($"reply-trans-add-body-{r.Id}-{lang.Code}")"
+                                                                  name="body" rows="4" required placeholder="…" data-rich-editor></textarea>
+                                                        <div class="rc-editor-pane rc-body" aria-live="polite" data-rich-editor-preview></div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                        <kw-l key="common.cancel">Cancel</kw-l>
+                                                    </button>
+                                                    <button type="submit" class="btn btn-primary" form="@($"reply-trans-add-form-{r.Id}-{lang.Code}")">
+                                                        <kw-l key="posts.translation_save">Save translation</kw-l>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
                     </li>
                 }
             </ul>
