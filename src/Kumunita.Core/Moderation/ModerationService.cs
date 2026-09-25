@@ -185,6 +185,15 @@ public sealed class ModerationService
         // notifying someone of their own filing). Staged into the
         // caller's session and committed by the single SaveChangesAsync
         // below (C3).
+        //
+        // **No reason snippet (2026-09-25 security fix):** the reporter's
+        // free-text reason is a low-privilege, attacker-controlled string
+        // (any resident can file a report) that is otherwise only visible
+        // to GlobalAdmins / standing moderators (ModerationController).
+        // Passing it to the content author via the notification body is a
+        // new disclosure channel — the author has no standing to read the
+        // rationale. The localized template alone ("your post was reported")
+        // is the intended signal.
         if (_notifications is not null
             && !string.IsNullOrWhiteSpace(post.AuthorId)
             && !string.Equals(post.AuthorId, actorId, StringComparison.Ordinal))
@@ -194,7 +203,7 @@ public sealed class ModerationService
                 recipientId: post.AuthorId,
                 kind: NotificationKinds.ReportFiled,
                 idempotencyKey: $"notification:report.filed:{report.Id}",
-                body: Truncate(reason),
+                body: null,
                 ct: default).ConfigureAwait(false);
         }
 
@@ -328,6 +337,11 @@ public sealed class ModerationService
         // author — no point notifying someone of their own filing). Staged
         // into the caller's session and committed by the single
         // SaveChangesAsync below (C3).
+        //
+        // **No reason snippet (2026-09-25 security fix):** same as the
+        // post-report emitter above — the reporter's free-text reason is
+        // not passed to the content author. The localized template alone
+        // is the intended signal.
         if (_notifications is not null
             && !string.IsNullOrWhiteSpace(reply.AuthorId)
             && !string.Equals(reply.AuthorId, actorId, StringComparison.Ordinal))
@@ -337,7 +351,7 @@ public sealed class ModerationService
                 recipientId: reply.AuthorId,
                 kind: NotificationKinds.ReportFiled,
                 idempotencyKey: $"notification:report.filed:{report.Id}",
-                body: Truncate(reason),
+                body: null,
                 ct: default).ConfigureAwait(false);
         }
 
