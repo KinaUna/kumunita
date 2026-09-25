@@ -10,6 +10,12 @@
             <a href="/projects" class="btn btn-link p-0 kanban-back"><kw-l key="pl.index.title">Projects</kw-l></a>
         </p>
 
+        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
+           idiom) — the project detail is part of the /projects section;
+           placed at the top of the page (after the back link), not the
+           bottom. *@
+        <partial name="_ProjectsTabs" />
+
         <header class="airy-head">
             <div class="head-row">
                 <div>
@@ -90,17 +96,25 @@
                    project's to-dos / boards stay in place (D6 — the
                    dangling-association rule; the project link simply stops
                    showing). *@
-                @if (Model.CanEdit)
-                {
-                    <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    @* The project's "New to-do" / "New board" entry points (the
+                       ProjectsIndex / TodosIndex / BoardsIndex header-button
+                       idioms) — any signed-in resident can create either; the
+                       composers are standalone pages, and the project
+                       association happens afterwards via each entity's project
+                       picker (ADR 0086 D9). *@
+                    <a class="btn btn-sm btn-outline-primary" href="/projects/todos/new"><kw-l key="projects.todo.new">New to-do</kw-l></a>
+                    <a class="btn btn-sm btn-outline-primary" href="/projects/boards/new"><kw-l key="projects.board.new">New board</kw-l></a>
+                    @if (Model.CanEdit)
+                    {
                         <a class="btn btn-sm btn-outline-secondary" href="@($"/projects/projects/{Model.Id}/edit")"><kw-l key="pl.project.edit">Edit project</kw-l></a>
                         <form method="post" action="@($"/projects/projects/{Model.Id}/delete")"
                               data-confirm="@("Delete this project? Its to-dos and boards stay in place — the link to this project simply stops showing.")" style="margin:0;">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-sm btn-outline-danger"><kw-l key="pl.project.delete">Delete project</kw-l></button>
                         </form>
-                    </div>
-                }
+                    }
+                </div>
             </div>
         </header>
 
@@ -205,9 +219,5 @@
                 </div>
             }
         </section>
-
-        @* The Projects / To-dos / Boards tab strip (the _AdminNav.cshtml
-           idiom) — the project detail is part of the /projects section. *@
-        <partial name="_ProjectsTabs" />
     </div>
 </div>

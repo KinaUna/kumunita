@@ -78,6 +78,24 @@
                                 data-bs-toggle="dropdown" aria-expanded="false"
                                 aria-label="Actions for @row.Title">⋮</button>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            @if (Model.Projects is { Count: > 0 })
+                            {
+                                @* ADR 0086 D9 — "Add to Project…": opens the
+                                   per-row modal (the TodosIndex subtask-modal
+                                   idiom) whose picker posts to the U04
+                                   set-project lane (the BoardEdit set-project
+                                   card idiom, repackaged as a modal). Hidden
+                                   when the actor sees no readable project —
+                                   a picker with no options is a noise
+                                   surface, not a control (F10). *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="@($"#add-project-{row.Id}")">
+                                        <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                                    </button>
+                                </li>
+                            }
                             <li>
                                 <form method="post" action="@($"/projects/boards/{row.Id}/delete")"
                                       data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
@@ -87,6 +105,58 @@
                             </li>
                         </ul>
                     </div>
+                    @if (Model.Projects is { Count: > 0 })
+                    {
+                        @* ADR 0086 D9 — the "Add to Project…" modal (one per
+                           row, the TodosIndex subtask-modal idiom): a picker
+                           over the actor's readable projects posting to the
+                           U04 set-project lane. The current association is
+                           preselected (the row's stored `ProjectId`); a
+                           blank choice clears it (the BoardEdit card
+                           idiom). The write's standing + project guard are
+                           the service's (C3 split) — this surface only
+                           renders the options. *@
+                        <div class="modal fade" id="@($"add-project-{row.Id}")" tabindex="-1"
+                             aria-labelledby="@($"add-project-label-{row.Id}")" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <form method="post" action="@($"/projects/boards/{row.Id}/set-project")">
+                                        @Html.AntiForgeryToken()
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="@($"add-project-label-{row.Id}")">
+                                                <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="@("Close")"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <label class="form-label" for="@($"add-project-select-{row.Id}")">
+                                                <kw-l key="pl.board.project_link">Project</kw-l>
+                                            </label>
+                                            <select class="form-select" id="@($"add-project-select-{row.Id}")" name="ProjectId">
+                                                <option value="" selected="@(string.IsNullOrWhiteSpace(row.ProjectId))">@(Html.Raw("&mdash;"))</option>
+                                                @foreach (var (id, name) in Model.Projects)
+                                                {
+                                                    <option value="@id" selected="@(id == row.ProjectId)">@name</option>
+                                                }
+                                            </select>
+                                            <div class="text-muted small mt-2">
+                                                <kw-l key="pl.board.project_hint">A project link is a display surface — it groups this board under the project, it never limits who can see it.</kw-l>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                                <kw-l key="common.cancel">Cancel</kw-l>
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">
+                                                <kw-l key="pl.board.set_project">Set project</kw-l>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             }
         </div>

@@ -147,6 +147,22 @@
                                     <a class="dropdown-item text-dark" href="@($"/projects/boards/{Model.Board.Id}/edit")"><kw-l key="projects.board.edit">Edit board</kw-l></a>
                                 </li>
                             }
+                            @if (Model.Projects is { Count: > 0 })
+                            {
+                                @* ADR 0086 D9 — "Add to Project…": opens the
+                                   modal (the BoardIndex row-modal idiom)
+                                   whose picker posts to the U04 set-project
+                                   lane (the BoardEdit set-project card
+                                   idiom, repackaged as a modal). Hidden when
+                                   the actor sees no readable project (F10). *@
+                                <li>
+                                    <button type="button" class="dropdown-item text-dark"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#add-project-modal">
+                                        <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                                    </button>
+                                </li>
+                            }
                             <li>
                                 <form method="post" action="@($"/projects/boards/{Model.Board.Id}/delete")"
                                       data-confirm="@("Delete this board? Its lanes and card placements are removed — the to-dos themselves are kept.")" style="margin:0;">
@@ -899,6 +915,59 @@
             </div>
         </div>
     </div>
+
+    @if (Model.Projects is { Count: > 0 })
+    {
+        @* ADR 0086 D9 — the "Add to Project…" modal (the BoardEdit
+           set-project card idiom, repackaged as a modal — the ⋮ menu's
+           "Add to Project…" item opens it). A picker over the actor's
+           readable projects posting to the U04 set-project lane; the
+           current association (Model.ProjectId — already dangling-filtered
+           for display) is preselected, and a blank choice clears it. The
+           write's standing (creator ∪ GlobalAdmin) + project guard are
+           the service's (C3 split) — this surface only renders the
+           options. *@
+        <div class="modal fade" id="add-project-modal" tabindex="-1"
+             aria-labelledby="add-project-modal-label" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="@($"/projects/boards/{Model.Board.Id}/set-project")">
+                        @Html.AntiForgeryToken()
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="add-project-modal-label">
+                                <kw-l key="pl.board.add_to_project">Add to Project…</kw-l>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="@("Close")"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="add-project-select">
+                                <kw-l key="pl.board.project_link">Project</kw-l>
+                            </label>
+                            <select class="form-select" id="add-project-select" name="ProjectId">
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.ProjectId))">@(Html.Raw("&mdash;"))</option>
+                                @foreach (var (id, name) in Model.Projects)
+                                {
+                                    <option value="@id" selected="@(id == Model.ProjectId)">@name</option>
+                                }
+                            </select>
+                            <div class="text-muted small mt-2">
+                                <kw-l key="pl.board.project_hint">A project link is a display surface — it groups this board under the project, it never limits who can see it.</kw-l>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <kw-l key="common.cancel">Cancel</kw-l>
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <kw-l key="pl.board.set_project">Set project</kw-l>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
 </div>
 
 @section Scripts {

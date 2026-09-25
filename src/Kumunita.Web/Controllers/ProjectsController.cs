@@ -1189,7 +1189,10 @@ public sealed class ProjectsController : Controller
             ComponentDisplayName: board.ComponentId is not null && componentNames.TryGetValue(board.ComponentId, out var cn) ? cn : null,
             LanguageCode: board.LanguageCode,
             Created: board.Created,
-            Modified: board.Modified);
+            Modified: board.Modified,
+            // ADR 0086 D9 — the stored association (may dangle — display
+            // only); the "Add to Project…" modal preselects it.
+            ProjectId: board.ProjectId);
     }
 
     /// <summary>
@@ -1233,7 +1236,11 @@ public sealed class ProjectsController : Controller
             Boards: rows,
             Components: await SeedComponentPickerAsync(),
             CurrentComponentId: componentId,
-            CurrentPage: page);
+            CurrentPage: page,
+            // ADR 0086 D9 — the row dropdown's "Add to Project…" modal
+            // picker (a display surface, never a gate — C-PL·3; empty ⇒
+            // the item + modal hide, the BoardEdit F10 rule).
+            Projects: await SeedProjectPickerAsync());
 
         return View("BoardIndex", vm);
     }
@@ -1372,7 +1379,11 @@ public sealed class ProjectsController : Controller
                          || RoleSet(User).Contains(Kumunita.Core.Identity.Roles.GlobalAdmin)),
             // ADR 0086 D9 — the project link (the D6 dangling rule above).
             ProjectId: projectLinkId,
-            ProjectTitle: projectLinkTitle);
+            ProjectTitle: projectLinkTitle,
+            // ADR 0086 D9 — the ⋮ menu's "Add to Project…" modal picker
+            // (a display surface, never a gate — C-PL·3; empty ⇒ the item
+            // + modal hide, the BoardEdit F10 rule).
+            Projects: await SeedProjectPickerAsync());
         // ADR 0071 (amendment) — the "Add subtask" modal offers an optional
         // assignee picker. Seed the standing assignee options (verified,
         // non-self profiles) the way the Create / BoardNew views do, so the

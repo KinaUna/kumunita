@@ -1,13 +1,20 @@
 @model Kumunita.Web.Models.TodoEditorModel
 @using Kumunita.Web.Security
-@inject Kumunita.Core.Localization.ITranslationProvider Translation
-@inject Kumunita.Core.Localization.ILocalizationService Localization
+@using Kumunita.Core.Projects
 @{
     ViewData["Title"] = "Edit to-do";
     string[] modes = { "Any", "All" };
-    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
-    var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     var assigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
+    // The fixed status vocabulary's label keys (the same closed set the
+    // Kanban lane's Set-status select offers: None + the four codes, ADR 0069).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
     // The form POSTs to /projects/todos/{id} (the UpdatePost lane). When
     // rendered via the GET /projects/todos/{id}/edit route the path carries
     // the "/edit" suffix — strip it to get the correct POST target. When
@@ -54,8 +61,25 @@
                     <div class="row g-2 align-items-end">
                         <div class="col-sm-6">
                             <label class="form-label" for="status" style="font-weight:600;"><kw-l key="projects.todo.status">Status</kw-l></label>
-                            <input class="form-control" type="text" id="status" name="Status"
-                                   placeholder="@optionalPlaceholder" value="@Model.Status" />
+                            @* The fixed status vocabulary (ADR 0069) — None +
+                               the four known codes, the same <c>
+                               KanbanStatuses.Known</c> set the Kanban lane's
+                               Set-status select offers. A pre-ADR-0069
+                               free-text status is preserved as an extra option
+                               so editing never loses it (C3). *@
+                            <select class="form-control" id="status" name="Status">
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                @if (!string.IsNullOrWhiteSpace(Model.Status) && !KanbanStatuses.Known.Contains(Model.Status))
+                                {
+                                    <option value="@Model.Status" selected>@Model.Status</option>
+                                }
+                                @foreach (var statusCode in KanbanStatuses.Known)
+                                {
+                                    <option value="@statusCode" selected="@(Model.Status == statusCode)">
+                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                    </option>
+                                }
+                            </select>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label" for="assignee" style="font-weight:600;"><kw-l key="projects.todo.assignee">Assignee</kw-l></label>

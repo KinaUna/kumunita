@@ -33,7 +33,12 @@ public sealed record BoardRow(
     string? ComponentDisplayName,
     string LanguageCode,
     DateTimeOffset Created,
-    DateTimeOffset? Modified);
+    DateTimeOffset? Modified,
+    // ADR 0086 D9 — the board's **project association** as stored (may
+    // dangle — the row is a display surface, never a gate, C-PL·3). The
+    // "Add to Project…" dropdown item preselects the current choice so the
+    // modal's picker opens on it (the BoardEdit set-project card idiom).
+    string? ProjectId = null);
 
 /// <summary>
 /// The <b>board feed</b> view model (the <c>GET /projects/boards</c> read
@@ -52,7 +57,13 @@ public sealed record BoardIndexViewModel(
     IReadOnlyList<BoardRow> Boards,
     IReadOnlyList<(string Id, string Name)> Components,
     string? CurrentComponentId,
-    int CurrentPage);
+    int CurrentPage,
+    // ADR 0086 D9 — the row dropdown's **project picker** options (the
+    // <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…" modal —
+    // a **display** surface, never a gate (C-PL·3). Empty ⇒ the item and
+    // the modal hide (a picker with no options is a noise surface, not a
+    // control — the BoardEdit F10 rule).
+    IReadOnlyList<(string Id, string Name)>? Projects = null);
 
 /// <summary>
 /// One <see cref="KanbanLane"/> of a board, enriched with its visible
@@ -143,7 +154,12 @@ public sealed record BoardDetailViewModel(
     // the actor — the link is then omitted entirely, never a 404/403 for the
     // board itself; the `pl.board.project_link` kw-l key labels it).
     string? ProjectId = null,
-    string? ProjectTitle = null);
+    string? ProjectTitle = null,
+    // ADR 0086 D9 — the board-head ⋮ menu's **project picker** options
+    // (the <c>SeedProjectPickerAsync</c> seed) for the "Add to Project…"
+    // modal — a **display** surface, never a gate (C-PL·3). Empty ⇒ the
+    // item and the modal hide (the BoardEdit F10 rule).
+    IReadOnlyList<(string Id, string Name)>? Projects = null);
 
 /// <summary>
 /// The **board compose** form model (the <c>GET /projects/boards/new</c> +

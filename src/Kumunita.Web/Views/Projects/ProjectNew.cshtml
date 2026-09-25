@@ -1,8 +1,20 @@
 @model Kumunita.Web.Models.ProjectComposerViewModel
 @using Kumunita.Web.Security
+@using Kumunita.Core.Projects
 @{
     ViewData["Title"] = "New project";
     string[] modes = { "Any", "All" };
+    // The fixed status vocabulary's label keys (the same closed set the
+    // Kanban lane's Set-status select offers: None + the four codes, ADR 0069
+    // — the to-do status shape, now shared with projects).
+    static string StatusLabelKey(string code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
 }
 
 <div class="row justify-content-center">
@@ -86,9 +98,27 @@
                     <div class="row g-2">
                         <div class="col">
                             <label class="form-label" for="status" style="font-weight:600;"><kw-l key="pl.project.status">Status</kw-l></label>
-                            <input class="form-control" type="text" id="status" name="Status"
-                                   maxlength="60" value="@Model.Status" />
-                            <div class="text-muted small mt-1"><kw-l key="pl.project.status_hint">An optional state label — the project's vocabulary is whatever you name it. Leave blank for none.</kw-l></div>
+                            @* The fixed status vocabulary (ADR 0069) — None +
+                               the four known codes, the same <c>
+                               KanbanStatuses.Known</c> set the to-do / Kanban
+                               lane selects offer (the to-do status shape
+                               shared with projects). A free-text value is
+                               preserved as an extra option so editing never
+                               loses it. *@
+                            <select class="form-select" id="status" name="Status">
+                                <option value="" selected="@(string.IsNullOrWhiteSpace(Model.Status))"><kw-l key="projects.board.status.none">None</kw-l></option>
+                                @if (!string.IsNullOrWhiteSpace(Model.Status) && !KanbanStatuses.Known.Contains(Model.Status))
+                                {
+                                    <option value="@Model.Status" selected>@Model.Status</option>
+                                }
+                                @foreach (var statusCode in KanbanStatuses.Known)
+                                {
+                                    <option value="@statusCode" selected="@(Model.Status == statusCode)">
+                                        <kw-l key="@StatusLabelKey(statusCode)">@statusCode</kw-l>
+                                    </option>
+                                }
+                            </select>
+                            <div class="text-muted small mt-1"><kw-l key="pl.project.status_hint">An optional state label — the same fixed vocabulary as to-dos. Leave blank for none.</kw-l></div>
                         </div>
                     </div>
                     <div class="row g-2 mt-3">
