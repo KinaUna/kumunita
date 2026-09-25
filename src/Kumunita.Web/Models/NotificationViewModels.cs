@@ -66,8 +66,8 @@ public sealed record TodoCard(
 /// The <c>GET/POST /notifications/preferences</c> view model (design doc
 /// §6.4 routes 4–5; the C-M6·9 lean-default pin).
 /// <para>
-/// **<see cref="KindsEnabled"/>** (C-M6·9) is the subset of the nine
-/// <see cref="NotificationKinds"/> constants the resident has **enabled**;
+/// **<see cref="KindsEnabled"/>** (C-M6·9) is the subset of the
+/// <see cref="NotificationKinds.Known"/> closed set the resident has **enabled**;
 /// <c>null</c> / empty = **all enabled** (the lean-default — the service's
 /// <c>EmailEnabledForAsync</c> gate reads exactly this). Nullable so a
 /// resident who unchecks every toggle posts an **empty** list, not <c>null</c>,

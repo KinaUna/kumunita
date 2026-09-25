@@ -263,9 +263,10 @@ public sealed class NotificationService
     /// <summary>
     /// The preference write lane (D9): upserts the recipient's
     /// <see cref="NotificationPreference"/> with <paramref name="kindsEnabled"/>
-    /// (the subset of the nine kind constants the resident has enabled;
-    /// <c>null</c> / empty = all enabled — the lean-default) and sets
-    /// <c>Updated = now</c>. A state lane — no audit row (D3).
+    /// (the subset of the <see cref="NotificationKinds.Known"/> closed set the
+    /// resident has enabled; <c>null</c> / empty = all enabled — the
+    /// lean-default) and sets <c>Updated = now</c>. A state lane — no audit
+    /// row (D3).
     /// </summary>
     public async Task SetPreferencesAsync(
         string recipientId,

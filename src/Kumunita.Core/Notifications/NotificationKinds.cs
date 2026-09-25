@@ -22,6 +22,21 @@ public static class NotificationKinds
     /// <summary>A new post was added to a group the resident is a member of (wired, U04).</summary>
     public const string GroupPost = "group.post";
 
+    /// <summary>
+    /// A group owner (or GlobalAdmin) added the resident directly to a group
+    /// the resident was not already a member of (wired, ADR 0083 — the
+    /// <c>UserInfoService.AddGroupMemberAsync</c> emitter; the recipient is the
+    /// newly added resident).
+    /// </summary>
+    public const string GroupAdded = "group.added";
+
+    /// <summary>
+    /// A group owner (or GlobalAdmin) invited the resident to join a group
+    /// (wired, ADR 0083 — the <c>UserInfoService.InviteGroupMemberAsync</c>
+    /// emitter; the recipient is the invited resident).
+    /// </summary>
+    public const string GroupInvite = "group.invite";
+
     /// <summary>A resident RSVP'd to an event the resident authored (wired, U04).</summary>
     public const string EventRsvp = "event.rsvp";
 
@@ -44,9 +59,10 @@ public static class NotificationKinds
     /// A new resident signed up (an <b>admin-lane</b> kind — the recipient is a
     /// <c>GlobalAdmin</c>, not the signing-up resident; wired by ADR 0077's
     /// <c>IdentityService.RegisterAsync</c> emitter, gated by the instance
-    /// <c>NotifyAdminsOnSignup</c> flag). One of the eleven kinds; the other ten
-    /// are the eight wired resident kinds + the reserved <c>post.mention</c> +
-    /// <c>account.verified</c>.
+    /// <c>NotifyAdminsOnSignup</c> flag). One of the thirteen kinds; the other
+    /// twelve are the resident-facing wired kinds (including ADR 0083's
+    /// <c>group.added</c> / <c>group.invite</c>) + the reserved
+    /// <c>post.mention</c> + <c>account.verified</c>.
     /// </summary>
     public const string AccountSignup = "account.signup";
 
@@ -54,7 +70,7 @@ public static class NotificationKinds
     /// A resident verified their account (an <b>admin-lane</b> kind — the
     /// recipient is a <c>GlobalAdmin</c>, not the verifying resident; wired by
     /// ADR 0077's <c>IdentityService.VerifyWithTokenAsync</c> emitter, gated by
-    /// the instance <c>NotifyAdminsOnSignup</c> flag). One of the eleven kinds.
+    /// the instance <c>NotifyAdminsOnSignup</c> flag). One of the thirteen kinds.
     /// </summary>
     public const string AccountVerified = "account.verified";
 
@@ -63,12 +79,13 @@ public static class NotificationKinds
     /// key table). Order is the settings page's canonical display order.
     /// The two admin-lane kinds (<c>account.signup</c> / <c>account.verified</c>,
     /// ADR 0077) are appended last — they are a separate lane (the recipient is a
-    /// GlobalAdmin, not the resident whose inbox the other nine serve), so they
-    /// trail the resident-facing kinds.
+    /// GlobalAdmin, not the resident whose inbox the resident-facing kinds serve),
+    /// so they trail the resident-facing kinds.
     /// </summary>
     public static IReadOnlyList<string> Known { get; } =
     [
-        PostReply, PostMention, GroupPost, EventRsvp, EventReminder,
+        PostReply, PostMention, GroupPost, GroupAdded, GroupInvite,
+        EventRsvp, EventReminder,
         ReportFiled, ReportAssigned, ReportResolved, TodoAssign,
         AccountSignup, AccountVerified,
     ];

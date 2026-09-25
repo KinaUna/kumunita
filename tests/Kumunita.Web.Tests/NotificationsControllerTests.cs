@@ -140,15 +140,16 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
         Assert.Equal(5, await CountAll(store, Actor));
     }
 
-    // ── 4 — GET /notifications/preferences → 200 + the eleven Known toggles ───
+    // ── 4 — GET /notifications/preferences → 200 + the thirteen Known toggles ─
 
     /// <summary>
     /// <c>GET /notifications/preferences</c> (route 4, C-M6·2 / C-M6·9): the
     /// preference read returns <c>200</c> + a <see cref="ViewResult"/> whose
     /// model carries the **closed, code-owned** <see cref="NotificationKinds
-    /// .Known"/> eleven-entry toggle set (C-M6·2 — a resident cannot mint a kind
-    /// string the emitters don't use; ADR 0077 adds the two admin-lane kinds) and
-    /// the actor's <c>KindsEnabled</c>
+    /// .Known"/> thirteen-entry toggle set (C-M6·2 — a resident cannot mint a kind
+    /// string the emitters don't use; ADR 0077 adds the two admin-lane kinds;
+    /// ADR 0083 adds the two group-membership kinds — group.added / group.invite)
+    /// and the actor's <c>KindsEnabled</c>
     /// (the lean-default <c>null</c> when no preference row yet — C-M6·9).
     /// </summary>
     [Fact]
@@ -163,10 +164,12 @@ public class NotificationsControllerTests(PostgresFixture fixture) : IClassFixtu
 
         var view = Assert.IsType<ViewResult>(result);                    // 200
         var vm = Assert.IsType<NotificationPreferencesViewModel>(view.ViewData.Model);
-        // The eleven-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
-        // adds the two admin-lane kinds — account.signup / account.verified).
+        // The thirteen-entry closed kind set (C-M6·2 / C-M6·9; ADR 0077
+        // adds the two admin-lane kinds — account.signup / account.verified;
+        // ADR 0083 adds the two group-membership kinds — group.added /
+        // group.invite).
         Assert.Equal(NotificationKinds.Known, vm.AllKinds);
-        Assert.Equal(11, vm.AllKinds.Count);
+        Assert.Equal(13, vm.AllKinds.Count);
         // Lean-default: no stored preference yet → KindsEnabled is null.
         Assert.Null(vm.KindsEnabled);
     }

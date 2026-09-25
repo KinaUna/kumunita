@@ -2,12 +2,11 @@ namespace Kumunita.Core.Notifications;
 
 /// <summary>
 /// The recipient's notification preference (ADR 0076 D9 — lean: **one**
-/// field). <see cref="KindsEnabled"/> is the subset of the nine
-/// <see cref="NotificationKinds"/> constants the resident has **enabled**;
-/// <c>null</c> / empty = **all enabled** (the lean-default — the M5
-/// <c>KanbanLane.MaxItems?</c> nullable precedent: <c>null</c> means "no
-/// limit", here "all on"). The preference governs the **email** nudge,
-/// never the inbox row (D7).
+/// field). <see cref="KindsEnabled"/> is the subset of the
+/// <see cref="NotificationKinds.Known"/> closed set the resident has
+/// **enabled**; <c>null</c> / empty = **all enabled** (the lean-default — the M5
+/// <c>KanbanLane.MaxItems?</c> nullable precedent). The preference governs the
+/// **email** nudge, never the inbox row (D7).
 /// </summary>
 public sealed class NotificationPreference
 {

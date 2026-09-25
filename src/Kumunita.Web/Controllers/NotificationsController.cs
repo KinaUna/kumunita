@@ -28,8 +28,9 @@ namespace Kumunita.Web.Controllers;
 /// <c>ReadAt = now</c> on **all** the caller's unread rows (one commit,
 /// C-M6·8), then back to the inbox.</item>
 /// <item><c>GET /notifications/preferences</c> — the preference read:
-/// the eleven <see cref="NotificationKinds.Known"/> toggles (ADR 0077
-/// adds the two admin-lane kinds), the lean-default (C-M6·9 — no
+/// the thirteen <see cref="NotificationKinds.Known"/> toggles (ADR 0077
+/// added the two admin-lane kinds; ADR 0083 added <c>group.added</c> /
+/// <c>group.invite</c>), the lean-default (C-M6·9 — no
 /// preference yet = all enabled).</item>
 /// <item><c>POST /notifications/preferences</c> — the preference write
 /// (the resident's own choice is the authority at emit time, C-M6·7),

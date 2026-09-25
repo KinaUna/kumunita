@@ -1,5 +1,7 @@
+using Kumunita.Core.Notifications;
 using Marten;
 using Marten.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kumunita.Core.UserInfo;
 
@@ -38,8 +40,39 @@ namespace Kumunita.Core.UserInfo;
 /// <see cref="Authorization.AccessVia.Owner"/>, else <see cref="Authorization.AccessVia.Admin"/>
 /// (requires one extra session load — acceptable for a rare admin action).</item>
 /// </list>
+/// <para>
+/// ADR 0083 — the group-membership notification emitters: <c>AddGroupMemberAsync</c>
+/// (kind <c>group.added</c>) and <c>InviteGroupMemberAsync</c> (kind
+/// <c>group.invite</c>) both resolve the recipient's inbox row + conditional
+/// email through the same
+/// <see cref="Notifications.NotificationService"/> emitter seam the M6
+/// PostService / EventService / IdentityService lanes use (F1 / F2 / D3). The
+/// seam is **optional** (CS1736) so the 181 direct-construction test harnesses
+/// that build <c>UserInfoService(store)</c> positionally keep compiling
+/// unchanged; the DI registration resolves the live instance automatically
+/// (the IdentityService precedent in <c>DependencyInjection.cs</c>). The
+/// emission sits in the caller's transaction (the same session the domain
+/// write uses), so the inbox row + outbox row commit atomically with the
+/// membership row (invariant C3).
+/// </para>
+/// <para>
+/// **Circular-dependency avoidance:** <c>NotificationService</c> depends on
+/// <c>IUserInfoService</c> (for the recipient's <c>Profile.EmailLanguage</c>
+/// + <c>Email</c>), so a direct <c>NotificationService?</c> parameter on
+/// <c>UserInfoService</c> would create a DI cycle
+/// (<c>IUserInfoService → UserInfoService → NotificationService →
+/// IUserInfoService</c>). Instead, the seam is
+/// <c>IServiceProvider?</c> (always resolvable, no cycle) and the
+/// <c>NotificationService</c> instance is resolved lazily at emission time
+/// (runtime, not construction) via
+/// <c>services.GetService&lt;NotificationService&gt;()</c>. The 181
+/// direct-construction test harnesses that build
+/// <c>UserInfoService(store)</c> positionally keep compiling unchanged
+/// (the <c>IServiceProvider?</c> has a <c>null</c> default — those harnesses
+/// simply get no emission, which is correct for pre-ADR 0083 tests).
+/// </para>
 /// </summary>
-public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
+public sealed class UserInfoService(IDocumentStore store, IServiceProvider? services = null) : IUserInfoService
 {
     // ── Read paths (plan step 3 — live-row reads, invariant C4) ───────────
 
@@ -325,6 +358,30 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
         };
 
         session.Store(audit);
+
+        // ADR 0083 — notify the newly added resident (kind group.added; the
+        // recipient is <c>userId</c>, not <c>addedBy</c>). The emission sits
+        // in this session's transaction so the inbox row + outbox row commit
+        // atomically with the membership row (invariant C3). The
+        // <c>NotificationService</c> is resolved lazily from
+        // <c>IServiceProvider</c> (not at construction — see the class
+        // doc-comment for the circular-dependency rationale). The 181
+        // pre-ADR 0083 direct-construction test harnesses that build
+        // <c>UserInfoService(store)</c> positionally pass
+        // <c>services = null</c>, so the <c>GetService</c> call is a no-op
+        // and the emission is silently skipped.
+        var ns = services?.GetService<Notifications.NotificationService>();
+        if (ns is not null)
+        {
+            await ns.EmitAsync(
+                session,
+                userId,
+                Notifications.NotificationKinds.GroupAdded,
+                $"notification:{Notifications.NotificationKinds.GroupAdded}:{groupId}:{userId}",
+                group.Name,
+                CancellationToken.None).ConfigureAwait(false);
+        }
+
         await session.SaveChangesAsync().ConfigureAwait(false);
         return;
     }
@@ -773,6 +830,25 @@ public sealed class UserInfoService(IDocumentStore store) : IUserInfoService
             Via = via,
             Outcome = Authorization.AccessOutcome.Allow
         });
+
+        // ADR 0083 — notify the invited resident (kind group.invite; the
+        // recipient is <c>userId</c>, not <c>invitedBy</c>). Same shape as
+        // the <c>AddGroupMemberAsync</c> emitter: the emission sits in this
+        // session's transaction, the <c>NotificationService</c> is resolved
+        // lazily from <c>IServiceProvider</c> (see the class doc-comment for
+        // the circular-dependency rationale), and pre-ADR 0083 direct-
+        // construction test harnesses (services = null) silently skip.
+        var ns = services?.GetService<Notifications.NotificationService>();
+        if (ns is not null)
+        {
+            await ns.EmitAsync(
+                session,
+                userId,
+                Notifications.NotificationKinds.GroupInvite,
+                $"notification:{Notifications.NotificationKinds.GroupInvite}:{groupId}:{userId}",
+                group.Name,
+                CancellationToken.None).ConfigureAwait(false);
+        }
 
         await session.SaveChangesAsync().ConfigureAwait(false);
         return row;
