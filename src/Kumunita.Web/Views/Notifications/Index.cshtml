@@ -1,8 +1,21 @@
 @model Kumunita.Web.Models.NotificationsInboxViewModel
 @using Kumunita.Core.Notifications
+@using Kumunita.Core.Projects
+@using Kumunita.Web.Security
 @{
     ViewData["Title"] = "Notifications";
     int unread = Model.Notifications.Count(n => n.ReadAt is null);
+    // ADR 0069 — the fixed status vocabulary's label keys (the same closed set
+    // the TodoDetail view + the Kanban lane's Set-status select offer: None +
+    // the four codes). A status outside the known set renders the "None" key.
+    static string StatusLabelKey(string? code) => code switch
+    {
+        KanbanStatuses.NotStarted => "projects.board.status.not_started",
+        KanbanStatuses.InProgress => "projects.board.status.in_progress",
+        KanbanStatuses.Done => "projects.board.status.done",
+        KanbanStatuses.Cancelled => "projects.board.status.cancelled",
+        _ => "projects.board.status.none",
+    };
 }
 
 <div class="row justify-content-center">
@@ -65,16 +78,125 @@
                             </span>
                             <span class="ms-auto small"><kw-dt dt="@n.Created" format="g"></kw-dt></span>
                         </div>
-                        @if (!string.IsNullOrWhiteSpace(n.Subject))
+
+                        @* todo.assign rows (SourceId = the TodoItem.Id) carry a
+                           structured card — the controller enriched them at
+                           read time (the to-do's title / status / start / due
+                           + the subtasks and boards the *recipient* may
+                           actually read, ADR 0006-D: the access decision is
+                           made in Core, not here). A row that could not be
+                           enriched (the to-do was later deleted, or the
+                           recipient may no longer read it) falls through to
+                           the plain subject + body below — the inbox never
+                           404s on an old notification. *@
+                        @if (n.Kind == NotificationKinds.TodoAssign
+                                && n.SourceId is not null
+                                && Model.TodoCards.TryGetValue(n.SourceId, out var card))
                         {
-                            <p class="mt-2 mb-1 fw-semibold">@n.Subject</p>
+                            var todo = card.Todo;
+                            <div class="mt-2">
+                                @* The to-do title, linked to its detail page
+                                   (the /projects/todos/{id} route, the same
+                                   link the TodoDetail / feed use). *@
+                                <p class="mb-1 fw-semibold">
+                                    <a href="@($"/projects/todos/{todo.Id}")">@todo.Title</a>
+                                </p>
+
+                                @* Status badge (the same StatusLabelKey the
+                                   TodoDetail view uses — a status outside the
+                                   known set still renders a label, never a
+                                   blank) + start / due dates (gated on the
+                                   value, the ADR 0079 kw-dt shape). *@
+                                <div class="d-flex align-items-center gap-2 flex-wrap small">
+                                    @if (!string.IsNullOrWhiteSpace(todo.Status))
+                                    {
+                                        <span class="badge text-bg-light border">
+                                            <kw-l key="@StatusLabelKey(todo.Status)">@todo.Status</kw-l>
+                                        </span>
+                                    }
+                                    @if (todo.StartAt is not null)
+                                    {
+                                        <span class="text-muted">
+                                            <kw-l key="projects.todo.start">Start</kw-l> · <kw-dt dt="@todo.StartAt" format="g"></kw-dt>
+                                        </span>
+                                    }
+                                    @if (todo.DueAt is not null)
+                                    {
+                                        <span class="text-muted">
+                                            <kw-l key="projects.todo.due">Due</kw-l> · <kw-dt dt="@todo.DueAt" format="g"></kw-dt>
+                                        </span>
+                                    }
+                                </div>
+
+                                @* The body — the recipient's own to-do, so it
+                                   is safe to render here; the platform's single
+                                   Markdown engine (the TodoDetail view's
+                                   render mode, XSS-safe by construction). *@
+                                @if (!string.IsNullOrWhiteSpace(todo.Body))
+                                {
+                                    <div class="markdown mt-2">@Html.Raw(MarkdownRenderer.RenderHtml(todo.Body))</div>
+                                }
+
+                                @* The boards this to-do sits on, **only** the
+                                   ones the recipient may read (the controller
+                                   ran ListBoardsForTodoAsync — the access-gated
+                                   set); links to the /projects/boards/{id}
+                                   route. *@
+                                @if (card.Boards.Count > 0)
+                                {
+                                    <div class="mt-2">
+                                        <span class="text-muted small"><kw-l key="projects.todo.boards">Boards</kw-l> · </span>
+                                        @for (var bi = 0; bi < card.Boards.Count; bi++)
+                                        {
+                                            var board = card.Boards[bi];
+                                            @if (bi > 0)
+                                            {
+                                                <span class="text-muted">, </span>
+                                            }
+                                            <a href="@($"/projects/boards/{board.Id}")">@(string.IsNullOrWhiteSpace(board.Title) ? board.Id : board.Title)</a>
+                                        }
+                                    </div>
+                                }
+
+                                @* The subtasks the recipient may read (the
+                                   controller ran the access-filtered
+                                   GetTodoAsync); each linked to its own
+                                   detail page. *@
+                                @if (card.Subtasks.Count > 0)
+                                {
+                                    <div class="mt-2">
+                                        <span class="text-muted small"><kw-l key="projects.todo.subtasks">Subtasks</kw-l></span>
+                                        <ul class="mb-0 ms-3">
+                                            @foreach (var sub in card.Subtasks)
+                                            {
+                                                <li>
+                                                    <a href="@($"/projects/todos/{sub.Id}")">@sub.Title</a>
+                                                    @if (!string.IsNullOrWhiteSpace(sub.Status))
+                                                    {
+                                                        <span class="badge text-bg-light border ms-1">
+                                                            <kw-l key="@StatusLabelKey(sub.Status)">@sub.Status</kw-l>
+                                                        </span>
+                                                    }
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                }
+                            </div>
                         }
-                        @if (!string.IsNullOrWhiteSpace(n.Body))
+                        else
                         {
-                            @* Platform-resolved text with the UGC snippet —
-                               rendered as stored (never re-wrapped: the kw-l
-                               TagHelper is platform-copy-only, M·3). *@
-                            <p class="mb-0">@n.Body</p>
+                            @if (!string.IsNullOrWhiteSpace(n.Subject))
+                            {
+                                <p class="mt-2 mb-1 fw-semibold">@n.Subject</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(n.Body))
+                            {
+                                @* Platform-resolved text with the UGC snippet —
+                                   rendered as stored (never re-wrapped: the kw-l
+                                   TagHelper is platform-copy-only, M·3). *@
+                                <p class="mb-0">@n.Body</p>
+                            }
                         }
                     </li>
                 }

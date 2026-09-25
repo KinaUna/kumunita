@@ -47,12 +47,29 @@ public sealed class ProjectService : IProjectService
     // TG-lane precedent); production wiring passes the DI-registered instance.
     private readonly NotificationService? _notifications;
 
-    public ProjectService(IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo, NotificationService? notifications = null)
+    // The todo.assign email body's status / date labels + the recipient's
+    // effective time zone + date-time format (ADR 0019 / 0020 — the same
+    // resolution order the <c>kw-dt</c> TagHelper and the M4
+    // <see cref="Events.EventReminderService"/> use): the ADR 0061
+    // <see cref="ITranslationProvider"/> (status labels in the recipient's
+    // <c>EmailLanguage</c>) + the platform default <c>TimeZone</c> /
+    // <c>DateFormat</c> (the per-recipient profile override → the platform
+    // default → the <c>UTC</c> / <see cref="DateFormat.FloorFormat"/> floor).
+    // Optional so the existing (pre-M6) 3-arg call sites keep compiling;
+    // production wiring passes the DI-registered instances.
+    private readonly ITranslationProvider? _translator;
+    private readonly ILocalizationService? _localization;
+
+    public ProjectService(
+        IDocumentStore store, IAuthorizationService authorization, IUserInfoService userInfo,
+        NotificationService? notifications = null, ITranslationProvider? translator = null, ILocalizationService? localization = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _authorization = authorization ?? throw new ArgumentNullException(nameof(authorization));
         _userInfo = userInfo ?? throw new ArgumentNullException(nameof(userInfo));
         _notifications = notifications;
+        _translator = translator;
+        _localization = localization;
     }
 
     // --- Read lanes (U04) -------------------------------------------------------
@@ -192,6 +209,56 @@ public sealed class ProjectService : IProjectService
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "board"), from that single call (the ListTodosAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(b => new KanbanBoardToAuditableResource(b)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(b => visibleIds.Contains(b.Id)).ToList();
+    }
+
+    /// <summary>
+    /// The boards the actor may <c>Read</c> on which this to-do is placed
+    /// (the "link(s) to the Kanban board(s) it is associated with, **if the
+    /// user has access to them**" surface, used by the notification inbox card):
+    /// the <see cref="BoardItemPlacement"/> rows for <paramref name="todoItemId"/>
+    /// resolve to their <see cref="KanbanBoard"/> (non-deleted); the survivors
+    /// are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared matching pass; C3,
+    /// the single aggregate <see cref="AccessAudit"/> row with
+    /// <c>TargetKind = "board"</c>) over the
+    /// <see cref="KanbanBoardToAuditableResource"/> (U03) — the denied boards
+    /// are dropped, **not** the whole set. A to-do with no placements, or whose
+    /// boards the actor may not see, returns an **empty** list (never null).
+    /// Ordered by board <c>Created</c> ascending. A plain read (the
+    /// <see cref="ListBoardsAsync"/> shape) — no in-flight caller transaction.
+    /// </summary>
+    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsForTodoAsync(string todoItemId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId))
+            return Array.Empty<KanbanBoard>();
+
+        await using var session = _store.QuerySession();
+        var boardIds = await session.Query<BoardItemPlacement>()
+            .Where(p => p.TodoItemId == todoItemId)
+            .Select(p => p.BoardId)
+            .Distinct()
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (boardIds.Count == 0)
+            return Array.Empty<KanbanBoard>();
+
+        var candidates = await session.Query<KanbanBoard>()
+            .Where(b => boardIds.Contains(b.Id) && !b.IsDeleted)
+            .OrderBy(b => b.Created)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<KanbanBoard>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "board"), from that single call (the ListBoardsAsync shape).
         var visibleSet = await _authorization
             .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(b => new KanbanBoardToAuditableResource(b)))
             .ConfigureAwait(false);
@@ -666,12 +733,24 @@ public sealed class ProjectService : IProjectService
             && !string.IsNullOrWhiteSpace(assigneeId)
             && !string.Equals(assigneeId, actorId, StringComparison.Ordinal))
         {
+            // The email + the inbox row's UGC snippet (EmitAsync composes
+            // bodyTemplate + " " + body) carry the to-do's title + status +
+            // start / due (each "if set") + the description. The **rich** card
+            // — title, description, status, dates, the link to the to-do, the
+            // access-gated board links, and the subtasks' titles + links — is
+            // built at **read time** by the notification inbox (the controller
+            // + Index.cshtml): a per-recipient access decision and a live
+            // subtask/board set can't be captured in a one-shot email (the
+            // board links are gated on the *recipient's* Read access, ADR
+            // 0006-D, and the email is plain text, ADR 0061). See
+            // BuildTodoAssignBodyAsync.
+            var body = await BuildTodoAssignBodyAsync(todo, assigneeId, ct).ConfigureAwait(false);
             await _notifications.EmitAsync(
                 session,
                 recipientId: assigneeId,
                 kind: NotificationKinds.TodoAssign,
                 idempotencyKey: $"notification:todo.assign:{todo.Id}",
-                body: todo.Title,
+                body: body,
                 ct: ct).ConfigureAwait(false);
         }
 
@@ -780,6 +859,145 @@ public sealed class ProjectService : IProjectService
 
         throw new UnauthorizedAccessException(
             "Only a member of the to-do's group or community may claim it.");
+    }
+
+    /// <summary>
+    /// The <c>todo.assign</c> email + inbox-row UGC snippet (the
+    /// <see cref="NotificationService.EmitAsync"/>'s <c>body</c> argument — the
+    /// part appended after the localized <c>notification.todo.assign.body</c>
+    /// template). It carries the to-do's **title**, its **status** (a status
+    /// label in the recipient's <c>EmailLanguage</c> — ADR 0061, the ADR 0069
+    /// closed status vocabulary), its **start** and **due** instants (each
+    /// "if set", rendered in the recipient's effective time zone + date-time
+    /// format — ADR 0019 / 0020, the <c>kw-dt</c> /
+    /// <see cref="Events.EventReminderService"/> resolution order), and its
+    /// **description** (the <see cref="TodoItem.Body"/>). A plain-text,
+    /// escape-free string (the <c>SmtpSender</c> sets <c>IsBodyHtml = false</c>)
+    /// — no links: the access-gated board links and the subtasks' titles +
+    /// links are a **read-time** surface (the notification inbox card; a
+    /// one-shot email can't gate the board links on the *recipient's*
+    /// <c>Read</c> access, ADR 0006-D, nor carry a live subtask set). When the
+    /// optional seams are absent (a pre-M6 test harness), degrades to the
+    /// title alone — the same text <see cref="NotificationService.EmitAsync"/>
+    /// composed before this enrichment existed (the F8 invariant: it does not
+    /// assert on the body content).
+    /// </summary>
+    private async Task<string> BuildTodoAssignBodyAsync(TodoItem todo, string recipientId, CancellationToken ct)
+    {
+        var parts = new List<string> { todo.Title };
+
+        // The recipient's profile (ADR 0061 — the EmailLanguage for the label
+        // words; ADR 0019 / 0020 — the TimeZone / DateFormat override) is
+        // loaded **once** and shared by every label + instant below. The
+        // platform defaults (the per-recipient override's floor) are resolved
+        // once too.
+        var profile = await _userInfo.GetProfileAsync(recipientId).ConfigureAwait(false);
+        var defaultZone = _localization is null ? null : await _localization.GetDefaultTimezoneAsync().ConfigureAwait(false);
+
+        // The status label — the recipient's EmailLanguage (ADR 0061), the
+        // ADR 0069 closed vocabulary's label key (the same StatusLabelKey the
+        // TodoDetail view + the inbox card use). A null / unknown status is
+        // skipped ("if set").
+        if (!string.IsNullOrWhiteSpace(todo.Status) && _translator is not null)
+        {
+            var label = await _translator.GetAsync(
+                $"projects.board.status.{StatusLabelKey(todo.Status)}",
+                profile?.EmailLanguage)
+                .ConfigureAwait(false);
+            parts.Add($"[{label}]");
+        }
+
+        // The start / due instants (each "if set"), rendered in the recipient's
+        // effective time zone + date-time format (ADR 0019 / 0020). The label
+        // words are the platform-copy (Start / Due), resolved in the recipient's
+        // EmailLanguage like the status label; the instant itself is
+        // localized to the recipient's zone/format.
+        var defaultFormat = _localization is null ? null : await _localization.GetDefaultDateFormatAsync().ConfigureAwait(false);
+
+        if (todo.StartAt is not null && _translator is not null)
+        {
+            var startLabel = await _translator.GetAsync("projects.todo.start", profile?.EmailLanguage).ConfigureAwait(false);
+            parts.Add($"{startLabel} {FormatTodoInstant(todo.StartAt.Value, profile?.TimeZone, defaultZone, profile?.DateFormat, defaultFormat)}");
+        }
+        if (todo.DueAt is not null && _translator is not null)
+        {
+            var dueLabel = await _translator.GetAsync("projects.todo.due", profile?.EmailLanguage).ConfigureAwait(false);
+            parts.Add($"{dueLabel} {FormatTodoInstant(todo.DueAt.Value, profile?.TimeZone, defaultZone, profile?.DateFormat, defaultFormat)}");
+        }
+
+        // The description (the to-do's own authored body, ADR 0018 — its own
+        // language, appended after the localized labels).
+        if (!string.IsNullOrWhiteSpace(todo.Body))
+            parts.Add(todo.Body);
+
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
+    /// The ADR 0069 closed status vocabulary → its label key (the same mapping
+    /// the <c>TodoDetail</c> view's <c>StatusLabelKey</c> and the inbox card
+    /// use): the four known codes map to their <c>projects.board.status.*</c>
+    /// key; a null / unknown code maps to the <c>none</c> key (which the
+    /// callers skip via their "if set" gate).
+    /// </summary>
+    private static string StatusLabelKey(string? code) => code switch
+    {
+        KanbanStatuses.NotStarted => "not_started",
+        KanbanStatuses.InProgress => "in_progress",
+        KanbanStatuses.Done => "done",
+        KanbanStatuses.Cancelled => "cancelled",
+        _ => "none",
+    };
+
+    /// <summary>
+    /// Renders <paramref name="instant"/> in <paramref name="profileZoneId"/>
+    /// → the platform <paramref name="defaultZoneId"/> → <c>UTC</c>, and
+    /// formats it with <paramref name="profileFormat"/> → the platform
+    /// <paramref name="defaultFormat"/> → <see cref="DateFormat.FloorFormat"/>
+    /// — the exact resolution order the <c>kw-dt</c> TagHelper and
+    /// <see cref="Events.EventReminderService"/> use (ADR 0019 / 0020). The
+    /// instant is converted to the zone's wall-clock **first**, then the format
+    /// is applied with the invariant culture (the zone/format, not the host
+    /// locale, is what the resident sees). Never throws — an unknown zone id
+    /// or an unusable format degrades to the next tier.
+    /// </summary>
+    private static string FormatTodoInstant(
+        DateTimeOffset instant,
+        string? profileZoneId, string? defaultZoneId,
+        string? profileFormat, string? defaultFormat)
+    {
+        var zone = TryResolveZone(profileZoneId)
+                  ?? TryResolveZone(defaultZoneId)
+                  ?? System.TimeZoneInfo.FindSystemTimeZoneById("UTC");
+
+        string fmt;
+        if (DateFormat.IsValid(profileFormat)) fmt = profileFormat!;
+        else if (DateFormat.IsValid(defaultFormat)) fmt = defaultFormat!;
+        else fmt = DateFormat.FloorFormat;
+
+        var utc = instant.UtcDateTime;
+        var wallTime = utc + zone.GetUtcOffset(utc);
+        return wallTime.ToString(fmt, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// An IANA zone id → a <see cref="System.TimeZoneInfo"/>, or <c>null</c>
+    /// when the id is blank / not present on the OS (the
+    /// <see cref="Events.EventReminderService"/> "fall through" rule — never a
+    /// throw).
+    /// </summary>
+    private static System.TimeZoneInfo? TryResolveZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+        try
+        {
+            return System.TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

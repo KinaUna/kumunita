@@ -224,7 +224,13 @@ public static class ServiceCollectionExtensions
             // M6 (U04) — the frozen notification emitter (U03); the ctor param
             // is optional (CS1736), production wiring passes the registered
             // instance so the todo.assign emitter fires (the C-M6 lane).
-            sp.GetRequiredService<Notifications.NotificationService>()));
+            sp.GetRequiredService<Notifications.NotificationService>(),
+            // The todo.assign email body's status / date labels (ADR 0061) +
+            // the platform default time zone / date-time format (ADR 0019 /
+            // 0020) — the recipient's effective zone/format floor (the kw-dt /
+            // EventReminderService resolution order).
+            sp.GetRequiredService<Localization.ITranslationProvider>(),
+            sp.GetRequiredService<Localization.ILocalizationService>()));
 
         // M6 (ADR 0076, plan U03): the Notifications bounded context's service
         // (bounded context Kumunita.Core.Notifications — the "shared awareness"

@@ -79,6 +79,22 @@ public interface IProjectService
     Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
 
     /// <summary>
+    /// The boards the actor may <c>Read</c> on which this to-do is placed —
+    /// the <c>BoardItemPlacement</c> rows for <paramref name="todoItemId"/>
+    /// resolve to their <see cref="KanbanBoard"/> (non-deleted), each
+    /// <c>CanSeeAsync(Read)</c>-gated over the
+    /// <see cref="KanbanBoardToAuditableResource"/> (C6); the denied boards are
+    /// dropped, not the whole set. A to-do with no placements, or whose boards
+    /// the actor may not see, returns an **empty** list (never null) — this is
+    /// the read-time "link(s) to the boards it is associated with, **if the
+    /// user has access to them**" surface (used by the notification inbox card,
+    /// ADR 0006-D: the access decision is made here, at read time, via the
+    /// unique <c>IAuthorizationService</c> path). Ordered by board <c>Created</c>
+    /// ascending; at most one <c>AccessAudit</c> pass.
+    /// </summary>
+    Task<IReadOnlyList<KanbanBoard>> ListBoardsForTodoAsync(string todoItemId, string actorId, CancellationToken ct = default);
+
+    /// <summary>
     /// One board + its **lanes** (the <see cref="KanbanLane"/> rows with
     /// <c>BoardId == boardId</c>, ordered by <c>Order</c> ascending) + each
     /// lane's **cards** (the <see cref="BoardItemPlacement"/> rows with

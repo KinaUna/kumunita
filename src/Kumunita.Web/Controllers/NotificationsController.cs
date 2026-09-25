@@ -1,4 +1,5 @@
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Projects;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -46,7 +47,8 @@ namespace Kumunita.Web.Controllers;
 /// </summary>
 [Authorize]
 public sealed class NotificationsController(
-    NotificationService notifications) : Controller
+    NotificationService notifications,
+    IProjectService? projects = null) : Controller
 {
     /// <summary>
     /// <c>GET /notifications</c> — the inbox (design doc §6.4 route 1,
@@ -62,7 +64,43 @@ public sealed class NotificationsController(
             return NotFound();
 
         var rows = await notifications.ListInboxAsync(actorId);
-        return View(new NotificationsInboxViewModel(rows, rows.Count));
+
+        // todo.assign rows (the kind whose SourceId is a TodoItem.Id) are
+        // enriched at **read time** with a structured card: the to-do's title
+        // / body / status / start / due, the subtasks the actor may read
+        // (via the existing access-filtered GetTodoAsync), and the boards the
+        // actor may read on which the to-do sits (the new
+        // ListBoardsForTodoAsync read lane — the "link(s) to the boards it
+        // is associated with, *if the user has access to them*" surface,
+        // ADR 0006-D: the access decision happens in Core, not here). A row
+        // that cannot be enriched (the to-do was later deleted, or the actor
+        // may not read it) degrades to the plain subject + body — the inbox
+        // never 404s on an old notification (C-M6·3, personal read).
+        var todoCards = new Dictionary<string, TodoCard>(StringComparer.Ordinal);
+        if (projects is not null)
+        {
+            foreach (var row in rows)
+            {
+                if (row.Kind != NotificationKinds.TodoAssign || row.SourceId is null)
+                    continue;
+
+                try
+                {
+                    var detail = await projects.GetTodoAsync(row.SourceId, actorId);
+                    var boards = await projects.ListBoardsForTodoAsync(row.SourceId, actorId);
+                    todoCards[row.SourceId] = new TodoCard(detail.Todo, boards, detail.Subtasks);
+                }
+                catch (Exception ex) when (
+                    ex is KeyNotFoundException or UnauthorizedAccessException)
+                {
+                    // The to-do no longer exists or the actor may no longer
+                    // read it — leave the row to render as its plain subject
+                    // + body rather than failing the whole inbox.
+                }
+            }
+        }
+
+        return View(new NotificationsInboxViewModel(rows, rows.Count, todoCards));
     }
 
     /// <summary>

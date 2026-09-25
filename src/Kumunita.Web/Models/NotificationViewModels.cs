@@ -1,4 +1,5 @@
 using Kumunita.Core.Notifications;
+using Kumunita.Core.Projects;
 
 namespace Kumunita.Web.Models;
 
@@ -13,6 +14,20 @@ namespace Kumunita.Web.Models;
 /// rendered row count) — never a re-query.
 /// </para>
 /// <para>
+/// **<see cref="TodoCards"/>** (the <c>todo.assign</c> enhancement) maps a
+/// <see cref="Notification"/> id to its live <see cref="TodoCard"/> — the
+/// to-do the resident was assigned, rendered rich (title + link, description,
+/// status, start/due, the boards the resident may read that carry it, and its
+/// subtasks the resident may read). Present only for the <c>todo.assign</c>
+/// rows the controller could enrich (a to-do later soft-deleted, or one the
+/// resident has lost read access to, is absent from the map — the row falls
+/// back to its stored subject/body). The access decisions are the
+/// <c>IProjectService</c>'s (the <c>IAuthorizationService</c> path, ADR
+/// 0006-D) — the inbox view model is a plain shape, it re-derives nothing
+/// (C-M6·11). Empty when no row is a <c>todo.assign</c> or the projects
+/// seam is absent (the test harness).
+/// </para>
+/// <para>
 /// A **personal read** (C-M6·3): the recipient reads their own rows — the
 /// <c>RecipientId</c> is the whole access story; no <c>IAuthorizationService</c>
 /// call, no audit row (F11).
@@ -20,7 +35,32 @@ namespace Kumunita.Web.Models;
 /// </summary>
 public sealed record NotificationsInboxViewModel(
     IReadOnlyList<Notification> Notifications,
-    int Count);
+    int Count,
+    IReadOnlyDictionary<string, TodoCard> TodoCards);
+
+/// <summary>
+/// The live shape of a <c>todo.assign</c> notification's to-do, resolved at
+/// inbox-read time (not stored — the <see cref="Notification"/> row keeps
+/// only its stable <c>SourceId</c> + the recipient's localized subject/body).
+/// <para>
+/// **<see cref="Todo"/>** is the to-do itself (title, body, status, start,
+/// due — the <c>GetTodoAsync</c> read, which is already <c>Read</c>-gated for
+/// the recipient, so its presence means the resident may see it).
+/// **<see cref="Boards"/>** are the <see cref="KanbanBoard"/>s the recipient
+/// may <c>Read</c> that this to-do is placed on (the <c>
+/// ListBoardsForTodoAsync</c> read — a board the resident lacks access to is
+/// **not** listed, not merely hidden). **<see cref="Subtasks"/>** are the
+/// to-do's subtasks the recipient may <c>Read</c> (the <c>GetTodoAsync</c>
+/// subtask set — each is a full to-do with its own <c>Audience</c>, C-M5·7;
+/// a denied subtask is not returned). All three are value shapes handed to
+/// the view; the view renders the links (a link is a presentation concern,
+/// not an access decision).
+/// </para>
+/// </summary>
+public sealed record TodoCard(
+    TodoItem Todo,
+    IReadOnlyList<KanbanBoard> Boards,
+    IReadOnlyList<TodoItem> Subtasks);
 
 /// <summary>
 /// The <c>GET/POST /notifications/preferences</c> view model (design doc
