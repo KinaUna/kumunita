@@ -1313,6 +1313,27 @@ public static class FirstBootSeeder
              "A moderator is a neighbor helping keep their part of the " +
              "neighborhood in good order — not an admin, and not a reader of " +
              "other people's content.\n"),
+            ("notifications", "Notifications",
+             "## Notifications\n\n" +
+             "Kumunita lets you know when something happens to the things you're " +
+             "part of — a reply on your post, an RSVP on your event, a new post " +
+             "in one of your groups, a to-do that lands with you.\n\n" +
+             "**Where to find them.** Open the **bell** in the top bar. It shows " +
+             "how many notifications are new, and a short list of the latest. " +
+             "Open the **inbox** for the full list, newest first. The inbox " +
+             "always records every notification — it's the reliable record.\n\n" +
+             "**Email.** For the kinds you care about, you also get an email. " +
+             "The email is in the language you chose for emails on your " +
+             "profile. Turning a kind off in your preferences stops the email " +
+             "for that kind — it never stops the inbox.\n\n" +
+             "**Your choices.** Two places:\n" +
+             "- **Notification preferences** — the on/off switch for each kind " +
+             "of email.\n" +
+             "- **Subscriptions** — the finer switches: follow a community or " +
+             "group to get a post when it's made there, or follow the platform " +
+             "for announcements.\n\n" +
+             "You can mark the whole inbox as read in one click. What you " +
+             "follow and what you get by email is always up to you.\n"),
         ];
     }
 
@@ -1625,6 +1646,32 @@ public static class FirstBootSeeder
              "Ein Moderator ist eine Nachbarin, die ihren Teil des Viertels " +
              "ordentlich hält — kein Administrator und kein Leser fremder " +
              "Inhalte.\n"),
+            ("notifications", "Benachrichtigungen",
+             "## Benachrichtigungen\n\n" +
+             "Kumunita gibt dir Bescheid, wenn etwas mit den Dingen passiert, " +
+             "die dich betreffen — eine Antwort auf deinen Beitrag, eine " +
+             "Anmeldung für dein Ereignis, ein neuer Beitrag in einer deiner " +
+             "Gruppen, eine Aufgabe, die bei dir landet.\n\n" +
+             "**Wo du sie findest.** Öffne die **Glocke** in der Leiste oben. " +
+             "Sie zeigt, wie viele Benachrichtigungen neu sind, und eine " +
+             "kurze Liste der jüngsten. Öffne das **Postfach** für die " +
+             "vollständige Liste, neueste zuerst. Das Postfach erfasst jede " +
+             "Benachrichtigung zuverlässig — es ist die verlässliche " +
+             "Aufzeichnung.\n\n" +
+             "**E-Mail.** Für die Arten, die dich interessieren, bekommst du " +
+             "auch eine E-Mail. Die E-Mail ist in der Sprache, die du für " +
+             "E-Mails in deinem Profil gewählt hast. Schaltest du eine Art " +
+             "in deinen Einstellungen aus, unterlässt das die E-Mail für " +
+             "diese Art — nie das Postfach.\n\n" +
+             "**Deine Wahl.** Zwei Orte:\n" +
+             "- **Benachrichtigungseinstellungen** — der Ein-/Ausschalter " +
+             "für die E-Mails jeder Art.\n" +
+             "- **Abonnements** — die feineren Schalter: folge einer " +
+             "Gemeinschaft oder Gruppe, um deren Beiträge zu erhalten, oder " +
+             "der Plattform für Ankündigungen.\n\n" +
+             "Du kannst das ganze Postfach mit einem Klick als gelesen " +
+             "markieren. Was du folgst und was dir per E-Mail kommt, " +
+             "entscheidest du allein.\n"),
         ];
     }
 
@@ -1925,6 +1972,32 @@ public static class FirstBootSeeder
              "visible, et un signalement ne change pas cela.\n\n" +
              "Un modérateur est un voisin qui veille sur sa part du quartier — " +
              "ni administrateur, ni lecteur du contenu des autres.\n"),
+            ("notifications", "Notifications",
+             "## Notifications\n\n" +
+             "Kumunita te prévient quand quelque chose arrive sur les choses " +
+             "qui te concernent — une réponse à ton message, une réponse à " +
+             "une invitation pour ton événement, un nouveau message dans l'un " +
+             "de tes groupes, une tâche qui arrive chez toi.\n\n" +
+             "**Où les trouver.** Ouvre la **cloche** en haut de l'écran. " +
+             "Elle indique combien de notifications sont neuves et affiche " +
+             "une brève liste des plus récentes. Ouvre la **boîte de " +
+             "réception** pour la liste complète, de la plus récente à la " +
+             "plus ancienne. La boîte de réception enregistre toujours " +
+             "chaque notification — c'est l'histoire fiable.\n\n" +
+             "**E-mail.** Pour les types qui t'intéressent, tu reçois aussi " +
+             "un e-mail. L'e-mail est dans la langue que tu as choisie pour " +
+             "les e-mails dans ton profil. Désactiver un type dans tes " +
+             "préférences arrête l'e-mail de ce type — jamais la boîte de " +
+             "réception.\n\n" +
+             "**Tes choix.** Deux endroits :\n" +
+             "- **Préférences de notification** — l'interrupteur de chaque " +
+             "type d'e-mail.\n" +
+             "- **Abonnements** — les réglages plus fins : suis une " +
+             "communauté ou un groupe pour recevoir ses messages, ou la " +
+             "plateforme pour les annonces.\n\n" +
+             "Tu peux marquer toute la boîte de réception comme lue d'un " +
+             "seul clic. Ce que tu suis et ce qui t'arrive par e-mail " +
+             "reste ton choix.\n"),
         ];
     }
 
@@ -2206,6 +2279,29 @@ public static class FirstBootSeeder
              "det.\n\n" +
              "En moderator er en nabo, der holder sin del af nabolaget i orden " +
              "— hverken en administrerende eller en læser af andres indhold.\n"),
+            ("notifications", "Notifikationer",
+             "## Notifikationer\n\n" +
+             "Kumunita giver dig besked, når der sker noget med de ting, " +
+             "der vedrører dig — et svar på dit indlæg, et svar på " +
+             "indbydelsen til din begivenhed, et nyt indlæg i en af dine " +
+             "grupper, en opgave, der lander hos dig.\n\n" +
+             "**Hvor du finder dem.** Åbn **klokken** i bjælken øverst. " +
+             "Den viser, hvor mange notifikationer der er nye, og en kort " +
+             "liste over de nyeste. Åbn **indbakken** for den fulde liste, " +
+             "nyeste først. Indbakken registrerer altid hver notifikation — " +
+             "det er den pålidelige optegnelse.\n\n" +
+             "**E-mail.** For de typer, der interesserer dig, får du også en " +
+             "e-mail. E-mailen er på det sprog, du har valgt til e-mail i " +
+             "din profil. Slår du en type fra i dine indstillinger, " +
+             "undlader den e-mailen for den type — aldrig indbakken.\n\n" +
+             "**Dine valg.** To steder:\n" +
+             "- **Notifikationsindstillinger** — til/fra-knappen for hver " +
+             "e-mailtype.\n" +
+             "- **Abonnementer** — de finere skifter: følg et fællesskab " +
+             "eller en gruppe for at modtage deres indlæg, eller platformen " +
+             "for meddelelser.\n\n" +
+             "Du kan markere hele indbakken som læst med ét klik. Hvad du " +
+             "følger, og hvad du får på e-mail, bestemmer du selv.\n"),
         ];
     }
 
