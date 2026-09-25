@@ -205,3 +205,32 @@ Testcontainers). **No association / delete / Web / view / `kw-l` change** —
 `git status` confirms exactly the four U03 files, all additions (759
 insertions, 0 deletions — the frozen M5 + U02 surface is untouched).
 **Not committed / staged / moved** (U10's close does the move).
+
+## U04
+
+Association write seams — the two `Set*ProjectAsync` lanes (§9.3, verbatim
+shapes) + the additive `string? projectId = null` feed-param on both
+`ListTodosAsync` and `ListBoardsAsync`. Implementation in `ProjectService`:
+each lane loads the to-do/board, checks the standing matrix (to-do:
+creator ∪ assignee ∪ GlobalAdmin via `CheckTodoStanding`; board: creator ∪
+GlobalAdmin via `CheckBoardStanding`), then — when `projectId` is non-null —
+loads the project, refuses soft-deleted (404) / unreadable (403), writes
+`ProjectId`, stamps `Modified`, and stores the audit row
+(`todo.set_project` / `board.set_project`, `TargetKind` = `"todo"` /
+`"board"`). `null` = unassociate (no project guard). The feed filter is
+appended after the existing `unassignedOnly` / audience filters and is **a
+filter, never a gate** (C-M3·2 / C-PL·3) — the audience decision stays the
+access boundary. **New tests (7):** `F7_SetTodoProject_StandingRechecked_RefusesDeletedProject`,
+`F7_SetBoardProject_StandingRechecked_RefusesDeletedProject` (the two §9.6
+pins), `SetTodoProject_Null_Unassociates`, `SetTodoProject_ProjectDenied_Refused`,
+`Todo_Feed_ProjectIdFilter_Narrows`, `Board_Feed_ProjectIdFilter_Narrows`,
+`Todo_Feed_ProjectIdNull_DefaultUnchanged`. **Tests pass:**
+`Total: 57, Errors: 0, Failed: 0` (the 50 from U03 + the 7 new).
+**No regressions:** full `Kumunita.Core.Tests` run green — `Total: 817,
+Errors: 0, Failed: 0`; `Kumunita.Web.Tests` run green — `Total: 431, Errors:
+0, Failed: 0`. **Backward-compat ripple (only):** two `ProjectsController`
+call-sites (`TodosIndex`, `BoardsIndex`) pass `null` for the new `projectId`
+param + `ct:` named-arg; three NSubstitute stub/verification arities updated
+in `ProjectsControllerTests.Todos_List_AudienceFiltered`. **No delete / Web
+view / `kw-l` change; no U02/U03 seam changed.** Not committed / staged /
+moved (U10's close does the move).

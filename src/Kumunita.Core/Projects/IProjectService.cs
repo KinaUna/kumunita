@@ -52,8 +52,19 @@ public interface IProjectService
     /// change the audience decision (a to-do still only appears if the actor
     /// passes the <c>CanSeeAsync(Read)</c> pass).
     /// </para>
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/> / <paramref name="assigneeId"/> /
+    /// <paramref name="unassignedOnly"/>). When non-null, only to-dos with
+    /// <see cref="TodoItem.ProjectId"/> equal to it are returned (the
+    /// <c>ProjectId == projectId</c> row set); when <c>null</c> (the default),
+    /// no filter — it narrows the candidate set, it does not change the
+    /// audience decision (a to-do still only appears if the actor passes the
+    /// <c>CanSeeAsync(Read)</c> pass — C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, CancellationToken ct = default);
+    Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, CancellationToken ct = default);
 
     /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
@@ -75,8 +86,18 @@ public interface IProjectService
     /// <c>Created</c> descending; paged. The **aggregate** <c>AccessAudit</c>
     /// row (<c>TargetKind = "board"</c>, <c>visibleCount</c> /
     /// <c>hiddenCount</c>) is the C-M3·3 shape.
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/>). When non-null, only boards with
+    /// <see cref="KanbanBoard.ProjectId"/> equal to it are returned (the
+    /// <c>ProjectId == projectId</c> row set); when <c>null</c> (the default),
+    /// no filter — it narrows the candidate set, it does not change the
+    /// audience decision (a board still only appears if the actor passes the
+    /// <c>CanSeeAsync(Read)</c> pass — C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+    Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default);
 
     /// <summary>
     /// The boards the actor may <c>Read</c> on which this to-do is placed —
@@ -495,6 +516,35 @@ public interface IProjectService
     /// "project"</c>) is stored in the caller's session (C3).
     /// </summary>
     Task<Project> UpdateProjectAsync(string projectId, string actorId, IReadOnlySet<string> actorRoles, UpdateProjectRequest request, CancellationToken ct = default);
+
+    // --- PL association lanes (U04) — additive on the frozen M5 surface (ADR 0086) ---
+    //
+    // **Association lanes (U04):**
+
+    /// <summary>
+    /// Sets <c>TodoItem.ProjectId</c> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate). **Creator ∪ assignee ∪ GlobalAdmin** over
+    /// the **to-do** (the C-M5·6 standing matrix, re-checked server-side). A
+    /// non-null <c>projectId</c> pointing at a soft-deleted or unreadable
+    /// project is **refused** (the C3 split). <c>AuthorId</c> / <c>Created</c>
+    /// preserved untouched; <c>Modified</c> stamped; the <c>AccessAudit</c> row
+    /// (<c>todo.set_project</c>, <c>TargetKind = "todo"</c>) is stored in the
+    /// caller's session (C3).
+    /// </summary>
+    Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets <c>KanbanBoard.ProjectId</c> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate). **Creator ∪ GlobalAdmin** over the
+    /// **board** (the ADR 0070 precedent, re-checked server-side). A non-null
+    /// <c>projectId</c> pointing at a soft-deleted or unreadable project is
+    /// **refused** (the C3 split). <c>AuthorId</c> / <c>Created</c> preserved
+    /// untouched; <c>Modified</c> stamped; the <c>AccessAudit</c> row
+    /// (<c>board.set_project</c>, <c>TargetKind = "board"</c>) is stored in the
+    /// caller's session (C3).
+    /// </summary>
+    Task<KanbanBoard> SetBoardProjectAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default);
+
     // --- Placement + reorder lanes (U06) ------------------------------------
 
     /// <summary>

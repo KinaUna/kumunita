@@ -65,7 +65,8 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         };
         projects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
             .Returns([todo]);
 
         // The feed's copy-to / move-to pickers read each to-do's placement
@@ -85,13 +86,14 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.Equal("todo-1", vm.Todos[0].Id);
         Assert.Equal("subj-author", vm.Todos[0].AuthorDisplayName); // no profile → raw id
         await projects.Received(1).ListTodosAsync(
-            null, null, actor, 1, false, Arg.Any<CancellationToken>());
+            null, null, actor, 1, false, null, Arg.Any<CancellationToken>());
 
         // The C3 403 split: a denied read is a clean ForbidResult, not a 500.
         var deniedProjects = Substitute.For<IProjectService>();
         deniedProjects.ListTodosAsync(
                 Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(),
-                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+                Arg.Any<int>(), Arg.Any<bool>(), Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<TodoItem>>(
                 new UnauthorizedAccessException("denied")));
         var deniedController = Build(deniedProjects, subjectId: actor);

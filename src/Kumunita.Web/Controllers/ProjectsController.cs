@@ -376,7 +376,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<TodoItem> todos;
         try
         {
-            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, HttpContext.RequestAborted);
+            todos = await projects.ListTodosAsync(componentId, assigneeId, actorId, page, unassignedOnly, null, ct: HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1060,7 +1060,7 @@ public sealed class ProjectsController : Controller
         IReadOnlyList<KanbanBoard> boards;
         try
         {
-            boards = await projects.ListBoardsAsync(componentId, actorId, page, HttpContext.RequestAborted);
+            boards = await projects.ListBoardsAsync(componentId, actorId, page, null, ct: HttpContext.RequestAborted);
         }
         catch (UnauthorizedAccessException)
         {

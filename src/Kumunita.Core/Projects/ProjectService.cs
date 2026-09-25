@@ -96,8 +96,18 @@ public sealed class ProjectService : IProjectService
     /// pagination, it does **not** change the audience decision (a to-do still
     /// only appears if the actor passes the <c>CanSeeAsync(Read)</c> pass).
     /// </para>
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/> / <paramref name="assigneeId"/> /
+    /// <paramref name="unassignedOnly"/>). When non-null, only to-dos with
+    /// <see cref="TodoItem.ProjectId"/> equal to it are in the candidate set
+    /// (the <c>ProjectId == projectId</c> row set); when <c>null</c> (the
+    /// default), no filter — it narrows candidates before pagination, it does
+    /// **not** change the audience decision (C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -110,6 +120,11 @@ public sealed class ProjectService : IProjectService
             q = q.Where(t => t.AssigneeId == assigneeId);
         if (unassignedOnly)
             q = q.Where(t => t.AssigneeId == null);
+        // The project association filter (ADR 0086 / U04): a feed filter,
+        // never a gate (C-M3·2 / C-PL·3) — the to-do's own Audience decision
+        // stays the access boundary (C-M5·3).
+        if (projectId is not null)
+            q = q.Where(t => t.ProjectId == projectId);
         var candidates = await q.OrderByDescending(t => t.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -192,8 +207,17 @@ public sealed class ProjectService : IProjectService
     /// matching pass; C3, the single aggregate <see cref="AccessAudit"/> row
     /// with <c>TargetKind = "board"</c> via the
     /// <see cref="KanbanBoardToAuditableResource"/>, U03).
+    /// <para>
+    /// <paramref name="projectId"/> (ADR 0086, U04) is the **project
+    /// association filter** — a *filter, never a gate* (the same discipline as
+    /// <paramref name="componentId"/>). When non-null, only boards with
+    /// <see cref="KanbanBoard.ProjectId"/> equal to it are in the candidate
+    /// set (the <c>ProjectId == projectId</c> row set); when <c>null</c> (the
+    /// default), no filter — it narrows candidates before pagination, it does
+    /// **not** change the audience decision (C-M3·2 / C-PL·3).
+    /// </para>
     /// </summary>
-    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -202,6 +226,11 @@ public sealed class ProjectService : IProjectService
             .Where(b => !b.IsDeleted);
         if (componentId is not null)
             q = q.Where(b => b.ComponentId == componentId);
+        // The project association filter (ADR 0086 / U04): a feed filter,
+        // never a gate (C-M3·2 / C-PL·3) — the board's own Audience decision
+        // stays the access boundary (C-M5·3).
+        if (projectId is not null)
+            q = q.Where(b => b.ProjectId == projectId);
         var candidates = await q.OrderByDescending(b => b.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
         if (candidates.Count == 0)
@@ -1856,6 +1885,167 @@ public sealed class ProjectService : IProjectService
         StoreAuditRow(session, actorId, "project.update", project.Id, TargetKindProject, ProjectAuditViaFor(actorId, project));
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return project;
+    }
+
+    // ─── PL association lanes (U04 — ADR 0086 / design doc §9.3) ────────────
+    //
+    // **Seam shape (design doc §9.3, the <see cref="AssignTodoAsync"/> /
+    // <see cref="UpdateBoardAsync"/> write-lane shape mirrored):** each lane
+    // carries <c>actorId</c> + the principal's real role set (<c>actorRoles</c>)
+    // and opens its **own** write session, storing the domain write + the
+    // <see cref="AccessAudit"/> row in that one session, committing atomically
+    // (C3). Standing is enforced server-side via the **same** pure helpers the
+    // tests pin (<see cref="CheckTodoStanding"/> /
+    // <see cref="CheckBoardStanding"/>) — the C3 single-source pin. The
+    // **project guard** (design doc §9.3): a non-null <c>projectId</c> must
+    // point at a project that exists (404 otherwise), is not soft-deleted
+    // (404), and that the actor may <c>Read</c> (403) — **before** the write
+    // (the <see cref="CreateProjectAsync"/> <c>GoalId</c> guard shape on the
+    // project side). A <c>null</c> <c>projectId</c> is the unassociate path —
+    // it skips the guard. **No new <c>AccessAction</c>, no new
+    // <c>AccessVia</c>, no new branch in <c>Decide()</c>** (C-PL·1) — the
+    // lanes reuse the frozen <c>Read</c> action and the existing per-resource
+    // standing matrix.
+
+    /// <summary>
+    /// **Associate a to-do with a project** (design doc §9.3): sets
+    /// <see cref="TodoItem.ProjectId"/> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate — the <see cref="AssignTodoAsync"/> null-
+    /// unassign shape). Standing (server-side, C3): **creator ∪ assignee ∪
+    /// GlobalAdmin** over the **to-do** (the <see cref="CheckTodoStanding"/>
+    /// shape — C-M5·6). The **project guard**: a non-null
+    /// <paramref name="projectId"/> pointing at a **soft-deleted** project is
+    /// <see cref="KeyNotFoundException"/> (404) and at an **unreadable**
+    /// project is <see cref="UnauthorizedAccessException"/> (403) — the C3
+    /// split, checked **before** the write (the <see
+    /// cref="CreateProjectAsync"/> <c>GoalId</c> guard shape, the project
+    /// side). A missing / soft-deleted to-do is
+    /// <see cref="KeyNotFoundException"/> (404). <see
+    /// cref="TodoItem.AuthorId"/> / <see cref="TodoItem.Created"/> preserved
+    /// untouched; <see cref="TodoItem.Modified"/> is stamped. One
+    /// <see cref="AccessAudit"/> row (<c>todo.set_project</c>,
+    /// <c>TargetKind = "todo"</c>, the to-do's id as the target — the
+    /// association points **at** the project, the audit target is the
+    /// mutated row; creator <c>Via Owner</c>, otherwise <c>Via Admin</c>,
+    /// the <see cref="TodoAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<TodoItem> SetTodoProjectAsync(string todoItemId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(todoItemId)) throw new KeyNotFoundException("A to-do id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a to-do with a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var todo = await session.LoadAsync<TodoItem>(todoItemId, ct).ConfigureAwait(false);
+        if (todo is null)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        if (todo.IsDeleted)
+            throw new KeyNotFoundException($"To-do '{todoItemId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** to-do: creator ∪ assignee ∪ GlobalAdmin (C-M5·6).
+        CheckTodoStanding(actorId, actorRoles, todo);
+
+        // The project guard (design doc §9.3): a non-null projectId must
+        // point at a project that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — all
+        // **before** the to-do write (the CreateProjectAsync GoalId guard
+        // shape). `null` = unassociate — no guard.
+        if (projectId is not null)
+        {
+            var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+            if (project is null)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+            if (project.IsDeleted)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+            var projectDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectToAuditableResource(project))
+                .ConfigureAwait(false);
+            if (!projectDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read project '{projectId}'.");
+        }
+
+        todo.ProjectId = projectId;                      // `null` = unassociate.
+        todo.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(todo);
+        StoreAuditRow(session, actorId, "todo.set_project", todo.Id, TargetKindTodo, TodoAuditViaFor(actorId, todo));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return todo;
+    }
+
+    /// <summary>
+    /// **Associate a board with a project** (design doc §9.3): sets
+    /// <see cref="KanbanBoard.ProjectId"/> to <paramref name="projectId"/>
+    /// (<c>null</c> = unassociate). Standing (server-side, C3): **creator ∪
+    /// GlobalAdmin** over the **board** (the <see
+    /// cref="CheckBoardStanding"/> shape — the ADR 0070 board-edit precedent;
+    /// the assignee branch does not apply to a board, C-M5·6). The **project
+    /// guard**: a non-null <paramref name="projectId"/> pointing at a
+    /// **soft-deleted** project is <see cref="KeyNotFoundException"/> (404)
+    /// and at an **unreadable** project is <see
+    /// cref="UnauthorizedAccessException"/> (403) — the C3 split, checked
+    /// **before** the write (the <see cref="CreateProjectAsync"/>
+    /// <c>GoalId</c> guard shape, the project side). A missing / soft-deleted
+    /// board is <see cref="KeyNotFoundException"/> (404). <see
+    /// cref="KanbanBoard.AuthorId"/> / <see cref="KanbanBoard.Created"/>
+    /// preserved untouched; <see cref="KanbanBoard.Modified"/> is stamped.
+    /// One <see cref="AccessAudit"/> row (<c>board.set_project</c>,
+    /// <c>TargetKind = "board"</c>, the board's id as the target — the
+    /// association points **at** the project, the audit target is the
+    /// mutated row; creator <c>Via Owner</c>, otherwise <c>Via Admin</c>,
+    /// the <see cref="BoardAuditViaFor"/> shape) commits atomically with the
+    /// write (C3).
+    /// </summary>
+    public async Task<KanbanBoard> SetBoardProjectAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, string? projectId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(boardId)) throw new KeyNotFoundException("A board id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to associate a board with a project.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var board = await session.LoadAsync<KanbanBoard>(boardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{boardId}' was not found in the session; nothing to associate.");
+
+        // Standing re-check (server-side, C3 single-source) against the
+        // **stored** board: creator ∪ GlobalAdmin (the ADR 0070 board-edit
+        // precedent) — the assignee branch does not apply to a board.
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // The project guard (design doc §9.3): a non-null projectId must
+        // point at a project that exists (404 otherwise), is not
+        // soft-deleted (404), and that the actor may Read (403) — all
+        // **before** the board write (the CreateProjectAsync GoalId guard
+        // shape). `null` = unassociate — no guard.
+        if (projectId is not null)
+        {
+            var project = await session.LoadAsync<Project>(projectId, ct).ConfigureAwait(false);
+            if (project is null)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+            if (project.IsDeleted)
+                throw new KeyNotFoundException($"Project '{projectId}' was not found.");
+
+            var projectDecision = await _authorization
+                .CanAsync(actorId, AccessAction.Read, new ProjectToAuditableResource(project))
+                .ConfigureAwait(false);
+            if (!projectDecision.Allowed)
+                throw new UnauthorizedAccessException($"Actor may not read project '{projectId}'.");
+        }
+
+        board.ProjectId = projectId;                     // `null` = unassociate.
+        board.Modified = DateTimeOffset.UtcNow;
+
+        session.Store(board);
+        StoreAuditRow(session, actorId, "board.set_project", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return board;
     }
 
     /// <summary>

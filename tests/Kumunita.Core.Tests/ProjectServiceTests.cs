@@ -2026,6 +2026,415 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Equal(2, audits.Count(a => a.Action == "project.update"));
     }
 
+    // ── F — the PL association lane (ADR 0086, design doc §9.6 pins) ────────
+
+    /// <summary>
+    /// <b>F7</b> (to-do association, the standing matrix + the C3 project
+    /// guard): <see cref="IProjectService.SetTodoProjectAsync"/> with a
+    /// readable project **succeeds** for a member with standing (the creator —
+    /// <c>todo.set_project</c>, <c>TargetKind = "todo"</c>, <c>Via Owner</c>,
+    /// <c>Modified</c> stamped); for a **stranger** (no standing) it is
+    /// refused with <see cref="UnauthorizedAccessException"/> (403) with
+    /// **nothing written**; and pointing at a **soft-deleted** project it is
+    /// refused with <see cref="KeyNotFoundException"/> (404) — the C3 split,
+    /// checked **before** the write (the <see cref="ProjectService"/>
+    /// <c>GoalId</c> guard shape, the project side).
+    /// </summary>
+    [Fact]
+    public async Task F7_SetTodoProject_StandingRechecked_RefusesDeletedProject()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7-creator";
+        const string stranger = "u-pl-f7-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7-todo",
+            AuthorId = creator,
+            Title = "A to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A readable project (public) — the happy path.
+        await Plant(store, new Project
+        {
+            Id = "f7-project",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch): the association
+        // writes, Modified is stamped, AuthorId / Created preserved.
+        var set = await svc.SetTodoProjectAsync(
+            "f7-todo", creator, MemberRoles, "f7-project");
+        Assert.Equal("f7-project", set.ProjectId);
+        Assert.NotNull(set.Modified);
+        Assert.Equal(creator, set.AuthorId);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            Assert.Equal("f7-project", reloaded.ProjectId);
+        }
+
+        var audits = await TodoAuditRows(store, "f7-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_project");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("f7-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+
+        // The stranger (no standing — not the creator, not the assignee,
+        // not a GlobalAdmin) is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoProjectAsync("f7-todo", stranger, MemberRoles, "f7-project"));
+
+        // A soft-deleted project — the 404 side of the C3 split (the guard is
+        // checked before the write, so the standing creator is still refused).
+        await Plant(store, new Project
+        {
+            Id = "f7-deleted-project",
+            AuthorId = creator,
+            Title = "Deleted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.SetTodoProjectAsync("f7-todo", creator, MemberRoles, "f7-deleted-project"));
+
+        // The refused attempts left the stored row's ProjectId untouched.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7-todo"))!;
+            Assert.Equal("f7-project", reloaded.ProjectId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (board association, the standing matrix + the C3 project
+    /// guard): <see cref="IProjectService.SetBoardProjectAsync"/> with a
+    /// readable project **succeeds** for the board's creator (
+    /// <c>board.set_project</c>, <c>TargetKind = "board"</c>, <c>Via Owner</c>,
+    /// <c>Modified</c> stamped); for a **stranger** (no standing — the
+    /// creator ∪ GlobalAdmin matrix has no assignee branch, ADR 0070) it is
+    /// refused with <see cref="UnauthorizedAccessException"/> (403) with
+    /// **nothing written**; and pointing at a **soft-deleted** project it is
+    /// refused with <see cref="KeyNotFoundException"/> (404) — the C3 split,
+    /// checked **before** the write.
+    /// </summary>
+    [Fact]
+    public async Task F7_SetBoardProject_StandingRechecked_RefusesDeletedProject()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7b-creator";
+        const string stranger = "u-pl-f7b-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7b-board",
+            AuthorId = creator,
+            Title = "A board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // A readable project (public) — the happy path.
+        await Plant(store, new Project
+        {
+            Id = "f7b-project",
+            AuthorId = creator,
+            Title = "A project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch): the association
+        // writes, Modified is stamped, AuthorId / Created preserved.
+        var set = await svc.SetBoardProjectAsync(
+            "f7b-board", creator, MemberRoles, "f7b-project");
+        Assert.Equal("f7b-project", set.ProjectId);
+        Assert.NotNull(set.Modified);
+        Assert.Equal(creator, set.AuthorId);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            Assert.Equal("f7b-project", reloaded.ProjectId);
+        }
+
+        var audits = await BoardAuditRows(store, "f7b-board");
+        var row = Assert.Single(audits, a => a.Action == "board.set_project");
+        Assert.Equal("board", row.TargetKind);
+        Assert.Equal("f7b-board", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+
+        // The stranger (no standing — not the creator, not a GlobalAdmin;
+        // the assignee branch does not apply to a board) is refused (403);
+        // nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetBoardProjectAsync("f7b-board", stranger, MemberRoles, "f7b-project"));
+
+        // A soft-deleted project — the 404 side of the C3 split (the guard is
+        // checked before the write, so the standing creator is still refused).
+        await Plant(store, new Project
+        {
+            Id = "f7b-deleted-project",
+            AuthorId = creator,
+            Title = "Deleted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            IsDeleted = true,
+            Audience = null,
+        });
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.SetBoardProjectAsync("f7b-board", creator, MemberRoles, "f7b-deleted-project"));
+
+        // The refused attempts left the stored row's ProjectId untouched.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f7b-board"))!;
+            Assert.Equal("f7b-project", reloaded.ProjectId);
+        }
+    }
+
+    /// <summary>
+    /// <b>F7</b> (unassociate): <see cref="IProjectService.SetTodoProjectAsync"/>
+    /// with <c>projectId = null</c> **clears** the to-do's
+    /// <see cref="TodoItem.ProjectId"/> (the <see cref="ProjectService"/>
+    /// <c>AssignTodoAsync</c> null-unassign shape) — the guard is skipped,
+    /// <see cref="TodoItem.Modified"/> is stamped, and one
+    /// <c>todo.set_project</c> audit row is written (C3).
+    /// </summary>
+    [Fact]
+    public async Task SetTodoProject_Null_Unassociates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7c-creator";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7c-todo",
+            AuthorId = creator,
+            Title = "An associated to-do",
+            ProjectId = "f7c-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var unset = await svc.SetTodoProjectAsync("f7c-todo", creator, MemberRoles, null);
+        Assert.Null(unset.ProjectId);
+        Assert.NotNull(unset.Modified);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7c-todo"))!;
+            Assert.Null(reloaded.ProjectId);
+        }
+
+        var audits = await TodoAuditRows(store, "f7c-todo");
+        var row = Assert.Single(audits, a => a.Action == "todo.set_project");
+        Assert.Equal("todo", row.TargetKind);
+        Assert.Equal("f7c-todo", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F7</b> (project guard, 403 side — to-do): a non-null
+    /// <paramref name="projectId"/> pointing at an **unreadable** project
+    /// (audience-restricted; the author is a third party) is refused with
+    /// <see cref="UnauthorizedAccessException"/> (403) even for a standing
+    /// creator — the resource exists, the actor may not read it (the C3
+    /// split); **nothing** is written.
+    /// </summary>
+    [Fact]
+    public async Task SetTodoProject_ProjectDenied_Refused()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f7d-creator";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7d-todo",
+            AuthorId = creator,
+            Title = "A to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // An unreadable project (audience-restricted to someone else; the
+        // actor is the to-do's creator — standing is irrelevant to the guard).
+        await Plant(store, new Project
+        {
+            Id = "f7d-project",
+            AuthorId = "u-pl-f7d-project-author",
+            Title = "Restricted project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, "u-pl-f7d-grantee"),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.SetTodoProjectAsync("f7d-todo", creator, MemberRoles, "f7d-project"));
+
+        // Nothing was written.
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<TodoItem>("f7d-todo"))!;
+            Assert.Null(reloaded.ProjectId);
+        }
+        Assert.Empty(await TodoAuditRows(store, "f7d-todo"));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (feed filter, to-do side): the <see
+    /// cref="IProjectService.ListTodosAsync"/> additive
+    /// <paramref name="projectId"/> filter narrows the candidate set to the
+    /// to-dos whose <see cref="TodoItem.ProjectId"/> matches — a *filter,
+    /// never a gate* (C-M3·2 / C-PL·3): an unreadable to-do is **still**
+    /// excluded from a stranger's feed by the audience decision even when it
+    /// matches the filter.
+    /// </summary>
+    [Fact]
+    public async Task Todo_Feed_ProjectIdFilter_Narrows()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7e-author";
+        const string grantee = "u-pl-f7e-grantee";
+        const string stranger = "u-pl-f7e-stranger";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-in-project",
+            AuthorId = author,
+            Title = "Associated to-do",
+            ProjectId = "f7e-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-out-of-project",
+            AuthorId = author,
+            Title = "Unassociated to-do",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A public to-do that matches the filter but that the actor may not
+        // see (audience-restricted) — the filter must not open the gate.
+        await Plant(store, new TodoItem
+        {
+            Id = "f7e-restricted",
+            AuthorId = author,
+            Title = "Restricted to-do",
+            ProjectId = "f7e-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 45, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        // The filter narrows to the ProjectId-matching to-dos: the
+        // out-of-project to-do is excluded for everyone (the filter), and the
+        // in-project + restricted to-dos are candidates — the audience
+        // decision then admits each actor its own slice.
+        var authorFiltered = await svc.ListTodosAsync(null, null, author, 1, false, "f7e-project");
+        Assert.Contains("f7e-in-project", authorFiltered.Select(t => t.Id));
+        Assert.DoesNotContain("f7e-out-of-project", authorFiltered.Select(t => t.Id));
+        Assert.Contains("f7e-restricted", authorFiltered.Select(t => t.Id)); // the author may read it.
+
+        // The audience decision stays the access boundary (C-M5·3 /
+        // C-PL·3): the filter does **not** open the gate for the stranger —
+        // the restricted to-do (which matches the filter) is still hidden,
+        // while the public in-project to-do is visible to everyone.
+        var strangerFiltered = await svc.ListTodosAsync(null, null, stranger, 1, false, "f7e-project");
+        Assert.Contains("f7e-in-project", strangerFiltered.Select(t => t.Id));   // public — visible.
+        Assert.DoesNotContain("f7e-out-of-project", strangerFiltered.Select(t => t.Id)); // the filter.
+        Assert.DoesNotContain("f7e-restricted", strangerFiltered.Select(t => t.Id)); // the gate.
+    }
+
+    /// <summary>
+    /// <b>F7</b> (feed filter, board side): the <see
+    /// cref="IProjectService.ListBoardsAsync"/> additive
+    /// <paramref name="projectId"/> filter narrows the candidate set to the
+    /// boards whose <see cref="KanbanBoard.ProjectId"/> matches — a
+    /// *filter, never a gate* (C-M3·2 / C-PL·3).
+    /// </summary>
+    [Fact]
+    public async Task Board_Feed_ProjectIdFilter_Narrows()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7f-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7f-in-project",
+            AuthorId = author,
+            Title = "Associated board",
+            ProjectId = "f7f-project",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f7f-out-of-project",
+            AuthorId = author,
+            Title = "Unassociated board",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var filtered = await svc.ListBoardsAsync(null, author, 1, "f7f-project");
+        Assert.Contains("f7f-in-project", filtered.Select(b => b.Id));
+        Assert.DoesNotContain("f7f-out-of-project", filtered.Select(b => b.Id));
+    }
+
+    /// <summary>
+    /// <b>F7</b> (additive-surface pin): the <see
+    /// cref="IProjectService.ListTodosAsync"/> feed with the default
+    /// <paramref name="projectId"/> (<c>null</c>) is **unchanged** — the
+    /// existing M5 feed behavior (the C-PL·8 additive pin: every existing
+    /// call site compiles and behaves unchanged).
+    /// </summary>
+    [Fact]
+    public async Task Todo_Feed_ProjectIdNull_DefaultUnchanged()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f7g-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f7g-in-project",
+            AuthorId = author,
+            Title = "Associated to-do",
+            ProjectId = "f7g-project",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new TodoItem
+        {
+            Id = "f7g-standalone",
+            AuthorId = author,
+            Title = "Standalone to-do",
+            ProjectId = null,
+            Created = new DateTimeOffset(2026, 1, 1, 9, 30, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The existing 5-arg call shape (default projectId = null): both
+        // to-dos are in the author's feed — the M5 behavior is intact.
+        var feed = await svc.ListTodosAsync(null, null, author, 1);
+        Assert.Contains("f7g-in-project", feed.Select(t => t.Id));
+        Assert.Contains("f7g-standalone", feed.Select(t => t.Id));
+    }
+
     // ── C — the claim lane (ADR 0073) ────────────────────────────────────────
 
     /// <summary>
