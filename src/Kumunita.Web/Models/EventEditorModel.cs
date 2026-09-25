@@ -161,6 +161,21 @@ public sealed class EventEditorModel
     /// pin) — the flag survives re-renders of an invalid-POST lane.</summary>
     public bool SaveAsDraft { get; set; }
 
+    /// <summary>
+    /// The <b>quick-create marker</b> (ADR 0081) — <c>true</c> only when
+    /// the form was POSTed from the calendar's quick-create modal (a hidden
+    /// <c>QuickCreate=true</c> field) rather than the full composer. The
+    /// controller reads it as a <b>shape signal</b>: when set and
+    /// <see cref="Body"/> is blank, it seeds <see cref="Body"/> from
+    /// <see cref="Title"/> <b>before</b> the <see cref="IsValid"/> gate, so
+    /// a title-only quick-create is a well-formed shape (the composer's own
+    /// "a body is required" validation stays untouched for the full
+    /// composer — this branch is the quick-create surface's floor, not a
+    /// relaxation of the composer's rule). Never a gate, never an access
+    /// input — a shape signal only (C-M3·2 posture).
+    /// </summary>
+    public bool QuickCreate { get; set; }
+
     /// <summary>The event's <b>authored-in language</b> (ADR 0018,
     /// ADR 0005 B) — the BCP-47 code the author is writing this event
     /// in. A form-bound <c>&lt;select&gt;</c> posting this;
@@ -380,10 +395,10 @@ public sealed record EventIndexViewModel(
 /// registry key — C-DWM·9).
 /// </para>
 /// <para>
-/// **<see cref="View"/>** (default <c>"month"</c> — the backward-
-/// compatible EV-CAL default, C-DWM·8) echoes the resolved
-/// <c>?view=</c> selector back to the view so the toggle can render the
-/// active button pressed. **<see cref="WindowDays"/>** is the ordered
+/// **<see cref="View"/>** (default <c>"week"</c> — the default view,
+/// ADR 0081 amending C-DWM·8's original "month" default) echoes the
+/// resolved <c>?view=</c> selector back to the view so the toggle can
+/// render the active button pressed. **<see cref="WindowDays"/>** is the ordered
 /// list of the view's grid day-columns (date-only
 /// <see cref="DateTime"/>): Day → 1 entry (the anchor); Week → 7 entries,
 /// Monday-first (C-DWM·5); Month → the 5–6 full weeks covering the
@@ -412,7 +427,7 @@ public sealed record EventCalendarViewModel(
     string? CurrentComponentId,
     IReadOnlyList<(string Id, string Name)> Components,
     string TimeZoneId,
-    string View = "month",
+    string View = "week",
     IReadOnlyList<DateTime> WindowDays = null!);
 
 /// <summary>

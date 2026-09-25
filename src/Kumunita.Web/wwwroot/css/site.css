@@ -1235,26 +1235,47 @@ body.kmb-page-fullbleed .navbar {
   color: var(--bs-primary);
 }
 
-/* EV-DWM (ADR 0064) — the Month chip grid: a fixed 7-column CSS grid so
-   every day-cell is the same width (a true calendar lattice) regardless of
-   viewport. A `minmax(0, 1fr)` track keeps long chips from blowing a column
-   out; the shared gap is what used to come from the `.row g-2` gutters. */
+/* EV-DWM (ADR 0064), reshaped by ADR 0081 — the Month chip grid: a fixed
+   7-column CSS grid so every day-cell is the same width (a true calendar
+   lattice) regardless of viewport. A `minmax(0, 1fr)` track keeps long chips
+   from blowing a column out. The grid itself carries one outer border +
+   radius (ADR 0081: no gaps, single-line separators between cells — the
+   cells draw their inner lines with top/right borders only, and the edge
+   cells drop the outer edge's border so nothing doubles up against the
+   grid's own border). */
 .events-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-/* EV-DWM (ADR 0064) — the Month chip grid's cells: a soft border on each
-   day-cell so the 7-column × 5–6-week grid reads as a calendar (a visible
-   lattice) even when a cell is empty, plus a shared min-height so empty and
-   chip-filled cells line up in equal rows (uniform cell sizing). */
-.events-calendar-day {
   border: 1px solid var(--kmb-border-soft);
   border-radius: var(--kmb-radius-chip);
+  overflow: hidden;
+}
+
+/* EV-DWM (ADR 0064), reshaped by ADR 0081 — the Month chip grid's cells:
+   a soft top + right border on each day-cell (the single-line lattice
+   separators — the grid's outer border supplies the bottom + left edges),
+   no per-cell radius (the grid's radius + overflow:hidden shape the outer
+   corners), plus a shared min-height so empty and chip-filled cells line up
+   in equal rows (uniform cell sizing). */
+.events-calendar-day {
+  border: 0;
+  border-top: 1px solid var(--kmb-border-soft);
+  border-right: 1px solid var(--kmb-border-soft);
   background: #fff;
   min-height: 4.5rem;
   min-width: 0;
+  padding: 0.375rem 0.5rem;
+}
+/* The last column's cells drop their right border (the grid's own border
+   supplies that edge — a doubled line would read heavier than the inner
+   separators). */
+.events-calendar-day:nth-child(7n) {
+  border-right: 0;
+}
+/* The first row's cells (the grid's first 7 children) drop their top
+   border (same reason — the grid's border is the top edge). */
+.events-calendar-day:nth-child(-n+7) {
+  border-top: 0;
 }
 
 /* EV-DWM (ADR 0064, U03) — Month as a true calendar month (D4): the

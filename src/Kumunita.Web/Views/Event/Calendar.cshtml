@@ -3,6 +3,10 @@
 @using Kumunita.Web.Security
 @inject ITranslationProvider Translation
 @inject ILocalizationService Localization
+@{
+    var _ncKwL = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor?.HttpContext?.Request, Localization, Translation);
+    var _ncOptionalPlaceholder = await Translation.GetAsync("common.optional", _ncKwL);
+}
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = "Events calendar";
@@ -116,6 +120,14 @@
                         <a class="btn btn-outline-secondary @(Model.View == "week" ? "active" : null)" href="@ViewHref("week")" aria-pressed="@(Model.View == "week" ? "true" : "false")"><kw-l key="events.calendar.view.week">Week</kw-l></a>
                         <a class="btn btn-outline-secondary @(Model.View == "month" ? "active" : null)" href="@ViewHref("month")" aria-pressed="@(Model.View == "month" ? "true" : "false")"><kw-l key="events.calendar.view.month">Month</kw-l></a>
                     </div>
+                    <!-- ADR 0081 — the "New event" quick-create affordance:
+                         a Bootstrap-modal button (the ADR 0071 convention)
+                         opening the quick-create modal below; the default
+                         Start/End are the anchor day at 09:00 local time,
+                         and events-calendar-new.ts (the click-to-time
+                         module) re-points them when a resident clicks an
+                         empty calendar slot instead. -->
+                    <button type="button" class="btn btn-primary btn-sm events-new-event-btn" data-bs-toggle="modal" data-bs-target="#new-event-modal"><kw-l key="events.new_event">New event</kw-l></button>
                 </div>
             </div>
         </header>
@@ -266,6 +278,65 @@
                 </div>
             </div>
         }
+
+        @* ADR 0081 — the "New event" quick-create modal (the ADR 0071 Bootstrap
+           modal convention). The default Start/End is the anchor day at 09:00
+           local time (the wall-clock string `datetime-local` expects — the
+           anchor is already in the viewer's effective zone, C-EV·5); clicking
+           an empty calendar slot re-points them to that slot's date + hour
+           via events-calendar-new.ts (the click-to-time module) before the
+           modal opens. The audience is the community-visible default (the
+           CreateGet shape — CommunityVisible + Mode Any + empty grants), and
+           the event is saved as a draft (the ADR 0037 floor — the author
+           reviews + publishes from the detail page). The QuickCreate marker
+           tells POST /events/new to seed a body from the title when no body
+           was typed (the composer's IsValid requires a non-blank body). *@
+        <div class="modal fade" id="new-event-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" action="/events/new">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="QuickCreate" value="true" />
+                        <input type="hidden" name="SaveAsDraft" value="true" />
+                        <input type="hidden" name="Audience.CommunityVisible" value="true" />
+                        <input type="hidden" name="Audience.Mode" value="Any" />
+                        <input type="hidden" name="Audience.Grants" value="[]" />
+
+                        <div class="modal-header">
+                            <h5 class="modal-title"><kw-l key="events.new_event">New event</kw-l></h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="nc-title" style="font-weight:600;"><kw-l key="common.title">Title</kw-l></label>
+                                <input class="form-control" type="text" id="nc-title" name="Title" maxlength="120" required />
+                                <div class="text-muted small mt-1"><kw-l key="events.title_hint">A short headline for the event.</kw-l></div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col">
+                                    <label class="form-label" for="nc-start" style="font-weight:600;"><kw-l key="events.start">Start</kw-l></label>
+                                    <input class="form-control" type="datetime-local" id="nc-start" name="Start" required
+                                           value="@($"{Model.FromAnchor}T09:00")" />
+                                </div>
+                                <div class="col">
+                                    <label class="form-label" for="nc-end" style="font-weight:600;"><kw-l key="events.end">End</kw-l></label>
+                                    <input class="form-control" type="datetime-local" id="nc-end" name="End" required
+                                           value="@($"{Model.FromAnchor}T10:00")" />
+                                </div>
+                            </div>
+                            <div class="mb-1">
+                                <label class="form-label" for="nc-location" style="font-weight:600;"><kw-l key="events.location">Location</kw-l></label>
+                                <input class="form-control" type="text" id="nc-location" name="Location" placeholder="@_ncOptionalPlaceholder" />
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><kw-l key="common.cancel">Cancel</kw-l></button>
+                            <button type="submit" class="btn btn-primary"><kw-l key="common.save">Save</kw-l></button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -282,4 +353,10 @@
          flag (C-DWM·4, mirrored from events-calendar.ts so the EV-CAL
          module stays untouched — C-DWM·7). -->
     <script type="module" src="~/js/lib/events-calendar-time.js"></script>
+    <!-- ADR 0081 — the quick-create "click an empty slot → New event modal
+         at that hour" affordance: a delegated click listener on
+         #events-calendar that, when a slot (not an existing event) is
+         clicked, re-points the modal's Start/End inputs to that date + hour
+         (30-minute snap) and opens the Bootstrap modal. -->
+    <script type="module" src="~/js/lib/events-calendar-new.js"></script>
 }
