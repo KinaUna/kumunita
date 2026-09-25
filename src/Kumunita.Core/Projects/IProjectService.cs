@@ -374,6 +374,56 @@ public interface IProjectService
     /// </summary>
     Task DeleteBoardAsync(string boardId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
+    // --- PL goal lanes (U02) — additive on the frozen M5 surface (ADR 0086) ---
+    //
+    // **Goal read lanes (U02):**
+
+    /// <summary>
+    /// The **goal list** (the feed): the candidates are <c>!IsDeleted</c>,
+    /// filtered by optional <paramref name="componentId"/> (a filter, never a
+    /// gate — C-M3·2); the survivors are <c>CanSeeAsync(Read)</c>-filtered
+    /// (C6 / C3) over the <see cref="ProjectGoalToAuditableResource"/>; ordered
+    /// by <c>Created</c> descending (the newest first — the post feed shape);
+    /// paged. The **aggregate** <c>AccessAudit</c> row (<c>TargetKind "goal"</c>,
+    /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape.
+    /// </summary>
+    Task<IReadOnlyList<ProjectGoal>> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+
+    /// <summary>
+    /// One goal; one <c>CanAsync(Read)</c>; <see cref="KeyNotFoundException"/>
+    /// (404) on absent, <see cref="UnauthorizedAccessException"/> (403) on
+    /// denied (the C3 404-vs-403 split). The goal's <c>GoalId</c>-linked
+    /// projects are **not** part of this seam (they are the
+    /// <see cref="ListProjectsAsync"/> feed with the <c>goalId</c> filter).
+    /// </summary>
+    Task<ProjectGoal> GetGoalAsync(string goalId, string actorId, CancellationToken ct = default);
+
+    // **Goal write lanes (U02):**
+
+    /// <summary>
+    /// Create a goal — the author becomes the standing owner (the
+    /// <c>AuthorId</c> branch); the goal is **live on creation** (no
+    /// <c>IsDraft</c> — the D8a precedent); the <c>AccessAudit</c> row
+    /// (<c>goal.create</c>, <c>TargetKind = "goal"</c>) is stored in the
+    /// caller's session (C3).
+    /// </summary>
+    Task<ProjectGoal> CreateGoalAsync(string actorId, IReadOnlySet<string> actorRoles, CreateGoalRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Edit a goal — **creator ∪ GlobalAdmin** (the ADR 0070 board-edit
+    /// precedent, enforced server-side per C-M5·6); a **full update** of
+    /// <c>Title</c> + <c>Description</c> (the ADR 0070 shape — the
+    /// <see cref="UpdateBoardAsync"/> shape: the edit page posts both; a blank
+    /// description clears it to <c>null</c>); <c>AuthorId</c> / <c>Created</c>
+    /// preserved untouched; <c>Modified</c> stamped on a real change; the
+    /// <c>AccessAudit</c> row (<c>goal.update</c>, <c>TargetKind = "goal"</c>)
+    /// is stored in the caller's session (C3). A missing goal is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403); a blank <c>Title</c> is
+    /// <see cref="ArgumentException"/> (the write shape's 400).
+    /// </summary>
+    Task<ProjectGoal> UpdateGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, UpdateGoalRequest request, CancellationToken ct = default);
+
     // --- Placement + reorder lanes (U06) ------------------------------------
 
     /// <summary>

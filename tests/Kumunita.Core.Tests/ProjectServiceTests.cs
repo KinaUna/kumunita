@@ -1629,6 +1629,172 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(updated.Modified);
     }
 
+    // ── F — the PL goal lane (ADR 0086, design doc §9.6 pins) ───────────────
+
+    /// <summary>
+    /// <b>F1</b> (goal feed, both sides): a goal whose <see
+    /// cref="ProjectGoal.Audience"/> grants a specific user is **present** in
+    /// that user's <see cref="IProjectService.ListGoalsAsync"/> feed (branch
+    /// 6 MatchGroups) and **absent** from a stranger's feed (branch 7 Deny —
+    /// the <c>CanSeeAsync(Read)</c> pass excludes the row, not just hidden in
+    /// the view). The author is a third party so only the audience branch is
+    /// exercised.
+    /// </summary>
+    [Fact]
+    public async Task F1_GoalVisibleToAudienceMember_HiddenFromNonMember()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f1-author";
+        const string grantee = "u-pl-f1-grantee";
+        const string stranger = "u-pl-f1-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f1-goal",
+            AuthorId = author,
+            Title = "Audience goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        var granteeFeed = await svc.ListGoalsAsync(null, grantee, 1);
+        Assert.Contains("f1-goal", granteeFeed.Select(g => g.Id));
+
+        var strangerFeed = await svc.ListGoalsAsync(null, stranger, 1);
+        Assert.DoesNotContain("f1-goal", strangerFeed.Select(g => g.Id));
+    }
+
+    /// <summary>
+    /// <b>F2</b> (goal detail, the C3 404-vs-403 split): <see
+    /// cref="IProjectService.GetGoalAsync"/> on an **absent** id throws
+    /// <see cref="KeyNotFoundException"/> (404); on an **audience-restricted**
+    /// goal a stranger who may not <c>Read</c> it is denied with
+    /// <see cref="UnauthorizedAccessException"/> (403) — the resource exists,
+    /// the actor does not.
+    /// </summary>
+    [Fact]
+    public async Task F2_GoalDetail_404OnAbsent_403OnDenied()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f2-author";
+        const string grantee = "u-pl-f2-grantee";
+        const string stranger = "u-pl-f2-stranger";
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.GetGoalAsync("no-such-goal", author));
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f2-goal",
+            AuthorId = author,
+            Title = "Restricted goal",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.GetGoalAsync("f2-goal", stranger));
+    }
+
+    /// <summary>
+    /// <b>F3</b> (create, F1 / C3): <see cref="IProjectService.CreateGoalAsync"/>
+    /// — the author becomes the standing owner (<see
+    /// cref="ProjectGoal.AuthorId"/> = the actor), the goal is **live on
+    /// creation** (<c>IsDeleted = false</c>, no <c>IsDraft</c>), the
+    /// <c>Created</c> stamp is set, the ADR 0018 language floor materializes
+    /// a null <c>LanguageCode</c> (the instance-default → <c>en</c> floor),
+    /// and one <see cref="AccessAudit"/> row is written: <c>goal.create</c>,
+    /// <c>TargetKind = "goal"</c>, <c>Via Owner</c>.
+    /// </summary>
+    [Fact]
+    public async Task F3_CreateGoal_AuthorIsStandingOwner_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-pl-f3-author";
+
+        var created = await svc.CreateGoalAsync(
+            author, MemberRoles,
+            new CreateGoalRequest { Title = "Neighborhood goal" });
+
+        Assert.Equal(author, created.AuthorId);
+        Assert.False(created.IsDeleted);
+        Assert.NotNull(created.Id);
+        Assert.Equal("en", created.LanguageCode);          // ADR 0018 floor (no LocaleSettings row planted).
+
+        var audits = await GoalAuditRows(store, created.Id);
+        var row = Assert.Single(audits);
+        Assert.Equal("goal.create", row.Action);
+        Assert.Equal("goal", row.TargetKind);
+        Assert.Equal(created.Id, row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F3</b> (update, C-PL·2): the **creator ∪ GlobalAdmin** standing
+    /// matrix, re-checked server-side — the creator <see
+    /// cref="IProjectService.UpdateGoalAsync"/>s successfully (a real change
+    /// stamps <see cref="ProjectGoal.Modified"/>; a blank
+    /// <c>Description</c> clears to <c>null</c> — the ADR 0070 full-update
+    /// shape), a GlobalAdmin who is **not** the creator also succeeds (the
+    /// override branch), and a stranger is refused with <see
+    /// cref="UnauthorizedAccessException"/> (403) with **nothing written**.
+    /// One <c>goal.update</c> audit row per successful write (C3).
+    /// </summary>
+    [Fact]
+    public async Task F3_UpdateGoal_CreatorGlobalAdmin_StandingRechecked()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string creator = "u-pl-f3b-creator";
+        const string admin = "u-pl-f3b-admin";
+        const string stranger = "u-pl-f3b-stranger";
+
+        await Plant(store, new ProjectGoal
+        {
+            Id = "f3b-goal",
+            AuthorId = creator,
+            Title = "Original title",
+            Description = "Original description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        // The creator has standing (the Owner branch); the change is real —
+        // Modified is stamped — and the blank Description clears to null.
+        var updated = await svc.UpdateGoalAsync(
+            "f3b-goal", creator, MemberRoles,
+            new UpdateGoalRequest { Title = "Edited title", Description = "   " });
+        Assert.Equal("Edited title", updated.Title);
+        Assert.Null(updated.Description);
+        Assert.NotNull(updated.Modified);
+        Assert.Equal(creator, updated.AuthorId);           // AuthorId preserved untouched.
+
+        // The GlobalAdmin (not the creator) has standing (the ADR 0017 override).
+        var adminUpdated = await svc.UpdateGoalAsync(
+            "f3b-goal", admin, GlobalAdminRoles,
+            new UpdateGoalRequest { Title = "Admin edit" });
+        Assert.Equal("Admin edit", adminUpdated.Title);
+
+        // The stranger is refused (403); nothing is written.
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.UpdateGoalAsync("f3b-goal", stranger, MemberRoles,
+                new UpdateGoalRequest { Title = "Intrusion" }));
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<ProjectGoal>("f3b-goal"))!;
+            Assert.Equal("Admin edit", reloaded.Title);
+            Assert.Equal(creator, reloaded.AuthorId);
+        }
+
+        // One goal.update row per successful write (C3); no row for the refusal.
+        var audits = await GoalAuditRows(store, "f3b-goal");
+        Assert.Equal(2, audits.Count(a => a.Action == "goal.update"));
+    }
+
     // ── C — the claim lane (ADR 0073) ────────────────────────────────────────
 
     /// <summary>
@@ -1969,6 +2135,19 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         await using var q = store.QuerySession();
         return await q.Query<AccessAudit>()
             .Where(a => a.TargetKind == "todo" && a.TargetId == todoId)
+            .ToListAsync(ct);
+    }
+
+    /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch
+    /// database whose <c>TargetId</c> is the given goal (the fresh-
+    /// postgres-per-test isolation makes "all rows for this goal"
+    /// unambiguous — the <see cref="BoardAuditRows"/> shape).</summary>
+    private static async Task<IReadOnlyList<AccessAudit>> GoalAuditRows(IDocumentStore store, string goalId)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var q = store.QuerySession();
+        return await q.Query<AccessAudit>()
+            .Where(a => a.TargetKind == "goal" && a.TargetId == goalId)
             .ToListAsync(ct);
     }
 

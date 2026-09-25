@@ -455,6 +455,35 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// The **goal** mutation standing (ADR 0086 / design doc §9.3, C-PL·2):
+    /// the actor is allowed iff **creator**
+    /// (<see cref="ProjectGoal.AuthorId"/> == actor, the <c>Owner</c> branch)
+    /// ∪ **GlobalAdmin** (<paramref name="actorRoles"/> carries the role —
+    /// the ADR 0017 override branch). The **assignee branch does not apply**
+    /// to a goal (a goal is not assignable the way a to-do is — the ADR 0070
+    /// board-edit precedent — C-PL·2). A null goal is a
+    /// <see cref="KeyNotFoundException"/> (the Web layer's 404); a denied
+    /// actor is an <see cref="UnauthorizedAccessException"/> (the Web layer's
+    /// 403).
+    /// </summary>
+    public static void CheckGoalStanding(string actorId, IReadOnlySet<string> actorRoles, ProjectGoal? goal)
+    {
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (goal is null)
+            throw new KeyNotFoundException("A goal is required for the standing check.");
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to mutate a goal.");
+
+        if (string.Equals(goal.AuthorId, actorId, StringComparison.Ordinal))
+            return;                                        // creator (Owner branch)
+        if (actorRoles.Contains(Roles.GlobalAdmin))
+            return;                                        // GlobalAdmin (ADR 0017 override)
+
+        throw new UnauthorizedAccessException(
+            "Only the creator or a GlobalAdmin may mutate this goal.");
+    }
+
+    /// <summary>
     /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
     /// audit tag for a **to-do** mutation (design doc §2.5): the creator
     /// (<see cref="AccessVia.Owner"/>); the assignee or a GlobalAdmin (both
@@ -477,6 +506,19 @@ public sealed class ProjectService : IProjectService
     /// </summary>
     private static AccessVia BoardAuditViaFor(string actorId, KanbanBoard board)
         => string.Equals(board.AuthorId, actorId, StringComparison.Ordinal)
+            ? AccessVia.Owner
+            : AccessVia.Admin;
+
+    /// <summary>
+    /// Maps the branch the actor qualified under to the <see
+    /// cref="AccessVia"/> audit tag for a **goal** mutation (ADR 0086 /
+    /// design doc §9.3): the creator (<see cref="AccessVia.Owner"/>); a
+    /// GlobalAdmin (<see cref="AccessVia.Admin"/> — the <see
+    /// cref="BoardAuditViaFor"/> shape; the assignee branch does not apply,
+    /// C-PL·2).
+    /// </summary>
+    private static AccessVia GoalAuditViaFor(string actorId, ProjectGoal goal)
+        => string.Equals(goal.AuthorId, actorId, StringComparison.Ordinal)
             ? AccessVia.Owner
             : AccessVia.Admin;
 
@@ -1252,6 +1294,195 @@ public sealed class ProjectService : IProjectService
         return board;
     }
 
+    // --- PL goal lanes (U02) — ADR 0086, the design doc §9.3 surface ---------
+    //
+    // The goal read lanes (design doc §9.3) mirror the <see
+    // cref="ListBoardsAsync"/> / <see cref="GetBoardAsync"/> shapes on the
+    // <see cref="ProjectGoal"/> surface: <c>CanSeeAsync(Read)</c> over the
+    // <see cref="ProjectGoalToAuditableResource"/> (C6, one shared matching
+    // pass; C3, one aggregate audit row per feed pass) for the feed,
+    // <c>CanAsync(Read)</c> for the detail (the 404-vs-403 split). The goal
+    // write lanes mirror the <see cref="CreateBoardAsync"/> /
+    // <see cref="UpdateBoardAsync"/> shapes: the author's choice written
+    // verbatim (ADR 0001-B), the **creator ∪ GlobalAdmin** standing
+    // re-checked server-side (the <see cref="CheckGoalStanding"/> shape —
+    // C-PL·2, the ADR 0070 board-edit precedent), the ADR 0018 language
+    // floor, one <see cref="AccessAudit"/> row per write (C3,
+    // <c>TargetKind = "goal"</c>).
+
+    /// <summary>
+    /// The goal feed (design doc §9.3) — mirrors <see
+    /// cref="ListBoardsAsync"/> on the <see cref="ProjectGoal"/> surface:
+    /// the candidate set is the non-deleted goals, filtered by the optional
+    /// <paramref name="componentId"/> (a *filter, never a gate* — C-M3·2),
+    /// ordered by <see cref="ProjectGoal.Created"/> descending, paged; the
+    /// survivors are <c>CanSeeAsync(Read)</c>-filtered (C6, one shared
+    /// matching pass; C3, the single aggregate <see cref="AccessAudit"/> row
+    /// with <c>TargetKind = "goal"</c> via the
+    /// <see cref="ProjectGoalToAuditableResource"/>, U01).
+    /// </summary>
+    public async Task<IReadOnlyList<ProjectGoal>> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    {
+        if (page < 1) page = 1;
+
+        await using var session = _store.QuerySession();
+        IQueryable<ProjectGoal> q = session.Query<ProjectGoal>()
+            .Where(g => !g.IsDeleted);
+        if (componentId is not null)
+            q = q.Where(g => g.ComponentId == componentId);
+        var candidates = await q.OrderByDescending(g => g.Created).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
+
+        if (candidates.Count == 0)
+            return Array.Empty<ProjectGoal>();
+
+        // C6 — one shared matching pass; C3 — one aggregate audit row
+        // (TargetKind "goal"), from that single call (the ListBoardsAsync shape).
+        var visibleSet = await _authorization
+            .CanSeeAsync(actorId, AccessAction.Read, candidates.Select(g => new ProjectGoalToAuditableResource(g)))
+            .ConfigureAwait(false);
+
+        var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
+        return candidates.Where(g => visibleIds.Contains(g.Id)).ToList();
+    }
+
+    /// <summary>
+    /// One goal (design doc §9.3) — a single <see
+    /// cref="IAuthorizationService.CanAsync(string, AccessAction, IAuditableResource)"/>
+    /// decision over the <see cref="ProjectGoalToAuditableResource"/> (C6,
+    /// one matching pass; C3, the single decision audit row). <see
+    /// cref="KeyNotFoundException"/> (404) on a missing / soft-deleted id,
+    /// <see cref="UnauthorizedAccessException"/> (403) on a Deny — the
+    /// <see cref="GetBoardAsync"/> 404-vs-403 split (C3).
+    /// </summary>
+    public async Task<ProjectGoal> GetGoalAsync(string goalId, string actorId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+
+        await using var session = _store.QuerySession();
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        if (goal.IsDeleted)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found.");
+
+        // C3 — one decision row from this single call; C6 — one matching pass.
+        // Standalone form (no IDocumentSession overload): this is a plain read
+        // with no in-flight caller transaction (the M2 GetAsync precedent).
+        var decision = await _authorization
+            .CanAsync(actorId, AccessAction.Read, new ProjectGoalToAuditableResource(goal))
+            .ConfigureAwait(false);
+
+        if (!decision.Allowed)
+            throw new UnauthorizedAccessException($"Actor may not read goal '{goalId}'.");
+
+        return goal;
+    }
+
+    /// <summary>
+    /// **Create** a goal (design doc §9.3): the author's choices are written
+    /// **verbatim** (ADR 0001-B — <see cref="ProjectGoal.Audience"/> is
+    /// copied as-is, never re-derived), the goal is **live on creation** (no
+    /// <c>IsDraft</c> — D8a), and the author becomes the standing owner
+    /// (<see cref="ProjectGoal.AuthorId"/> = <paramref name="actorId"/>).
+    /// Standing (server-side, C3): **any signed-in resident** — a null/empty
+    /// actor is a 403 (the <see cref="CreateBoardAsync"/> shape). One <see
+    /// cref="AccessAudit"/> row (<c>goal.create</c>, <c>TargetKind =
+    /// "goal"</c>, <c>Via Owner</c>) is stored in the same session (C3) and
+    /// commits atomically with the write.
+    /// </summary>
+    public async Task<ProjectGoal> CreateGoalAsync(string actorId, IReadOnlySet<string> actorRoles, CreateGoalRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId))
+            throw new UnauthorizedAccessException("An acting actor is required to create a goal.");
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A goal title is required.", nameof(request));
+
+        var now = DateTimeOffset.UtcNow;
+        var goal = new ProjectGoal
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Title = request.Title,
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description, // blank → null (the create-path normalization).
+            ComponentId = request.ComponentId,             // a filter, never a gate (C-M3·2) — written verbatim.
+            AuthorId = actorId,                            // C-PL·2 — the author becomes the standing owner.
+            Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
+            IsDeleted = false,                             // live on creation (D8a — no draft lane).
+            LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below.
+            Created = now
+        };
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        goal.LanguageCode = await ResolveLanguageCodeAsync(goal.LanguageCode, session, ct).ConfigureAwait(false);
+
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.create", goal.Id, TargetKindGoal, AccessVia.Owner);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return goal;
+    }
+
+    /// <summary>
+    /// **Update** a goal's own <c>Title</c> + <c>Description</c> (ADR 0086 —
+    /// the goal edit lane; the <see cref="UpdateBoardAsync"/> ADR 0070 shape).
+    /// A **full update** of those two fields (the edit page posts both; a
+    /// blank <c>Description</c> clears it to <c>null</c> — the
+    /// <see cref="UpdateGoalRequest"/> shape). The goal's standing, audience,
+    /// component, and language are creation-time choices — **not** editable
+    /// here (ADR 0070). <see cref="ProjectGoal.Modified"/> is stamped **only
+    /// on a real change** (the <see cref="UpdateLaneAsync"/> no-op shape — a
+    /// no-op re-save leaves the stamp untouched). Standing (server-side, C3):
+    /// **creator ∪ GlobalAdmin** over the goal (the
+    /// <see cref="CheckGoalStanding"/> shape — C-PL·2). A missing goal is
+    /// <see cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403); a blank <c>Title</c> is
+    /// <see cref="ArgumentException"/> (the write shape's 400). One <see
+    /// cref="AccessAudit"/> row (<c>goal.update</c>, <c>TargetKind =
+    /// "goal"</c>, the goal's id as the target — creator <c>Via Owner</c>,
+    /// otherwise <c>Via Admin</c>, the <see cref="GoalAuditViaFor"/> shape)
+    /// commits atomically with the write (C3).
+    /// </summary>
+    public async Task<ProjectGoal> UpdateGoalAsync(string goalId, string actorId, IReadOnlySet<string> actorRoles, UpdateGoalRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(goalId)) throw new KeyNotFoundException("A goal id is required.");
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to update a goal.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("A goal title is required.", nameof(request));
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var goal = await session.LoadAsync<ProjectGoal>(goalId, ct).ConfigureAwait(false);
+        if (goal is null)
+            throw new KeyNotFoundException($"Goal '{goalId}' was not found in the session; nothing to update.");
+
+        // Standing re-check (server-side, C3 single-source) over the **goal**
+        // (C-PL·2): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a goal (the CheckBoardStanding shape).
+        CheckGoalStanding(actorId, actorRoles, goal);
+
+        // A "real change" is either field differing from the stored row (the
+        // UpdateBoardAsync `changed` shape — a no-op re-save leaves the stamp
+        // untouched). A blank Description clears it to null (full-update
+        // semantics — the edit page always posts both fields).
+        var normalizedDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        var changed = goal.Title != request.Title
+            || !string.Equals(goal.Description, normalizedDescription, StringComparison.Ordinal);
+
+        goal.Title = request.Title;
+        goal.Description = normalizedDescription;
+        if (changed)
+            goal.Modified = DateTimeOffset.UtcNow;
+
+        // Track the loaded document for save explicitly (the UpdateBoardAsync
+        // `session.Store(...)` shape) — the sibling write lanes never rely on
+        // dirty-tracking of a loaded row.
+        session.Store(goal);
+        StoreAuditRow(session, actorId, "goal.update", goal.Id, TargetKindGoal, GoalAuditViaFor(actorId, goal));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return goal;
+    }
+
     /// <summary>
     /// **Update** a lane (design doc §2.5): sets the lane's <c>Title</c> /
     /// <c>Status</c> / <c>MaxItems</c> / <c>Order</c> (a partial update — each
@@ -1921,6 +2152,11 @@ public sealed class ProjectService : IProjectService
     /// string the <see cref="KanbanBoardToAuditableResource"/> discriminator carries
     /// (U03).</summary>
     private const string TargetKindBoard = "board";
+
+    /// <summary>The <see cref="AccessAudit"/> <c>TargetKind</c> for goal rows — the exact
+    /// string the <see cref="ProjectGoalToAuditableResource"/> discriminator carries
+    /// (U01, ADR 0086).</summary>
+    private const string TargetKindGoal = "goal";
 
     /// <summary>
     /// Appends the single <see cref="AccessAudit"/> row for a write lane

@@ -159,3 +159,48 @@ public sealed record LaneDetail
     public required KanbanLane Lane { get; init; }
     public IReadOnlyList<TodoItem> Cards { get; init; } = [];
 }
+
+// Kumunita.Core.Projects — the two PL goal request DTOs (ADR 0086 / the
+// design doc §9.4 shape, verbatim; the M5 `CreateTodoRequest` /
+// `UpdateBoardRequest` shape, ADR 0067 / 0070). The goal write lanes (U02)
+// consume these.
+
+/// <summary>
+/// The create-a-goal request (the
+/// <see cref="IProjectService.CreateGoalAsync"/> shape, ADR 0086) — the
+/// author's choice is written **verbatim** (ADR 0001-B); the goal is
+/// **live on creation** (no <c>IsDraft</c> — the D8a precedent). <see
+/// cref="Title"/> is the goal's label (non-empty); <see cref="Description"/>
+/// is optional Markdown (blank → <c>null</c> — the create-path
+/// normalization); <see cref="ComponentId"/> is a feed filter, never a gate
+/// (C-M3·2); <see cref="Audience"/> is the **exact** post
+/// <see cref="Audience"/> (ADR 0001-B / 0036, <c>null</c> = public);
+/// <see cref="LanguageCode"/> is the ADR 0018 authored-in tag (<c>null</c> →
+/// the resolver's effective language).
+/// </summary>
+public sealed record CreateGoalRequest
+{
+    public required string Title { get; init; }
+    public string? Description { get; init; }                   // blank → `null` (the create-path normalization)
+    public string? ComponentId { get; init; }                   // a feed filter, never a gate (C-M3·2)
+    public Authorization.Audience? Audience { get; init; }      // `null` = public (the ADR 0001-B / 0036 shape)
+    public string? LanguageCode { get; init; }                  // `null` → the ADR 0018 resolver's effective language
+}
+
+/// <summary>
+/// The edit-a-goal request (the
+/// <see cref="IProjectService.UpdateGoalAsync"/> shape, ADR 0086) — a
+/// **full update** of the goal's <c>Title</c> + <c>Description</c> (the
+/// edit page posts both fields; a blank <see cref="Description"/> clears it
+/// to <c>null</c> — the ADR 0070 board-edit precedent). The goal's
+/// <c>Audience</c> / <c>ComponentId</c> / <c>LanguageCode</c> are
+/// **creation-time choices** — not editable here (ADR 0070). Standing:
+/// **creator ∪ GlobalAdmin** over the goal (C-PL·2).
+/// </summary>
+public sealed record UpdateGoalRequest
+{
+    public required string Title { get; init; }
+    public string? Description { get; init; }                   // blank → `null` (the ADR 0070 full-update shape)
+    // `Audience` / `ComponentId` / `LanguageCode` are creation-time choices
+    // — NOT editable here (the ADR 0070 board-edit precedent).
+}

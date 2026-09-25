@@ -79,3 +79,55 @@ pre-existing, the file is untouched by this unit). **No regressions:**
 full `Kumunita.Core.Tests` run green — `Total: 802, Errors: 0, Failed: 0`
 (in-process xunit.v3, Testcontainers). **Not committed / staged / moved**
 (U10's close does the move).
+
+## U02 — the four goal seams + two goal DTOs + their implementations
+
+**Three additive edits (all under `src/Kumunita.Core/Projects/`) + one test
+addition** — the design doc §9.3 (seams) + §9.4 (DTOs) landed **verbatim**,
+and the four `ProjectService` implementations mirror the frozen M5 board
+lanes. **`IProjectService.cs`:** the four goal seams (`ListGoalsAsync` /
+`GetGoalAsync` / `CreateGoalAsync` / `UpdateGoalAsync`) in a new
+`// --- PL goal lanes (U02) ---` section, XML-doc prose verbatim from §9.3
+(the `CanSeeAsync(Read)` feed gate, the C3 404-vs-403 split, the standing
+re-check, the `AccessAudit` row shape). **`ProjectRequests.cs`:** the two
+sealed records `CreateGoalRequest` (the §9.4 field set — `required string
+Title`, `Description?` / `ComponentId?` / `Audience?` / `LanguageCode?`
+creation-time choices) + `UpdateGoalRequest` (`required string Title` +
+`Description?` only — `Audience` / `ComponentId` / `LanguageCode`
+**not** editable, the ADR 0070 precedent). **`ProjectService.cs`:** the four
+implementations — `ListGoalsAsync` mirrors `ListBoardsAsync` (`!IsDeleted`
++ optional `ComponentId` filter + `CanSeeAsync(Read)` survivor pass over
+`ProjectGoalToAuditableResource` + `Created`-descending + paging);
+`GetGoalAsync` mirrors `GetBoardAsync` (the `CanAsync(Read)` entry gate, the
+404-on-absent / soft-deleted + 403-on-denied split); `CreateGoalAsync`
+mirrors `CreateBoardAsync` (the author's choice verbatim, `AuthorId =
+actorId`, the ADR 0018 language floor, one `goal.create` audit row,
+`Via Owner`); `UpdateGoalAsync` mirrors `UpdateBoardAsync` (a **new**
+public pure helper `CheckGoalStanding` — the **creator ∪ GlobalAdmin**
+matrix, the assignee branch does **not** apply, C-PL·2; a full update of
+`Title` + `Description`, a blank `Description` → `null`, `AuthorId` /
+`Created` preserved, `Modified` stamped on a real change; one `goal.update`
+audit row via a **new** `GoalAuditViaFor` — creator `Owner` / else `Admin`).
+A **new** `private const string TargetKindGoal = "goal"` is added next to
+`TargetKindTodo` / `TargetKindBoard`. **`ProjectServiceTests.cs`:** the
+four §9.6 goal pins **as named** — `F1_GoalVisibleToAudienceMember_HiddenFromNonMember`
+(the feed's both sides), `F2_GoalDetail_404OnAbsent_403OnDenied` (the C3
+split), `F3_CreateGoal_AuthorIsStandingOwner_Audited` (the `goal.create`
+row, the ADR 0018 `en` floor, the `Via Owner` tag), `F3_UpdateGoal_CreatorGlobalAdmin_StandingRechecked`
+(the standing matrix — creator + GlobalAdmin succeed, the stranger is
+refused 403 with nothing written, the blank `Description` clears to
+`null`, `AuthorId` preserved, the `Modified` stamp, two `goal.update`
+audit rows) — plus a new `GoalAuditRows` query helper (mirrors the existing
+`BoardAuditRows` / `TodoAuditRows`).
+**Build clean:** `dotnet build Kumunita.slnx -c Debug` — `Build succeeded`,
+zero errors, zero **new** warnings (the one remaining `BoardDetail.cshtml`
+CS8600 is pre-existing, the file is untouched by this unit). **Tests
+pass:** `-class "Kumunita.Core.Tests.ProjectServiceTests"` — `Total: 46,
+Errors: 0, Failed: 0` (the 41 pre-existing + the 5 new pins — the four
+§9.6 names; the class is a `ClassFixture` so all tests run in one fresh
+scratch Postgres). **No regressions:** full `Kumunita.Core.Tests` run
+green — `Total: 806, Errors: 0, Failed: 0` (in-process xunit.v3,
+Testcontainers). **No project / association / delete / Web / view / `kw-l`
+change** — `git status` confirms exactly the four U02 files, all additions
+(510 insertions, 0 deletions — the frozen M5 surface is untouched).
+**Not committed / staged / moved** (U10's close does the move).
