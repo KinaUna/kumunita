@@ -545,6 +545,55 @@ public sealed class ProjectsController : Controller
         return View(vm);
     }
 
+    /// <summary>
+    /// <c>GET /projects/todos/{id}/edit</c> — the edit form (loads the to-do,
+    /// prefills the <see cref="TodoEditorModel"/> from the stored values, seeds
+    /// the audience editor, language / component / parent pickers, and renders
+    /// the <c>Edit</c> view). The <see cref="IProjectService.GetTodoAsync"/>
+    /// <c>CanSeeAsync(Read)</c> gate runs (a denied actor gets 403, a missing
+    /// id gets 404 — the C3 split). The POST target is
+    /// <c>/projects/todos/{id}</c> (the <see cref="UpdatePost"/> lane).
+    /// </summary>
+    [HttpGet("/projects/todos/{id}/edit")]
+    public async Task<IActionResult> TodoEditGet(string id)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+
+        TodoItem todo;
+        try
+        {
+            todo = (await projects.GetTodoAsync(id, actorId, HttpContext.RequestAborted)).Todo;
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        var model = new TodoEditorModel
+        {
+            Title       = todo.Title,
+            Body        = todo.Body,
+            Status      = todo.Status,
+            AssigneeId  = todo.AssigneeId,
+            ParentId    = todo.ParentId,
+            ComponentId = todo.ComponentId,
+            Audience    = AudienceEditorModel.FromAudience(todo.Audience),
+            LanguageCode = todo.LanguageCode,
+            TagIds      = todo.TagIds is { Count: > 0 }
+                ? System.Text.Json.JsonSerializer.Serialize(todo.TagIds)
+                : null,
+            Languages   = await SeedLanguagePickerAsync(),
+            Components  = await SeedComponentPickerAsync(),
+        };
+        await ReSeedParentOptionsAsync(model, actorId);
+        await SeedGrantPickerOptionsAsync();
+        return View("Edit", model);
+    }
+
     // ── Write lanes ────────────────────────────────────────────────────────────
 
     /// <summary>

@@ -8,12 +8,12 @@
     var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
     var optionalPlaceholder = await Translation.GetAsync("common.optional", _kwL);
     var assigneeOptions = (ViewData["Audience_Users"] as List<GrantOption>) ?? new List<GrantOption>();
-    // The Edit view is rendered only by the frozen UpdatePost's failed-POST
-    // re-render (no GET /projects/todos/{id}/edit route exists — U07 froze the
-    // controller without one). In that scenario Request.Path is exactly
-    // /projects/todos/{id} — the correct re-POST target. The frozen
-    // TodoEditorModel carries no Id, so the path is the id source.
-    var editPath = ViewContext.HttpContext?.Request?.Path.Value ?? "/projects/todos";
+    // The form POSTs to /projects/todos/{id} (the UpdatePost lane). When
+    // rendered via the GET /projects/todos/{id}/edit route the path carries
+    // the "/edit" suffix — strip it to get the correct POST target. When
+    // re-rendered after a failed POST the path is already /projects/todos/{id}.
+    var rawPath = ViewContext.HttpContext?.Request?.Path.Value ?? "/projects/todos";
+    var editPath = rawPath.EndsWith("/edit") ? rawPath[..^"/edit".Length] : rawPath;
 }
 
 <div class="row justify-content-center">
