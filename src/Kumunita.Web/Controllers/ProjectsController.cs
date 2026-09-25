@@ -267,6 +267,11 @@ public sealed class ProjectsController : Controller
             LanguageCode: todo.LanguageCode,
             Created: todo.Created,
             Modified: todo.Modified,
+            // ADR 0079 — the optional dates pass through verbatim (the Event
+            // Start/End shape, but OPTIONAL — `null` = no date, the view
+            // gates the label on non-null).
+            StartAt: todo.StartAt,
+            DueAt: todo.DueAt,
             GroupNames: groupNamesList,
             CanClaim: canClaim,
             // The row builder is placement-agnostic (the detail lane resolves
@@ -580,6 +585,11 @@ public sealed class ProjectsController : Controller
             Status      = todo.Status,
             AssigneeId  = todo.AssigneeId,
             ParentId    = todo.ParentId,
+            // ADR 0079 — the optional dates prefill from the stored values
+            // (a blank field on POST is the clear intent — the
+            // UpdateTodoRequest partial shape).
+            StartAt     = todo.StartAt,
+            DueAt       = todo.DueAt,
             ComponentId = todo.ComponentId,
             Audience    = AudienceEditorModel.FromAudience(todo.Audience),
             LanguageCode = todo.LanguageCode,
@@ -690,6 +700,10 @@ public sealed class ProjectsController : Controller
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // ADR 0079 — the due date must not precede the start (the Event
+            // "the end time must be after the start" shape refusal).
+            if (model.StartAt is not null && model.DueAt is not null && model.DueAt < model.StartAt)
+                ModelState.AddModelError(nameof(model.DueAt), "The due date must be on or after the start.");
             return View("Create", model);
         }
 
@@ -703,6 +717,10 @@ public sealed class ProjectsController : Controller
             ComponentId = model.ComponentId,
             AssigneeId = string.IsNullOrWhiteSpace(model.AssigneeId) ? null : model.AssigneeId,
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
+            // ADR 0079 — the optional dates pass through verbatim (`null`
+            // = no date).
+            StartAt = model.StartAt,
+            DueAt = model.DueAt,
             Audience = model.Audience.BuildAudience(), // ADR 0001-B — the single deserialization site.
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
             TagIds = TagSlugs.Parse(model.TagIds), // TG (ADR 0044) — server-side parse + normalize.
@@ -780,6 +798,10 @@ public sealed class ProjectsController : Controller
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
             if (model.Audience is null || !model.Audience.IsValid)
                 ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
+            // ADR 0079 — the due date must not precede the start (the Event
+            // "the end time must be after the start" shape refusal).
+            if (model.StartAt is not null && model.DueAt is not null && model.DueAt < model.StartAt)
+                ModelState.AddModelError(nameof(model.DueAt), "The due date must be on or after the start.");
             return View("Edit", model);
         }
 
@@ -791,6 +813,12 @@ public sealed class ProjectsController : Controller
             Status = model.Status,
             ParentId = string.IsNullOrWhiteSpace(model.ParentId) ? null : model.ParentId,
             ClearParent = model.ClearParent,
+            // ADR 0079 — the optional dates: non-null applied, null *clears*
+            // (the edit form posts a blank `datetime-local` as null — the
+            // field is always in the form, unlike the other partial fields
+            // where null means "leave untouched").
+            StartAt = model.StartAt,
+            DueAt = model.DueAt,
             LanguageCode = string.IsNullOrWhiteSpace(model.LanguageCode) ? null : model.LanguageCode,
             TagIds = model.TagIds is null ? null : TagSlugs.Parse(model.TagIds),
         };
@@ -1136,7 +1164,11 @@ public sealed class ProjectsController : Controller
                     AssigneeId: card.AssigneeId,
                     AssigneeDisplayName: ResolveAssigneeDisplayName(
                         card.AssigneeId, names, groupNames, componentNames),
-                    Order: p?.Order ?? 0);
+                    Order: p?.Order ?? 0,
+                    // ADR 0079 — the optional dates pass through verbatim
+                    // (`null` = no date; the card gates the line on non-null).
+                    StartAt: card.StartAt,
+                    DueAt: card.DueAt);
             }).ToList();
 
             laneRows.Add(new LaneDetailRow(

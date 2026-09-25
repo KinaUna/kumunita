@@ -443,6 +443,8 @@ public sealed class ProjectService : IProjectService
             AuthorId = actorId,                            // C-M5·6 — the author becomes the standing owner.
             AssigneeId = request.AssigneeId,               // display + standing, never a gate (C-M5·3 / C-M5·6).
             ParentId = request.ParentId,                   // C-M5·7 — the sole hierarchy mechanism; `null` = top-level.
+            StartAt = request.StartAt,                     // ADR 0079 — the optional start (`null` = no date); the Event Start/End shape, but optional.
+            DueAt = request.DueAt,                         // ADR 0079 — the optional due date (`null` = no date).
             Audience = request.Audience,                   // ADR 0001-B — written verbatim; never mutated.
             IsDeleted = false,                             // published on creation (D8a — no draft lane).
             LanguageCode = request.LanguageCode ?? "",     // ADR 0018 — materialized below (instance default floor).
@@ -567,12 +569,17 @@ public sealed class ProjectService : IProjectService
 
         // A "real change" is any of the editable fields differing from the
         // stored row (the EventService.UpdateAsync `changed` shape — a no-op
-        // re-save leaves the stamp untouched).
+        // re-save leaves the stamp untouched). ADR 0079 — the optional dates
+        // differ in value (null vs value, or a different instant): unlike the
+        // other partial fields, a `null` here is the *clear* intent (the edit
+        // form's blank field), so the comparison is the plain `!=`.
         var changed = request.Title is not null && todo.Title != request.Title
             || request.Body is not null && todo.Body != request.Body
             || request.ComponentId is not null && !string.Equals(todo.ComponentId, request.ComponentId, StringComparison.Ordinal)
             || request.Status is not null && !string.Equals(todo.Status, request.Status, StringComparison.Ordinal)
             || newParentId != todo.ParentId
+            || todo.StartAt != request.StartAt
+            || todo.DueAt != request.DueAt
             || (request.LanguageCode is not null && existingLanguageCode != updatedLanguageCode)
             || (request.TagIds is not null && !ListsEqual(todo.TagIds, request.TagIds));
 
@@ -589,6 +596,12 @@ public sealed class ProjectService : IProjectService
             todo.ComponentId = request.ComponentId;
         if (request.Status is not null)
             todo.Status = request.Status;
+        // ADR 0079 — the optional dates are *always* assigned (not gated on
+        // non-null): a `null` in the request is the *clear* intent (the edit
+        // form posts a blank `datetime-local` as null), so the stored value is
+        // overwritten verbatim — value or clear, both land.
+        todo.StartAt = request.StartAt;
+        todo.DueAt = request.DueAt;
         todo.ParentId = newParentId;                       // C-M5·7 — the resolved hierarchy (no-op when unchanged).
         if (request.LanguageCode is not null)
             todo.LanguageCode = updatedLanguageCode;       // ADR 0018

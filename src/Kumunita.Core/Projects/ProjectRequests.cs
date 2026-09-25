@@ -27,6 +27,8 @@ public sealed record CreateTodoRequest
     public string? ComponentId { get; init; }
     public string? AssigneeId { get; init; }
     public string? ParentId { get; init; }                    // a non-null value = created as a subtask of that parent (the AddSubtaskAsync shape)
+    public DateTimeOffset? StartAt { get; init; }              // optional start — the Event Start/End shape, optional (ADR 0079)
+    public DateTimeOffset? DueAt { get; init; }                // optional due date — the Event Start/End shape, optional (ADR 0079)
     public Audience? Audience { get; init; }
     public string? LanguageCode { get; init; }
     public IReadOnlyList<string>? TagIds { get; init; }
@@ -42,6 +44,12 @@ public sealed record CreateTodoRequest
 /// a no-op on the hierarchy. The **hierarchy cycle guard** (C-M5·7) is enforced
 /// server-side in <see cref="IProjectService.UpdateTodoAsync"/> — the request
 /// carries the intent, the service enforces the guard (F9).
+/// <para>
+/// The optional dates (ADR 0079) follow the same partial rule as
+/// <see cref="ComponentId"/> / <see cref="Status"/>: a non-null value is
+/// applied, a <c>null</c> clears it (the edit form posts a blank
+/// <c>datetime-local</c> as null — the field is always in the form).
+/// </para>
 /// </summary>
 public sealed record UpdateTodoRequest
 {
@@ -51,6 +59,8 @@ public sealed record UpdateTodoRequest
     public string? Status { get; init; }
     public string? ParentId { get; init; }                    // a non-null value **reparents** the to-do to that parent
     public bool ClearParent { get; init; }                     // `true` = explicit unparent (sets `ParentId = null`)
+    public DateTimeOffset? StartAt { get; init; }              // ADR 0079 — non-null applied, null clears (the edit form's blank field)
+    public DateTimeOffset? DueAt { get; init; }                // ADR 0079 — non-null applied, null clears (the edit form's blank field)
     public string? LanguageCode { get; init; }
     public IReadOnlyList<string>? TagIds { get; init; }
 }

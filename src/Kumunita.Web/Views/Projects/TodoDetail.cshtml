@@ -218,6 +218,31 @@
                     </div>
                 }
 
+                @* ADR 0079 — the optional start / due dates (the <kw-dt>
+                   TagHelper renders null as empty; the label is gated on the
+                   value so an unset date shows nothing at all). Shown to
+                   viewers in their own timezone (the kw-dt effective-timezone
+                   conversion). *@
+                @if (Model.Todo.StartAt is not null || Model.Todo.DueAt is not null)
+                {
+                    <div class="mb-3">
+                        @if (Model.Todo.StartAt is not null)
+                        {
+                            <span class="text-muted small"><kw-l key="projects.todo.start">Start</kw-l> · </span>
+                            <kw-dt dt="@Model.Todo.StartAt" format="g"></kw-dt>
+                        }
+                        @if (Model.Todo.StartAt is not null && Model.Todo.DueAt is not null)
+                        {
+                            <span class="text-muted small mx-2">·</span>
+                        }
+                        @if (Model.Todo.DueAt is not null)
+                        {
+                            <span class="text-muted small"><kw-l key="projects.todo.due">Due</kw-l> · </span>
+                            <kw-dt dt="@Model.Todo.DueAt" format="g"></kw-dt>
+                        }
+                    </div>
+                }
+
                 @* The body (the U09 spec's rich-editor shape — the
                    rc-editor-toolbar / data-rich-editor /
                    data-rich-editor-preview pattern, the ADR 0031 pin, the

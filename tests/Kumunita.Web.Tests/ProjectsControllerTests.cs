@@ -99,6 +99,58 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
             await deniedController.TodosIndex(null, null, page: 1));
     }
 
+    // ── ADR 0079 — the editor model's date-coherence rule ──────────────────
+
+    /// <summary>
+    /// The <see cref="TodoEditorModel.IsValid"/> date-coherence rule (ADR
+    /// 0079): a due date **before** the start date is rejected — the form
+    /// posts a coherent pair or neither. Blank dates (both null) are valid
+    /// ("no date"), and a due on the same instant as the start is allowed
+    /// (the Event's "on or after" shape, not strictly-after). This pins the
+    /// Web-boundary validation the controller surfaces as the
+    /// "The due date must be on or after the start." form error.
+    /// </summary>
+    [Fact]
+    public void TodoEditorModel_DueBeforeStart_IsInvalid()
+    {
+        var startAt = new DateTimeOffset(2026, 9, 5, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+
+        // A well-formed audience ("Any" mode, empty grants) so the assertion
+        // isolates the date-coherence rule — the <see cref="AudienceEditorModel"/>
+        // default (no mode) would fail IsValid independently of the dates.
+        static AudienceEditorModel ValidAudience()
+            => new() { Mode = "Any" };
+
+        var beforeStart = new TodoEditorModel
+        {
+            Title = "Dated",
+            StartAt = startAt,
+            DueAt = dueAt,
+            Audience = ValidAudience(),
+        };
+        Assert.False(beforeStart.IsValid);
+
+        // Blank dates are valid (no date) — the "leave blank for no date" rule.
+        var undated = new TodoEditorModel
+        {
+            Title = "Undated",
+            Audience = ValidAudience(),
+        };
+        Assert.True(undated.IsValid);
+
+        // Due == Start is allowed (on-or-after, not strictly-after — the
+        // Event precedent's "on or after the start").
+        var equal = new TodoEditorModel
+        {
+            Title = "Equal",
+            StartAt = startAt,
+            DueAt = startAt,
+            Audience = ValidAudience(),
+        };
+        Assert.True(equal.IsValid);
+    }
+
     // ── 2 — Todo_Detail_SubtasksRendered (real store) ────────────────────────
 
     /// <summary>

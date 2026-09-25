@@ -72,6 +72,29 @@
                 </div>
             </div>
 
+            @* ADR 0079 — the optional start / due dates (the Event Start/End
+               `datetime-local` shape, but OPTIONAL: a blank field posts null,
+               which on the create lane means "no date"). *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col">
+                            <label class="form-label" for="start-at" style="font-weight:600;"><kw-l key="projects.todo.start">Start</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="start-at" name="StartAt"
+                                   value="@Model.StartAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label" for="due-at" style="font-weight:600;"><kw-l key="projects.todo.due">Due</kw-l></label>
+                            <input class="form-control" type="datetime-local" id="due-at" name="DueAt"
+                                   value="@Model.DueAt?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")" />
+                        </div>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        <kw-l key="projects.todo.dates_hint">Both are optional — leave blank for no date. Shown to viewers in their own timezone.</kw-l>
+                    </div>
+                </div>
+            </div>
+
             @if (Model.ParentOptions.Count > 0)
             {
                 <div class="card mb-4">

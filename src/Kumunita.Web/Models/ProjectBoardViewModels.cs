@@ -109,7 +109,14 @@ public sealed record TodoCardRow(
     string? Status,
     string? AssigneeId,
     string? AssigneeDisplayName,
-    int Order);
+    int Order,
+    // ADR 0079 — the optional dates (the Event Start/End shape, but OPTIONAL):
+    // `null` = no date. Display metadata only — the board card renders the
+    // due date so a kanban view shows the deadline at a glance (the <kw-dt>
+    // TagHelper renders it in the effective timezone; null renders empty,
+    // the card gates the line on non-null).
+    DateTimeOffset? StartAt,
+    DateTimeOffset? DueAt);
 
 /// <summary>
 /// The <b>board detail</b> view model (the <c>GET /projects/boards/{id}</c>

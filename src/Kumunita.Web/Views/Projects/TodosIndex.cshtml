@@ -120,6 +120,20 @@
                                 <span>· <kw-l key="projects.todo.unassigned">Unassigned</kw-l></span>
                             }
                             <span>· <kw-dt dt="@row.Created" format="g"></kw-dt></span>
+                            @if (row.StartAt is not null || row.DueAt is not null)
+                            {
+                                @* ADR 0079 — the optional dates (the <kw-dt>
+                                   effective-timezone render; gated on non-null
+                                   so an unset date shows nothing). *@
+                                @if (row.StartAt is not null)
+                                {
+                                    <span>· <kw-l key="projects.todo.start">Start</kw-l> <kw-dt dt="@row.StartAt" format="g"></kw-dt></span>
+                                }
+                                @if (row.DueAt is not null)
+                                {
+                                    <span>· <kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@row.DueAt" format="g"></kw-dt></span>
+                                }
+                            }
                             @if (!string.IsNullOrWhiteSpace(row.Status))
                             {
                                 <span class="badge text-bg-light border ms-2">@row.Status</span>

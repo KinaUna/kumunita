@@ -113,6 +113,10 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "No parent (top-level)",
             ["projects.todo.clear_parent"]   = "Clear parent (make top-level)",
             ["projects.todo.reparent_hint"]  = "A subtask is a full to-do with its own status, assignee, and board placement. Reparenting to a descendant is refused (cycle guard).",
+            // ADR 0079 — optional start/due dates on a to-do.
+            ["projects.todo.start"]          = "Start",
+            ["projects.todo.due"]            = "Due",
+            ["projects.todo.dates_hint"]     = "Both are optional — leave blank for no date. Shown to viewers in their own timezone.",
             ["projects.todo.created"]        = "Created",
             ["projects.todo.modified"]       = "Modified",
             ["projects.todo.no_body"]        = "No body — this to-do is title-only.",
@@ -1423,6 +1427,10 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Keine Elternaufgabe (Top-Level)",
             ["projects.todo.clear_parent"]   = "Elternaufgabe löschen (zur Top-Level machen)",
             ["projects.todo.reparent_hint"]  = "Eine Unteraufgabe ist eine vollständige Aufgabe mit eigenem Status, Zuweisung und Board-Platzierung. Das Umhängen an einen Nachkommen wird abgelehnt (Zyklusschutz).",
+            // ADR 0079 — optionale Start-/Fälligkeitsdaten auf einer Aufgabe.
+            ["projects.todo.start"]          = "Beginn",
+            ["projects.todo.due"]            = "Fällig",
+            ["projects.todo.dates_hint"]     = "Beide sind optional — leer lassen für kein Datum. Wird Zuschauenden in deren eigener Zeitzone angezeigt.",
             ["projects.todo.created"]        = "Erstellt",
             ["projects.todo.modified"]       = "Geändert",
             ["projects.todo.no_body"]        = "Kein Text — diese Aufgabe hat nur einen Titel.",
@@ -2710,6 +2718,10 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Pas de tâche parente (niveau supérieur)",
             ["projects.todo.clear_parent"]   = "Retirer la tâche parente (rendre de niveau supérieur)",
             ["projects.todo.reparent_hint"]  = "Une sous-tâche est une tâche complète avec son propre statut, son assignation et sa position sur un tableau. Replacer sous un descendant est refusé (garde anti-cycle).",
+            // ADR 0079 — dates de début/échéance optionnelles sur une tâche.
+            ["projects.todo.start"]          = "Début",
+            ["projects.todo.due"]            = "Échéance",
+            ["projects.todo.dates_hint"]     = "Les deux sont optionnels — laissez vide pour aucune date. Affiché aux visiteurs dans leur propre fuseau horaire.",
             ["projects.todo.created"]        = "Créé le",
             ["projects.todo.modified"]       = "Modifié le",
             ["projects.todo.no_body"]        = "Pas de texte — cette tâche n'a qu'un titre.",
@@ -3954,6 +3966,10 @@ public static class KnownTranslationKeys
             ["projects.todo.no_parent"]      = "Ingen forældreopgave (tophængende)",
             ["projects.todo.clear_parent"]   = "Fjern forældreopgave (gør top-hængende)",
             ["projects.todo.reparent_hint"]  = "En delopgave er en fuldstændig opgave med egen status, tildeling og boardplacering. Omhængning til en efterkommer nægtes (cyklusvagt).",
+            // ADR 0079 — valgfri start-/forfaldsdato på en opgave.
+            ["projects.todo.start"]          = "Start",
+            ["projects.todo.due"]            = "Faldig",
+            ["projects.todo.dates_hint"]     = "Begge er valgfri — lad tom for ingen dato. Vises for beskuer i deres egen tidszone.",
             ["projects.todo.created"]        = "Oprettet",
             ["projects.todo.modified"]       = "Ændret",
             ["projects.todo.no_body"]        = "Ingen tekst — denne opgave har kun et navn.",

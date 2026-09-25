@@ -1856,6 +1856,94 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Contains("c5-assigned", all.Select(t => t.Id));
     }
 
+    // ── F11 — optional start/due dates (ADR 0079) ───────────────────────────
+
+    /// <summary>
+    /// <b>F11</b> (C-M5·11): <see cref="ProjectService.CreateTodoAsync"/>
+    /// writes the author's <see cref="TodoItem.StartAt"/> /
+    /// <see cref="TodoItem.DueAt"/> verbatim — the optional dates are stored
+    /// as the author posted them (the ADR 0079 create lane). A <c>null</c>
+    /// date is stored as <c>null</c> (no date), so the "leave blank for no
+    /// date" form contract round-trips.
+    /// </summary>
+    [Fact]
+    public async Task F11_CreateTodo_SetsOptionalStartAndDueDates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11-author";
+
+        var startAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 5, 17, 0, 0, TimeSpan.Zero);
+
+        var created = await svc.CreateTodoAsync(
+            author, MemberRoles,
+            new CreateTodoRequest
+            {
+                Title = "Dated to-do",
+                StartAt = startAt,
+                DueAt = dueAt,
+                Audience = null, // public
+            });
+
+        Assert.Equal(startAt, created.StartAt);
+        Assert.Equal(dueAt, created.DueAt);
+
+        // A second to-do with no dates stores both as null (no date).
+        var undated = await svc.CreateTodoAsync(
+            author, MemberRoles,
+            new CreateTodoRequest
+            {
+                Title = "Undated to-do",
+                Audience = null,
+            });
+
+        Assert.Null(undated.StartAt);
+        Assert.Null(undated.DueAt);
+    }
+
+    /// <summary>
+    /// <b>F11</b> (C-M5·11, update lane): <see cref="ProjectService.UpdateTodoAsync"/>
+    /// sets both dates and stamps <see cref="TodoItem.Modified"/> (a changed
+    /// to-do), then a **blank** request (both dates <c>null</c>) **clears**
+    /// them back to no-date (ADR 0079's null=clear rule) — the edit form's
+    /// always-present <c>datetime-local</c> field posts blank as null.
+    /// </summary>
+    [Fact]
+    public async Task F11_UpdateTodo_SetsThenClearsOptionalDates()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f11-author";
+
+        await Plant(store, new TodoItem
+        {
+            Id = "f11-todo",
+            AuthorId = author,
+            Title = "Dated to-do",
+            Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var startAt = new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero);
+        var dueAt = new DateTimeOffset(2026, 9, 5, 17, 0, 0, TimeSpan.Zero);
+
+        // Setting both dates is a change → the dates are applied + Modified stamped.
+        var set = await svc.UpdateTodoAsync(
+            "f11-todo", author, MemberRoles,
+            new UpdateTodoRequest { StartAt = startAt, DueAt = dueAt });
+        Assert.Equal(startAt, set.StartAt);
+        Assert.Equal(dueAt, set.DueAt);
+        Assert.NotNull(set.Modified);
+
+        // Blank (null) request clears both → back to no-date.
+        var cleared = await svc.UpdateTodoAsync(
+            "f11-todo", author, MemberRoles,
+            new UpdateTodoRequest { StartAt = null, DueAt = null });
+        Assert.Null(cleared.StartAt);
+        Assert.Null(cleared.DueAt);
+    }
+
     // ── Shared scaffolding (the EventServiceTests shape) ────────────────────
 
     /// <summary>The <see cref="AccessAudit"/> rows for this test's scratch

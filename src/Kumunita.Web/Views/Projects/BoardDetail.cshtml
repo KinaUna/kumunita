@@ -458,6 +458,20 @@
                                             {
                                                 <span class="ms-1"><kw-l key="projects.todo.assignee">Assignee</kw-l>: @card.AssigneeDisplayName</span>
                                             }
+                                            @* ADR 0079 — the optional dates (the
+                                               <kw-dt> effective-timezone render;
+                                               gated on non-null so an unset date
+                                               shows nothing). The due date is the
+                                               at-a-glance deadline on a kanban
+                                               card. *@
+                                            @if (card.StartAt is not null)
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.start">Start</kw-l> <kw-dt dt="@card.StartAt" format="g"></kw-dt></span>
+                                            }
+                                            @if (card.DueAt is not null)
+                                            {
+                                                <span class="ms-1"><kw-l key="projects.todo.due">Due</kw-l> <kw-dt dt="@card.DueAt" format="g"></kw-dt></span>
+                                            }
                                         </div>
                                     </div>
                                     @* The card action dropdown (the
