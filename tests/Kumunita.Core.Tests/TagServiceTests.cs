@@ -521,11 +521,11 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         // The non-member's by-tag result is **empty** — the group post's own
         // Read decision (membership) is the gate, applied **before** it is
         // returned (C-TG·3, D5). The tag grants nothing.
-        Assert.Empty(await svc.ListPostsByTagAsync("sanitation", stranger));
+        Assert.Empty((await svc.ListPostsByTagPagedAsync("sanitation", stranger, page: 1)).Items);
 
         // Positive control: the member (the owner) **does** see it — the tag
         // is real, only the non-member's Read is the exclusion.
-        var memberPosts = await svc.ListPostsByTagAsync("sanitation", owner);
+        var memberPosts = (await svc.ListPostsByTagPagedAsync("sanitation", owner, page: 1)).Items;
         var memberPost = Assert.Single(memberPosts);
         Assert.Equal("f3-post", memberPost.Id);
     }
@@ -593,10 +593,10 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         var svc = NewTagService(store);
 
         // The by-tag result is empty for the unread viewer (C-TG·1 / C-TG·2).
-        Assert.Empty(await svc.ListPostsByTagAsync("secret", viewer));
+        Assert.Empty((await svc.ListPostsByTagPagedAsync("secret", viewer, page: 1)).Items);
 
         // Positive control: the author (in the audience) sees the post.
-        var authorPosts = await svc.ListPostsByTagAsync("secret", other);
+        var authorPosts = (await svc.ListPostsByTagPagedAsync("secret", other, page: 1)).Items;
         Assert.Contains(authorPosts, p => p.Id == "f4b-post");
     }
 
@@ -726,7 +726,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         // Exercise the tag-list + by-tag reads (the two read shapes that
         // return tagged content).
         await svc.ListForActorAsync(author);
-        await svc.ListPostsByTagAsync("sanitation", author);
+        await svc.ListPostsByTagPagedAsync("sanitation", author, page: 1);
 
         Assert.Empty(await AuditsFor(store, "tag.attach"));
         Assert.Empty(await AuditsFor(store, "tag.create"));
@@ -827,16 +827,16 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         // ── Drive the read lanes (all four, C-TG·2 base query) ───────────
         await svc.ListForActorAsync(author);
-        await svc.ListPostsByTagAsync("sanitation", author);
-        await svc.ListPagesByTagAsync("budget", author);
+        await svc.ListPostsByTagPagedAsync("sanitation", author, page: 1);
+        await svc.ListPagesByTagPagedAsync("budget", author, page: 1);
         await svc.SuggestAsync("san", author);
 
         // ── Drive the group-lane read (C-TG·3 — the membership lane) ─────
         var group = await userInfo.CreateGroupAsync(author, "TG lane family", null);
         await Plant(store, new Tag { Id = "tag-lane-g", Slug = "family", Name = "Family", LanguageCode = "en", CreatedBy = author });
         await Plant(store, TaggedGroupPost("lane-gpost", group.Id, author, "tag-lane-g"));
-        await svc.ListPostsByTagAsync("family", stranger);   // non-member — the Deny branch
-        await svc.ListPostsByTagAsync("family", author);      // member — the Allow branch
+        await svc.ListPostsByTagPagedAsync("family", stranger, page: 1);   // non-member — the Deny branch
+        await svc.ListPostsByTagPagedAsync("family", author, page: 1);      // member — the Allow branch
         await svc.SuggestAsync("fam", stranger);
         await svc.SuggestAsync("fam", author);
         await svc.ListForActorAsync(stranger);
@@ -933,7 +933,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         Assert.Equal(1, item.UseCount);
 
         // The by-tag view shows the post.
-        var posts = await svc.ListPostsByTagAsync("sanitation", "u-cl-author");
+        var posts = (await svc.ListPostsByTagPagedAsync("sanitation", "u-cl-author", page: 1)).Items;
         Assert.Contains(posts, p => p.Id == "cl-post");
     }
 
@@ -970,14 +970,14 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
 
         // Before the membership add: the member (not yet in the group) sees
         // **nothing** — the group post's own Read decision denies.
-        Assert.Empty(await svc.ListPostsByTagAsync("sanitation", member));
+        Assert.Empty((await svc.ListPostsByTagPagedAsync("sanitation", member, page: 1)).Items);
         Assert.Empty(await svc.ListForActorAsync(member));
 
         // The membership lands through the frozen write seam (C4 live row).
         await userInfo.AddGroupMemberAsync(group.Id, member, addedBy: owner);
 
         // The **very next** request: the member now sees the post + the tag.
-        var memberPosts = await svc.ListPostsByTagAsync("sanitation", member);
+        var memberPosts = (await svc.ListPostsByTagPagedAsync("sanitation", member, page: 1)).Items;
         Assert.Contains(memberPosts, p => p.Id == "ho-post");
         Assert.Contains(await svc.ListForActorAsync(member), i => i.Tag.Id == "tag-ho");
 
@@ -1057,7 +1057,7 @@ public class TagServiceTests(PostgresFixture fixture) : IClassFixture<PostgresFi
         });
         await Plant(store, TaggedPost("pw-post-b", author, "tag-pw-secret"));
         Assert.Empty(await svc.ListForActorAsync(viewer));
-        Assert.Empty(await svc.ListPostsByTagAsync("secret", viewer));
+        Assert.Empty((await svc.ListPostsByTagPagedAsync("secret", viewer, page: 1)).Items);
 
         // ── F6 anchor (C-TG·5): creator sets a translation → one row ───────
         await using var q = store.QuerySession();

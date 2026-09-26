@@ -9,15 +9,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace Kumunita.Web.Controllers;
 
 /// <summary>
-/// The resident's settings surface (ADR 0005 B; M·5, M7 FACES) — four
-/// linkable section pages (ADR 0080): **Language** (<c>/settings/language</c>),
-/// **Time zone** (<c>/settings/timezone</c>, ADR 0019's resident surface,
-/// folded in 2026-09-13 and split back out 2026-09-25), **Date &amp; time
-/// format** (<c>/settings/dateformat</c>, ADR 0020) and **Email &amp;
-/// notification language** (<c>/settings/email-language</c>, ADR 0061).
-/// Each page is its own GET action rendering one section of the same
-/// <see cref="LocaleSettingsViewModel"/>; the four POST save lanes are
-/// unchanged and redirect back to the section that owns them.
+/// The resident's settings surface (ADR 0005 B; M·5, M7 FACES) — three
+/// linkable section pages (ADR 0080): **Language** (<c>/settings/language</c>,
+/// which now also carries the **Email &amp; notification language** section,
+/// ADR 0061, folded in 2026-09-30), **Time zone** (<c>/settings/timezone</c>,
+/// ADR 0019's resident surface, folded in 2026-09-13 and split back out
+/// 2026-09-25) and **Date &amp; time format** (<c>/settings/dateformat</c>,
+/// ADR 0020). Each page is its own GET action rendering its section of the
+/// same <see cref="LocaleSettingsViewModel"/>; the four POST save lanes are
+/// unchanged — the email-language save now redirects back to the **Language**
+/// page that owns the section it writes.
 /// The <see cref="LocaleCookie"/> read/write/clear trio is consumed **here** —
 /// this is the settings-page save (M7: the cookie is written → the **next**
 /// request renders in the new language). The cookie is **never** a claim
@@ -128,16 +129,16 @@ public sealed class LocaleController(
     }
 
     /// <summary>
-    /// <c>GET /settings/email-language</c> — the resident's email &amp;
-    /// notification language settings section (ADR 0061) on its own linkable
-    /// page (ADR 0080). The model is the full
-    /// <see cref="LocaleSettingsViewModel"/>; the view renders only the
-    /// email-language section.
+    /// <c>GET /settings/email-language</c> — retired as its own page: the
+    /// email &amp; notification language section (ADR 0061) was folded into
+    /// the **Language** tab (ADR 0080, 2026-09-30). The route is kept as a
+    /// redirect so saved links and deep references still land the resident on
+    /// the settings tab that now owns the section.
     /// </summary>
     [HttpGet("/settings/email-language")]
-    public async Task<IActionResult> SettingsEmailLanguage()
+    public IActionResult SettingsEmailLanguage()
     {
-        return View("EmailLanguage", await BuildModel());
+        return RedirectToAction(nameof(Index));
     }
 
     /// <summary>
@@ -449,7 +450,7 @@ public sealed class LocaleController(
     {
         var subject = SubjectId(User);
         if (string.IsNullOrEmpty(subject))
-            return RedirectToAction(nameof(SettingsEmailLanguage));
+            return RedirectToAction(nameof(Index));
 
         try
         {
@@ -474,7 +475,7 @@ public sealed class LocaleController(
             TempData["error"] = "Your profile is not available — sign out and back in.";
         }
 
-        return RedirectToAction(nameof(SettingsEmailLanguage));
+        return RedirectToAction(nameof(Index));
     }
 
     // ── View model (public nested type so the Razor view can bind to it) ──

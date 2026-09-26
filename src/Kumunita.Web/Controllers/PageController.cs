@@ -156,8 +156,31 @@ public sealed class PageController(
                 kids.Select(ToNode).ToList());
         }
 
+        // ADR 0043/0057 — the seeder's `system` root is a *container*: an
+        // empty-titled, empty-body PageKind.System node whose only job is to
+        // hold the four standing pages (terms / help / privacy / conduct).
+        // It renders as a bare arrow on the tree browse (no label), so we
+        // hoist its children to the top level for display only. Storage is
+        // untouched (the ADR 0043/0057 pin — `system` stays the only root and
+        // its direct children stay {terms, help, privacy, conduct} — is a
+        // storage pin, not a display pin), so every PagePaths href is derived
+        // from the real ancestor chain and still resolves (/pages/system/terms,
+        // /pages/system/help/posts, …). A container is recognized structurally
+        // (Kind, Title and Body all empty) rather than by id, so a resident
+        // blog (PageKind.User) or any real content page is never mistaken for
+        // one.
+        var containerIds = visible
+            .Where(p => p.Kind == PageKind.System
+                && string.IsNullOrEmpty(p.Title)
+                && string.IsNullOrEmpty(p.Body))
+            .Select(p => p.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
         var roots = visible
-            .Where(p => p.ParentId is null || !visibleSet.ContainsKey(p.ParentId))
+            .Where(p => !containerIds.Contains(p.Id)
+                && (p.ParentId is null
+                    || !visibleSet.ContainsKey(p.ParentId)
+                    || containerIds.Contains(p.ParentId)))
             .ToList();
 
         return View(new PageTreeViewModel(roots.Select(ToNode).ToList()));

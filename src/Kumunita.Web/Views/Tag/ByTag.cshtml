@@ -34,6 +34,15 @@
                     </li>
                 }
             </ul>
+
+            @* M7 (ADR 0090 D5/D6) — the posts section's pager (F2 one-page
+               no-render pin): the <c>_Pager</c> partial renders nothing when
+               the VM field is null. The tag is the route (D9) — no filter
+               form; the links carry ?page=N only. *@
+            @if (Model.PagerPosts is not null)
+            {
+                <partial name="_Pager" model="Model.PagerPosts" />
+            }
         }
 
         @if (Model.Pages.Count > 0)
@@ -50,6 +59,15 @@
                     </li>
                 }
             </ul>
+
+            @* M7 (ADR 0090 D5/D6) — the blog-pages section's pager (F2
+               one-page no-render pin): the <c>_Pager</c> partial renders
+               nothing when the VM field is null. The tag is the route (D9) —
+               no filter form; the links carry ?page=N only. *@
+            @if (Model.PagerPages is not null)
+            {
+                <partial name="_Pager" model="Model.PagerPages" />
+            }
         }
 
         @if (Model.Posts.Count == 0 && Model.Pages.Count == 0)

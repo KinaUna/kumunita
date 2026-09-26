@@ -187,16 +187,16 @@
                 }
             </div>
 
-            @if (Model.Total > Model.Items.Count)
+            @* M7 (ADR 0090 D2) — the "N in this community; M shown to you"
+               hidden-count hint is removed: the candidate count is never
+               viewer-facing (C-M7·7), and the pager (below) is the sole
+               paging affordance. *@
+            @* M7 (ADR 0090 D5) — the shared pager (F2 one-page no-render pin):
+               the <c>_Pager</c> partial renders nothing when the VM field is
+               null (a one-page feed). *@
+            @if (Model.Pager is not null)
             {
-                // The feed is intentionally small (a neighborhood, not a
-                // firehose), but a hidden-count hint is still useful — it
-                // tells the viewer *something* is in this component that
-                // they (or their community's rules) can't currently see.
-                <p class="text-muted small mt-3">
-                    @Model.Total post@(Model.Total == 1 ? "" : "s") in this community;
-                    @Model.Items.Count shown to you.
-                </p>
+                <partial name="_Pager" model="Model.Pager" />
             }
         }
         </div>

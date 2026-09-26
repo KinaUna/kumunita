@@ -171,12 +171,12 @@ import { test as baseTest, expect, type Page } from '@playwright/test';
 //
 //   getPostsByTag(slug, actorId)
 //   ⇒ Promise<Array<{ id: string; title: string; groupId: string }>>
-//     · Core-level read: the `ListPostsByTagAsync` seam's result
+//     · Core-level read: the `ListPostsByTagPagedAsync` seam's result
 //       (C-TG·3: the post's own `Read` decision applied before return)
 //
 //   getPagesByTag(slug, actorId)
 //   ⇒ Promise<Array<{ id: string; title: string }>>
-//     · Core-level read: the `ListPagesByTagAsync` seam's result
+//     · Core-level read: the `ListPagesByTagPagedAsync` seam's result
 //
 // The e2e's *browser* steps assert the *observable* surface: the
 // dropdown items (F9 / F10), the composer tag field's presence /

@@ -63,7 +63,11 @@ public sealed record BoardIndexViewModel(
     // a **display** surface, never a gate (C-PL·3). Empty ⇒ the item and
     // the modal hide (a picker with no options is a noise surface, not a
     // control — the BoardEdit F10 rule).
-    IReadOnlyList<(string Id, string Name)>? Projects = null);
+    IReadOnlyList<(string Id, string Name)>? Projects = null,
+    // M7 (ADR 0090 D5) — the pager (the F2 one-page no-render pin: null on a
+    // single page). Carries the <c>componentId</c> filter (D7) as
+    // <see cref="PagedViewModel.FilterParams"/>.
+    PagedViewModel? Pager = null);
 
 /// <summary>
 /// One <see cref="KanbanLane"/> of a board, enriched with its visible

@@ -12,7 +12,7 @@ namespace Kumunita.Core.Tags;
 /// The <c>TG</c> lane's service (U5: the attach / create / translate lane +
 /// the three standing probes + the <see cref="DeriveSlug"/> helper; U6: the
 /// four read-lane methods). <see cref="ListForActorAsync"/> /
-/// <see cref="ListPostsByTagAsync"/> / <see cref="ListPagesByTagAsync"/> /
+/// <see cref="ListPostsByTagPagedAsync"/> / <see cref="ListPagesByTagPagedAsync"/> /
 /// <see cref="SuggestAsync"/> are all four callers of the one C-TG·2 base
 /// query over the actor's readable content (the content's own <c>Read</c>
 /// decision is the gate, C-TG·1/C-TG·3; the tag lane writes no tag-family
@@ -42,6 +42,10 @@ namespace Kumunita.Core.Tags;
 /// </summary>
 public sealed class TagService : ITagService
 {
+    // ADR 0090 D4 — the M7 paged by-tag feeds' page size (the PostService /
+    // EventService / ProjectService `PageSize = 30` precedent).
+    private const int PageSize = 30;
+
     private readonly IDocumentStore _store;
     private readonly IAuthorizationService _authz;
     private readonly ITranslationProvider _translations;
@@ -390,44 +394,97 @@ public sealed class TagService : ITagService
             .ToList();
     }
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId)
+    /// <summary>
+    /// The by-tag post results (F3 / F4) — the actor-readable posts whose
+    /// <c>TagIds</c> contains the tag resolved from <paramref name="slug"/> —
+    /// **paged** (ADR 0090 D6, M7 U01 — the design doc §7.6 lock): the
+    /// <see cref="LoadActorReadableContentAsync"/> C-TG·3 gate (the
+    /// content's own <c>Read</c> decision, never a tag-lane one), the same
+    /// <c>TagIds</c> contains + <c>Created</c> ascending order, then a
+    /// <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window over the
+    /// ordered candidate list (<see cref="PageSize"/> = 30 — the D4 shape).
+    /// <see cref="TagPostPage.HasMore"/> is the sole paging signal (D1 —
+    /// <c>pageCount == PageSize</c>); an out-of-range page returns an empty
+    /// page with <c>HasMore: false</c>. **No** tag-lane <c>AccessAudit</c>
+    /// row (C-TG·8 — the content's own decision rows are the content's, D7).
+    /// A tag slug that resolves to no <see cref="Tag"/> doc returns an empty
+    /// page with <c>HasMore: false</c> (the not-found shape — the Web's
+    /// 404-floor reads it as an empty page).
+    /// </summary>
+    public async Task<TagPostPage> ListPostsByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
         var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
-        if (tag is null) return Array.Empty<Post>();
+        if (tag is null)
+            return new TagPostPage(Items: Array.Empty<Post>(), HasMore: false);
 
-        // C-TG·3: the post's own Read decision is applied (in
-        // LoadActorReadableContentAsync) **before** the post is returned.
         var (readablePosts, _) = await LoadActorReadableContentAsync(actorId, session);
-        return readablePosts
+        var candidates = readablePosts
             .Where(p => p.TagIds.Contains(tag.Id))
             .OrderBy(p => p.Created)
             .ToList();
+
+        var items = candidates
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+        // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
+        // set filled the page (design doc §7.6).
+        return new TagPostPage(Items: items, HasMore: items.Count == PageSize);
     }
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId)
+    /// <summary>
+    /// The by-tag blog-page results — the actor-readable <c>PageKind.User</c>
+    /// pages whose <c>TagIds</c> contains the tag resolved from
+    /// <paramref name="slug"/> — **paged** (ADR 0090 D6, M7 U01 — the design
+    /// doc §7.6 lock): the same readable-content filter
+    /// (the <see cref="LoadActorReadableContentAsync"/> C-TG·3 gate — the
+    /// content's own <c>Read</c> decision, never a tag-lane one), the same
+    /// <c>TagIds</c> contains + <c>Created</c> ascending order, then a
+    /// <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window over the
+    /// ordered candidate list (<see cref="PageSize"/> = 30 — the D4 shape).
+    /// <see cref="TagPagePage.HasMore"/> is the sole paging signal (D1 —
+    /// <c>pageCount == PageSize</c>); an out-of-range page returns an empty
+    /// page with <c>HasMore: false</c>. **No** tag-lane <c>AccessAudit</c>
+    /// row (C-TG·8 — the content's own decision rows are the content's, D7).
+    /// A tag slug that resolves to no <see cref="Tag"/> doc returns an empty
+    /// page with <c>HasMore: false</c> (the not-found shape — the Web's
+    /// 404-floor reads it as an empty page).
+    /// </summary>
+    public async Task<TagPagePage> ListPagesByTagPagedAsync(string slug, string actorId, int page, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(slug))
             throw new ArgumentException("A tag slug is required.", nameof(slug));
         if (string.IsNullOrEmpty(actorId))
             throw new ArgumentException("An acting actor is required.", nameof(actorId));
+        if (page < 1) page = 1;
 
         await using var session = _store.QuerySession();
         var tag = await session.Query<Tag>().Where(t => t.Slug == slug).FirstOrDefaultAsync();
-        if (tag is null) return Array.Empty<Page>();
+        if (tag is null)
+            return new TagPagePage(Items: Array.Empty<Page>(), HasMore: false);
 
         var (_, readablePages) = await LoadActorReadableContentAsync(actorId, session);
-        return readablePages
+        var candidates = readablePages
             .Where(p => p.TagIds.Contains(tag.Id))
             .OrderBy(p => p.Created)
             .ToList();
+
+        var items = candidates
+            .Skip((page - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+
+        // ADR 0090 D1 / D6 — the sole paging signal: the page's candidate
+        // set filled the page (design doc §7.6).
+        return new TagPagePage(Items: items, HasMore: items.Count == PageSize);
     }
 
     /// <inheritdoc />

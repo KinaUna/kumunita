@@ -1,5 +1,6 @@
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
+using Kumunita.Core.Posts;
 using Kumunita.Core.Tags;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -97,14 +98,22 @@ public sealed class TagController(
     /// the tag lane's own (C-TG·8).
     /// </summary>
     [HttpGet("/tags/{slug}")]
-    public async Task<IActionResult> ByTag([FromRoute] string slug)
+    public async Task<IActionResult> ByTag([FromRoute] string slug, int page = 1)
     {
         if (string.IsNullOrWhiteSpace(slug))
             return NotFound();
 
         var actor = ActorId(User) ?? string.Empty;
-        var posts = await tags.ListPostsByTagAsync(slug, actor);
-        var blogPages = await tags.ListPagesByTagAsync(slug, actor);
+        // M7 (ADR 0090 D6) — the two paged seams are the read (U01's D6 lane:
+        // the same readable-content filter + order, then a Skip/Take(30)
+        // window). <c>HasMore</c> (D1) is the sole paging signal.
+        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page);
+        IReadOnlyList<Post> posts = pagedPosts.Items;
+        bool postsHasMore = pagedPosts.HasMore;
+
+        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page);
+        IReadOnlyList<Page> blogPages = pagedPages.Items;
+        bool pagesHasMore = pagedPages.HasMore;
 
         // 404-floor: both lists empty = slug unknown or used only on unread
         // content (C-TG·1 / C-TG·2 — the two are indistinguishable and both
@@ -134,6 +143,17 @@ public sealed class TagController(
             Posts = posts,
             Pages = blogPages,
             PageById = pageById,
+            // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
+            // one-page no-render pin: null on a single page so the _Pager
+            // partial renders nothing). The tag is the route (D9) — no filter
+            // form; the links carry ?page=N only. Section-scoped names (the
+            // Groups.Detail precedent) keep each _Pager's BaseUrl unambiguous.
+            PagerPosts = (postsHasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, postsHasMore)
+                : null,
+            PagerPages = (pagesHasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, pagesHasMore)
+                : null,
         };
 
         // U8c — seed the reword form (C-TG·5 standing split: the form is

@@ -52,7 +52,7 @@ public sealed class GroupsDetailViewModelTests
     // ── Shape pin: exact field sets on the two U10 records ──────────────
 
     [Fact]
-    public void GroupDetailViewModel_Has_Exactly_Nineteen_Projected_Fields()
+    public void GroupDetailViewModel_Has_Exactly_TwentyOne_Projected_Fields()
     {
         var fields = typeof(GroupDetailViewModel)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -100,6 +100,12 @@ public sealed class GroupsDetailViewModelTests
                 "Name",
                 "OwnerDisplayName",
                 "OwnerSubjectId",
+                // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
+                // one-page no-render pin: each null on a single page so the
+                // <c>_Pager</c> partial renders nothing). The ADR 0090 U03
+                // addition — the group-detail route's section-scoped pagers.
+                "PagerEvents",
+                "PagerPosts",
                 "PendingInvitations",
                 "ResidentCandidates",
             },

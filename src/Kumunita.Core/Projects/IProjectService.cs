@@ -64,7 +64,7 @@ public interface IProjectService
     /// <c>CanSeeAsync(Read)</c> pass — C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default);
+Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string actorId, int page, bool unassignedOnly = false, string? projectId = null, bool blockedOnly = false, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
     /// One to-do + its **subtasks** (the <see cref="TodoItem"/> rows with
@@ -86,7 +86,7 @@ Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assign
         /// descending; paged). A **display** surface, never a gate (C-TBD·4) —
         /// it does not pre-check cycles (the write lane does — C-TBD·3).
         /// </summary>
-        Task<IReadOnlyList<TodoItem>> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default);
+        Task<TodoPage> ListPickerTodosAsync(string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
     /// <summary>
     /// The board list (the feed): candidates = <c>!IsDeleted</c>, filtered by
     /// the optional <paramref name="componentId"/> (a filter, never a gate —
@@ -106,7 +106,7 @@ Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assign
     /// <c>CanSeeAsync(Read)</c> pass — C-M3·2 / C-PL·3).
     /// </para>
     /// </summary>
-    Task<IReadOnlyList<KanbanBoard>> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default);
+    Task<BoardPage> ListBoardsAsync(string? componentId, string actorId, int page, string? projectId = null, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
     /// The boards the actor may <c>Read</c> on which this to-do is placed —
@@ -417,7 +417,7 @@ Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assign
     /// paged. The **aggregate** <c>AccessAudit</c> row (<c>TargetKind "goal"</c>,
     /// <c>visibleCount</c> / <c>hiddenCount</c>) is the C-M3·3 shape.
     /// </summary>
-    Task<IReadOnlyList<ProjectGoal>> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default);
+    Task<GoalPage> ListGoalsAsync(string? componentId, string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
     /// One goal; one <c>CanAsync(Read)</c>; <see cref="KeyNotFoundException"/>
@@ -472,7 +472,7 @@ Task<IReadOnlyList<TodoItem>> ListTodosAsync(string? componentId, string? assign
     /// (<c>TargetKind "project"</c>, <c>visibleCount</c> /
     /// <c>hiddenCount</c>) is the C-M3·3 shape.
     /// </summary>
-    Task<IReadOnlyList<Project>> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default);
+    Task<ProjectPage> ListProjectsAsync(string? componentId, string? goalId, string actorId, int page, CancellationToken ct = default); // ADR 0090 D1/D3 — HasMore = candidates.Count == PageSize (false on an empty page, C-M7·5); record shape, not an out param (CS1988).
 
     /// <summary>
     /// One project; one <c>CanAsync(Read)</c>; the 404-vs-403 split (C3).

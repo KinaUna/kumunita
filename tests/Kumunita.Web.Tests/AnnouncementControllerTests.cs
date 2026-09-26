@@ -68,13 +68,14 @@ public class AnnouncementControllerTests
     public async Task Index_When_Anonymous_PassesNullActorId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync(null, new HashSet<string>()).Returns(new List<Announcement>());
+        announcements.ListVisiblePagedAsync(null, Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>())
+            .Returns(new AnnouncementPage(Items: new List<Announcement>(), HasMore: false));
         var controller = Build(announcements, IsAuthenticated: false);
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisibleAsync(null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0));
-        await announcements.DidNotReceive().ListVisibleAsync(Arg.Is<string>(x => x != null), Arg.Any<IReadOnlySet<string>>());
+        await announcements.Received(1).ListVisiblePagedAsync(null, Arg.Is<IReadOnlySet<string>>(s => s.Count == 0), 1, Arg.Any<CancellationToken>());
+        await announcements.DidNotReceive().ListVisiblePagedAsync(Arg.Is<string>(x => x != null), Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     /// <summary>
@@ -88,13 +89,14 @@ public class AnnouncementControllerTests
     public async Task Index_When_Authenticated_PassesSubjectId_ToService()
     {
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync("subj-resident-001", new HashSet<string> { Roles.Member }).Returns(new List<Announcement>());
+        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>())
+            .Returns(new AnnouncementPage(Items: new List<Announcement>(), HasMore: false));
         var controller = Build(announcements, roles: new[] { Roles.Member }, IsAuthenticated: true, subjectId: "subj-resident-001");
 
         await controller.Index();
 
-        await announcements.Received(1).ListVisibleAsync("subj-resident-001", Arg.Is<IReadOnlySet<string>>(s => s.Count == 1 && s.Contains(Roles.Member)));
-        await announcements.DidNotReceive().ListVisibleAsync(null, Arg.Any<IReadOnlySet<string>>());
+        await announcements.Received(1).ListVisiblePagedAsync("subj-resident-001", Arg.Is<IReadOnlySet<string>>(s => s.Count == 1 && s.Contains(Roles.Member)), 1, Arg.Any<CancellationToken>());
+        await announcements.DidNotReceive().ListVisiblePagedAsync(null, Arg.Any<IReadOnlySet<string>>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     // ── Read gate display-name fallback (null-safe) ──
@@ -113,7 +115,7 @@ public class AnnouncementControllerTests
     {
         const string author = "subj-anon-author-001";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(new List<Announcement>
+        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(new AnnouncementPage(Items: new List<Announcement>
         {
             new()
             {
@@ -121,7 +123,7 @@ public class AnnouncementControllerTests
                 Title = "Scheduled maintenance", Body = "Saturday 02:00-04:00 UTC",
                 AuthorId = author, Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
             },
-        });
+        }, HasMore: false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(author).Returns((Profile?)null);
@@ -153,7 +155,7 @@ public class AnnouncementControllerTests
         const string author = "subj-admin-001";
         const string display = "Kumunita Admin";
         var announcements = Substitute.For<IAnnouncementService>();
-        announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(new List<Announcement>
+        announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(new AnnouncementPage(Items: new List<Announcement>
         {
             new()
             {
@@ -161,7 +163,7 @@ public class AnnouncementControllerTests
                 Title = "Scheduled maintenance", Body = "Saturday 02:00-04:00 UTC",
                 AuthorId = author, Created = new DateTimeOffset(2026, 1, 15, 12, 0, 0, TimeSpan.Zero),
             },
-        });
+        }, HasMore: false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync(author).Returns(new Profile
@@ -737,17 +739,19 @@ public class AnnouncementControllerTests
             {
                 const string author = "subj-mod-001";
                 var announcements = Substitute.For<IAnnouncementService>();
-                announcements.ListVisibleAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>()).Returns(
-                    new List<Announcement>
-                    {
-                        new()
+                announcements.ListVisiblePagedAsync("subj-resident-001", Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(
+                    new AnnouncementPage(
+                        Items: new List<Announcement>
                         {
-                            Id = "ann-targeted", Scope = AnnouncementScope.Community,
-                            CommunityId = "community-A",
-                            Title = "Potluck Saturday", Body = "Community A potluck, bring a side",
-                            AuthorId = author, Created = new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero),
+                            new()
+                            {
+                                Id = "ann-targeted", Scope = AnnouncementScope.Community,
+                                CommunityId = "community-A",
+                                Title = "Potluck Saturday", Body = "Community A potluck, bring a side",
+                                AuthorId = author, Created = new DateTimeOffset(2026, 2, 1, 12, 0, 0, TimeSpan.Zero),
+                            },
                         },
-                    });
+                        HasMore: false));
 
                 var userInfo = Substitute.For<IUserInfoService>();
                 userInfo.GetProfileAsync(author).Returns((Profile?)new Profile { SubjectId = author, DisplayName = "Community Moderator" });
@@ -783,16 +787,18 @@ public class AnnouncementControllerTests
             {
                 const string author = "subj-admin-001";
                 var announcements = Substitute.For<IAnnouncementService>();
-                announcements.ListVisibleAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>()).Returns(
-                    new List<Announcement>
-                    {
-                        new()
+                announcements.ListVisiblePagedAsync(Arg.Any<string?>(), Arg.Any<IReadOnlySet<string>>(), 1, Arg.Any<CancellationToken>()).Returns(
+                    new AnnouncementPage(
+                        Items: new List<Announcement>
                         {
-                            Id = "ann-da", Scope = AnnouncementScope.Public,
-                            Title = "Community potluck", Body = "Bring a side dish to the potluck this Saturday",
-                            AuthorId = author, Created = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero),
+                            new()
+                            {
+                                Id = "ann-da", Scope = AnnouncementScope.Public,
+                                Title = "Community potluck", Body = "Bring a side dish to the potluck this Saturday",
+                                AuthorId = author, Created = new DateTimeOffset(2026, 3, 1, 12, 0, 0, TimeSpan.Zero),
+                            },
                         },
-                    });
+                        HasMore: false));
                 // The Danish translation: a blank title (→ the authored-in title is
                 // kept) and a translated body (→ the list preview shows the Danish).
                 announcements.GetAnnouncementTranslationsAsync("ann-da").Returns(

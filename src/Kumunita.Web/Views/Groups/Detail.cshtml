@@ -343,12 +343,15 @@
                         }
                     </ul>
 
-                    @if (Model.GroupPostsTotal > Model.GroupPosts.Count)
+                    @* M7 (ADR 0090 D2) — the "N in this group; M shown to you"
+                       hidden-count hint is removed (C-M7·7: the candidate count
+                       is never viewer-facing). *@
+                    @* M7 (ADR 0090 D5) — the group-posts section pager (F2
+                       one-page no-render pin): the <c>_Pager</c> partial renders
+                       nothing when the VM field is null. *@
+                    @if (Model.PagerPosts is not null)
                     {
-                        <p class="text-muted small mt-3">
-                            @Model.GroupPostsTotal post@(Model.GroupPostsTotal == 1 ? "" : "s") in this group;
-                            @Model.GroupPosts.Count shown to you.
-                        </p>
+                        <partial name="_Pager" model="Model.PagerPosts" />
                     }
                 }
 
@@ -406,12 +409,15 @@
                         }
                     </ul>
 
-                    @if (Model.GroupEventsTotal > Model.GroupEvents.Count)
+                    @* M7 (ADR 0090 D2) — the "N in this group; M shown to you"
+                       hidden-count hint is removed (C-M7·7: the candidate count
+                       is never viewer-facing). *@
+                    @* M7 (ADR 0090 D5) — the group-events section pager (F2
+                       one-page no-render pin): the <c>_Pager</c> partial renders
+                       nothing when the VM field is null. *@
+                    @if (Model.PagerEvents is not null)
                     {
-                        <p class="text-muted small mt-3">
-                            @Model.GroupEventsTotal event@(Model.GroupEventsTotal == 1 ? "" : "s") in this group;
-                            @Model.GroupEvents.Count shown to you.
-                        </p>
+                        <partial name="_Pager" model="Model.PagerEvents" />
                     }
                 }
             </div>

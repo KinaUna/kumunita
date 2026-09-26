@@ -84,7 +84,7 @@ public sealed class EventService : IEventService
     /// <see cref="AccessAudit"/> row with <c>TargetKind = "event"</c> via the
     /// <see cref="EventToAuditableResource"/>, U02).
     /// </summary>
-    public async Task<IReadOnlyList<Event>> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
+    public async Task<EventPage> ListUpcomingAsync(string? componentId, string actorId, int page, CancellationToken ct = default)
     {
         if (page < 1) page = 1;
 
@@ -95,8 +95,14 @@ public sealed class EventService : IEventService
             q = q.Where(e => e.ComponentId == componentId);
         var candidates = await q.OrderBy(e => e.Start).Skip((page - 1) * PageSize).Take(PageSize).ToListAsync(ct).ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
+        // decision (no audit row) and reports no further page (ADR 0090 D1).
         if (candidates.Count == 0)
-            return Array.Empty<Event>();
+            return new EventPage(Array.Empty<Event>(), false);
+
+        // ADR 0090 D1 / D3 — the sole paging signal: the page's candidate
+        // list filled the page (candidates is the pre-CanSeeAsync list).
+        var hasMore = candidates.Count == PageSize;
 
         // C6 — one shared matching pass; C3 — one aggregate audit row
         // (TargetKind "event"), from that single call (the PostService shape).
@@ -108,7 +114,7 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
 
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
-        return candidates.Where(e => visibleIds.Contains(e.Id)).ToList();
+        return new EventPage(candidates.Where(e => visibleIds.Contains(e.Id)).ToList(), hasMore);
     }
 
     /// <summary>
@@ -901,7 +907,7 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
 
         if (candidates.Count == 0)
-            return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: 0, Page: page, Total: 0);
+            return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
 
         // GE·5 (the C-M3·3 analog) — one standalone whole-channel call over the
         // paged candidate set writes the visit's single aggregate AccessAudit
@@ -913,12 +919,13 @@ public sealed class EventService : IEventService
             .ConfigureAwait(false);
 
         if (decision.Allowed)
-            return new GroupEventFeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count);
+            // ADR 0090 D1 / design doc §7.4 — HasMore: candidates.Count == PageSize.
+            return new GroupEventFeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count, HasMore: candidates.Count == PageSize);
 
         // GE2 — Deny: empty visible list, HiddenCount = the candidate count (the
         // aggregate Deny row **is** the audit evidence — GE·1/GE·5); never an
-        // event's fields.
-        return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: candidates.Count, Page: page, Total: 0);
+        // event's fields. HasMore is false on Deny (the design doc §7.4 pin).
+        return new GroupEventFeedResult(Visible: Array.Empty<Event>(), HiddenCount: candidates.Count, Page: page, Total: 0, HasMore: false);
     }
 
     /// <inheritdoc cref="IEventService.GetGroupEventAsync"/>

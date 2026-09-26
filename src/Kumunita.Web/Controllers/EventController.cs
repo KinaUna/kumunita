@@ -236,9 +236,12 @@ public sealed class EventController : Controller
         var actorId = SubjectId(User) ?? string.Empty;
 
         IReadOnlyList<Event> events;
+        bool hasMore;
         try
         {
-            events = await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted);
+            var pageResult = await this.events.ListUpcomingAsync(componentId, actorId, page, HttpContext.RequestAborted); // ADR 0090 D1/D3 — the paging signal is the page's .HasMore.
+            events = pageResult.Items;
+            hasMore = pageResult.HasMore;
         }
         catch (UnauthorizedAccessException)
         {
@@ -335,7 +338,14 @@ public sealed class EventController : Controller
                 .ToList(),
             CurrentComponentId: componentId,
             CurrentPage: page,
-            MyEvents: myRows);
+            MyEvents: myRows,
+            // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin): null on a
+            // single page so the _Pager partial renders nothing. The community
+            // filter is carried across prev/next (D7) as a FilterParams pair.
+            Pager: (hasMore || page > 1)
+                ? PagedViewModel.ForRoute("/events", page, 30, hasMore,
+                    componentId is null ? null : new Dictionary<string, string> { ["componentId"] = componentId })
+                : null);
 
         return View(vm);
     }

@@ -14,8 +14,8 @@ namespace Kumunita.Web.Models;
 /// **Read-only by construction (C-TG·1 / C-TG·8):** every row here was
 /// returned by the access-scoped read seam
 /// (<see cref="Kumunita.Core.Tags.ITagService.ListForActorAsync"/> /
-/// <see cref="Kumunita.Core.Tags.ITagService.ListPostsByTagAsync"/> /
-/// <see cref="Kumunita.Core.Tags.ITagService.ListPagesByTagAsync"/> /
+/// <see cref="Kumunita.Core.Tags.ITagService.ListPostsByTagPagedAsync"/> /
+/// <see cref="Kumunita.Core.Tags.ITagService.ListPagesByTagPagedAsync"/> /
 /// <see cref="Kumunita.Core.Tags.ITagService.SuggestAsync"/>) — the
 /// content's own <c>Read</c> decision already ran in Core (the ADR 0035
 /// <c>PostReadDecision</c> routing), so a denied post's or page's fields
@@ -107,6 +107,24 @@ public sealed class TagByTagViewModel
     /// before this model is rendered, so this property is only set when a
     /// readable tag exists).</summary>
     public TagTranslationForm? Translation { get; set; }
+
+    // ── M7 (ADR 0090 D5) — the two paged sections' pagers ──────────────────────
+    // The by-tag page renders **two** paged sections (the posts + the blog
+    // pages) — each carries its own <see cref="PagedViewModel"/> (the
+    // section-scoped names make each <c>_Pager</c>'s <c>BaseUrl</c> +
+    // <c>FilterParams</c> unambiguous, the Groups.Detail precedent). The tag
+    // is the route (the D9 inventory row) — no filter form; the links carry
+    // <c>?page=N</c> only. The F2 one-page no-render pin: null on a single
+    // page — the <c>_Pager</c> partial renders nothing. Object-initializer
+    // properties (not positional params) so the existing shape-pinning Web
+    // tests keep compiling unchanged.
+    /// <summary>The posts section's pager (M7, ADR 0090 D5) — null on a single
+    /// page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
+    public PagedViewModel? PagerPosts { get; set; }
+
+    /// <summary>The blog-pages section's pager (M7, ADR 0090 D5) — null on a
+    /// single page (F2); the <c>_Pager</c> partial renders nothing then.</summary>
+    public PagedViewModel? PagerPages { get; set; }
 }
 
 /// <summary>

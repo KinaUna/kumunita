@@ -10,12 +10,17 @@ namespace Kumunita.Core.Events;
 /// row (TargetKind <c>"grouppost"</c> — the frozen seam's existing
 /// discriminator, reused — TargetId null, the counts) is the row for this
 /// visit (GE·5, C3).
+/// <para>
+/// <see cref="HasMore"/> is the sole paging signal (ADR 0090 D1, C-M7·4):
+/// Allow: <c>candidates.Count == PageSize</c>; Deny: <c>false</c>.
+/// </para>
 /// </summary>
 public sealed record GroupEventFeedResult(
     IReadOnlyList<Event> Visible,
     int HiddenCount,
     int Page,
-    int Total);
+    int Total,
+    bool HasMore);     // D1 — Allow: candidates.Count == PageSize; Deny: false
 
 /// <summary>
 /// A group-event create input (ADR 0089, GE·2/GE·8) — the

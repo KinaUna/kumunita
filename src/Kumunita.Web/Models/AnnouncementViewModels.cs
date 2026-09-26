@@ -28,8 +28,25 @@ public sealed record AnnouncementRow(
 /// signed in — see <see cref="AnnouncementService.ListVisibleAsync"/>),
 /// sorted latest-first, with a resolved author display name (null-safe:
 /// falls back to the raw subject id if the author's profile row is missing —
-/// a display-name lookup, never an access decision).</summary>
-public sealed record AnnouncementIndexViewModel(IReadOnlyList<AnnouncementRow> Announcements);
+/// a display-name lookup, never an access decision).
+/// <para>
+/// <see cref="Pager"/> (M7, ADR 0090 D5/F2): the paged-seam pager — null on
+/// a single page so the <c>_Pager</c> partial renders nothing; the list has
+/// no filter form (the D9 inventory row) so the pager's links carry
+/// <c>?page=N</c> only.
+/// </para>
+/// </summary>
+public sealed record AnnouncementIndexViewModel(IReadOnlyList<AnnouncementRow> Announcements)
+{
+    /// <summary>The M7 (ADR 0090 D5) pager — null on a single page (F2
+    /// one-page no-render pin; the <c>_Pager</c> partial then renders
+    /// nothing). Built by <see cref="Kumunita.Web.Controllers
+    /// .AnnouncementController.Index"/> off the
+    /// <see cref="Kumunita.Core.Announcements.IAnnouncementService
+    /// .ListVisiblePagedAsync"/> seam's <c>HasMore</c> (D1); no filter form
+    /// (D9) so the links carry <c>?page=N</c> only.</summary>
+    public PagedViewModel? Pager { get; init; }
+}
 
 /// <summary>The /announcements/{id} detail view (the full-body read
 /// surface — the list shows a truncated preview and links here): the

@@ -131,7 +131,11 @@ is now live — ADR 0076 ships the `Notification` + `NotificationPreference` doc
 (the `M6DocTypes` surface) + the `NotificationService` (the `EmitAsync` writer +
 the inbox / preference lanes, reusing the M1 durable-email trio, no
 `IAuthorizationService` — a personal read, not an `AccessAction` decision).
-(`Events/`, M4, is live — ADR 0054.)
+(`Events/`, M4, is live — ADR 0054.) M7 (ADR 0090) shipped the shared pagination idiom
+— the `PagedViewModel` record + the `_Pager` partial (`Views/Shared/_Pager.cshtml`) +
+the `HasMore` signal on every paged Core seam. A new list surface that needs paging adds
+the `HasMore` signal to its seam (the D1/D3 shape) and drops in the `_Pager` partial (the
+D5 shape); it does not re-invent a pager.
 
 ## 3. Modular monolith & bounded contexts
 

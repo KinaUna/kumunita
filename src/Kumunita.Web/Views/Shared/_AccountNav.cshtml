@@ -11,7 +11,8 @@
     Right-hand nav actions (the public section links live in the layout's
     left nav). Signed in: a single account dropdown (toggle labelled with the
     resident's display name, falling back to the translated "Account" key)
-    holding Profile · Children · My drafts · Settings · Translations
+    holding Profile · My drafts · Settings (which carries the Children tab,
+    ADR 0028, moved out of this dropdown 2026-09-30) · Translations
     (Translator-only) · Admin (global admins only) · Sign out — collapsed so
     the navbar stays narrow. Signed out: the globe language switcher (standalone
     dropdown) plus Sign in · Sign up (flat links).
@@ -123,12 +124,9 @@
                 <li class="nav-item">
                     <a class="dropdown-item text-dark" asp-controller="Profile" asp-action="Edit"><kw-l key="nav.profile">Profile</kw-l></a>
                 </li>
-                @* GU (ADR 0028) — the guardian's child-accounts surface. Every signed-in
-                   resident can reach their own /me/children; the list is empty for a
-                   non-guardian (the Index view handles that empty state), so no is… flag. *@
-                <li class="nav-item">
-                    <a class="dropdown-item text-dark" asp-controller="Guardian" asp-action="Index"><kw-l key="nav.children">Children</kw-l></a>
-                </li>
+                @* GU (ADR 0028) — the guardian's child-accounts surface moved to a
+                   settings tab (2026-09-30); it is reached via the settings "Children"
+                   tab, not here. *@
                 @* ADR 0037 — the author's drafts surface: saved-but-not-published posts,
                    group posts, and announcements live here, hidden from every feed. *@
                 <li class="nav-item">

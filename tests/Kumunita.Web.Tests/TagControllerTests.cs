@@ -483,10 +483,14 @@ public sealed class TagControllerTests(PostgresFixture fixture) : IClassFixture<
         };
         tags.ListForActorAsync(actorId)
             .Returns(new List<TagItem> { new(tag, 1, "Sanitation") });
-        tags.ListPostsByTagAsync(slug, actorId)
-            .Returns(new List<Post> { post });
-        tags.ListPagesByTagAsync(slug, actorId)
-            .Returns(new List<Page>());
+        // M7 (ADR 0090 D6) — the controller reads the paged seams (the
+        // non-paged ListPostsByTagAsync / ListPagesByTagAsync were the
+        // pre-M7 shape; the app calls the paged pair). One post, one page,
+        // HasMore false (the by-tag single-page pin).
+        tags.ListPostsByTagPagedAsync(slug, actorId, 1, Arg.Any<CancellationToken>())
+            .Returns(new TagPostPage(Items: new List<Post> { post }, HasMore: false));
+        tags.ListPagesByTagPagedAsync(slug, actorId, 1, Arg.Any<CancellationToken>())
+            .Returns(new TagPagePage(Items: new List<Page>(), HasMore: false));
         tags.CanTranslateTag(Arg.Any<Tag>(), Arg.Any<string>(), Arg.Any<IReadOnlySet<string>>())
             .Returns(canTranslate);
         return tags;

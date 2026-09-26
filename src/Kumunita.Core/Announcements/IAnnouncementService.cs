@@ -37,6 +37,23 @@ public interface IAnnouncementService
     Task<IReadOnlyList<Announcement>> ListVisibleAsync(string? actorId, IReadOnlySet<string> roles);
 
     /// <summary>
+    /// The <see cref="ListVisibleAsync"/> feed, **paged** (ADR 0090 D6, M7
+    /// U01) — the same in-memory visibility filter, the same
+    /// <c>Created</c> descending order, then a
+    /// <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window
+    /// (<c>PageSize = 30</c>, the D4 shape). <see cref="AnnouncementPage.HasMore"/>
+    /// is the sole paging signal (D1 — <c>pageCount == PageSize</c>); there is
+    /// no <c>Total</c> and **no** <see cref="Kumunita.Core.Authorization.AccessAudit"/>
+    /// row (announcements have no audit lane — the
+    /// <see cref="ListVisibleAsync"/> pin; C-M7·1 vacuously satisfied). The
+    /// non-paged <see cref="ListVisibleAsync"/> is unmodified (the banner +
+    /// admin surfaces keep the whole-list read). See
+    /// <see cref="AnnouncementService.ListVisiblePagedAsync"/> for the full
+    /// contract.
+    /// </summary>
+    Task<AnnouncementPage> ListVisiblePagedAsync(string? actorId, IReadOnlySet<string> roles, int page, CancellationToken ct = default);
+
+    /// <summary>
     /// A single caller-visible <see cref="Announcement"/> by id — the
     /// <c>/announcements/{id}</c> detail view's read shape. The visibility
     /// gate is the same as <see cref="ListVisibleAsync"/>:

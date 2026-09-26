@@ -153,13 +153,29 @@ public sealed class AnnouncementController(
     /// The read surface: the caller-visible announcements (public scope always,
     /// community scope when signed in) — latest first. No [Authorize]: visitors
     /// see the public-scope set; residents see the union.
+    /// <para>
+    /// **Paged (M7, ADR 0090 D6 — the D6 newly-paged lane):** the U01
+    /// <see cref="IAnnouncementService.ListVisiblePagedAsync"/> seam is the
+    /// read (the same in-memory visibility filter, the same <c>Created</c>
+    /// descending order, then a <c>Skip/Take(30)</c> window); the
+    /// <see cref="AnnouncementIndexViewModel.Pager"/> (M7, ADR 0090 D5)
+    /// carries the <c>HasMore</c> signal (D1 — the sole paging signal) and is
+    /// null on a single page (F2 one-page no-render pin) so the
+    /// <c>_Pager</c> partial renders nothing. No filter form (the D9
+    /// inventory row) — the pager's links carry <c>?page=N</c> only.
+    /// </para>
     /// </summary>
     [HttpGet("/announcements")]
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(int page = 1)
     {
         var subjectId = SubjectId(User);
         var roles     = RoleSet(User);
-        var visible   = await announcements.ListVisibleAsync(subjectId, roles);
+        // M7 (ADR 0090 D6) — the paged seam is the read (U01's D6 lane: the
+        // same visibility filter + order, then a Skip/Take(30) window).
+        // <c>HasMore</c> (D1) is the sole paging signal.
+        var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page);
+        IReadOnlyList<Announcement> visible = paged.Items;
+        bool hasMore = paged.HasMore;
 
         var authorIds = visible.Select(a => a.AuthorId).Distinct().ToHashSet();
 
@@ -213,7 +229,15 @@ public sealed class AnnouncementController(
                                              authorNames[a.AuthorId], a.AuthorId, a.Pinned, a.CommunityId, a.CommunityId is not null && componentNames.TryGetValue(a.CommunityId, out var cn) ? cn : null))
             .ToList();
 
-        return View(new AnnouncementIndexViewModel(rows));
+        // M7 (ADR 0090 D5) — the pager (F2 one-page no-render pin: null on a
+        // single page so the _Pager partial renders nothing). No filter form
+        // (D9) — the links carry ?page=N only.
+        return View(new AnnouncementIndexViewModel(rows)
+        {
+            Pager = (hasMore || page > 1)
+                ? PagedViewModel.ForRoute("/announcements", page, 30, hasMore)
+                : null,
+        });
     }
 
     // ── Detail (GET /announcements/{id}) ───────────────────────────────────

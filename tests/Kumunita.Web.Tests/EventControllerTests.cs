@@ -266,7 +266,7 @@ public class EventControllerTests
     {
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync("component-A", "subj-resident-001", 2, Arg.Any<CancellationToken>())
-            .Returns(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001", componentId: "component-A") });
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001", componentId: "component-A") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-author-001").Returns((Profile?)new Profile { SubjectId = "subj-author-001", DisplayName = "Ada" });
@@ -299,7 +299,7 @@ public class EventControllerTests
     {
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
-            .Returns(new List<Event> { SampleEvent("ev-1", authorId: "subj-ghost-001") });
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-ghost-001") }, false));
 
         var userInfo = Substitute.For<IUserInfoService>();
         userInfo.GetProfileAsync("subj-ghost-001").Returns((Profile?)null);
@@ -329,7 +329,7 @@ public class EventControllerTests
     {
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
-            .Returns(new List<Event> { SampleEvent("ev-feed", authorId: "subj-author-001") });
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-feed", authorId: "subj-author-001") }, false));
         events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
             .Returns(new List<Event> { SampleEvent("ev-mine", authorId: "subj-resident-001", componentId: "component-A") });
 
@@ -365,7 +365,7 @@ public class EventControllerTests
     {
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
-            .Returns(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001") });
+            .Returns(new EventPage(new List<Event> { SampleEvent("ev-1", authorId: "subj-author-001") }, false));
         // ListMineAsync left un-stubbed — NSubstitute auto-returns an empty
         // IReadOnlyList<Event> (the "no section" case).
 
@@ -397,7 +397,7 @@ public class EventControllerTests
     {
         var events = Substitute.For<IEventService>();
         events.ListUpcomingAsync(null, "subj-resident-001", 1, Arg.Any<CancellationToken>())
-            .Returns(new List<Event>());
+            .Returns(new EventPage(new List<Event>(), false));
         events.ListMineAsync("subj-resident-001", Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IReadOnlyList<Event>>(new UnauthorizedAccessException("An actor is required to read their events.")));
 

@@ -100,8 +100,20 @@ public sealed class PostService
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
+        // decision and **before** the D2 CountAsync: an oversized page is a
+        // no-decision, Total: 0, HasMore: false.
         if (candidates.Count == 0)
-            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
+
+        // M7 (ADR 0090 D2 / C-M7·7) — the candidate-set count (pre-decision,
+        // post-filter), one CountAsync over the same filtered query (the
+        // page's window is non-empty here, so the component has candidates).
+        int candidateCount = await session
+            .Query<Post>()
+            .Where(p => p.ComponentId == componentId && p.DeletedAt == null && !p.IsDraft)
+            .CountAsync()
+            .ConfigureAwait(false);
 
         // C6 — one shared matching pass over the whole candidate set; C3 — one aggregate
         // audit row (VisibleCount/HiddenCount), TargetKind "post" (C-M3·3), from that
@@ -118,7 +130,7 @@ public sealed class PostService
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
         var visible = candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
 
-        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: visible.Count);
+        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
     }
 
     /// <summary>
@@ -153,7 +165,7 @@ public sealed class PostService
         if (page < 1) page = 1;
 
         if (componentIds.Count == 0)
-            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
 
         await using var session = _store.QuerySession();
         var candidates = await session
@@ -165,8 +177,19 @@ public sealed class PostService
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
+        // decision and **before** the D2 CountAsync: an oversized page is a
+        // no-decision, Total: 0, HasMore: false.
         if (candidates.Count == 0)
-            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
+
+        // M7 (ADR 0090 D2 / C-M7·7) — the candidate-set count (pre-decision,
+        // post-filter), one CountAsync over the same filtered query.
+        int candidateCount = await session
+            .Query<Post>()
+            .Where(p => componentIds.Contains(p.ComponentId) && p.DeletedAt == null && !p.IsDraft)
+            .CountAsync()
+            .ConfigureAwait(false);
 
         // C-M3·3 — one shared matching pass over the whole candidate set
         // (across all enabled components), one aggregate audit row (the
@@ -180,7 +203,7 @@ public sealed class PostService
         var visibleIds = new HashSet<string>(visibleSet.Visible.Select(v => v.Id));
         var visible = candidates.Where(p => visibleIds.Contains(p.Id)).ToList();
 
-        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: visible.Count);
+        return new FeedResult(Visible: visible, HiddenCount: visibleSet.HiddenCount, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
     }
 
     /// <summary>
@@ -1145,8 +1168,19 @@ public sealed class PostService
             .ToListAsync()
             .ConfigureAwait(false);
 
+        // C-M7·5 (D8) — the 0-candidate early return runs **before** any
+        // decision and **before** the D2 CountAsync: an oversized page is a
+        // no-decision, Total: 0, HasMore: false.
         if (candidates.Count == 0)
-            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0);
+            return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: 0, Page: page, Total: 0, HasMore: false);
+
+        // M7 (ADR 0090 D2 / C-M7·7) — the candidate-set count (pre-decision,
+        // post-filter), one CountAsync over the same filtered query.
+        int candidateCount = await session
+            .Query<Post>()
+            .Where(p => p.GroupId == groupId && p.DeletedAt == null && !p.IsDraft)
+            .CountAsync()
+            .ConfigureAwait(false);
 
         // G·5 (the C-M3·3 analog) — one standalone whole-channel call over the
         // paged candidate set writes the visit's single aggregate AccessAudit
@@ -1160,12 +1194,14 @@ public sealed class PostService
 
         if (decision.Allowed)
             // G1 — the paged candidates, as-is (membership is the sole decision; G·1).
-            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidates.Count);
+            return new FeedResult(Visible: candidates, HiddenCount: 0, Page: page, Total: candidateCount, HasMore: candidates.Count == PageSize);
 
         // G2 — Deny: empty visible list, HiddenCount = the candidate count (the
         // aggregate Deny row **is** the audit evidence — G·1/G·5); never a
-        // post's fields.
-        return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: candidates.Count, Page: page, Total: 0);
+        // post's fields. HasMore is false on Deny (the design doc §7.4 pin —
+        // the paging signal is computed from the page's window only on Allow;
+        // a Deny visit has no visible page to page through).
+        return new FeedResult(Visible: Array.Empty<Post>(), HiddenCount: candidates.Count, Page: page, Total: 0, HasMore: false);
     }
 
     /// <summary>

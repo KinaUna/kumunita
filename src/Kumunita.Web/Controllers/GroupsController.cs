@@ -215,7 +215,7 @@ public sealed class GroupsController(
     /// </para>
     /// </summary>
     [HttpGet("{id}")]
-    public async Task<IActionResult> Detail(string id)
+    public async Task<IActionResult> Detail(string id, int page = 1)
     {
         if (string.IsNullOrEmpty(id))
             return NotFound();
@@ -279,7 +279,7 @@ public sealed class GroupsController(
         //    stays the authoritative deny). The Detail page is member-scoped
         //    by its owner ∪ member gate, so every viewer here is a member
         //    and sees the feed + the "New post" button. ──
-        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: 1);
+        var feed = await posts.ListGroupFeedAsync(group.Id, actor, page: page);
 
         var groupPosts = new List<PostListItem>(feed.Visible.Count);
         foreach (var post in feed.Visible)
@@ -308,7 +308,7 @@ public sealed class GroupsController(
         //    same live membership read as CanPost. The detail page is
         //    member-scoped by its owner ∪ member gate, so every viewer here is a
         //    member and sees the feed + the button. ──
-        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: 1);
+        var eventFeed = await events.ListGroupEventsAsync(group.Id, actor, page: page);
 
         var groupEvents = new List<GroupEventListItem>(eventFeed.Visible.Count);
         foreach (var ev in eventFeed.Visible)
@@ -405,6 +405,16 @@ public sealed class GroupsController(
             GroupTranslations = groupTranslations,
             Languages = groupLanguages,
             CanTranslate = canTranslate,
+            // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
+            // one-page no-render pin: null on a single page so the _Pager
+            // partial renders nothing). The group is the route (D9) — no
+            // filter form; the links carry ?page=N only.
+            PagerPosts = (feed.HasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, feed.HasMore)
+                : null,
+            PagerEvents = (eventFeed.HasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/groups/{group.Id}", page, 30, eventFeed.HasMore)
+                : null,
         });
     }
 
