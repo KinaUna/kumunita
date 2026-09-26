@@ -260,7 +260,13 @@ read over the `ParentId` chain; the Read decision is the Web layer's, ADR
   lanes) or their "item" is the recipient's own settings/group (not the
   content the resident is acting on). If a follow-on wants a "view" link on
   any of these, it is a one-line `linkPath` on the existing emitter — this ADR
-  deliberately does not reach for them.
+  deliberately does not reach for them. **Note:** ADR 0095 amends this
+  clause for the `group.invite` kind — it makes the group-invite
+  notification *actionable* by adding two **separate** action-path fields
+  (`AcceptPath` / `DeclinePath`, the accept/decline link targets), which are
+  **not** a `LinkPath` "View" link and do not change this ADR's single-`LinkPath`
+  item-link contract. The other non-content kinds (including `group.added`)
+  remain no-link under this clause.
 - A "view" deep-link into the inbox itself (a `/notifications?open={id}`
   affordance that pre-opens a specific row). The inbox is a flat list; the
   "View" link on each row already carries the recipient to the item, which is

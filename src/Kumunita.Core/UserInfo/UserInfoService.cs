@@ -909,13 +909,26 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         var ns = services?.GetService<Notifications.NotificationService>();
         if (ns is not null)
         {
+            // ADR 0095 — the group-invite notification now carries the accept /
+            // decline actions: the invitee can act on the email's links (or the
+            // inbox's buttons) without navigating to the group first. The two
+            // same-origin relative paths point at the Web's self-lane GET
+            // actions (GroupsController.AcceptInvitationLink / DeclineInvitationLink,
+            // the same [Authorize] gate as the POST self-lane); the
+            // NotificationService stores them relative and appends them to the
+            // email as BaseUrl-prefixed absolute links (the VerificationOptions.BaseUrl
+            // precedent). The idempotency key / body / kind are unchanged (ADR
+            // 0083's emission shape — this is an additive ADR 0095 lane, not a
+            // re-emission; a re-invite still dedups on the same key).
             await ns.EmitAsync(
                 session,
                 userId,
                 Notifications.NotificationKinds.GroupInvite,
                 $"notification:{Notifications.NotificationKinds.GroupInvite}:{groupId}:{userId}",
                 group.Name,
-                CancellationToken.None).ConfigureAwait(false);
+                acceptPath: $"/groups/{groupId}/invitations/accept",
+                declinePath: $"/groups/{groupId}/invitations/decline",
+                ct: CancellationToken.None).ConfigureAwait(false);
         }
 
         await session.SaveChangesAsync().ConfigureAwait(false);

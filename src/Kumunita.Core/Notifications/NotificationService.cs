@@ -111,7 +111,7 @@ public sealed class NotificationService
         string idempotencyKey,
         string? body,
         CancellationToken ct = default)
-        => await EmitAsync(session, recipientId, kind, idempotencyKey, body, targetId: null, linkPath: null, ct).ConfigureAwait(false);
+        => await EmitAsync(session, recipientId, kind, idempotencyKey, body, targetId: null, linkPath: null, acceptPath: null, declinePath: null, ct).ConfigureAwait(false);
 
     /// <summary>
     /// ADR 0084 — the writer with the per-target subscription gate. Same
@@ -134,8 +134,22 @@ public sealed class NotificationService
     /// link via the instance <c>BaseUrl</c> (the
     /// <see cref="Identity.VerificationOptions.BaseUrl"/> precedent).
     /// <c>null</c> / empty <paramref name="linkPath"/> (the non-content
-    /// kinds: reports, to-dos, group add/invite, account lanes) stores no
+    /// kinds: reports, to-dos, account lanes) stores no
     /// link and appends nothing.
+    ///
+    /// <paramref name="acceptPath"/> / <paramref name="declinePath"/> (ADR 0095) are
+    /// the same-origin relative paths to the ACCEPT / DECLINE **actions** this
+    /// notification offers (e.g. <c>/groups/{id}/invitations/accept</c>). They
+    /// are stored on <see cref="Notification.AcceptPath"/> /
+    /// <see cref="Notification.DeclinePath"/> (the inbox renders them as
+    /// clickable action buttons) and appended to the **email** body as absolute
+    /// links via the instance <c>BaseUrl</c> with localized
+    /// <see cref="KnownTranslationKeys"/> labels — the same absolute-link
+    /// precedent as <paramref name="linkPath"/>. <c>null</c> / empty (every
+    /// kind that isn't actionable, and every emitter that predates the
+    /// fields) stores nothing and appends nothing. A group-invite notification
+    /// supplies **both** (accept and decline); the two are independent —
+    /// either may be absent.
     /// </summary>
     public async Task<Notification?> EmitAsync(
         IDocumentSession session,
@@ -145,6 +159,8 @@ public sealed class NotificationService
         string? body,
         string? targetId = null,
         string? linkPath = null,
+        string? acceptPath = null,
+        string? declinePath = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -233,6 +249,11 @@ public sealed class NotificationService
             // inbox; the email below appends the instance BaseUrl to make it
             // absolute). `null` when the emitter didn't provide one.
             LinkPath = string.IsNullOrWhiteSpace(linkPath) ? null : linkPath,
+            // ADR 0095 — the accept/decline action links (stored relative, same
+            // shape as LinkPath; `null` when the kind isn't actionable). The
+            // email below appends the instance BaseUrl to make them absolute.
+            AcceptPath = string.IsNullOrWhiteSpace(acceptPath) ? null : acceptPath,
+            DeclinePath = string.IsNullOrWhiteSpace(declinePath) ? null : declinePath,
             Created = DateTimeOffset.UtcNow,
         };
         session.Store(notification);
@@ -284,6 +305,25 @@ public sealed class NotificationService
         {
             var viewPrefix = await _translator.GetAsync("notifications.view", lang).ConfigureAwait(false);
             emailBody += "\n\n" + viewPrefix + ": " + AbsoluteLink(_baseUrl, notification.LinkPath);
+        }
+        // (5b) ADR 0095 — the accept/decline action links (the group-invite
+        //      lane): each is appended **only to the email** as an **absolute**
+        //      link (instance BaseUrl + relative path, the same precedent as
+        //      the view link above), each with its own localized label (the
+        //      <c>notifications.accept</c> / <c>notifications.decline</c>
+        //      keys, the <c>notifications.view</c> sibling pattern; the en
+        //      floor "Accept" / "Decline"). The stored row's AcceptPath /
+        //      DeclinePath stay relative — the inbox renders them as its own
+        //      clickable buttons. Either may be absent.
+        if (!string.IsNullOrWhiteSpace(notification.AcceptPath))
+        {
+            var acceptLabel = await _translator.GetAsync("notifications.accept", lang).ConfigureAwait(false);
+            emailBody += "\n\n" + acceptLabel + ": " + AbsoluteLink(_baseUrl, notification.AcceptPath);
+        }
+        if (!string.IsNullOrWhiteSpace(notification.DeclinePath))
+        {
+            var declineLabel = await _translator.GetAsync("notifications.decline", lang).ConfigureAwait(false);
+            emailBody += "\n\n" + declineLabel + ": " + AbsoluteLink(_baseUrl, notification.DeclinePath);
         }
 
         await _mailer.StageAsync(session, idempotencyKey, profile.Email!, subject, emailBody, ct).ConfigureAwait(false);

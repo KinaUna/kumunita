@@ -883,7 +883,9 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
             "notification:post.reply:reply-adr85", "New reply on your post",
             targetId: null,
             linkPath: linkPath,
-            TestContext.Current.CancellationToken);
+            acceptPath: null,
+            declinePath: null,
+            ct: TestContext.Current.CancellationToken);
         await session.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // A stored row is the contract (the synthetic recipient is not a
@@ -925,6 +927,116 @@ public class NotificationServiceTests(PostgresFixture fixture) : IClassFixture<P
         Assert.Null(row!.LinkPath);
         var email = Assert.Single(staged);
         Assert.DoesNotContain("http://localhost:5123", email.Body);
+    }
+
+    // ── ADR 0095 — the accept / decline action-link lane (the group-invite
+    //    surface) ────────────────────────────────────────────────────────────
+    //
+    // When an emitter supplies an <c>AcceptPath</c> and/or a
+    // <c>DeclinePath</c> (a same-origin relative path to the accept / decline
+    // action), the stored inbox row carries them verbatim (the inbox renders
+    // them as its own clickable buttons) and the **email** body has each
+    // appended as an **absolute** link (the instance BaseUrl + the relative
+    // path), each prefixed by its localized
+    // <c>notifications.accept</c> / <c>notifications.decline</c> label — the
+    // <see cref="Kumunita.Core.Identity.VerificationOptions.BaseUrl"/>
+    // precedent. The two are independent (either may be absent); a kind with
+    // neither appends nothing.
+
+    [Fact]
+    public async Task Emit_WithAcceptAndDeclinePath_Stores_Relative_Both_And_Appends_Absolute_Both_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95-invitee";
+        await PlantProfile(store, invitee, "adr95-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        const string acceptPath = "/groups/grp-adr95/invitations/accept";
+        const string declinePath = "/groups/grp-adr95/invitations/decline";
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95:u-adr95-invitee", "Garden Club",
+            targetId: null,
+            linkPath: null,
+            acceptPath: acceptPath,
+            declinePath: declinePath,
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        // The inbox row carries **both** relative paths verbatim (the inbox
+        // renders them as its own clickable buttons), and no LinkPath (the
+        // group-invite lane isn't a content/reply "View" lane).
+        Assert.Equal(acceptPath, row!.AcceptPath);
+        Assert.Equal(declinePath, row.DeclinePath);
+        Assert.Null(row.LinkPath);
+
+        // The email body carries **both** as absolute links (BaseUrl +
+        // relative path), each prefixed by its localized label (the
+        // RecordingTranslator resolves each to a key-derived marker).
+        var email = Assert.Single(staged);
+        Assert.Contains(baseUrl + acceptPath, email.Body);
+        Assert.Contains(baseUrl + declinePath, email.Body);
+        Assert.Contains("notifications.accept-en", email.Body);
+        Assert.Contains("notifications.decline-en", email.Body);
+    }
+
+    [Fact]
+    public async Task Emit_WithOnlyAcceptPath_Stores_Only_Accept_And_Appends_Only_Accept_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95b-invitee";
+        await PlantProfile(store, invitee, "adr95b-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        const string acceptPath = "/groups/grp-adr95b/invitations/accept";
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95b:u-adr95b-invitee", "Garden Club",
+            targetId: null,
+            linkPath: null,
+            acceptPath: acceptPath,
+            declinePath: null,
+            ct: TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Equal(acceptPath, row!.AcceptPath);
+        Assert.Null(row.DeclinePath);
+
+        var email = Assert.Single(staged);
+        Assert.Contains(baseUrl + acceptPath, email.Body);
+        Assert.Contains("notifications.accept-en", email.Body);
+        // No decline link, no decline label.
+        Assert.DoesNotContain("notifications.decline", email.Body);
+    }
+
+    [Fact]
+    public async Task Emit_WithoutAcceptOrDeclinePath_Appends_No_Action_Links_To_Email()
+    {
+        const string baseUrl = "http://localhost:5123";
+        var (store, svc, _, staged) = await BootAsync(baseUrl);
+
+        const string invitee = "u-adr95c-invitee";
+        await PlantProfile(store, invitee, "adr95c-invitee@kumunita", emailLanguage: "en");
+
+        await using var session = store.OpenSession(new Marten.Services.SessionOptions());
+        var row = await svc.EmitAsync(session, invitee,
+            NotificationKinds.GroupInvite,
+            "notification:group.invite:grp-adr95c:u-adr95c-invitee", "Garden Club",
+            TestContext.Current.CancellationToken);
+        await session.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(row);
+        Assert.Null(row!.AcceptPath);
+        Assert.Null(row.DeclinePath);
+        var email = Assert.Single(staged);
+        Assert.DoesNotContain("notifications.accept", email.Body);
+        Assert.DoesNotContain("notifications.decline", email.Body);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

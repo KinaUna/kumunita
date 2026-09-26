@@ -34,16 +34,15 @@
                         <span class="name">@inv.GroupName</span>
                         <span class="by"><kw-l key="groups.invited_by">Invited by</kw-l> @inv.InvitedByDisplayName</span>
                         <span class="row-actions">
-                            <form method="post"
-                                  action="@Url.Action("AcceptInvitation", "Groups", new { id = inv.GroupId })">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.invite_accept">Accept</kw-l></button>
-                            </form>
-                            <form method="post"
-                                  action="@Url.Action("DeclineInvitation", "Groups", new { id = inv.GroupId })">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.invite_decline">Decline</kw-l></button>
-                            </form>
+                            @* ADR 0095 — the self-lane accept/decline are now
+                               link-clickable (the group-invite email's links and
+                               the inbox's buttons all land on the same
+                               [Authorize] GET actions), so the card uses GET
+                               links rather than anti-forgery POST forms. Same
+                               self-lane gate (the row must be in MY pending
+                               list) as before. *@
+                            <a href="@Url.Action("AcceptInvitationLink", "Groups", new { id = inv.GroupId })" class="btn btn-sm btn-primary"><kw-l key="groups.invite_accept">Accept</kw-l></a>
+                            <a href="@Url.Action("DeclineInvitationLink", "Groups", new { id = inv.GroupId })" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.invite_decline">Decline</kw-l></a>
                         </span>
                     </div>
                 }

@@ -207,13 +207,38 @@
                                    (absolute); the inbox carries it relative
                                    (same-origin). Gated on the field being set — a
                                    kind with no <c>LinkPath</c> (reports, to-dos,
-                                   group add/invite, the account lanes) renders
-                                   nothing here. *@
+                                   the account lanes) renders nothing here. *@
                                 <p class="mb-0 mt-2">
                                     <a href="@n.LinkPath" class="small">
                                         <kw-l key="notifications.view">View</kw-l>
                                         <span class="text-muted" aria-hidden="true">→</span>
                                     </a>
+                                </p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(n.AcceptPath) || !string.IsNullOrWhiteSpace(n.DeclinePath))
+                            {
+                                @* ADR 0095 — the accept / decline actions (the
+                                   group-invite lane): the stored <c>AcceptPath</c>
+                                   / <c>DeclinePath</c> (same-origin relative paths,
+                                   e.g. <c>/groups/{id}/invitations/accept</c>)
+                                   rendered as clickable buttons — the inbox form of
+                                   the email's absolute links (the two share the
+                                   same [Authorize] self-lane GET actions in
+                                   GroupsController). Gated on each field being
+                                   set; either may be absent. *@
+                                <p class="mb-0 mt-2">
+                                    @if (!string.IsNullOrWhiteSpace(n.AcceptPath))
+                                    {
+                                        <a href="@n.AcceptPath" class="btn btn-sm btn-primary me-2">
+                                            <kw-l key="notifications.accept">Accept</kw-l>
+                                        </a>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(n.DeclinePath))
+                                    {
+                                        <a href="@n.DeclinePath" class="btn btn-sm btn-outline-secondary">
+                                            <kw-l key="notifications.decline">Decline</kw-l>
+                                        </a>
+                                    }
                                 </p>
                             }
                         }

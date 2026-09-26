@@ -1132,6 +1132,83 @@ public sealed class GroupsController(
     }
 
     /// <summary>
+    /// Accept a pending invitation **from a link** (ADR 0095):
+    /// <c>GET /groups/{id}/invitations/accept</c>. The link-clickable form of
+    /// <see cref="AcceptInvitation"/> — the group-invite email's "Accept" link
+    /// and the inbox's accept button both land here. Same self-lane gate (the
+    /// row must be in MY pending list, C-M2b·2) and the same Core seam
+    /// (<c>AcceptGroupInvitationAsync</c>) and the same invalid-transition
+    /// wall (C-M2b·3 → <c>InvalidOperationException</c> → the error message)
+    /// as the POST action; the only difference is that a GET must be
+    /// link-clickable (it carries <b>no</b> anti-forgery token — the M1
+    /// <c>/account/verify</c> one-time-link GET precedent, the link's
+    /// integrity is the subject-bearing self-lane gate, not a CSRF token).
+    /// An unauthenticated invitee (a fresh cookie after clicking the email
+    /// link) is bounced to sign-in by the controller's
+    /// <c>[Authorize]</c> (the cookie's
+    /// <c>LoginPath</c>/<c>ReturnUrl</c> round-trip) and lands back here
+    /// signed in.
+    /// </summary>
+    [HttpGet("{id}/invitations/accept")]
+    public async Task<IActionResult> AcceptInvitationLink(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        if (pending.All(inv => inv.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.AcceptGroupInvitationAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That invitation is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Invitation accepted — you are now a member.";
+        return RedirectToAction(nameof(Detail), new { id });
+    }
+
+    /// <summary>
+    /// Decline a pending invitation **from a link** (ADR 0095):
+    /// <c>GET /groups/{id}/invitations/decline</c>. The link-clickable form of
+    /// <see cref="DeclineInvitation"/> — identical gate, seam, wall, and
+    /// redirect shape; the only difference is that a GET carries <b>no</b>
+    /// anti-forgery token (it must be link-clickable). An unauthenticated
+    /// invitee is bounced to sign-in by <c>[Authorize]</c> and lands back
+    /// here signed in.
+    /// </summary>
+    [HttpGet("{id}/invitations/decline")]
+    public async Task<IActionResult> DeclineInvitationLink(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        var pending = await userInfo.GetPendingInvitationsForUserAsync(actor);
+        if (pending.All(inv => inv.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.DeclineGroupInvitationAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That invitation is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Invitation declined.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
     /// Cancel a pending invitation (m2b lane C-M2b·1 — owner ∪ GlobalAdmin
     /// only, the <see cref="TryResolveInviteSurface"/> gate):
     /// <c>POST /groups/{id}/invitations/{subjectId}/cancel</c>. The
