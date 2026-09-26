@@ -141,10 +141,11 @@ why nothing else*.
   adapter, no new bounded context, no new document, no new index — this
   is a read-lane and a UI lane on the frozen seams (the ADR 0006 /
   ADR 0004 §B discipline). The frozen-surface rule is honoured: the
-  `HasMore` signal (record return / `HasMore` field) / two new paged read
-  overloads are compatible ADDs; the existing `ListVisibleAsync` /
-  `ListPostsByTagAsync` / `ListPagesByTagAsync` stay byte-identical for
-  the banner / admin / non-paged call sites.
+  `HasMore` signal (record return / `HasMore` field) / the new paged read
+  seams are compatible ADDs; the tag lane's non-paged
+  `ListPostsByTagAsync` / `ListPagesByTagAsync` were the pre-M7 shape and
+  were retired once the paged pair became the lane's only read — no
+  non-paged call site ever survived.
 
 ## Consequences
 

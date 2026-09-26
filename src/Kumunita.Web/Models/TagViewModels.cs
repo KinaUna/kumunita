@@ -14,8 +14,8 @@ namespace Kumunita.Web.Models;
 /// **Read-only by construction (C-TG·1 / C-TG·8):** every row here was
 /// returned by the access-scoped read seam
 /// (<see cref="Kumunita.Core.Tags.ITagService.ListForActorAsync"/> /
-/// <see cref="Kumunita.Core.Tags.ITagService.ListPostsByTagAsync"/> /
-/// <see cref="Kumunita.Core.Tags.ITagService.ListPagesByTagAsync"/> /
+/// <see cref="Kumunita.Core.Tags.ITagService.ListPostsByTagPagedAsync"/> /
+/// <see cref="Kumunita.Core.Tags.ITagService.ListPagesByTagPagedAsync"/> /
 /// <see cref="Kumunita.Core.Tags.ITagService.SuggestAsync"/>) — the
 /// content's own <c>Read</c> decision already ran in Core (the ADR 0035
 /// <c>PostReadDecision</c> routing), so a denied post's or page's fields

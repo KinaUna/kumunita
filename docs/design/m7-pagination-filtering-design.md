@@ -114,10 +114,12 @@ M7 amends additively:
 6. **`ITagService` / `TagService`** (`Kumunita.Core/Tags/`) —
    `ListPostsByTagAsync(string slug, string actorId)` →
    `IReadOnlyList<Post>` and `ListPagesByTagAsync(string slug, string
-   actorId)` → `IReadOnlyList<Page>`, **not paged** (in-memory
-   `LoadActorReadableContentAsync` filter, `OrderBy(Created)`). Two
-   **different element types** — the D6 paged overloads return two
-   different records (the §7.6 refinement).
+   actorId)` → `IReadOnlyList<Page>` (both **not paged** here — U01 adds
+   the `ListPostsByTagPagedAsync` / `ListPagesByTagPagedAsync` pair; the
+   non-paged shapes were later retired, the paged pair is the lane's only
+   read — in-memory `LoadActorReadableContentAsync` filter,
+   `OrderBy(Created)`). Two **different element types** — the D6 paged
+   overloads return two different records (the §7.6 refinement).
 7. **The 9 paged routes (verified signatures):**
    - `GET /community/{componentId}` — `PostsController.Index` →
      `ListFeedAsync`
@@ -238,8 +240,8 @@ surface shows no pager — the F2 pin).
 
 **Paged (U01 + U04):** `ListVisibleAsync` (announcements — a site with
 years of pinned + community announcements can exceed 30),
-`ListPostsByTagAsync` and `ListPagesByTagAsync` (a tag like "garden" can
-accumulate). **Not paged (explicitly):** `ListMyDraftsAsync` (an author's
+`ListPostsByTagPagedAsync` and `ListPagesByTagPagedAsync` (a tag like
+"garden" can accumulate — the paged pair is the tag lane's only read). **Not paged (explicitly):** `ListMyDraftsAsync` (an author's
 drafts are bounded by the author's patience — a long draft list is a
 *curation* problem, not a paging one), `GetTreeAsync` (the page tree is a
 tree, not a feed), `GetComponentsAsync` (four to ten rows, by

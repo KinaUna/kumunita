@@ -68,32 +68,17 @@ public interface ITagService
     Task<IReadOnlyList<TagItem>> ListForActorAsync(string actorId);
 
     /// <summary>
-    /// The by-tag post results (F3 / F4): the actor-readable posts whose
-    /// <c>TagIds</c> contains the tag resolved from <paramref name="slug"/>;
-    /// the post's own <c>Read</c> decision is applied **before** the post is
-    /// returned (C-TG·3, D5). No <c>AccessAudit</c> row (C-TG·8).
-    /// </summary>
-    Task<IReadOnlyList<Post>> ListPostsByTagAsync(string slug, string actorId);
-
-    /// <summary>
-    /// The by-tag blog-page results: the actor-readable
-    /// <c>PageKind.User</c> pages whose <c>TagIds</c> contains the tag.
-    /// No <c>AccessAudit</c> row (C-TG·8).
-    /// </summary>
-    Task<IReadOnlyList<Page>> ListPagesByTagAsync(string slug, string actorId);
-
-    /// <summary>
     /// The by-tag post results, **paged** (ADR 0090 D6, M7 U01 — the design
-    /// doc §7.6 lock): the <see cref="ListPostsByTagAsync"/> shape
-    /// (same readable-content filter + same <c>Created</c> ascending order),
-    /// then a <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window
+    /// doc §7.6 lock): the actor-readable posts (F3 / F4) whose <c>TagIds</c>
+    /// contains the tag resolved from <paramref name="slug"/>, in
+    /// <c>Created</c> ascending order — the post's own <c>Read</c> decision
+    /// is applied **before** the post is returned (C-TG·3, D5) — then a
+    /// <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window
     /// (<c>PageSize = 30</c> — the D4 shape).
     /// <see cref="TagPostPage.HasMore"/> is the sole paging signal (D1 —
     /// <c>pageCount == PageSize</c>); an out-of-range page returns an empty
     /// page with <c>HasMore: false</c>. **No** <c>AccessAudit</c> row
-    /// (C-TG·8 — the tag lane is a plain read). The non-paged
-    /// <see cref="ListPostsByTagAsync"/> is unmodified (its call sites keep
-    /// the whole-list read). See
+    /// (C-TG·8 — the tag lane is a plain read). See
     /// <see cref="TagService.ListPostsByTagPagedAsync"/> for the full
     /// contract.
     /// </summary>
@@ -101,16 +86,14 @@ public interface ITagService
 
     /// <summary>
     /// The by-tag blog-page results, **paged** (ADR 0090 D6, M7 U01 — the
-    /// design doc §7.6 lock): the <see cref="ListPagesByTagAsync"/> shape
-    /// (same readable-content filter + same <c>Created</c> ascending order),
-    /// then a <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window
+    /// design doc §7.6 lock): the actor-readable <c>PageKind.User</c> pages
+    /// whose <c>TagIds</c> contains the tag, in <c>Created</c> ascending
+    /// order, then a <c>Skip((page - 1) * PageSize).Take(PageSize)</c> window
     /// (<c>PageSize = 30</c> — the D4 shape).
     /// <see cref="TagPagePage.HasMore"/> is the sole paging signal (D1 —
     /// <c>pageCount == PageSize</c>); an out-of-range page returns an empty
     /// page with <c>HasMore: false</c>. **No** <c>AccessAudit</c> row
-    /// (C-TG·8 — the tag lane is a plain read). The non-paged
-    /// <see cref="ListPagesByTagAsync"/> is unmodified (its call sites keep
-    /// the whole-list read). See
+    /// (C-TG·8 — the tag lane is a plain read). See
     /// <see cref="TagService.ListPagesByTagPagedAsync"/> for the full
     /// contract.
     /// </summary>

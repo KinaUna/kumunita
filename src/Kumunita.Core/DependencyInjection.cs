@@ -123,8 +123,8 @@ public static class ServiceCollectionExtensions
         // never a new AccessVia value beyond Owner/Admin). The write lanes
         // (AttachToPostAsync / AttachToPageAsync / AddTagTranslationAsync) take
         // the caller's IDocumentSession (C3) and the standing probes are pure;
-        // U6's read lane (ListForActorAsync / ListPostsByTagAsync /
-        // ListPagesByTagAsync / SuggestAsync) composes IAuthorizationService (the
+        // U6's read lane (ListForActorAsync / ListPostsByTagPagedAsync /
+        // ListPagesByTagPagedAsync / SuggestAsync) composes IAuthorizationService (the
         // content's own Read decision — C-TG·3 / C-TG·2) + ITranslationProvider
         // (display-name resolution, ADR 0005 / D5) over the host-registered
         // Marten IDocumentStore. The registration composes the frozen seams only
