@@ -2542,7 +2542,7 @@ public sealed class ProjectService : IProjectService
             Id = Guid.NewGuid().ToString("N"),
             Title = title,
             AuthorId = actorId,                            // C-M5·6 — the actor becomes the standing owner.
-            Audience = null,                               // public — the board's Audience is the gate (C-M5·3); the placement is not itself an auditable resource.
+            Audience = board.Audience,                     // inherit the board's audience (C-M5·3 — a card's visibility is the board's): `null` board audience = public; carried verbatim, never re-derived (the copy-verbatim shape, ADR 0001-B — the CopyTodoToBoardAsync precedent).
             IsDeleted = false,                             // published on creation (D8a — no draft lane).
             LanguageCode = "",                             // ADR 0018 — materialized below (instance default floor).
             TagIds = [],

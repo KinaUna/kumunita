@@ -303,6 +303,14 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// <see cref="BoardItemPlacement"/> row placing it on the given lane at
     /// the **end** of the lane (the max <c>Order</c> + 1 — the
     /// <see cref="MoveTodoToAdjacentLaneAsync"/> end-of-lane shape). **The
+    /// audience inheritance (C-M5·3):** the new to-do's <see
+    /// cref="TodoItem.Audience"/> is the board's
+    /// <see cref="KanbanBoard.Audience"/>, carried verbatim (a
+    /// <c>null</c> board audience is public; a non-null one is copied as-is,
+    /// the copy-verbatim shape, ADR 0001-B) — a card's visibility is the
+    /// board's, so the card is gated by the same audience whether read on the
+    /// board (the two-level decision) or in the standalone to-do feed (which
+    /// gates on the to-do's own <c>Audience</c>). **The
     /// lane-status auto-update (C-M5·4):** if the lane's <c>Status</c> is
     /// non-null, the to-do's <c>Status</c> is set to that lane's status in the
     /// same transaction (C3); a null lane <c>Status</c> leaves the to-do's

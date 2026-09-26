@@ -1061,6 +1061,90 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
     }
 
     /// <summary>
+    /// <b>F12</b> (audience inheritance, C-M5·3): a to-do added directly onto
+    /// a board lane <b>inherits the board's audience</b> — the new card's
+    /// <see cref="TodoItem.Audience"/> is the board's <see
+    /// cref="KanbanBoard.Audience"/>, carried verbatim. The behavioral pin is
+    /// the standalone feed (which gates on the to-do's own <c>Audience</c>,
+    /// not the board's): the audience grantee sees the card, a stranger does
+    /// not. This is what keeps a card created on a restricted board from
+    /// leaking into the public to-do feed (the pre-change behavior was
+    /// <c>Audience = null</c> — world-visible).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_InheritsBoardAudience()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12d-author";
+        const string grantee = "u-u12-f12d-grantee";
+        const string stranger = "u-u12-f12d-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12d-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = Audience(GrantKind.User, grantee),
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12d-lane", BoardId = "f12d-board", Title = "Doing", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var todo = await svc.AddTodoToLaneAsync("f12d-board", "f12d-lane", "Inherited card", author, MemberRoles);
+
+        // The card carries the board's audience verbatim (C-M5·3) — not null.
+        Assert.NotNull(todo.Audience);
+        Assert.Equal(AudienceMode.Any, todo.Audience.Mode);
+        var grant = Assert.Single(todo.Audience.Grants);
+        Assert.Equal(GrantKind.User, grant.Kind);
+        Assert.Equal(grantee, grant.Id);
+
+        // Behavioral: the standalone feed gates on the to-do's own audience.
+        var granteeFeed = (await svc.ListTodosAsync(null, null, grantee, 1)).Items;
+        Assert.Contains(todo.Id, granteeFeed.Select(t => t.Id));
+
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        Assert.DoesNotContain(todo.Id, strangerFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
+    /// <b>F12</b> (public board, C-M5·3): a board whose <see
+    /// cref="KanbanBoard.Audience"/> is <c>null</c> (public) still yields a
+    /// <c>null</c> (public) card — inheritance is a copy of the stored value,
+    /// not a forcing to a non-null shape. The card is visible to the grantee,
+    /// the author, and a stranger alike (world-visible).
+    /// </summary>
+    [Fact]
+    public async Task F12_AddTodoToLane_PublicBoardYieldsPublicCard()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f12e-author";
+        const string stranger = "u-u12-f12e-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f12e-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null, // public
+        });
+        await Plant(store, new KanbanLane
+        {
+            Id = "f12e-lane", BoardId = "f12e-board", Title = "Doing", Order = 0,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+        });
+
+        var todo = await svc.AddTodoToLaneAsync("f12e-board", "f12e-lane", "Public card", author, MemberRoles);
+
+        Assert.Null(todo.Audience); // inherited null — public, unchanged
+
+        var strangerFeed = (await svc.ListTodosAsync(null, null, stranger, 1)).Items;
+        Assert.Contains(todo.Id, strangerFeed.Select(t => t.Id));
+    }
+
+    /// <summary>
     /// <b>F12</b> (refuse, C-M5·5): a lane already at its <c>MaxItems</c>
     /// limit **refuses** the add with <see cref="InvalidOperationException"/>
     /// (the lane's <c>Title</c> in the message) and **nothing is written**
