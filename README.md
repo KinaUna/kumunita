@@ -47,7 +47,7 @@ four surfaces.
 account (ADR 0028); **PG is done** — the hierarchical, audience-restricted,
 translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
 (ADR 0054); **EV-DWM is done** — events calendar day/week/month views
-(ADR 0064); **M5 is done** — projects (ADR 0067); **M6 is done** — notifications (ADR 0076); **M7 is done** — pagination & filtering (the `HasMore` signal on every paged seam, the `FeedResult.Total` correction, the `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, the D7 filter-reset pin; ADR 0090); **next is M8** — search. Then M9–M13 (PWA, portability, iCal, logging & analytics, Events+Projects integration — see the "Roadmap" below).
+(ADR 0064); **M5 is done** — projects (ADR 0067); **M6 is done** — notifications (ADR 0076); **M7 is done** — pagination & filtering (the `HasMore` signal on every paged seam, the `FeedResult.Total` correction, the `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, the D7 filter-reset pin; ADR 0090); **M8 is done** — search (one `/search` surface over the four resident content surfaces on the frozen authorization seams, zero schema change; ADR 0091); **next is M9** — PWA and responsive design. Then M10–M13 (portability, iCal, logging & analytics, Events+Projects integration — see the "Roadmap" below).
 
 ## Principles
 
@@ -160,6 +160,20 @@ translatable pages tree (ADR 0039); **M4 is done** — events, RSVPs, reminders
   default → Long floor) via the `kw-dt` TagHelper — the same per-request
   resolution shape as timezone and multilingual, data-driven, no rebuild
   (ADR 0020).
+- **Search** — one nav search box (anonymous + signed-in) over the four
+  resident content surfaces: posts (community **and** group), events
+  (community + group), pages, and announcements. `/search` renders `all`
+  (top 5 hits per surface — a search-box answer, no pager) or a single-surface
+  paged list on the M7 `HasMore` / `_Pager` discipline (pager links carry
+  `q` + `surface` + `scope`); the `groups` scope is signed-in-only and rides
+  the **frozen** ADR 0013 group seams (a group you can't see contributes no
+  hit and no count; anonymous silently degrades to community — no 403).
+  Drafts, soft-deletes, and hidden content are never hits; every decided
+  visit audits (one aggregate row per (query, surface, scope), `TargetKind =
+  "search:<surface>"`); the render surface is hits + `HasMore` only — never a
+  count. Case-insensitive substring match over authored-in `Title` + `Body`
+  — zero schema change; language-scoped search and `tsvector` full-text are
+  the named deferred lanes (ADR 0018's own consequence; ADR 0091).
 ## Tech stack
 
 - **ASP.NET Core 10** — MVC + Razor, server-rendered
@@ -245,8 +259,8 @@ stays trivial and the authorization rules can grow freely.
 - **Goals & Projects** (`PL`, ADR 0086) — the higher-level **goals** and **projects** page on top of the M5 to-do / board surface: two new documents (`ProjectGoal` + `Project`) in the **existing** `Projects` context (additive on `M5DocTypes`, zero migration), the **creator ∪ GlobalAdmin** standing (ADR 0070), the `GET /projects` landing feed (goals + standalone projects) + the **Projects** nav tab, the goal / project detail + composer + edit views, the project picker + "Project:" link on the to-do / board surface, the goal link + picker on the project surface, and the ADR 0024 soft-delete lanes (a goal's / project's delete **never deletes** its associated to-dos / boards — the association dangles, the link stops showing); `pl.*` `kw-l` keys × 4 languages; additive and reusing — no new `AccessAction` / `AccessVia` / authorization branch, no hard delete, `M7` stays the single in-progress milestone (a named lane, not a milestone). **Done.**
 - **Todo dependency** (`TBD`, ADR 0087) — the "waiting on" lane on top of M5: one optional `BlockedByTodoId?` on `TodoItem` (additive on `M5DocTypes`, zero migration) — a **hint, never a gate** (it never changes the to-do's own `Audience` decision, a write, or a hard-delete cascade); a "Blocked by" chip on the to-do detail (access-scoped — an unreadable / absent / soft-deleted blocker degrades to a generic label, no title / link), the blocker picker on the to-do create / edit forms (select a to-do or "None" to clear — the `ClearBlockedBy` flag), and a `?blockedOnly=true` feed filter (a filter, never a gate, the `unassignedOnly` / `projectId` discipline); the **creator ∪ assignee ∪ GlobalAdmin** standing (C-M5·6) is re-checked server-side in the write lane, and the only refusal this lane adds is one cycle guard (self + transitive); additive and reusing — no new `AccessAction` / `AccessVia` / authorization branch, no hard delete, `todo.*` `kw-l` keys × 4 languages, `M7` stays the single in-progress milestone (a named lane, not a milestone). **Done.**
 - **M7** — Pagination and filtering: the one canonical paging contract — a `HasMore` signal on every paged seam, the `FeedResult.Total` correction (candidate count, not page count), the shared `PagedViewModel` + `_Pager` partial, the pager wired into the 11 list surfaces, and the D7 filter-reset pin (the filter set is frozen — text search is M8). **Done** (ADR 0090).
-- **M8** — Search. **In progress.**
-- **M9** — PWA and responsive design.
+- **M8** — Search: one `/search` surface (a nav search box, anonymous + signed-in) over the four resident content surfaces (community + group posts, community + group events, pages, announcements): `all` renders the top 5 hits per surface (a search-box answer, no pager); a single surface renders a paged list on the M7 `HasMore` signal + the shared `_Pager` partial (the ADR 0090 hand-off — no new pager idiom); the `groups` scope is signed-in-only and rides the **frozen** ADR 0013 group seams (`CanSeeGroupAsync` / `CanSeeGroupFeedAsync` — a group the viewer can't see contributes no hit and no count; anonymous degrades silently to community, no 403); case-insensitive substring match over authored-in `Title` + `Body` with a truncated, HTML-escaped context window — **zero schema change** (no index, no migration, ADR 0004 §B untouched); zero new authorization surface (no new `AccessAction` / `AccessVia` / adapter); one aggregate audit row per (query, surface, scope) decision (`TargetKind = "search:<surface>"`, zero-candidate visits emit no row); the render surface is hits + `HasMore` only — never a `Total`/`HiddenCount`. **Done** (ADR 0091). *Deliberately not in M8 (follow-on lanes, own ADRs): search over UGC translations (ADR 0018's "language-scoped search" consequence), `tsvector` full-text search (a versioned migration by construction), the project-family surfaces (M5's scope — a one-line predicate when wanted).*
+- **M9** — PWA and responsive design. **In progress.**
 - **M10** — Portability (import/export).
 - **M11** — iCal.
 - **M12** — Logging and analytics.

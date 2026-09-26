@@ -51,7 +51,7 @@ public class GroupsControllerGroupEventTests
     {
         var (controller, events, userInfo) = Build(subjectId: "subj-nonmember");
         userInfo.GetGroupAsync(GroupId).Returns(GeGroup);
-        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember").Returns((Kumunita.Core.Events.Event?)null);
+        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
         var result = await controller.GroupEventDetail(GroupId, EventId);
 
@@ -69,7 +69,7 @@ public class GroupsControllerGroupEventTests
         var result = await controller.GroupEventDetail(GroupId, EventId);
 
         Assert.IsType<NotFoundResult>(result);
-        await events.DidNotReceive().GetGroupEventAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+        await events.DidNotReceive().GetGroupEventAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class GroupsControllerGroupEventTests
             Title = "T", Body = "b", IsDraft = false,
             Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow.AddHours(1),
         };
-        events.GetGroupEventAsync(GroupId, EventId, Author).Returns(ev);
+        events.GetGroupEventAsync(GroupId, EventId, Author, Arg.Any<CancellationToken>()).Returns(ev);
         userInfo.GetProfileAsync(Author).Returns((Kumunita.Core.UserInfo.Profile?)null);
         events.GetMyRsvpAsync(EventId, Author, Arg.Any<CancellationToken>()).Returns((EventRsvp?)null);
         events.GetRsvpsAsync(EventId, Arg.Any<CancellationToken>()).Returns(new List<EventRsvp>());
@@ -166,7 +166,7 @@ public class GroupsControllerGroupEventTests
             Title = "T", Body = "b",
             Start = DateTimeOffset.UtcNow, End = DateTimeOffset.UtcNow.AddHours(1),
         };
-        events.GetGroupEventAsync(GroupId, EventId, "subj-member").Returns(ev);
+        events.GetGroupEventAsync(GroupId, EventId, "subj-member", Arg.Any<CancellationToken>()).Returns(ev);
 
         var result = await controller.EditGroupEvent(GroupId, EventId);
 
@@ -208,7 +208,7 @@ public class GroupsControllerGroupEventTests
     {
         var (controller, events, userInfo) = Build(subjectId: "subj-nonmember");
         userInfo.GetGroupAsync(GroupId).Returns(GeGroup);
-        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember").Returns((Kumunita.Core.Events.Event?)null);
+        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
         var result = await controller.PublishGroupEvent(GroupId, EventId);
 
@@ -223,7 +223,7 @@ public class GroupsControllerGroupEventTests
         // the author-only publish lane throws → 404 (GE·4, no GlobalAdmin skip).
         var (controller, events, userInfo) = Build(subjectId: "subj-member");
         userInfo.GetGroupAsync(GroupId).Returns(GeGroup);
-        events.GetGroupEventAsync(GroupId, EventId, "subj-member").Returns(new Event
+        events.GetGroupEventAsync(GroupId, EventId, "subj-member", Arg.Any<CancellationToken>()).Returns(new Event
         {
             Id = EventId, AuthorId = Author, GroupId = GroupId,
             Title = "T", Body = "b", IsDraft = true,
@@ -242,7 +242,7 @@ public class GroupsControllerGroupEventTests
     {
         var (controller, events, userInfo) = Build(subjectId: "subj-nonmember");
         userInfo.GetGroupAsync(GroupId).Returns(GeGroup);
-        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember").Returns((Kumunita.Core.Events.Event?)null);
+        events.GetGroupEventAsync(GroupId, EventId, "subj-nonmember", Arg.Any<CancellationToken>()).Returns((Kumunita.Core.Events.Event?)null);
 
         var result = await controller.GroupEventRsvp(GroupId, EventId, RsvpStatus.Going);
 
@@ -255,7 +255,7 @@ public class GroupsControllerGroupEventTests
     {
         var (controller, events, userInfo) = Build(subjectId: "subj-member");
         userInfo.GetGroupAsync(GroupId).Returns(GeGroup);
-        events.GetGroupEventAsync(GroupId, EventId, "subj-member").Returns(new Event
+        events.GetGroupEventAsync(GroupId, EventId, "subj-member", Arg.Any<CancellationToken>()).Returns(new Event
         {
             Id = EventId, AuthorId = Author, GroupId = GroupId,
             Title = "T", Body = "b", IsDraft = false,

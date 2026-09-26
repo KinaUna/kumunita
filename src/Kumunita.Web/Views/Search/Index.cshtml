@@ -1,0 +1,121 @@
+@model Kumunita.Web.Models.SearchIndexViewModel
+@using Kumunita.Core.Search
+@using Kumunita.Web.Security
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
+@{
+    ViewData["Title"] = "Search";
+    // The input's placeholder is a fixed UI string that must live in a
+    // placeholder="…" attribute — the <kw-l> TagHelper can't sit inside an
+    // attribute, so resolve it server-side (the ADR 0072 / _GrantPickers /
+    // Groups/Detail pattern; M·5/M·8).
+    var _kwL = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation);
+    var placeholder = await Translation.GetAsync("search.placeholder", _kwL);
+    var scopeWire = Model.Scope == SearchScope.Groups ? "groups" : "community";
+    bool hasHits = Model.Sections.Values.Any(h => h.Count > 0);
+
+    // The detail route per surface (design §9 handoff — the same routes the
+    // feeds use). Group-scope hits use their /groups/{id}/… route (the hit
+    // carries the GroupId); the page surface is path-derived (PageHrefs);
+    // the rest are the canonical /{surface}/{id} routes.
+    string SeeAllHref(string s) =>
+        $"/search?q={Uri.EscapeDataString(Model.Q)}&surface={s}&scope={scopeWire}";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-9">
+        <header class="airy-head">
+            <h1><kw-l key="search.title">Search</kw-l></h1>
+        </header>
+
+        @* The scope picker is resident-only (F6 — anonymous is community-scope
+           on the server side; a no-op "Groups" option would mislead them). *@
+        @{ bool isSignedIn = User.Identity?.IsAuthenticated == true; }
+        <form class="row g-2 mb-4" action="/search" method="get" role="search">
+            <div class="col-12 @(isSignedIn ? "col-md-8" : "col-md-11")">
+                <input class="form-control" type="search" name="q" value="@Model.Q"
+                       placeholder="@placeholder" aria-label="Search" required />
+            </div>
+            @if (isSignedIn)
+            {
+                <div class="col-6 col-md-3">
+                    <select class="form-select" name="scope" aria-label="Scope">
+                        <option value="community" selected="@(scopeWire == "community" ? "selected" : null)">
+                            <kw-l key="search.scope.community">Community</kw-l>
+                        </option>
+                        <option value="groups" selected="@(scopeWire == "groups" ? "selected" : null)">
+                            <kw-l key="search.scope.groups">Groups</kw-l>
+                        </option>
+                    </select>
+                </div>
+            }
+            <div class="col-6 col-md-1 d-grid">
+                <button class="btn btn-primary" type="submit" aria-label="Search"><span aria-hidden="true">&#128269;</span></button>
+            </div>
+        </form>
+
+        @if (string.IsNullOrWhiteSpace(Model.Q))
+        {
+            <div class="p-4 text-muted">
+                <kw-l key="search.empty.hint">Find posts, events, pages and announcements by text.</kw-l>
+            </div>
+        }
+        else if (!hasHits)
+        {
+            <div class="p-4 text-muted">
+                <kw-l key="search.no-results">No results for</kw-l> <code>@Model.Q</code>.
+            </div>
+        }
+        else
+        {
+            // The four surfaces, fixed order; a surface absent from
+            // Model.Sections had zero visible hits (the SearchResults
+            // contract — C-M8·2/4) and renders nothing.
+            var surfaces = new[] { "posts", "events", "pages", "announcements" };
+            @foreach (var s in surfaces)
+            {
+                if (!Model.Sections.TryGetValue(s, out var hits) || hits.Count == 0)
+                    continue;
+
+                <section class="mb-4">
+                    <div class="d-flex justify-content-between align-items-baseline mb-2">
+                        <h2 class="h5 mb-0">
+                            @if (Model.IsAll)
+                            {
+                                // The section heading links to the full paged
+                                // surface view (D1 — the "see all" affordance);
+                                // no extra key needed (the heading key is the
+                                // label).
+                                <a href="@SeeAllHref(s)"><kw-l key="search.section.@s">Section</kw-l></a>
+                            }
+                            else
+                            {
+                                <kw-l key="search.section.@s">Section</kw-l>
+                            }
+                        </h2>
+                    </div>
+                    <ul class="list-unstyled">
+                        @foreach (var h in hits)
+                        {
+                            <li class="mb-3">
+                                <a href="@Model.HrefFor(h)">@h.Title</a>
+                                @if (h.BodyExcerpt is not null)
+                                {
+                                    // The excerpt is the raw stored text — Razor's
+                                    // @ escapes it (risk #4 — HTML/Markdown in the
+                                    // window is escaped at render). C-M8·4: only
+                                    // visible hits render; no count is shown.
+                                    <p class="mb-0 text-muted small">@h.BodyExcerpt</p>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (!Model.IsAll && Model.Pager is not null)
+                    {
+                        <partial name="_Pager" model="Model.Pager" />
+                    }
+                </section>
+            }
+        }
+    </div>
+</div>

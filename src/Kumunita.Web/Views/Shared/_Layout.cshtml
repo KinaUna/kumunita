@@ -1,4 +1,7 @@
+@using Kumunita.Web.Security
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@inject Kumunita.Core.Localization.ITranslationProvider Translation
+@inject Kumunita.Core.Localization.ILocalizationService Localization
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,6 +106,18 @@
                             </li>
                         }
                     </ul>
+
+                    @* M8 (ADR 0091 D1) — the one /search entry in the navbar. A
+                       GET form (no token — same idiom as the post-filter
+                       forms); the scope picker is resident-only (anonymous
+                       degrades to the community scope on the server side,
+                       F6). The placeholder is a fixed UI string resolved
+                       server-side (the <kw-l> TagHelper can't sit in an
+                       attribute — the ADR 0072 / Groups/Detail pattern). *@
+                    @{ var _kwLNav = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation); var _navPlaceholder = await Translation.GetAsync("search.placeholder", _kwLNav); var _navAriaLabel = await Translation.GetAsync("search.nav", _kwLNav); }
+                    <form class="navbar-form me-2 my-2 my-sm-0" action="/search" method="get" role="search">
+                        <input class="form-control" type="search" name="q" placeholder="@_navPlaceholder" aria-label="@_navAriaLabel" required />
+                    </form>
 
                     <partial name="_AccountNav" />
                 </div>
