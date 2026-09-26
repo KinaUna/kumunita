@@ -2719,6 +2719,95 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
+    /// **Delete a lane** from a board (ADR 0097): the <see cref="KanbanLane"/>
+    /// row is **deleted** (the <see cref="KanbanLane"/> /
+    /// <see cref="BoardItemPlacement"/> shape — lanes are the board's own
+    /// rows, not documents with their own <c>IsDeleted</c> flag — the
+    /// <see cref="DeleteBoardAsync"/> cascade shape applied to one lane) and
+    /// the lane's <see cref="BoardItemPlacement"/> rows are **deleted** (the
+    /// **to-dos are untouched** — a to-do keeps its standalone form and any
+    /// placements on other boards, C-M5·2). The board's **remaining** lanes
+    /// are re-settled to a clean <c>0..n-1</c> <c>Order</c> sequence (the
+    /// <see cref="MoveLaneToPositionAsync"/> park-then-settle shape — the
+    /// <c>(BoardId, Order)</c> unique index is enforced row-by-row, so the
+    /// lanes are parked to a guaranteed-free band and settled in a second
+    /// commit); deleting the **last** lane is a renumber no-op (the lane is
+    /// still deleted — the board is left with zero lanes, which the detail
+    /// view renders as the <c>projects.board.no_lanes</c> empty state).
+    /// Standing (server-side, C3): **creator ∪ GlobalAdmin over the board**
+    /// (the <see cref="CheckBoardStanding"/> shape; the assignee branch does
+    /// not apply to a lane — C-M5·6). A missing lane or board is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see
+    /// cref="AccessAudit"/> row (<c>board.delete_lane</c>,
+    /// <c>TargetKind = "board"</c>, the **board's** id as the target — the
+    /// lane is not an auditable resource of its own) commits atomically with
+    /// the write (C3).
+    /// </summary>
+    public async Task DeleteLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(laneId)) throw new KeyNotFoundException("A lane id is required.");
+        if (string.IsNullOrEmpty(actorId)) throw new UnauthorizedAccessException("An acting actor is required to delete a lane.");
+        ArgumentNullException.ThrowIfNull(actorRoles);
+
+        await using var session = _store.OpenSession(new Marten.Services.SessionOptions());
+        var lane = await session.LoadAsync<KanbanLane>(laneId, ct).ConfigureAwait(false);
+        if (lane is null)
+            throw new KeyNotFoundException($"Lane '{laneId}' was not found in the session; nothing to delete.");
+
+        var board = await session.LoadAsync<KanbanBoard>(lane.BoardId, ct).ConfigureAwait(false);
+        if (board is null)
+            throw new KeyNotFoundException($"The board '{lane.BoardId}' for lane '{laneId}' was not found in the session; nothing to delete.");
+
+        if (board.IsDeleted)
+            throw new KeyNotFoundException($"Board '{board.Id}' was not found in the session; nothing to delete.");
+
+        // Standing re-check (server-side, C3 single-source) over the **board**
+        // (C-M5·6): creator ∪ GlobalAdmin — the assignee branch does not
+        // apply to a lane (the CheckBoardStanding shape).
+        CheckBoardStanding(actorId, actorRoles, board);
+
+        // The lane's placements are the lane's own rows — they are
+        // hard-deleted in the same session (the DeleteBoardAsync cascade
+        // shape). The **to-dos are untouched** (C-M5·2 — a to-do on this lane
+        // is still standalone; its placements on other boards keep working).
+        var placements = await session.Query<BoardItemPlacement>()
+            .Where(p => p.LaneId == lane.Id)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        foreach (var placement in placements)
+            session.Delete(placement);
+
+        session.Delete(lane);
+
+        // Re-settle the board's **remaining** lanes to a clean 0..n-1 Order
+        // sequence (the MoveLaneToPositionAsync park-then-settle shape). The
+        // deleted lane's slot is now free — parking the survivors to a band
+        // above their current max (unchanged) is a no-op for the Order
+        // values, so the two commits collapse into the settle commit below:
+        // each lane is written once, to its final 0-based index.
+        var remaining = (await session.Query<KanbanLane>()
+            .Where(l => l.BoardId == lane.BoardId && l.Id != lane.Id)
+            .OrderBy(l => l.Order)
+            .ToListAsync(ct)
+            .ConfigureAwait(false))
+            .ToList();
+        var now = DateTimeOffset.UtcNow;
+        for (var i = 0; i < remaining.Count; i++)
+        {
+            if (remaining[i].Order != i)
+            {
+                remaining[i].Order = i;
+                remaining[i].Modified = now;
+            }
+            session.Store(remaining[i]);
+        }
+
+        StoreAuditRow(session, actorId, "board.delete_lane", board.Id, TargetKindBoard, BoardAuditViaFor(actorId, board));
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// **Move a card to a lane + position** (ADR 0069 — the card drag,
     /// generalizes <see cref="MoveTodoToAdjacentLaneAsync"/>): the
     /// placement's <c>LaneId</c> is set to the target lane and its

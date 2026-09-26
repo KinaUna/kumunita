@@ -394,6 +394,28 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     Task<BoardItemPlacement> MoveTodoToLanePositionAsync(string placementId, string targetLaneId, int index, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
 
     /// <summary>
+    /// **Delete a lane** from a board (ADR 0097): the <see cref="KanbanLane"/>
+    /// row is **deleted** + the lane's <see cref="BoardItemPlacement"/> rows
+    /// are **deleted** (the **to-dos are untouched** — a to-do keeps its
+    /// standalone form and any placements on other boards, C-M5·2). The
+    /// board's remaining lanes are **re-settled to a clean <c>0..n-1</c>
+    /// <c>Order</c> sequence** (the
+    /// <see cref="MoveLaneToPositionAsync"/> park-then-settle shape — the
+    /// <c>(BoardId, Order)</c> unique index is enforced row-by-row, so the
+    /// lanes are parked to a guaranteed-free band and settled in a second
+    /// commit); deleting the **last** lane is a renumber no-op. **Creator ∪
+    /// GlobalAdmin** over the **board** (the lane's standing is the board's —
+    /// the <c>CheckBoardStanding</c> shape; the assignee branch does not apply
+    /// to a lane, C-M5·6). A missing lane or board is <see
+    /// cref="KeyNotFoundException"/> (404); a denied actor is <see
+    /// cref="UnauthorizedAccessException"/> (403). One <see cref="AccessAudit"/>
+    /// row (<c>board.delete_lane</c>, <c>TargetKind = "board"</c>, the
+    /// **board's** id as the target — the lane is not an auditable resource of
+    /// its own) commits atomically with the write (C3).
+    /// </summary>
+    Task DeleteLaneAsync(string laneId, string actorId, IReadOnlySet<string> actorRoles, CancellationToken ct = default);
+
+    /// <summary>
     /// **Soft-delete** a board — sets <c>IsDeleted = true</c> (the ADR 0024
     /// author-lane shape) + **deletes** the board's <see cref="KanbanLane"/>
     /// rows + **deletes** the board's <see cref="BoardItemPlacement"/> rows (the

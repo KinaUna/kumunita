@@ -738,6 +738,57 @@ public class ProjectsControllerTests(PostgresFixture fixture) : IClassFixture<Po
         Assert.IsType<ForbidResult>(await deniedController.MoveLanePost(boardId, laneId, 0));
     }
 
+    // ── 10b — Board_DeleteLane (ADR 0097) ────────────────────────────────────
+
+    /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/delete</c>: the
+    /// controller forwards to the seam's
+    /// <see cref="IProjectService.DeleteLaneAsync"/> (the cascade + renumber +
+    /// standing, F17, are the seam's — not re-derived here) and redirects
+    /// back to the board with <c>TempData["info"] = "Lane deleted."</c> on
+    /// success; the C3 404/403 split is the same as the other board write
+    /// lanes.
+    /// </summary>
+    [Fact]
+    public async Task Board_DeleteLane()
+    {
+        const string actor = "subj-deletelane-actor";
+        const string boardId = "board-deletelane";
+        const string laneId = "lane-deletelane";
+
+        var projects = Substitute.For<IProjectService>();
+        projects.DeleteLaneAsync(
+                laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var controller = Build(projects, subjectId: actor);
+
+        var result = await controller.LaneDeletePost(boardId, laneId);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal($"/projects/boards/{boardId}", redirect.Url);
+        Assert.Equal("Lane deleted.", controller.TempData["info"] as string);
+        await projects.Received(1).DeleteLaneAsync(
+            laneId, actor, Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>());
+
+        // The C3 404 split: a missing lane is a clean NotFoundResult, not a 500.
+        var missingProjects = Substitute.For<IProjectService>();
+        missingProjects.DeleteLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new KeyNotFoundException("no lane")));
+        var missingController = Build(missingProjects, subjectId: actor);
+        Assert.IsType<NotFoundResult>(await missingController.LaneDeletePost(boardId, laneId));
+
+        // The C3 403 split: a denied actor is a clean ForbidResult, not a 500.
+        var deniedProjects = Substitute.For<IProjectService>();
+        deniedProjects.DeleteLaneAsync(
+                Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<IReadOnlySet<string>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new UnauthorizedAccessException("denied")));
+        var deniedController = Build(deniedProjects, subjectId: actor);
+        Assert.IsType<ForbidResult>(await deniedController.LaneDeletePost(boardId, laneId));
+    }
+
     // ── 11 — Board_MoveCard_DropPosition (ADR 0069) ──────────────────────────
 
     /// <summary>

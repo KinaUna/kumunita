@@ -1372,6 +1372,183 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         }
     }
 
+    // ── F17 — delete a lane (ADR 0097) ─────────────────────────────────────
+
+    /// <summary>
+    /// <b>F17</b> (delete): <see cref="ProjectService.DeleteLaneAsync"/>
+    /// **deletes** the <see cref="KanbanLane"/> row and its
+    /// <see cref="BoardItemPlacement"/> rows (lanes are the board's own rows —
+    /// no <c>IsDeleted</c> flag), the **to-do is untouched** (C-M5·2 — it
+    /// keeps its standalone form), the board's **remaining** lanes re-settle
+    /// to a clean <c>0..n-1</c> <c>Order</c>, and one
+    /// <see cref="AccessAudit"/> row (<c>board.delete_lane</c>, the **board's**
+    /// id as the target — the lane is not an auditable resource of its own)
+    /// commits atomically (C3).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_DeletesLaneAndPlacements_TodosKept_Renumerated_Audited()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        // A (0), B (1), C (2) — cards on B (the lane to delete) and on A (a
+        // surviving lane) to prove the survivors' placements are untouched.
+        await Plant(store, new KanbanLane { Id = "f17-A", BoardId = "f17-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f17-B", BoardId = "f17-board", Title = "B", Order = 1, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new KanbanLane { Id = "f17-C", BoardId = "f17-board", Title = "C", Order = 2, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17-todoB", AuthorId = author, Title = "On B", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new TodoItem { Id = "f17-todoA", AuthorId = author, Title = "On A", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17-pB", TodoItemId = "f17-todoB", BoardId = "f17-board", LaneId = "f17-B", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+        await Plant(store, new BoardItemPlacement { Id = "f17-pA", TodoItemId = "f17-todoA", BoardId = "f17-board", LaneId = "f17-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await svc.DeleteLaneAsync("f17-B", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            // The lane and its placements are gone.
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17-B"));
+            Assert.Null(await q.LoadAsync<BoardItemPlacement>("f17-pB"));
+
+            // The to-do itself is kept (C-M5·2) — standalone, not soft-deleted.
+            var todo = (await q.LoadAsync<TodoItem>("f17-todoB"))!;
+            Assert.Equal("On B", todo.Title);
+            Assert.False(todo.IsDeleted);
+
+            // The remaining lanes re-settle to a clean 0..n-1 sequence:
+            // A (0), C (1) — the survivor on A keeps its placement + slot.
+            Assert.Equal(0, (await q.LoadAsync<KanbanLane>("f17-A"))!.Order);
+            Assert.Equal(1, (await q.LoadAsync<KanbanLane>("f17-C"))!.Order);
+            var pA = (await q.LoadAsync<BoardItemPlacement>("f17-pA"))!;
+            Assert.Equal("f17-A", pA.LaneId);
+            Assert.Equal(0, pA.Order);
+        }
+
+        // The board.delete_lane audit row (C3) — the board is the target
+        // (the lane is not an auditable resource of its own), Via Owner
+        // (the creator branch).
+        var audits = await BoardAuditRows(store, "f17-board");
+        var row = Assert.Single(audits, a => a.Action == "board.delete_lane");
+        Assert.Equal("board", row.TargetKind);
+        Assert.Equal("f17-board", row.TargetId);
+        Assert.Equal(AccessVia.Owner, row.Via);
+    }
+
+    /// <summary>
+    /// <b>F17</b> (last lane): deleting the board's **only** lane is a
+    /// renumber no-op — the lane is still deleted, the board is left with
+    /// **zero** lanes (the detail view's <c>projects.board.no_lanes</c> empty
+    /// state), and the lane's to-do is kept (C-M5·2).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_LastLane_BoardLeftWithZeroLanes_TodoKept()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17b-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17b-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17b-sole", BoardId = "f17b-board", Title = "Only", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17b-todo", AuthorId = author, Title = "On the only lane", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17b-p", TodoItemId = "f17b-todo", BoardId = "f17b-board", LaneId = "f17b-sole", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await svc.DeleteLaneAsync("f17b-sole", author, MemberRoles);
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.Null(await q.LoadAsync<KanbanLane>("f17b-sole"));
+            Assert.Equal(0, await q.Query<KanbanLane>().Where(l => l.BoardId == "f17b-board").CountAsync());
+            // The to-do survives its lane's deletion (C-M5·2).
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17b-todo"));
+            // The board itself is untouched (no soft-delete flag on a lane
+            // delete — only the board-delete seam flips board.IsDeleted).
+            var board = (await q.LoadAsync<KanbanBoard>("f17b-board"))!;
+            Assert.False(board.IsDeleted);
+        }
+    }
+
+    /// <summary>
+    /// <b>F17</b> (standing, C-M5·6): a stranger who is neither the board's
+    /// creator nor a GlobalAdmin is **denied** the delete with
+    /// <see cref="UnauthorizedAccessException"/> (403); nothing is written
+    /// (the lane, its placements, and the to-do are all untouched).
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_NonCreatorRefused_NothingWritten()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17c-author";
+        const string stranger = "u-u12-f17c-stranger";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17c-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17c-A", BoardId = "f17c-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+        await Plant(store, new TodoItem { Id = "f17c-todo", AuthorId = author, Title = "On A", Created = new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), Audience = null });
+        await Plant(store, new BoardItemPlacement { Id = "f17c-p", TodoItemId = "f17c-todo", BoardId = "f17c-board", LaneId = "f17c-A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 30, 0, TimeSpan.Zero) });
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            svc.DeleteLaneAsync("f17c-A", stranger, MemberRoles));
+
+        await using (var q = store.QuerySession())
+        {
+            Assert.NotNull(await q.LoadAsync<KanbanLane>("f17c-A"));        // untouched
+            Assert.NotNull(await q.LoadAsync<BoardItemPlacement>("f17c-p"));
+            Assert.NotNull(await q.LoadAsync<TodoItem>("f17c-todo"));
+        }
+
+        // No audit row for the refused delete.
+        Assert.Empty(await BoardAuditRows(store, "f17c-board"));
+    }
+
+    /// <summary>
+    /// <b>F17</b> (C3 404-vs-403 split): a **missing** lane id is <see
+    /// cref="KeyNotFoundException"/> (404); a lane whose board is
+    /// **soft-deleted** is <see cref="KeyNotFoundException"/> (404) too — the
+    /// board-delete seam already owns the board, so the lane-delete seam does
+    /// not re-enter a deleted board's tree.
+    /// </summary>
+    [Fact]
+    public async Task F17_DeleteLane_MissingLane_404_OnSoftDeletedBoard_404()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f17d-author";
+
+        // A missing lane id — the 404 side.
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.DeleteLaneAsync("no-such-lane", author, MemberRoles));
+
+        // A lane on a soft-deleted board — the 404 side (checked before the
+        // standing, so even the creator is refused).
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f17d-board", AuthorId = author, Title = "Deleted board",
+            IsDeleted = true,
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+        await Plant(store, new KanbanLane { Id = "f17d-A", BoardId = "f17d-board", Title = "A", Order = 0, Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero) });
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            svc.DeleteLaneAsync("f17d-A", author, MemberRoles));
+    }
+
     // ── F15 — move a card to a lane + position (ADR 0069) ───────────────────
 
     /// <summary>

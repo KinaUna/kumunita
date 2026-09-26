@@ -596,6 +596,28 @@
                                         </li>
                                     }
                                 }
+                                @* ADR 0097 — the lane-delete row (the board
+                                   ⋮ menu's "Delete board" idiom, scoped to
+                                   one lane): the lane + its card placements
+                                   are removed, the to-dos are kept
+                                   standalone, the board's remaining lanes
+                                   renumber. The standing (creator ∪
+                                   GlobalAdmin) is the service's on write;
+                                   the CanEdit flag is the same matrix (the
+                                   board-delete item's gate). The confirm is
+                                   the declarative data-confirm contract
+                                   (SECURITY.md §6 no-inline-script). *@
+                                @if (Model.CanEdit)
+                                {
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li>
+                                        <form method="post" action="@($"/projects/boards/{Model.Board.Id}/lanes/{lane.LaneId}/delete")"
+                                              data-confirm="@("Delete this lane? Its cards come off this board — the to-dos themselves are kept.")" style="margin:0;">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item text-danger"><kw-l key="projects.board.lane.delete">Delete lane</kw-l></button>
+                                        </form>
+                                    </li>
+                                }
                             </ul>
                         </div>
                     </div>

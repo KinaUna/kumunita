@@ -2127,6 +2127,38 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
+    /// <c>POST /projects/boards/{id}/lanes/{laneId}/delete</c> — the
+    /// lane-delete write lane (ADR 0097 — the service's
+    /// <see cref="IProjectService.DeleteLaneAsync"/>: the lane + its card
+    /// placements are removed, the to-dos are kept standalone (C-M5·2), and
+    /// the board's remaining lanes are renumbered 0..n-1). **Creator ∪
+    /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
+    /// standing gate; a missing id is 404, a denied actor 403 (the C3
+    /// split).
+    /// </summary>
+    [HttpPost("/projects/boards/{id}/lanes/{laneId}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LaneDeletePost(string id, string laneId)
+    {
+        var actorId = SubjectId(User) ?? string.Empty;
+        try
+        {
+            await projects.DeleteLaneAsync(laneId, actorId, RoleSet(User), HttpContext.RequestAborted);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new ForbidResult();
+        }
+
+        TempData["info"] = "Lane deleted.";
+        return Redirect($"/projects/boards/{id}");
+    }
+
+    /// <summary>
     /// <c>POST /projects/boards/{id}/lanes/{laneId}/todos</c> — the
     /// add-to-do-to-lane write lane (ADR 0068 — the service's
     /// <see cref="IProjectService.AddTodoToLaneAsync"/>: a new to-do placed
