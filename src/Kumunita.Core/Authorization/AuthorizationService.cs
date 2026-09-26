@@ -424,21 +424,35 @@ public sealed class AuthorizationService(IDocumentStore store, IUserInfoService 
         if (hasBreakGlass)
             return new Decision(true, AccessVia.BreakGlass, actorId);
 
-        // 4. Community-visible branch (ADR 0036) — the resource's
-        //    Audience.Community flag is true AND the actor is a member of the
-        //    target component (the live communityIds contain the target's
-        //    ComponentId). Placed after the moderator / break-glass branches
-        //    so those standing rights still apply (a moderator who is not a
-        //    member still sees the post); before the audience / grants
-        //    branch so it short-circuits when it matches. Uses the actor's
-        //    own membership (not the effective principal's) — the same
-        //    actor-scoped standing as the break-glass / moderator branches.
-        if (target.Audience is { Community: true } &&
-            target.ComponentId is not null &&
-            communityIds.Contains(target.ComponentId))
+        // 4. Community-visible branch (ADR 0036, refined by ADR 0102) — the
+        //    resource's Audience.Community flag is true AND the actor's
+        //    standing covers the target's community scope. When the target
+        //    names a specific community (a non-empty ComponentId), the actor
+        //    must be a member of that community (the live communityIds
+        //    contain the target's ComponentId). When the target's community
+        //    scope is "all communities" (a null/empty ComponentId — the
+        //    Event/Project "All communities" shape), the flag is the whole
+        //    decision: ANY signed-in actor (a non-empty actorId) sees it —
+        //    the same resident-only standing as the AllResidents branch
+        //    (4.5). Anonymous (empty actorId) is denied in that case (the
+        //    public branch, 5, is the world-readable shape). Placed after
+        //    the moderator / break-glass branches so those standing rights
+        //    still apply (a moderator who is not a member still sees the
+        //    post); before the audience / grants branch so it
+        //    short-circuits when it matches. Uses the actor's own standing
+        //    (not the effective principal's) — the same actor-scoped
+        //    standing as the break-glass / moderator branches.
+        if (target.Audience is { Community: true })
         {
-            var via = isDelegated ? AccessVia.Delegation : AccessVia.Community;
-            return new Decision(true, via, effectivePrincipalId);
+            bool matches = string.IsNullOrEmpty(target.ComponentId)
+                ? !string.IsNullOrEmpty(actorId)
+                : communityIds.Contains(target.ComponentId);
+
+            if (matches)
+            {
+                var via = isDelegated ? AccessVia.Delegation : AccessVia.Community;
+                return new Decision(true, via, effectivePrincipalId);
+            }
         }
 
         // 4.5 All-residents branch (ADR 0041) — the resource's

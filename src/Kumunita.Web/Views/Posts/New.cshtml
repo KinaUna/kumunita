@@ -165,16 +165,17 @@
 
                     <hr class="my-3" />
 
-                    @* The granular audience block — hidden by default (ADR
-                       0036): the "Everyone in this community" checkbox
-                       above drives the show/hide (the page script below).
-                       The hidden <c>Grants</c> textarea inside
-                       _GrantPickers stays the ONLY form-bound grant field
-                       (the U11 / F13 single-source pin) regardless of
-                       visibility. *@
+                    @* ADR 0102 — the granular audience block (mode radios + "Who to grant
+                       to") is hidden while "Everyone in this community" is
+                       on (the checkbox above drives the show/hide;
+                       client/lib/audience-toggle.js reacts to changes) and
+                       shown when the author opts in to a narrower audience.
+                       The hidden <c>Grants</c> textarea inside _GrantPickers
+                       stays the ONLY form-bound grant field (the U11 / F13
+                       single-source pin) regardless of visibility. *@
                     <div id="audience-restricted" data-audience-panel
                          class="audience-restricted"
-                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
+                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
                         <div class="form-label mt-2" style="font-weight:600;">
                             <kw-l key="posts.audience_combine">How the picks combine</kw-l>
                         </div>

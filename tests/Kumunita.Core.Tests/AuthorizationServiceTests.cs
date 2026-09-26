@@ -416,19 +416,28 @@ public class AuthorizationServiceTests(PostgresFixture fixture) : IClassFixture<
         Assert.False(decision.Allowed);
     }
 
+    // ADR 0102 — the pre-ADR-0102 "inert" consequence is reversed. When the
+    // Community flag is on AND the target's community scope is "all
+    // communities" (a null/empty ComponentId), the flag is the whole
+    // decision: ANY signed-in actor sees it (the resident-only standing,
+    // the same as the AllResidents branch 4.5), regardless of which specific
+    // communities they are a member of. Anonymous (empty actorId) is denied
+    // (the public branch is the world-readable shape). The old behavior
+    // (this shape was inert ⇒ owner-only) is gone.
+
     [Fact]
-    public async Task A0036_CommunityFlagButNullComponent_Inert()
+    public async Task A0036_CommunityFlagNullComponent_SignedInActor_Allows_ViaCommunity()
     {
         var (store, _conn, userInfo, auth) = await BootAsync();
         const string actor = "u-member-0036c";
         const string componentId = "comp-0036-null";
         await SeedCommunityWithMemberAsync(store, userInfo, componentId, actor);
 
-        // Community flag on but the target has NO ComponentId (the group-
-        // post shape: empty ComponentId + non-null empty audience). The
-        // branch requires a non-null ComponentId, so it is inert — the
-        // actor's membership of *some* other component does not grant
-        // access. Grants empty → MatchGroups denies.
+        // Community flag on but the target has NO ComponentId (the
+        // Event/Project "All communities" scope: null ComponentId +
+        // non-null audience). Under ADR 0102 this is the "all residents"
+        // shape — the actor's membership of *some* specific community is
+        // irrelevant; ANY signed-in actor sees it.
         var audience = new Audience(AudienceMode.Any, []) { Community = true };
         var target = new TestResource
         {
@@ -440,6 +449,59 @@ public class AuthorizationServiceTests(PostgresFixture fixture) : IClassFixture<
         };
 
         var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Community, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagNullComponent_SignedInNonMember_Allows()
+    {
+        var (store, _conn, userInfo, auth) = await BootAsync();
+        const string actor = "u-standalone-0036c2";
+        const string componentId = "comp-0036-null2";
+        // Seed a community + a *different* member so the store has live
+        // community data; the actor is NOT a member of any community.
+        await SeedCommunityWithMemberAsync(store, userInfo, componentId, "u-other-member-0036c2");
+
+        // Community flag on + null ComponentId = "all communities" scope
+        // (ADR 0102). A signed-in actor with NO community membership at all
+        // still sees it — the flag is the whole decision, not a member
+        // match.
+        var audience = new Audience(AudienceMode.Any, []) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-nullcomp-nonmember",
+            TargetKind = "post",
+            OwnerId = "u-other-0036c2",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync(actor, AccessAction.Read, target);
+        Assert.True(decision.Allowed);
+        Assert.Equal(AccessVia.Community, decision.Via);
+    }
+
+    [Fact]
+    public async Task A0036_CommunityFlagNullComponent_AnonymousActor_Denies()
+    {
+        var (store, _conn, _userInfo, auth) = await BootAsync();
+
+        // Community flag on + null ComponentId = "all communities" scope,
+        // but the actor is anonymous (empty actorId). The Community branch
+        // (4) requires a signed-in actor in this shape; the public branch
+        // (5) does not fire because the audience is non-null. → Deny.
+        var audience = new Audience(AudienceMode.Any, []) { Community = true };
+        var target = new TestResource
+        {
+            Id = "post-0036-nullcomp-anon",
+            TargetKind = "post",
+            OwnerId = "u-other-0036c3",
+            ComponentId = null,
+            Audience = audience,
+        };
+
+        var decision = await auth.CanAsync("", AccessAction.Read, target);
         Assert.False(decision.Allowed);
     }
 

@@ -35,15 +35,23 @@ public sealed class Audience
     public List<AudienceGrant> Grants { get; set; } = new();
 
     /// <summary>
-    /// The "community-visible" flag (ADR 0036): when <c>true</c>, the
-    /// resource is visible to all members of the target component (the
-    /// actor's <c>communityIds</c> must contain the target's
-    /// <c>ComponentId</c>). This is the **default** for new community posts
-    /// (the Web composer seeds it <c>true</c>); existing posts have it
-    /// <c>false</c> (the old owner-only behavior). A <c>true</c> flag with
-    /// an empty <see cref="Grants"/> list is the "all community members"
-    /// shape — the empty-audience-denies invariant (C1) does **not** apply
-    /// to the Community branch (it is a distinct grant, not a mode of the
+    /// The "community-visible" flag (ADR 0036, refined by ADR 0102): when
+    /// <c>true</c>, the resource is visible according to its community
+    /// scope. When the resource names a specific community (a non-empty
+    /// <c>ComponentId</c>), the actor must be a member of that community
+    /// (the actor's <c>communityIds</c> must contain the target's
+    /// <c>ComponentId</c>). When the resource's community scope is "all
+    /// communities" (a null/empty <c>ComponentId</c> — the Event/Project
+    /// "All communities" shape), the flag is the whole decision: ANY
+    /// signed-in actor (a non-empty <c>actorId</c>) sees it — the same
+    /// resident-only standing as <see cref="AllResidents"/> (ADR 0102,
+    /// "everyone in this community" + "all communities" ⇒ all residents).
+    /// This is the **default** for new community posts (the Web composer
+    /// seeds it <c>true</c>); existing posts have it <c>false</c> (the old
+    /// owner-only behavior). A <c>true</c> flag with an empty
+    /// <see cref="Grants"/> list is the "all community members" shape — the
+    /// empty-audience-denies invariant (C1) does **not** apply to the
+    /// Community branch (it is a distinct grant, not a mode of the
     /// <see cref="Grants"/> list).
     /// </summary>
     public bool Community { get; set; }

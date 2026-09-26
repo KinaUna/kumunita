@@ -161,22 +161,25 @@
                         Audience — who can see this post
                     </h6>
 
-                    @* ADR 0036 — the "Everyone in this community" checkbox
-                       is bound (Audience.CommunityVisible) and seeded from
-                       the post's stored audience (FromAudience). The
-                       granular picker block below stays hidden until the
-                       checkbox is turned off (the page script in
-                       @section Scripts drives the show/hide). Without
-                       this checkbox the edit POST would bind
-                       CommunityVisible to <c>false</c> (field absent) and
-                       silently flip a community-visible post back to
-                       owner-only. *@
+                    @* ADR 0036, refined by ADR 0102 — the "Everyone in this
+                       community" checkbox is bound (Audience.CommunityVisible)
+                       and seeded from the post's stored audience
+                       (FromAudience). The granular picker block below stays
+                       hidden while the checkbox is on (the page script in
+                       @section Scripts drives the show/hide). The default is
+                       <c>true</c> (ADR 0102): "Everyone in this community" is
+                       the default on every form where the option is available,
+                       so the edit lane starts checked and only narrows if the
+                       author opts in to a narrower audience. Without this
+                       checkbox the edit POST would bind CommunityVisible to
+                       <c>false</c> (field absent) and silently flip a
+                       community-visible post back to owner-only. *@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox"
                                name="Audience.CommunityVisible"
                                id="aud-community" data-audience-toggle
                                value="true"
-                               @(Model.Audience?.CommunityVisible ?? false ? "checked" : null) />
+                               @(Model.Audience?.CommunityVisible ?? true ? "checked" : null) />
                         <label class="form-check-label fw-semibold" for="aud-community">
                             <kw-l key="posts.audience_all_members">Everyone in this community</kw-l>
                         </label>
@@ -187,17 +190,19 @@
 
                     <hr class="my-3" />
 
-                    @* The granular audience block — hidden by default
-                       (ADR 0036) unless the post already carries an
-                       explicit grant list (seeded visible by
-                       <c>AudienceEditorModel.FromAudience</c>). The
-                       hidden <c>Grants</c> textarea inside _GrantPickers
-                       stays the ONLY form-bound grant field (the
-                       U11 / F13 single-source pin) regardless of
-                       visibility. *@
+                    @* ADR 0102 — the granular audience block (mode radios + "Who to grant
+                       to") is hidden while "Everyone in this community" is
+                       on (the checkbox above, bound and seeded by
+                       <c>AudienceEditorModel.FromAudience</c>, drives the
+                       show/hide; client/lib/audience-toggle.js reacts to
+                       changes). It is shown when the checkbox is off (the
+                       author wants a narrower audience). The hidden
+                       <c>Grants</c> textarea inside _GrantPickers stays the
+                       ONLY form-bound grant field (the U11 / F13 single-
+                       source pin) regardless of visibility. *@
                     <div id="audience-restricted" data-audience-panel
                          class="audience-restricted"
-                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
+                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
                         <div class="form-label mt-2" style="font-weight:600;">
                             <kw-l key="posts.audience_combine">How the picks combine</kw-l>
                         </div>

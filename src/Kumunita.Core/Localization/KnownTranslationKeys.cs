@@ -565,9 +565,9 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "How the picks combine",
             ["posts.audience_restrict_hint"] =
-                "These picks are ADDITIONAL — “Everyone in this community” " +
-                "stays on unless you turn it off, so the post is visible to " +
-                "the whole community and the picks you make here.",
+                "These picks are hidden while “Everyone in this community” is " +
+                "on — the post is visible to everyone in the community. Turn " +
+                "that off to narrow who can see it with the picks here.",
             ["posts.audience_only_picks"] =
                 "Whatever you pick here becomes the post's audience — nothing " +
                 "above or below this form is added to it. An empty pick (with " +
@@ -2060,9 +2060,10 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Wie die Auswahl kombiniert wird",
             ["posts.audience_restrict_hint"] =
-                "Diese Auswahl ist zusätzlich — „Alle in dieser Gemeinschaft“ " +
-                "bleibt an, solange du es nicht ausschaltest, der Beitrag ist also " +
-                "für die ganze Gemeinschaft und die hier gewählten Personen sichtbar.",
+                "Diese Auswahl ist ausgeblendet, solange „Alle in dieser " +
+                "Gemeinschaft“ an ist — der Beitrag ist für alle in der " +
+                "Gemeinschaft sichtbar. Schalte sie ab, um mit den Auswahl " +
+                "hier zu bestimmen, wer ihn sehen kann.",
             ["posts.audience_only_picks"] =
                 "Was du hier wählst, wird das Publikum des Beitrags — es wird " +
                 "nichts darüber oder darunter hinzugefügt. Eine leere Auswahl (mit " +
@@ -3493,9 +3494,10 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Combinaison des sélections",
             ["posts.audience_restrict_hint"] =
-                "Ces sélections sont additionnelles — « Tout le monde dans cette communauté » " +
-                "reste actif sauf si tu le désactives, donc la publication est visible par " +
-                "toute la communauté et les sélections que tu fais ici.",
+                "Ces sélections sont masquées tant que « Tout le monde dans cette " +
+                "communauté » est actif — la publication est visible par toute la " +
+                "communauté. Désactive-le pour restreindre l'accès avec les " +
+                "sélections ci-dessous.",
             ["posts.audience_only_picks"] =
                 "Ce que tu sélectionnes ici devient l'audience de la publication — rien " +
                 "au-dessus ou en dessous de ce formulaire n'y est ajouté. Une sélection vide (avec " +
@@ -4927,9 +4929,9 @@ public static class KnownTranslationKeys
             ["posts.audience_combine"] =
                 "Sådan kombineres valgene",
             ["posts.audience_restrict_hint"] =
-                "Disse valg er yderligere — \"Alle i dette fællesskab\" " +
-                "bliver tændt, medmindre du slår det fra, så indlægget er synligt " +
-                "for hele fællesskabet og de valg, du træffer her.",
+                "Disse valg er skjult, mens \"Alle i dette fællesskab\" er " +
+                "tændt — indlægget er synligt for alle i fællesskabet. Slå det " +
+                "fra for at begrænse adgang med valgene her.",
             ["posts.audience_only_picks"] =
                 "Det, du vælger her, bliver indlæggets modtagerkreds — der " +
                 "tilføjes intet ovenfor eller nedenfor denne formular. Et tomt valg (med " +

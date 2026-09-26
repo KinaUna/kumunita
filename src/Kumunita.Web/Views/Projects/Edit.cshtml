@@ -254,7 +254,15 @@
                         </label>
                     </div>
 
-                    <div class="mt-3">
+                    @* ADR 0102 — the granular audience block (mode radios +
+                       "Who to grant to") is hidden while "Everyone" is on:
+                       the checkbox above drives show/hide via
+                       client/lib/audience-toggle.js (loaded in _Layout).
+                       The hidden <c>Grants</c> textarea inside _GrantPickers
+                       stays the ONLY form-bound grant field (the single-
+                       source pin) regardless of visibility. *@
+                    <div id="audience-restricted" data-audience-panel class="mt-3 audience-restricted"
+                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
                         <label class="form-label" for="aud-mode" style="font-weight:600;"><kw-l key="posts.audience_combine">How the picks combine</kw-l></label>
                         @foreach (var m in modes)
                         {

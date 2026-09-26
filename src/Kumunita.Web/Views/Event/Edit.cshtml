@@ -183,7 +183,7 @@
 
                     <div id="audience-restricted" data-audience-panel
                          class="audience-restricted"
-                         @(Model.Audience is { IsEmpty: false } ? null : "d-none")>
+                         @(Model.Audience?.CommunityVisible ?? true ? "d-none" : null)>
                         <div class="form-label mt-2" style="font-weight:600;">
                             <kw-l key="posts.audience_combine">How the picks combine</kw-l>
                         </div>
