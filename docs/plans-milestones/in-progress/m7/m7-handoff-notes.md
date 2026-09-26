@@ -87,3 +87,46 @@ scratch tier of the three-tier contract — see the plan header).
   `GroupEventServiceTests.cs`, `ProjectServiceTests.cs`,
   `EventControllerTests.cs`, `ProjectsControllerTests.cs`), and the 2 ADR /
   design docs above. **No schema, auth-surface, or document changes.**
+
+## U02 — PagedViewModel + _Pager + kw-l keys
+
+- **Files touched (4: 2 new + 1 modify + 1 new test):** `src/Kumunita.Web/
+  Models/PagedViewModel.cs` (new), `src/Kumunita.Web/Views/Shared/_Pager.
+  cshtml` (new), `src/Kumunita.Core/Localization/KnownTranslationKeys.cs`
+  (modify — the two keys × en/de/fr/da, appended at each dictionary's tail),
+  `tests/Kumunita.Web.Tests/PagedViewModelTests.cs` (new, 4 tests).
+- **Record shape (D5 — the exact C# from design doc §7.7):** `public
+  sealed record PagedViewModel(int CurrentPage, int PageSize, bool
+  HasPrevious, bool HasNext, string BaseUrl, IReadOnlyDictionary<string,
+  string> FilterParams)` + the static `ForRoute(string baseUrl, int page,
+  int pageSize, bool hasMore, IReadOnlyDictionary<string, string>?
+  filterParams = null)` factory — `HasPrevious = page > 1`, `HasNext =
+  hasMore`, `FilterParams` defaults to an empty `Dictionary`.
+- **The two kw-l keys (locked en strings, design §7.8):**
+  `pagination.prev` = "Newer" (toward the head — the feeds are
+  newest-first / earliest-start-first), `pagination.next` = "Older"
+  (toward the tail). Non-en values (initial baselines, community-owned via
+  the in-app editor — the ADR 0042 D1 / D2 idiom): `de` "Neuere"/"Ältere";
+  `fr` "Plus récents"/"Plus anciens"; `da` "Nyere"/"Ældre".
+- **The `_Pager` partial's no-render pin (F2):** the partial's top guard is
+  `@if (Model.HasPrevious || Model.HasNext) { … }` — a one-page surface
+  (`page = 1`, `hasMore = false`) renders **nothing**. U03's drop-in
+  pattern is `@if (Model.PagerPosts is not null) { <partial name="_Pager"
+  model="Model.PagerPosts" /> }` (the VM field is `null` on a one-page
+  section, the F2 pin's consumer).
+- **The 4 VM tests (all passing):** `ForRoute_Page1_Full_HasNextTrue_
+  HasPrevFalse`, `ForRoute_Page2_Partial_HasNextFalse_HasPrevTrue`,
+  `ForRoute_FilterParams_Preserved`, `ForRoute_Page1_NotFull_RendersNothing`.
+  `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+  -class Kumunita.Web.Tests.PagedViewModelTests` → `Total: 4, Errors: 0,
+  Failed: 0`.
+- **Parity tests (still passing):** `dotnet exec tests\Kumunita.Core.Tests\
+  bin\Debug\net10.0\Kumunita.Core.Tests.dll -class Kumunita.Core.Tests.
+  KnownTranslationKeys_ParityTests` → `Total: 7, Errors: 0, Failed: 0`
+  (the two new keys are present in all four dictionaries; the en/non-en
+  parity invariants hold).
+- **Validation:** `dotnet build Kumunita.slnx -c Debug` → **Build succeeded,
+  0 errors** (10 warnings, all pre-existing — none in the 3 new files or
+  the modified registry). **No surface wired** (U03/U04 do that), **no
+  design-doc edits** (the design doc's § Seams / § FACES / §7.8 are the
+  pins consumed, not modified).

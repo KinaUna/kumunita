@@ -1498,6 +1498,13 @@ public static class KnownTranslationKeys
             ["pl.goal.delete_confirm"] = "Delete this goal? Its projects stay in place — the link to this goal simply stops showing.",
             ["pl.project.delete"] = "Delete project",
             ["pl.project.delete_confirm"] = "Delete this project? Its to-dos and boards stay in place — the link to this project simply stops showing.",
+
+            // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
+            // The feeds are newest-first / earliest-start-first, so *Prev*
+            // steps toward the head (the newer rows) and *Next* toward the
+            // tail (the older rows) — the locked en strings (design §7.8).
+            ["pagination.prev"] = "Newer",
+            ["pagination.next"] = "Older",
         };
 
     /// <summary>
@@ -2860,6 +2867,10 @@ public static class KnownTranslationKeys
             ["pl.goal.delete_confirm"] = "Dieses Ziel löschen? Seine Projekte bleiben an ihrem Ort — der Link zu diesem Ziel wird einfach nicht mehr angezeigt.",
             ["pl.project.delete"] = "Projekt löschen",
             ["pl.project.delete_confirm"] = "Dieses Projekt löschen? Seine To-dos und Boards bleiben an ihrem Ort — der Link zu diesem Projekt wird einfach nicht mehr angezeigt.",
+
+            // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
+            ["pagination.prev"] = "Neuere",
+            ["pagination.next"] = "Ältere",
         };
 
     /// <summary>
@@ -4224,6 +4235,10 @@ public static class KnownTranslationKeys
             ["pl.board.set_project"] = "Définir le projet",
             ["pl.board.add_to_project"] = "Ajouter au projet…",
             ["pl.board.project_hint"] = "Un lien de projet est une surface d'affichage — il rattache ce tableau au projet, il ne limite jamais qui peut le voir.",
+
+            // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
+            ["pagination.prev"] = "Plus récents",
+            ["pagination.next"] = "Plus anciens",
         };
 
     /// <summary>
@@ -5583,6 +5598,10 @@ public static class KnownTranslationKeys
             ["pl.board.set_project"] = "Vælg projekt",
             ["pl.board.add_to_project"] = "Tilføj til projekt…",
             ["pl.board.project_hint"] = "Et projektlink er en visningsflade — den grupperer dette board under projektet, men begrænser aldrig, hvem der kan se det.",
+
+            // ── M7 (ADR 0090) — the shared pager's two link labels (D5) ──
+            ["pagination.prev"] = "Nyere",
+            ["pagination.next"] = "Ældre",
         };
     /// the completeness view's "known" universe). Always equal to
     /// <see cref="EnValues"/>.Keys, in declaration order.
