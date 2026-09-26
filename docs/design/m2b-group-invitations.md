@@ -29,6 +29,10 @@ user-approved decisions in the plan
 - **Direction:** the **owner invites**, the **invitee resolves** (accept /
   decline). No join-request flow — that would open the reader to
   owner∪member-less state and break the owner∪member privacy model.
+  *(Superseded by **ADR 0094** / the `group-join-request-lane` design doc:
+  a self-initiated join-request lane now exists, but **public groups only** —
+  the private-group owner∪member model it protected is untouched, and the
+  m2b invitation lane is kept side-by-side, not replaced.)*
 - **Coexistence:** the immediate `AddGroupMemberAsync`/`RemoveGroupMemberAsync`
   pair is untouched and remains the U10/F7 pin's surface; the invitation is a
   second add-path with the invitee's consent in the audit lane.

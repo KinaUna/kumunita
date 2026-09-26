@@ -58,6 +58,12 @@ public static class M1DocTypes
         // than inserting a second one (C-M2b·3).
         opts.Schema.For<GroupInvitation>()
                .UniqueIndex(i => i.GroupId, i => i.UserId);   // business key
+        // ADR 0094 (resident self-initiated join request for public groups):
+        // the same one-row-per-(group, user) business-key convention — a
+        // re-request after a resolution resets the existing row rather than
+        // inserting a second one.
+        opts.Schema.For<GroupJoinRequest>()
+               .UniqueIndex(j => j.GroupId, j => j.UserId);   // business key
         opts.Schema.For<DelegationGrant>();
         // GU (ADR 0028): one row per (guardian, child); the pair is the business key (GroupInvitation convention)
         opts.Schema.For<GuardianLink>().UniqueIndex(g => g.GuardianId, g => g.ChildId);

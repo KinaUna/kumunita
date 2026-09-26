@@ -49,6 +49,22 @@ public sealed record InvitationViewModel(
     string InvitedByDisplayName);
 
 /// <summary>
+/// One <b>join request the actor made</b> on the <c>/groups</c> list
+/// (ADR 0094 — the "Your join requests" card; the withdraw self-lane's UI
+/// shape). The <see cref="Kumunita.Core.UserInfo.GroupJoinRequest"/> source
+/// row's <c>Status</c> / <c>RequestedAt</c> / resolution stamps never reach
+/// the model — the card only ever carries <em>pending</em> rows (the read
+/// lane filters them), and "when resolved, by whom" is an
+/// <see cref="Kumunita.Core.Authorization.AccessAudit"/> lane fact, not a UI
+/// fact (the <see cref="InvitationViewModel"/> pin carried to the join-request
+/// axis). There is no "invited by" cell: the resident <em>initiated</em> the
+/// request, so <c>GroupId</c> + <c>GroupName</c> is the whole row.
+/// </summary>
+public sealed record JoinRequestViewModel(
+    string GroupId,
+    string GroupName);
+
+/// <summary>
 /// The <b>group list</b> view model (M2 plan U9 + m2b). Holds the
 /// <see cref="IReadOnlyList{GroupViewModel}"/> projection the
 /// <c>/groups</c> <c>Index</c> action renders plus — since m2b — the actor's
@@ -70,6 +86,25 @@ public sealed class GroupListViewModel
     /// a feature, not a state).
     /// </summary>
     public IReadOnlyList<InvitationViewModel> Invitations { get; init; } = Array.Empty<InvitationViewModel>();
+
+    /// <summary>
+    /// <b>Public</b> groups the actor is <b>not</b> yet a member of (ADR 0094
+    /// — the "Other public groups" directory the <c>Request to join</c> lane
+    /// is offered on). Same <see cref="GroupViewModel"/> 3-tuple as
+    /// <see cref="Groups"/> (the row is the same projection — a group the
+    /// actor can see but not join yet); the only lane difference is the view's
+    /// affordance (a request button rather than a detail link). Empty when
+    /// there is nothing to request; the section is then absent.
+    /// </summary>
+    public IReadOnlyList<GroupViewModel> PublicGroups { get; init; } = Array.Empty<GroupViewModel>();
+
+    /// <summary>
+    /// The actor's <b>own</b> pending join requests (ADR 0094 read lane — the
+    /// <c>/groups</c> list's "Your join requests" card + the withdraw
+    /// self-lane's UI). Empty when the actor holds none; the card is then
+    /// absent from the view (not a "no requests" placeholder).
+    /// </summary>
+    public IReadOnlyList<JoinRequestViewModel> MyJoinRequests { get; init; } = Array.Empty<JoinRequestViewModel>();
 }
 
 /// <summary>
@@ -118,6 +153,20 @@ public sealed class GroupCreateModel
 /// member-list-shaped UI fact (docs/design/m2b-group-invitations.md).
 /// </summary>
 public sealed record PendingInvitationViewModel(string SubjectId, string DisplayName);
+
+/// <summary>
+/// One <b>pending join request</b> on the <c>/groups/{id}</c> review surface
+/// (ADR 0094 — the owner ∪ GlobalAdmin's approve/decline list). The
+/// <see cref="PendingInvitationViewModel"/> 2-tuple pin carried to the
+/// join-request axis: <see cref="SubjectId"/> (the requester's opaque
+/// <see cref="Kumunita.Core.UserInfo.GroupJoinRequest.UserId"/> — the
+/// approve/decline route's <c>{subjectId}</c>) + <see cref="DisplayName"/>
+/// (a <see cref="IUserInfoService.GetProfileAsync"/> / catalog lookup; the raw
+/// subject id when the profile is absent — fail-safe, not a silent blank row).
+/// The source row's <c>RequestedAt</c> / <c>Status</c> never reach the model
+/// (audit-lane and read-lane facts — the list shows only <em>pending</em> rows).
+/// </summary>
+public sealed record PendingJoinRequestViewModel(string SubjectId, string DisplayName);
 
 /// <summary>
 /// One <b>member row</b> on the <c>/groups/{id}</c> member list (M2 plan U10).
@@ -261,6 +310,14 @@ public sealed record GroupDetailViewModel(
     public IReadOnlyList<LanguageOption> Languages { get; init; } = [];
 
     public bool CanTranslate { get; init; }
+
+    // ── ADR 0094 — resident self-initiated join requests (public groups) ──
+    // The owner ∪ GlobalAdmin's review surface on the detail page: the group's
+    // pending join requests (each row's display name resolved through the same
+    // catalog read as the member rows). Object-initializer property (not a
+    // positional param) so the existing positional shape-pin keeps its
+    // ordering.
+    public IReadOnlyList<PendingJoinRequestViewModel> PendingJoinRequests { get; init; } = [];
 
     // ── Group events (ADR 0089) — the membership-scoped events feed lives on
     //    the same detail page (the group-posts lane's shape, carried to the M4

@@ -127,7 +127,44 @@ public sealed class GroupsController(
                 by?.DisplayName ?? inv.InvitedBy));
         }
 
-        return View(new GroupListViewModel { Groups = rows, Invitations = invitations });
+        // ADR 0094 — the "Other public groups" directory: the public groups the
+        // actor is NOT yet in (GetPublicGroupsAsync minus the actor's own
+        // owner∪member set — a group the actor already belongs to or owns is on
+        // the Groups list above, so requesting to join it would be a no-op).
+        // Same GroupViewModel 3-tuple projection + the same per-row member-count
+        // read; the only difference is the view's affordance (a request button).
+        var myGroupIds = groups.Select(g => g.Id).ToHashSet(StringComparer.Ordinal);
+        var publicGroups = await userInfo.GetPublicGroupsAsync();
+        var publicRows = new List<GroupViewModel>();
+        foreach (var g in publicGroups)
+        {
+            if (myGroupIds.Contains(g.Id))
+                continue;
+            var members = await userInfo.GetGroupMembersAsync(g.Id);
+            publicRows.Add(new GroupViewModel(g.Id, g.Name, members.Count));
+        }
+
+        // ADR 0094 — the actor's OWN pending join requests (the "Your join
+        // requests" card; the withdraw self-lane's UI). Read lane (no audit,
+        // C-M2·2 carried); the group name per row comes from the single-group
+        // read — same shape as the invitations card above.
+        List<JoinRequestViewModel> myJoinRequests = [];
+        var pendingRequests = await userInfo.GetPendingJoinRequestsForUserAsync(subject);
+        foreach (var req in pendingRequests)
+        {
+            var group = await userInfo.GetGroupAsync(req.GroupId);
+            myJoinRequests.Add(new JoinRequestViewModel(
+                req.GroupId,
+                group?.Name ?? req.GroupId));
+        }
+
+        return View(new GroupListViewModel
+        {
+            Groups = rows,
+            Invitations = invitations,
+            PublicGroups = publicRows,
+            MyJoinRequests = myJoinRequests
+        });
     }
 
     /// <summary>
@@ -345,6 +382,20 @@ public sealed class GroupsController(
             pendingInvitations.Add(new PendingInvitationViewModel(inv.UserId, p?.DisplayName ?? inv.UserId));
         }
 
+        // ADR 0094 — the group's pending join requests (the owner ∪ GlobalAdmin
+        // review surface: the pending list + approve/decline links). Read lane
+        // (no audit, C-M2·2 carried); each row's display name via the same
+        // catalog read as the member rows above (the PendingInvitations shape
+        // carried to the join-request axis).
+        List<PendingJoinRequestViewModel> pendingJoinRequests = [];
+        var pendingRequests = await userInfo.GetPendingJoinRequestsForGroupAsync(group.Id);
+        foreach (var req in pendingRequests)
+        {
+            Profile? p;
+            bySubject.TryGetValue(req.UserId, out p);
+            pendingJoinRequests.Add(new PendingJoinRequestViewModel(req.UserId, p?.DisplayName ?? req.UserId));
+        }
+
         // The "Add a member" dropdown rows: the catalog minus the group's
         // current members (adding someone already in is a no-op the form
         // should not offer), sorted by display name — the view filters
@@ -405,6 +456,9 @@ public sealed class GroupsController(
             GroupTranslations = groupTranslations,
             Languages = groupLanguages,
             CanTranslate = canTranslate,
+            // ADR 0094 — the owner ∪ GlobalAdmin's pending join requests to
+            // review (approve/decline); empty when the group holds none.
+            PendingJoinRequests = pendingJoinRequests,
             // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
             // one-page no-render pin: null on a single page so the _Pager
             // partial renders nothing). The group is the route (D9) — no
@@ -1111,6 +1165,173 @@ public sealed class GroupsController(
         }
 
         TempData["info"] = $"Cancelled the invitation for {subjectId}.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    // ── ADR 0094: resident self-initiated join requests (public groups) — the
+    // reverse of the m2b invitation lane above: the resident starts it
+    // (request/withdraw self-lane) and the owner ∪ GlobalAdmin resolves it
+    // (approve → membership / decline). docs/adr/0094-group-join-request-lane.md ──
+
+    /// <summary>
+    /// Request to join a group (ADR 0094 self-lane):
+    /// <c>POST /groups/{id}/join/request</c>. The actor is always
+    /// <c>SubjectId(User)</c> (never a form field). The Core writes the
+    /// <see cref="Kumunita.Core.UserInfo.GroupJoinRequest"/> row
+    /// (<c>Pending</c>, re-request resets a resolved row — the ADR 0094 state
+    /// machine) and appends the <c>group.join.request</c> audit row; it touches
+    /// <b>no</b> membership — that lands only on
+    /// <see cref="ApproveJoinRequest"/>. The route 404s when the group is
+    /// missing (the Core's fail-safe) or when the actor already belongs to it
+    /// (a request to join one's own group is a no-op — the Index view only
+    /// offers the button for public non-member groups, this is the route's own
+    /// wall).
+    /// </summary>
+    [HttpPost("{id}/join/request")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RequestToJoin(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        // Fail-safe: the group must exist and be one the actor can request to
+        // join (public, and not already a member of). The Core does not
+        // re-check membership (it is a write lane, not a projection), so the
+        // Web asserts it here — the same "what is offered is what the route
+        // accepts" rule the invite lane uses.
+        var group = await userInfo.GetGroupAsync(id);
+        if (group is null || group.IsPrivate)
+            return NotFound();
+
+        var myGroups = await userInfo.GetGroupsForUserAsync(actor);
+        if (myGroups.Any(g => g.Id == id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.RequestToJoinGroupAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "Could not record that request.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = $"Requested to join “{group.Name}”.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Withdraw the actor's own pending join request (ADR 0094 self-lane):
+    /// <c>POST /groups/{id}/join/withdraw</c>. Same gate and shape as
+    /// <see cref="RequestToJoin"/>; the Core verifies actor == row.UserId (the
+    /// self-lane wall) and moves the row to its terminal <c>Withdrawn</c> state
+    /// (the m2b owner's <c>Cancelled</c> analogue — the row drops off both the
+    /// requester's "Your join requests" card and the owner's review list) — the
+    /// actor may re-request afterward (a re-request resets it to <c>Pending</c>).
+    /// </summary>
+    [HttpPost("{id}/join/withdraw")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WithdrawJoinRequest(string id)
+    {
+        var actor = SubjectId(User);
+        if (string.IsNullOrEmpty(actor))
+            return Unauthorized();
+
+        // Self-lane gate: the row must be in MY pending list.
+        var pending = await userInfo.GetPendingJoinRequestsForUserAsync(actor);
+        if (pending.All(r => r.GroupId != id))
+            return NotFound();
+
+        try
+        {
+            await userInfo.WithdrawJoinRequestAsync(id, actor);
+        }
+        catch (InvalidOperationException)
+        {
+            // Resolved (approved/declined) in the gap between the click and this
+            // commit — the Core's invalid-transition wall.
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        TempData["info"] = "Join request withdrawn.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>
+    /// Approve a pending join request (ADR 0094 owner ∪ GlobalAdmin lane):
+    /// <c>POST /groups/{id}/join-requests/{subjectId}/approve</c>. The
+    /// <see cref="TryResolveOwnerSurface"/> gate (owner ∪ GlobalAdmin on top of
+    /// the owner ∪ member projection — a plain member's POST 404s). The
+    /// <c>subjectId</c> is the requester's opaque subject, route-carried the
+    /// way <see cref="CancelInvitation"/> carries its form field. On success the
+    /// <see cref="Kumunita.Core.UserInfo.GroupMembership"/> row is live on the
+    /// very next read (C4). A row already resolved maps to an error message,
+    /// never a 500.
+    /// </summary>
+    [HttpPost("{id}/join-requests/{subjectId}/approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApproveJoinRequest(string id, string subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.ApproveJoinRequestAsync(
+                groupId: resolved.Group.Id,
+                userId: subjectId!,
+                resolvedBy: resolved.Actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+        }
+
+        TempData["info"] = $"Approved {subjectId}'s request to join “{resolved.Group.Name}”.";
+        return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+    }
+
+    /// <summary>
+    /// Decline a pending join request (ADR 0094 owner ∪ GlobalAdmin lane):
+    /// <c>POST /groups/{id}/join-requests/{subjectId}/decline</c>. The same
+    /// <see cref="TryResolveOwnerSurface"/> gate and shape as
+    /// <see cref="ApproveJoinRequest"/>, but <b>no</b> membership row is
+    /// written — the requester simply never becomes a member; they may
+    /// re-request afterward.
+    /// </summary>
+    [HttpPost("{id}/join-requests/{subjectId}/decline")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeclineJoinRequest(string id, string subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+            return NotFound();
+
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        try
+        {
+            await userInfo.DeclineJoinRequestAsync(
+                groupId: resolved.Group.Id,
+                userId: subjectId!,
+                resolvedBy: resolved.Actor);
+        }
+        catch (InvalidOperationException)
+        {
+            TempData["error"] = "That request is no longer pending.";
+            return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
+        }
+
+        TempData["info"] = $"Declined {subjectId}'s request to join “{resolved.Group.Name}”.";
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 

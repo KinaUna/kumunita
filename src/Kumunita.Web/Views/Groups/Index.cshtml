@@ -50,6 +50,36 @@
             </section>
         }
 
+        @*
+            ADR 0094 — "Your join requests" card: the actor's OWN pending
+            join requests (GroupListViewModel.MyJoinRequests). The requester
+            initiated each one, so the row carries only the group's name —
+            and the single affordance is a Withdraw (the self-lane route).
+        *@
+        @if (Model.MyJoinRequests.Count > 0)
+        {
+            <section class="airy-invite">
+                <h2>
+                    <kw-l key="groups.join_requests">Join requests</kw-l>
+                    <span class="badge bg-secondary">@Model.MyJoinRequests.Count <kw-l key="groups.join_requests_pending">pending</kw-l></span>
+                </h2>
+                @foreach (var req in Model.MyJoinRequests)
+                {
+                    <div class="airy-invite-row">
+                        <span class="name">@req.GroupName</span>
+                        <span class="by"><kw-l key="groups.join_requests_note">Waiting for the group owner.</kw-l></span>
+                        <span class="row-actions">
+                            <form method="post"
+                                  action="@Url.Action("WithdrawJoinRequest", "Groups", new { id = req.GroupId })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.join_withdraw">Withdraw</kw-l></button>
+                            </form>
+                        </span>
+                    </div>
+                }
+            </section>
+        }
+
         @if (Model.Groups.Count == 0)
         {
             <div class="alert alert-info">
@@ -70,6 +100,39 @@
                         <span class="gcount">
                             @g.MemberCount
                             member@(g.MemberCount == 1 ? "" : "s")
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+
+        @*
+            ADR 0094 — "Other public groups": public groups the actor is NOT
+            yet a member of (GroupListViewModel.PublicGroups), each with a
+            "Request to join" button (the self-lane route). The group name is
+            not a link to the detail: the actor cannot reach the detail
+            (owner ∪ member gate) until the request is approved.
+        *@
+        @if (Model.PublicGroups.Count > 0)
+        {
+            <h2 class="mt-4">
+                <kw-l key="groups.other_public">Other public groups</kw-l>
+            </h2>
+            <div class="airy-group-grid">
+                @foreach (var g in Model.PublicGroups)
+                {
+                    <div class="airy-group-card">
+                        <span class="gname">@g.Name</span>
+                        <span class="gcount">
+                            @g.MemberCount
+                            member@(g.MemberCount == 1 ? "" : "s")
+                        </span>
+                        <span class="row-actions">
+                            <form method="post"
+                                  action="@Url.Action("RequestToJoin", "Groups", new { id = g.Id })">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.request_join">Request to join</kw-l></button>
+                            </form>
                         </span>
                     </div>
                 }

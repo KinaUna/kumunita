@@ -506,6 +506,42 @@
                     </ul>
                 }
 
+                @*
+                    ADR 0094 — the owner ∪ GlobalAdmin's join-request review
+                    surface (Model.PendingJoinRequests). A resident's
+                    self-initiated request to join this (public) group: approve
+                    lands the membership (C4) / decline leaves the requester
+                    out. Offered to canManage (the route's TryResolveOwnerSurface
+                    gate is the real SoD wall — a plain member's POST 404s).
+                *@
+                @if (canManage && Model.PendingJoinRequests.Count > 0)
+                {
+                    <h2 class="mt-4">
+                        <kw-l key="groups.join_requests_pending_heading">Pending join requests</kw-l>
+                        <span class="badge bg-secondary">@Model.PendingJoinRequests.Count</span>
+                    </h2>
+                    <ul class="list-group mb-3">
+                        @foreach (var p in Model.PendingJoinRequests)
+                        {
+                            <li class="list-group-item d-flex align-items-center justify-content-between">
+                                <span>@p.DisplayName</span>
+                                <span class="d-inline-flex gap-2">
+                                    <form method="post"
+                                          action="@Url.Action("ApproveJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-primary"><kw-l key="groups.join_approve">Approve</kw-l></button>
+                                    </form>
+                                    <form method="post"
+                                          action="@Url.Action("DeclineJoinRequest", "Groups", new { id = Model.GroupId, subjectId = p.SubjectId })">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"><kw-l key="groups.join_decline">Decline</kw-l></button>
+                                    </form>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+
                 @if (Model.IsOwner)
                 {
                     <h2 class="mt-4"><kw-l key="groups.invite_heading">Invite a resident</kw-l></h2>

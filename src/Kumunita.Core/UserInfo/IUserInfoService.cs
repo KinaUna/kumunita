@@ -879,6 +879,96 @@ public interface IUserInfoService
     /// </summary>
     Task<IReadOnlyList<GroupInvitation>> GetPendingInvitationsForGroupAsync(string groupId);
 
+    // ── ADR 0094 additions (resident self-initiated join request for public
+    // groups — the reverse direction of the m2b owner-invited lane.
+    // docs/adr/0094-group-join-request-lane.md; invariants JR·1..5) ────────
+
+    /// <summary>
+    /// Request to join <paramref name="groupId"/> as <paramref name="actorId"/>
+    /// (ADR 0094 — the resident's <b>self-initiated</b> lane; the Web offers it
+    /// only on a <b>public</b> group the actor is not yet a member of). The row
+    /// is an upsert on the (<c>GroupId</c>, <c>UserId</c>) business key: an
+    /// absent or resolved (Approved / Declined) row resets to
+    /// <see cref="JoinRequestStatus.Pending"/> (re-request — a pre-existing
+    /// Pending row is simply re-stamped). The group's membership is <b>not</b>
+    /// touched here — it lands only on <see cref="ApproveJoinRequestAsync"/>.
+    /// Appends an <see cref="Authorization.AccessAudit"/> row (action
+    /// <c>group.join.request</c>, <c>TargetKind</c> "group",
+    /// <c>TargetId</c> = group, <see cref="Authorization.AccessVia.Owner"/> —
+    /// the requester's own standing, all three identities the requester) in the
+    /// same session/transaction as the row (invariant C3).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id exists.</exception>
+    Task<GroupJoinRequest> RequestToJoinGroupAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// Resolve a pending join request as <b>Approved</b> (ADR 0094 — the
+    /// group's <b>owner ∪ GlobalAdmin</b> lane; the Web surfaces that standing
+    /// and passes the actor as <paramref name="resolvedBy"/>). In the same
+    /// session (invariant C3), the row moves <see cref="JoinRequestStatus.Pending"/>
+    /// → <see cref="JoinRequestStatus.Approved"/> (<c>ResolvedAt</c>/<c>ResolvedBy</c>
+    /// stamped) and the <see cref="GroupMembership"/> row is upserted with
+    /// <c>AddedBy = resolvedBy</c> — the membership is live on the very next
+    /// <see cref="GetGroupIdsAsync"/> / <see cref="GetGroupsForUserAsync"/>
+    /// call (C4 carried). Appends an audit row (action <c>group.join.approve</c>,
+    /// <c>TargetKind</c> "group", <see cref="Authorization.AccessVia"/> derived
+    /// exactly like <see cref="AddGroupMemberAsync"/>'s lane:
+    /// <c>resolvedBy == Group.OwnerId ⇒ Owner</c>, else <c>Admin</c>).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id, no join request for this (group, user) pair, or the row is not <c>Pending</c>.</exception>
+    Task ApproveJoinRequestAsync(string groupId, string userId, string resolvedBy);
+
+    /// <summary>
+    /// Resolve a pending join request as <b>Declined</b> (ADR 0094 — the same
+    /// owner ∪ GlobalAdmin lane and <c>Via</c> derivation as
+    /// <see cref="ApproveJoinRequestAsync"/>, action
+    /// <c>group.join.decline</c>), but <b>no</b> <see cref="GroupMembership"/>
+    /// row is written — the requester simply never becomes a member. A
+    /// resolved-or-absent row is an invalid transition and throws.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id, no join request for this (group, user) pair, or the row is not <c>Pending</c>.</exception>
+    Task DeclineJoinRequestAsync(string groupId, string userId, string resolvedBy);
+
+    /// <summary>
+    /// Withdraw the requester's <b>own</b> pending join request (ADR 0094 — the
+    /// self-lane: the actor resolves their <b>own</b> row; the service verifies
+    /// <paramref name="actorId"/> equals the row's <c>UserId</c>). The row moves
+    /// <see cref="JoinRequestStatus.Pending"/> →
+    /// <see cref="JoinRequestStatus.Withdrawn"/> (stamped with the requester) —
+    /// the direct analogue of the m2b owner's <c>Cancelled</c>: it drops the row
+    /// off both the requester's "Your join requests" card and the owner's review
+    /// list, and stays re-requestable (a re-request resets it to
+    /// <c>Pending</c>). No <see cref="GroupMembership"/> row is touched. Appends
+    /// an audit row (action <c>group.join.withdraw</c>, <c>TargetKind</c>
+    /// "group", <see cref="Authorization.AccessVia.Owner"/> — the requester's
+    /// own standing).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No join request for this (group, actor) pair (self-lane), or the row is not <c>Pending</c>.</exception>
+    Task WithdrawJoinRequestAsync(string groupId, string actorId);
+
+    /// <summary>
+    /// The actor's <b>own</b> pending join requests across all groups (ADR 0094
+    /// read lane — the <c>/groups</c> list's "Your join requests" card + the
+    /// withdraw self-lane's Web gate "in my pending list, else 404").
+    /// <c>Pending</c> rows only, sorted by <see cref="GroupJoinRequest.RequestedAt"/>
+    /// descending (newest first). A candidate read (C-M2·2 carried): no
+    /// <see cref="Authorization.AccessAudit"/> row. Live rows (invariant C4): a
+    /// resolve on the owner lane in the same commit is live on the very next
+    /// call.
+    /// </summary>
+    Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForUserAsync(string userId);
+
+    /// <summary>
+    /// A group's pending join requests (ADR 0094 read lane — the
+    /// <c>/groups/{id}</c> detail's review surface: the pending list +
+    /// approve/decline links). <c>Pending</c> rows only, sorted by
+    /// <see cref="GroupJoinRequest.RequestedAt"/> ascending (oldest first — the
+    /// natural "who is still holding" order). A candidate read (C-M2·2 carried):
+    /// no audit row. Live rows (invariant C4): a resolve on the self/owner lane
+    /// is live on the very next call.
+    /// </summary>
+    Task<IReadOnlyList<GroupJoinRequest>> GetPendingJoinRequestsForGroupAsync(string groupId);
+
     // ── GU guardian lanes (ADR 0028) — additive, beside the membership lanes ──
     // Account-scope supervision of a child's account (ADR 0028 §C). The standing
     // is <c>AccessVia.Guardian</c> (the 9th value), resolved **live** off the
