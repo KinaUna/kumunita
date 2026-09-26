@@ -539,7 +539,7 @@ public sealed class ProjectsController : Controller
             await using var session = store.QuerySession();
             var placements = await session.Query<BoardItemPlacement>()
                 .Where(p => todoIds.Contains(p.TodoItemId))
-                .ToListAsync(HttpContext.RequestAborted);
+                .ToListAsync(HttpContext!.RequestAborted);
             var boardsByTodo = placements
                 .GroupBy(p => p.TodoItemId)
                 .ToDictionary(g => g.Key, g => g.Select(p => p.BoardId).Distinct(StringComparer.Ordinal).ToList());

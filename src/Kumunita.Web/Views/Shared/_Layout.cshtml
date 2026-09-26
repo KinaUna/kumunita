@@ -114,9 +114,9 @@
                        F6). The placeholder is a fixed UI string resolved
                        server-side (the <kw-l> TagHelper can't sit in an
                        attribute — the ADR 0072 / Groups/Detail pattern). *@
-                    @{ var _kwLNav = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation); var _navPlaceholder = await Translation.GetAsync("search.placeholder", _kwLNav); }
+                    @{ var _kwLNav = await EffectiveLanguageCode.ResolveAsync(ViewContext.HttpContext?.Request, Localization, Translation); var _navPlaceholder = await Translation.GetAsync("search.placeholder", _kwLNav); var _navAriaLabel = await Translation.GetAsync("search.nav", _kwLNav); }
                     <form class="navbar-form me-2 my-2 my-sm-0" action="/search" method="get" role="search">
-                        <input class="form-control" type="search" name="q" placeholder="@_navPlaceholder" aria-label="Search" required />
+                        <input class="form-control" type="search" name="q" placeholder="@_navPlaceholder" aria-label="@_navAriaLabel" required />
                     </form>
 
                     <partial name="_AccountNav" />

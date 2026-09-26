@@ -596,7 +596,7 @@
                                glyph mapping is the StatusGlyph helper above
                                (a free-text / unrecognized value shows the
                                fallback circle + the raw text, C3). *@
-                            string effectiveStatus = !string.IsNullOrWhiteSpace(card.Status) ? card.Status : lane.Status;
+                            string? effectiveStatus = !string.IsNullOrWhiteSpace(card.Status) ? card.Status : lane.Status;
                             // The badge text: the card's own raw Status when it
                             // has one (C3 — the view renders what the service
                             // stored), else the lane's status resolved through
