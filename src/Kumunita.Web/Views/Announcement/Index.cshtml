@@ -122,6 +122,15 @@
                     </div>
                 </div>
             }
+
+            @* M7 (ADR 0090 D5/D6) — the paged list's pager (F2 one-page
+               no-render pin): the <c>_Pager</c> partial renders nothing when
+               the VM field is null (a one-page surface). No filter form (D9)
+               — the links carry ?page=N only. *@
+            @if (Model.Pager is not null)
+            {
+                <partial name="_Pager" model="Model.Pager" />
+            }
         </div>
     </div>
 </div>

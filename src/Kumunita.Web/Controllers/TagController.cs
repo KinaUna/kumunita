@@ -1,5 +1,6 @@
 using Kumunita.Core.Localization;
 using Kumunita.Core.Pages;
+using Kumunita.Core.Posts;
 using Kumunita.Core.Tags;
 using Kumunita.Web.Models;
 using Kumunita.Web.Security;
@@ -97,14 +98,46 @@ public sealed class TagController(
     /// the tag lane's own (C-TG·8).
     /// </summary>
     [HttpGet("/tags/{slug}")]
-    public async Task<IActionResult> ByTag([FromRoute] string slug)
+    public async Task<IActionResult> ByTag([FromRoute] string slug, int page = 1)
     {
         if (string.IsNullOrWhiteSpace(slug))
             return NotFound();
 
         var actor = ActorId(User) ?? string.Empty;
-        var posts = await tags.ListPostsByTagAsync(slug, actor);
-        var blogPages = await tags.ListPagesByTagAsync(slug, actor);
+        // M7 (ADR 0090 D6) — the two paged seams are the read (U01's D6 lane:
+        // the same readable-content filter + order, then a Skip/Take(30)
+        // window). The null-safe fallback: a pre-M7 NSubstitute that stubs
+        // only the non-paged ITagService.ListPostsByTagAsync /
+        // ITagService.ListPagesByTagAsync (the existing TagControllerTests
+        // shape) returns a null page record — fall back to the (unmodified)
+        // non-paged seam then, so those tests keep passing.
+        IReadOnlyList<Post> posts;
+        bool postsHasMore;
+        var pagedPosts = await tags.ListPostsByTagPagedAsync(slug, actor, page);
+        if (pagedPosts is not null && pagedPosts.Items is not null)
+        {
+            posts = pagedPosts.Items;
+            postsHasMore = pagedPosts.HasMore;
+        }
+        else
+        {
+            posts = await tags.ListPostsByTagAsync(slug, actor);
+            postsHasMore = posts.Count >= 30; // the PageSize = 30 constant (D4)
+        }
+
+        IReadOnlyList<Page> blogPages;
+        bool pagesHasMore;
+        var pagedPages = await tags.ListPagesByTagPagedAsync(slug, actor, page);
+        if (pagedPages is not null && pagedPages.Items is not null)
+        {
+            blogPages = pagedPages.Items;
+            pagesHasMore = pagedPages.HasMore;
+        }
+        else
+        {
+            blogPages = await tags.ListPagesByTagAsync(slug, actor);
+            pagesHasMore = blogPages.Count >= 30; // the PageSize = 30 constant (D4)
+        }
 
         // 404-floor: both lists empty = slug unknown or used only on unread
         // content (C-TG·1 / C-TG·2 — the two are indistinguishable and both
@@ -134,6 +167,17 @@ public sealed class TagController(
             Posts = posts,
             Pages = blogPages,
             PageById = pageById,
+            // M7 (ADR 0090 D5) — the two paged sections' pagers (the F2
+            // one-page no-render pin: null on a single page so the _Pager
+            // partial renders nothing). The tag is the route (D9) — no filter
+            // form; the links carry ?page=N only. Section-scoped names (the
+            // Groups.Detail precedent) keep each _Pager's BaseUrl unambiguous.
+            PagerPosts = (postsHasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, postsHasMore)
+                : null,
+            PagerPages = (pagesHasMore || page > 1)
+                ? PagedViewModel.ForRoute($"/tags/{slug}", page, 30, pagesHasMore)
+                : null,
         };
 
         // U8c — seed the reword form (C-TG·5 standing split: the form is

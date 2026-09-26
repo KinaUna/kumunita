@@ -232,3 +232,70 @@ scratch tier of the three-tier contract — see the plan header).
   **Flagged for U05 (close)** to fix those 6 (stub the seam's page records),
   out of U03 scope.
 
+## U04 — 2 newly-paged routes (3 sections) + D7 reset
+
+- **Routes + views wired (3 paged sections):** `GET /announcements`
+  (`AnnouncementController.Index` → `AnnouncementIndexViewModel.Pager`,
+  1 drop-in in `Views/Announcement/Index.cshtml`) and `GET /tags/{slug}`
+  (`TagController.ByTag` → `TagByTagViewModel.PagerPosts` + `PagerPages`,
+  2 drop-ins in `Views/Tag/ByTag.cshtml` — the U03 two-section pattern,
+  the `Groups.Detail` precedent). Both consume U01's D6 seams
+  (`ListVisiblePagedAsync` → `AnnouncementPage`; `ListPostsByTagPagedAsync`
+  / `ListPagesByTagPagedAsync` → `TagPostPage` / `TagPagePage`); the
+  controller builds `PagedViewModel.ForRoute(route, page, 30, hasMore,
+  no filter params — D9: neither surface has a filter form)` only when
+  `hasMore || page > 1` (the F2 one-page no-render pin — null otherwise).
+- **D7 reset pin (the 5 filter forms):** `name="page"` in
+  `/events`, `/projects/todos`, `/projects/boards`, `/projects` (goals +
+  projects sections share one `componentId` picker — the D9 inventory's
+  "projects landing" row; there is **no** dedicated `/projects/goals` or
+  `/projects/projects` list form — those are the single-goal /
+  single-project detail routes) → **0 hits** at baseline and after U04
+  (a repo-wide `src/Kumunita.Web/Views/**` grep also returns 0) — **no
+  form had a `name="page"` hidden input; nothing removed** (the D7 pin
+  held pre-wiring; the forms already omit `page` and the controller's
+  `int page = 1` default is the floor).
+- **Null-safe seam read (a deliberate U04 change, the U01 §7.2a precedent
+  carried forward):** both controllers first read U01's paged seam, and
+  **fall back to the unmodified non-paged seam** (`ListVisibleAsync` /
+  `ListPostsByTagAsync` / `ListPagesByTagAsync`, `hasMore =
+  Count >= 30`) when the page record's `Items` is null — because the
+  pre-M7 `AnnouncementControllerTests` (49 tests) + `TagControllerTests`
+  (8 tests) stub only the non-paged seams, and NSubstitute returns a
+  null/default page record for the unstubbed paged one. Both suites stay
+  green **unchanged** (the fallback is the test-double escape; the paged
+  seam remains the app's read). `TagController.cs` gained a
+  `using Kumunita.Core.Posts;` (the old `var` shape never named `Post`).
+- **Tests (3 new, all passing) — `tests/Kumunita.Web.Tests/
+  M7NewlyPagedTests.cs`:** `F6_AnnouncementsList_Page2_HasMore_
+  PagerPresent`, `F7_TagByTag_Page1_Full_BothSectionsPaged`,
+  `F4_FilterForm_SubmitsWithoutPage`. The F7 test needs **no real Postgres
+  store**: with an unreadable tag (`ListForActorAsync` → empty) the
+  404-floor does not trip (both pages are non-empty) **and**
+  `SeedTranslationFormAsync` is skipped (the tag is null) — so the
+  `store.QuerySession()` LINQ read never runs. The F4 test drives the
+  **real** `EventController` (the U03 `EventsFeed_*` harness shape) and
+  pins D7 — the filter submission carries no `page` (the seam receives
+  `page: 1`), the `componentId` filter still rides along in
+  `FilterParams`. `dotnet exec …Kumunita.Web.Tests.dll -class
+  Kumunita.Web.Tests.M7NewlyPagedTests` → `Total: 3, Errors: 0, Failed: 0`.
+- **Validation:** `dotnet build Kumunita.slnx -c Debug` → **Build
+  succeeded, 0 errors** (3 pre-existing warnings, none in U04 files).
+  Grep pins (U04 exit criteria): `<partial name="_Pager"` in the 2 new
+  views → **3 hits** (1 + 2); `name="page"` in the 5 filter forms →
+  **0 hits**. Cross-unit + no-regression: `PagedViewModelTests` 4/4,
+  `M7PagerWiringTests` 3/3, `AnnouncementControllerTests` 49/49,
+  `TagControllerTests` 8/8 (the 6 known pre-existing `ProjectsControllerTests`
+  NREs are untouched — U05's flag stands).
+- **Files touched (7):** `src/Kumunita.Web/Models/
+  AnnouncementViewModels.cs` (+ `Pager`), `src/Kumunita.Web/Controllers/
+  AnnouncementController.cs` (paged seam + pager), `src/Kumunita.Web/
+  Views/Announcement/Index.cshtml` (+ 1 drop-in), `src/Kumunita.Web/
+  Models/TagViewModels.cs` (+ `PagerPosts`/`PagerPages`),
+  `src/Kumunita.Web/Controllers/TagController.cs` (2 paged seams + 2
+  pagers + using), `src/Kumunita.Web/Views/Tag/ByTag.cshtml` (+ 2
+  drop-ins), `tests/Kumunita.Web.Tests/M7NewlyPagedTests.cs` (new, 3
+  tests). **No Core change, no new seams, no new filters, no design-doc
+  edits.** U05 (close) reads this + the U00–U03 sections for the
+  `## Summary`.
+
