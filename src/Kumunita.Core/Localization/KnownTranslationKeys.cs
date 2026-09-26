@@ -588,6 +588,20 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Post to this group",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
+            // ADR 0089 (GE) — the group-events lane: the feed section heading,
+            // the empty-state (mirroring the posts lane), the composer +
+            // editor headings, and the detail-page back link.
+            ["groups.back"]           = "Back to",
+            ["groups.events_heading"] = "Events",
+            ["groups.new_event"]      = "New event",
+            ["groups.events_empty_can"] =
+                "No events yet. Plan the first one — it will be visible to the current members.",
+            ["groups.events_empty"]    = "No events here yet.",
+            ["groups.new_event_title"] = "Event for this group",
+            ["groups.new_event_lead"]  =
+                "Your event will be visible to the current members of this group only.",
+            ["groups.new_event_submit"] = "Add event to group",
+            ["groups.edit_event_title"] = "Edit this event",
             // ── groups list (the Airy layout — the invitation panel + the
             //    member-count word on each group card) ───────────────────────
             ["groups.invitations"]    = "Invitations",
@@ -1989,6 +2003,18 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
+            // ADR 0089 (GE) — the group-events lane (de).
+            ["groups.back"]           = "Zurück zu",
+            ["groups.events_heading"] = "Veranstaltungen",
+            ["groups.new_event"]      = "Neue Veranstaltung",
+            ["groups.events_empty_can"] =
+                "Noch keine Veranstaltungen. Plane die erste — sie ist den aktuellen Mitgliedern sichtbar.",
+            ["groups.events_empty"]    = "Hier sind noch keine Veranstaltungen.",
+            ["groups.new_event_title"] = "Veranstaltung für diese Gruppe",
+            ["groups.new_event_lead"]  =
+                "Deine Veranstaltung ist nur den aktuellen Mitgliedern dieser Gruppe sichtbar.",
+            ["groups.new_event_submit"] = "Veranstaltung zur Gruppe hinzufügen",
+            ["groups.edit_event_title"] = "Diese Veranstaltung bearbeiten",
             // ── groups list (the Airy layout — the invitation panel + the
             //    member-count word on each group card) ───────────────────────
             ["groups.invitations"]    = "Einladungen",
@@ -3339,6 +3365,18 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Publier dans ce groupe",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
+            // ADR 0089 (GE) — the group-events lane (fr).
+            ["groups.back"]           = "Retour à",
+            ["groups.events_heading"] = "Événements",
+            ["groups.new_event"]      = "Nouvel événement",
+            ["groups.events_empty_can"] =
+                "Aucun événement. Prévois le premier — il sera visible par les membres actuels.",
+            ["groups.events_empty"]    = "Il n'y a encore aucun événement ici.",
+            ["groups.new_event_title"] = "Événement pour ce groupe",
+            ["groups.new_event_lead"]  =
+                "Ton événement ne sera visible que par les membres actuels de ce groupe.",
+            ["groups.new_event_submit"] = "Ajouter l'événement au groupe",
+            ["groups.edit_event_title"] = "Modifier cet événement",
             // ── groups list (the Airy layout — the invitation panel + the
             //    member-count word on each group card) ───────────────────────
             ["groups.invitations"]    = "Invitations",
@@ -4691,6 +4729,18 @@ public static class KnownTranslationKeys
             ["groups.new_title"]      = "Skriv til denne gruppe",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",
+            // ADR 0089 (GE) — the group-events lane (da).
+            ["groups.back"]           = "Tilbage til",
+            ["groups.events_heading"] = "Arrangementer",
+            ["groups.new_event"]      = "Nyt arrangement",
+            ["groups.events_empty_can"] =
+                "Ingen arrangementer endnu. Plan den første — den vil være synlig for de nuværende medlemmer.",
+            ["groups.events_empty"]    = "Der er endnu ingen arrangementer her.",
+            ["groups.new_event_title"] = "Arrangement for denne gruppe",
+            ["groups.new_event_lead"]  =
+                "Dit arrangement vil kun være synlig for de nuværende medlemmer af denne gruppe.",
+            ["groups.new_event_submit"] = "Tilføj arrangement til gruppen",
+            ["groups.edit_event_title"] = "Redigér dette arrangement",
             // ── groups list (the Airy layout — the invitation panel + the
             //    member-count word on each group card) ───────────────────────
             ["groups.invitations"]    = "Indladelser",

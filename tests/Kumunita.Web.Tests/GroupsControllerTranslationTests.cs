@@ -217,7 +217,13 @@ public class GroupsControllerTranslationTests
         var store = Substitute.For<IDocumentStore>();
         store.LightweightSession().Returns(Substitute.For<IDocumentSession>());
 
-        var controller = new GroupsController(userInfoImpl, posts, localization, store);
+        // Group events (ADR 0089) — a substitute IEventService for the
+        // constructor shape; this class exercises only the group
+        // name/description translation lanes (IUserInfoService), never the
+        // group-event actions, so the seam is not invoked.
+        var events = Substitute.For<Kumunita.Core.Events.IEventService>();
+
+        var controller = new GroupsController(userInfoImpl, posts, localization, store, events);
         var httpContext = new DefaultHttpContext();
         controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
 

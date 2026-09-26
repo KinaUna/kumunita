@@ -71,6 +71,20 @@ public sealed class Event
     /// </summary>
     public string? ComponentId { get; set; }
 
+    /// <summary>
+    /// Group-lane marker (ADR 0089, the <see cref="Kumunita.Core.Posts.Post.GroupId"/>
+    /// precedent): non-empty ⇒ a **group-channel event** — visible to the group's current
+    /// members only (the ADR 0013 membership lane), with a pinned <see cref="ComponentId"/>
+    /// of <c>string.Empty</c> and a non-null empty <see cref="Audience"/> (GE·2/GE·8).
+    /// Written **only** by <c>EventService.CreateGroupEventAsync</c>; empty (the default)
+    /// ⇒ a community event (M4), unchanged. ADR 0004 §B.1 additive (delta-detected,
+    /// idempotent); **no new index** (the <c>Post.GroupId</c> precedent has none — ADR 0089
+    /// Decision). The community read seams (<c>ListUpcomingAsync</c> /
+    /// <c>ListInRangeAsync</c>) carry an explicit <c>GroupId == string.Empty</c> candidate
+    /// filter (GE·2) so a group event never reaches the community feed/calendar.
+    /// </summary>
+    public string GroupId { get; set; } = string.Empty;
+
     /// <summary>The event author's <c>SubjectId</c> — the owner branch and the standing
     /// matrix's standing owner (ADR 0054 §3.4).</summary>
     public string AuthorId { get; set; } = string.Empty;
