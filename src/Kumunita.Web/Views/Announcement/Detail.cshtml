@@ -483,7 +483,8 @@
                                 <select class="form-control" id="ann-comment-language" name="languageCode">
                                     @foreach (var l in Model.CommentLanguages)
                                     {
-                                        <option value="@l.Code">@l.NativeName</option>
+                                        @* ADR 0049 — default to the language the resident is reading in *@
+                                        <option value="@l.Code" selected="@(String.Equals(l.Code, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@l.NativeName</option>
                                     }
                                 </select>
                                 <div class="text-muted small mt-1">

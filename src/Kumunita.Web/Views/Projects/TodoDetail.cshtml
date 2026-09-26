@@ -3,8 +3,14 @@
 @using Kumunita.Core.Projects
 @inject Kumunita.Core.Localization.ITranslationProvider Translation
 @inject Kumunita.Core.Localization.ILocalizationService Localization
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
 @{
     ViewData["Title"] = string.IsNullOrWhiteSpace(Model.Todo.Title) ? "To-do" : Model.Todo.Title;
+    // ADR 0049 — the resident's current effective language (the comment
+    // form's language picker default: "write in the language you're reading
+    // in"), resolved through the same chain the <c>&lt;kw-l&gt;</c>
+    // TagHelper resolves UI strings in.
+    var defaultVariant = await EffectiveLanguageCode.ResolveAsync(HttpContextAccessor.HttpContext?.Request, Localization, Translation);
     // ADR 0069 — the fixed status vocabulary's label keys (the same closed
     // set the Kanban lane's Set-status select offers: None + the four codes).
     static string StatusLabelKey(string code) => code switch
@@ -724,7 +730,8 @@
                             <select class="form-control" id="todo-comment-language" name="languageCode">
                                 @foreach (var (languageCode, nativeName) in commentLanguages)
                                 {
-                                    <option value="@languageCode">@nativeName</option>
+                                    @* ADR 0049 — default to the language the resident is reading in *@
+                                    <option value="@languageCode" selected="@(String.Equals(languageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
                                 }
                             </select>
                             <div class="text-muted small mt-1">

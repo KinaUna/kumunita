@@ -112,10 +112,10 @@ public sealed class AnnouncementController(
     /// the controller's existing <c>IDocumentStore</c> (the
     /// <see cref="LocaleController.Index"/> catalog read pattern) — no new
     /// constructor dependency (the 10 test-construction sites of this
-    /// controller stay untouched). The form leaves the selection empty by
-    /// default so the *instance default* is what the service materializes
-    /// server-side at write time; on the edit lane the stored row's
-    /// <c>LanguageCode</c> pre-selects it.
+    /// controller stay untouched). The create lane pre-selects the actor's
+    /// current effective language (ADR 0049) so the picker highlights the
+    /// language the resident is reading the platform in; on the edit lane the
+    /// stored row's <c>LanguageCode</c> pre-selects it.
     /// </para>
     /// </summary>
     private async Task SeedComposeOptionsAsync(AnnouncementComposeViewModel model, IReadOnlySet<string> roles)
@@ -138,13 +138,14 @@ public sealed class AnnouncementController(
             .Select(l => (l.Id, l.NativeName))
             .ToList();
 
-        // ADR 0018 — pre-select the instance default so the picker highlights
-        // the right option and a no-change submit is a concrete BCP-47 code
-        // (never an empty row). The edit lane sets model.LanguageCode from the
-        // stored row *before* calling this, and that value is preserved here
-        // (the guard only fills an unset/blank selection).
+        // ADR 0018 — pre-select the actor's current effective language (ADR
+        // 0049) so the picker highlights the right option and a no-change
+        // submit is a concrete BCP-47 code (never an empty row). The edit
+        // lane sets model.LanguageCode from the stored row *before* calling
+        // this, and that value is preserved here (the guard only fills an
+        // unset/blank selection).
         if (string.IsNullOrWhiteSpace(model.LanguageCode))
-            model.LanguageCode = await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+            model.LanguageCode = await ResolveComposeDefaultLanguageAsync().ConfigureAwait(false);
     }
 
     // ── Read (GET /announcements) ─
@@ -567,6 +568,25 @@ public sealed class AnnouncementController(
             .OrderBy(l => l.SortOrder)
             .Select(l => (l.Id, l.NativeName))
             .ToList();
+    }
+
+    /// <summary>
+    /// The create-lane composer's <b>default authored-in language</b> (the
+    /// picker's pre-selection): the actor's per-request **effective**
+    /// language (ADR 0049 — the <c>kumunita.locale</c> cookie → first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor, the
+    /// exact <see cref="EffectiveLanguageCode.ResolveAsync"/> chain the
+    /// <c>&lt;kw-l&gt;</c> TagHelper resolves UI strings through) — "write in
+    /// the language you're reading in", the ADR 0018 "instance default"
+    /// pre-selection generalized. A null <see cref="ITranslationProvider"/>
+    /// (test-construction site) falls back to the instance default — the
+    /// legacy behavior, so the existing mock sites keep passing.
+    /// </summary>
+    private async Task<string> ResolveComposeDefaultLanguageAsync()
+    {
+        if (translationProvider is null)
+            return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+        return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
 
     /// <summary>

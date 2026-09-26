@@ -67,10 +67,11 @@ public sealed class GroupsController(
     /// <see cref="LanguageCatalog"/>, ordered by <c>SortOrder</c>. Read through
     /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
     /// seam, ADR 0005 D) — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses. The composer/reply form
-    /// leaves the selection empty by default so the *instance default* is what
-    /// the service materializes server-side at write time — the picker is the
-    /// set of choices, not the choice.
+    /// <see cref="LocaleController.Index"/> page uses. The create lane
+    /// pre-selects the actor's current effective language (ADR 0049 —
+    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
+    /// highlights the language the resident is reading the platform in; the
+    /// reply/comment forms mark the same code selected in their option list.
     /// </summary>
     private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
     {
@@ -80,6 +81,25 @@ public sealed class GroupsController(
             .OrderBy(l => l.SortOrder)
             .Select(l => (l.Id, l.NativeName))
             .ToList();
+    }
+
+    /// <summary>
+    /// The create-lane composer's <b>default authored-in language</b> (the
+    /// picker's pre-selection): the actor's per-request **effective**
+    /// language (ADR 0049 — the <c>kumunita.locale</c> cookie → first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor, the
+    /// exact <see cref="EffectiveLanguageCode.ResolveAsync"/> chain the
+    /// <c>&lt;kw-l&gt;</c> TagHelper resolves UI strings through) — "write in
+    /// the language you're reading in", the ADR 0018 "instance default"
+    /// pre-selection generalized. A null <see cref="ITranslationProvider"/>
+    /// (test-construction site) falls back to the instance default — the
+    /// legacy behavior, so the existing mock sites keep passing.
+    /// </summary>
+    private async Task<string> ResolveComposeDefaultLanguageAsync()
+    {
+        if (translationProvider is null)
+            return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+        return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1568,10 +1588,10 @@ public sealed class GroupsController(
         return View("New", new GroupPostComposeViewModel
         {
             Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
-            // ADR 0018 — pre-select the instance default so the picker
-            // highlights the right option and a no-change submit is a
-            // concrete BCP-47 code (never an empty row).
-            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
         });
     }
 
@@ -2214,10 +2234,10 @@ public sealed class GroupsController(
         return View("EventNew", new GroupEventComposeViewModel
         {
             Languages = await SeedLanguagePickerAsync(), // ADR 0018 — the authored-in language picker.
-            // Pre-select the instance default (the ADR 0018 idiom) so the
-            // picker highlights the right option and a no-change submit is a
-            // concrete BCP-47 code (never an empty row).
-            LanguageCode = await localization.GetDefaultLanguageCodeAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             // Default the time range to the actor's *current* local date/time
             // (the M4 CreateGet idiom: now rounded to the minute, End one hour
             // after Start — the author adjusts both on the form).

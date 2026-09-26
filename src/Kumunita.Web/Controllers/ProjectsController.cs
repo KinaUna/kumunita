@@ -147,11 +147,30 @@ public sealed class ProjectsController : Controller
     /// ordered by <c>SortOrder</c>, read through
     /// <see cref="ILocalizationService.ListLanguagesAsync"/> (the HTTP-free
     /// seam, ADR 0005 D — the exact catalog read the
-    /// <see cref="LocaleController.Index"/> page uses). The composer leaves
-    /// the selection empty by default so the *instance default* is what the
-    /// service materializes server-side at write time — the picker is the set
-    /// of choices, not the choice.
+    /// <see cref="LocaleController.Index"/> page uses). The create lane
+    /// pre-selects the actor's current effective language (ADR 0049 —
+    /// <see cref="ResolveComposeDefaultLanguageAsync"/>) so the picker
+    /// highlights the language the resident is reading the platform in.
     /// </summary>
+    /// <summary>
+    /// The create-lane composer's <b>default authored-in language</b> (the
+    /// picker's pre-selection): the actor's per-request **effective**
+    /// language (ADR 0049 — the <c>kumunita.locale</c> cookie → first enabled
+    /// <c>Accept-Language</c> match → instance default → <c>en</c> floor, the
+    /// exact <see cref="EffectiveLanguageCode.ResolveAsync"/> chain the
+    /// <c>&lt;kw-l&gt;</c> TagHelper resolves UI strings through) — "write in
+    /// the language you're reading in", the ADR 0018 "instance default"
+    /// pre-selection generalized. A null <see cref="ITranslationProvider"/>
+    /// (test-construction site) falls back to the instance default — the
+    /// legacy behavior, so the existing mock sites keep passing.
+    /// </summary>
+    private async Task<string> ResolveComposeDefaultLanguageAsync()
+    {
+        if (translationProvider is null)
+            return await localization.GetDefaultLanguageCodeAsync().ConfigureAwait(false);
+        return await EffectiveLanguageCode.ResolveAsync(HttpContext?.Request, localization, translationProvider).ConfigureAwait(false);
+    }
+
     private async Task<IReadOnlyList<(string Code, string NativeName)>> SeedLanguagePickerAsync()
     {
         var catalog = await localization.ListLanguagesAsync().ConfigureAwait(false);
@@ -886,6 +905,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             ParentOptions = parentCandidates
                 .Select(t => (Id: t.Id, Title: t.Title))
@@ -1963,6 +1986,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             // ADR 0086 D9 — the **project picker** on the new form (a
             // display surface, never a gate — C-PL·3); a new board has no
@@ -2896,6 +2923,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
         };
         await SeedGrantPickerOptionsAsync();
@@ -3281,6 +3312,10 @@ public sealed class ProjectsController : Controller
                 Grants = "[]",
             },
             Languages = await SeedLanguagePickerAsync(),
+            // ADR 0018 / ADR 0049 — pre-select the actor's current effective
+            // language so the picker highlights the right option and a
+            // no-change submit is a concrete BCP-47 code (never an empty row).
+            LanguageCode = await ResolveComposeDefaultLanguageAsync(),
             Components = await SeedComponentPickerAsync(),
             Goals = await SeedGoalPickerAsync(),
         };

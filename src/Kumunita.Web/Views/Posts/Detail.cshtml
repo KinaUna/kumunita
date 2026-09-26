@@ -899,7 +899,8 @@
                         <select class="form-control" id="reply-language" name="languageCode">
                             @foreach (var (languageCode, nativeName) in replyLanguages)
                             {
-                                <option value="@languageCode">@nativeName</option>
+                                @* ADR 0049 — default to the language the resident is reading in *@
+                                <option value="@languageCode" selected="@(String.Equals(languageCode, defaultVariant, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@nativeName</option>
                             }
                         </select>
                         <div class="text-muted small mt-1">
