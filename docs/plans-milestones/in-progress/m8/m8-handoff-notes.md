@@ -225,3 +225,121 @@ next unit's entry reads.
   in its excerpt must render escaped, not execute). **Do not start U03
   from this unit** — U02 stops here.
 
+## U03 — Web tests (`SearchControllerTests`, the 10 pinned mocks)
+
+- **Files written (1):** `tests/Kumunita.Web.Tests/SearchControllerTests.cs`
+  — the 10 pinned tests from design doc §2.4 (Web pins 1–10), over an
+  NSubstitute `ISearchService` + `IPageService` harness (the
+  `AnnouncementControllerTests` precedent — `DefaultHttpContext`, no host,
+  the `ViewResult`'s model asserted on). **No `src/` change, no Core
+  interface change, no `kw-l` key change** (the U03 plan rule — tests-only).
+- **Build + tests (all green):**
+  - `dotnet build Kumunita.slnx -c Debug` → **0 errors** (the same 2
+    pre-existing warnings in `ProjectsController`/`BoardDetail` that U02
+    recorded — unrelated to U03).
+  - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll
+    -class "Kumunita.Web.Tests.SearchControllerTests"` → **Total: 10, Errors: 0,
+    Failed: 0** (the 10 pinned tests, in order).
+  - `dotnet exec tests\Kumunita.Web.Tests\bin\Debug\net10.0\Kumunita.Web.Tests.dll`
+    (full assembly) → **Total: 486, Errors: 0, Failed: 0** — the 476 pre-existing
+    (U02's exit count) + the 10 new `SearchControllerTests`. The
+    `KwLRegistryConsistencyTests` and `MilestonesTests` in that set stay green.
+- **The 10 pinned tests (in the order of design doc §2.4):**
+  1. `Search_Index_NoQuery_RendersEmptyState_NoServiceCall` — the blank-`q`
+     short-circuit (a render decision, not a query): the view model carries
+     the empty `Sections` + null `Pager` + the trimmed-blank `Q`, and the
+     `ISearchService` substitute records **zero** calls (both `SearchAsync`
+     and `SearchSurfaceAsync` — the `DidNotReceiveWithAnyArgs` pin — the
+     legitimate use of that idiom, "the method was never called").
+  2. `Search_Index_AllScope_RendersSections_NoPager` — `surface=all` renders
+     per-surface sections (the mocked `SearchResults`) with `Pager` **null**
+     (D1 — the search-box answer, F2 no-render); the service is driven with
+     `SearchScope.Community` + the null anonymous actor.
+  3. `Search_Index_SingleSurface_RendersPager_WithPageAndQInLinks` — the
+     single-surface shape: with `HasMore` true the `PagedViewModel` is
+     present, `BaseUrl == "/search"`, `PageSize == SearchService.PageSize`
+     (20), `HasNext` mirroring the seam's `HasMore` (D1) and `HasPrevious`
+     false (page 1, D5); **`FilterParams` carries `q` + `surface` + `scope`**
+     (the ADR 0090 D7 filter-preservation rule the `_Pager` partial renders
+     into its links — the one U02's live-app smoke could not exercise; this
+     is the pin that owns it). The service is driven with the signed-in
+     subject id (the `subj-resident-001` claim) — the subject-claim pin is
+     the Web-half of the D3 signed-in read.
+  4. `Search_Index_ScopeGroups_SignedIn_RendersGroupHits` — a signed-in
+     `scope=groups` request drives the service with `SearchScope.Groups`
+     + the subject id; the group-scope hits (a group post + a group event,
+     each carrying its `GroupId`) render, the model's `Scope` reflects the
+     scope actually served, and `HrefFor` resolves the group-scope hit to
+     its `/groups/{gid}/{surface}/{id}` route (the `SearchIndexViewModel`
+     projection — a pure Web-side read).
+  5. `Search_Index_ScopeGroups_Anonymous_CommunityOnly` — the silent
+     degradation (D3/F6): an anonymous `scope=groups` request returns a 200
+     view (not a 403, not a redirect), the service is driven with
+     `SearchScope.Community` + the null actor, and the model's `Scope`
+     reflects `Community` (the view never shows a groups-scope affordance to
+     a guest). *Harness note:* see the drift entry below for the first
+     draft's `DidNotReceiveWithAnyArgs` trap.
+  6. `Search_Hit_BodyTruncated_RenderedEscaped` — the `<script>`-in-Title/
+     BodyExcerpt XSS pin. The view emits the model through Razor's `@`
+     (`@h.Title` / `@h.BodyExcerpt` in `Views/Search/Index.cshtml`), which
+     applies the `HtmlEncoder`; this pin drives the same encoder over the
+     model value and asserts the escaped entity form is present and the raw
+     tag is not, *plus* reads the view's source to confirm the `@h.Title`
+     / `@h.BodyExcerpt` shape is the rendering path (the
+     `PublicLocaleAndAboutTests` / `StaticPagesSP_U04Tests` source-read
+     pattern, walked up to the repo root via `Kumunita.slnx`). The Core
+     seam's own truncation pin is U01's `Search_BodyTruncated_AroundFirstMatch`
+     shape; this is the Web-half (the render is escaped, not the store).
+  7. `Search_Index_PageFloor_FloorsToOne` — `page=0` and `page=-1` both
+     floor to 1 at the controller (the D5 discipline — the Web side does
+     not pass a sub-1 page through). The service receives the floored page
+     (1) in both iterations of the loop; `Received(1)` with the exact
+     floored arg + `ClearReceivedCalls()` between iterations is the precise
+     pin.
+  8. `Search_NavBox_Rendered_ForAnonymous` — F1 (anonymous can search): the
+     `SearchController` renders a 200 view for a signed-out visitor; the
+     `_Layout.cshtml` nav carries the unconditional search box (a
+     `<form action="/search" method="get">` + `<input type="search" name="q">`
+     — the U02 deliverable's markup, verified by a source read); the
+     `search.nav` + `search.placeholder` keys the box's placeholder resolves
+     through are registered non-empty in `KnownTranslationKeys.EnValues`
+     (the `KnownTranslationKeys_ParityTests` in Core enforces the four-
+     language parity; this pin is the Web-side registration shape).
+  9. `Search_NavBox_Rendered_ForSignedIn` — F1 parity: the same nav box
+     renders for a signed-in resident (the box is unconditional layout
+     markup, not a conditional `@if` on `User.Identity` — the pin is its
+     presence alongside a successful signed-in search render, so a future
+     reflow that gates the box on sign-in breaks this).
+  10. `Search_EmptyResults_RendersLocalizedNoResults` — C-M8·4 (no hidden-
+     count leak): a non-blank `q` with zero visible hits renders the
+     localized `search.no-results` text + the echoed `q` (the view's
+     `<code>@Model.Q</code>` shape — verified by a source read), and the
+     `SearchIndexViewModel` record carries **no** `Total`/`HiddenCount`/
+     `CandidateCount` field at all (the hidden count lives on the stored
+     aggregate `AccessAudit` row, never the render surface — the pin is the
+     type shape, asserted via `typeof(SearchIndexViewModel).GetProperties()`).
+- **Drift (1 entry, harness note — not a design-doc rewrite):** the
+  `DidNotReceiveWithAnyArgs` trap in test 5. `DidNotReceiveWithAnyArgs`
+  matches **any** call to the method regardless of argument matchers — the
+  NSubstitute idiom is `DidNotReceive()` (with `Arg.Any` for the args you
+  want to ignore, `Arg.Is`/`Arg.Equal` for the args you want to constrain).
+  The first draft's
+  `DidNotReceiveWithAnyArgs().SearchAsync(Arg.Any<string>(), Arg.Is<SearchScope>(s => s == SearchScope.Groups), …)`
+  was therefore semantically "no calls at all" and failed against the
+  positive `Received(1)` call. Resolution: the positive `Received(1)` with
+  the exact `Community` scope already constrains every arg the test cares
+  about; the redundant negative was dropped and a comment explains the
+  shape. No other test in the suite uses the negative pin (tests 1, 2 do —
+  but their argument matchers are pure `Arg.Any` on every arg, which is the
+  form `DidNotReceiveWithAnyArgs` is actually for — "the method was never
+  called"). **This is a harness idiom, not a U02 surface defect** — the
+  controller/view are unchanged.
+- **U04 entry reads:** the lane close (the M7 U05 shape) is next — the
+  README Roadmap + "What works" flip (M8 → `**Done.**` citing ADR 0091;
+  M9 → `**In progress.**`), `src/Kumunita.Web/Milestones.cs` (M8 →
+  `StatusDone`, M9 → `StatusNext` — the single-in-progress invariant),
+  `tests/Kumunita.Web.Tests/MilestonesTests.cs` (the M8/M9 pins), and
+  `docs/ARCHITECTURE.md` (the "shape of the code" — the `Search/` bounded
+  context + the seam + the audit `TargetKind`s). **Do not start U04 from
+  this unit** — U03 stops here.
+
