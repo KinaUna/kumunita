@@ -505,6 +505,21 @@ Append-only; each entry: date, unit, what diverged, the locked resolution.
    records the dominant standing — `Audience` for the community surfaces,
    `Group` for the group-scope surfaces, `Audience` for the announcement
    surface (its flat-scope equivalence).
+4. **2026-09-27, U01** — D4/§2.2 implied the case-insensitive substring
+   match runs *inside* the Marten query (an `ILIKE`-style predicate over
+   Title + Body). `ILIKE`/`IContains`/`IStartsWith`/`IEndsWith` are **not**
+   in Marten 9.31.2's LINQ surface (verified by scanning the installed
+   `Marten.dll` for those members and by `docs/marten/querying.md`, which
+   tracks 9.30–9.31 and lists no case-insensitive operator). Locked
+   resolution: the **canonical (non-match) predicate stays in the Marten
+   query** — `GroupId == ""` / non-empty `GroupId`, `!IsDraft`,
+   `!IsDeleted` / `DeletedAt == null`, announcement `!IsDraft` — so the
+   visibility-narrowing invariant (C-M8·2) holds at the query layer; the
+   case-insensitive substring match is applied in C# over Title + Body
+   (`OrdinalIgnoreCase`) *after* the candidates load, and the visible set
+   is paginated in C#. Behavior is identical to a query-side match and is
+   test-pinned (tests 1, 13); the mechanism (C# post-filter, not `ILIKE`)
+   is what it is.
 
 *End of design doc. Part 1 is the authority on why; Part 2 is the
 authority on shape. The ADR 0091 is the authority on the decision record.*

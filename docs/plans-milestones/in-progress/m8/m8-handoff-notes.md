@@ -44,3 +44,71 @@ next unit's entry reads.
   records, the six candidate predicates, the audit-row shape, the 14
   pinned test names)** + §4 (C-M8·1/2/3/7) + this section.
 
+## U01 — Core seam (`ISearchService` + `SearchService` + DI + 14 tests)
+
+- **Files written (the 5 U01 deliverables):**
+  - `src/Kumunita.Core/Search/SearchModels.cs` — `SearchHit`,
+    `SearchResults`, `SearchSurfacePage`, `SearchScope` (verbatim §2.1).
+  - `src/Kumunita.Core/Search/ISearchService.cs` — `SearchAsync` +
+    `SearchSurfaceAsync` (verbatim §2.1 / D8).
+  - `src/Kumunita.Core/Search/SearchService.cs` — the store-composing
+    implementation.
+  - `src/Kumunita.Core/DependencyInjection.cs` — one `AddTransient<ISearchService>`
+    factory line (composes `IDocumentStore` + `IAuthorizationService` +
+    `IUserInfoService`).
+  - `tests/Kumunita.Core.Tests/SearchServiceTests.cs` — the 14 pinned tests
+    (§2.4) + helpers.
+- **Build + tests:** `dotnet build Kumunita.slnx -c Debug` clean (Core
+  compiles; Web has only pre-existing warnings). The 14 pinned tests run
+  green via the AGENTS.md path —
+  `dotnet exec tests\Kumunita.Core.Tests\bin\Debug\net10.0\Kumunita.Core.Tests.dll
+  -class "Kumunita.Core.Tests.SearchServiceTests"` → **Total: 14, Errors: 0,
+  Failed: 0** (xunit.v3 runner; `dotnet test` / Test Explorer discovery is the
+  known-broken path, not a real failure).
+- **Candidate predicates (copied from the named canonical methods, D6/§2.2):**
+  - community posts — `PostService.ListFeedAsync`: `GroupId == "" &&
+    DeletedAt == null && !IsDraft`, `OrderByDescending Created`.
+  - group posts — `PostService` group-feed: `GroupId == <group> && DeletedAt ==
+    null && !IsDraft`, membership-gated via `GetGroupIdsAsync` +
+    `CanSeeGroupFeedAsync`.
+  - community events — `EventService.ListUpcomingAsync`: `GroupId == "" &&
+    !IsDeleted && !IsDraft`.
+  - group events — same shape: `GroupId == <group> && !IsDeleted && !IsDraft`,
+    membership-gated.
+  - pages — `IPageService` canonical: `!IsDraft && !IsDeleted`.
+  - announcements — `AnnouncementService.ListVisibleAsync` flat branch:
+    `!IsDraft` (in query) + `Scope == Public || (authed && Scope == Community)`
+    (flat scope check only — search has no roles/CommunityId/admin branch).
+- **Frozen seams used (no new seams):** caller-session overloads
+  `IAuthorizationService.CanSeeAsync(actor, Read, candidates, session)` and
+  `CanSeeGroupFeedAsync(actor, groupId, count, session)` (the *caller
+  commits* form) + `GetGroupIdsAsync(actor)`. Anonymous + zero-candidate
+  visits call **none** of these (D7 "no row").
+- **Audit-mechanism decision (D7 / C3, the crux):** `CanSeeAsync`/
+  `CanSeeGroupFeedAsync` emit their **own** rows with the *adapter's*
+  `TargetKind` ("post"/"event"/"page") into Search's session. Search then
+  stores its **own** aggregate row — `TargetKind = "search:<surface>"`,
+  `TargetId = null`, `VisibleCount`/`HiddenCount` set, `Via` = dominant
+  standing (Audience / Group), `Outcome = Allow iff visible.Count > 0` — in
+  the **same session**; ONE `SaveChangesAsync` commits the read + all rows
+  (C3 "same transaction as the read"). The tests read with
+  `Where(a => a.TargetKind == "search:<surface>")`, so only the search rows
+  count; the frozen-seam per-item rows are present but correctly ignored.
+- **Drift (1 new entry → design doc §2.6 entry 4):** the design's `ILIKE`
+  match (D4/§2.2) is **not** in Marten 9.31.2's LINQ surface (verified by
+  scanning the installed `Marten.dll` + `docs/marten/querying.md`). Locked
+  resolution: the canonical (non-match) predicate stays in the Marten query
+  (C-M8·2 holds at the query layer); the case-insensitive substring match is
+  applied in C# over Title + Body (`OrdinalIgnoreCase`) after load, and the
+  visible set is paginated in C#. Behavior is test-pinned (tests 1, 13) and
+  mechanism-independent.
+- **Constants (D8):** `PageSize = 20`, `MaxPerSurface = 5`,
+  `TruncationRadius = 120`; `surface=all` → top 5 per surface (no pager),
+  `surface=<one>` → paged, `HasMore` the sole signal, page floors to 1.
+- **U02 entry reads:** the Web surface is next — `SearchController` + the
+  search view + the nav box + the 11 `kw-l` keys (design doc §2.5 / ADR
+  0091 FACES). This Core seam is the only surface it may call; `q`/`page`/
+  `scope`/`surface` are display-only (C-M8·5) and never inputs to
+  `IAuthorizationService` or the audit identity. **Do not start U02 from
+  this unit** — U01 stops here.
+

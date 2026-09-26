@@ -265,6 +265,23 @@ public static class ServiceCollectionExtensions
             // (the link still renders, just relative) via the ctor's null
             // default.
             sp.GetService<Microsoft.Extensions.Options.IOptions<Identity.VerificationOptions>>()));
+
+        // M8 (ADR 0091, U01): the Search bounded context's service seam (bounded
+        // context Kumunita.Core.Search — the "find content by text" read lane over
+        // the four resident content surfaces: posts, events, pages, announcements).
+        // A store-composing service kept behind an interface (the ADR 0090 D10
+        // "split by seam" test home — the Web SearchController can substitute without
+        // a live Postgres) composing **only** the three frozen seams (D8 — the ADR
+        // 0006-D frozen-composition pin; no fourth dependency, no new seam):
+        // IDocumentStore + IAuthorizationService + IUserInfoService. The same
+        // "AddTransient with the store injected" shape as IPageService / IEventService
+        // above. C-M8·6 — zero schema change: no new document, no new index, no
+        // migration.
+        services.AddTransient<Search.ISearchService>(sp => new Search.SearchService(
+            sp.GetRequiredService<Marten.IDocumentStore>(),
+            sp.GetRequiredService<IAuthorizationService>(),
+            sp.GetRequiredService<IUserInfoService>()));
+
         return services;
     }
 }
