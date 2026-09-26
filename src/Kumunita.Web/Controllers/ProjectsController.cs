@@ -1668,10 +1668,11 @@ public sealed class ProjectsController : Controller
     }
 
     /// <summary>
-    /// <c>GET /projects/boards/{id}/edit</c> — the board edit page (ADR 0070)
-    /// — the board's own <c>Title</c> + <c>Description</c> (the
-    /// <see cref="BoardUpdateModel"/> shape; the audience / component /
-    /// language are creation-time choices, not editable here). The board is
+    /// <c>GET /projects/boards/{id}/edit</c> — the board edit page (ADR 0070,
+    /// amended by ADR 0098) — the board's own <c>Title</c> +
+    /// <c>Description</c> + <c>Audience</c> editor (the
+    /// <see cref="BoardUpdateModel"/> shape; the component / language are
+    /// creation-time choices, not editable here). The board is
     /// loaded through the frozen seam's <see
     /// cref="IProjectService.GetBoardAsync"/> (the audience gate is the
     /// service's single entry <c>CanAsync(Read)</c>, C-M5·3) — a missing
@@ -1679,6 +1680,10 @@ public sealed class ProjectsController : Controller
     /// decision (creator ∪ GlobalAdmin) is the service's on write; the view
     /// renders the form (the board-head ⋮ menu's "Edit board" item is
     /// <see cref="BoardDetailViewModel.CanEdit"/>-gated, the same matrix).
+    /// The audience editor prefills from the stored
+    /// <see cref="KanbanBoard.Audience"/> (ADR 0098 — a <c>null</c> stored
+    /// audience is the default "everyone" shape) and the grant-picker option
+    /// lists seed alongside the create lane's shape.
     /// </summary>
     [HttpGet("/projects/boards/{id}/edit")]
     public async Task<IActionResult> BoardEditGet(string id)
@@ -1703,6 +1708,10 @@ public sealed class ProjectsController : Controller
         {
             Title = board.Title,
             Description = board.Description,
+            // ADR 0098 — the board's **audience** editor prefilled from the
+            // stored value (a `null` stored audience is the default "everyone"
+            // shape — the <c>FromAudience(null)</c> default).
+            Audience = AudienceEditorModel.FromAudience(board.Audience),
             // ADR 0086 D9 — the **project picker** (display surface, never a
             // gate — C-PL·3): prefill the current association + seed the
             // actor's readable, non-deleted project options (a `null`
@@ -1710,15 +1719,20 @@ public sealed class ProjectsController : Controller
             ProjectId = board.ProjectId,
             Projects = await SeedProjectPickerAsync(),
         };
+        // The _GrantPickers partial reads these from ViewData (the M2/M3/M4
+        // shared shape — the create lane's precedent).
+        await SeedGrantPickerOptionsAsync();
         ViewData["boardId"] = id; // the edit form's POST action (POST /projects/boards/{id}).
         return View("BoardEdit", model);
     }
 
     /// <summary>
     /// <c>POST /projects/boards/{id}</c> — the board update write lane (ADR
-    /// 0070 — the service's <see cref="IProjectService.UpdateBoardAsync"/>:
-    /// a full update of the board's <c>Title</c> + <c>Description</c>, a
-    /// blank description clearing it to <c>null</c>). **Creator ∪
+    /// 0070, amended by ADR 0098 — the service's <see
+    /// cref="IProjectService.UpdateBoardAsync"/>: a full update of the
+    /// board's <c>Title</c> + <c>Description</c>, a blank description
+    /// clearing it to <c>null</c>, + the posted audience editor written
+    /// verbatim). **Creator ∪
     /// GlobalAdmin** over the board (C-M5·6) — the service's server-side
     /// standing gate; a missing id is 404, a denied actor 403 (the C3
     /// split); a blank title is a form error (the M4 "a form is a shape"
@@ -1731,10 +1745,17 @@ public sealed class ProjectsController : Controller
     {
         var actorId = SubjectId(User) ?? string.Empty;
 
+        // Re-seed the pickers so a failed-shape re-render below still shows
+        // the project + grant options (the create lane's precedent).
+        model.Projects = await SeedProjectPickerAsync();
+        await SeedGrantPickerOptionsAsync();
+
         if (!model.IsValid)
         {
             if (string.IsNullOrWhiteSpace(model.Title))
                 ModelState.AddModelError(nameof(model.Title), "A title is required.");
+            if (model.Audience is null || !model.Audience.IsValid)
+                ModelState.AddModelError("Audience.Mode", "Audience mode is required (Any or All).");
             return View("BoardEdit", model);
         }
 
@@ -1742,6 +1763,9 @@ public sealed class ProjectsController : Controller
         {
             Title = model.Title!,
             Description = string.IsNullOrWhiteSpace(model.Description) ? null : model.Description,
+            // ADR 0098 — the posted audience is the actor's complete choice,
+            // written verbatim (ADR 0001-B — the single deserialization site).
+            Audience = model.Audience.BuildAudience(),
         };
 
         try

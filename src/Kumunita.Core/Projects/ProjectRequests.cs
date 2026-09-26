@@ -86,17 +86,24 @@ public sealed record CreateBoardRequest
 
 /// <summary>
 /// The update-a-board request (the
-/// <see cref="IProjectService.UpdateBoardAsync"/> shape, ADR 0070) — a
-/// **full update** of the board's <c>Title</c> + <c>Description</c> (the
-/// board edit page posts both fields; a blank <see cref="Description"/>
-/// clears it to <c>null</c>). The board's standing, audience, component,
-/// and language are **creation-time choices** — not editable here (ADR
-/// 0070). Standing: **creator ∪ GlobalAdmin** over the board (C-M5·6).
+/// <see cref="IProjectService.UpdateBoardAsync"/> shape, ADR 0070,
+/// amended by ADR 0098) — a **full update** of the board's
+/// <c>Title</c> + <c>Description</c> (the board edit page posts both
+/// fields; a blank <see cref="Description"/> clears it to <c>null</c>).
+/// The board's <see cref="Audience"/> is editable at update time (ADR
+/// 0098): <c>null</c> leaves the stored audience **unchanged** (a lane
+/// that posts only title/description leaves it untouched); a non-null
+/// value is the actor's complete choice, written verbatim (ADR 0001-B —
+/// the service neither validates the grants against the store nor
+/// mutates them). Standing: **creator ∪ GlobalAdmin** over the board
+/// (C-M5·6). The board's component and language remain creation-time
+/// choices (ADR 0070).
 /// </summary>
 public sealed record UpdateBoardRequest
 {
     public required string Title { get; init; }
     public string? Description { get; init; }
+    public Audience? Audience { get; init; }
 }
 
 /// <summary>

@@ -1806,6 +1806,93 @@ public class ProjectServiceTests(PostgresFixture fixture) : IClassFixture<Postgr
         Assert.Null(updated.Modified);
     }
 
+    /// <summary>
+    /// <b>F16</b> (ADR 0098 — audience edit): a non-null
+    /// <see cref="UpdateBoardRequest.Audience"/> is applied verbatim (ADR
+    /// 0001-B) and <see cref="KanbanBoard.Modified"/> is stamped (a real
+    /// change — the audience went from <c>null</c>/public to restricted).
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_AudienceApplied_ModifiedStamped()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16f-author";
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Board",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = null,
+        });
+
+        var audience = new Audience(AudienceMode.Any,
+            new[] { new AudienceGrant(GrantKind.User, "u-f16f-grantee") })
+        {
+            Community = true,
+        };
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "Board", Audience = audience });
+
+        Assert.NotNull(updated.Modified);
+        Assert.NotNull(updated.Audience);
+        Assert.Equal(AudienceMode.Any, updated.Audience!.Mode);
+        Assert.True(updated.Audience.Community);
+        Assert.Single(updated.Audience.Grants);
+        Assert.Equal(GrantKind.User, updated.Audience.Grants[0].Kind);
+        Assert.Equal("u-f16f-grantee", updated.Audience.Grants[0].Id);
+
+        await using (var q = store.QuerySession())
+        {
+            var reloaded = (await q.LoadAsync<KanbanBoard>("f16-board"))!;
+            Assert.NotNull(reloaded.Audience);
+            Assert.Equal(AudienceMode.Any, reloaded.Audience!.Mode);
+            Assert.Single(reloaded.Audience.Grants);
+            Assert.Equal("u-f16f-grantee", reloaded.Audience.Grants[0].Id);
+        }
+    }
+
+    /// <summary>
+    /// <b>F16</b> (ADR 0098 — null audience leaves it unchanged): a
+    /// <see cref="UpdateBoardRequest.Audience"/> of <c>null</c> (the
+    /// title/description-only shape) leaves the stored audience **untouched**
+    /// and, when the title/description are also unchanged, the no-op
+    /// <c>Modified</c> stamp stays <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task F16_UpdateBoard_NullAudience_LeavesStoredAudienceUntouched()
+    {
+        var store = await BootStoreAsync();
+        var (_, _, svc) = Services(store);
+        const string author = "u-u12-f16g-author";
+
+        var storedAudience = new Audience(AudienceMode.All,
+            new[] { new AudienceGrant(GrantKind.Group, "g-f16g") });
+
+        await Plant(store, new KanbanBoard
+        {
+            Id = "f16-board", AuthorId = author, Title = "Same title",
+            Description = "Same description",
+            Created = new DateTimeOffset(2026, 1, 1, 8, 0, 0, TimeSpan.Zero),
+            Audience = storedAudience,
+        });
+
+        var updated = await svc.UpdateBoardAsync(
+            "f16-board", author, MemberRoles,
+            new UpdateBoardRequest { Title = "Same title", Description = "Same description" });
+
+        // A null audience on the request does not clear the stored one.
+        Assert.NotNull(updated.Audience);
+        Assert.Equal(AudienceMode.All, updated.Audience!.Mode);
+        Assert.Single(updated.Audience.Grants);
+        Assert.Equal(GrantKind.Group, updated.Audience.Grants[0].Kind);
+
+        // No field changed — the Modified stamp stays untouched.
+        Assert.Null(updated.Modified);
+    }
+
     // ── F — the PL goal lane (ADR 0086, design doc §9.6 pins) ───────────────
 
     /// <summary>

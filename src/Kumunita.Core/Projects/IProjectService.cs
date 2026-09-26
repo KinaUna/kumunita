@@ -236,11 +236,15 @@ Task<TodoPage> ListTodosAsync(string? componentId, string? assigneeId, string ac
     /// <summary>
     /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
     /// the board edit lane, <c>GET /projects/boards/{id}/edit</c> +
-    /// <c>POST /projects/boards/{id}</c>). A **full update** of those two
-    /// fields (the edit page posts both; a blank description clears it to
-    /// <c>null</c> — the <see cref="UpdateBoardRequest"/> shape). The board's
-    /// standing, audience, component, and language are creation-time choices
-    /// — **not** editable here (ADR 0070). <see cref="KanbanBoard.Modified"/>
+    /// <c>POST /projects/boards/{id}</c>) and — when supplied (ADR 0098) —
+    /// its <c>Audience</c> (the board edit page posts the audience editor
+    /// alongside both text fields). A **full update** of the two text fields
+    /// (the edit page posts both; a blank description clears it to
+    /// <c>null</c>); a <c>null</c> <see cref="UpdateBoardRequest.Audience"/>
+    /// leaves the stored audience **unchanged**, a non-null value is written
+    /// verbatim (ADR 0001-B). The board's standing, component, and language
+    /// remain creation-time choices — **not** editable here (ADR 0070).
+    /// <see cref="KanbanBoard.Modified"/>
     /// is stamped **only on a real change** (the
     /// <see cref="UpdateLaneAsync"/> no-op shape). Standing (server-side,
     /// C3): **creator ∪ GlobalAdmin** over the board (the

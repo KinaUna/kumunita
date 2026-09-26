@@ -704,6 +704,27 @@ public sealed class ProjectService : IProjectService
             : AccessVia.Admin;
 
     /// <summary>
+    /// Structural equality over two <see cref="Audience"/> values (ADR 0098 —
+    /// <c>UpdateBoardAsync</c>'s "did the audience actually change?" test):
+    /// the <c>Mode</c>, the <c>Community</c> / <c>AllResidents</c> flags, and
+    /// the grant list element-for-element (order-sensitive — the Web editor
+    /// posts a deterministic order). Two <c>null</c> values are equal (both
+    /// "public"); a <c>null</c> vs a value is not (public vs restricted is a
+    /// real change).
+    /// </summary>
+    private static bool AudiencesEqual(Authorization.Audience? left, Authorization.Audience? right)
+    {
+        if (left is null && right is null) return true;
+        if (left is null || right is null) return false;
+        if (left.Mode != right.Mode || left.Community != right.Community || left.AllResidents != right.AllResidents)
+            return false;
+        if (left.Grants.Count != right.Grants.Count) return false;
+        for (var i = 0; i < left.Grants.Count; i++)
+            if (left.Grants[i] != right.Grants[i]) return false;
+        return true;
+    }
+
+    /// <summary>
     /// Maps the branch the actor qualified under to the <see cref="AccessVia"/>
     /// audit tag for a **board / lane** mutation (design doc §2.5): the creator
     /// (<see cref="AccessVia.Owner"/>); a GlobalAdmin (<see
@@ -1521,11 +1542,16 @@ public sealed class ProjectService : IProjectService
     }
 
     /// <summary>
-    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070 —
-    /// the board edit lane). A **full update** of those two fields (the edit
-    /// page posts both; a blank <c>Description</c> clears it to <c>null</c>).
-    /// The board's standing, audience, component, and language are
-    /// creation-time choices — **not** editable here (ADR 0070). <see
+    /// **Update** a board's own <c>Title</c> + <c>Description</c> (ADR 0070
+    /// — the board edit lane), and — when supplied (ADR 0098) — its
+    /// <see cref="KanbanBoard.Audience"/>: a <c>null</c>
+    /// <see cref="UpdateBoardRequest.Audience"/> leaves the stored audience
+    /// **unchanged**; a non-null value is the actor's complete choice, written
+    /// verbatim (ADR 0001-B — never mutated, never grant-validated against the
+    /// store). A **full update** of the two text fields (the edit page posts
+    /// both; a blank <c>Description</c> clears it to <c>null</c>). The board's
+    /// standing, component, and language remain creation-time choices —
+    /// **not** editable here (ADR 0070). <see
     /// cref="KanbanBoard.Modified"/> is stamped **only on a real change**
     /// (the <see cref="UpdateLaneAsync"/> no-op shape — a no-op re-save
     /// leaves the stamp untouched). Standing (server-side, C3): **creator ∪
@@ -1560,13 +1586,19 @@ public sealed class ProjectService : IProjectService
         // A "real change" is either field differing from the stored row (the
         // UpdateLaneAsync `changed` shape — a no-op re-save leaves the stamp
         // untouched). A blank Description clears it to null (full-update
-        // semantics — the edit page always posts both fields).
+        // semantics — the edit page always posts both fields). A non-null
+        // Audience differing from the stored one is a real change too (ADR
+        // 0098); a null Audience leaves the stored one untouched.
         var normalizedDescription = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description;
+        var audienceChanged = request.Audience is not null && !AudiencesEqual(board.Audience, request.Audience);
         var changed = board.Title != request.Title
-            || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal);
+            || !string.Equals(board.Description, normalizedDescription, StringComparison.Ordinal)
+            || audienceChanged;
 
         board.Title = request.Title;
         board.Description = normalizedDescription;
+        if (request.Audience is not null)
+            board.Audience = request.Audience;     // written verbatim (ADR 0001-B — the create lane's shape).
         if (changed)
             board.Modified = DateTimeOffset.UtcNow;
 
