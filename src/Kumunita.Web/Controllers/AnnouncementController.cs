@@ -170,28 +170,12 @@ public sealed class AnnouncementController(
     {
         var subjectId = SubjectId(User);
         var roles     = RoleSet(User);
-        // M7 (ADR 0090 D6) — the paged seam is the read (U01's D6 lane). The
-        // null-safe read: an NSubstitute that stubs only the non-paged
-        // <see cref="IAnnouncementService.ListVisibleAsync"/> (the pre-M7
-        // AnnouncementControllerTests shape) returns a default-constructed
-        // <see cref="Kumunita.Core.Announcements.AnnouncementPage"/> with a
-        // null <c>Items</c> — fall back to the (unmodified) non-paged seam
-        // then, so those tests keep pinning the read-gate + display-name
-        // contract. The paged seam remains the read the app uses (U04's wire
-        // is the primary path; the fallback is only the test-double escape).
-        IReadOnlyList<Announcement> visible;
-        bool hasMore;
+        // M7 (ADR 0090 D6) — the paged seam is the read (U01's D6 lane: the
+        // same visibility filter + order, then a Skip/Take(30) window).
+        // <c>HasMore</c> (D1) is the sole paging signal.
         var paged = await announcements.ListVisiblePagedAsync(subjectId, roles, page);
-        if (paged is not null && paged.Items is not null)
-        {
-            visible = paged.Items;
-            hasMore = paged.HasMore;
-        }
-        else
-        {
-            visible = await announcements.ListVisibleAsync(subjectId, roles);
-            hasMore = visible.Count >= 30; // the PageSize = 30 constant (D4) — a full page signals a further one.
-        }
+        IReadOnlyList<Announcement> visible = paged.Items;
+        bool hasMore = paged.HasMore;
 
         var authorIds = visible.Select(a => a.AuthorId).Distinct().ToHashSet();
 
