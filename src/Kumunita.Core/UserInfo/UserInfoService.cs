@@ -514,6 +514,65 @@ public sealed class UserInfoService(IDocumentStore store, IServiceProvider? serv
         return;
     }
 
+    /// <inheritdoc />
+    public async Task DeleteGroupAsync(string groupId, string deletedBy)
+    {
+        // ADR 0093: the owner ∪ GlobalAdmin delete lane. Hard delete — the
+        // Group document, its GroupMembership rows, and its GroupInvitation
+        // rows go in one session + one SaveChangesAsync (invariant C3); one
+        // AccessAudit row (Action "group.delete", TargetKind "group",
+        // TargetId = groupId) rides the same transaction with the Owner/Admin
+        // Via derivation every other group write lane uses. No cascade into
+        // group-scoped Post / Event / GroupTranslation rows (ADR 0093): the
+        // group lane's authorization is membership-only (ADR 0013) and the
+        // membership rows are gone, so those rows become unreachable and are
+        // left in place rather than deleted.
+        var now = DateTimeOffset.UtcNow;
+
+        await using var session = store.OpenSession(new SessionOptions());
+
+        var group = await session.LoadAsync<Group>(groupId).ConfigureAwait(false);
+        if (group is null)
+            throw new InvalidOperationException($"Group not found: {groupId}");
+
+        // The group document + its membership + its invitation rows.
+        session.Delete<Group>(groupId);
+
+        var memberships = await session.Query<GroupMembership>()
+            .Where(m => m.GroupId == groupId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var m in memberships)
+            session.Delete<GroupMembership>(m.Id);
+
+        var invitations = await session.Query<GroupInvitation>()
+            .Where(i => i.GroupId == groupId)
+            .ToListAsync()
+            .ConfigureAwait(false);
+        foreach (var i in invitations)
+            session.Delete<GroupInvitation>(i.Id);
+
+        var via = deletedBy == group.OwnerId ? Authorization.AccessVia.Owner : Authorization.AccessVia.Admin;
+        var effective = via == Authorization.AccessVia.Owner ? group.OwnerId : deletedBy;
+
+        var audit = new Authorization.AccessAudit
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            At = now,
+            ActorId = deletedBy,
+            EffectivePrincipalId = effective,
+            Action = "group.delete",
+            TargetKind = "group",
+            TargetId = groupId,
+            Via = via,
+            Outcome = Authorization.AccessOutcome.Allow
+        };
+
+        session.Store(audit);
+        await session.SaveChangesAsync().ConfigureAwait(false);
+        return;
+    }
+
     // ── ADR 0026 — group name/description translations ─────────────────────
     // Mirrors the ADR 0022 post-translation lane (PostService), in this context:
     // a GroupTranslation row (at most one per language, the M1DocTypes unique

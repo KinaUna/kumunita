@@ -890,6 +890,49 @@ public sealed class GroupsController(
         return RedirectToAction(nameof(Detail), new { id = resolved.Group.Id });
     }
 
+    // ── ADR 0093: the group's delete (the owner ∪ GlobalAdmin lane, the
+    // destructive counterpart of the privacy toggle above) ────────────────
+
+    /// <summary>
+    /// Delete a group (ADR 0093): <c>POST /groups/{id}/delete</c>. The SoD
+    /// lane is <see cref="TryResolveOwnerSurface"/> (owner ∪ GlobalAdmin —
+    /// ADR 0007's new-lane rule, identical to the add/remove/invite/
+    /// description/privacy lanes): a plain member's POST 404s, the same
+    /// consistent failure shape as every other group write lane. The form
+    /// carries no actor id — the actor is minted from the signed-in
+    /// principal and passed as <c>deletedBy</c> (never a form field; the
+    /// seam's <c>Via</c> derivation is the single SoD source, exactly the U10
+    /// add-member pin). The Core seam
+    /// <see cref="IUserInfoService.DeleteGroupAsync"/> hard-deletes the group
+    /// document, its membership rows, and its invitation rows in one session
+    /// (invariant C3) and appends the <c>group.delete</c> audit row; group-
+    /// scoped posts / events / translations are left in storage and become
+    /// unreachable (the group lane is membership-only, ADR 0013, and the
+    /// membership rows are gone) rather than cascaded.
+    /// <para>
+    /// The redirect goes to <see cref="Index"/>, never
+    /// <see cref="Detail"/>: the actor is out of the owner ∪ member
+    /// projection on the very next read (the ADR 0008
+    /// <see cref="LeaveGroup"/> redirect shape), so a redirect to the detail
+    /// page would 404.
+    /// </para>
+    /// </summary>
+    [HttpPost("{id}/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteGroup(string id)
+    {
+        var resolved = await TryResolveOwnerSurface(id);
+        if (resolved is null)
+            return NotFound();
+
+        await userInfo.DeleteGroupAsync(
+            groupId: resolved.Group.Id,
+            deletedBy: resolved.Actor);
+
+        TempData["info"] = $"Group “{resolved.Group.Name}” deleted.";
+        return RedirectToAction(nameof(Index));
+    }
+
     // ── M2b: owner-invited membership (invite → accept/decline; the
     // immediate add/remove above is kept side-by-side — U10/F7 pin
     // untouched). docs/design/m2b-group-invitations.md ────────────────

@@ -585,6 +585,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Private group",
             ["groups.private_hint"]         =
                 "A private group (e.g. a family) is hidden from everyone else; only the people you add as members can see and use it. Clear the box to make the group public again.",
+            ["groups.danger_heading"]   = "Danger zone",
+            ["groups.danger_delete_hint"] =
+                "Deleting the group removes it, its members, and any pending invitations. This cannot be undone.",
+            ["groups.danger_delete_button"] = "Delete this group",
             ["groups.new_title"]      = "Post to this group",
             ["groups.new_back"]       = "back to the group",
             ["groups.new_submit"]     = "Post to group",
@@ -2020,6 +2024,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Private Gruppe",
             ["groups.private_hint"]         =
                 "Eine private Gruppe (z. B. eine Familie) ist für alle anderen unsichtbar; nur die Menschen, die du als Mitglieder hinzufügst, können sie sehen und nutzen. Das Häkchen aufheben, um die Gruppe wieder öffentlich zu machen.",
+            ["groups.danger_heading"]   = "Gefahrenzone",
+            ["groups.danger_delete_hint"] =
+                "Das Löschen der Gruppe entfernt sie, ihre Mitglieder und ausstehende Einladungen. Dies kann nicht rückgängig gemacht werden.",
+            ["groups.danger_delete_button"] = "Diese Gruppe löschen",
             ["groups.new_title"]      = "Beitrag in dieser Gruppe",
             ["groups.new_back"]       = "zurück zur Gruppe",
             ["groups.new_submit"]     = "In die Gruppe posten",
@@ -3399,6 +3407,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Groupe privé",
             ["groups.private_hint"]         =
                 "Un groupe privé (p. ex. une famille) est masqué à tous les autres ; seules les personnes que tu ajoutes comme membres peuvent le voir et l'utiliser. Décocher la case pour rendre le groupe public à nouveau.",
+            ["groups.danger_heading"]   = "Zone de danger",
+            ["groups.danger_delete_hint"] =
+                "Supprimer le groupe le retire, ainsi que ses membres et toutes les invitations en attente. Cette action est irréversible.",
+            ["groups.danger_delete_button"] = "Supprimer ce groupe",
             ["groups.new_title"]      = "Publier dans ce groupe",
             ["groups.new_back"]       = "retour au groupe",
             ["groups.new_submit"]     = "Publier dans le groupe",
@@ -4780,6 +4792,10 @@ public static class KnownTranslationKeys
             ["groups.private_label"]        = "Privat gruppe",
             ["groups.private_hint"]         =
                 "En privat gruppe (f. eks. en familie) er skjult for alle andre; kun de mennesker, du tilføjer som medlemmer, kan se og bruge den. Fjern afkrydsningen for at gøre gruppen offentlig igen.",
+            ["groups.danger_heading"]   = "Farerzone",
+            ["groups.danger_delete_hint"] =
+                "Sletning af gruppen fjerner den, dens medlemmer og eventuelle afventende invitationer. Dette kan ikke fortrydes.",
+            ["groups.danger_delete_button"] = "Slet denne gruppe",
             ["groups.new_title"]      = "Skriv til denne gruppe",
             ["groups.new_back"]       = "tilbage til gruppen",
             ["groups.new_submit"]     = "Skriv til gruppen",

@@ -665,6 +665,34 @@
                             }
                         </div>
                     }
+
+                    @*
+                        ADR 0093 — the group's delete (owner ∪ GlobalAdmin, the
+                        TryResolveOwnerSurface gate is the real SoD wall; a plain
+                        member never sees this form). Hard delete — the group, its
+                        membership, and its invitations are removed; group-scoped
+                        posts / events / translations are left in place and become
+                        unreachable (the group lane is membership-only, ADR 0013).
+                        The confirm is the declarative data-confirm contract
+                        (client/lib/confirm.ts, SECURITY.md §6). The route redirects
+                        to the /groups list (the actor is out of the owner ∪ member
+                        projection on the next read — the ADR 0008 LeaveGroup
+                        redirect shape).
+                    *@
+                    <div class="mt-4 border-top pt-3">
+                        <h2 class="h4"><kw-l key="groups.danger_heading">Danger zone</kw-l></h2>
+                        <p class="text-muted">
+                            <kw-l key="groups.danger_delete_hint">Deleting the group removes it, its members, and any pending invitations. This cannot be undone.</kw-l>
+                        </p>
+                        <form method="post" action="@Url.Action("DeleteGroup", "Groups", new { id = Model.GroupId })"
+                              data-confirm="Delete this group? This removes the group, its members, and its pending invitations, and cannot be undone."
+                              style="display:inline;">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-danger">
+                                <kw-l key="groups.danger_delete_button">Delete this group</kw-l>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             }
 

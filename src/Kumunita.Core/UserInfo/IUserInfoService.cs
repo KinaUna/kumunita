@@ -103,6 +103,39 @@ public interface IUserInfoService
     Task SetGroupPrivacyAsync(string groupId, bool isPrivate, string updatedBy);
 
     /// <summary>
+    /// Delete a group (ADR 0093 — the owner ∪ GlobalAdmin delete lane). The
+    /// SoD standing is owner ∪ GlobalAdmin: the Web surface gates that (the
+    /// <c>TryResolveOwnerSurface</c> lane, ADR 0007's new-lane rule) and passes
+    /// the <b>actor</b> as <paramref name="deletedBy"/>; the seam does not
+    /// re-gate (ADR 0006-D) and derives the audit <c>Via</c> exactly like every
+    /// other group write lane: <c>deletedBy == Group.OwnerId ⇒ Owner</c>, else
+    /// <c>Admin</c> (effective principal folds to the owner on the Owner lane).
+    /// <para>
+    /// <b>Hard delete, one session, one <c>SaveChangesAsync</c> (invariant C3):</b>
+    /// the <see cref="Group"/> document, every <see cref="GroupMembership"/>
+    /// row, and every <see cref="GroupInvitation"/> row for the group are
+    /// removed in the same transaction, and one
+    /// <see cref="Authorization.AccessAudit"/> row (action <c>group.delete</c>,
+    /// <c>TargetKind</c> "group", <c>TargetId</c> = group) is appended. There
+    /// is no cascade into the group-scoped <c>Post</c> / <c>Event</c> /
+    /// <see cref="GroupTranslation"/> rows (ADR 0093): they remain in storage
+    /// but become unreachable, because the group lane's authorization is
+    /// membership-only (ADR 0013) and the membership rows are gone — the
+    /// group feed / detail / group-event lanes all fail closed to a non-member,
+    /// so the orphaned rows surface to no one.
+    /// </para>
+    /// <para>
+    /// <b>Strong-consistency (C4):</b> after the commit the actor is out of the
+    /// owner ∪ member projection on the very next
+    /// <see cref="GetGroupsForUserAsync"/> / <see cref="GetPublicGroupsAsync" />
+    /// call, and <see cref="GetGroupIdsAsync"/> returns the empty set for every
+    /// former member — access is revoked live.
+    /// </para>
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No group with that id exists.</exception>
+    Task DeleteGroupAsync(string groupId, string deletedBy);
+
+    /// <summary>
     /// Grant a scoped delegation (invariant C2):
     /// <paramref name="delegateId"/> is <paramref name="ownerId"/> *only for* the actions
     /// named in <paramref name="scope"/>. <paramref name="from"/> is the effective
