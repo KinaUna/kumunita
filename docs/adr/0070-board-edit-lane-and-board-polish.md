@@ -62,7 +62,9 @@ One already-accepted decision constrains this lane:
   `projects.board.edit`, `projects.board.edit_heading`,
   `projects.board.edit_lead`, `projects.board.save` × 4 languages.
 
-- **Borderless ⋮ triggers.** A new `.kanban-glyph-btn` class (border: 0,
+- **Borderless ⋮ triggers.** A new `.kanban-glyph-btn` class (renamed
+  `.action-glyph-btn` by ADR 0092, which generalizes the class to every `⋮`
+  dropdown trigger in the app) (border: 0,
   transparent ground, a faint `rgba(0,0,0,.06)` hover/focus tint) replaces
   `btn-outline-secondary` on the board-head and lane-head ⋮ buttons — the
   same quiet affordance the card-head ⋮ already had.

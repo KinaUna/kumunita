@@ -86,7 +86,7 @@
                    unconditionally so a non-author can still file a report. *@
                 <div class="d-flex justify-content-end mb-2">
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                            <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false"
                                     aria-label="@($"Actions for {Model.Post.Title ?? "post"}")">⋮</button>
                             <ul class="dropdown-menu dropdown-menu-end">
@@ -564,7 +564,7 @@
                                        gated on IsAuthor. The service's write-lane re-check at
                                        POST is the real gate. *@
                                     <div class="dropdown d-inline-block">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        <button class="btn btn-sm action-glyph-btn dropdown-toggle" type="button"
                                                 data-bs-toggle="dropdown" aria-expanded="false"
                                                 aria-label="@($"Actions for reply by {r.AuthorDisplayName}")">⋮</button>
                                         <ul class="dropdown-menu dropdown-menu-end">

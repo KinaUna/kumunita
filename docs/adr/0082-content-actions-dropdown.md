@@ -39,8 +39,10 @@ surfaces), and reads at a glance.
   announcement/page and for the post itself; one per reply row for the
   reply's own actions. The button is the
   `_AccountNav.cshtml` / `TodoDetail.cshtml` shape (the M2/M3/M4
-  shared nav-dropdown idiom): `btn btn-sm btn-outline-secondary
-  dropdown-toggle`, `data-bs-toggle="dropdown"`, `aria-label`, and the
+  shared nav-dropdown idiom): `btn btn-sm action-glyph-btn
+  dropdown-toggle` (the borderless ⋮ trigger, ADR 0070's `.kanban-glyph-btn`
+  generalized to all `⋮` dropdown triggers by ADR 0092),
+  `data-bs-toggle="dropdown"`, `aria-label`, and the
   `⋮` glyph. `ms-auto` aligns it right.
 - **Light actions inline in the menu.** Edit (a link, or a form that
   POSTs to the existing edit route) and Delete (a form with `data-confirm`)
@@ -139,6 +141,12 @@ surfaces), and reads at a glance.
 - `src/Kumunita.Web/Views/Announcement/Detail.cshtml`
 - `src/Kumunita.Web/Views/Page/Show.cshtml`
 - `src/Kumunita.Web/Views/Posts/Detail.cshtml`
+- `src/Kumunita.Web/Views/Event/Detail.cshtml` (the same `⋮` trigger
+  shape, added later)
+- `src/Kumunita.Web/Views/Groups/Detail.cshtml` / `Groups/PostDetail.cshtml`
+  (the same `⋮` trigger shape, added later)
+- `src/Kumunita.Web/wwwroot/css/site.css` (the trigger class, now
+  `.action-glyph-btn` — ADR 0092)
 - `tests/Kumunita.Web.Tests/e2e-m3.spec.ts` (helper only; no test-body
   changes)
 
